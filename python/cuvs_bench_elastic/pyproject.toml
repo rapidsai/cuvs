@@ -25,10 +25,14 @@ classifiers = [
 ]
 dependencies = [
     "cuvs-bench>=26.4.0",
-    "elasticsearch>=8.0",
     "numpy",
     "pyyaml",
 ]
+
+[project.optional-dependencies]
+# elasticsearch client; automatically installed via `pip install cuvs-bench[elastic]`.
+# Only needed here for standalone dev installs of this package directly.
+client = ["elasticsearch>=8.0"]
 
 [project.urls]
 Homepage = "https://github.com/rapidsai/cuvs"

@@ -10,7 +10,8 @@ Install with: pip install cuvs-bench[elastic]
 Build params (index_options): type, m, ef_construction.
   type: hnsw, int8_hnsw, int4_hnsw, bbq_hnsw (per ES-GPU-API-REFERENCE.md)
   similarity: l2_norm, cosine, max_inner_product (overrides dataset distance)
-Index settings: number_of_shards, number_of_replicas, use_gpu, vector_field.
+Index settings: number_of_shards, number_of_replicas, vector_field.
+  GPU indexing is configured at the node level (vectors.indexing.use_gpu in elasticsearch.yml).
 Search params (knn): num_candidates, vector_field.
 """
 
@@ -23,8 +24,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import yaml
 
-from elasticsearch import Elasticsearch
-from elasticsearch.helpers import bulk
 
 from cuvs_bench.backends.base import BenchmarkBackend, BuildResult, Dataset, SearchResult
 from cuvs_bench.backends.registry import register_backend, register_config_loader
@@ -64,11 +63,10 @@ _DEFAULT_M = 16
 _DEFAULT_EF_CONSTRUCTION = 100
 _DEFAULT_NUM_SHARDS = 1
 _DEFAULT_NUM_REPLICAS = 0
-_DEFAULT_USE_GPU = True
+
 _DEFAULT_VECTOR_FIELD = "embedding"
 _DEFAULT_NUM_CANDIDATES = 100
 
-# Build params passed through from config (index_options + index settings + similarity)
 _BUILD_PARAM_KEYS = (
     "type",
     "m",
@@ -76,10 +74,8 @@ _BUILD_PARAM_KEYS = (
     "similarity",
     "number_of_shards",
     "number_of_replicas",
-    "use_gpu",
     "vector_field",
 )
-# Search params passed through from config (knn)
 _SEARCH_PARAM_KEYS = ("num_candidates", "vector_field")
 
 
@@ -88,7 +84,7 @@ class ElasticBackend(BenchmarkBackend):
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self._client: Optional[Elasticsearch] = None
+        self._client: Optional["Elasticsearch"] = None
 
     @property
     def algo(self) -> str:
@@ -96,11 +92,22 @@ class ElasticBackend(BenchmarkBackend):
         index_type = self.config.get("type", _DEFAULT_INDEX_TYPE)
         return f"elastic_{index_type}"
 
-    def _get_client(self) -> Elasticsearch:
+    def _get_client(self) -> "Elasticsearch":
         if self._client is None:
+            try:
+                from elasticsearch import Elasticsearch
+            except ImportError as e:
+                raise ImportError(
+                    "`elasticsearch` is required for the Elasticsearch backend. "
+                    "Install with: pip install cuvs-bench[elastic]"
+                ) from e
             host = self.config.get("host", "localhost")
             port = self.config.get("port", 9200)
-            kwargs: Dict[str, Any] = {"hosts": [f"http://{host}:{port}"]}
+            scheme = self.config.get("scheme", "http")
+            kwargs: Dict[str, Any] = {
+                "hosts": [f"{scheme}://{host}:{port}"],
+                "request_timeout": 300,  # 5 min for slow bulk ops / remote ES
+            }
             basic_auth = self.config.get("basic_auth")
             if basic_auth is not None:
                 if isinstance(basic_auth, (list, tuple)) and len(basic_auth) >= 2:
@@ -149,22 +156,53 @@ class ElasticBackend(BenchmarkBackend):
 
         skip_reason = self._pre_flight_check()
         if skip_reason:
-            idx = indexes[0] if indexes else None
             return BuildResult(
-                index_path=idx.file if idx else "",
-                build_time_seconds=0,
+                index_path="",
+                build_time_seconds=0.0,
                 index_size_bytes=0,
                 algorithm=self.algo,
-                build_params=dict(idx.build_param or {}) if idx else {},
-                success=True,
-                metadata={"skipped": True, "reason": skip_reason},
+                build_params={},
+                success=False,
+                error_message=f"pre-flight check failed: {skip_reason}",
             )
 
-        base_file = dataset.base_file
-        if not base_file:
+        index_name = self.config.get("index_name", "cuvs_bench_vectors")
+        idx = indexes[0] if indexes else None
+        build_params = dict(idx.build_param or {}) if idx else {}
+        for k, v in self.config.items():
+            if k not in build_params and k in _BUILD_PARAM_KEYS:
+                build_params[k] = v
+
+        try:
+            client = self._get_client()
+            if client.indices.exists(index=index_name):
+                if not force:
+                    stats = client.indices.stats(index=index_name)
+                    index_size = stats["_all"]["primaries"]["store"]["size_in_bytes"]
+                    return BuildResult(
+                        index_path=index_name,
+                        build_time_seconds=0,
+                        index_size_bytes=index_size,
+                        algorithm=self.algo,
+                        build_params=build_params,
+                        success=True,
+                    )
+                client.indices.delete(index=index_name)
+        except Exception as e:
             return BuildResult(
                 index_path="",
                 build_time_seconds=0,
+                index_size_bytes=0,
+                algorithm=self.algo,
+                build_params={},
+                success=False,
+                error_message=str(e),
+            )
+
+        if not dataset.base_file:
+            return BuildResult(
+                index_path="",
+                build_time_seconds=0.0,
                 index_size_bytes=0,
                 algorithm=self.algo,
                 build_params={},
@@ -172,12 +210,11 @@ class ElasticBackend(BenchmarkBackend):
                 error_message="base_file is required for Elasticsearch backend",
             )
 
-        data_prefix = self.config.get("data_prefix", "")
-        base_path = Path(data_prefix) / base_file
+        base_path = Path(dataset.base_file)
         if not base_path.exists():
             return BuildResult(
                 index_path="",
-                build_time_seconds=0,
+                build_time_seconds=0.0,
                 index_size_bytes=0,
                 algorithm=self.algo,
                 build_params={},
@@ -185,24 +222,6 @@ class ElasticBackend(BenchmarkBackend):
                 error_message=f"Base file not found: {base_path}",
             )
 
-        index_name = self.config.get("index_name", "cuvs_bench_vectors")
-        dims = dataset.dims or self.config.get("dims")
-        if not dims:
-            return BuildResult(
-                index_path="",
-                build_time_seconds=0,
-                index_size_bytes=0,
-                algorithm=self.algo,
-                build_params={},
-                success=False,
-                error_message="dims is required",
-            )
-
-        idx = indexes[0] if indexes else None
-        build_params = dict(idx.build_param or {}) if idx else {}
-        for k, v in self.config.items():
-            if k not in build_params and k in _BUILD_PARAM_KEYS:
-                build_params[k] = v
         # similarity: from config, or derive from dataset distance
         similarity = build_params.get("similarity") or _distance_to_similarity(
             getattr(dataset, "distance_metric", None) or "euclidean"
@@ -211,6 +230,7 @@ class ElasticBackend(BenchmarkBackend):
         try:
             vectors = _load_fbin(base_path)
             n_vectors = len(vectors)
+            dims = vectors.shape[1]
             client = self._get_client()
 
             vector_field = build_params.get("vector_field", _DEFAULT_VECTOR_FIELD)
@@ -223,14 +243,12 @@ class ElasticBackend(BenchmarkBackend):
             num_replicas = build_params.get(
                 "number_of_replicas", _DEFAULT_NUM_REPLICAS
             )
-            use_gpu = build_params.get("use_gpu", _DEFAULT_USE_GPU)
-
             settings: Dict[str, Any] = {
                 "number_of_shards": num_shards,
                 "number_of_replicas": num_replicas,
             }
-            if use_gpu:
-                settings["index"] = {"vectors.indexing.use_gpu": True}
+            # Note: GPU indexing is controlled at the node level via
+            # vectors.indexing.use_gpu in elasticsearch.yml, not per-index.
 
             index_options: Dict[str, Any] = {
                 "type": index_type,
@@ -254,22 +272,11 @@ class ElasticBackend(BenchmarkBackend):
             }
 
             t0 = time.perf_counter()
-            if client.indices.exists(index=index_name):
-                if not force:
-                    stats = client.indices.stats(index=index_name)
-                    index_size = stats["_all"]["primaries"]["store"]["size_in_bytes"]
-                    return BuildResult(
-                        index_path=index_name,
-                        build_time_seconds=0,
-                        index_size_bytes=index_size,
-                        algorithm=self.algo,
-                        build_params=build_params,
-                        success=True,
-                    )
-                client.indices.delete(index=index_name)
             client.indices.create(index=index_name, body=index_config)
 
+            from elasticsearch.helpers import bulk
             chunk_size = 1000
+            progress_interval = max(50, n_vectors // (chunk_size * 20))  # ~20 progress lines
             for i in range(0, n_vectors, chunk_size):
                 chunk = vectors[i : i + chunk_size]
                 actions = [
@@ -281,6 +288,8 @@ class ElasticBackend(BenchmarkBackend):
                     for j, vec in enumerate(chunk)
                 ]
                 bulk(client, actions, raise_on_error=True)
+                if progress_interval and (i // chunk_size) % progress_interval == 0:
+                    print(f"    Indexed {min(i + chunk_size, n_vectors):,}/{n_vectors:,} vectors")
 
             client.indices.refresh(index=index_name)
             build_time = time.perf_counter() - t0
@@ -318,11 +327,11 @@ class ElasticBackend(BenchmarkBackend):
         search_threads: Optional[int] = None,
         dry_run: bool = False,
     ) -> SearchResult:
-        """Run kNN search and compute recall."""
+        """Run kNN search over all search-param combinations and compute recall."""
         if dry_run:
             return SearchResult(
-                neighbors=np.empty((0, k)),
-                distances=np.empty((0, k)),
+                neighbors=np.zeros((0, k), dtype=np.int64),
+                distances=np.zeros((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -333,27 +342,35 @@ class ElasticBackend(BenchmarkBackend):
 
         skip_reason = self._pre_flight_check()
         if skip_reason:
-            idx = indexes[0] if indexes else None
             return SearchResult(
-                neighbors=np.empty((0, k)),
-                distances=np.empty((0, k)),
+                neighbors=np.zeros((0, k), dtype=np.int64),
+                distances=np.zeros((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
                 algorithm=self.algo,
-                search_params=idx.search_params if idx and idx.search_params else [],
-                success=True,
-                metadata={"skipped": True, "reason": skip_reason},
+                search_params=[],
+                success=False,
+                error_message=f"pre-flight check failed: {skip_reason}",
             )
 
-        query_file = dataset.query_file
-        gt_file = dataset.groundtruth_neighbors_file
-        data_prefix = self.config.get("data_prefix", "")
-
-        if not query_file:
+        if not indexes:
             return SearchResult(
-                neighbors=np.empty((0, k)),
-                distances=np.empty((0, k)),
+                neighbors=np.zeros((0, k), dtype=np.int64),
+                distances=np.zeros((0, k), dtype=np.float32),
+                search_time_ms=0,
+                queries_per_second=0,
+                recall=0,
+                algorithm=self.algo,
+                search_params=[],
+                success=False,
+                error_message="No indexes provided",
+            )
+
+        if not dataset.query_file:
+            return SearchResult(
+                neighbors=np.zeros((0, k), dtype=np.int64),
+                distances=np.zeros((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -363,11 +380,11 @@ class ElasticBackend(BenchmarkBackend):
                 error_message="query_file is required",
             )
 
-        query_path = Path(data_prefix) / query_file
+        query_path = Path(dataset.query_file)
         if not query_path.exists():
             return SearchResult(
-                neighbors=np.empty((0, k)),
-                distances=np.empty((0, k)),
+                neighbors=np.zeros((0, k), dtype=np.int64),
+                distances=np.zeros((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -380,89 +397,95 @@ class ElasticBackend(BenchmarkBackend):
         try:
             query_vectors = _load_fbin(query_path)
             n_queries = len(query_vectors)
-            groundtruth = None
-            if gt_file:
-                gt_path = Path(data_prefix) / gt_file
+
+            groundtruth = dataset.groundtruth_neighbors
+            if groundtruth is None and dataset.groundtruth_neighbors_file:
+                gt_path = Path(dataset.groundtruth_neighbors_file)
                 if gt_path.exists():
                     groundtruth = _load_ibin(gt_path)
 
             index_name = self.config.get("index_name", "cuvs_bench_vectors")
-            search_params = {}
-            if indexes and indexes[0] and indexes[0].search_params:
-                search_params = dict(indexes[0].search_params[0] or {})
-            for key, val in self.config.items():
-                if key not in search_params and key in _SEARCH_PARAM_KEYS:
-                    search_params[key] = val
-            num_candidates = search_params.get(
-                "num_candidates", _DEFAULT_NUM_CANDIDATES
-            )
-            vector_field = search_params.get(
-                "vector_field", _DEFAULT_VECTOR_FIELD
-            )
+            index_cfg = indexes[0]
+            search_params_list = index_cfg.search_params or [{}]
 
-            neighbors_list: List[List[int]] = []
-            latencies: List[float] = []
+            per_param_results: List[Dict[str, Any]] = []
+            last_neighbors = np.full((n_queries, k), -1, dtype=np.int64)
+            last_distances = np.zeros((n_queries, k), dtype=np.float32)
 
-            for i, qv in enumerate(query_vectors):
-                body = {
-                    "knn": {
-                        "field": vector_field,
-                        "query_vector": qv.tolist(),
-                        "k": k,
-                        "num_candidates": num_candidates,
-                    }
-                }
+            for sp in search_params_list:
+                num_candidates = sp.get("num_candidates", _DEFAULT_NUM_CANDIDATES)
+                vector_field = sp.get("vector_field", _DEFAULT_VECTOR_FIELD)
+
+                neighbors = np.full((n_queries, k), -1, dtype=np.int64)
+                distances = np.zeros((n_queries, k), dtype=np.float32)
+                latencies: List[float] = []
+
                 t0 = time.perf_counter()
-                resp = self._get_client().search(
-                    index=index_name, body=body, size=k
-                )
-                latencies.append((time.perf_counter() - t0) * 1000)
-                hits = resp.get("hits", {}).get("hits", [])
-                ids = [int(h["_id"]) for h in hits if "_id" in h]
-                neighbors_list.append(ids[:k])
+                for i, qv in enumerate(query_vectors):
+                    body = {
+                        "knn": {
+                            "field": vector_field,
+                            "query_vector": qv.tolist(),
+                            "k": k,
+                            "num_candidates": num_candidates,
+                        }
+                    }
+                    t_q = time.perf_counter()
+                    resp = self._get_client().search(index=index_name, body=body, size=k)
+                    latencies.append((time.perf_counter() - t_q) * 1000)
+                    hits = resp.get("hits", {}).get("hits", [])
+                    for j, hit in enumerate(hits[:k]):
+                        neighbors[i, j] = int(hit["_id"])
+                        distances[i, j] = float(hit["_score"])
 
-            search_time_ms = sum(latencies)
-            qps = n_queries / (search_time_ms / 1000) if search_time_ms > 0 else 0
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                qps = n_queries / (elapsed_ms / 1000) if elapsed_ms > 0 else 0.0
 
-            recall = 0.0
-            if groundtruth is not None and len(neighbors_list) <= len(groundtruth):
-                correct = 0
-                total = 0
-                for q in range(len(neighbors_list)):
-                    retrieved = set(neighbors_list[q])
-                    gt_row = groundtruth[q, :k]
-                    for gt_id in gt_row:
-                        if int(gt_id) in retrieved:
-                            correct += 1
-                        total += 1
-                recall = correct / total if total > 0 else 0
+                recall = 0.0
+                if groundtruth is not None:
+                    gt_k = min(k, groundtruth.shape[1])
+                    n_correct = sum(
+                        len(set(neighbors[i, :k].tolist()) & set(groundtruth[i, :gt_k].tolist()))
+                        for i in range(n_queries)
+                    )
+                    recall = n_correct / (n_queries * gt_k) if gt_k > 0 else 0.0
 
-            max_len = max(len(r) for r in neighbors_list)
-            neighbors_arr = np.array(
-                [r + [-1] * (max_len - len(r)) for r in neighbors_list],
-                dtype=np.int64,
-            )
-            distances_arr = np.zeros_like(neighbors_arr, dtype=np.float32)
-
-            return SearchResult(
-                neighbors=neighbors_arr,
-                distances=distances_arr,
-                search_time_ms=search_time_ms,
-                queries_per_second=qps,
-                recall=recall,
-                algorithm=self.algo,
-                search_params=[search_params],
-                latency_percentiles={
+                per_param_results.append({
+                    "search_params": sp,
+                    "search_time_ms": elapsed_ms,
+                    "queries_per_second": qps,
+                    "recall": recall,
                     "p50_ms": float(np.percentile(latencies, 50)),
                     "p95_ms": float(np.percentile(latencies, 95)),
                     "p99_ms": float(np.percentile(latencies, 99)),
+                })
+                last_neighbors = neighbors
+                last_distances = distances
+
+            avg_recall = float(np.mean([r["recall"] for r in per_param_results]))
+            avg_qps = float(np.mean([r["queries_per_second"] for r in per_param_results]))
+            total_ms = float(sum(r["search_time_ms"] for r in per_param_results))
+
+            return SearchResult(
+                neighbors=last_neighbors,
+                distances=last_distances,
+                search_time_ms=total_ms,
+                queries_per_second=avg_qps,
+                recall=avg_recall,
+                algorithm=self.algo,
+                search_params=search_params_list,
+                latency_percentiles={
+                    "p50_ms": per_param_results[-1]["p50_ms"],
+                    "p95_ms": per_param_results[-1]["p95_ms"],
+                    "p99_ms": per_param_results[-1]["p99_ms"],
                 },
+                metadata={"per_search_param_results": per_param_results},
                 success=True,
             )
         except Exception as e:
             return SearchResult(
-                neighbors=np.empty((0, k)),
-                distances=np.empty((0, k)),
+                neighbors=np.zeros((0, k), dtype=np.int64),
+                distances=np.zeros((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -528,6 +551,7 @@ class ElasticConfigLoader(ConfigLoader):
         tune_search_params = kwargs.pop("_tune_search_params", None)
         username = kwargs.pop("username", None)
         password = kwargs.pop("password", None)
+        scheme = kwargs.pop("scheme", "http")
         if basic_auth is None and username and password:
             basic_auth = (username, password)
 
@@ -546,12 +570,17 @@ class ElasticConfigLoader(ConfigLoader):
         if not dataset_conf:
             raise ValueError(f"Dataset '{dataset}' not found")
 
+        def _resolve(rel: Optional[str]) -> Optional[str]:
+            if rel and not os.path.isabs(rel):
+                return os.path.join(dataset_path, rel)
+            return rel
+
         dataset_config = DatasetConfig(
             name=dataset_conf["name"],
-            base_file=dataset_conf.get("base_file"),
-            query_file=dataset_conf.get("query_file"),
-            groundtruth_neighbors_file=dataset_conf.get(
-                "groundtruth_neighbors_file"
+            base_file=_resolve(dataset_conf.get("base_file")),
+            query_file=_resolve(dataset_conf.get("query_file")),
+            groundtruth_neighbors_file=_resolve(
+                dataset_conf.get("groundtruth_neighbors_file")
             ),
             distance=dataset_conf.get("distance", "euclidean"),
             dims=dataset_conf.get("dims"),
@@ -560,12 +589,14 @@ class ElasticConfigLoader(ConfigLoader):
 
         if tune_mode and tune_build_params is not None and tune_search_params is not None:
             algo_name = algorithms or "elastic_hnsw"
-            # Extract type from algo (elastic_hnsw -> hnsw, elastic_int8_hnsw -> int8_hnsw)
             build_param = dict(tune_build_params)
             if "type" not in build_param and algo_name.startswith("elastic_"):
                 build_param["type"] = algo_name.replace("elastic_", "", 1)
+            name_parts = [f"{k}{v}" for k, v in build_param.items() if k in ("m", "ef_construction")]
+            index_label = "_".join([f"{algo_name}_tune"] + name_parts) if name_parts else f"{algo_name}_tune"
+            es_index_name = index_label.lower().replace(".", "_")
             index_config = IndexConfig(
-                name=f"{algo_name}_tune",
+                name=index_label,
                 algo=algo_name,
                 build_param=build_param,
                 search_params=[tune_search_params],
@@ -574,15 +605,14 @@ class ElasticConfigLoader(ConfigLoader):
             config = BenchmarkConfig(
                 indexes=[index_config],
                 backend_config={
-                    "name": index_config.name,
+                    "name": index_label,
                     "host": host,
                     "port": port,
-                    "index_name": index_name,
+                    "scheme": scheme,
+                    "index_name": es_index_name,
                     "basic_auth": basic_auth,
-                    "data_prefix": dataset_path,
-                    "dims": dataset_config.dims,
+
                     **build_param,
-                    **tune_search_params,
                 },
             )
             return dataset_config, [config]
@@ -625,39 +655,55 @@ class ElasticConfigLoader(ConfigLoader):
         build_keys = list(build_params.keys())
         search_keys = list(search_params.keys())
 
+        search_params_list = [
+            dict(zip(search_keys, svals)) for svals in search_combos
+        ]
+
         benchmark_configs = []
         for bvals in build_combos:
             bdict = dict(zip(build_keys, bvals))
-            for svals in search_combos:
-                sdict = dict(zip(search_keys, svals))
-                algo_name = f"elastic_{bdict.get('type', 'hnsw')}"
-                index_config = IndexConfig(
-                    name=f"{algo_name}_{group_name}",
-                    algo=algo_name,
-                    build_param=bdict,
-                    search_params=[sdict],
-                    file="",
-                )
-                config = BenchmarkConfig(
-                    indexes=[index_config],
-                    backend_config={
-                        "name": index_config.name,
-                        "host": host,
-                        "port": port,
-                        "index_name": index_name,
-                        "basic_auth": basic_auth,
-                        "data_prefix": dataset_path,
-                        "dims": dataset_config.dims,
-                        **bdict,
-                        **sdict,
-                    },
-                )
-                benchmark_configs.append(config)
+            algo_name = f"elastic_{bdict.get('type', 'hnsw')}"
+
+            # Derive a unique, human-readable index name from build params
+            prefix = f"{algo_name}_{group_name}" if group_name != "base" else algo_name
+            name_parts = [f"{k}{v}" for k, v in bdict.items() if k in ("m", "ef_construction")]
+            index_label = "_".join([prefix] + name_parts) if name_parts else prefix
+            es_index_name = index_label.lower().replace(".", "_")
+
+            index_config = IndexConfig(
+                name=index_label,
+                algo=algo_name,
+                build_param=bdict,
+                search_params=search_params_list,
+                file="",
+            )
+            config = BenchmarkConfig(
+                indexes=[index_config],
+                backend_config={
+                    "name": index_label,
+                    "host": host,
+                    "port": port,
+                    "scheme": scheme,
+                    "index_name": es_index_name,
+                    "basic_auth": basic_auth,
+
+                    **bdict,
+                },
+            )
+            benchmark_configs.append(config)
 
         return dataset_config, benchmark_configs
 
 
 def register() -> None:
-    """Register Elasticsearch backend and config loader (called from entry point)."""
-    register_backend("elastic", ElasticBackend)
-    register_config_loader("elastic", ElasticConfigLoader)
+    """Register Elasticsearch backend and config loader (idempotent)."""
+    from cuvs_bench.backends.registry import (
+        _CONFIG_LOADER_REGISTRY,
+        get_registry,
+    )
+
+    reg = get_registry()
+    if not reg.is_registered("elastic"):
+        register_backend("elastic", ElasticBackend)
+    if "elastic" not in _CONFIG_LOADER_REGISTRY:
+        register_config_loader("elastic", ElasticConfigLoader)
