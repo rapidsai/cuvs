@@ -572,14 +572,6 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
 /**
  * @brief Unified k-means fit (works with host or device data).
  *
- * Handles centroid initialization, the n_init best-of loop, and the batched
- * Lloyd iteration.  All reusable work buffers are allocated once before the
- * n_init loop and shared across iterations.
- *
- * Data and weights are batched via batch_load_iterator (transparent H2D copy
- * for host memory, zero-copy offset for device).  Only batch-sized device
- * buffers are allocated — no O(n_samples) device memory.
- *
  * @tparam DataT    Data / weight type
  * @tparam IndexT   Index type
  * @tparam Accessor Accessor policy (host or device); deduced from X
@@ -882,7 +874,7 @@ void kmeans_fit(
                    inertia[0],
                    n_iter[0]);
   }
-  RAFT_LOG_DEBUG("KMeans.fit: completed.");
+  RAFT_LOG_DEBUG("KMeans.fit: async call returned (fit could still be running on the device)");
 }
 
 template <typename DataT, typename IndexT = int>

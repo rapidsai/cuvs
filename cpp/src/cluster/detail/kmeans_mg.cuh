@@ -701,47 +701,45 @@ void fit(const raft::resources& handle,
                raft::make_device_vector_view(newCentroids.data_handle(), newCentroids.size()));
 
     bool done = false;
-    {
-      rmm::device_scalar<raft::KeyValuePair<IndexT, DataT>> clusterCostD(stream);
+    rmm::device_scalar<raft::KeyValuePair<IndexT, DataT>> clusterCostD(stream);
 
-      // calculate cluster cost phi_x(C)
-      cuvs::cluster::kmeans::cluster_cost(
-        handle,
-        minClusterAndDistance.view(),
-        workspace,
-        raft::make_device_scalar_view(clusterCostD.data()),
-        cuda::proclaim_return_type<raft::KeyValuePair<IndexT, DataT>>(
-          [] __device__(const raft::KeyValuePair<IndexT, DataT>& a,
-                        const raft::KeyValuePair<IndexT, DataT>& b) {
-            raft::KeyValuePair<IndexT, DataT> res;
-            res.key   = 0;
-            res.value = a.value + b.value;
-            return res;
-          }));
+    // calculate cluster cost phi_x(C)
+    cuvs::cluster::kmeans::cluster_cost(
+      handle,
+      minClusterAndDistance.view(),
+      workspace,
+      raft::make_device_scalar_view(clusterCostD.data()),
+      cuda::proclaim_return_type<raft::KeyValuePair<IndexT, DataT>>(
+        [] __device__(const raft::KeyValuePair<IndexT, DataT>& a,
+                      const raft::KeyValuePair<IndexT, DataT>& b) {
+          raft::KeyValuePair<IndexT, DataT> res;
+          res.key   = 0;
+          res.value = a.value + b.value;
+          return res;
+        }));
 
-      // Cluster cost phi_x(C) from all ranks
-      comm.allreduce(&(clusterCostD.data()->value),
-                     &(clusterCostD.data()->value),
-                     1,
-                     raft::comms::op_t::SUM,
-                     stream);
+    // Cluster cost phi_x(C) from all ranks
+    comm.allreduce(&(clusterCostD.data()->value),
+                   &(clusterCostD.data()->value),
+                   1,
+                   raft::comms::op_t::SUM,
+                   stream);
 
-      DataT curClusteringCost = 0;
-      raft::copy(handle,
-                 raft::make_host_scalar_view(&curClusteringCost),
-                 raft::make_device_scalar_view(&(clusterCostD.data()->value)));
+    DataT curClusteringCost = 0;
+    raft::copy(handle,
+               raft::make_host_scalar_view(&curClusteringCost),
+               raft::make_device_scalar_view(&(clusterCostD.data()->value)));
 
-      ASSERT(comm.sync_stream(stream) == raft::comms::status_t::SUCCESS,
-             "An error occurred in the distributed operation. This can result "
-             "from a failed rank");
-      if (curClusteringCost == (DataT)0.0) {
-        RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
-      } else if (n_iter[0] > 0) {
-        DataT delta = curClusteringCost / priorClusteringCost;
-        if (delta > 1 - params.tol) done = true;
-      }
-      priorClusteringCost = curClusteringCost;
+    ASSERT(comm.sync_stream(stream) == raft::comms::status_t::SUCCESS,
+           "An error occurred in the distributed operation. This can result "
+           "from a failed rank");
+    if (curClusteringCost == (DataT)0.0) {
+      RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
+    } else if (n_iter[0] > 0) {
+      DataT delta = curClusteringCost / priorClusteringCost;
+      if (delta > 1 - params.tol) done = true;
     }
+    priorClusteringCost = curClusteringCost;
 
     raft::resource::sync_stream(handle, stream);
     if (sqrdNormError < params.tol) done = true;

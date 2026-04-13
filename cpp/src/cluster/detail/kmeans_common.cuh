@@ -17,6 +17,7 @@
 #include <raft/core/kvp.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
+#include <raft/core/memory_type.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
@@ -620,21 +621,18 @@ DataT compute_weight_scale(const DataT* weight_ptr, IndexT n_samples, cudaStream
 {
   if (weight_ptr == nullptr) { return DataT{1}; }
 
-  bool is_host = true;
-  cudaPointerAttributes attr;
-  auto err = cudaPointerGetAttributes(&attr, weight_ptr);
-  if (err == cudaSuccess && attr.type == cudaMemoryTypeDevice) { is_host = false; }
-  cudaGetLastError();  // clear any error
+  bool is_device_accessible =
+    raft::is_device_accessible(raft::memory_type_from_pointer(weight_ptr));
 
   DataT wt_sum = DataT{0};
-  if (is_host) {
+  if (!is_device_accessible) {
     for (IndexT i = 0; i < n_samples; ++i) {
       wt_sum += weight_ptr[i];
     }
   } else {
     std::vector<DataT> h_weights(n_samples);
     raft::copy(h_weights.data(), weight_ptr, n_samples, stream);
-    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+    raft::resource::sync_stream(handle);
     for (IndexT i = 0; i < n_samples; ++i) {
       wt_sum += h_weights[i];
     }
