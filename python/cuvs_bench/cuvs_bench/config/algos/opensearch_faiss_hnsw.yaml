@@ -1,8 +1,6 @@
 # OpenSearch k-NN benchmark configuration – faiss HNSW engine
 #
-# Uses OpenSearch's faiss engine with the HNSW method.  Faiss HNSW typically
-# offers faster build times and a smaller memory footprint than nmslib at
-# comparable recall levels.
+# Uses OpenSearch's faiss engine with the HNSW method.
 #
 # Build parameters
 # ----------------

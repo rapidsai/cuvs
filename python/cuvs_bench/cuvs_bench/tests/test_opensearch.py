@@ -39,8 +39,8 @@ def _make_dataset(
     n_base: int = 10, n_queries: int = 5, dims: int = 4, k: int = 10
 ) -> Dataset:
     rng = np.random.default_rng(0)
-    base = rng.random((n_base, dims)).astype(np.float32)
-    queries = rng.random((n_queries, dims)).astype(np.float32)
+    base = rng.random((n_base, dims), dtype=np.float32)
+    queries = rng.random((n_queries, dims), dtype=np.float32)
     dists = np.sum((queries[:, None, :] - base[None, :, :]) ** 2, axis=2)
     groundtruth = np.argsort(dists, axis=1)[:, :k].astype(np.int32)
     return Dataset(
@@ -74,11 +74,11 @@ def _cleanup_backend(backend: OpenSearchBackend, index_name: str) -> None:
 @pytest.fixture(scope="session")
 def opensearch_url():
     """Skip integration tests when no live OpenSearch node is reachable."""
-    url = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
+    url = os.environ.get("OPENSEARCH_URL", "http://localhost:9200").rstrip("/")
     try:
         requests.get(f"{url}/_cluster/health", timeout=2).raise_for_status()
     except Exception:
-        pytest.skip("no OpenSearch node reachable")
+        pytest.skip("No OpenSearch node reachable")
     return url
 
 
@@ -100,8 +100,10 @@ def live_backend(opensearch_url):
             "requires_network": True,
         }
     )
-    yield backend
-    _cleanup_backend(backend, index_name)
+    try:
+        yield backend
+    finally:
+        _cleanup_backend(backend, index_name)
 
 
 @pytest.fixture
@@ -109,27 +111,31 @@ def config_dir(tmp_path):
     """Config directory with a minimal dataset and algo definition."""
     (tmp_path / "datasets").mkdir()
     (tmp_path / "datasets" / "datasets.yaml").write_text(
-        "- name: test-ds\n  distance: euclidean\n  dims: 4\n"
+        """\
+- name: test-ds
+  distance: euclidean
+  dims: 4
+"""
     )
     (tmp_path / "algos").mkdir()
     (tmp_path / "algos" / "opensearch_faiss_hnsw.yaml").write_text(
-        "name: opensearch_faiss_hnsw\n"
-        "groups:\n"
-        "  test:\n"
-        "    build:\n"
-        "      m: [16, 32]\n"
-        "      ef_construction: [100, 200]\n"
-        "    search:\n"
-        "      ef_search: [50, 100]\n"
+        """\
+name: opensearch_faiss_hnsw
+groups:
+  test:
+    build:
+      m: [16, 32]
+      ef_construction: [100, 200]
+    search:
+      ef_search: [50, 100]
+"""
     )
     return tmp_path
 
 
 class TestOpenSearchConfigLoader:
     def test_load_produces_correct_configs(self, config_dir):
-        loader = OpenSearchConfigLoader()
-        loader._DEFAULT_CONFIG_PATH = str(config_dir)
-
+        loader = OpenSearchConfigLoader(config_path=config_dir)
         dataset_config, benchmark_configs = loader.load(
             dataset="test-ds", dataset_path="/data", groups="test"
         )
@@ -143,9 +149,7 @@ class TestOpenSearchConfigLoader:
         assert len(bc.indexes[0].search_params) == 2  # ef_search: [50, 100]
 
     def test_load_forwards_remote_build_kwargs(self, config_dir):
-        loader = OpenSearchConfigLoader()
-        loader._DEFAULT_CONFIG_PATH = str(config_dir)
-
+        loader = OpenSearchConfigLoader(config_path=config_dir)
         _, configs = loader.load(
             dataset="test-ds",
             dataset_path="/data",
@@ -166,11 +170,12 @@ class TestOpenSearchConfigLoader:
 
 class TestOpenSearchBackend:
     def test_build_dry_run(self):
-        result = _make_backend().build(
+        backend = _make_backend()
+        result = backend.build(
             _make_dataset(), [_make_index_cfg()], dry_run=True
         )
         assert result.success
-        assert result.index_path == "test_index"
+        assert result.index_path == backend.config["index_name"]
 
     def test_search_dry_run(self):
         result = _make_backend().search(
@@ -178,6 +183,17 @@ class TestOpenSearchBackend:
         )
         assert result.success
         assert len(result.search_params) == 2
+
+    def test_remote_build_requires_faiss_engine(self):
+        backend = _make_backend({"engine": "lucene"})
+        with pytest.raises(ValueError, match="faiss engine"):
+            backend._build_index_mapping(
+                dims=4,
+                engine="lucene",
+                space_type="l2",
+                build_param={},
+                remote_index_build=True,
+            )
 
     def test_search_fails_without_query_vectors(self):
         dataset = Dataset(
@@ -207,6 +223,7 @@ def remote_build_env(opensearch_url):
     s3_bucket = os.environ.get("S3_BUCKET")
     s3_access_key = os.environ.get("S3_ACCESS_KEY")
     s3_secret_key = os.environ.get("S3_SECRET_KEY")
+    s3_prefix = "knn-indexes/"
 
     missing = [
         name
@@ -221,13 +238,13 @@ def remote_build_env(opensearch_url):
     ]
     if missing:
         pytest.skip(
-            f"remote index build tests require env vars: {', '.join(missing)}"
+            f"Remote index build tests require environment variables: {', '.join(missing)}"
         )
 
     try:
         requests.get(builder_url, timeout=2)
     except requests.exceptions.ConnectionError:
-        pytest.skip(f"remote index builder not reachable at {builder_url}")
+        pytest.skip(f"Remote index builder not reachable at {builder_url}")
 
     try:
         requests.get(s3_endpoint, timeout=2)
@@ -243,7 +260,10 @@ def remote_build_env(opensearch_url):
         f"{opensearch_url}/_snapshot/{repo_name}",
         json={
             "type": "s3",
-            "settings": {"bucket": s3_bucket, "base_path": "knn-indexes"},
+            "settings": {
+                "bucket": s3_bucket,
+                "base_path": s3_prefix.rstrip("/"),
+            },
         },
     ).raise_for_status()
 
@@ -261,6 +281,7 @@ def remote_build_env(opensearch_url):
     return {
         "s3_endpoint": s3_endpoint,
         "s3_bucket": s3_bucket,
+        "s3_prefix": s3_prefix,
         "s3_access_key": s3_access_key,
         "s3_secret_key": s3_secret_key,
     }
@@ -285,13 +306,15 @@ def live_remote_build_backend(opensearch_url, remote_build_env):
             "remote_index_build": True,
             "remote_build_s3_endpoint": remote_build_env["s3_endpoint"],
             "remote_build_s3_bucket": remote_build_env["s3_bucket"],
-            "remote_build_s3_prefix": "knn-indexes/",
+            "remote_build_s3_prefix": remote_build_env["s3_prefix"],
             "remote_build_s3_access_key": remote_build_env["s3_access_key"],
             "remote_build_s3_secret_key": remote_build_env["s3_secret_key"],
         }
     )
-    yield backend
-    _cleanup_backend(backend, index_name)
+    try:
+        yield backend
+    finally:
+        _cleanup_backend(backend, index_name)
 
 
 @pytest.mark.integration

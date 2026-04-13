@@ -4,8 +4,8 @@
 #
 
 """
-OpenSearch benchmark backend for cuvs-bench supporting nmslib (HNSW), faiss,
-and lucene engines for approximate nearest-neighbor search.
+OpenSearch benchmark backend for cuvs-bench supporting faiss and lucene
+engines for approximate nearest-neighbor search.
 
 It also supports the remote index build service (OpenSearch 3.0+),
 which offloads Faiss HNSW graph construction to a GPU-accelerated external service.
@@ -15,7 +15,7 @@ https://docs.opensearch.org/latest/vector-search/remote-index-build/
 import itertools
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import yaml
@@ -107,9 +107,23 @@ class OpenSearchConfigLoader(ConfigLoader):
         register_config_loader("opensearch", OpenSearchConfigLoader)
     """
 
-    _DEFAULT_CONFIG_PATH: str = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "../config"
-    )
+    def __init__(self, config_path: Optional[Union[str, os.PathLike]] = None):
+        """
+        Initialize the config loader.
+
+        Parameters
+        ----------
+        config_path : Optional[Union[str, os.PathLike]]
+            Path to the config directory. If None, uses the default path
+            bundled with cuvs-bench.
+        """
+        self.config_path = (
+            os.fspath(config_path)
+            if config_path is not None
+            else os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "../config"
+            )
+        )
 
     @property
     def backend_type(self) -> str:
@@ -134,7 +148,7 @@ class OpenSearchConfigLoader(ConfigLoader):
         dataset_path : str
             Root directory where dataset files live.
         algorithms : Optional[str]
-            Comma-separated algorithm names to run (e.g. ``"opensearch_hnsw"``).
+            Comma-separated algorithm names to run (e.g. ``"opensearch_faiss_hnsw"``).
             If *None*, all opensearch-prefixed algorithms are included.
         count : int
             Number of neighbors *k* (informational for this loader).
@@ -167,10 +181,8 @@ class OpenSearchConfigLoader(ConfigLoader):
         -------
         Tuple[DatasetConfig, List[BenchmarkConfig]]
         """
-        config_path = self._DEFAULT_CONFIG_PATH
-
         ds_yaml = kwargs.get("dataset_configuration") or os.path.join(
-            config_path, "datasets", "datasets.yaml"
+            self.config_path, "datasets", "datasets.yaml"
         )
         all_ds = _load_yaml(ds_yaml)
         ds_conf = _get_dataset_conf(dataset, all_ds)
@@ -193,7 +205,7 @@ class OpenSearchConfigLoader(ConfigLoader):
         )
 
         algo_files = _gather_algo_configs(
-            config_path, kwargs.get("algorithm_configuration")
+            self.config_path, kwargs.get("algorithm_configuration")
         )
 
         allowed_algos = (
@@ -290,11 +302,9 @@ class OpenSearchConfigLoader(ConfigLoader):
                         file=index_file,
                     )
 
-                    engine = "nmslib"
+                    engine = "lucene"
                     if "faiss" in algo_name:
                         engine = "faiss"
-                    elif "lucene" in algo_name:
-                        engine = "lucene"
 
                     backend_cfg: Dict[str, Any] = {
                         "name": index_label,
@@ -333,8 +343,7 @@ class OpenSearchBackend(BenchmarkBackend):
     """
     Benchmark backend for OpenSearch's k-NN plugin.
 
-    Supports the nmslib (HNSW), faiss (HNSW / IVF), and lucene (HNSW)
-    engines. Vectors are bulk-indexed as ``knn_vector`` fields and retrieved
+    Supports the faiss (HNSW / IVF) and lucene (HNSW) engines. Vectors are bulk-indexed as ``knn_vector`` fields and retrieved
     via the standard ``knn`` query type.
 
     Requires ``opensearch-py`` Python package.
@@ -346,10 +355,10 @@ class OpenSearchBackend(BenchmarkBackend):
         Recognized keys:
 
         Required:
-        - ``name`` – index label (e.g. ``"opensearch_hnsw.m16.ef_construction100"``)
+        - ``name`` – index label (e.g. ``"opensearch_faiss_hnsw.m16.ef_construction100"``)
         - ``index_name`` – OpenSearch index name (lowercase, no dots)
-        - ``engine`` – ``"nmslib"``, ``"faiss"``, or ``"lucene"``
-        - ``algo`` – algorithm name (e.g. ``"opensearch_hnsw"``)
+        - ``engine`` – ``"faiss"`` or ``"lucene"``
+        - ``algo`` – algorithm name (e.g. ``"opensearch_faiss_hnsw"``)
 
         Optional:
         - ``host`` – hostname (default: ``"localhost"``)
@@ -443,16 +452,16 @@ class OpenSearchBackend(BenchmarkBackend):
 
         When ``remote_index_build=True``, ``index.knn.remote_index_build.enabled``
         is set to ``true`` in the index settings, opting qualifying segments into
-        the GPU build path.  ``remote_build_size_min`` sets
+        the GPU build path. ``remote_build_size_min`` sets
         ``index.knn.remote_index_build.size.min`` to control the minimum segment
         size that triggers the GPU build; the default ``"1kb"`` ensures any
-        non-trivial segment is built remotely.  The cluster-level infrastructure
+        non-trivial segment is built remotely. The cluster-level infrastructure
         is assumed to be pre-configured externally.
         """
         m = build_param.get("m", 16)
         ef_construction = build_param.get("ef_construction", 100)
 
-        if engine in ("nmslib", "lucene"):
+        if engine == "lucene":
             method_name = "hnsw"
             method_params: Dict[str, Any] = {
                 "m": m,
@@ -476,7 +485,7 @@ class OpenSearchBackend(BenchmarkBackend):
         else:
             raise ValueError(
                 f"Unknown OpenSearch k-NN engine {engine!r}. "
-                "Use 'nmslib', 'faiss', or 'lucene'."
+                "Use 'faiss' or 'lucene'."
             )
 
         index_settings = {
@@ -671,7 +680,7 @@ class OpenSearchBackend(BenchmarkBackend):
         index_name = self.config.get(
             "index_name", index_cfg.name.replace(".", "_").lower()
         )
-        engine = self.config.get("engine", "nmslib")
+        engine = self.config.get("engine", "lucene")
         bulk_batch_size = int(self.config.get("bulk_batch_size", 500))
         remote_index_build = bool(self.config.get("remote_index_build", False))
         remote_build_size_min = self.config.get("remote_build_size_min")
@@ -855,7 +864,7 @@ class OpenSearchBackend(BenchmarkBackend):
         index_name = self.config.get(
             "index_name", index_cfg.name.replace(".", "_").lower()
         )
-        engine = self.config.get("engine", "nmslib")
+        engine = self.config.get("engine", "lucene")
         search_params_list = index_cfg.search_params or [{}]
 
         if dry_run:
@@ -909,7 +918,7 @@ class OpenSearchBackend(BenchmarkBackend):
         for sp in search_params_list:
             ef_search = sp.get("ef_search", 100)
 
-            if engine in ("nmslib", "faiss"):
+            if engine == "faiss":
                 self._client.indices.put_settings(
                     index=index_name,
                     body={"index.knn.algo_param.ef_search": ef_search},
