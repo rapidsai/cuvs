@@ -130,11 +130,13 @@ void kmeansPlusPlus(raft::resources const& handle,
   raft::device_matrix_view<DataT, IndexT> candidates_view(
     centroidCandidates.data_handle(), n_trials, n_features);
 
-  // L2 norm of X: ||c||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
 
-  if (metric == cuvs::distance::DistanceType::L2Expanded ||
-      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle, X, L2NormX.view(), raft::sqrt_op{});
+  } else if (metric == cuvs::distance::DistanceType::L2Expanded ||
+             metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(handle, X, L2NormX.view());
   }
 
@@ -342,13 +344,15 @@ void kmeans_fit_main(raft::resources const& handle,
 
   rmm::device_scalar<DataT> clusterCostD(stream);
 
-  // L2 norm of X: ||x||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
   auto l2normx_view =
     raft::make_device_vector_view<const DataT, IndexT>(L2NormX.data_handle(), n_samples);
 
-  if (metric == cuvs::distance::DistanceType::L2Expanded ||
-      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle, X, L2NormX.view(), raft::sqrt_op{});
+  } else if (metric == cuvs::distance::DistanceType::L2Expanded ||
+             metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(handle, X, L2NormX.view());
   }
 
@@ -523,10 +527,12 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
   // destructor releases the resource
   rmm::device_uvector<DataT> L2NormBuf_OR_DistBuf(0, stream);
 
-  // L2 norm of X: ||x||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
-  if (metric == cuvs::distance::DistanceType::L2Expanded ||
-      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle, X, L2NormX.view(), raft::sqrt_op{});
+  } else if (metric == cuvs::distance::DistanceType::L2Expanded ||
+             metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(handle, X, L2NormX.view());
   }
 
@@ -933,10 +939,12 @@ void kmeans_predict(raft::resources const& handle,
     raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(handle, n_samples);
   rmm::device_uvector<DataT> L2NormBuf_OR_DistBuf(0, stream);
 
-  // L2 norm of X: ||x||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
-  if (metric == cuvs::distance::DistanceType::L2Expanded ||
-      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle, X, L2NormX.view(), raft::sqrt_op{});
+  } else if (metric == cuvs::distance::DistanceType::L2Expanded ||
+             metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(handle, X, L2NormX.view());
   }
 
