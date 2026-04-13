@@ -113,11 +113,6 @@ struct params : base_params {
   int batch_centroids = 0;
 
   /**
-   * If true, check inertia during iterations for early convergence.
-   */
-  bool inertia_check = false;
-
-  /**
    * Number of samples to process per GPU batch when fitting with host data.
    * When set to 0, defaults to n_samples (process all at once).
    * Only used by the batched (host-data) code path and ignored by device-data

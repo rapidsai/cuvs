@@ -91,9 +91,6 @@ struct cuvsKMeansParams {
    */
   int batch_centroids;
 
-  /** Check inertia during iterations for early convergence. */
-  bool inertia_check;
-
   /**
    * Whether to use hierarchical (balanced) kmeans or not
    */

@@ -76,8 +76,6 @@ cdef class KMeansParams:
         [batch_samples x n_clusters].
     batch_centroids : int
         Number of centroids to process in each batch. If 0, uses n_clusters.
-    inertia_check : bool
-        If True, check inertia during iterations for early convergence.
     streaming_batch_size : int
         Number of samples to process per GPU batch when fitting with host
         (numpy) data. When set to 0, defaults to n_samples (process all
@@ -111,7 +109,6 @@ cdef class KMeansParams:
                  oversampling_factor=None,
                  batch_samples=None,
                  batch_centroids=None,
-                 inertia_check=None,
                  streaming_batch_size=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
@@ -134,8 +131,6 @@ cdef class KMeansParams:
             self.params.batch_samples = batch_samples
         if batch_centroids is not None:
             self.params.batch_centroids = batch_centroids
-        if inertia_check is not None:
-            self.params.inertia_check = inertia_check
         if streaming_batch_size is not None:
             self.params.streaming_batch_size = streaming_batch_size
         if hierarchical is not None:
@@ -181,10 +176,6 @@ cdef class KMeansParams:
     @property
     def batch_centroids(self):
         return self.params.batch_centroids
-
-    @property
-    def inertia_check(self):
-        return self.params.inertia_check
 
     @property
     def streaming_batch_size(self):

@@ -28,7 +28,6 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
   kmeans_params.oversampling_factor = params.oversampling_factor;
   kmeans_params.batch_samples       = params.batch_samples;
   kmeans_params.batch_centroids     = params.batch_centroids;
-  kmeans_params.inertia_check       = params.inertia_check;
   kmeans_params.streaming_batch_size  = params.streaming_batch_size;
   return kmeans_params;
 }
@@ -237,7 +236,6 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
       .oversampling_factor  = cpp_params.oversampling_factor,
       .batch_samples        = cpp_params.batch_samples,
       .batch_centroids      = cpp_params.batch_centroids,
-      .inertia_check        = cpp_params.inertia_check,
       .hierarchical         = false,
       .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters),
       .streaming_batch_size           = cpp_params.streaming_batch_size};

@@ -701,7 +701,7 @@ void fit(const raft::resources& handle,
                raft::make_device_vector_view(newCentroids.data_handle(), newCentroids.size()));
 
     bool done = false;
-    if (params.inertia_check) {
+    {
       rmm::device_scalar<raft::KeyValuePair<IndexT, DataT>> clusterCostD(stream);
 
       // calculate cluster cost phi_x(C)
