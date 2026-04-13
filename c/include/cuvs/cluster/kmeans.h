@@ -102,6 +102,12 @@ struct cuvsKMeansParams {
   int hierarchical_n_iters;
 
   /**
+   * Number of samples to draw for KMeansPlusPlus initialization with host data.
+   * When set to 0, uses heuristic min(3 * n_clusters, n_samples).
+   */
+  int64_t init_size;
+
+  /**
    * Number of samples to process per GPU batch for the batched (host-data) API.
    * When set to 0, defaults to n_samples (process all at once).
    */

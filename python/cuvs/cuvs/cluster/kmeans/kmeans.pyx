@@ -76,6 +76,10 @@ cdef class KMeansParams:
         [batch_samples x n_clusters].
     batch_centroids : int
         Number of centroids to process in each batch. If 0, uses n_clusters.
+    init_size : int
+        Number of samples to draw for KMeansPlusPlus initialization with
+        host (out-of-core) data. When set to 0, uses the heuristic
+        min(3 * n_clusters, n_samples). Default: 0.
     streaming_batch_size : int
         Number of samples to process per GPU batch when fitting with host
         (numpy) data. When set to 0, defaults to n_samples (process all
@@ -109,6 +113,7 @@ cdef class KMeansParams:
                  oversampling_factor=None,
                  batch_samples=None,
                  batch_centroids=None,
+                 init_size=None,
                  streaming_batch_size=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
@@ -131,6 +136,8 @@ cdef class KMeansParams:
             self.params.batch_samples = batch_samples
         if batch_centroids is not None:
             self.params.batch_centroids = batch_centroids
+        if init_size is not None:
+            self.params.init_size = init_size
         if streaming_batch_size is not None:
             self.params.streaming_batch_size = streaming_batch_size
         if hierarchical is not None:
@@ -176,6 +183,10 @@ cdef class KMeansParams:
     @property
     def batch_centroids(self):
         return self.params.batch_centroids
+
+    @property
+    def init_size(self):
+        return self.params.init_size
 
     @property
     def streaming_batch_size(self):

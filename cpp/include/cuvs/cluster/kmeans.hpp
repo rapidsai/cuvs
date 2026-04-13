@@ -113,6 +113,16 @@ struct params : base_params {
   int batch_centroids = 0;
 
   /**
+   * Number of samples to randomly draw for the KMeansPlusPlus initialization
+   * step. A random subset of this size is used for centroid seeding.
+   * When set to 0 the default depends on the data location:
+   *   - Device data: n_samples (use the full dataset).
+   *   - Host data:   min(3 * n_clusters, n_samples).
+   * Default: 0.
+   */
+  int64_t init_size = 0;
+
+  /**
    * Number of samples to process per GPU batch when fitting with host data.
    * When set to 0, defaults to n_samples (process all at once).
    * Only used by the batched (host-data) code path and ignored by device-data

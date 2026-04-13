@@ -639,47 +639,30 @@ void kmeans_fit(
       return;
     }
 
-    if constexpr (data_on_device) {
-      auto X_dev =
-        raft::make_device_matrix_view<const DataT, IndexT>(X.data_handle(), n_samples, n_features);
+    raft::random::RngState random_state(iter_params.rng_state.seed);
 
-      if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-        initRandom<DataT, IndexT>(handle, iter_params, X_dev, centroidsRawData);
-      } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-        if (iter_params.oversampling_factor == 0)
-          kmeansPlusPlus<DataT, IndexT>(handle, iter_params, X_dev, centroidsRawData, workspace);
-        else
-          initScalableKMeansPlusPlus<DataT, IndexT>(
-            handle, iter_params, X_dev, centroidsRawData, workspace);
-      } else {
-        THROW("unknown initialization method to select initial centers");
-      }
+    if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
+      raft::matrix::sample_rows(handle, random_state, X, centroidsRawData);
+    } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
+      IndexT default_init_size =
+        data_on_device ? n_samples : std::min(static_cast<IndexT>(3 * n_clusters), n_samples);
+      IndexT init_sample_size = iter_params.init_size > 0
+                                  ? std::min(static_cast<IndexT>(iter_params.init_size), n_samples)
+                                  : default_init_size;
+
+      auto init_sample =
+        raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
+      raft::matrix::sample_rows(handle, random_state, X, init_sample.view());
+
+      auto init_sample_const = raft::make_const_mdspan(init_sample.view());
+      if (iter_params.oversampling_factor == 0)
+        kmeansPlusPlus<DataT, IndexT>(
+          handle, iter_params, init_sample_const, centroidsRawData, workspace);
+      else
+        initScalableKMeansPlusPlus<DataT, IndexT>(
+          handle, iter_params, init_sample_const, centroidsRawData, workspace);
     } else {
-      raft::random::RngState random_state(iter_params.rng_state.seed);
-
-      if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-        raft::matrix::sample_rows(handle, random_state, X, centroidsRawData);
-      } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-        IndexT init_sample_size =
-          std::min(static_cast<IndexT>(3 * streaming_batch_size), n_samples);
-        if (init_sample_size < n_clusters) {
-          init_sample_size = std::min(static_cast<IndexT>(3 * n_clusters), n_samples);
-        }
-
-        auto init_sample =
-          raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
-        raft::matrix::sample_rows(handle, random_state, X, init_sample.view());
-
-        auto init_sample_const = raft::make_const_mdspan(init_sample.view());
-        if (iter_params.oversampling_factor == 0)
-          kmeansPlusPlus<DataT, IndexT>(
-            handle, iter_params, init_sample_const, centroidsRawData, workspace);
-        else
-          initScalableKMeansPlusPlus<DataT, IndexT>(
-            handle, iter_params, init_sample_const, centroidsRawData, workspace);
-      } else {
-        THROW("unknown initialization method to select initial centers");
-      }
+      THROW("unknown initialization method to select initial centers");
     }
   };
 
