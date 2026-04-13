@@ -433,7 +433,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     auto d_centroids_ref_view =
       raft::make_device_matrix_view<T, int>(d_centroids_ref.data(), params.n_clusters, n_features);
 
-    params.init    = cuvs::cluster::kmeans::params::Array;
+    params.init     = cuvs::cluster::kmeans::params::Array;
     params.max_iter = 20;
 
     T ref_inertia  = 0;
