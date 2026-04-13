@@ -45,6 +45,9 @@ public final class CuVSParamsHelper {
     cuvsCagraSearchParams.hashmap_max_fill_rate(seg, params.getHashMapMaxFillRate());
     cuvsCagraSearchParams.num_random_samplings(seg, params.getNumRandomSamplings());
     cuvsCagraSearchParams.rand_xor_mask(seg, params.getRandXORMask());
+    cuvsCagraSearchParams.persistent(seg, params.isPersistent());
+    cuvsCagraSearchParams.persistent_lifetime(seg, params.getPersistentLifetime());
+    cuvsCagraSearchParams.persistent_device_usage(seg, params.getPersistentDeviceUsage());
     return seg;
   }
 
