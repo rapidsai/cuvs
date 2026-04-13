@@ -734,11 +734,9 @@ void fit(const raft::resources& handle,
       ASSERT(comm.sync_stream(stream) == raft::comms::status_t::SUCCESS,
              "An error occurred in the distributed operation. This can result "
              "from a failed rank");
-      ASSERT(curClusteringCost != (DataT)0.0,
-             "Too few points and centroids being found is getting 0 cost from "
-             "centers\n");
-
-      if (n_iter[0] > 0) {
+      if (curClusteringCost == (DataT)0.0) {
+        RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
+      } else if (n_iter[0] > 0) {
         DataT delta = curClusteringCost / priorClusteringCost;
         if (delta > 1 - params.tol) done = true;
       }

@@ -822,10 +822,9 @@ void kmeans_fit(
       raft::copy(&curClusteringCost, clustering_cost.data_handle(), 1, stream);
       raft::resource::sync_stream(handle, stream);
 
-      ASSERT(curClusteringCost != DataT{0},
-             "Too few points and centroids being found is getting 0 cost from centers");
-
-      if (n_current_iter > 1) {
+      if (curClusteringCost == DataT{0}) {
+        RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
+      } else if (n_current_iter > 1) {
         DataT delta = curClusteringCost / priorClusteringCost;
         if (delta > 1 - iter_params.tol) done = true;
       }
