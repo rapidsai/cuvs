@@ -3062,10 +3062,11 @@ namespace experimental::udf {
 /**
  * @brief Wrapper for vector elements that provides both packed and unpacked access.
  *
- * For float/half: trivial wrapper around scalar values
+ * For float: trivial wrapper around scalar values
  * For int8/uint8 with Veclen > 1: wraps packed bytes in a 32-bit word
  *
- * @tparam T Data type (float, __half, int8_t, uint8_t)
+ * @tparam T Data type (float, int8_t, uint8_t). Fp16 vector elements are not supported for UDFs
+ *             at this time (see `metric_interface` static_assert when `cuda_fp16.h` is available).
  * @tparam AccT Storage/accumulator type (float, __half, int32_t, uint32_t)
  * @tparam Veclen Vector length (1, 2, 4, 8, 16)
  */
@@ -3129,6 +3130,13 @@ struct point {
 template <typename T, typename AccT, int Veclen = 1>
 struct metric_interface {
   using point_type = point<T, AccT, Veclen>;
+
+#if CUVS_IVF_FLAT_UDF_HAS_CUDA_FP16
+  static_assert(
+    !(std::is_same_v<std::remove_cv_t<T>, __half> || std::is_same_v<std::remove_cv_t<T>, half>),
+    "IVF-Flat custom metric UDF does not support fp16 (__half / half) at this time; do not set "
+    "search_params.metric_udf for fp16 indices.");
+#endif
 
   virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
   virtual ~metric_interface()                                               = default;
@@ -3380,8 +3388,6 @@ __device__ __forceinline__ AccT max_elem(point<T, AccT, V> x, point<T, AccT, V> 
  * the necessary types and utilities inline.
  */
 constexpr std::string_view jit_preamble_code = R"(
-#include <cuda_fp16.h>
-
 /* Fixed-width integer types for nvrtc */
 using int8_t = signed char;
 using uint8_t = unsigned char;

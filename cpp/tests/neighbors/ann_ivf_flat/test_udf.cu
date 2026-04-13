@@ -31,7 +31,7 @@ CUVS_METRIC(custom_l2, { acc += squared_diff(x, y); })
 // ============================================================================
 
 template <typename T>
-concept udf_test_fp_element = std::same_as<T, float> || std::same_as<T, __half>;
+concept udf_test_fp_element = std::same_as<T, float>;
 
 template <typename T>
 concept udf_test_int_byte_element = std::same_as<T, int8_t> || std::same_as<T, uint8_t>;
@@ -46,7 +46,7 @@ struct TestDataTraits<T> {
 
   static std::vector<T> database()
   {
-    // 4-dimensional float/__half dataset
+    // 4-dimensional float dataset
     // Vectors arranged for easy distance verification:
     //   db[0] = [0, 0, 0, 0]  - origin
     //   db[1] = [1, 0, 0, 0]  - unit along x
@@ -292,7 +292,7 @@ class IvfFlatUdfTest : public ::testing::Test {
   uint32_t n_probes_;
 };
 
-using TestTypes = ::testing::Types<float, __half, int8_t, uint8_t>;
+using TestTypes = ::testing::Types<float, int8_t, uint8_t>;
 TYPED_TEST_SUITE(IvfFlatUdfTest, TestTypes);
 
 // ============================================================================
