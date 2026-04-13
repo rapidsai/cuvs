@@ -5,7 +5,8 @@
 
 /*
  * Tests that CAGRA build only attaches a view to the index (never takes ownership).
- * After build, index.data().is_owning() must be false. This documents the invariant
+ * After build, index.data() must not be an owning `dataset` (typically a padded view). This
+ * documents the invariant
  * that build is migrated to view-only; update/merge/extend may still pass ownership
  * via update_dataset(unique_ptr&&).
  */
@@ -49,7 +50,7 @@ TEST(CagraBuildViewOnly, BuildFromViewIndexDoesNotOwn)
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, padded_view);
 
   // Build only takes a view; index must not own the dataset.
-  EXPECT_FALSE(index.data().is_owning())
+  EXPECT_EQ(dynamic_cast<const cuvs::neighbors::dataset<int64_t>*>(&index.data()), nullptr)
     << "Build must attach only a view; index must not own the dataset.";
 }
 
@@ -86,7 +87,7 @@ TEST(CagraBuildViewOnly, BuildFromOwnedDatasetViaViewIndexDoesNotOwn)
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, ds->as_dataset_view());
 
   // Index must hold only the view, not take ownership of ds.
-  EXPECT_FALSE(index.data().is_owning())
+  EXPECT_EQ(dynamic_cast<const cuvs::neighbors::dataset<int64_t>*>(&index.data()), nullptr)
     << "Build must attach only a view even when caller has an owning dataset; "
     << "index must not own the dataset.";
 }

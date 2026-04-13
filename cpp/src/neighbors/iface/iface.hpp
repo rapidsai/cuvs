@@ -171,7 +171,7 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
-    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+    std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> out_dataset;
     cagra::deserialize(handle, is, &idx, &out_dataset);
     if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);
@@ -201,7 +201,7 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
-    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+    std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> out_dataset;
     cagra::deserialize(handle, is, &idx, &out_dataset);
     if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);

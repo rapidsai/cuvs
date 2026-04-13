@@ -82,8 +82,8 @@ TEST(CagraVpqBuildResult, VpqBuildReturnsBuildResultSearchSucceeds)
 
   EXPECT_TRUE(build_res.vpq.has_value())
     << "With params.compression set, build_result must contain the VPQ dataset.";
-  EXPECT_FALSE(build_res.idx.data().is_owning())
-    << "Index must hold only a view of the VPQ dataset, not own it.";
+  EXPECT_EQ(dynamic_cast<const cuvs::neighbors::dataset<int64_t>*>(&build_res.idx.data()), nullptr)
+    << "Index must hold only a view of the VPQ dataset, not an owning dataset.";
 
   // Keep build_res in scope so .vpq stays alive while we search with .idx.
   rmm::device_uvector<float> distances_cagra_dev(queries_size, stream);

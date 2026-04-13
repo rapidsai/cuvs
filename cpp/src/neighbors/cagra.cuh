@@ -32,28 +32,28 @@ namespace cuvs::neighbors::cagra {
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 {
-  // After deserialize, the index often holds dataset_view<int64_t> pointing at the real dataset.
-  // search_main unwraps that; index::dataset() does not, and would return a null strided
+  // After deserialize, the index may hold indirect_dataset_view<int64_t> pointing at the real
+  // dataset. search_main unwraps that; index::dataset() does not, and would return a null strided
   // placeholder — the same coalesced_reduction invalid-configuration failure as a bad row pitch.
-  const cuvs::neighbors::dataset<int64_t>* croot = dataset_.get();
-  while (auto* dv = dynamic_cast<const cuvs::neighbors::dataset_view<int64_t>*>(croot)) {
-    croot = dv->ptr_;
+  const cuvs::neighbors::polymorphic_dataset<int64_t>* croot = dataset_.get();
+  while (auto* ref = dynamic_cast<const cuvs::neighbors::indirect_dataset_view<int64_t>*>(croot)) {
+    croot = ref->target();
   }
-  auto* root = const_cast<cuvs::neighbors::dataset<int64_t>*>(croot);
 
   // raft::linalg::reduce wants row-major with leading dim = row pitch in elements.  Prefer the
   // padded types' native row-major view; for strided_dataset use its stride() helper (same as
   // strided_dataset::stride() in common.hpp), not index::dataset()'s synthetic mdspan alone.
   raft::device_matrix_view<const T, int64_t, raft::row_major> rm_dataset;
   if (auto* p_padded_view =
-        dynamic_cast<cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(root);
+        dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(croot);
       p_padded_view != nullptr) {
     rm_dataset = p_padded_view->view();
   } else if (auto* p_padded_own =
-               dynamic_cast<cuvs::neighbors::device_padded_dataset<T, int64_t>*>(root);
+               dynamic_cast<const cuvs::neighbors::device_padded_dataset<T, int64_t>*>(croot);
              p_padded_own != nullptr) {
     rm_dataset = p_padded_own->view();
-  } else if (auto* p_strided = dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(root);
+  } else if (auto* p_strided =
+               dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(croot);
              p_strided != nullptr) {
     auto sv    = p_strided->view();
     rm_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(

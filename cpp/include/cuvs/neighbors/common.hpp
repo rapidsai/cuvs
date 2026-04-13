@@ -132,17 +132,49 @@ enum class MergeStrategy {
 
 /** @} */  // end group neighbors_index
 
-/** Two-dimensional dataset; maybe owning, maybe compressed, maybe strided. */
+/**
+ * @brief Abstract base for any dataset representation used behind a type-erased pointer.
+ *
+ * Provides the minimal virtual interface (`n_rows`, `dim`) shared by owning `dataset` types and
+ * non-owning `dataset_view` types. Indices store `std::unique_ptr<polymorphic_dataset<IdxT>>` so
+ * they can hold either branch at runtime. Ownership is expressed by type (`dataset` vs
+ * `dataset_view`), not by a flag.
+ */
 template <typename IdxT>
-struct dataset {
-  using index_type = IdxT;
-  /**  Size of the dataset. */
+struct polymorphic_dataset {
+  using index_type                                                 = IdxT;
   [[nodiscard]] virtual auto n_rows() const noexcept -> index_type = 0;
-  /** Dimensionality of the dataset. */
-  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t = 0;
-  /** Whether the object owns the data. */
-  [[nodiscard]] virtual auto is_owning() const noexcept -> bool = 0;
-  virtual ~dataset() noexcept                                   = default;
+  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t      = 0;
+  virtual ~polymorphic_dataset() noexcept                          = default;
+
+ protected:
+  polymorphic_dataset() = default;
+};
+
+/** Owning or authoritative dataset storage (marker base). Concrete owning types derive from this.
+ */
+template <typename IdxT>
+struct dataset : public virtual polymorphic_dataset<IdxT> {
+ protected:
+  dataset() = default;
+
+ public:
+  ~dataset() override = default;
+};
+
+/**
+ * @brief Non-owning dataset view (marker base).
+ *
+ * Padded views, strided non-owning rows, and pointer indirection (`indirect_dataset_view`) derive
+ * from this—not from `dataset`. This mirrors the mdspan vs mdarray split.
+ */
+template <typename IdxT>
+struct dataset_view : public virtual polymorphic_dataset<IdxT> {
+ protected:
+  dataset_view() = default;
+
+ public:
+  ~dataset_view() override = default;
 };
 
 template <typename IdxT>
@@ -152,54 +184,69 @@ struct empty_dataset : public dataset<IdxT> {
   explicit empty_dataset(uint32_t dim) noexcept : suggested_dim(dim) {}
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return 0; }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return suggested_dim; }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 };
 
-/** Non-owning view over an external dataset. Caller must keep the referenced dataset alive. */
+/**
+ * @brief Non-owning `dataset_view` that forwards shape from an owning `dataset` via pointer.
+ *
+ * The index can store this in `unique_ptr<polymorphic_dataset>` while the owning object (e.g.
+ * `vpq_dataset`) is kept alive elsewhere. Callers must ensure `target()` outlives any use of the
+ * index. Serialization unwraps this to persist the underlying owning dataset.
+ */
 template <typename IdxT>
-struct dataset_view : public dataset<IdxT> {
+struct indirect_dataset_view final : public dataset_view<IdxT> {
   using index_type = IdxT;
-  const dataset<IdxT>* ptr_;
-  explicit dataset_view(const dataset<IdxT>* p) noexcept : ptr_(p) {}
-  dataset_view(const dataset_view& other) noexcept : ptr_(other.ptr_) {}
-  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return ptr_->n_rows(); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return ptr_->dim(); }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return false; }
+  const dataset<IdxT>* target_;
+  explicit indirect_dataset_view(const dataset<IdxT>* p) noexcept : target_(p)
+  {
+    RAFT_EXPECTS(p != nullptr, "indirect_dataset_view: null target");
+  }
+  indirect_dataset_view(indirect_dataset_view const& other) noexcept = default;
+  [[nodiscard]] auto target() const noexcept -> const dataset<IdxT>* { return target_; }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return target_->n_rows(); }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return target_->dim(); }
 };
 
 template <typename DataT, typename IdxT>
-struct strided_dataset : public dataset<IdxT> {
+struct strided_dataset : public virtual polymorphic_dataset<IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using view_type  = raft::device_matrix_view<const value_type, index_type, raft::layout_stride>;
+
+ protected:
+  strided_dataset() = default;
+
+ public:
+  ~strided_dataset() override = default;
+
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return view().extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final
   {
     return static_cast<uint32_t>(view().extent(1));
   }
-  /** Leading dimension of the dataset. */
   [[nodiscard]] constexpr auto stride() const noexcept -> uint32_t
   {
     auto v = view();
     return static_cast<uint32_t>(v.stride(0) > 0 ? v.stride(0) : v.extent(1));
   }
-  /** Get the view of the data. */
   [[nodiscard]] virtual auto view() const noexcept -> view_type = 0;
 };
 
 template <typename DataT, typename IdxT>
-struct non_owning_dataset : public strided_dataset<DataT, IdxT> {
+struct non_owning_dataset : public dataset_view<IdxT>, public strided_dataset<DataT, IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using typename strided_dataset<value_type, index_type>::view_type;
   view_type data;
-  explicit non_owning_dataset(view_type v) noexcept : data(v) {}
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return false; }
+  explicit non_owning_dataset(view_type v) noexcept
+    : dataset_view<IdxT>(), strided_dataset<DataT, IdxT>(), data(v)
+  {
+  }
   [[nodiscard]] auto view() const noexcept -> view_type final { return data; };
 };
 
 template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
-struct owning_dataset : public strided_dataset<DataT, IdxT> {
+struct owning_dataset : public dataset<IdxT>, public strided_dataset<DataT, IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using typename strided_dataset<value_type, index_type>::view_type;
@@ -209,11 +256,13 @@ struct owning_dataset : public strided_dataset<DataT, IdxT> {
   storage_type data;
   mapping_type view_mapping;
   owning_dataset(storage_type&& store, mapping_type view_mapping) noexcept
-    : data{std::move(store)}, view_mapping{view_mapping}
+    : dataset<IdxT>(),
+      strided_dataset<DataT, IdxT>(),
+      data{std::move(store)},
+      view_mapping{view_mapping}
   {
   }
 
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
   [[nodiscard]] auto view() const noexcept -> view_type final
   {
     return view_type{data.data_handle(), view_mapping};
@@ -267,7 +316,6 @@ struct device_padded_dataset : public dataset<IdxT> {
   {
     return static_cast<uint32_t>(data_.extent(1));
   }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
   [[nodiscard]] auto view() const noexcept -> view_type { return data_.view(); }
   /** Return a non-owning padded_dataset_view over this buffer (e.g. to pass to index). */
   [[nodiscard]] auto as_dataset_view() const noexcept -> device_padded_dataset_view<DataT, IdxT>
@@ -284,7 +332,7 @@ struct device_padded_dataset : public dataset<IdxT> {
 
 /** Device padded dataset view (non-owning). */
 template <typename DataT, typename IdxT>
-struct device_padded_dataset_view : public dataset<IdxT> {
+struct device_padded_dataset_view : public dataset_view<IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using view_type  = raft::device_matrix_view<const value_type, index_type, raft::row_major>;
@@ -293,17 +341,17 @@ struct device_padded_dataset_view : public dataset<IdxT> {
   uint32_t logical_dim_;  // logical dimension (number of columns); stride may be larger
 
   explicit device_padded_dataset_view(view_type v) noexcept
-    : data_(v), logical_dim_(static_cast<uint32_t>(v.extent(1)))
+    : dataset_view<IdxT>(), data_(v), logical_dim_(static_cast<uint32_t>(v.extent(1)))
   {
   }
 
   device_padded_dataset_view(view_type v, uint32_t logical_dim) noexcept
-    : data_(v), logical_dim_(logical_dim)
+    : dataset_view<IdxT>(), data_(v), logical_dim_(logical_dim)
   {
   }
 
   device_padded_dataset_view(device_padded_dataset_view const& other) noexcept
-    : data_(other.data_), logical_dim_(other.logical_dim_)
+    : dataset_view<IdxT>(), data_(other.data_), logical_dim_(other.logical_dim_)
   {
   }
 
@@ -313,7 +361,6 @@ struct device_padded_dataset_view : public dataset<IdxT> {
   {
     return static_cast<uint32_t>(data_.stride(0) > 0 ? data_.stride(0) : data_.extent(1));
   }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return false; }
   [[nodiscard]] auto view() const noexcept -> view_type { return data_; }
 };
 
@@ -339,22 +386,24 @@ struct host_padded_dataset : public dataset<IdxT> {
   {
     return static_cast<uint32_t>(data_.extent(1));
   }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
   [[nodiscard]] auto view() const noexcept -> view_type { return data_.view(); }
 };
 
 /** Host padded dataset view (non-owning). */
 template <typename DataT, typename IdxT>
-struct host_padded_dataset_view : public dataset<IdxT> {
+struct host_padded_dataset_view : public dataset_view<IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using view_type  = raft::host_matrix_view<const value_type, index_type, raft::row_major>;
 
   view_type data_;
 
-  explicit host_padded_dataset_view(view_type v) noexcept : data_{v} {}
+  explicit host_padded_dataset_view(view_type v) noexcept : dataset_view<IdxT>(), data_{v} {}
 
-  host_padded_dataset_view(host_padded_dataset_view const& other) noexcept : data_{other.data_} {}
+  host_padded_dataset_view(host_padded_dataset_view const& other) noexcept
+    : dataset_view<IdxT>(), data_{other.data_}
+  {
+  }
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final
@@ -365,7 +414,6 @@ struct host_padded_dataset_view : public dataset<IdxT> {
   {
     return static_cast<uint32_t>(data_.stride(0) > 0 ? data_.stride(0) : data_.extent(1));
   }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return false; }
   [[nodiscard]] auto view() const noexcept -> view_type { return data_; }
 };
 
@@ -685,7 +733,6 @@ struct vpq_dataset : public dataset<IdxT> {
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book.extent(1); }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 
   /** Row length of the encoded data in bytes. */
   [[nodiscard]] constexpr inline auto encoded_row_length() const noexcept -> uint32_t
@@ -1121,7 +1168,7 @@ struct iface {
   std::optional<raft::device_matrix<T, int64_t, raft::row_major>> cagra_build_dataset_;
   /** Used by CAGRA when deserializing an index that contains a dataset; keeps it alive for the
    * view. */
-  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> cagra_owned_dataset_;
+  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> cagra_owned_dataset_;
   std::shared_ptr<std::mutex> mutex_;
 };
 

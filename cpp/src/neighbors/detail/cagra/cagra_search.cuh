@@ -150,11 +150,12 @@ void search_main(raft::resources const& res,
   using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;
 
-  // Dispatch on dataset type. If index holds dataset_view (e.g. after deserialize), unwrap once.
+  // Dispatch on dataset type. Unwrap indirect_dataset_view (e.g. VPQ) to the owning target.
   auto const* data_ptr = &index.data();
-  if (auto* view_dset = dynamic_cast<const dataset_view<ds_idx_type>*>(data_ptr);
-      view_dset != nullptr) {
-    data_ptr = view_dset->ptr_;
+  if (auto* ref_dset =
+        dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(data_ptr);
+      ref_dset != nullptr) {
+    data_ptr = ref_dset->target();
   }
 
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(data_ptr);

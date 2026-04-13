@@ -125,8 +125,9 @@ struct index : cuvs::neighbors::index {
     return graph_view_.extent(1);
   }
 
-  /** Dataset [size, dim] */
-  [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
+  /** Polymorphic dataset binding (owning storage or non-owning view). */
+  [[nodiscard]] inline auto data() const noexcept
+    -> const cuvs::neighbors::polymorphic_dataset<int64_t>&
   {
     return *dataset_;
   }
@@ -261,7 +262,7 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
-  std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  std::unique_ptr<neighbors::polymorphic_dataset<int64_t>> dataset_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;
   IdxT medoid_id_;
 };

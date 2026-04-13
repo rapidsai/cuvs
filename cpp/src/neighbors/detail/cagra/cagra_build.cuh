@@ -2318,7 +2318,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build(
     cuvs::neighbors::cagra::build_result<T, IdxT> out{index<T, IdxT>(res, params.metric),
                                                       std::make_optional(train_vpq())};
     out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(res, cuvs::neighbors::dataset_view<int64_t>(&*out.vpq));
+    out.idx.update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(&*out.vpq));
     return out;
   }
   if (params.attach_dataset_on_build) {

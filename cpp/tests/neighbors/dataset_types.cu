@@ -23,6 +23,13 @@ namespace cuvs::neighbors::test {
 
 using namespace cuvs::neighbors;
 
+/** True if dynamic type is an owning `dataset<IdxT>` (not a `dataset_view<IdxT>`). */
+template <typename IdxT>
+bool stores_owning_dataset(const polymorphic_dataset<IdxT>& d)
+{
+  return dynamic_cast<const dataset<IdxT>*>(&d) != nullptr;
+}
+
 // Helper: assert that ptr is device memory (for device_* dataset views).
 inline void expect_device_pointer(const void* ptr)
 {
@@ -53,12 +60,12 @@ TEST(DatasetTypes, EmptyDataset)
   empty_dataset<int64_t> ds(128);
   EXPECT_EQ(ds.n_rows(), 0);
   EXPECT_EQ(ds.dim(), 128u);
-  EXPECT_TRUE(ds.is_owning());
+  EXPECT_TRUE(stores_owning_dataset(ds));
 
   empty_dataset<int32_t> ds32(64);
   EXPECT_EQ(ds32.n_rows(), 0);
   EXPECT_EQ(ds32.dim(), 64u);
-  EXPECT_TRUE(ds32.is_owning());
+  EXPECT_TRUE(stores_owning_dataset(ds32));
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +121,7 @@ TEST(DatasetTypes, StridedOwningAndNonOwning)
   auto* strided = ds_maybe_view.get();
   EXPECT_EQ(strided->stride(), dim);
   // With matching stride and device pointer, we expect non-owning
-  EXPECT_FALSE(ds_maybe_view->is_owning());
+  EXPECT_FALSE(stores_owning_dataset(*ds_maybe_view));
 
   // Force owning by requiring a larger stride (padding)
   const uint32_t padded_stride = dim + 8;
@@ -123,7 +130,7 @@ TEST(DatasetTypes, StridedOwningAndNonOwning)
   EXPECT_EQ(ds_owning->n_rows(), n_rows);
   EXPECT_EQ(ds_owning->dim(), dim);
   EXPECT_EQ(ds_owning->stride(), padded_stride);
-  EXPECT_TRUE(ds_owning->is_owning());
+  EXPECT_TRUE(stores_owning_dataset(*ds_owning));
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +157,7 @@ TEST(DatasetTypes, MakeAlignedDatasetViewWhenStrideMatches)
   EXPECT_EQ(ds->n_rows(), n_rows);
   EXPECT_EQ(ds->dim(), dim);
   EXPECT_GE(ds->stride(), dim);
-  EXPECT_FALSE(ds->is_owning());  // stride matches -> no copy, non-owning view
+  EXPECT_FALSE(stores_owning_dataset(*ds));  // stride matches -> no copy, non-owning view
 }
 
 // dim=30, align=16: row bytes 120 -> round up to 128 -> required_stride=32, src_stride=30 -> copy
@@ -166,18 +173,18 @@ TEST(DatasetTypes, MakeAlignedDatasetOwningWhenPadded)
   ASSERT_NE(ds, nullptr);
   EXPECT_EQ(ds->n_rows(), n_rows);
   EXPECT_EQ(ds->dim(), dim);
-  EXPECT_GE(ds->stride(), dim);  // stride will be 32 (rounded up from 30)
-  EXPECT_TRUE(ds->is_owning());  // stride mismatch -> copy with padding
+  EXPECT_GE(ds->stride(), dim);             // stride will be 32 (rounded up from 30)
+  EXPECT_TRUE(stores_owning_dataset(*ds));  // stride mismatch -> copy with padding
 }
 
 // ---------------------------------------------------------------------------
 // Padded datasets (device_padded_dataset, device_padded_dataset_view, host_*)
 // ---------------------------------------------------------------------------
-// These tests exercise the dataset *types* (shape, stride, is_owning, view()).
+// These tests exercise the dataset *types* (shape, stride, owning vs view, view()).
 // Padded construction factories are tested in cagra_padded_dataset.cu.
 // Owning vs view is determined by which factory is used, not by dim/stride:
-//   make_*_padded_dataset(...)  -> always allocates -> is_owning() == true
-//   make_*_padded_dataset_view(...) -> wraps existing memory -> is_owning() == false
+//   make_*_padded_dataset(...)  -> always allocates -> stores_owning_dataset == true
+//   make_*_padded_dataset_view(...) -> wraps existing memory -> stores_owning_dataset == false
 //
 TEST(DatasetTypes, DevicePaddedDataset)
 {
@@ -191,7 +198,7 @@ TEST(DatasetTypes, DevicePaddedDataset)
   EXPECT_EQ(ds->n_rows(), n_rows);
   EXPECT_EQ(ds->dim(), dim);
   EXPECT_EQ(ds->stride(), dim);
-  EXPECT_TRUE(ds->is_owning());
+  EXPECT_TRUE(stores_owning_dataset(*ds));
   expect_device_pointer(ds->view().data_handle());
   auto v = ds->view();
   EXPECT_EQ(v.extent(0), n_rows);
@@ -206,7 +213,7 @@ TEST(DatasetTypes, DevicePaddedDataset)
   EXPECT_EQ(ds_padded->n_rows(), n_rows);
   EXPECT_EQ(ds_padded->dim(), dim);
   EXPECT_EQ(ds_padded->stride(), padded_stride);
-  EXPECT_TRUE(ds_padded->is_owning());
+  EXPECT_TRUE(stores_owning_dataset(*ds_padded));
   expect_device_pointer(ds_padded->view().data_handle());
 }
 
@@ -220,7 +227,7 @@ TEST(DatasetTypes, DevicePaddedDatasetView)
   EXPECT_EQ(ds.n_rows(), n_rows);
   EXPECT_EQ(ds.dim(), dim);
   EXPECT_EQ(ds.stride(), dim);
-  EXPECT_FALSE(ds.is_owning());
+  EXPECT_FALSE(stores_owning_dataset(ds));
   expect_device_pointer(ds.view().data_handle());
   auto v = ds.view();
   EXPECT_EQ(v.extent(0), n_rows);
@@ -239,7 +246,7 @@ TEST(DatasetTypes, HostPaddedDataset)
   EXPECT_EQ(ds->n_rows(), n_rows);
   EXPECT_EQ(ds->dim(), dim);
   EXPECT_EQ(ds->stride(), dim);
-  EXPECT_TRUE(ds->is_owning());
+  EXPECT_TRUE(stores_owning_dataset(*ds));
   expect_host_pointer(ds->view().data_handle());
   auto v = ds->view();
   EXPECT_EQ(v.extent(0), n_rows);
@@ -256,7 +263,7 @@ TEST(DatasetTypes, HostPaddedDatasetView)
   EXPECT_EQ(ds.n_rows(), n_rows);
   EXPECT_EQ(ds.dim(), dim);
   EXPECT_EQ(ds.stride(), dim);
-  EXPECT_FALSE(ds.is_owning());
+  EXPECT_FALSE(stores_owning_dataset(ds));
   expect_host_pointer(ds.view().data_handle());
   auto v = ds.view();
   EXPECT_EQ(v.extent(0), n_rows);
@@ -339,7 +346,7 @@ TEST(DatasetTypes, VpqDataset)
 
   EXPECT_EQ(vpq.n_rows(), n_rows);
   EXPECT_EQ(vpq.dim(), dim);
-  EXPECT_TRUE(vpq.is_owning());
+  EXPECT_TRUE(stores_owning_dataset(vpq));
   EXPECT_EQ(vpq.encoded_row_length(), pq_dim);
   EXPECT_EQ(vpq.vq_n_centers(), vq_n_centers);
   EXPECT_EQ(vpq.pq_len(), pq_len);
@@ -378,7 +385,7 @@ TEST(DatasetTypes, VpqDataset)
 // }
 
 // ---------------------------------------------------------------------------
-// Polymorphic access via dataset<IdxT>*
+// Polymorphic access via polymorphic_dataset<IdxT>* (owning dataset vs view)
 // ---------------------------------------------------------------------------
 TEST(DatasetTypes, PolymorphicBaseAccess)
 {
@@ -386,36 +393,36 @@ TEST(DatasetTypes, PolymorphicBaseAccess)
 
   // empty
   empty_dataset<int64_t> empty(64);
-  dataset<int64_t>* base = &empty;
-  EXPECT_EQ(base->n_rows(), 0);
-  EXPECT_EQ(base->dim(), 64u);
-  EXPECT_TRUE(base->is_owning());
+  polymorphic_dataset<int64_t>* poly = &empty;
+  EXPECT_EQ(poly->n_rows(), 0);
+  EXPECT_EQ(poly->dim(), 64u);
+  EXPECT_TRUE(stores_owning_dataset(*poly));
 
   // strided (owning)
   auto dev_matrix = raft::make_device_matrix<float, int64_t>(res, 5, 8);
   auto ds_strided = make_strided_dataset(res, dev_matrix.view(), 16u);
-  base            = ds_strided.get();
-  EXPECT_EQ(base->n_rows(), 5);
-  EXPECT_EQ(base->dim(), 8u);
-  EXPECT_TRUE(base->is_owning());
+  poly            = ds_strided.get();
+  EXPECT_EQ(poly->n_rows(), 5);
+  EXPECT_EQ(poly->dim(), 8u);
+  EXPECT_TRUE(stores_owning_dataset(*poly));
 
   // device padded (owning)
   auto dev_data  = raft::make_device_matrix<float, int64_t>(res, 6, 4);
   auto ds_padded = std::make_unique<device_padded_dataset<float, int64_t>>(std::move(dev_data), 4u);
-  base           = ds_padded.get();
-  EXPECT_EQ(base->n_rows(), 6);
-  EXPECT_EQ(base->dim(), 4u);
-  EXPECT_TRUE(base->is_owning());
+  poly           = ds_padded.get();
+  EXPECT_EQ(poly->n_rows(), 6);
+  EXPECT_EQ(poly->dim(), 4u);
+  EXPECT_TRUE(stores_owning_dataset(*poly));
 
   // vpq
   auto vq       = raft::make_device_matrix<float, uint32_t>(res, 2, 4);
   auto pq       = raft::make_device_matrix<float, uint32_t>(res, 256, 2);
   auto vpq_data = raft::make_device_matrix<uint8_t, int64_t>(res, 3, 2);
   vpq_dataset<float, int64_t> vpq(std::move(vq), std::move(pq), std::move(vpq_data));
-  base = &vpq;
-  EXPECT_EQ(base->n_rows(), 3);
-  EXPECT_EQ(base->dim(), 4u);
-  EXPECT_TRUE(base->is_owning());
+  poly = &vpq;
+  EXPECT_EQ(poly->n_rows(), 3);
+  EXPECT_EQ(poly->dim(), 4u);
+  EXPECT_TRUE(stores_owning_dataset(*poly));
 
   // pq (disabled until pq_dataset is in common.hpp)
   // auto pq_cb = raft::make_device_matrix<float, uint32_t>(res, 256, 2);

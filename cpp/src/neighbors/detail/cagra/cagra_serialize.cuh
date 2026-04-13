@@ -263,10 +263,11 @@ void serialize_to_hnswlib(
  *
  */
 template <typename T, typename IdxT>
-void deserialize(raft::resources const& res,
-                 std::istream& is,
-                 index<T, IdxT>* index_,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
+void deserialize(
+  raft::resources const& res,
+  std::istream& is,
+  index<T, IdxT>* index_,
+  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
@@ -294,7 +295,10 @@ void deserialize(raft::resources const& res,
     RAFT_EXPECTS(out_dataset != nullptr,
                  "deserialize: index contains a dataset; pass a non-null out_dataset to own it.");
     *out_dataset = cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is);
-    index_->update_dataset(res, cuvs::neighbors::dataset_view<int64_t>(out_dataset->get()));
+    auto* own    = dynamic_cast<const cuvs::neighbors::dataset<int64_t>*>(out_dataset->get());
+    RAFT_EXPECTS(own != nullptr,
+                 "deserialize: loaded dataset must be owning storage (dataset<>, not a view)");
+    index_->update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(own));
   }
 
   bool has_source_indices = content_map & 0x2u;
@@ -308,10 +312,11 @@ void deserialize(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-void deserialize(raft::resources const& res,
-                 const std::string& filename,
-                 index<T, IdxT>* index_,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
+void deserialize(
+  raft::resources const& res,
+  const std::string& filename,
+  index<T, IdxT>* index_,
+  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 

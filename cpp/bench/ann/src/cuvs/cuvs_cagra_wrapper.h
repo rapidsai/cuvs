@@ -163,8 +163,9 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
   std::vector<raft::device_matrix<T, int64_t, raft::row_major>> sub_dataset_buffers_;
-  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> deserialized_dataset_;
-  std::vector<std::unique_ptr<cuvs::neighbors::dataset<int64_t>>> sub_deserialized_datasets_;
+  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> deserialized_dataset_;
+  std::vector<std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>>
+    sub_deserialized_datasets_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {

@@ -99,7 +99,9 @@ void serialize(const raft::resources& res,
 }
 
 template <typename IdxT>
-void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>& dataset)
+void serialize(const raft::resources& res,
+               std::ostream& os,
+               const polymorphic_dataset<IdxT>& dataset)
 {
   if (auto x = dynamic_cast<const empty_dataset<IdxT>*>(&dataset); x != nullptr) {
     raft::serialize_scalar(res, os, kSerializeEmptyDataset);
@@ -124,6 +126,26 @@ void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>
     raft::serialize_scalar(res, os, kSerializeStridedDataset);
     raft::serialize_scalar(res, os, CUDA_R_8U);
     return serialize(res, os, *x);
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset<float, IdxT>*>(&dataset); x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_32F);
+    return serialize(res, os, x->as_dataset_view());
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset<half, IdxT>*>(&dataset); x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_16F);
+    return serialize(res, os, x->as_dataset_view());
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset<int8_t, IdxT>*>(&dataset); x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_8I);
+    return serialize(res, os, x->as_dataset_view());
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset<uint8_t, IdxT>*>(&dataset); x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_8U);
+    return serialize(res, os, x->as_dataset_view());
   }
   if (auto x = dynamic_cast<const device_padded_dataset_view<float, IdxT>*>(&dataset);
       x != nullptr) {
@@ -159,35 +181,43 @@ void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>
     raft::serialize_scalar(res, os, CUDA_R_16F);
     return serialize(res, os, *x);
   }
-  if (auto x = dynamic_cast<const dataset_view<IdxT>*>(&dataset); x != nullptr) {
-    return serialize(res, os, *x->ptr_);
+  if (auto x = dynamic_cast<const indirect_dataset_view<IdxT>*>(&dataset); x != nullptr) {
+    return serialize(res, os, *x->target());
   }
   RAFT_FAIL("unsupported dataset type.");
 }
 
+/** Owning-dataset entry point (forwards to polymorphic_dataset serialization). */
+template <typename IdxT>
+void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>& dataset)
+{
+  serialize(res, os, static_cast<const polymorphic_dataset<IdxT>&>(dataset));
+}
+
 template <typename IdxT>
 auto deserialize_empty(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<empty_dataset<IdxT>>
+  -> std::unique_ptr<polymorphic_dataset<IdxT>>
 {
   auto suggested_dim = raft::deserialize_scalar<uint32_t>(res, is);
-  return std::make_unique<empty_dataset<IdxT>>(suggested_dim);
+  return std::unique_ptr<polymorphic_dataset<IdxT>>(new empty_dataset<IdxT>(suggested_dim));
 }
 
 template <typename DataT, typename IdxT>
 auto deserialize_strided(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<strided_dataset<DataT, IdxT>>
+  -> std::unique_ptr<polymorphic_dataset<IdxT>>
 {
   auto n_rows     = raft::deserialize_scalar<IdxT>(res, is);
   auto dim        = raft::deserialize_scalar<uint32_t>(res, is);
   auto stride     = raft::deserialize_scalar<uint32_t>(res, is);
   auto host_array = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
   raft::deserialize_mdspan(res, is, host_array.view());
-  return make_strided_dataset(res, std::move(host_array), stride);
+  auto up = make_strided_dataset(res, std::move(host_array), stride);
+  return std::unique_ptr<polymorphic_dataset<IdxT>>(up.release());
 }
 
 template <typename MathT, typename IdxT>
 auto deserialize_vpq(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<vpq_dataset<MathT, IdxT>>
+  -> std::unique_ptr<polymorphic_dataset<IdxT>>
 {
   auto n_rows             = raft::deserialize_scalar<IdxT>(res, is);
   auto dim                = raft::deserialize_scalar<uint32_t>(res, is);
@@ -207,13 +237,14 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, pq_code_book.view());
   raft::deserialize_mdspan(res, is, data.view());
 
-  return std::make_unique<vpq_dataset<MathT, IdxT>>(
+  auto vpq_up = std::make_unique<vpq_dataset<MathT, IdxT>>(
     std::move(vq_code_book), std::move(pq_code_book), std::move(data));
+  return std::unique_ptr<polymorphic_dataset<IdxT>>(vpq_up.release());
 }
 
 template <typename IdxT>
 auto deserialize_dataset(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<dataset<IdxT>>
+  -> std::unique_ptr<polymorphic_dataset<IdxT>>
 {
   switch (raft::deserialize_scalar<dataset_instance_tag>(res, is)) {
     case kSerializeEmptyDataset: return deserialize_empty<IdxT>(res, is);
