@@ -16,6 +16,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
@@ -57,26 +58,35 @@ constexpr auto get_idx_type_tag()
   if constexpr (std::is_same_v<IdxT, int64_t>) { return tag_idx_l{}; }
 }
 
-// Convert type to string for JIT code generation
+// Convert type to string for JIT code generation (strip cv/ref so const/volatile T still matches).
+template <typename>
+inline constexpr bool type_name_always_false_v = false;
+
 template <typename T>
 constexpr const char* type_name()
 {
-  if constexpr (std::is_same_v<T, float>) {
+  using U = std::remove_cv_t<std::remove_reference_t<T>>;
+
+  if constexpr (std::is_same_v<U, float>) {
     return "float";
-  } else if constexpr (std::is_same_v<T, __half>) {
+  } else if constexpr (std::is_same_v<U, __half>) {
     return "__half";
-  } else if constexpr (std::is_same_v<T, int8_t>) {
+  } else if constexpr (std::is_same_v<U, half>) {
+    return "__half";
+  } else if constexpr (std::is_same_v<U, int8_t> || std::is_same_v<U, signed char>) {
     return "int8_t";
-  } else if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, unsigned char>) {
+  } else if constexpr (std::is_same_v<U, uint8_t> || std::is_same_v<U, unsigned char>) {
     return "uint8_t";
-  } else if constexpr (std::is_same_v<T, int32_t>) {
+  } else if constexpr (std::is_same_v<U, int32_t> ||
+                       (std::is_same_v<U, long> && sizeof(long) == sizeof(int32_t))) {
     return "int32_t";
-  } else if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, unsigned int>) {
+  } else if constexpr (std::is_same_v<U, uint32_t> || std::is_same_v<U, unsigned int> ||
+                       (std::is_same_v<U, unsigned long> && sizeof(unsigned long) == 4)) {
     return "uint32_t";
-  } else if constexpr (std::is_same_v<T, int64_t>) {
+  } else if constexpr (std::is_same_v<U, int64_t>) {
     return "int64_t";
   } else {
-    static_assert(false, "Unsupported type to create UDF");
+    static_assert(type_name_always_false_v<U>, "Unsupported type to create UDF");
     return "";
   }
 }
