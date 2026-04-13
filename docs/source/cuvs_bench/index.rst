@@ -84,7 +84,7 @@ We provide images for GPU enabled systems, as well as systems without a GPU. The
 
 Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_.
 
-The following command pulls the nightly container for Python version 3.13, CUDA version 12.9, and cuVS version 26.04:
+The following command pulls the nightly container for Python version 3.13, CUDA version 12.9, and cuVS version 26.06:
 
 .. code-block:: bash
 
@@ -289,7 +289,7 @@ For GPU-enabled systems, the `DATA_FOLDER` variable should be a local folder whe
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run --gpus all --rm -it -u $(id -u)                      \
         -v $DATA_FOLDER:/data/benchmarks                            \
-        rapidsai/cuvs-bench:26.06-cuda12.9-py3.13              \
+        rapidsai/cuvs-bench:26.06a-cuda12-py3.13              \
         "--dataset deep-image-96-angular"                           \
         "--normalize"                                               \
         "--algorithms cuvs_cagra,cuvs_ivf_pq --batch-size 10 -k 10" \
@@ -302,7 +302,7 @@ Usage of the above command is as follows:
  * - Argument
    - Description
 
- * - `rapidsai/cuvs-bench:26.06-cuda12.9-py3.13`
+ * - `rapidsai/cuvs-bench:26.06a-cuda12-py3.13`
    - Image to use. See "Docker" section for links to lists of available tags.
 
  * - `"--dataset deep-image-96-angular"`
@@ -331,7 +331,7 @@ The container arguments in the above section also be used for the CPU-only conta
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run  --rm -it -u $(id -u)                  \
         -v $DATA_FOLDER:/data/benchmarks              \
-        rapidsai/cuvs-bench-cpu:26.04a-py3.13     \
+        rapidsai/cuvs-bench-cpu:26.06a-py3.13     \
          "--dataset deep-image-96-angular"            \
          "--normalize"                                \
          "--algorithms hnswlib --batch-size 10 -k 10" \
@@ -349,7 +349,7 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         --entrypoint /bin/bash                          \
         --workdir /data/benchmarks                      \
         -v $DATA_FOLDER:/data/benchmarks                \
-        rapidsai/cuvs-bench:26.06-cuda12.9-py3.13
+        rapidsai/cuvs-bench:26.06a-cuda12-py3.13
 
 This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the `Running the benchmarks`_ section above:
 
