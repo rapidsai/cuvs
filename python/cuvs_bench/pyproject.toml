@@ -45,14 +45,10 @@ Homepage = "https://github.com/rapidsai/cuvs"
 elastic = ["elasticsearch>=8.0"]
 
 [project.entry-points."cuvs_bench.backends"]
-elastic = "cuvs_bench_elastic:register"
+elastic = "cuvs_bench.backends.elasticsearch:register"
 
 [project.entry-points."cuvs_bench.config_loaders"]
-elastic = "cuvs_bench_elastic:register"
-
-[tool.setuptools.packages.find]
-where = [".", "../cuvs_bench_elastic"]
-include = ["cuvs_bench*"]
+elastic = "cuvs_bench.backends.elasticsearch:register"
 
 [tool.setuptools.package-data]
 "*" = ["*.*", "VERSION"]

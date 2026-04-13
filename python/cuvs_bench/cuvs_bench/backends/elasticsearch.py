@@ -25,9 +25,9 @@ import numpy as np
 import yaml
 
 
-from cuvs_bench.backends.base import BenchmarkBackend, BuildResult, Dataset, SearchResult
-from cuvs_bench.backends.registry import register_backend, register_config_loader
-from cuvs_bench.orchestrator.config_loaders import (
+from .base import BenchmarkBackend, BuildResult, Dataset, SearchResult
+from .registry import register_backend, register_config_loader
+from ..orchestrator.config_loaders import (
     BenchmarkConfig,
     ConfigLoader,
     DatasetConfig,
@@ -517,8 +517,8 @@ def _get_cuvs_bench_config_path() -> str:
 
 
 def _get_elastic_config_path() -> str:
-    """Get this package's config directory for elastic.yaml."""
-    return os.path.join(os.path.dirname(__file__), "config")
+    """Get the config directory for elastic.yaml."""
+    return os.path.join(os.path.dirname(__file__), "../config")
 
 
 class ElasticConfigLoader(ConfigLoader):
