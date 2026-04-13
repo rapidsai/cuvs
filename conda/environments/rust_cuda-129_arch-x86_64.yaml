@@ -6,8 +6,8 @@ channels:
 - conda-forge
 dependencies:
 - c-compiler
-- clang-tools==20.1.4
-- clang==20.1.4
+- clang-tools==20.1.8
+- clang==20.1.8
 - cmake>=3.30.4
 - cuda-cudart-dev
 - cuda-nvcc
@@ -17,7 +17,7 @@ dependencies:
 - cuda-version=12.9
 - cxx-compiler
 - gcc_linux-64=14.*
-- libclang==20.1.4
+- libclang==20.1.8
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
