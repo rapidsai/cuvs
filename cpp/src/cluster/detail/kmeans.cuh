@@ -583,6 +583,22 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
  * @tparam DataT    Data / weight type
  * @tparam IndexT   Index type
  * @tparam Accessor Accessor policy (host or device); deduced from X
+ *
+ * @param[in]     handle        The raft handle.
+ * @param[in]     pams          Parameters for the KMeans model.
+ * @param[in]     X             Training instances to cluster (host or device).
+ *                              Row-major, [n_samples x n_features].
+ * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              [n_samples].  When std::nullopt, uniform weights
+ *                              are used.
+ * @param[inout]  centroids     [in] When init is InitMethod::Array, used as
+ *                              the initial cluster centers.
+ *                              [out] The final centroids produced by the
+ *                              algorithm.  [n_clusters x n_features].
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
+ * @param[out]    n_iter        Number of iterations run for the best
+ *                              initialization.
  */
 template <typename DataT, typename IndexT, typename Accessor>
 void kmeans_fit(
