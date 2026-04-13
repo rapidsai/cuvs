@@ -399,69 +399,213 @@ if(NOT BUILD_CPU_ONLY)
   target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
   target_link_libraries(jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL)
 
-  block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
+  block(PROPAGATE jit_lto_files)
+  set(jit_lto_files)
   set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
+  set(ivf_flat_ns "cuvs::neighbors::ivf_flat::detail")
   generate_jit_lto_kernels(
-    interleaved_scan_files
+    jit_lto_files
     NAME_FORMAT
-      "interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
+      "ivf_flat_interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_interleaved_scan<${ivf_flat_ns}::tag_@type_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${ivf_flat_ns}::tag_idx_@idx_abbrev@, @capacity@, @veclen@, @ascending_value@, @compute_norm_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/interleaved_scan"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    metric_files
-    NAME_FORMAT "metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
+    jit_lto_files
+    NAME_FORMAT "ivf_flat_metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/metric"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_metric<@veclen@, ${ivf_flat_ns}::tag_@type_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${ivf_flat_ns}::tag_metric_@metric_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/metric"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    filter_files
-    NAME_FORMAT "@filter_name@"
+    jit_lto_files
+    NAME_FORMAT "ivf_flat_@filter_name@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/filter"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_filter<${ivf_flat_ns}::tag_filter<${ivf_flat_ns}::tag_idx_l, ${ivf_flat_ns}::tag_@filter_name@_impl>>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    post_lambda_files
-    NAME_FORMAT "@post_lambda_name@"
+    jit_lto_files
+    NAME_FORMAT "ivf_flat_@post_lambda_name@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_post_lambda<${ivf_flat_ns}::tag_@post_lambda_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/post_lambda"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  set(ivf_pq_ns "cuvs::neighbors::ivf_pq::detail")
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_compute_similarity_out_@out_abbrev@_lut_@lut_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_similarity_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_similarity_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_compute_similarity<${ivf_pq_ns}::tag_out_@out_abbrev@, ${ivf_pq_ns}::tag_lut_@lut_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_similarity"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_prepare_lut_lut_@lut_abbrev@_@enable_smem_lut_str@_@pq_bits@pq"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/prepare_lut_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/prepare_lut_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_prepare_lut<${ivf_pq_ns}::tag_lut_@lut_abbrev@, @enable_smem_lut@, @pq_bits@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/prepare_lut"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_store_calculated_distances_out_@out_abbrev@_@k_manage_local_topk_str@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/store_calculated_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/store_calculated_distances_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_store_calculated_distances<${ivf_pq_ns}::tag_out_@out_abbrev@, @k_manage_local_topk@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/store_calculated_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_precompute_base_diff_metric_@metric@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_precompute_base_diff<${ivf_pq_ns}::tag_metric_@metric@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/precompute_base_diff"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "ivf_pq_create_lut_lut_@lut_abbrev@_@precomp_base_diff_str@_@pq_bits@pq_metric_@metric@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/create_lut_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/create_lut_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_create_lut<${ivf_pq_ns}::tag_lut_@lut_abbrev@, ${ivf_pq_ns}::tag_metric_@metric@, @precomp_base_diff@, @pq_bits@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/create_lut"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_compute_distances_out_@out_abbrev@_lut_@lut_abbrev@_capacity_@capacity@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_distances_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_compute_distances<${ivf_pq_ns}::tag_out_@out_abbrev@, ${ivf_pq_ns}::tag_lut_@lut_abbrev@, @capacity@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_get_early_stop_limit_out_@out_abbrev@_metric_@metric@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_early_stop_limit_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_early_stop_limit_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_get_early_stop_limit<${ivf_pq_ns}::tag_out_@out_abbrev@, ${ivf_pq_ns}::tag_metric_@metric@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/get_early_stop_limit"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_sample_filter_@filter_name@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/sample_filter_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/sample_filter_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_sample_filter<${ivf_pq_ns}::tag_filter_@filter_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/sample_filter"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_get_line_width_@pq_bits@pq"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_line_width_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_line_width_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_pq_ns}::fragment_tag_get_line_width<@pq_bits@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/get_line_width"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_compute_score_out_@out_abbrev@_lut_@lut_abbrev@_@pq_bits@pq"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_score_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_score_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_compute_score<${ivf_pq_ns}::tag_out_@out_abbrev@, ${ivf_pq_ns}::tag_lut_@lut_abbrev@, @pq_bits@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_score"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_increment_score_out_@out_abbrev@_@increment_str@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/increment_score_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/increment_score_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_pq_ns}::fragment_tag_increment_score<${ivf_pq_ns}::tag_out_@out_abbrev@, @increment@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/increment_score"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   endblock()
-
-  set(jit_lto_files
-      ${interleaved_scan_files}
-      ${metric_files}
-      ${filter_files}
-      ${post_lambda_files}
-      src/detail/jit_lto/AlgorithmLauncher.cpp
-      src/detail/jit_lto/AlgorithmPlanner.cpp
-      src/detail/jit_lto/FragmentEntry.cpp
-      src/detail/jit_lto/nvjitlink_checker.cpp
-  )
 
   # Note that this matrix contains an `arch_includes` placeholder, since we don't currently have a
   # way to do an item-wise transform on a list after computing the matrix product and before
@@ -577,11 +721,20 @@ if(NOT BUILD_CPU_ONLY)
   generate_inst_matrix(
     ivf_pq_compute_similarity_inst_files
     MATRIX_JSON_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_matrix.json"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_select_matrix.json"
     INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_inst.cu.in"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_select_inst.cu.in"
     OUTPUT_FILE_FORMAT
-      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_inst_out_@out_abbrev@_lut_@lut_abbrev@.cu"
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_select_inst_out_@out_abbrev@_lut_@lut_abbrev@_filter_@filter_name@_metric_@metric@_@increment_score_str@.cu"
+  )
+  generate_inst_matrix(
+    ivf_pq_compute_similarity_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_run_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_run_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_run_inst_out_@out_abbrev@_lut_@lut_abbrev@.cu"
   )
   generate_inst_matrix(
     ivf_pq_search_inst_files
@@ -662,11 +815,16 @@ if(NOT BUILD_CPU_ONLY)
     src/core/omp_wrapper.cpp
     src/util/file_io.cpp
     src/util/host_memory.cpp
+    src/detail/jit_lto/AlgorithmLauncher.cpp
+    src/detail/jit_lto/AlgorithmPlanner.cpp
+    src/detail/jit_lto/FragmentEntry.cpp
+    src/detail/jit_lto/nvjitlink_checker.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
     ${pairwise_matrix_dispatch_inst_files}
     src/distance/distance.cu
+    src/distance/kde.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/neighbors/all_neighbors/all_neighbors.cu
