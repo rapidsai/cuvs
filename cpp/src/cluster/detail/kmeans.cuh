@@ -683,7 +683,11 @@ void kmeans_fit(
     n_init = 1;
   }
 
-  auto centroidsRawData = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
+  IndexT centroid_buf_size = n_clusters * n_features;
+  rmm::device_uvector<DataT> centroid_buf_A(centroid_buf_size, stream);
+  rmm::device_uvector<DataT> centroid_buf_B(centroid_buf_size, stream);
+  DataT* cur_centroids_ptr = centroid_buf_A.data();
+  DataT* new_centroids_ptr = centroid_buf_B.data();
 
   auto minClusterAndDistance = raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(
     handle, streaming_batch_size);
@@ -693,7 +697,6 @@ void kmeans_fit(
 
   auto centroid_sums      = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto weight_per_cluster = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
-  auto new_centroids      = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto clustering_cost    = raft::make_device_scalar<DataT>(handle, DataT{0});
   auto batch_sums         = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto batch_counts       = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
@@ -738,7 +741,11 @@ void kmeans_fit(
                    n_init,
                    (unsigned long long)iter_params.rng_state.seed);
 
-    init_centroids(iter_params, centroidsRawData.view());
+    cur_centroids_ptr = centroid_buf_A.data();
+    new_centroids_ptr = centroid_buf_B.data();
+    init_centroids(
+      iter_params,
+      raft::make_device_matrix_view<DataT, IndexT>(cur_centroids_ptr, n_clusters, n_features));
 
     DataT iter_inertia        = std::numeric_limits<DataT>::max();
     IndexT n_current_iter     = 0;
@@ -754,7 +761,9 @@ void kmeans_fit(
                         raft::const_op<DataT>{DataT{0}});
 
       auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
-        centroidsRawData.data_handle(), n_clusters, n_features);
+        cur_centroids_ptr, n_clusters, n_features);
+      auto new_centroids_view =
+        raft::make_device_matrix_view<DataT, IndexT>(new_centroids_ptr, n_clusters, n_features);
 
       data_batches.reset();
       weight_batches.reset();
@@ -795,17 +804,14 @@ void kmeans_fit(
                                         raft::make_const_mdspan(centroid_sums.view()),
                                         raft::make_const_mdspan(weight_per_cluster.view()),
                                         centroids_const,
-                                        new_centroids.view());
+                                        new_centroids_view);
 
       DataT sqrdNormError =
         compute_centroid_shift<DataT, IndexT>(handle,
                                               raft::make_const_mdspan(centroids_const),
-                                              raft::make_const_mdspan(new_centroids.view()));
+                                              raft::make_const_mdspan(new_centroids_view));
 
-      raft::copy(
-        handle,
-        raft::make_device_vector_view(centroidsRawData.data_handle(), new_centroids.size()),
-        raft::make_device_vector_view(new_centroids.data_handle(), new_centroids.size()));
+      std::swap(cur_centroids_ptr, new_centroids_ptr);
 
       bool done = false;
 
@@ -832,7 +838,7 @@ void kmeans_fit(
 
     {
       auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
-        centroidsRawData.data_handle(), n_clusters, n_features);
+        cur_centroids_ptr, n_clusters, n_features);
 
       iter_inertia = DataT{0};
       data_batches.reset();
@@ -863,10 +869,7 @@ void kmeans_fit(
     if (iter_inertia < inertia[0]) {
       inertia[0] = iter_inertia;
       n_iter[0]  = n_current_iter;
-      raft::copy(
-        handle,
-        raft::make_device_vector_view(centroids.data_handle(), n_clusters * n_features),
-        raft::make_device_vector_view(centroidsRawData.data_handle(), n_clusters * n_features));
+      raft::copy(centroids.data_handle(), cur_centroids_ptr, centroid_buf_size, stream);
     }
     RAFT_LOG_DEBUG("KMeans.fit after iteration-%d/%d: inertia - %f, n_iter - %d",
                    seed_iter + 1,
