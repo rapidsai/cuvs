@@ -11,7 +11,7 @@ namespace {
 constexpr auto sample_filter_impl =
   cuvs::neighbors::detail::sample_filter_@filter_name@<uint32_t, int64_t>;
 
-}
+}  // namespace
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
