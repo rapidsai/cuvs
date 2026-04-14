@@ -748,7 +748,7 @@ void fit(const raft::resources& handle,
              "Too few points and centroids being found is getting 0 cost from "
              "centers\n");
 
-      if (n_iter[0] > 0) {
+      if (n_iter[0] > 1) {
         DataT delta = curClusteringCost / priorClusteringCost;
         if (delta > 1 - params.tol) done = true;
       }

@@ -1,0 +1,18 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <cuvs/neighbors/cagra.hpp>
+#include <neighbors/cagra.cuh>
+
+namespace {
+
+using data_t  = @data_type@;
+using index_t = @index_type@;
+
+}  // namespace
+
+namespace cuvs::neighbors::cagra {
+CUVS_INST_CAGRA_MERGE(data_t, index_t);
+}  // namespace cuvs::neighbors::cagra
