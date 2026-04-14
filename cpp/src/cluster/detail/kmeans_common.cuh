@@ -158,7 +158,7 @@ void checkWeight(raft::resources const& handle,
   raft::copy(handle,
              raft::make_host_scalar_view(&wt_sum),
              raft::make_device_scalar_view(wt_aggr.data_handle()));
-  raft::resource::sync_stream(handle, stream);
+  raft::resource::sync_stream(handle);
 
   if (wt_sum != n_samples) {
     RAFT_LOG_DEBUG(
@@ -266,7 +266,7 @@ void sampleCentroids(raft::resources const& handle,
   raft::copy(handle,
              raft::make_host_scalar_view(&nPtsSampledInRank),
              raft::make_device_scalar_view(nSelected.data_handle()));
-  raft::resource::sync_stream(handle, stream);
+  raft::resource::sync_stream(handle);
 
   uint8_t* rawPtr_isSampleCentroid = isSampleCentroid.data_handle();
   thrust::for_each_n(raft::resource::get_thrust_policy(handle),
@@ -598,7 +598,7 @@ DataT compute_centroid_shift(raft::resources const& handle,
                                  new_centroids.data_handle());
   DataT result = 0;
   raft::copy(&result, sqrdNorm.data_handle(), 1, stream);
-  raft::resource::sync_stream(handle, stream);
+  raft::resource::sync_stream(handle);
   return result;
 }
 
@@ -611,13 +611,13 @@ DataT compute_centroid_shift(raft::resources const& handle,
  * @tparam DataT  Weight type
  * @tparam IndexT Index type
  *
+ * @param[in] handle      RAFT resources handle
  * @param[in] weight_ptr  Pointer to sample weights (host or device), may be nullptr
  * @param[in] n_samples   Number of samples
- * @param[in] stream      CUDA stream (used when pointer is device memory)
  * @return Scale factor (1.0 if weights already sum to n_samples or nullptr)
  */
 template <typename DataT, typename IndexT>
-DataT compute_weight_scale(const DataT* weight_ptr, IndexT n_samples, cudaStream_t stream)
+DataT compute_weight_scale(raft::resources const& handle, const DataT* weight_ptr, IndexT n_samples)
 {
   if (weight_ptr == nullptr) { return DataT{1}; }
 
@@ -631,7 +631,9 @@ DataT compute_weight_scale(const DataT* weight_ptr, IndexT n_samples, cudaStream
     }
   } else {
     std::vector<DataT> h_weights(n_samples);
-    raft::copy(h_weights.data(), weight_ptr, n_samples, stream);
+    auto d_view = raft::make_device_vector_view<const DataT, IndexT>(weight_ptr, n_samples);
+    auto h_view = raft::make_host_vector_view<DataT, IndexT>(h_weights.data(), n_samples);
+    raft::copy(handle, h_view, d_view);
     raft::resource::sync_stream(handle);
     for (IndexT i = 0; i < n_samples; ++i) {
       wt_sum += h_weights[i];
@@ -689,7 +691,7 @@ void process_batch(
   int batch_samples_param,
   int batch_centroids_param,
   raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
-  raft::device_vector_view<DataT, IndexT> L2NormBatch,
+  raft::device_vector_view<const DataT, IndexT> L2NormBatch,
   rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
   rmm::device_uvector<char>& workspace,
   raft::device_matrix_view<DataT, IndexT> centroid_sums,
@@ -701,22 +703,11 @@ void process_batch(
   cudaStream_t stream     = raft::resource::get_cuda_stream(handle);
   IndexT current_batch_sz = batch_data.extent(0);
 
-  if (metric == cuvs::distance::DistanceType::L2Expanded ||
-      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-      handle,
-      raft::make_device_matrix_view<const DataT, IndexT>(
-        batch_data.data_handle(), current_batch_sz, batch_data.extent(1)),
-      L2NormBatch);
-  }
-
-  auto L2NormBatch_const = raft::make_const_mdspan(L2NormBatch);
-
   minClusterAndDistanceCompute<DataT, IndexT>(handle,
                                               batch_data,
                                               centroids,
                                               minClusterAndDistance,
-                                              L2NormBatch_const,
+                                              L2NormBatch,
                                               L2NormBuf_OR_DistBuf,
                                               metric,
                                               batch_samples_param,
