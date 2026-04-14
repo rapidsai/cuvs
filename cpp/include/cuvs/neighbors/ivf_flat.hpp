@@ -169,8 +169,6 @@ struct index : cuvs::neighbors::index {
   /** Distance metric used for clustering. */
   cuvs::distance::DistanceType metric() const noexcept;
 
-  void set_metric(cuvs::distance::DistanceType metric);
-
   /** Whether `centers()` change upon extending the index (ivf_flat::extend). */
   bool adaptive_centers() const noexcept;
 
@@ -3294,11 +3292,33 @@ template <typename T, typename AccT, int V>
 __device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT, V> y)
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    AccT acc{0};
+    for (int i = 0; i < 4; ++i) {
+      unsigned xi = (x.raw() >> (i * 8)) & 0xFFu;
+      unsigned yi = (y.raw() >> (i * 8)) & 0xFFu;
+      AccT d        = static_cast<AccT>(xi) - static_cast<AccT>(yi);
+      acc += d * d;
+    }
+    return acc;
+#else
     auto diff = __vabsdiffu4(x.raw(), y.raw());
     return __dp4a(diff, diff, AccT{0});
+#endif
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    AccT acc{0};
+    for (int i = 0; i < 4; ++i) {
+      int xi = static_cast<int>(static_cast<int8_t>((x.raw() >> (i * 8)) & 0xFFu));
+      int yi = static_cast<int>(static_cast<int8_t>((y.raw() >> (i * 8)) & 0xFFu));
+      AccT d = static_cast<AccT>(xi - yi);
+      acc += d * d;
+    }
+    return acc;
+#else
     auto diff = __vabsdiffs4(x.raw(), y.raw());
     return __dp4a(diff, diff, uint32_t{0});
+#endif
   } else {
     auto diff = x.raw() - y.raw();
     return diff * diff;
@@ -3311,11 +3331,33 @@ template <typename T, typename AccT, int V>
 __device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> y)
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    uint32_t r = 0;
+    for (int i = 0; i < 4; ++i) {
+      unsigned xi = (x.raw() >> (i * 8)) & 0xFFu;
+      unsigned yi = (y.raw() >> (i * 8)) & 0xFFu;
+      unsigned d  = (xi > yi) ? (xi - yi) : (yi - xi);
+      r |= (d & 0xFFu) << (i * 8);
+    }
+    return r;
+#else
     auto diff = __vabsdiffu4(x.raw(), y.raw());
     return diff;
+#endif
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    uint32_t r = 0;
+    for (int i = 0; i < 4; ++i) {
+      int xi     = static_cast<int8_t>((x.raw() >> (i * 8)) & 0xFFu);
+      int yi     = static_cast<int8_t>((y.raw() >> (i * 8)) & 0xFFu);
+      unsigned d = static_cast<unsigned>(xi > yi ? xi - yi : yi - xi);
+      r |= (d & 0xFFu) << (i * 8);
+    }
+    return r;
+#else
     auto diff = __vabsdiffs4(x.raw(), y.raw());
     return diff;
+#endif
   } else {
     auto a = x.raw();
     auto b = y.raw();
@@ -3329,7 +3371,17 @@ template <typename T, typename AccT, int V>
 __device__ __forceinline__ AccT dot_product(point<T, AccT, V> x, point<T, AccT, V> y)
 {
   if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    AccT acc = AccT{0};
+    for (int i = 0; i < 4; ++i) {
+      int xi = static_cast<int8_t>((x.raw() >> (i * 8)) & 0xFFu);
+      int yi = static_cast<int8_t>((y.raw() >> (i * 8)) & 0xFFu);
+      acc += static_cast<AccT>(xi) * static_cast<AccT>(yi);
+    }
+    return acc;
+#else
     return __dp4a(x.raw(), y.raw(), AccT{0});
+#endif
   } else {
     return x.raw() * y.raw();
   }
@@ -3402,6 +3454,13 @@ template <typename T, typename U> struct is_same { static constexpr bool value =
 template <typename T> struct is_same<T, T> { static constexpr bool value = true; };
 template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U>::value;
 }
+
+/* NVRTC defines CUDA_VERSION; CUDA 12.2 and earlier lack __dp4a in this UDF path. */
+#if defined(CUDA_VERSION) && (CUDA_VERSION < 12030)
+#define CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS 1
+#else
+#define CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS 0
+#endif
 )";
 
 /**
