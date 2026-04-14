@@ -91,6 +91,9 @@ struct cuvsKMeansParams {
    */
   int batch_centroids;
 
+  /** Deprecated, ignored. Kept for ABI compatibility. */
+  bool inertia_check;
+
   /**
    * Whether to use hierarchical (balanced) kmeans or not
    */
@@ -102,16 +105,17 @@ struct cuvsKMeansParams {
   int hierarchical_n_iters;
 
   /**
-   * Number of samples to draw for KMeansPlusPlus initialization with host data.
-   * When set to 0, uses heuristic min(3 * n_clusters, n_samples).
-   */
-  int64_t init_size;
-
-  /**
    * Number of samples to process per GPU batch for the batched (host-data) API.
    * When set to 0, defaults to n_samples (process all at once).
    */
-   int64_t streaming_batch_size;
+  int64_t streaming_batch_size;
+
+  /**
+   * Number of samples to draw for KMeansPlusPlus initialization.
+   * When set to 0, uses heuristic min(3 * n_clusters, n_samples) for host data,
+   * or n_samples for device data.
+   */
+  int64_t init_size;
 };
 
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;

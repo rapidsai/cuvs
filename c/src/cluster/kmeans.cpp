@@ -237,10 +237,11 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
       .oversampling_factor  = cpp_params.oversampling_factor,
       .batch_samples        = cpp_params.batch_samples,
       .batch_centroids      = cpp_params.batch_centroids,
+      .inertia_check        = false,
       .hierarchical         = false,
       .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters),
-      .init_size                      = cpp_params.init_size,
-      .streaming_batch_size           = cpp_params.streaming_batch_size};
+      .streaming_batch_size = cpp_params.streaming_batch_size,
+      .init_size            = cpp_params.init_size};
   });
 }
 

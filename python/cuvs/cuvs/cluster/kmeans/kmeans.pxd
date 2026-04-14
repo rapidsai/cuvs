@@ -32,10 +32,11 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         double oversampling_factor,
         int batch_samples,
         int batch_centroids,
-        int64_t init_size,
-        int64_t streaming_batch_size,
+        bool inertia_check,
         bool hierarchical,
-        int hierarchical_n_iters
+        int hierarchical_n_iters,
+        int64_t streaming_batch_size,
+        int64_t init_size
 
     ctypedef cuvsKMeansParams* cuvsKMeansParams_t
 
