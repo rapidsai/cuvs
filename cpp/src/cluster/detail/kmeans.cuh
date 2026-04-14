@@ -697,6 +697,7 @@ void kmeans_fit(
 
   auto centroid_sums      = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto weight_per_cluster = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
+  auto centroid_norms_buf = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
   auto clustering_cost    = raft::make_device_scalar<DataT>(handle, DataT{0});
   auto batch_sums         = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto batch_counts       = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
@@ -729,10 +730,10 @@ void kmeans_fit(
     n_clusters,
     static_cast<size_t>(streaming_batch_size));
 
-  bool compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
-                       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                       metric == cuvs::distance::DistanceType::CosineExpanded;
-  bool use_norm_cache = compute_norms && !data_on_device;
+  bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
+                           metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                           metric == cuvs::distance::DistanceType::CosineExpanded;
+  bool use_norm_cache     = need_compute_norms && !data_on_device;
   std::vector<DataT> h_norm_cache;
   if (use_norm_cache) { h_norm_cache.resize(n_samples); }
   bool norms_cached = false;
@@ -751,7 +752,7 @@ void kmeans_fit(
     }
   };
 
-  if (compute_norms && data_on_device) {
+  if (need_compute_norms && data_on_device) {
     compute_batch_norms(X.data_handle(), n_samples);
     norms_cached = true;
   }
@@ -792,6 +793,15 @@ void kmeans_fit(
       auto new_centroids_view =
         raft::make_device_matrix_view<DataT, IndexT>(new_centroids_ptr, n_clusters, n_features);
 
+      std::optional<raft::device_vector_view<const DataT, IndexT>> centroid_norms_opt =
+        std::nullopt;
+      if (need_compute_norms) {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centroids_const, centroid_norms_buf.view());
+        centroid_norms_opt = raft::make_device_vector_view<const DataT, IndexT>(
+          centroid_norms_buf.data_handle(), n_clusters);
+      }
+
       data_batches.reset();
       weight_batches.reset();
       auto wt_it = weight_batches.begin();
@@ -807,7 +817,7 @@ void kmeans_fit(
         auto minCAD_view = raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
           minClusterAndDistance.data_handle(), cur_batch_size);
 
-        if (compute_norms && !norms_cached) {
+        if (need_compute_norms && !norms_cached) {
           compute_batch_norms(data_batch.data(), cur_batch_size);
           if (use_norm_cache) {
             raft::copy(h_norm_cache.data() + data_batch.offset(),
@@ -840,7 +850,8 @@ void kmeans_fit(
                                      weight_per_cluster.view(),
                                      batch_sums.view(),
                                      batch_counts.view(),
-                                     clustering_cost.view());
+                                     clustering_cost.view(),
+                                     centroid_norms_opt);
       }
       if (!norms_cached && use_norm_cache) {
         raft::resource::sync_stream(handle, stream);

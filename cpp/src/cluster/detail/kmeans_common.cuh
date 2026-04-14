@@ -371,7 +371,9 @@ void minClusterAndDistanceCompute(
   cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
-  rmm::device_uvector<char>& workspace);
+  rmm::device_uvector<char>& workspace,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms =
+    std::nullopt);
 
 #define EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(DataT, IndexT)                                \
   extern template void minClusterAndDistanceCompute<DataT, IndexT>(                            \
@@ -384,7 +386,8 @@ void minClusterAndDistanceCompute(
     cuvs::distance::DistanceType metric,                                                       \
     int batch_samples,                                                                         \
     int batch_centroids,                                                                       \
-    rmm::device_uvector<char>& workspace);
+    rmm::device_uvector<char>& workspace,                                                      \
+    std::optional<raft::device_vector_view<const DataT, IndexT>>);
 
 EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(float, int64_t)
 EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(float, int)
@@ -403,7 +406,9 @@ void minClusterDistanceCompute(raft::resources const& handle,
                                cuvs::distance::DistanceType metric,
                                int batch_samples,
                                int batch_centroids,
-                               rmm::device_uvector<char>& workspace);
+                               rmm::device_uvector<char>& workspace,
+                               std::optional<raft::device_vector_view<const DataT, IndexT>>
+                                 precomputed_centroid_norms = std::nullopt);
 
 #define EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(DataT, IndexT)      \
   extern template void minClusterDistanceCompute<DataT, IndexT>( \
@@ -416,7 +421,8 @@ void minClusterDistanceCompute(raft::resources const& handle,
     cuvs::distance::DistanceType metric,                         \
     int batch_samples,                                           \
     int batch_centroids,                                         \
-    rmm::device_uvector<char>& workspace);
+    rmm::device_uvector<char>& workspace,                        \
+    std::optional<raft::device_vector_view<const DataT, IndexT>>);
 
 EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(float, int64_t)
 EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(double, int64_t)
@@ -652,13 +658,12 @@ DataT compute_weight_scale(raft::resources const& handle, const DataT* weight_pt
 /**
  * @brief Process a single batch of data in the Lloyd iteration.
  *
- * This is the shared per-batch helper used by both the device (single-batch) and
- * host-streaming (multi-batch) k-means paths.  It operates entirely on device
- * buffers: given one batch of data + weights + current centroids it
- *   1. computes L2 norms (if needed),
- *   2. finds the nearest centroid for every sample,
- *   3. accumulates weighted centroid sums and counts into the running accumulators,
- *   4. accumulates the weighted clustering cost (inertia).
+ * Given one batch of data + precomputed norms + weights + current centroids it
+ *   1. finds the nearest centroid for every sample,
+ *   2. accumulates weighted centroid sums and counts into the running accumulators,
+ *   3. accumulates the weighted clustering cost (inertia).
+ *
+ * Data norms must be precomputed by the caller and passed in via L2NormBatch.
  *
  * @tparam DataT  Data / weight type (float, double)
  * @tparam IndexT Index type (int, int64_t)
@@ -672,7 +677,7 @@ DataT compute_weight_scale(raft::resources const& handle, const DataT* weight_pt
  * @param[in]     batch_centroids_param Batch-centroids param forwarded to
  *                                      minClusterAndDistanceCompute
  * @param[inout]  minClusterAndDistance Work buffer [batch_size]
- * @param[inout]  L2NormBatch          Work buffer for L2 norms [batch_size]
+ * @param[in]     L2NormBatch          Precomputed data norms [batch_size]
  * @param[inout]  L2NormBuf_OR_DistBuf Resizable scratch
  * @param[inout]  workspace            Resizable scratch
  * @param[inout]  centroid_sums        Running weighted sums [n_clusters x n_features] (added into)
@@ -680,6 +685,8 @@ DataT compute_weight_scale(raft::resources const& handle, const DataT* weight_pt
  * @param[inout]  batch_sums           Scratch for this batch [n_clusters x n_features]
  * @param[inout]  batch_counts         Scratch for this batch [n_clusters]
  * @param[inout]  clustering_cost      Running cost scalar (device) (added into)
+ * @param[in]     centroid_norms       Optional precomputed centroid norms [n_clusters].
+ *                                     When provided, skips internal centroid norm computation.
  */
 template <typename DataT, typename IndexT>
 void process_batch(
@@ -698,7 +705,8 @@ void process_batch(
   raft::device_vector_view<DataT, IndexT> weight_per_cluster,
   raft::device_matrix_view<DataT, IndexT> batch_sums,
   raft::device_vector_view<DataT, IndexT> batch_counts,
-  raft::device_scalar_view<DataT> clustering_cost)
+  raft::device_scalar_view<DataT> clustering_cost,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> centroid_norms = std::nullopt)
 {
   cudaStream_t stream     = raft::resource::get_cuda_stream(handle);
   IndexT current_batch_sz = batch_data.extent(0);
@@ -712,7 +720,8 @@ void process_batch(
                                               metric,
                                               batch_samples_param,
                                               batch_centroids_param,
-                                              workspace);
+                                              workspace,
+                                              centroid_norms);
 
   KeyValueIndexOp<IndexT, DataT> conversion_op;
   thrust::transform_iterator<KeyValueIndexOp<IndexT, DataT>,
