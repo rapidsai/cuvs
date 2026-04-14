@@ -7,6 +7,7 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
 #include <cuvs/detail/jit_lto/FragmentEntry.hpp>
+#include <cuvs/detail/jit_lto/common_fragments.hpp>
 #include <cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>
 
 namespace cuvs::neighbors::ivf_pq::detail {
@@ -61,6 +62,10 @@ struct ComputeSimilarityPlanner : AlgorithmPlanner {
   void add_sample_filter_function()
   {
     this->add_static_fragment<fragment_tag_sample_filter<FilterTag>>();
+    this->add_static_fragment<
+      cuvs::neighbors::detail::fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
+                                                          cuvs::neighbors::detail::tag_index_i64,
+                                                          FilterTag>>();
   }
 
   template <uint32_t PqBits>

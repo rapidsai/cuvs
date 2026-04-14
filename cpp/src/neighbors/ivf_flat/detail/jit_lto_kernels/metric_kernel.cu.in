@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <@header_file@>
+#include <neighbors/ivf_flat/detail/jit_lto_kernels/device_functions.cuh>
+#include <neighbors/ivf_flat/detail/jit_lto_kernels/metric_impl.cuh>
 
 namespace {
 
@@ -16,6 +17,10 @@ constexpr int veclen = @veclen@;
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Instantiate the device function template
-template __device__ void compute_dist<veclen, data_t, acc_t>(acc_t&, acc_t, acc_t);
+template <>
+__device__ void compute_dist<acc_t>(acc_t& acc, acc_t x, acc_t y)
+{
+  compute_dist_@metric_name@_impl<data_t, acc_t, veclen>(acc, x, y);
+}
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

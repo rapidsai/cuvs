@@ -1,0 +1,21 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/detail/jit_lto_kernels/filter_impl.cuh>
+
+namespace {
+
+using bitset_t = @bitset_type@;
+using index_t  = @index_type@;
+
+}  // namespace
+
+namespace cuvs::neighbors::detail {
+
+template __device__ bool sample_filter_@filter_name@<bitset_t, index_t>(uint32_t query_id,
+                                                                  index_t node_id,
+                                                                  void* filter_data);
+
+}  // namespace cuvs::neighbors::detail
