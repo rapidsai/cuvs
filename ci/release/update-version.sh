@@ -155,7 +155,6 @@ sed_runner "s|@v[0-9][0-9].[0-9][0-9].[0-9][0-9]|@v${NEXT_FULL_TAG}|g" examples/
 # rust can't handle leading 0's in the major/minor/patch version - remove
 NEXT_FULL_RUST_TAG=$(printf "%d.%d.%d" $((10#$NEXT_MAJOR)) $((10#$NEXT_MINOR)) $((10#$NEXT_PATCH)))
 sed_runner "s/version = \".*\"/version = \"${NEXT_FULL_RUST_TAG}\"/g" rust/Cargo.toml
-sed_runner "s/version = \".*\"/version = \"${NEXT_FULL_RUST_TAG}\"/g" rust/cuvs/Cargo.toml
 
 # .devcontainer files
 find .devcontainer/ -type f -name devcontainer.json -print0 | while IFS= read -r -d '' filename; do

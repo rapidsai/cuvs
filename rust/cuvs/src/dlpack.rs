@@ -84,9 +84,11 @@ fn dl_tensor_bytes(tensor: &ffi::DLTensor) -> usize {
 }
 
 unsafe extern "C" fn rmm_free_tensor(self_: *mut ffi::DLManagedTensor) {
-    let bytes = dl_tensor_bytes(&(*self_).dl_tensor);
-    let res = Resources::new().unwrap();
-    let _ = ffi::cuvsRMMFree(res.0, (*self_).dl_tensor.data as *mut _, bytes);
+    unsafe {
+        let bytes = dl_tensor_bytes(&(*self_).dl_tensor);
+        let res = Resources::new().unwrap();
+        let _ = ffi::cuvsRMMFree(res.0, (*self_).dl_tensor.data as *mut _, bytes);
+    }
 }
 
 /// Create a non-owning view of a Tensor from a ndarray

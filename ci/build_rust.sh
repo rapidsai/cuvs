@@ -38,7 +38,7 @@ export SCCACHE_S3_USE_PREPROCESSOR_CACHE_MODE=true
 
 rapids-print-env
 
-rapids-logger "Begin rust build"
+rapids-logger "Begin Rust build"
 
 sccache --stop-server 2>/dev/null || true
 

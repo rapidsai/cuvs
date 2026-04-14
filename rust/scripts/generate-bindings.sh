@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  rust/scripts/generate-bindings.sh
+  rust/scripts/generate-bindings.sh --check
+
+Regenerate the cuvs-sys bindgen output and either:
+  - copy it into rust/cuvs-sys/src/bindings.rs (default), or
+  - verify that the checked-in bindings.rs is up to date (--check)
+EOF
+}
+
+mode="write"
+case "${1:-}" in
+  "")
+    ;;
+  --check)
+    mode="check"
+    shift
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if [[ $# -ne 0 ]]; then
+  usage >&2
+  exit 2
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+rust_dir="$(cd -- "${script_dir}/.." && pwd)"
+bindings_file="${rust_dir}/cuvs-sys/src/bindings.rs"
+
+target_dir="$(
+  cargo metadata \
+    --format-version 1 \
+    --no-deps \
+    --manifest-path "${rust_dir}/Cargo.toml" \
+  | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p'
+)"
+
+if [[ -z "${target_dir}" ]]; then
+  echo "Failed to determine Cargo target directory" >&2
+  exit 1
+fi
+
+cargo build \
+  -p cuvs-sys \
+  --features generate-bindings \
+  --manifest-path "${rust_dir}/Cargo.toml"
+
+generated_file="$(
+  find "${target_dir}/debug/build" \
+    -path '*/cuvs-sys-*/out/cuvs_bindings.rs' \
+    -printf '%T@ %p\n' \
+  | sort -n \
+  | tail -n 1 \
+  | cut -d' ' -f2-
+)"
+
+if [[ -z "${generated_file}" || ! -f "${generated_file}" ]]; then
+  echo "Could not locate generated cuvs_bindings.rs in ${target_dir}/debug/build" >&2
+  exit 1
+fi
+
+echo "Generated: ${generated_file}"
+
+if [[ "${mode}" == "check" ]]; then
+  if cmp -s "${generated_file}" "${bindings_file}"; then
+    echo "Checked-in bindings are up to date: ${bindings_file}"
+    exit 0
+  fi
+
+  echo "Checked-in bindings are stale: ${bindings_file}" >&2
+  echo "Regenerate them with: ${script_dir}/generate-bindings.sh" >&2
+  exit 1
+fi
+
+cp "${generated_file}" "${bindings_file}"
+echo "Updated ${bindings_file}"
