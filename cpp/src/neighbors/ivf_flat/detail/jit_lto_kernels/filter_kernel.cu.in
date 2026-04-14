@@ -9,8 +9,10 @@
 namespace {
 
 using index_t = @index_type@;
+constexpr auto sample_filter_impl =
+  cuvs::neighbors::detail::sample_filter_@filter_name@<uint32_t, index_t>;
 
-}
+}  // namespace
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
@@ -18,8 +20,7 @@ namespace cuvs::neighbors::ivf_flat::detail {
 template <>
 __device__ bool sample_filter<int64_t>(uint32_t query_id, index_t node_id, void* filter_data)
 {
-  return cuvs::neighbors::detail::sample_filter_@filter_name@<uint32_t, index_t>(
-    query_id, node_id, filter_data);
+  return sample_filter_impl(query_id, node_id, filter_data);
 }
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

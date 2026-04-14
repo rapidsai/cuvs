@@ -6,12 +6,18 @@
 #include <neighbors/detail/jit_lto_kernels/filter.cuh>
 #include <neighbors/ivf_pq/detail/jit_lto_kernels/device_functions.cuh>
 
+namespace {
+
+constexpr auto sample_filter_impl =
+  cuvs::neighbors::detail::sample_filter_@filter_name@<uint32_t, int64_t>;
+
+}
+
 namespace cuvs::neighbors::ivf_pq::detail {
 
 __device__ bool sample_filter(uint32_t query_id, int64_t node_id, void* filter_data)
 {
-  return cuvs::neighbors::detail::sample_filter_@filter_name@<uint32_t, int64_t>(
-    query_id, node_id, filter_data);
+  return sample_filter_impl(query_id, node_id, filter_data);
 }
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
