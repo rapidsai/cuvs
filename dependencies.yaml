@@ -285,9 +285,9 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - clang==20.1.4
-          - clang-tools==20.1.4
-          - libclang==20.1.4
+          - clang==20.1.8
+          - clang-tools==20.1.8
+          - libclang==20.1.8
   # 'cuda_version' intentionally does not contain fallback entries... we want
   # a loud error if an unsupported 'cuda' value is passed
   cuda_version:
@@ -514,6 +514,17 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - scikit-learn>=1.5
+    # TODO: we're seeing test failures with openblas > 0.3.30 on aarch64. For
+    # now we pin openblas in tests on that architecture.
+    specific:
+      - output_types: [conda]
+        matrices:
+          - matrix:
+              arch: aarch64
+            packages:
+              - libopenblas<=0.3.30
+          - matrix:
+            packages:
   java:
     common:
       - output_types: conda
