@@ -735,7 +735,7 @@ void fit(const raft::resources& handle,
            "from a failed rank");
     if (curClusteringCost == (DataT)0.0) {
       RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
-    } else if (n_iter[0] > 0) {
+    } else if (n_iter[0] > 1) {
       DataT delta = curClusteringCost / priorClusteringCost;
       if (delta > 1 - params.tol) done = true;
     }
