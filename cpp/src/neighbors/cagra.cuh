@@ -327,16 +327,15 @@ ace_build_result<T, IdxT> build(
 }
 
 /**
- * @brief Build the index from a device padded dataset view.
+ * @brief Build the index from a device `dataset_view<int64_t>`.
  *
- * The index stores a non-owning copy of the view; the caller must keep the underlying data alive.
- * Obtain the view via make_padded_dataset_view() (when stride is correct) or
- * make_padded_dataset()->as_dataset_view() (when stride is incorrect).
+ * Graph construction uses `detail::convert_dataset_view_to_padded_for_graph_build`. The index
+ * stores the original view when `attach_dataset_on_build` is true.
  */
 template <typename T, typename IdxT>
 build_result<T, IdxT> build(raft::resources const& res,
                             const index_params& params,
-                            cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+                            cuvs::neighbors::dataset_view<int64_t> const& dataset)
 {
   return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
 }

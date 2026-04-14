@@ -9,6 +9,7 @@
 #include <cuda_fp16.h>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/detail/cagra_dataset_view_dispatch.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
@@ -513,13 +514,12 @@ struct index : cuvs::neighbors::index {
   {
   }
 
-  /** Construct an index from a padded dataset view and knn_graph.
+  /** Construct an index from a `dataset_view` and knn_graph.
    *
-   * The index stores a non-owning copy of the view. The caller must keep the underlying data
-   * (or the owning padded_dataset that produced the view) alive for the lifetime of the index.
-   *
-   * Usage: obtain a view via make_padded_dataset_view() (when stride is correct) or
-   * make_padded_dataset()->as_dataset_view() (when stride is incorrect), then pass it here.
+   * `detail::cagra_index_dataset_view_dispatcher` selects the concrete type. Supported:
+   * `empty_dataset_view`, `indirect_dataset_view`, `device_padded_dataset_view`,
+   * `non_owning_dataset`. The caller must keep underlying device data (and any indirect target)
+   * alive for the index lifetime.
    *
    * @code{.cpp}
    *   auto view = make_padded_dataset_view(res, dataset_mdspan);  // or
@@ -530,7 +530,7 @@ struct index : cuvs::neighbors::index {
   template <typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
-        device_padded_dataset_view<T, int64_t> const& dataset,
+        cuvs::neighbors::dataset_view<dataset_index_type> const& dataset,
         raft::mdspan<const graph_index_type,
                      raft::matrix_extent<int64_t>,
                      raft::row_major,
@@ -538,7 +538,7 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
-      dataset_(std::make_unique<device_padded_dataset_view<T, int64_t>>(dataset)),
+      dataset_(detail::cagra_index_dataset_view_dispatcher<T, dataset_index_type>(dataset)),
       dataset_norms_(std::nullopt)
   {
     RAFT_EXPECTS(dataset.n_rows() == static_cast<int64_t>(knn_graph.extent(0)),
@@ -553,51 +553,45 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Replace the dataset with a new dataset view.
+   * Replace the dataset with a new `dataset_view` (centralized handling in
+   * `detail::cagra_index_dataset_view_dispatcher`).
    *
-   * The index stores a non-owning copy of the view. The caller must keep the underlying data
-   * alive for the lifetime of the index.
-   *
-   * Note: This will clear any precomputed dataset norms.
+   * The index owns a heap copy of the view handle only (not the vector storage). The caller must
+   * keep the underlying device data (and any indirect target) alive. Clears precomputed norms.
    */
   void update_dataset(raft::resources const& res,
-                      device_padded_dataset_view<T, int64_t> const& dataset)
+                      cuvs::neighbors::dataset_view<dataset_index_type> const& dataset)
   {
-    dataset_ = std::make_unique<device_padded_dataset_view<T, int64_t>>(dataset);
+    dataset_ = detail::cagra_index_dataset_view_dispatcher<T, dataset_index_type>(dataset);
     dataset_norms_.reset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.n_rows() > 0) { compute_dataset_norms_(res); }
+      if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
     }
   }
 
   /**
-   * Replace the dataset with a non-owning strided view.
-   *
-   * The index stores a non-owning reference. The caller must keep the underlying data
-   * alive for the lifetime of the index. Used internally by extend (chunked updates).
+   * Replace the dataset with a non-owning strided device matrix view (convenience overload).
    */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset_view)
   {
-    dataset_ = std::make_unique<non_owning_dataset<T, int64_t>>(dataset_view);
-    dataset_norms_.reset();
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
-    }
+    non_owning_dataset<T, dataset_index_type> wrap(dataset_view);
+    update_dataset(res,
+                   static_cast<cuvs::neighbors::dataset_view<dataset_index_type> const&>(wrap));
   }
 
   /**
-   * Replace the dataset with a non-owning indirection to an owning `dataset` (e.g. VPQ).
-   * The caller must keep `view.target()` alive for the lifetime of the index.
+   * Replace the dataset with a non-owning row-major device matrix view (convenience overload).
    */
   void update_dataset(raft::resources const& res,
-                      cuvs::neighbors::indirect_dataset_view<int64_t> view)
+                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view)
   {
-    dataset_ = std::make_unique<cuvs::neighbors::indirect_dataset_view<int64_t>>(view);
-    dataset_norms_.reset();
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
-    }
+    auto strided =
+      raft::make_device_strided_matrix_view<const T, int64_t>(dataset_view.data_handle(),
+                                                              dataset_view.extent(0),
+                                                              dataset_view.extent(1),
+                                                              dataset_view.extent(1));
+    update_dataset(res, strided);
   }
 
   /**
@@ -1176,17 +1170,36 @@ auto build(raft::resources const& res,
   -> cuvs::neighbors::cagra::ace_build_result<uint8_t, uint32_t>;
 
 /**
- * @brief Build the index from a device padded dataset view (non-owning).
+ * @brief Build the index from a device `dataset_view` (non-owning).
  *
- * The index stores a copy of the view; the caller must keep the dataset memory alive.
- * When VPQ compression is used, returns build_result with .vpq that caller must keep alive.
- * See build(res, params, device_matrix_view) for full documentation.
+ * Graph construction uses `detail::convert_dataset_view_to_padded_for_graph_build`. The index
+ * stores a copy of the original view when `attach_dataset_on_build` is true. When VPQ compression
+ * is used, returns `build_result` with `.vpq` that the caller must keep alive.
+ * See `build(res, params, device_matrix_view)` for full documentation.
+ */
+template <typename T, typename IdxT = uint32_t>
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           cuvs::neighbors::dataset_view<int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::build_result<T, IdxT>;
+
+/**
+ * @brief Same as `build<T, IdxT>(res, params, dataset_view)` but deduces \p T from
+ *        `device_padded_dataset_view<T, int64_t>`.
+ *
+ * `build(res, params, dataset_view<int64_t>)` cannot deduce `T` from a bare `dataset_view`
+ * reference; use this overload (or specify `build<float, uint32_t>(...)`) when passing a padded
+ * view without an explicit template argument list.
  */
 template <typename T, typename IdxT = uint32_t>
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
-  -> cuvs::neighbors::cagra::build_result<T, IdxT>;
+  -> cuvs::neighbors::cagra::build_result<T, IdxT>
+{
+  return cuvs::neighbors::cagra::build<T, IdxT>(
+    res, params, static_cast<cuvs::neighbors::dataset_view<int64_t> const&>(dataset));
+}
 
 /**
  * @}

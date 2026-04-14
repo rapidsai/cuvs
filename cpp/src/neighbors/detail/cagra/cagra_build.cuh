@@ -1098,7 +1098,7 @@ template <typename T, typename IdxT>
 cuvs::neighbors::cagra::build_result<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset);
+  cuvs::neighbors::dataset_view<int64_t> const& dataset);
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
 // ACE enables building indexes for datasets too large to fit in GPU memory by:
@@ -2188,16 +2188,18 @@ template <typename T, typename IdxT = uint32_t>
 cuvs::neighbors::cagra::build_result<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+  cuvs::neighbors::dataset_view<int64_t> const& dataset)
 {
+  const auto padded = convert_dataset_view_to_padded_for_graph_build<T>(dataset);
+
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build(view)(%zu, %zu)", intermediate_degree, graph_degree);
   check_graph_degree<T, IdxT>(
-    intermediate_degree, graph_degree, static_cast<size_t>(dataset.n_rows()));
+    intermediate_degree, graph_degree, static_cast<size_t>(padded.n_rows()));
 
-  auto dataset_extents = raft::matrix_extent<int64_t>(dataset.n_rows(), dataset.dim());
+  auto dataset_extents = raft::matrix_extent<int64_t>(padded.n_rows(), padded.dim());
 
   // Set default value in case knn_build_params is not defined.
   auto knn_build_params = params.graph_build_params;
@@ -2235,12 +2237,12 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build(
   // Dispatch based on graph_build_params
   if (std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params)) {
-    cagra_graph = iterative_build_graph<T, IdxT>(res, params, dataset);
+    cagra_graph = iterative_build_graph<T, IdxT>(res, params, padded);
   } else {
     std::optional<raft::host_matrix<IdxT, int64_t>> knn_graph(
-      raft::make_host_matrix<IdxT, int64_t>(dataset.n_rows(), intermediate_degree));
+      raft::make_host_matrix<IdxT, int64_t>(padded.n_rows(), intermediate_degree));
 
-    auto dataset_view = dataset.view();
+    auto dataset_view = padded.view();
 
     if (std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params)) {
       auto ivf_pq_params =
@@ -2282,7 +2284,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build(
       build_knn_graph<T, IdxT>(res, dataset_view, knn_graph->view(), nn_descent_params);
     }
 
-    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.n_rows(), graph_degree);
+    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(padded.n_rows(), graph_degree);
 
     RAFT_LOG_TRACE("optimizing graph");
     optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
@@ -2298,21 +2300,21 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build(
                  "VPQ compression is only supported with L2Expanded distance mertric");
     // vpq_build expects row-major storage with extent(1) == logical dim. When the padded view has
     // row pitch != dim, densify the logical columns into a temporary [n_rows, dim] matrix.
-    const auto n_rows = static_cast<int64_t>(dataset.n_rows());
-    const auto dim    = static_cast<int64_t>(dataset.dim());
-    const auto stride = static_cast<int64_t>(dataset.stride());
+    const auto n_rows = static_cast<int64_t>(padded.n_rows());
+    const auto dim    = static_cast<int64_t>(padded.dim());
+    const auto stride = static_cast<int64_t>(padded.stride());
     auto stream       = raft::resource::get_cuda_stream(res);
     auto train_vpq    = [&]() -> cuvs::neighbors::vpq_dataset<half, int64_t> {
       if (stride != dim) {
         auto dense = raft::make_device_matrix<T, int64_t>(res, n_rows, dim);
         raft::copy_matrix(
-          dense.data_handle(), dim, dataset.view().data_handle(), stride, dim, n_rows, stream);
+          dense.data_handle(), dim, padded.view().data_handle(), stride, dim, n_rows, stream);
         auto dense_view =
           raft::make_device_matrix_view<const T, int64_t>(dense.data_handle(), n_rows, dim);
         return cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dense_view);
       }
       auto row_view =
-        raft::make_device_matrix_view<const T, int64_t>(dataset.view().data_handle(), n_rows, dim);
+        raft::make_device_matrix_view<const T, int64_t>(padded.view().data_handle(), n_rows, dim);
       return cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, row_view);
     };
     cuvs::neighbors::cagra::build_result<T, IdxT> out{index<T, IdxT>(res, params.metric),
