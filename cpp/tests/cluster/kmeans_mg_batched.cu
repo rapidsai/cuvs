@@ -11,7 +11,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/matrix/init.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -34,7 +33,7 @@ struct KmeansSNMGInputs {
   int n_col;
   int n_clusters;
   T tol;
-  int weight_mode;  // 0 = no weights, 1 = uniform (all-ones), 2 = non-uniform
+  int weight_mode;  // 0 = no weights, 1 = uniform, 2 = mild non-uniform, 3 = extreme non-uniform
   int streaming_batch_size;
   int n_init;
   cuvs::cluster::kmeans::params::InitMethod init = cuvs::cluster::kmeans::params::Array;
@@ -88,9 +87,27 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     auto d_centroids_ref  = raft::make_device_matrix<T, int64_t>(clique_, n_clusters, n_features);
 
     if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
-      raft::random::RngState rng(42);
-      raft::random::uniform(
-        clique_, rng, d_centroids_snmg.data_handle(), n_clusters * n_features, T(-1), T(1));
+      std::vector<int> h_labels(n_samples);
+      raft::update_host(h_labels.data(), labels.data_handle(), n_samples, stream);
+      raft::resource::sync_stream(clique_, stream);
+
+      std::vector<T> h_centroids(n_clusters * n_features, T(0));
+      std::vector<int> counts(n_clusters, 0);
+      for (int i = 0; i < n_samples; ++i) {
+        int c = h_labels[i];
+        counts[c]++;
+        for (int j = 0; j < n_features; ++j)
+          h_centroids[c * n_features + j] += h_X[i * n_features + j];
+      }
+      for (int c = 0; c < n_clusters; ++c) {
+        if (counts[c] > 0) {
+          for (int j = 0; j < n_features; ++j)
+            h_centroids[c * n_features + j] /= T(counts[c]);
+        }
+      }
+
+      raft::update_device(
+        d_centroids_snmg.data_handle(), h_centroids.data(), n_clusters * n_features, stream);
       raft::copy(d_centroids_ref.data_handle(),
                  d_centroids_snmg.data_handle(),
                  n_clusters * n_features,
@@ -104,7 +121,12 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     if (testparams_.weight_mode > 0) {
       h_sample_weight.resize(n_samples);
       for (int i = 0; i < n_samples; ++i) {
-        h_sample_weight[i] = (testparams_.weight_mode == 2) ? T(1) + T(i % 5) : T(1);
+        if (testparams_.weight_mode == 3)
+          h_sample_weight[i] = (i % 10 == 0) ? T(100) : T(1);
+        else if (testparams_.weight_mode == 2)
+          h_sample_weight[i] = T(1) + T(i % 5);
+        else
+          h_sample_weight[i] = T(1);
       }
       h_sw = raft::make_host_vector_view<const T, int64_t>(h_sample_weight.data(), n_samples);
     }
@@ -229,6 +251,27 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     snmg_n_iter_  = snmg_n_iter;
     sg_n_iter_    = sg_n_iter;
 
+    // --- Centroid-level comparison for deterministic (Array) init ---
+    if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
+      std::vector<T> h_c_snmg(n_clusters * n_features);
+      std::vector<T> h_c_sg(n_clusters * n_features);
+      raft::update_host(
+        h_c_snmg.data(), d_centroids_snmg_copy.data_handle(), n_clusters * n_features, sg_stream);
+      raft::update_host(
+        h_c_sg.data(), d_centroids_sg_int.data_handle(), n_clusters * n_features, sg_stream);
+      raft::resource::sync_stream(sg_handle, sg_stream);
+
+      double max_rel = 0;
+      for (int i = 0; i < n_clusters * n_features; ++i) {
+        double denom = std::max(double{1e-8}, std::abs(static_cast<double>(h_c_sg[i])));
+        double rel =
+          std::abs(static_cast<double>(h_c_snmg[i]) - static_cast<double>(h_c_sg[i])) / denom;
+        max_rel = std::max(max_rel, rel);
+      }
+      max_centroid_rel_diff_   = max_rel;
+      has_centroid_comparison_ = true;
+    }
+
     if (ari_vs_ref_ < 0.94 || ari_vs_sg_ < 0.94) {
       std::cout << "SNMG KMeans: ARI vs ref = " << ari_vs_ref_ << ", ARI vs SG = " << ari_vs_sg_
                 << ", num_ranks = " << num_ranks << ", snmg_inertia = " << snmg_inertia
@@ -239,14 +282,37 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
 
   void SetUp() override { runTest(); }
 
+  void checkResult()
+  {
+    // make_blobs generates well-separated clusters (spread=1.0, range [-10,10]).
+    // ARI >= 0.94 allows for minor label disagreement from floating-point
+    // non-determinism across GPUs while still catching real clustering failures.
+    ASSERT_GE(ari_vs_ref_, 0.94);
+    ASSERT_GE(ari_vs_sg_, 0.94);
+    ASSERT_GT(snmg_n_iter_, int64_t{0});
+    ASSERT_LE(snmg_n_iter_, static_cast<int64_t>(testparams_.max_iter));
+    if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
+      EXPECT_GE(ari_vs_sg_, 0.98);
+      if (sg_inertia_ > 0) {
+        EXPECT_LT(std::abs(snmg_inertia_ - sg_inertia_) / sg_inertia_, decltype(sg_inertia_){0.02});
+      }
+    }
+    if (has_centroid_comparison_) {
+      EXPECT_LT(max_centroid_rel_diff_, 0.02)
+        << "SNMG vs SG centroid max relative diff = " << max_centroid_rel_diff_;
+    }
+  }
+
   raft::device_resources_snmg clique_;
   KmeansSNMGInputs<T> testparams_;
-  double ari_vs_ref_   = 0;
-  double ari_vs_sg_    = 0;
-  T snmg_inertia_      = T{0};
-  T sg_inertia_        = T{0};
-  int64_t snmg_n_iter_ = 0;
-  int64_t sg_n_iter_   = 0;
+  double ari_vs_ref_            = 0;
+  double ari_vs_sg_             = 0;
+  T snmg_inertia_               = T{0};
+  T sg_inertia_                 = T{0};
+  int64_t snmg_n_iter_          = 0;
+  int64_t sg_n_iter_            = 0;
+  double max_centroid_rel_diff_ = 0;
+  bool has_centroid_comparison_ = false;
 };
 
 // ============================================================================
@@ -261,16 +327,19 @@ const std::vector<KmeansSNMGInputs<float>> snmg_inputsf = {
   {10000, 16, 10, 0.0001f, 1, 2000, 1},
   {10000, 16, 10, 0.0001f, 0, 500, 1},
   {1001, 32, 5, 0.0001f, 0, 1001, 1},
-  {1000, 32, 5, 0.0001f, 0, 1000, 3},
   {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::KMeansPlusPlus},
   {1001, 32, 5, 0.0001f, 0, 128, 1},
   // Non-uniform weights: exercises weight_scale = global_n / global_wt normalization
   {1000, 32, 5, 0.0001f, 2, 1000, 1},
   {10000, 16, 10, 0.0001f, 2, 2000, 1},
+  // Extreme non-uniform weights (100:1 ratio): stresses weight normalization
+  {1000, 32, 5, 0.0001f, 3, 1000, 1},
   // Extreme batch size = 1: single-element work buffers, many batch iterations
   {100, 8, 3, 0.001f, 0, 1, 1},
   // Very small dataset: some ranks may get only 2-3 rows with 4+ GPUs
   {10, 4, 3, 0.001f, 0, 10, 1},
+  // Fewer rows than GPUs: exercises empty-rank (has_data=false) partitions on 4+ GPU systems
+  {3, 4, 2, 0.001f, 0, 3, 1},
   // Trivial single cluster: convergence should be immediate
   {1000, 16, 1, 0.0001f, 0, 1000, 1},
   // Batch size > n_samples: tests per-rank clamping logic
@@ -291,8 +360,16 @@ const std::vector<KmeansSNMGInputs<double>> snmg_inputsd = {
   {1000, 32, 5, 0.0001, 0, 1000, 1},
   {1000, 32, 5, 0.0001, 0, 128, 1},
   {1000, 32, 5, 0.0001, 1, 1000, 1},
-  // Non-uniform weights for double precision
   {1000, 32, 5, 0.0001, 2, 1000, 1},
+  {10000, 16, 10, 0.0001, 0, 2000, 1},
+  {100, 8, 3, 0.001, 0, 1, 1},
+  {10, 4, 3, 0.001, 0, 10, 1},
+  {3, 4, 2, 0.001, 0, 3, 1},
+  {1000, 16, 1, 0.0001, 0, 1000, 1},
+  {1000, 32, 5, 0.0001, 0, 5000, 1},
+  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::KMeansPlusPlus},
+  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, false},
+  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, true, 2},
 };
 
 // ============================================================================
@@ -301,29 +378,11 @@ const std::vector<KmeansSNMGInputs<double>> snmg_inputsd = {
 typedef KmeansSNMGTest<float> KmeansSNMGTestF;
 typedef KmeansSNMGTest<double> KmeansSNMGTestD;
 
-TEST_P(KmeansSNMGTestF, Result)
-{
-  ASSERT_GE(ari_vs_ref_, 0.94);
-  ASSERT_GE(ari_vs_sg_, 0.94);
-  ASSERT_GT(snmg_n_iter_, int64_t{0});
-  ASSERT_LE(snmg_n_iter_, static_cast<int64_t>(testparams_.max_iter));
-  if (testparams_.init == cuvs::cluster::kmeans::params::Array && sg_inertia_ > 0) {
-    EXPECT_LT(std::abs(snmg_inertia_ - sg_inertia_) / sg_inertia_, decltype(sg_inertia_){0.05});
-  }
-}
+TEST_P(KmeansSNMGTestF, Result) { checkResult(); }
 
-TEST_P(KmeansSNMGTestD, Result)
-{
-  ASSERT_GE(ari_vs_ref_, 0.94);
-  ASSERT_GE(ari_vs_sg_, 0.94);
-  ASSERT_GT(snmg_n_iter_, int64_t{0});
-  ASSERT_LE(snmg_n_iter_, static_cast<int64_t>(testparams_.max_iter));
-  if (testparams_.init == cuvs::cluster::kmeans::params::Array && sg_inertia_ > 0) {
-    EXPECT_LT(std::abs(snmg_inertia_ - sg_inertia_) / sg_inertia_, decltype(sg_inertia_){0.05});
-  }
-}
+TEST_P(KmeansSNMGTestD, Result) { checkResult(); }
 
-INSTANTIATE_TEST_CASE_P(KmeansSNMGTests, KmeansSNMGTestF, ::testing::ValuesIn(snmg_inputsf));
-INSTANTIATE_TEST_CASE_P(KmeansSNMGTests, KmeansSNMGTestD, ::testing::ValuesIn(snmg_inputsd));
+INSTANTIATE_TEST_SUITE_P(KmeansSNMGTests, KmeansSNMGTestF, ::testing::ValuesIn(snmg_inputsf));
+INSTANTIATE_TEST_SUITE_P(KmeansSNMGTests, KmeansSNMGTestD, ::testing::ValuesIn(snmg_inputsd));
 
 }  // namespace cuvs
