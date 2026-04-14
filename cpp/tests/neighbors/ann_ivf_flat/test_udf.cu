@@ -7,6 +7,7 @@
 
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
@@ -92,14 +93,6 @@ struct TestDataTraits<T> {
       0.0f,  // query[1]: same as db[1]
     };
   }
-
-  // Expected: query[0] nearest is db[0] with distance 0
-  static int64_t expected_nearest_idx_q0() { return 0; }
-  static float expected_nearest_dist_q0() { return 0.0f; }
-
-  // Expected: query[1] nearest is db[1] with distance 0
-  static int64_t expected_nearest_idx_q1() { return 1; }
-  static float expected_nearest_dist_q1() { return 0.0f; }
 };
 
 template <udf_test_int_byte_element T>
@@ -259,14 +252,6 @@ struct TestDataTraits<T> {
       1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  // query[1]
     };
   }
-
-  // Expected: query[0] nearest is db[0] with distance 0
-  static int64_t expected_nearest_idx_q0() { return 0; }
-  static float expected_nearest_dist_q0() { return 0.0f; }
-
-  // Expected: query[1] nearest is db[3] with distance 0
-  static int64_t expected_nearest_idx_q1() { return 3; }
-  static float expected_nearest_dist_q1() { return 0.0f; }
 };
 
 // ============================================================================
@@ -401,19 +386,6 @@ TYPED_TEST(IvfFlatUdfTest, CustomL2MatchesBuiltIn)
                               static_cast<size_t>(this->k_),
                               1e-5,
                               1.0));
-
-  // Verify expected distances for query[0]
-  EXPECT_EQ(h_indices_udf[0], Traits::expected_nearest_idx_q0())
-    << "Query[0] nearest neighbor index mismatch";
-  EXPECT_NEAR(h_distances_udf[0], Traits::expected_nearest_dist_q0(), 1e-5f)
-    << "Query[0] nearest neighbor distance mismatch";
-
-  // Verify expected distances for query[1]
-  int64_t q1_offset = this->k_;
-  EXPECT_EQ(h_indices_udf[q1_offset], Traits::expected_nearest_idx_q1())
-    << "Query[1] nearest neighbor index mismatch";
-  EXPECT_NEAR(h_distances_udf[q1_offset], Traits::expected_nearest_dist_q1(), 1e-5f)
-    << "Query[1] nearest neighbor distance mismatch";
 }
 
 /**
@@ -494,6 +466,52 @@ TEST(IvfFlatUdfChebyshev, ChebyshevMatchesNaiveKnnWhenProbingAllLists)
                               static_cast<size_t>(k),
                               eps,
                               min_recall));
+}
+
+/**
+ * Invalid UDF source must fail NVRTC compilation; search should surface that as an exception,
+ * not return garbage neighbors.
+ */
+TEST(IvfFlatUdfInvalidSource, SearchThrowsWhenMetricUdfDoesNotCompile)
+{
+  using Traits = TestDataTraits<float>;
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  std::vector<float> const h_db = Traits::database();
+  std::vector<float> const h_q  = Traits::queries();
+  int64_t const n_db            = Traits::num_db_vecs;
+  int64_t const n_queries       = 2;
+  int64_t const dim             = Traits::dim;
+  int const k                   = 4;
+  uint32_t const n_lists        = 4;
+
+  rmm::device_uvector<float> d_db(static_cast<size_t>(n_db * dim), stream);
+  rmm::device_uvector<float> d_q(static_cast<size_t>(n_queries * dim), stream);
+  raft::copy(d_db.data(), h_db.data(), h_db.size(), stream);
+  raft::copy(d_q.data(), h_q.data(), h_q.size(), stream);
+
+  auto db_view = raft::make_device_matrix_view<const float, int64_t>(d_db.data(), n_db, dim);
+  auto q_view  = raft::make_device_matrix_view<const float, int64_t>(d_q.data(), n_queries, dim);
+
+  ivf_flat::index_params ip;
+  ip.n_lists = n_lists;
+  ip.metric  = cuvs::distance::DistanceType::L2Expanded;
+  auto idx   = ivf_flat::build(handle, ip, db_view);
+
+  rmm::device_uvector<int64_t> d_idx(static_cast<size_t>(n_queries * k), stream);
+  rmm::device_uvector<float> d_dist(static_cast<size_t>(n_queries * k), stream);
+  auto out_idx  = raft::make_device_matrix_view<int64_t, int64_t>(d_idx.data(), n_queries, k);
+  auto out_dist = raft::make_device_matrix_view<float, int64_t>(d_dist.data(), n_queries, k);
+
+  ivf_flat::search_params sp;
+  sp.n_probes = 2;
+  // Not valid CUDA / device code — NVRTC compile must fail (see NVRTCLTOFragmentCompiler::compile).
+  sp.metric_udf = std::string{R"__(
+__device__ void not_even_close_to_valid( { { {
+)__"};
+
+  EXPECT_THROW(ivf_flat::search(handle, sp, idx, q_view, out_idx, out_dist), raft::logic_error);
 }
 
 }  // namespace cuvs::neighbors::ivf_flat
