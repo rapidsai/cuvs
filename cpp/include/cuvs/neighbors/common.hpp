@@ -133,48 +133,36 @@ enum class MergeStrategy {
 /** @} */  // end group neighbors_index
 
 /**
- * @brief Abstract base for any dataset representation used behind a type-erased pointer.
+ * @brief Owning dataset storage (mdarray-like). Concrete owning types derive from this.
  *
- * Provides the minimal virtual interface (`n_rows`, `dim`) shared by owning `dataset` types and
- * non-owning `dataset_view` types. Indices store `std::unique_ptr<polymorphic_dataset<IdxT>>` so
- * they can hold either branch at runtime. Ownership is expressed by type (`dataset` vs
- * `dataset_view`), not by a flag.
+ * Does not inherit from `dataset_view`; ownership is expressed only by inheriting `dataset`.
  */
 template <typename IdxT>
-struct polymorphic_dataset {
+struct dataset {
   using index_type                                                 = IdxT;
   [[nodiscard]] virtual auto n_rows() const noexcept -> index_type = 0;
   [[nodiscard]] virtual auto dim() const noexcept -> uint32_t      = 0;
-  virtual ~polymorphic_dataset() noexcept                          = default;
+  virtual ~dataset()                                               = default;
 
- protected:
-  polymorphic_dataset() = default;
-};
-
-/** Owning or authoritative dataset storage (marker base). Concrete owning types derive from this.
- */
-template <typename IdxT>
-struct dataset : public virtual polymorphic_dataset<IdxT> {
  protected:
   dataset() = default;
-
- public:
-  ~dataset() override = default;
 };
 
 /**
- * @brief Non-owning dataset view (marker base).
+ * @brief Non-owning dataset view (mdspan-like).
  *
- * Padded views, strided non-owning rows, and pointer indirection (`indirect_dataset_view`) derive
- * from this—not from `dataset`. This mirrors the mdspan vs mdarray split.
+ * Padded views, strided non-owning rows, empty placeholder views, and pointer indirection
+ * (`indirect_dataset_view`) derive from this—not from `dataset`.
  */
 template <typename IdxT>
-struct dataset_view : public virtual polymorphic_dataset<IdxT> {
+struct dataset_view {
+  using index_type                                                 = IdxT;
+  [[nodiscard]] virtual auto n_rows() const noexcept -> index_type = 0;
+  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t      = 0;
+  virtual ~dataset_view()                                          = default;
+
  protected:
   dataset_view() = default;
-
- public:
-  ~dataset_view() override = default;
 };
 
 template <typename IdxT>
@@ -186,10 +174,20 @@ struct empty_dataset : public dataset<IdxT> {
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return suggested_dim; }
 };
 
+/** Non-owning placeholder when an index has no vectors but may still report logical dimension. */
+template <typename IdxT>
+struct empty_dataset_view : public dataset_view<IdxT> {
+  using index_type = IdxT;
+  uint32_t suggested_dim_{};
+  explicit empty_dataset_view(uint32_t dim) noexcept : suggested_dim_(dim) {}
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return 0; }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return suggested_dim_; }
+};
+
 /**
  * @brief Non-owning `dataset_view` that forwards shape from an owning `dataset` via pointer.
  *
- * The index can store this in `unique_ptr<polymorphic_dataset>` while the owning object (e.g.
+ * Indices may store this in `unique_ptr<dataset_view>` while the owning object (e.g.
  * `vpq_dataset`) is kept alive elsewhere. Callers must ensure `target()` outlives any use of the
  * index. Serialization unwraps this to persist the underlying owning dataset.
  */
@@ -207,8 +205,9 @@ struct indirect_dataset_view final : public dataset_view<IdxT> {
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return target_->dim(); }
 };
 
+/** Strided device row layout; independent of owning vs view (no common root with `dataset`). */
 template <typename DataT, typename IdxT>
-struct strided_dataset : public virtual polymorphic_dataset<IdxT> {
+struct strided_dataset {
   using index_type = IdxT;
   using value_type = DataT;
   using view_type  = raft::device_matrix_view<const value_type, index_type, raft::layout_stride>;
@@ -217,10 +216,10 @@ struct strided_dataset : public virtual polymorphic_dataset<IdxT> {
   strided_dataset() = default;
 
  public:
-  ~strided_dataset() override = default;
+  virtual ~strided_dataset() = default;
 
-  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return view().extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t final
+  [[nodiscard]] auto n_rows() const noexcept -> index_type { return view().extent(0); }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
     return static_cast<uint32_t>(view().extent(1));
   }
@@ -241,6 +240,14 @@ struct non_owning_dataset : public dataset_view<IdxT>, public strided_dataset<Da
   explicit non_owning_dataset(view_type v) noexcept
     : dataset_view<IdxT>(), strided_dataset<DataT, IdxT>(), data(v)
   {
+  }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final
+  {
+    return strided_dataset<value_type, index_type>::n_rows();
+  }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t final
+  {
+    return strided_dataset<value_type, index_type>::dim();
   }
   [[nodiscard]] auto view() const noexcept -> view_type final { return data; };
 };
@@ -263,6 +270,14 @@ struct owning_dataset : public dataset<IdxT>, public strided_dataset<DataT, IdxT
   {
   }
 
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final
+  {
+    return strided_dataset<value_type, index_type>::n_rows();
+  }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t final
+  {
+    return strided_dataset<value_type, index_type>::dim();
+  }
   [[nodiscard]] auto view() const noexcept -> view_type final
   {
     return view_type{data.data_handle(), view_mapping};
@@ -1168,7 +1183,7 @@ struct iface {
   std::optional<raft::device_matrix<T, int64_t, raft::row_major>> cagra_build_dataset_;
   /** Used by CAGRA when deserializing an index that contains a dataset; keeps it alive for the
    * view. */
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> cagra_owned_dataset_;
+  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> cagra_owned_dataset_;
   std::shared_ptr<std::mutex> mutex_;
 };
 

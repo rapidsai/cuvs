@@ -263,11 +263,10 @@ void serialize_to_hnswlib(
  *
  */
 template <typename T, typename IdxT>
-void deserialize(
-  raft::resources const& res,
-  std::istream& is,
-  index<T, IdxT>* index_,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr)
+void deserialize(raft::resources const& res,
+                 std::istream& is,
+                 index<T, IdxT>* index_,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
@@ -312,11 +311,10 @@ void deserialize(
 }
 
 template <typename T, typename IdxT>
-void deserialize(
-  raft::resources const& res,
-  const std::string& filename,
-  index<T, IdxT>* index_,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr)
+void deserialize(raft::resources const& res,
+                 const std::string& filename,
+                 index<T, IdxT>* index_,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 

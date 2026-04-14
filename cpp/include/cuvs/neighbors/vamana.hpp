@@ -125,9 +125,9 @@ struct index : cuvs::neighbors::index {
     return graph_view_.extent(1);
   }
 
-  /** Polymorphic dataset binding (owning storage or non-owning view). */
-  [[nodiscard]] inline auto data() const noexcept
-    -> const cuvs::neighbors::polymorphic_dataset<int64_t>&
+  /** Non-owning dataset view stored by the index (full-precision vectors may live in
+   * `full_precision_dataset_`). */
+  [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset_view<int64_t>&
   {
     return *dataset_;
   }
@@ -164,7 +164,8 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0)),
+      full_precision_dataset_(),
+      dataset_(std::make_unique<cuvs::neighbors::empty_dataset_view<int64_t>>(0)),
       quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0))
   {
   }
@@ -182,7 +183,9 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      dataset_(make_aligned_dataset(res, dataset, 16)),
+      full_precision_dataset_(make_aligned_dataset(res, dataset, 16)),
+      dataset_(std::make_unique<cuvs::neighbors::non_owning_dataset<T, int64_t>>(
+        full_precision_dataset_->view())),
       quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)),
       medoid_id_(medoid_id)
   {
@@ -262,7 +265,9 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
-  std::unique_ptr<neighbors::polymorphic_dataset<int64_t>> dataset_;
+  /** Owns full-precision vectors when built from mdspan; destroyed after `dataset_` view. */
+  std::unique_ptr<cuvs::neighbors::strided_dataset<T, int64_t>> full_precision_dataset_;
+  std::unique_ptr<cuvs::neighbors::dataset_view<int64_t>> dataset_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;
   IdxT medoid_id_;
 };

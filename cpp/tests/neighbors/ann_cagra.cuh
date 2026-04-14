@@ -479,7 +479,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> loaded_dataset;
+        std::unique_ptr<cuvs::neighbors::dataset<int64_t>> loaded_dataset;
         cagra::deserialize(handle_, index_file.filename, &index, &loaded_dataset);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, device_padded.view); }

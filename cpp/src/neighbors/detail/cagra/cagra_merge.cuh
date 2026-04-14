@@ -73,7 +73,7 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
                      "Row stride of datasets in indices must be equal.");
       }
       new_dataset_size += index->size();
-    } else if (dynamic_cast<const cuvs::neighbors::empty_dataset<int64_t>*>(&index->data()) !=
+    } else if (dynamic_cast<const cuvs::neighbors::empty_dataset_view<int64_t>*>(&index->data()) !=
                nullptr) {
       RAFT_FAIL(
         "cagra::merge only supports an index to which the dataset is attached. Please check if the "

@@ -23,11 +23,17 @@ namespace cuvs::neighbors::test {
 
 using namespace cuvs::neighbors;
 
-/** True if dynamic type is an owning `dataset<IdxT>` (not a `dataset_view<IdxT>`). */
+/** True if dynamic type inherits `dataset<>` (not only `dataset_view<>`). */
 template <typename IdxT>
-bool stores_owning_dataset(const polymorphic_dataset<IdxT>& d)
+bool stores_owning_dataset(const dataset<IdxT>&)
 {
-  return dynamic_cast<const dataset<IdxT>*>(&d) != nullptr;
+  return true;
+}
+
+template <typename T>
+bool stores_owning_dataset(const T& d)
+{
+  return dynamic_cast<const dataset<typename T::index_type>*>(&d) != nullptr;
 }
 
 // Helper: assert that ptr is device memory (for device_* dataset views).
@@ -385,44 +391,44 @@ TEST(DatasetTypes, VpqDataset)
 // }
 
 // ---------------------------------------------------------------------------
-// Polymorphic access via polymorphic_dataset<IdxT>* (owning dataset vs view)
+// Owning `dataset<IdxT>` vs `dataset_view<IdxT>` roots (dynamic_cast)
 // ---------------------------------------------------------------------------
-TEST(DatasetTypes, PolymorphicBaseAccess)
+TEST(DatasetTypes, DatasetVsDatasetViewRoots)
 {
   raft::resources res;
 
-  // empty
+  // empty (owning marker)
   empty_dataset<int64_t> empty(64);
-  polymorphic_dataset<int64_t>* poly = &empty;
-  EXPECT_EQ(poly->n_rows(), 0);
-  EXPECT_EQ(poly->dim(), 64u);
-  EXPECT_TRUE(stores_owning_dataset(*poly));
+  dataset<int64_t>* dptr = &empty;
+  EXPECT_EQ(dptr->n_rows(), 0);
+  EXPECT_EQ(dptr->dim(), 64u);
+  EXPECT_TRUE(stores_owning_dataset(*dptr));
 
   // strided (owning)
   auto dev_matrix = raft::make_device_matrix<float, int64_t>(res, 5, 8);
   auto ds_strided = make_strided_dataset(res, dev_matrix.view(), 16u);
-  poly            = ds_strided.get();
-  EXPECT_EQ(poly->n_rows(), 5);
-  EXPECT_EQ(poly->dim(), 8u);
-  EXPECT_TRUE(stores_owning_dataset(*poly));
+  auto* sbase     = ds_strided.get();
+  EXPECT_EQ(sbase->n_rows(), 5);
+  EXPECT_EQ(sbase->dim(), 8u);
+  EXPECT_TRUE(stores_owning_dataset(*sbase));
 
   // device padded (owning)
   auto dev_data  = raft::make_device_matrix<float, int64_t>(res, 6, 4);
   auto ds_padded = std::make_unique<device_padded_dataset<float, int64_t>>(std::move(dev_data), 4u);
-  poly           = ds_padded.get();
-  EXPECT_EQ(poly->n_rows(), 6);
-  EXPECT_EQ(poly->dim(), 4u);
-  EXPECT_TRUE(stores_owning_dataset(*poly));
+  dptr           = ds_padded.get();
+  EXPECT_EQ(dptr->n_rows(), 6);
+  EXPECT_EQ(dptr->dim(), 4u);
+  EXPECT_TRUE(stores_owning_dataset(*dptr));
 
   // vpq
   auto vq       = raft::make_device_matrix<float, uint32_t>(res, 2, 4);
   auto pq       = raft::make_device_matrix<float, uint32_t>(res, 256, 2);
   auto vpq_data = raft::make_device_matrix<uint8_t, int64_t>(res, 3, 2);
   vpq_dataset<float, int64_t> vpq(std::move(vq), std::move(pq), std::move(vpq_data));
-  poly = &vpq;
-  EXPECT_EQ(poly->n_rows(), 3);
-  EXPECT_EQ(poly->dim(), 4u);
-  EXPECT_TRUE(stores_owning_dataset(*poly));
+  dptr = &vpq;
+  EXPECT_EQ(dptr->n_rows(), 3);
+  EXPECT_EQ(dptr->dim(), 4u);
+  EXPECT_TRUE(stores_owning_dataset(*dptr));
 
   // pq (disabled until pq_dataset is in common.hpp)
   // auto pq_cb = raft::make_device_matrix<float, uint32_t>(res, 256, 2);

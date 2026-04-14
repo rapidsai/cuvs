@@ -58,7 +58,7 @@ void to_file(const std::string& dataset_base_file, raft::host_matrix<T, int64_t>
  */
 template <typename T>
 void serialize_dataset(raft::resources const& res,
-                       const cuvs::neighbors::polymorphic_dataset<int64_t>* dataset,
+                       const cuvs::neighbors::dataset_view<int64_t>* dataset,
                        const std::string& dataset_base_file)
 {
   // try allocating a buffer for the dataset on host
@@ -122,7 +122,7 @@ void serialize_dataset(raft::resources const& res,
 template <typename T, typename IdxT, typename HostMatT>
 void serialize_sector_aligned(raft::resources const& res,
                               const HostMatT& h_graph,
-                              const cuvs::neighbors::polymorphic_dataset<int64_t>& dataset,
+                              const cuvs::neighbors::dataset_view<int64_t>& dataset,
                               const uint64_t medoid,
                               std::ofstream& output_writer)
 {

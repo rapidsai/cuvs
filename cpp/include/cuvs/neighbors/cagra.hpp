@@ -437,18 +437,12 @@ struct index : cuvs::neighbors::index {
         p_padded_view->dim(),
         p_padded_view->stride());
     }
-    auto p_padded = dynamic_cast<device_padded_dataset<T, int64_t>*>(dataset_.get());
-    if (p_padded != nullptr) {
-      return raft::make_device_strided_matrix_view<const T, int64_t>(
-        p_padded->view().data_handle(), p_padded->n_rows(), p_padded->dim(), p_padded->stride());
-    }
     auto d = dataset_->dim();
     return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
   }
 
-  /** Polymorphic dataset binding (owning storage or non-owning view). */
-  [[nodiscard]] inline auto data() const noexcept
-    -> const cuvs::neighbors::polymorphic_dataset<int64_t>&
+  /** Non-owning dataset binding stored by the index (mdspan-like). */
+  [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset_view<int64_t>&
   {
     return *dataset_;
   }
@@ -514,7 +508,7 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
-      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0)),
+      dataset_(std::make_unique<cuvs::neighbors::empty_dataset_view<int64_t>>(0)),
       dataset_norms_(std::nullopt)
   {
   }
@@ -715,7 +709,7 @@ struct index : cuvs::neighbors::index {
     // Re-open the file descriptor in read-only mode for subsequent operations
     dataset_fd_.emplace(std::move(fd));
 
-    dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
+    dataset_ = std::make_unique<cuvs::neighbors::empty_dataset_view<int64_t>>(0);
     dataset_norms_.reset();
   }
 
@@ -799,7 +793,7 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> graph_view_;
-  std::unique_ptr<neighbors::polymorphic_dataset<dataset_index_type>> dataset_;
+  std::unique_ptr<neighbors::dataset_view<dataset_index_type>> dataset_;
   // Mapping from internal graph node indices to the original user-provided indices.
   std::optional<raft::device_vector<IdxT, int64_t>> source_indices_;
   // only float distances supported at the moment
@@ -1773,11 +1767,10 @@ void serialize(raft::resources const& handle,
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  const std::string& filename,
-  cuvs::neighbors::cagra::index<float, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<float, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1827,11 +1820,10 @@ void serialize(raft::resources const& handle,
  * @param[in] is input stream
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  std::istream& is,
-  cuvs::neighbors::cagra::index<float, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<float, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 /**
  * Save the index to file.
  *
@@ -1882,11 +1874,10 @@ void serialize(raft::resources const& handle,
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  const std::string& filename,
-  cuvs::neighbors::cagra::index<half, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1936,11 +1927,10 @@ void serialize(raft::resources const& handle,
  * @param[in] is input stream
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  std::istream& is,
-  cuvs::neighbors::cagra::index<half, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -1991,11 +1981,10 @@ void serialize(raft::resources const& handle,
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  const std::string& filename,
-  cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2045,11 +2034,10 @@ void serialize(raft::resources const& handle,
  * @param[in] is input stream
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  std::istream& is,
-  cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -2100,11 +2088,10 @@ void serialize(raft::resources const& handle,
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  const std::string& filename,
-  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2154,11 +2141,10 @@ void serialize(raft::resources const& handle,
  * @param[in] is input stream
  * @param[out] index the cagra index
  */
-void deserialize(
-  raft::resources const& handle,
-  std::istream& is,
-  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream

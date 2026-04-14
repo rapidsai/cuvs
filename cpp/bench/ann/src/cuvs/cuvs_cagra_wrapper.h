@@ -163,9 +163,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
   std::vector<raft::device_matrix<T, int64_t, raft::row_major>> sub_dataset_buffers_;
-  std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>> deserialized_dataset_;
-  std::vector<std::unique_ptr<cuvs::neighbors::polymorphic_dataset<int64_t>>>
-    sub_deserialized_datasets_;
+  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> deserialized_dataset_;
+  std::vector<std::unique_ptr<cuvs::neighbors::dataset<int64_t>>> sub_deserialized_datasets_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
@@ -391,9 +390,14 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
     need_dataset_update_ = false;
   } else {
     using ds_idx_type = decltype(index_->data().n_rows());
+    auto const* dptr  = &index_->data();
+    if (auto* ind =
+          dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(dptr)) {
+      dptr = ind->target();
+    }
     bool is_vpq =
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(dptr) != nullptr ||
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(dptr) != nullptr;
     // It can happen that we are re-using a previous algo object which already has
     // the dataset set. Check if we need update.
     if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
@@ -419,9 +423,14 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
     f.close();
   } else {
     using ds_idx_type = decltype(index_->data().n_rows());
+    auto const* dptr  = &index_->data();
+    if (auto* ind =
+          dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(dptr)) {
+      dptr = ind->target();
+    }
     bool is_vpq =
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(dptr) != nullptr ||
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(dptr) != nullptr;
     cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
   }
 }

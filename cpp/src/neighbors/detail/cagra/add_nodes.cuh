@@ -454,7 +454,7 @@ void extend_core(
     } else {
       index.update_graph(handle, raft::make_const_mdspan(updated_graph.view()));
     }
-  } else if (dynamic_cast<const cuvs::neighbors::empty_dataset<int64_t>*>(&index.data()) !=
+  } else if (dynamic_cast<const cuvs::neighbors::empty_dataset_view<int64_t>*>(&index.data()) !=
              nullptr) {
     RAFT_FAIL(
       "cagra::extend only supports an index to which the dataset is attached. Please check if the "
