@@ -7,7 +7,6 @@
 
 #include <cstdint>
 
-#include "../../../detail/jit_lto_kernels/filter_data.cuh"
 #include "block_sort.cuh"
 #include "device_functions.cuh"
 
@@ -75,15 +74,10 @@ __device__ void compute_distances_impl(const uint32_t* chunk_indices,
        i += blockDim.x, pq_thread_data += pq_line_width) {
     OutT score = kDummy;
     bool valid = i < n_samples;
-    // For IVF PQ, convert (label, i) to node_id using inds_ptrs
-    const int64_t node_id = inds_ptrs[label][i];
-    // Construct filter_data struct (bitset data is in global memory)
-    cuvs::neighbors::detail::bitset_filter_data_t<uint32_t, int64_t> filter_data(
-      bitset_ptr, bitset_len, original_nbits);
     // Check bounds and that the sample is acceptable for the query
     if (valid &&
         sample_filter(
-          queries_offset + query_ix, node_id, bitset_ptr != nullptr ? &filter_data : nullptr)) {
+          inds_ptrs, queries_offset + query_ix, label, i, bitset_ptr, bitset_len, original_nbits)) {
       score = compute_score<OutT, LutT>(
         pq_dim, reinterpret_cast<const vec_t::io_t*>(pq_thread_data), lut_scores, early_stop_limit);
       score = increment_score<OutT>(score);

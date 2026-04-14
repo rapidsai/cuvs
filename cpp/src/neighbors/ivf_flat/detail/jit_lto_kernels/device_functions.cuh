@@ -27,6 +27,12 @@ template <typename T>
 __device__ T post_process(T val);
 
 template <typename IndexT>
-__device__ bool sample_filter(uint32_t query_id, IndexT node_id, void* filter_data);
+__device__ bool sample_filter(const IndexT* const* const inds_ptrs,
+                              const uint32_t query_ix,
+                              const uint32_t cluster_ix,
+                              const uint32_t sample_ix,
+                              uint32_t* bitset_ptr,
+                              IndexT bitset_len,
+                              IndexT original_nbits);
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

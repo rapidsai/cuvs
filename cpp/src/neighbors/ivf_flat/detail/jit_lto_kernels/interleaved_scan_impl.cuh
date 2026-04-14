@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "../../../detail/jit_lto_kernels/filter_data.cuh"
 #include "../../../ivf_common.cuh"
 #include "device_functions.cuh"
 
@@ -157,15 +156,13 @@ __device__ __forceinline__ void interleaved_scan_impl(const uint32_t query_smem_
 
         // This is the vector a given lane/thread handles
         const uint32_t vec_id = group_id * raft::WarpSize + lane_id;
-        // For IVF Flat, convert (list_id, vec_id) to node_id using inds_ptrs
-        const IdxT node_id = inds_ptrs[list_id][vec_id];
-        // Construct filter_data struct (bitset data is in global memory)
-        cuvs::neighbors::detail::bitset_filter_data_t<uint32_t, IdxT> filter_data(
-          bitset_ptr, bitset_len, original_nbits);
-        const bool valid =
-          vec_id < list_length &&
-          sample_filter<IdxT>(
-            queries_offset + blockIdx.y, node_id, bitset_ptr != nullptr ? &filter_data : nullptr);
+        const bool valid      = vec_id < list_length && sample_filter<IdxT>(inds_ptrs,
+                                                                       queries_offset + blockIdx.y,
+                                                                       list_id,
+                                                                       vec_id,
+                                                                       bitset_ptr,
+                                                                       bitset_len,
+                                                                       original_nbits);
 
         // Enqueue one element per thread
         float val = local_topk_t::queue_t::kDummy;
