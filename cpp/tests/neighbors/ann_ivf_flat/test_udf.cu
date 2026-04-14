@@ -12,6 +12,8 @@
 #include <raft/core/resources.hpp>
 #include <rmm/device_uvector.hpp>
 
+#include "../ann_utils.cuh"
+
 #include <array>
 #include <chrono>
 #include <concepts>
@@ -25,6 +27,13 @@ namespace cuvs::neighbors::ivf_flat {
 
 // Custom L2 (squared Euclidean) metric - should match built-in L2
 CUVS_METRIC(custom_l2, { acc += squared_diff(x, y); })
+
+// L∞ (Chebyshev): per dimension acc = max(acc, |x - y|); acc starts at 0 in the scan kernel.
+// For float (Veclen == 1) each invocation sees one coordinate pair.
+CUVS_METRIC(chebyshev_linf, {
+  auto d = abs_diff(x, y);
+  acc    = (d > acc) ? d : acc;
+})
 
 // ============================================================================
 // Test data traits for different types
@@ -383,12 +392,15 @@ TYPED_TEST(IvfFlatUdfTest, CustomL2MatchesBuiltIn)
   raft::copy(h_distances_udf.data(), d_distances_udf.data(), this->num_queries_ * this->k_, stream);
   raft::resource::sync_stream(this->handle_);
 
-  // Verify UDF results match built-in results
-  for (int64_t i = 0; i < this->num_queries_ * this->k_; ++i) {
-    EXPECT_EQ(h_indices_udf[i], h_indices_builtin[i]) << "Index mismatch at position " << i;
-    EXPECT_NEAR(h_distances_udf[i], h_distances_builtin[i], 1e-5f)
-      << "Distance mismatch at position " << i;
-  }
+  // UDF vs built-in: same neighbors/distances (per-query recall against built-in top-k).
+  ASSERT_TRUE(eval_neighbours(h_indices_builtin,
+                              h_indices_udf,
+                              h_distances_builtin,
+                              h_distances_udf,
+                              static_cast<size_t>(this->num_queries_),
+                              static_cast<size_t>(this->k_),
+                              1e-5,
+                              1.0));
 
   // Verify expected distances for query[0]
   EXPECT_EQ(h_indices_udf[0], Traits::expected_nearest_idx_q0())
@@ -402,6 +414,86 @@ TYPED_TEST(IvfFlatUdfTest, CustomL2MatchesBuiltIn)
     << "Query[1] nearest neighbor index mismatch";
   EXPECT_NEAR(h_distances_udf[q1_offset], Traits::expected_nearest_dist_q1(), 1e-5f)
     << "Query[1] nearest neighbor distance mismatch";
+}
+
+/**
+ * Build the index with native L2, search with a different metric (Chebyshev UDF), and compare to
+ * exhaustive top-k from naive_knn (DistanceType::Linf). With n_probes == n_lists every cluster is
+ * probed so every database vector is scored — equivalent to brute force for correctness.
+ */
+TEST(IvfFlatUdfChebyshev, ChebyshevMatchesNaiveKnnWhenProbingAllLists)
+{
+  using Traits = TestDataTraits<float>;
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  std::vector<float> const h_db = Traits::database();
+  std::vector<float> const h_q  = Traits::queries();
+  int64_t const n_db            = Traits::num_db_vecs;
+  int64_t const n_queries       = 2;
+  int64_t const dim             = Traits::dim;
+  int const k                   = 4;
+  uint32_t const n_lists        = 4;
+  uint32_t const n_probes       = n_lists;
+
+  rmm::device_uvector<float> d_db(static_cast<size_t>(n_db * dim), stream);
+  rmm::device_uvector<float> d_q(static_cast<size_t>(n_queries * dim), stream);
+  raft::copy(d_db.data(), h_db.data(), h_db.size(), stream);
+  raft::copy(d_q.data(), h_q.data(), h_q.size(), stream);
+
+  auto db_view = raft::make_device_matrix_view<const float, int64_t>(d_db.data(), n_db, dim);
+  auto q_view  = raft::make_device_matrix_view<const float, int64_t>(d_q.data(), n_queries, dim);
+
+  ivf_flat::index_params ip;
+  ip.n_lists = n_lists;
+  ip.metric  = cuvs::distance::DistanceType::L2Expanded;
+  auto idx   = ivf_flat::build(handle, ip, db_view);
+
+  rmm::device_uvector<int64_t> d_idx(static_cast<size_t>(n_queries * k), stream);
+  rmm::device_uvector<float> d_dist(static_cast<size_t>(n_queries * k), stream);
+  auto out_idx  = raft::make_device_matrix_view<int64_t, int64_t>(d_idx.data(), n_queries, k);
+  auto out_dist = raft::make_device_matrix_view<float, int64_t>(d_dist.data(), n_queries, k);
+
+  ivf_flat::search_params sp;
+  sp.n_probes   = n_probes;
+  sp.metric_udf = chebyshev_linf_udf();
+  ivf_flat::search(handle, sp, idx, q_view, out_idx, out_dist);
+
+  std::vector<int64_t> gpu_idx(static_cast<size_t>(n_queries * k));
+  std::vector<float> gpu_dist(static_cast<size_t>(n_queries * k));
+  raft::copy(gpu_idx.data(), d_idx.data(), gpu_idx.size(), stream);
+  raft::copy(gpu_dist.data(), d_dist.data(), gpu_dist.size(), stream);
+
+  rmm::device_uvector<float> d_ref_dist(static_cast<size_t>(n_queries * k), stream);
+  rmm::device_uvector<int64_t> d_ref_idx(static_cast<size_t>(n_queries * k), stream);
+  cuvs::neighbors::naive_knn<float, float, int64_t>(handle,
+                                                    d_ref_dist.data(),
+                                                    d_ref_idx.data(),
+                                                    d_q.data(),
+                                                    d_db.data(),
+                                                    static_cast<size_t>(n_queries),
+                                                    static_cast<size_t>(n_db),
+                                                    static_cast<size_t>(dim),
+                                                    static_cast<uint32_t>(k),
+                                                    cuvs::distance::DistanceType::Linf);
+
+  std::vector<int64_t> ref_idx(static_cast<size_t>(n_queries * k));
+  std::vector<float> ref_dist(static_cast<size_t>(n_queries * k));
+  raft::copy(ref_idx.data(), d_ref_idx.data(), ref_idx.size(), stream);
+  raft::copy(ref_dist.data(), d_ref_dist.data(), ref_dist.size(), stream);
+  raft::resource::sync_stream(handle);
+
+  // Full probe (n_probes == n_lists): expect agreement with exhaustive naive_knn (Linf).
+  double const min_recall = 1.0;
+  double const eps        = 1e-4;
+  ASSERT_TRUE(eval_neighbours(ref_idx,
+                              gpu_idx,
+                              ref_dist,
+                              gpu_dist,
+                              static_cast<size_t>(n_queries),
+                              static_cast<size_t>(k),
+                              eps,
+                              min_recall));
 }
 
 }  // namespace cuvs::neighbors::ivf_flat
