@@ -19,10 +19,10 @@
     },
     {
       "data_type": "__half",
-      "acc_type": "__half",
+      "acc_type": "float",
       "veclen": ["1", "8"],
       "type_abbrev": "h",
-      "acc_abbrev": "h"
+      "acc_abbrev": "f"
     },
     {
       "data_type": "uint8_t",
