@@ -492,6 +492,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libcublas
           - libcurand
