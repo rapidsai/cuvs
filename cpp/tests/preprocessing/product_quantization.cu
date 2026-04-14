@@ -165,7 +165,10 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     kmeans_params_variant kmeans_params =
       (params_.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced)
         ? kmeans_params_variant(cuvs::cluster::kmeans::balanced_params{.n_iters = 25})
-        : kmeans_params_variant(cuvs::cluster::kmeans::params{.max_iter = 25});
+        : kmeans_params_variant(
+            cuvs::cluster::kmeans::params{.n_clusters = 1 << params_.pq_bits,
+                                          .init = cuvs::cluster::kmeans::params::InitMethod::Random,
+                                          .max_iter = 25});
     config_ = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
                                                         params_.pq_dim,
                                                         params_.use_subspaces,

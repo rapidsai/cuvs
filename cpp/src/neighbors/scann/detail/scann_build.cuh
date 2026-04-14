@@ -160,15 +160,16 @@ index<T, IdxT> build(
   int dim_per_subspace = params.pq_dim;
   int num_clusters     = 1 << params.pq_bits;
 
-  cuvs::preprocessing::quantize::pq::params pq_build_params;
-  cuvs::cluster::kmeans::balanced_params pq_bp;
-  pq_bp.n_iters                                = params.pq_train_iters;
-  pq_build_params.pq_bits                      = params.pq_bits;
-  pq_build_params.pq_dim                       = num_subspaces;
-  pq_build_params.use_subspaces                = true;
-  pq_build_params.use_vq                       = false;  // We already computed residuals
-  pq_build_params.kmeans_params                = pq_bp;
-  pq_build_params.max_train_points_per_pq_code = pq_n_rows_train / num_clusters;
+  cuvs::preprocessing::quantize::pq::params pq_build_params(
+    params.pq_bits,
+    num_subspaces,
+    true,
+    false,
+    0,
+    params.pq_train_iters,
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+    pq_n_rows_train / num_clusters,
+    1024);
 
   auto pq_quantizer = cuvs::preprocessing::quantize::pq::build(
     res, pq_build_params, raft::make_const_mdspan(trainset_residuals.view()));

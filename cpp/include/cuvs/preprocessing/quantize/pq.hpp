@@ -29,6 +29,54 @@ using kmeans_params_variant =
  */
 struct params {
   /**
+   * Simplified constructor that will build an appropriate kmeans params object.
+   */
+  params(uint32_t pq_bits,
+         uint32_t pq_dim,
+         bool use_subspaces,
+         bool use_vq,
+         uint32_t vq_n_centers,
+         uint32_t kmeans_n_iters,
+         cuvs::cluster::kmeans::kmeans_type pq_kmeans_type,
+         uint32_t max_train_points_per_pq_code,
+         uint32_t max_train_points_per_vq_cluster)
+  {
+    this->pq_bits       = pq_bits;
+    this->pq_dim        = pq_dim;
+    this->use_subspaces = use_subspaces;
+    this->use_vq        = use_vq;
+    this->vq_n_centers  = vq_n_centers;
+    this->kmeans_params =
+      pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced
+        ? kmeans_params_variant{cuvs::cluster::kmeans::balanced_params{.n_iters = kmeans_n_iters}}
+        : kmeans_params_variant{cuvs::cluster::kmeans::params{.n_clusters = 1 << pq_bits,
+                                                              .max_iter   = (int)kmeans_n_iters}};
+    this->max_train_points_per_pq_code    = max_train_points_per_pq_code;
+    this->max_train_points_per_vq_cluster = max_train_points_per_vq_cluster;
+  }
+
+  params(uint32_t pq_bits,
+         uint32_t pq_dim,
+         bool use_subspaces,
+         bool use_vq,
+         uint32_t vq_n_centers,
+         kmeans_params_variant kmeans_params,
+         uint32_t max_train_points_per_pq_code,
+         uint32_t max_train_points_per_vq_cluster)
+  {
+    this->pq_bits                         = pq_bits;
+    this->pq_dim                          = pq_dim;
+    this->use_subspaces                   = use_subspaces;
+    this->use_vq                          = use_vq;
+    this->vq_n_centers                    = vq_n_centers;
+    this->kmeans_params                   = kmeans_params;
+    this->max_train_points_per_pq_code    = max_train_points_per_pq_code;
+    this->max_train_points_per_vq_cluster = max_train_points_per_vq_cluster;
+  }
+
+  params() = default;
+
+  /**
    * The bit length of the vector element after compression by PQ.
    *
    * Possible value range: [4-16].

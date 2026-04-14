@@ -62,27 +62,10 @@ void* _build(cuvsResources_t res,
   auto dataset = dataset_tensor->dl_tensor;
 
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-
-  cuvs::preprocessing::quantize::pq::kmeans_params_variant kmeans_params_var;
-  if (params->pq_kmeans_type == CUVS_KMEANS_TYPE_KMEANS_BALANCED) {
-    cuvs::cluster::kmeans::balanced_params bp;
-    bp.n_iters = params->kmeans_n_iters;
-    kmeans_params_var         = bp;
-  } else {
-    cuvs::cluster::kmeans::params classic_params;
-    classic_params.max_iter = params->kmeans_n_iters;
-    kmeans_params_var          = classic_params;
-  }
-
-  cuvs::preprocessing::quantize::pq::params quantizer_params;
-  quantizer_params.pq_bits                         = params->pq_bits;
-  quantizer_params.pq_dim                          = params->pq_dim;
-  quantizer_params.use_subspaces                   = params->use_subspaces;
-  quantizer_params.use_vq                          = params->use_vq;
-  quantizer_params.vq_n_centers                    = params->vq_n_centers;
-  quantizer_params.kmeans_params                   = kmeans_params_var;
-  quantizer_params.max_train_points_per_pq_code    = params->max_train_points_per_pq_code;
-  quantizer_params.max_train_points_per_vq_cluster = params->max_train_points_per_vq_cluster;
+  cuvs::preprocessing::quantize::pq::params quantizer_params(
+    params->pq_bits, params->pq_dim, params->use_subspaces, params->use_vq, params->vq_n_centers,
+    params->kmeans_n_iters,  static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type), params->max_train_points_per_pq_code,
+     params->max_train_points_per_vq_cluster);
   cuvs::preprocessing::quantize::pq::quantizer<T>* ret = nullptr;
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {

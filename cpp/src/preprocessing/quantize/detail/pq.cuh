@@ -368,28 +368,19 @@ void vpq_convert_math_type(const raft::resources& res,
 inline auto from_vpq_params(const cuvs::neighbors::vpq_params& in_params, const uint64_t n_rows)
   -> cuvs::preprocessing::quantize::pq::params
 {
-  std::variant<cuvs::cluster::kmeans::balanced_params, cuvs::cluster::kmeans::params> kmeans_params;
-  if (in_params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
-    kmeans_params = cuvs::cluster::kmeans::balanced_params{
-      .n_iters = in_params.kmeans_n_iters,
-    };
-  } else {
-    kmeans_params = cuvs::cluster::kmeans::params{
-      .max_iter = (int)in_params.kmeans_n_iters,
-    };
-  }
   const uint32_t pq_n_centers = 1 << in_params.pq_bits;
   return cuvs::preprocessing::quantize::pq::params{
-    .pq_bits       = in_params.pq_bits,
-    .pq_dim        = in_params.pq_dim,
-    .vq_n_centers  = in_params.vq_n_centers,
-    .kmeans_params = kmeans_params,
-    .max_train_points_per_pq_code =
-      std::min<uint32_t>(in_params.max_train_points_per_pq_code,
-                         n_rows * in_params.pq_kmeans_trainset_fraction / pq_n_centers),
-    .max_train_points_per_vq_cluster =
-      std::min<uint32_t>(in_params.max_train_points_per_vq_cluster,
-                         n_rows * in_params.vq_kmeans_trainset_fraction / in_params.vq_n_centers)};
+    in_params.pq_bits,
+    in_params.pq_dim,
+    true,
+    true,
+    in_params.vq_n_centers,
+    in_params.kmeans_n_iters,
+    in_params.pq_kmeans_type,
+    std::min<uint32_t>(in_params.max_train_points_per_pq_code,
+                       n_rows * in_params.pq_kmeans_trainset_fraction / pq_n_centers),
+    std::min<uint32_t>(in_params.max_train_points_per_vq_cluster,
+                       n_rows * in_params.vq_kmeans_trainset_fraction / in_params.vq_n_centers)};
 }
 
 template <typename DatasetT, typename MathT, typename IdxT>
