@@ -731,9 +731,9 @@ void kmeans_fit(
     static_cast<size_t>(streaming_batch_size));
 
   bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
-                           metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                           metric == cuvs::distance::DistanceType::CosineExpanded;
-  bool use_norm_cache     = need_compute_norms && !data_on_device;
+                            metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                            metric == cuvs::distance::DistanceType::CosineExpanded;
+  bool use_norm_cache = need_compute_norms && !data_on_device;
   std::vector<DataT> h_norm_cache;
   if (use_norm_cache) { h_norm_cache.resize(n_samples); }
   bool norms_cached = false;
