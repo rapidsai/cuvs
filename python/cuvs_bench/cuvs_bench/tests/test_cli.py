@@ -446,7 +446,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             assert 1 <= actual_rows <= expectations["rows"], (
                 f"Frontier file {rel_path} has {actual_rows} row(s), "
                 f"expected between 1 and {expectations['rows']}"
-)
+            )
             if actual_rows < expectations["rows"]:
                 print(
                     f"Note: {rel_path} has {actual_rows} row(s), "
