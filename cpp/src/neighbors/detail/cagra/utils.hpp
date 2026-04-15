@@ -10,6 +10,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/matrix/init.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 
 #include <rmm/resource_ref.hpp>
@@ -284,14 +285,13 @@ void copy_with_padding(
   } else {
     // copy with padding
     raft::matrix::fill(res, dst.view(), T(0));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
-                                    sizeof(T) * dst.extent(1),
-                                    src.data_handle(),
-                                    sizeof(T) * src.extent(1),
-                                    sizeof(T) * src.extent(1),
-                                    src.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(dst.data_handle(),
+                      dst.extent(1),
+                      src.data_handle(),
+                      src.extent(1),
+                      src.extent(1),
+                      src.extent(0),
+                      raft::resource::get_cuda_stream(res));
   }
 }
 }  // namespace cuvs::neighbors::cagra::detail

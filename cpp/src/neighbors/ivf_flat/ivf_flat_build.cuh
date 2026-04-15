@@ -32,6 +32,7 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/stats/histogram.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -417,14 +418,13 @@ inline auto build(raft::resources const& handle,
     rmm::device_uvector<T> trainset(
       n_rows_train * index.dim(), stream, raft::resource::get_large_workspace_resource_ref(handle));
     // TODO: a proper sampling
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
-                                    sizeof(T) * index.dim(),
-                                    dataset,
-                                    sizeof(T) * index.dim() * trainset_ratio,
-                                    sizeof(T) * index.dim(),
-                                    n_rows_train,
-                                    cudaMemcpyDefault,
-                                    stream));
+    raft::copy_matrix(trainset.data(),
+                      index.dim(),
+                      dataset,
+                      index.dim() * trainset_ratio,
+                      index.dim(),
+                      n_rows_train,
+                      stream);
     auto trainset_const_view =
       raft::make_device_matrix_view<const T, IdxT>(trainset.data(), n_rows_train, index.dim());
     auto centers_view = raft::make_device_matrix_view<float, IdxT>(

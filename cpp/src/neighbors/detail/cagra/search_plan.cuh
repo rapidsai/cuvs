@@ -7,8 +7,8 @@
 
 #include "hashmap.hpp"
 
-#include "compute_distance-ext.cuh"
 #include <cuvs/neighbors/common.hpp>
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 // #include "topk_for_cagra/topk.h"
 
