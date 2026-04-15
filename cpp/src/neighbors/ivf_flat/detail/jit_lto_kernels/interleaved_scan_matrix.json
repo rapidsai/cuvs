@@ -12,50 +12,36 @@
       "ascending_value": "false"
     }
   ],
-  "_compute_norm": [
-    {
-      "compute_norm_name": "compute_norm",
-      "compute_norm_value": "true"
-    },
-    {
-      "compute_norm_name": "no_compute_norm",
-      "compute_norm_value": "false"
-    }
-  ],
   "_data_type": [
     {
       "data_type": "float",
+      "data_abbrev": "f",
       "acc_type": "float",
-      "veclen": ["1", "4"],
-      "type_abbrev": "f",
       "acc_abbrev": "f"
     },
     {
       "data_type": "__half",
+      "data_abbrev": "h",
       "acc_type": "__half",
-      "veclen": ["1", "8"],
-      "type_abbrev": "h",
       "acc_abbrev": "h"
     },
     {
       "data_type": "uint8_t",
+      "data_abbrev": "u8",
       "acc_type": "uint32_t",
-      "veclen": ["1", "16"],
-      "type_abbrev": "uc",
-      "acc_abbrev": "ui"
+      "acc_abbrev": "u32"
     },
     {
       "data_type": "int8_t",
+      "data_abbrev": "i8",
       "acc_type": "int32_t",
-      "veclen": ["1", "16"],
-      "type_abbrev": "sc",
-      "acc_abbrev": "i"
+      "acc_abbrev": "i32"
     }
   ],
   "_index": [
     {
-      "idx_type": "int64_t",
-      "idx_abbrev": "l"
+      "index_type": "int64_t",
+      "index_abbrev": "i64"
     }
   ]
 }

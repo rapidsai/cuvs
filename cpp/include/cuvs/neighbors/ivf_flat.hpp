@@ -10,6 +10,8 @@
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <sstream>
+#include <string>
 
 namespace cuvs::neighbors::ivf_flat {
 /**
@@ -3464,6 +3466,30 @@ template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U
 )";
 
 /**
+ * NVRTC/LTO fragment appended to custom metric UDF source. The UDF program is compiled alone, so it
+ * must supply the `compute_dist` definition that device_functions.cuh only declares: same primary
+ * template signature with a body that forwards to `compute_dist_udf_impl`, plus an explicit
+ * instantiation of `compute_dist<acc_type>` so the linked device image exports the symbol the scan
+ * kernel references.
+ * `data_type` / `acc_type` are spellings as in NVRTC (e.g. from the IVF-flat JIT type_name
+ * helpers).
+ */
+inline std::string instantiate_udf(char const* data_type, char const* acc_type, int veclen)
+{
+  std::ostringstream oss;
+  oss << "\nnamespace cuvs { namespace neighbors { namespace ivf_flat { namespace detail {\n"
+      << "template <typename AccT>\n"
+      << "__device__ void compute_dist(AccT& acc, AccT x, AccT y) {\n"
+      << "  compute_dist_udf_impl<" << data_type << ", " << acc_type << ", " << veclen
+      << ">(acc, x, y);\n"
+      << "}\n"
+      << "template __device__ void compute_dist<" << acc_type << ">(" << acc_type << "&, "
+      << acc_type << ", " << acc_type << ");\n"
+      << "}}}}\n";
+  return oss.str();
+}
+
+/**
  * @brief Define a custom distance metric with compile-time validation.
  *
  * This macro creates:
@@ -3537,8 +3563,8 @@ struct )" #NAME R"( : metric_interface<T, AccT, Veclen> {                       
 };                                                                                     \
                                                                                        \
 namespace cuvs { namespace neighbors { namespace ivf_flat { namespace detail {         \
-template <int Veclen, typename T, typename AccT>                                       \
-__device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)                \
+template <typename T, typename AccT, int Veclen>                                       \
+__device__ __forceinline__ void compute_dist_udf_impl(AccT& acc, AccT x, AccT y)       \
 {                                                                                      \
   ::)" #NAME R"(<T, AccT, Veclen> metric;                                              \
   metric(acc, ::point<T, AccT, Veclen>(x), ::point<T, AccT, Veclen>(y));               \

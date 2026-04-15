@@ -108,9 +108,11 @@ auto get_filter_type_tag()
   using namespace cuvs::neighbors::filtering;
 
   // Determine the filter implementation tag
-  if constexpr (std::is_same_v<FilterT, none_sample_filter>) { return tag_filter_none{}; }
+  if constexpr (std::is_same_v<FilterT, none_sample_filter>) {
+    return cuvs::neighbors::detail::tag_filter_none{};
+  }
   if constexpr (std::is_same_v<FilterT, bitset_filter<uint32_t, int64_t>>) {
-    return tag_filter_bitset{};
+    return cuvs::neighbors::detail::tag_filter_bitset{};
   }
 }
 
