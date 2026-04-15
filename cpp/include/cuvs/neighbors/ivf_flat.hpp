@@ -3455,8 +3455,8 @@ template <typename T> struct is_same<T, T> { static constexpr bool value = true;
 template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U>::value;
 }
 
-/* NVRTC defines CUDA_VERSION; CUDA 12.2 and earlier lack __dp4a in this UDF path. */
-#if defined(CUDA_VERSION) && (CUDA_VERSION < 12030)
+/* NVRTC sets __CUDACC_VER_*; CUDA 12.2 and earlier lack __dp4a in this UDF path. */
+#if defined(__CUDACC_VER_MAJOR__) && defined(__CUDACC_VER_MINOR__) && __CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ < 3
 #define CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS 1
 #else
 #define CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS 0
