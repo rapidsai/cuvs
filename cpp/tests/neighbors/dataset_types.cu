@@ -15,7 +15,6 @@
 #include <gtest/gtest.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/core/host_mdarray.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <string>
 
@@ -42,15 +41,6 @@ inline void expect_device_pointer(const void* ptr)
   cudaPointerAttributes attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
   EXPECT_EQ(attr.type, cudaMemoryTypeDevice) << "Expected device memory";
-}
-
-// Helper: assert that ptr is host memory (for host_* dataset views).
-inline void expect_host_pointer(const void* ptr)
-{
-  cudaPointerAttributes attr;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-  EXPECT_TRUE(attr.type == cudaMemoryTypeHost || attr.type == cudaMemoryTypeUnregistered)
-    << "Expected host memory";
 }
 
 // Type aliases to avoid commas in GTest macro arguments (preprocessor splits on comma).
@@ -99,8 +89,6 @@ TEST(DatasetTypes, TypeTraits)
   // Padded dataset type traits
   EXPECT_TRUE((is_padded_dataset_v<device_padded_dataset<float, int64_t>>));
   EXPECT_TRUE((is_padded_dataset_v<device_padded_dataset_view<float, int64_t>>));
-  EXPECT_TRUE((is_padded_dataset_v<host_padded_dataset<float, int64_t>>));
-  EXPECT_TRUE((is_padded_dataset_v<host_padded_dataset_view<float, int64_t>>));
   EXPECT_FALSE((is_padded_dataset_v<strided_float_i64>));
   EXPECT_FALSE((is_padded_dataset_v<empty_dataset<int64_t>>));
 }
@@ -184,7 +172,7 @@ TEST(DatasetTypes, MakeAlignedDatasetOwningWhenPadded)
 }
 
 // ---------------------------------------------------------------------------
-// Padded datasets (device_padded_dataset, device_padded_dataset_view, host_*)
+// Padded datasets (device_padded_dataset, device_padded_dataset_view)
 // ---------------------------------------------------------------------------
 // These tests exercise the dataset *types* (shape, stride, owning vs view, view()).
 // Padded construction factories are tested in cagra_padded_dataset.cu.
@@ -235,42 +223,6 @@ TEST(DatasetTypes, DevicePaddedDatasetView)
   EXPECT_EQ(ds.stride(), dim);
   EXPECT_FALSE(stores_owning_dataset(ds));
   expect_device_pointer(ds.view().data_handle());
-  auto v = ds.view();
-  EXPECT_EQ(v.extent(0), n_rows);
-  EXPECT_EQ(v.extent(1), dim);
-}
-
-TEST(DatasetTypes, HostPaddedDataset)
-{
-  raft::resources res;
-  const int64_t n_rows = 30;
-  const uint32_t dim   = 12;
-
-  auto data = raft::make_host_matrix<float, int64_t>(res, n_rows, dim);
-  auto ds   = std::make_unique<host_padded_dataset<float, int64_t>>(std::move(data), dim);
-  ASSERT_NE(ds, nullptr);
-  EXPECT_EQ(ds->n_rows(), n_rows);
-  EXPECT_EQ(ds->dim(), dim);
-  EXPECT_EQ(ds->stride(), dim);
-  EXPECT_TRUE(stores_owning_dataset(*ds));
-  expect_host_pointer(ds->view().data_handle());
-  auto v = ds->view();
-  EXPECT_EQ(v.extent(0), n_rows);
-  EXPECT_EQ(v.extent(1), dim);
-}
-
-TEST(DatasetTypes, HostPaddedDatasetView)
-{
-  raft::resources res;
-  const int64_t n_rows = 10;
-  const uint32_t dim   = 4;
-  auto host_matrix     = raft::make_host_matrix<float, int64_t>(res, n_rows, dim);
-  host_padded_dataset_view<float, int64_t> ds(host_matrix.view());
-  EXPECT_EQ(ds.n_rows(), n_rows);
-  EXPECT_EQ(ds.dim(), dim);
-  EXPECT_EQ(ds.stride(), dim);
-  EXPECT_FALSE(stores_owning_dataset(ds));
-  expect_host_pointer(ds.view().data_handle());
   auto v = ds.view();
   EXPECT_EQ(v.extent(0), n_rows);
   EXPECT_EQ(v.extent(1), dim);

@@ -301,8 +301,7 @@ template <typename DatasetT>
 inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
 
 // =============================================================================
-// Device and host padded datasets (mirrors RAFT device_matrix / device_matrix_view,
-// host_matrix / host_matrix_view)
+// Device padded datasets (row-major with optional row padding / alignment pitch).
 // =============================================================================
 
 /** Forward declaration for device_padded_dataset_view (used in device_padded_dataset). */
@@ -379,69 +378,12 @@ struct device_padded_dataset_view : public dataset_view<IdxT> {
   [[nodiscard]] auto view() const noexcept -> view_type { return data_; }
 };
 
-/** Host padded dataset (owning). */
-template <typename DataT, typename IdxT>
-struct host_padded_dataset : public dataset<IdxT> {
-  using index_type   = IdxT;
-  using value_type   = DataT;
-  using storage_type = raft::host_matrix<value_type, index_type, raft::row_major>;
-  using view_type    = raft::host_matrix_view<const value_type, index_type, raft::row_major>;
-
-  storage_type data_;
-  uint32_t dim_;
-
-  host_padded_dataset(storage_type&& data, uint32_t logical_dim) noexcept
-    : data_{std::move(data)}, dim_{logical_dim}
-  {
-  }
-
-  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_.extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return dim_; }
-  [[nodiscard]] auto stride() const noexcept -> uint32_t
-  {
-    return static_cast<uint32_t>(data_.extent(1));
-  }
-  [[nodiscard]] auto view() const noexcept -> view_type { return data_.view(); }
-};
-
-/** Host padded dataset view (non-owning). */
-template <typename DataT, typename IdxT>
-struct host_padded_dataset_view : public dataset_view<IdxT> {
-  using index_type = IdxT;
-  using value_type = DataT;
-  using view_type  = raft::host_matrix_view<const value_type, index_type, raft::row_major>;
-
-  view_type data_;
-
-  explicit host_padded_dataset_view(view_type v) noexcept : dataset_view<IdxT>(), data_{v} {}
-
-  host_padded_dataset_view(host_padded_dataset_view const& other) noexcept
-    : dataset_view<IdxT>(), data_{other.data_}
-  {
-  }
-
-  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_.extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t final
-  {
-    return static_cast<uint32_t>(data_.extent(1));
-  }
-  [[nodiscard]] auto stride() const noexcept -> uint32_t
-  {
-    return static_cast<uint32_t>(data_.stride(0) > 0 ? data_.stride(0) : data_.extent(1));
-  }
-  [[nodiscard]] auto view() const noexcept -> view_type { return data_; }
-};
-
 template <typename DatasetT>
 struct is_padded_dataset : std::false_type {};
 template <typename DataT, typename IdxT>
 struct is_padded_dataset<device_padded_dataset<DataT, IdxT>> : std::true_type {};
 template <typename DataT, typename IdxT>
 struct is_padded_dataset<device_padded_dataset_view<DataT, IdxT>> : std::true_type {};
-template <typename DataT, typename IdxT>
-struct is_padded_dataset<host_padded_dataset<DataT, IdxT>> : std::true_type {};
-template <typename DataT, typename IdxT>
-struct is_padded_dataset<host_padded_dataset_view<DataT, IdxT>> : std::true_type {};
 template <typename DatasetT>
 inline constexpr bool is_padded_dataset_v = is_padded_dataset<DatasetT>::value;
 
