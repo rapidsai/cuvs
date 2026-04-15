@@ -12,6 +12,7 @@ jobs:
       - check-nightly-ci
       - changed-files
       - checks
+      - check-c-abi
       - conda-cpp-build
       - conda-cpp-tests
       - conda-cpp-checks
@@ -67,6 +68,8 @@ jobs:
       files_yaml: |
         build_docs:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -89,6 +92,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_cpp:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -123,6 +128,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_java:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -156,6 +163,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_python_conda:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -193,6 +202,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_python_wheels:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -235,6 +246,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_rust:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -272,6 +285,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_go:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -315,6 +330,9 @@ jobs:
     with:
       enable_check_generated_files: false
       ignored_pr_jobs: "telemetry-summarize"
+  check-c-abi:
+    needs: telemetry-setup
+    uses: ./.github/workflows/check-c-abi.yaml
   conda-cpp-build:
     needs: checks
     secrets: inherit

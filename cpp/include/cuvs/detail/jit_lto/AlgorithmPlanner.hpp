@@ -5,13 +5,14 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "AlgorithmLauncher.hpp"
-
-struct FragmentEntry;
+#include "FragmentEntry.hpp"
 
 struct AlgorithmPlanner {
   AlgorithmPlanner(std::string entrypoint) : entrypoint(std::move(entrypoint)) {}
@@ -19,14 +20,18 @@ struct AlgorithmPlanner {
   std::shared_ptr<AlgorithmLauncher> get_launcher();
 
   std::string entrypoint;
-  std::vector<const FragmentEntry*> fragments;
+  std::vector<std::unique_ptr<FragmentEntry>> fragments;
 
-  void add_fragment(const FragmentEntry& fragment);
-
-  template <typename FragmentT>
-  void add_fragment()
+  template <typename T, typename = std::enable_if_t<std::is_convertible_v<T*, FragmentEntry*>>>
+  void add_fragment(std::unique_ptr<T> fragment)
   {
-    add_fragment(FragmentT{});
+    fragments.push_back(std::unique_ptr<FragmentEntry>(std::move(fragment)));
+  }
+
+  template <typename FragmentTag>
+  void add_static_fragment()
+  {
+    add_fragment(std::make_unique<StaticFatbinFragmentEntry<FragmentTag>>());
   }
 
  private:
