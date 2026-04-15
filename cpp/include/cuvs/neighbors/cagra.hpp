@@ -29,6 +29,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <numeric>
 #include <optional>
 #include <string>
 #include <variant>
@@ -518,13 +519,29 @@ struct index : cuvs::neighbors::index {
    *
    * `detail::cagra_index_dataset_view_dispatcher` selects the concrete type. Supported:
    * `empty_dataset_view`, `indirect_dataset_view`, `device_padded_dataset_view`,
-   * `non_owning_dataset`. The caller must keep underlying device data (and any indirect target)
-   * alive for the index lifetime.
+   * `non_owning_dataset`. The index stores only a **non-owning** view; the caller must keep all
+   * underlying device storage (and any `indirect_dataset_view` target) alive for the index
+   * lifetime.
    *
+   * Example — **non-owning** `make_padded_dataset_view` (wraps an existing device matrix; that
+   * matrix must outlive the index):
    * @code{.cpp}
-   *   auto view = make_padded_dataset_view(res, dataset_mdspan);  // or
-   * make_padded_dataset(...)->as_dataset_view() cagra::index<T, IdxT> index(res, metric, view,
-   * raft::make_const_mdspan(knn_graph.view()));
+   *   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset = ...;
+   *   auto view = cuvs::neighbors::make_padded_dataset_view(res, dataset);
+   *   auto graph = raft::make_device_matrix_view<const uint32_t, int64_t>(...);
+   *   cuvs::neighbors::cagra::index<float, uint32_t> idx(res, metric, view,
+   *                                                       raft::make_const_mdspan(graph));
+   * @endcode
+   *
+   * Example — **owning** `make_padded_dataset` returns owning storage (`std::unique_ptr`). You must
+   * **keep that object alive** (e.g. hold the `unique_ptr` in a variable or member) for as long as
+   * the index uses the dataset; the index does not take ownership of the buffer.
+   * @code{.cpp}
+   *   auto padded_owner = cuvs::neighbors::make_padded_dataset(res, dataset_mdspan);
+   *   auto view         = padded_owner->as_dataset_view();
+   *   cuvs::neighbors::cagra::index<float, uint32_t> idx(res, metric, view,
+   *                                                       raft::make_const_mdspan(graph));
+   *   // `padded_owner` must outlive `idx` (do not let it go out of scope while `idx` is used).
    * @endcode
    */
   template <typename graph_accessor>
@@ -571,10 +588,33 @@ struct index : cuvs::neighbors::index {
 
   /**
    * Replace the dataset with a non-owning strided device matrix view (convenience overload).
+   *
+   * Row pitch must match the same 16-byte alignment rule as `make_padded_dataset_view` (leading
+   * dimension in elements must equal the stride computed from `extent(1)` and `sizeof(T)`). If
+   * your buffer is not already padded, use `make_padded_dataset_view` / `make_padded_dataset`
+   * first, or pass a `device_padded_dataset_view`.
    */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset_view)
   {
+    constexpr uint32_t align_bytes = 16;
+    constexpr size_t kSize         = sizeof(T);
+    uint32_t const required_stride =
+      raft::round_up_safe<size_t>(static_cast<size_t>(dataset_view.extent(1)) * kSize,
+                                  std::lcm(align_bytes, kSize)) /
+      kSize;
+    uint32_t const src_stride = dataset_view.stride(0) > 0
+                                  ? static_cast<uint32_t>(dataset_view.stride(0))
+                                  : static_cast<uint32_t>(dataset_view.extent(1));
+    RAFT_EXPECTS(
+      src_stride == required_stride,
+      "update_dataset: row stride does not satisfy %u-byte row alignment (required leading "
+      "dimension %u elements, got %u). Use make_padded_dataset_view() or make_padded_dataset(), or "
+      "pass device_padded_dataset_view.",
+      static_cast<unsigned>(align_bytes),
+      static_cast<unsigned>(required_stride),
+      static_cast<unsigned>(src_stride));
+
     non_owning_dataset<T, dataset_index_type> wrap(dataset_view);
     update_dataset(res,
                    static_cast<cuvs::neighbors::dataset_view<dataset_index_type> const&>(wrap));
