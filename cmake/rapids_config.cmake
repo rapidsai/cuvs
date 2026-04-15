@@ -35,8 +35,8 @@ if(NOT rapids-cmake-branch)
   set(rapids-cmake-branch "${_rapids_branch}")
 endif()
 
-set(rapids-cmake-repo "robertmaynard/rapids-cmake")
 set(rapids-cmake-branch "bug/find_package_redirect_support")
+set(rapids-cmake-repo "robertmaynard/rapids-cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/RAPIDS.cmake")
 
 # Don't use sccache-dist for CMake's compiler tests
