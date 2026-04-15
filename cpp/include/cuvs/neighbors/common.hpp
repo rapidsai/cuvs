@@ -432,16 +432,6 @@ struct host_padded_dataset_view : public dataset_view<IdxT> {
   [[nodiscard]] auto view() const noexcept -> view_type { return data_; }
 };
 
-// Aliases mirroring RAFT device_matrix / device_matrix_view, host_matrix / host_matrix_view
-template <typename DataT, typename IdxT = int64_t>
-using device_dataset = device_padded_dataset<DataT, IdxT>;
-template <typename DataT, typename IdxT = int64_t>
-using device_dataset_view = device_padded_dataset_view<DataT, IdxT>;
-template <typename DataT, typename IdxT = int64_t>
-using host_dataset = host_padded_dataset<DataT, IdxT>;
-template <typename DataT, typename IdxT = int64_t>
-using host_dataset_view = host_padded_dataset_view<DataT, IdxT>;
-
 template <typename DatasetT>
 struct is_padded_dataset : std::false_type {};
 template <typename DataT, typename IdxT>
