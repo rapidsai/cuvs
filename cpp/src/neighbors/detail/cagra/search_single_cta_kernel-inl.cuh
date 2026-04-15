@@ -7,13 +7,13 @@
 #include "search_single_cta_kernel.cuh"
 
 #include "bitonic.hpp"
-#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_by_radix.cuh"
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk
 #include "utils.hpp"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <cub/warp/warp_scan.cuh>
 
@@ -705,7 +705,8 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   using LOAD_T = device::LOAD_128BIT_T;
 
@@ -794,7 +795,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                                            local_visited_hashmap_ptr,
                                            hash_bitlen,
                                            (INDEX_T*)nullptr,
-                                           0);
+                                           0,
+                                           0,
+                                           1,
+                                           graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -1127,7 +1131,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const std::uint32_t hash_bitlen,
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
@@ -1158,7 +1163,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                small_hash_bitlen,
                                small_hash_reset_interval,
                                query_id,
-                               sample_filter);
+                               sample_filter,
+                               graph_size);
 }
 
 // To make sure we avoid false sharing on both CPU and GPU, we enforce cache line size to the

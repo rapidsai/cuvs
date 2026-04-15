@@ -10,6 +10,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/matrix/init.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 
 #include <rmm/resource_ref.hpp>
@@ -174,8 +175,10 @@ class device_matrix_view_from_host {
   {
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
-    device_ptr = reinterpret_cast<T*>(attr.devicePointer);
-    if (device_ptr == NULL) {
+    device_ptr      = reinterpret_cast<T*>(attr.devicePointer);
+    bool needs_copy = (device_ptr == NULL) ||
+                      (attr.type != cudaMemoryTypeDevice && attr.type != cudaMemoryTypeManaged);
+    if (needs_copy) {
       // allocate memory and copy over
       // NB: We use the temporary "large" workspace resource here; this structure is supposed to
       // live on stack and not returned to a user.
@@ -282,14 +285,13 @@ void copy_with_padding(
   } else {
     // copy with padding
     raft::matrix::fill(res, dst.view(), T(0));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
-                                    sizeof(T) * dst.extent(1),
-                                    src.data_handle(),
-                                    sizeof(T) * src.extent(1),
-                                    sizeof(T) * src.extent(1),
-                                    src.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(dst.data_handle(),
+                      dst.extent(1),
+                      src.data_handle(),
+                      src.extent(1),
+                      src.extent(1),
+                      src.extent(0),
+                      raft::resource::get_cuda_stream(res));
   }
 }
 }  // namespace cuvs::neighbors::cagra::detail

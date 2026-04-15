@@ -8,10 +8,9 @@ dependencies:
 - _go_select *=cgo
 - breathe>=4.35.0
 - c-compiler
-- clang-tools==20.1.4
-- clang==20.1.4
+- clang-tools==20.1.8
+- clang==20.1.8
 - cmake>=3.30.4
-- cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvrtc-dev
 - cuda-nvtx-dev
@@ -27,12 +26,13 @@ dependencies:
 - go
 - graphviz
 - ipython
-- libclang==20.1.4
+- libclang==20.1.8
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
 - libnvjitlink-dev
+- libopenblas<=0.3.30
 - librmm==26.6.*,>=0.0.0a0
 - make
 - nccl>=2.19

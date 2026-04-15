@@ -12,7 +12,7 @@ Please start by reading the [Contributor Guide](contributing.md).
 
 Developing features and fixing bugs for the RAFT library itself is straightforward and only requires building and installing the relevant RAFT artifacts.
 
-The process for working on a CUDA/C++ feature which might span RAFT and one or more consuming libraries can vary slightly depending on whether the consuming project relies on a source build (as outlined in the [BUILD](BUILD.md#install_header_only_cpp) docs). In such a case, the option `CPM_raft_SOURCE=/path/to/raft/source` can be passed to the cmake of the consuming project in order to build the local RAFT from source. The PR with relevant changes to the consuming project can also pin the RAFT version temporarily by explicitly changing the `FORK` and `PINNED_TAG` arguments to the RAFT branch containing their changes when invoking `find_and_configure_raft`.  The pin should be reverted after the changed is merged to the RAFT project and before it is merged to the dependent project(s) downstream.
+The process for working on a CUDA/C++ feature which might span RAFT and one or more consuming libraries can vary slightly depending on whether the consuming project relies on a source build (as outlined in the [BUILD](BUILD.md#install_header_only_cpp) docs). In such a case, the option `CPM_raft_SOURCE=/path/to/raft/source` can be passed to the cmake of the consuming project in order to build the local RAFT from source. The PR with relevant changes to the consuming project can also pin the RAFT version temporarily by explicitly changing the `FORK` and `PINNED_TAG` arguments to the RAFT branch containing their changes when invoking `find_and_configure_raft`.  The pin should be reverted after the change is merged to the RAFT project and before it is merged to the dependent project(s) downstream.
 
 If building a feature which spans projects and not using the source build in cmake, the RAFT changes (both C++ and Python) will need to be installed into the environment of the consuming project before they can be used. The ideal integration of RAFT into consuming projects will enable both the source build in the consuming project only for this case but also rely on a more stable packaging (such as conda packaging) otherwise.
 
@@ -390,7 +390,7 @@ int main(int argc, char * argv[])
 ```
 
 A RAFT developer can assume the following:
-* A instance of `raft::comms::comms_t` was correctly initialized.
+* An instance of `raft::comms::comms_t` was correctly initialized.
 * All processes that are part of `raft::comms::comms_t` call into the RAFT algorithm cooperatively.
 
 The initialized instance of `raft::comms::comms_t` can be accessed from the `raft::resources` instance:
@@ -406,3 +406,13 @@ void foo(const raft::resources& res, ...)
     ...
 }
 ```
+
+## Using Just-in-Time Link-Time Optimization
+
+cuVS is moving to using link-time optimization for new kernels, and this requires some changes to the way kernels are written. Instead of compiling all kernel variants at build time (which leads to binary size explosion), JIT LTO compiles kernel fragments separately and links them together at runtime based on the specific configuration needed.
+
+This approach ultimately enables:
+- **Reduced binary size**: Compile fragments once, combine many ways
+- **User Defined Functions**: Link UDFs in cuVS CUDA kernels
+
+For more information on JIT LTO, see [Advanced Topics](advanced_topics). For a complete guide on implementing JIT LTO kernels, including step-by-step examples, see the [JIT LTO Guide](jit_lto_guide.md).

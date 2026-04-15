@@ -5,7 +5,6 @@
 #pragma once
 
 #include "bitonic.hpp"
-#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
@@ -13,6 +12,7 @@
 #include "topk_by_radix.cuh"
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk
 #include "utils.hpp"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>

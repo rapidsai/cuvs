@@ -13,7 +13,6 @@
 #include <string>
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/nvjitlink_checker.hpp>
 
 #include "cuda_runtime.h"
@@ -22,15 +21,10 @@
 #include <raft/core/logger.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
-void AlgorithmPlanner::add_fragment(const FragmentEntry& fragment)
-{
-  fragments.push_back(&fragment);
-}
-
 std::string AlgorithmPlanner::get_fragments_key() const
 {
   std::string key = "";
-  for (const auto* fragment : this->fragments) {
+  for (const auto& fragment : this->fragments) {
     key += fragment->get_key();
   }
   return key;
@@ -47,7 +41,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
     RAFT_LOG_INFO("A first-time JIT compilation has been triggered for your algorithm");
     std::string log_message =
       "JIT compiling launcher for kernel: " + this->entrypoint + " and device functions: ";
-    for (const auto* fragment : this->fragments) {
+    for (const auto& fragment : this->fragments) {
       log_message += std::string{fragment->get_key()} + ",";
     }
     log_message.pop_back();
@@ -75,7 +69,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   auto result = nvJitLinkCreate(&handle, 2, lopts);
   check_nvjitlink_result(handle, result);
 
-  for (auto& frag : this->fragments) {
+  for (const auto& frag : this->fragments) {
     frag->add_to(handle);
   }
 

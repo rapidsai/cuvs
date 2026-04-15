@@ -82,6 +82,21 @@ inline bool is_min_close(DistanceType metric)
   return select_min;
 }
 
+/**
+ * @brief Density kernel type for Kernel Density Estimation.
+ *
+ * These are the smoothing kernels used in KDE — distinct from the dot-product
+ * kernels (RBF, Polynomial, etc.) in cuvs::distance::kernels used by SVMs.
+ */
+enum class DensityKernelType : int {
+  Gaussian     = 0,
+  Tophat       = 1,
+  Epanechnikov = 2,
+  Exponential  = 3,
+  Linear       = 4,
+  Cosine       = 5
+};
+
 namespace kernels {
 enum KernelType { LINEAR, POLYNOMIAL, RBF, TANH };
 

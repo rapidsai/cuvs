@@ -7,10 +7,12 @@
 
 #include "../detail/jit_lto_kernels/filter_data.h"
 #include "../ivf_common.cuh"
-#include "jit_lto_kernels/interleaved_scan_planner.hpp"
+#include "detail/jit_lto_kernels/interleaved_scan_planner.hpp"
+#include "detail/jit_lto_kernels/kernel_def.hpp"
 #include <cstdint>
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <cuvs/detail/jit_lto/common_fragments.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
@@ -24,7 +26,6 @@
 #include <rmm/cuda_stream_view.hpp>
 
 namespace cuvs::neighbors::ivf_flat::detail {
-
 static constexpr int kThreadsPerBlock = 128;
 
 using namespace cuvs::spatial::knn::detail;  // NOLINT
@@ -35,8 +36,8 @@ constexpr auto get_data_type_tag()
 {
   if constexpr (std::is_same_v<T, float>) { return tag_f{}; }
   if constexpr (std::is_same_v<T, __half>) { return tag_h{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return tag_sc{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return tag_uc{}; }
+  if constexpr (std::is_same_v<T, int8_t>) { return tag_i8{}; }
+  if constexpr (std::is_same_v<T, uint8_t>) { return tag_u8{}; }
 }
 
 template <typename AccT>
@@ -44,14 +45,14 @@ constexpr auto get_acc_type_tag()
 {
   if constexpr (std::is_same_v<AccT, float>) { return tag_acc_f{}; }
   if constexpr (std::is_same_v<AccT, __half>) { return tag_acc_h{}; }
-  if constexpr (std::is_same_v<AccT, int32_t>) { return tag_acc_i{}; }
-  if constexpr (std::is_same_v<AccT, uint32_t>) { return tag_acc_ui{}; }
+  if constexpr (std::is_same_v<AccT, int32_t>) { return tag_acc_i32{}; }
+  if constexpr (std::is_same_v<AccT, uint32_t>) { return tag_acc_u32{}; }
 }
 
 template <typename IdxT>
 constexpr auto get_idx_type_tag()
 {
-  if constexpr (std::is_same_v<IdxT, int64_t>) { return tag_idx_l{}; }
+  if constexpr (std::is_same_v<IdxT, int64_t>) { return cuvs::neighbors::detail::tag_index_i64{}; }
 }
 
 // Convert type to string for JIT code generation
@@ -72,9 +73,12 @@ constexpr auto get_filter_type_tag()
 {
   using namespace cuvs::neighbors::filtering;
 
-  if constexpr (std::is_same_v<FilterT, none_sample_filter>) { return tag_filter_none{}; }
+  // Determine the filter implementation tag
+  if constexpr (std::is_same_v<FilterT, none_sample_filter>) {
+    return cuvs::neighbors::detail::tag_filter_none{};
+  }
   if constexpr (std::is_same_v<FilterT, bitset_filter<uint32_t, int64_t>>) {
-    return tag_filter_bitset{};
+    return cuvs::neighbors::detail::tag_filter_bitset{};
   }
 }
 
@@ -137,40 +141,17 @@ void launch_kernel(const index<T, IdxT>& index,
 
   // Use tag types for the planner to avoid template bloat
   InterleavedScanPlanner kernel_planner;
-  kernel_planner
-    .add_entrypoint<DataTag, AccTag, IdxTag, Capacity, Veclen, Ascending, ComputeNorm>();
-  if (params.metric_udf.has_value()) {
-    std::string metric_udf = params.metric_udf.value();
-    // Add explicit template instantiation with actual types
-    metric_udf += "\ntemplate void cuvs::neighbors::ivf_flat::detail::compute_dist<";
-    metric_udf += std::to_string(Veclen);
-    metric_udf += ", ";
-    metric_udf += type_name<T>();
-    metric_udf += ", ";
-    metric_udf += type_name<AccT>();
-    metric_udf += ">(";
-    metric_udf += type_name<AccT>();
-    metric_udf += "&, ";
-    metric_udf += type_name<AccT>();
-    metric_udf += ", ";
-    metric_udf += type_name<AccT>();
-    metric_udf += ");\n";
-    // Include hash of UDF source in key to differentiate different UDFs
-    auto udf_hash            = std::to_string(std::hash<std::string>{}(metric_udf));
-    auto& nvrtc_lto_compiler = nvrtc_compiler();
-    const auto& fragment     = nvrtc_lto_compiler.compile(metric_udf);
-    kernel_planner.add_fragment(fragment);
-  } else {
-    kernel_planner.add_metric_device_function<Veclen, DataTag, AccTag, MetricTag>();
-  }
-  kernel_planner.add_filter_device_function<IvfSampleFilterTag>();
+  kernel_planner.add_entrypoint<DataTag, AccTag, IdxTag, Capacity, Ascending>();
+  kernel_planner.add_load_and_compute_dist_function<DataTag, AccTag, ComputeNorm, Veclen>();
+  kernel_planner.add_metric_device_function<DataTag, AccTag, MetricTag, Veclen>();
+  kernel_planner.add_filter_device_function<IdxTag, IvfSampleFilterTag>();
   kernel_planner.add_post_lambda_device_function<PostLambdaTag>();
   auto kernel_launcher = kernel_planner.get_launcher();
 
-  const int max_query_smem = 16384;
-  int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
-                                       raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
-  int smem_size            = query_smem_elems * sizeof(T);
+  const int max_query_smem  = 16384;
+  uint32_t query_smem_elems = std::min<int>(
+    max_query_smem / sizeof(T), raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
+  size_t smem_size = query_smem_elems * sizeof(T);
 
   if constexpr (Capacity > 0) {
     constexpr int kSubwarpSize = std::min<int>(Capacity, raft::WarpSize);
@@ -204,27 +185,29 @@ void launch_kernel(const index<T, IdxT>& index,
       block_dim.x,
       n_probes,
       smem_size);
-    kernel_launcher->dispatch(stream,
-                              grid_dim,
-                              block_dim,
-                              smem_size,
-                              query_smem_elems,
-                              queries,
-                              coarse_index,
-                              index.data_ptrs().data_handle(),
-                              index.list_sizes().data_handle(),
-                              queries_offset + query_offset,
-                              n_probes,
-                              k,
-                              max_samples,
-                              chunk_indices,
-                              index.dim(),
-                              inds_ptrs,
-                              bitset_ptr.value_or(nullptr),
-                              bitset_len.value_or(0),
-                              original_nbits.value_or(0),
-                              neighbors,
-                              distances);
+    kernel_launcher->dispatch<interleaved_scan_func_t<T, IdxT>>(
+      stream,
+      grid_dim,
+      block_dim,
+      smem_size,
+      query_smem_elems,
+      queries,
+      coarse_index,
+      const_cast<const T* const*>(index.data_ptrs().data_handle()),
+      index.list_sizes().data_handle(),
+      static_cast<uint32_t>(queries_offset + query_offset),
+      n_probes,
+      k,
+      max_samples,
+      chunk_indices,
+      index.dim(),
+      // sample_filter,
+      inds_ptrs,
+      bitset_ptr.value_or(nullptr),
+      bitset_len.value_or(0),
+      original_nbits.value_or(0),
+      neighbors,
+      distances);
     queries += grid_dim_y * index.dim();
     if constexpr (Capacity > 0) {
       neighbors += grid_dim_y * grid_dim_x * k;
@@ -260,7 +243,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_euclidean,
-                           tag_post_identity>(std::forward<Args>(args)...);
+                           tag_post_process_identity>(std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2SqrtUnexpanded:
       return launch_kernel<Capacity,
@@ -272,7 +255,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_euclidean,
-                           tag_post_sqrt>(std::forward<Args>(args)...);
+                           tag_post_process_sqrt>(std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::InnerProduct:
       return launch_kernel<Capacity,
                            Veclen,
@@ -283,7 +266,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_inner_product,
-                           tag_post_identity>(std::forward<Args>(args)...);
+                           tag_post_process_identity>(std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::CosineExpanded:
       // NB: "Ascending" is reversed because the post-processing step is done after that sort
       return launch_kernel<Capacity,
@@ -295,9 +278,9 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_inner_product,
-                           tag_post_compose>(
-        std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
-                                       // adding here a new metric.
+                           tag_post_process_compose>(
+        std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build`
+                                       // when adding here a new metric.
     case cuvs::distance::DistanceType::CustomUDF:
       return launch_kernel<Capacity,
                            Veclen,

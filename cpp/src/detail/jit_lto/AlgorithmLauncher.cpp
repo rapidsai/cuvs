@@ -36,12 +36,13 @@ AlgorithmLauncher& AlgorithmLauncher::operator=(AlgorithmLauncher&& other) noexc
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
-  cudaLaunchConfig_t config;
+  cudaLaunchConfig_t config{};
   config.gridDim          = grid;
   config.blockDim         = block;
   config.stream           = stream;
   config.dynamicSmemBytes = shared_mem;
   config.numAttrs         = 0;
+  config.attrs            = NULL;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
@@ -53,7 +54,7 @@ void AlgorithmLauncher::call_cooperative(
   attribute[0].id              = cudaLaunchAttributeCooperative;
   attribute[0].val.cooperative = 1;
 
-  cudaLaunchConfig_t config;
+  cudaLaunchConfig_t config{};
   config.gridDim          = grid;
   config.blockDim         = block;
   config.stream           = stream;
