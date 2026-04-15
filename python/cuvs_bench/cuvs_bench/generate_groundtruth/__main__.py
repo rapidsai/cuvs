@@ -201,7 +201,13 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
         else:
             distances = xp.concatenate([distances, D], axis=1)
             indices = xp.concatenate([indices, Ind], axis=1)
-            idx = xp.argsort(distances, axis=1)[:, :k]
+            # Euclidean: smaller distance is better → sort ascending.
+            # Inner product: D holds similarities, larger is better → sort
+            # descending (equivalent to ascending on -D if library used -sim).
+            if metric == "inner_product":
+                idx = xp.argsort(-distances, axis=1)[:, :k]
+            else:
+                idx = xp.argsort(distances, axis=1)[:, :k]
             distances = xp.take_along_axis(distances, idx, axis=1)
             indices = xp.take_along_axis(indices, idx, axis=1)
 

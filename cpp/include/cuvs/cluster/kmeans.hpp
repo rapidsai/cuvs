@@ -141,6 +141,10 @@ struct balanced_params : base_params {
    * Number of training iterations
    */
   uint32_t n_iters = 20;
+
+  /** If true (only valid with InnerProduct), E-step uses cosine-style fused NN; M-step uses raw
+   * means. */
+  bool inner_product_cosine_assignment = false;
 };
 
 /**

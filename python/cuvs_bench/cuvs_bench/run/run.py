@@ -356,7 +356,7 @@ def get_build_path(executable: str, executable_dir: str) -> Optional[str]:
     build_path = os.getenv("CUVS_HOME")
     if build_path:
         build_path = os.path.join(
-            build_path, "cpp", "build", "release", executable
+            build_path, "cpp", "build", "bench", "ann", executable
         )
         if os.path.exists(build_path):
             print(f"-- Using cuVS bench from repository in {build_path}.")

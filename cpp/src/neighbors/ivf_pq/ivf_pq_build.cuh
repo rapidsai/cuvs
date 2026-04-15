@@ -1317,6 +1317,14 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    kmeans_params.inner_product_cosine_assignment =
+      (impl->metric() == distance::DistanceType::InnerProduct);
+    if (kmeans_params.inner_product_cosine_assignment) {
+      RAFT_LOG_INFO(
+        "IVF-PQ build: balanced k-means inner_product_cosine_assignment=true (cosine-style E-step "
+        "for "
+        "InnerProduct)");
+    }
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
@@ -1328,6 +1336,7 @@ auto build(raft::resources const& handle,
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
+
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
