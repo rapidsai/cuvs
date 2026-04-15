@@ -109,17 +109,15 @@ inline ncclDataType_t nccl_dtype<int64_t>()
 // ---------------------------------------------------------------------------
 // snmg_fit — shared multi-GPU core (Paths 1 & 2)
 // ---------------------------------------------------------------------------
-template <typename T>
+template <typename T, typename IdxT>
 void snmg_fit(const raft::resources& handle,
               const cuvs::cluster::kmeans::params& params,
-              raft::host_matrix_view<const T, int64_t> X_local,
-              std::optional<raft::host_vector_view<const T, int64_t>> sample_weight,
-              raft::device_matrix_view<T, int64_t> centroids,
+              raft::host_matrix_view<const T, IdxT> X_local,
+              std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
+              raft::device_matrix_view<T, IdxT> centroids,
               raft::host_scalar_view<T> inertia,
-              raft::host_scalar_view<int64_t> n_iter)
+              raft::host_scalar_view<IdxT> n_iter)
 {
-  using IdxT = int64_t;
-
   // --- Setup: rank, num_ranks, dev_res, comm mechanism ---
   bool use_nccl = raft::resource::is_multi_gpu(handle);
   int rank, num_ranks;
@@ -185,10 +183,10 @@ void snmg_fit(const raft::resources& handle,
   // --- Weight normalization via allreduce (only when sample weights are provided) ---
   T weight_scale = T{1};
   if (sample_weight.has_value()) {
-    auto d_n_local = raft::make_device_scalar<int64_t>(dev_res, static_cast<int64_t>(n_local));
+    auto d_n_local = raft::make_device_scalar<IdxT>(dev_res, static_cast<IdxT>(n_local));
     SNMG_ALLREDUCE(d_n_local.data_handle(), d_n_local.data_handle(), 1);
     raft::resource::sync_stream(dev_res);
-    int64_t global_n{};
+    IdxT global_n{};
     raft::copy(&global_n, d_n_local.data_handle(), 1, stream);
     raft::resource::sync_stream(dev_res);
 
@@ -534,17 +532,15 @@ void snmg_fit(const raft::resources& handle,
 // ---------------------------------------------------------------------------
 // batched_fit_omp — OpenMP wrapper for Path 1 (cuVS / SNMG)
 // ---------------------------------------------------------------------------
-template <typename T>
+template <typename T, typename IdxT>
 void batched_fit_omp(const raft::resources& clique,
                      const cuvs::cluster::kmeans::params& params,
-                     raft::host_matrix_view<const T, int64_t> X,
-                     std::optional<raft::host_vector_view<const T, int64_t>> sample_weight,
-                     raft::device_matrix_view<T, int64_t> centroids,
+                     raft::host_matrix_view<const T, IdxT> X,
+                     std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
+                     raft::device_matrix_view<T, IdxT> centroids,
                      raft::host_scalar_view<T> inertia,
-                     raft::host_scalar_view<int64_t> n_iter)
+                     raft::host_scalar_view<IdxT> n_iter)
 {
-  using IdxT = int64_t;
-
   raft::resource::get_nccl_comms(clique);
   int num_ranks   = raft::resource::get_num_ranks(clique);
   IdxT n_samples  = X.extent(0);
@@ -569,7 +565,7 @@ void batched_fit_omp(const raft::resources& clique,
         raft::make_host_vector_view<const T, IdxT>(sample_weight->data_handle() + offset, n_local);
     }
 
-    snmg_fit<T>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
+    snmg_fit<T, IdxT>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
   }
 }
 

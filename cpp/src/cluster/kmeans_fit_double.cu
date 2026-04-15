@@ -78,10 +78,11 @@ void fit(raft::resources const& handle,
 {
 #ifdef CUVS_BUILD_MG_ALGOS
   if (raft::resource::is_multi_gpu(handle)) {
-    mg::detail::batched_fit_omp<double>(
+    mg::detail::batched_fit_omp<double, int64_t>(
       handle, params, X, sample_weight, centroids, inertia, n_iter);
   } else if (raft::resource::comms_initialized(handle)) {
-    mg::detail::snmg_fit<double>(handle, params, X, sample_weight, centroids, inertia, n_iter);
+    mg::detail::snmg_fit<double, int64_t>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
   } else
 #endif
   {
