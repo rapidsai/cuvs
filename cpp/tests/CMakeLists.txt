@@ -37,7 +37,8 @@ function(ConfigureTest)
   endif()
 
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
-  # Link to static lib when available so tests use build-tree cuvs (no libcuvs.so load, avoids conda RPATH).
+  # Link to static lib when available so tests use build-tree cuvs (no libcuvs.so load, avoids conda
+  # RPATH).
   if(TARGET cuvs_static)
     set(_cuvs_lib cuvs_static)
     set(_cuvs_alias cuvs::cuvs_static)

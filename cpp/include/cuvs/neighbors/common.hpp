@@ -195,7 +195,7 @@ template <typename IdxT>
 struct indirect_dataset_view final : public dataset_view<IdxT> {
   using index_type = IdxT;
   const dataset<IdxT>* target_;
-  explicit indirect_dataset_view(const dataset<IdxT>* p) noexcept : target_(p)
+  explicit indirect_dataset_view(const dataset<IdxT>* p) : target_(p)
   {
     RAFT_EXPECTS(p != nullptr, "indirect_dataset_view: null target");
   }
