@@ -1,0 +1,71 @@
+UDF Usage
+=========
+
+.. caution::
+
+   Custom distance metrics for IVF-flat search are **experimental**. They live under the
+   ``cuvs::neighbors::ivf_flat::experimental::udf`` namespace and the associated ``CUVS_METRIC``
+   macro. APIs and behavior may change without a major release.
+
+What this feature does
+----------------------
+
+You can supply **your own CUDA device code** that defines how distance accumulates between a query
+vector and database vectors **inside the IVF-flat interleaved scan** (the fine search over lists).
+Technical background on compilation and linking is in :doc:`jit_lto_guide`.
+
+Available via C++ APIs for the following algorithms
+---------------------------------------------------
+
+* IVF-flat — :doc:`search <cpp_api/neighbors_ivf_flat>` (``search_params.metric_udf`` / ``CUVS_METRIC``).
+
+Requirements and tips
+-----------------------
+
+* Include ``<cuvs/neighbors/ivf_flat.hpp>`` and define a metric with ``CUVS_METRIC(MyName, { ... })``.
+  Set ``search_params.metric_udf`` to the string returned by ``MyName_udf()``.
+* Prefer the helpers documented next to the macro (``squared_diff``, ``abs_diff``, ``dot_product``,
+  ``point`` element access, and so on) so the same definition works across ``float``, ``int8_t`` /
+  ``uint8_t`` packed lanes, and related accumulator types.
+* Custom UDF is **not supported for fp16** (``__half`` / ``half``) indices at this time; the headers
+  enforce this with a static assertion when applicable.
+* The scan assumes **ascending** distance order for top-*k* selection; metrics that do not behave
+  like a distance in that sense need careful validation.
+* The first search with a new metric string may pay a one-time compilation cost; reuse the same
+  string (and run a warmup) to benefit from the caches described in :doc:`advanced_topics`.
+
+Example
+-------
+
+.. code-block:: cpp
+
+   #include <cuvs/neighbors/ivf_flat.hpp>
+
+   namespace ivf = cuvs::neighbors::ivf_flat;
+
+   // L∞ (Chebyshev): per dimension, acc = max(acc, |x - y|); acc starts at 0 in the scan kernel.
+   CUVS_METRIC(my_chebyshev, {
+     auto d = abs_diff(x, y);
+     acc    = (d > acc) ? d : acc;
+   })
+
+   void run_search(raft::resources const& res,
+                   ivf::index<float, int64_t> const& index,
+                   raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+                   raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+                   raft::device_matrix_view<float, int64_t, raft::row_major> distances)
+   {
+     ivf::search_params params;
+     params.metric_udf = my_chebyshev_udf();
+
+     ivf::search(res, params, index, queries, neighbors, distances);
+   }
+
+For more examples (L2 via ``squared_diff``, raw string fragments, and so on), see
+``cpp/tests/neighbors/ann_ivf_flat/test_udf.cu`` in the cuVS repository.
+
+Further reading
+---------------
+
+* C++ API reference: :doc:`cpp_api/neighbors_ivf_flat`
+* JIT LTO architecture and IVF-flat fragments: :doc:`jit_lto_guide`
