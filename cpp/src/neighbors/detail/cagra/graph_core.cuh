@@ -1431,8 +1431,9 @@ void optimize(
     for (uint64_t k = 0; k < output_graph_degree; k++) {
 #pragma omp parallel for
       for (uint64_t i = 0; i < graph_size; i++) {
-        // dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
-        dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+        dest_nodes(i) = (k < natural_degree_vec(i))
+                          ? output_graph_ptr[k + (output_graph_degree * i)]
+                          : static_cast<IdxT>(graph_size);
       }
       raft::resource::sync_stream(res);
 
@@ -1513,23 +1514,9 @@ void optimize(
         }
       }
 
-      const auto num_protected_edges =
-        std::max<uint64_t>(mst_graph_num_edges_ptr[i], effective_degree / 2);
+      const auto num_protected_edges = std::max<uint64_t>(
+        mst_graph_num_edges_ptr[i], std::min<uint64_t>(effective_degree, output_graph_degree / 2));
       if (num_protected_edges > effective_degree) { check_num_protected_edges = false; }
-      if (num_protected_edges == effective_degree) {
-        if (variable_graph_degree) {
-          for (uint32_t j = effective_degree; j < output_graph_degree; j++) {
-            my_out_graph[j] = static_cast<IdxT>(-1);
-          }
-          natural_degree_vec(i) = effective_degree;
-        }
-        if (guarantee_connectivity) {
-          for (uint32_t j = 0; j < output_graph_degree; j++) {
-            output_graph_ptr[(output_graph_degree * i) + j] = my_out_graph[j];
-          }
-        }
-        continue;
-      }
 
       // Replace some edges of the output graph with edges of the reverse graph.
       auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
@@ -1539,20 +1526,13 @@ void optimize(
           uint64_t pos = pos_in_array<IdxT>(my_rev_graph[kr], my_out_graph, output_graph_degree);
           if (pos < num_protected_edges) { continue; }
 
-          if (pos < effective_degree) {
-            uint64_t num_shift = pos - num_protected_edges;
-            shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
-            my_out_graph[num_protected_edges] = my_rev_graph[kr];
-          } else if (pos < output_graph_degree) {
-            continue;
-          } else if (effective_degree < output_graph_degree) {
-            my_out_graph[effective_degree] = my_rev_graph[kr];
-            effective_degree++;
-          } else {
-            uint64_t num_shift = effective_degree - num_protected_edges - 1;
-            shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
-            my_out_graph[num_protected_edges] = my_rev_graph[kr];
+          uint64_t num_shift = pos - num_protected_edges;
+          if (pos >= output_graph_degree) {
+            num_shift = output_graph_degree - num_protected_edges - 1;
           }
+          shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
+          my_out_graph[num_protected_edges] = my_rev_graph[kr];
+          if (effective_degree < output_graph_degree) { effective_degree++; }
         }
       }
 

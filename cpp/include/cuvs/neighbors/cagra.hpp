@@ -147,7 +147,7 @@ struct index_params : cuvs::neighbors::index_params {
   /**
    * Fraction of output graph_degree used as the target for low-detour edges
    * during the pruning step. Must be in (0, 1]. The default value of 1.0
-   * disables variable-degree logic (original CAGRA behavior). Values < 1.0
+   * disables variable-degree logic (normal CAGRA behavior). Values < 1.0
    * enable variable-degree graphs: the optimize step finds the minimum detour
    * threshold that covers at least ceil(graph_degree * fraction) edges per node,
    * then lets reverse edges expand the degree further. Unused slots are filled
