@@ -117,15 +117,10 @@ ConfigureTest(
   PERCENT 100
 )
 
-set(CLUSTER_TEST_SOURCES cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
-                         cluster/linkage.cu cluster/connect_knn.cu
-)
-if(CUVS_BUILD_SPECTRAL_EMBEDDING)
-  list(APPEND CLUSTER_TEST_SOURCES cluster/spectral.cu)
-endif()
 ConfigureTest(
   NAME CLUSTER_TEST
-  PATH ${CLUSTER_TEST_SOURCES}
+  PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
+       cluster/connect_knn.cu cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )
@@ -396,17 +391,13 @@ ConfigureTest(
   PERCENT 100
 )
 
-set(PREPROCESSING_TEST_SOURCES preprocessing/scalar_quantization.cu
-                               preprocessing/binary_quantization.cu
-)
-if(CUVS_BUILD_SPECTRAL_EMBEDDING)
-  list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/spectral_embedding.cu)
-endif()
-list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/product_quantization.cu)
-list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/pca.cu)
 ConfigureTest(
   NAME PREPROCESSING_TEST
-  PATH ${PREPROCESSING_TEST_SOURCES}
+  PATH preprocessing/scalar_quantization.cu
+       preprocessing/binary_quantization.cu
+       preprocessing/spectral_embedding.cu
+       preprocessing/product_quantization.cu
+       preprocessing/pca.cu
   GPUS 1
   PERCENT 100
 )
