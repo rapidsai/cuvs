@@ -37,19 +37,10 @@ function(ConfigureTest)
   endif()
 
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
-  # Link to static lib when available so tests use build-tree cuvs (no libcuvs.so load, avoids conda
-  # RPATH).
-  if(TARGET cuvs_static)
-    set(_cuvs_lib cuvs_static)
-    set(_cuvs_alias cuvs::cuvs_static)
-  else()
-    set(_cuvs_lib cuvs)
-    set(_cuvs_alias cuvs::cuvs)
-  endif()
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE ${_cuvs_lib}
-            ${_cuvs_alias}
+    PRIVATE cuvs
+            cuvs::cuvs
             raft::raft
             GTest::gtest
             GTest::gtest_main
