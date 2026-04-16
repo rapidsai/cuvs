@@ -76,7 +76,7 @@ class shared_raft_resources {
     : pool_resource_(rmm::mr::get_current_device_resource_ref(), 1024 * 1024 * 1024ull),
       resource_(pool_resource_, rmm_oom_callback, nullptr),
       large_mr_() {
-    orig_resource_ = rmm::mr::set_current_device_resource_ref(resource_);
+    orig_resource_ = rmm::mr::set_current_device_resource(resource_);
   } catch (const std::exception& e) {
     auto cuda_status = cudaGetLastError();
     size_t free      = 0;
@@ -96,7 +96,7 @@ class shared_raft_resources {
   shared_raft_resources(const shared_raft_resources& res)                      = delete;
   auto operator=(const shared_raft_resources& other) -> shared_raft_resources& = delete;
 
-  ~shared_raft_resources() noexcept { rmm::mr::set_current_device_resource_ref(orig_resource_); }
+  ~shared_raft_resources() noexcept { rmm::mr::set_current_device_resource(orig_resource_); }
 
   auto get_large_memory_resource() noexcept -> rmm::device_async_resource_ref { return large_mr_; }
 

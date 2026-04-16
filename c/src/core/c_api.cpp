@@ -168,14 +168,14 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
 
     pool_mr.emplace(pool_upstream, initial_size, max_size);
 
-    rmm::mr::set_current_device_resource_ref(*pool_mr);
+    rmm::mr::set_current_device_resource(*pool_mr);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
   return cuvs::core::translate_exceptions([=] {
-    rmm::mr::reset_current_device_resource_ref();
+    rmm::mr::reset_current_device_resource();
     pool_mr.reset();
   });
 }
