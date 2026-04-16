@@ -145,7 +145,10 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Fraction of output graph_degree used as the target for low-detour edges
+   * Fraction of output graph_degree to define the minimum output graph degree,
+   * allowing variable-degree neighbor graphs.
+   *
+   * This fraction is used as the target for low-detour edges
    * during the pruning step. Must be in (0, 1]. The default value of 1.0
    * disables variable-degree logic (normal CAGRA behavior). Values < 1.0
    * enable variable-degree graphs: the optimize step finds the minimum detour
