@@ -7,52 +7,39 @@ package com.nvidia.cuvs;
 import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.DEVICE_TO_HOST;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpyAsync;
 import static com.nvidia.cuvs.internal.common.Util.getStream;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaEventRecord;
+import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearchMultiSegment;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamWaitEvent;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLCUDA;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLFloat;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 
 import com.nvidia.cuvs.internal.BufferedCagraSearch;
+import com.nvidia.cuvs.internal.CuVSMatrixInternal;
 import com.nvidia.cuvs.internal.CuVSParamsHelper;
-import com.nvidia.cuvs.internal.CuVSResourcesImpl;
-import com.nvidia.cuvs.internal.CudaStreamPool;
 import com.nvidia.cuvs.internal.SelectKHelper;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 /**
  * Performs a single-query approximate nearest neighbor search across multiple CAGRA index segments
- * using a shared GPU buffer and a fixed-size CUDA stream pool, eliminating per-segment
- * device-to-host copies.
+ * using a shared GPU buffer, eliminating per-segment device-to-host copies.
  *
  * <h3>Algorithm</h3>
  * <ol>
  *   <li>Allocate two global device buffers sized {@code numSegments × k}:
  *       one for uint32 neighbor ordinals and one for float32 distances.</li>
- *   <li>Assign each segment a slot from the {@link CudaStreamPool} via round-robin. Segments on
- *       different slots run in parallel on separate CUDA streams.</li>
- *   <li>For each segment, call {@link BufferedCagraSearch#searchIntoBuffer} to queue the CAGRA
- *       search kernel. In non-persistent mode this enqueues asynchronously on the slot's CUDA
- *       stream. In persistent mode each call blocks on CPU until the GPU worker signals completion;
- *       all segments are submitted concurrently via {@link #ASYNC_SEARCH_POOL} so the GPU can
- *       execute multiple segment jobs in parallel (bounded by {@code worker_queue_size}).</li>
- *   <li>Record a CUDA event on each slot's stream; make the main stream wait on all events.</li>
+ *   <li>Call {@code cuvsCagraSearchMultiSegment} which launches a single GPU kernel covering all
+ *       segments concurrently (one CTA per segment), writing results into the global buffers.</li>
  *   <li>Call {@code cuvsSelectK} on the main stream to find the global top-k entirely on GPU.</li>
  *   <li>Sync the main stream.</li>
- *   <li>Copy the three result arrays to host in a single pass:
- *       k selected distances, k flat-array positions, and all {@code numSegments × k} ordinals.</li>
- *   <li>Decode each result: {@code segment = position / k}, {@code ordinal = ordinals[position]}.</li>
+ *   <li>Copy the three result arrays to host in a single pass.</li>
+ *   <li>Decode each result: {@code segment = position / k},
+ *       {@code ordinal = ordinals[position]}.</li>
  * </ol>
  *
  * @since 25.10
@@ -60,22 +47,6 @@ import java.util.concurrent.Future;
 public class MultiSegmentCagraSearch {
 
   private MultiSegmentCagraSearch() {}
-
-  /**
-   * Thread pool used to submit persistent-mode segment searches concurrently.
-   *
-   * <p>In persistent mode, {@link BufferedCagraSearch#searchIntoBuffer} blocks on the CPU until
-   * the GPU signals completion via a system-scope atomic. Running each segment in its own thread
-   * allows the persistent kernel's job queue to hold all N segment jobs simultaneously, so GPU
-   * workers can execute them in parallel (bounded by {@code worker_queue_size}).
-   */
-  private static final ExecutorService ASYNC_SEARCH_POOL =
-      Executors.newCachedThreadPool(
-          r -> {
-            Thread t = new Thread(r, "cuvs-segment-search");
-            t.setDaemon(true);
-            return t;
-          });
 
   /**
    * Searches multiple CAGRA index segments for the global top-k nearest neighbors.
@@ -122,13 +93,7 @@ public class MultiSegmentCagraSearch {
     long outIdxBytes = (long) k * Long.BYTES; // int64 positions from select_k
     long outValBytes = (long) k * Float.BYTES;
 
-    // Assign a pool slot to each segment via round-robin.
-    CudaStreamPool pool = CuVSResourcesImpl.getStreamPool(resources);
-    int startSlot = pool.nextSlot(numSegments);
-    int[] slots = new int[numSegments];
-    for (int i = 0; i < numSegments; i++) {
-      slots[i] = Math.floorMod(startSlot + i, pool.size());
-    }
+    CagraSearchParams searchParameters = queries.get(0).getCagraSearchParameters();
 
     try (var resourcesAccessor = resources.access()) {
       long cuvsRes = resourcesAccessor.handle();
@@ -139,110 +104,59 @@ public class MultiSegmentCagraSearch {
           var outIdxDP = allocateRMMSegment(cuvsRes, outIdxBytes);
           var outValDP = allocateRMMSegment(cuvsRes, outValBytes)) {
 
-        // --- Phase 1: queue all per-segment CAGRA searches ---
-        CagraSearchParams searchParameters = queries.get(0).getCagraSearchParameters();
-        if (searchParameters.isPersistent()) {
-          // Persistent mode: searchIntoBuffer blocks on CPU (via system-scope atomic spin) until
-          // the GPU signals completion. Submit one task per pool slot in parallel so the GPU can
-          // work on multiple segment jobs concurrently, bounded by worker_queue_size.
-          //
-          // Segments are grouped by slot: if numSegments > pool.size(), multiple segments share a
-          // slot and must be serialized within that slot's task — each cuvsResources_t handle is
-          // not thread-safe for concurrent access (the descriptor_cache inside is not guarded).
-          // Parallelism = min(numSegments, pool.size()).
-          int poolSize = pool.size();
-          // Collect segment indices per slot. Size: poolSize, each entry may have 0..n indices.
-          @SuppressWarnings("unchecked")
-          List<Integer>[] segsBySlot = new List[poolSize];
-          for (int slot = 0; slot < poolSize; slot++) {
-            segsBySlot[slot] = new ArrayList<>();
-          }
+        // --- Phase 1: call cuvsCagraSearchMultiSegment ---
+        // Single kernel launch covers all segments; results land in globalNeighborsDP /
+        // globalDistancesDP on the same CUDA stream, so SelectK below sees them via ordering.
+        try (var arena = Arena.ofConfined()) {
+          MemorySegment sp = CuVSParamsHelper.buildCagraSearchParams(arena, searchParameters);
+
+          // Build C arrays: cuvsCagraIndex_t* indices, DLManagedTensor** q/n/d
+          MemorySegment indexArray = arena.allocate(ValueLayout.ADDRESS, numSegments);
+          MemorySegment queriesArray = arena.allocate(ValueLayout.ADDRESS, numSegments);
+          MemorySegment neighborsArray = arena.allocate(ValueLayout.ADDRESS, numSegments);
+          MemorySegment distancesArray = arena.allocate(ValueLayout.ADDRESS, numSegments);
+
+          long[] segShape = {1, k};
           for (int i = 0; i < numSegments; i++) {
-            segsBySlot[slots[i]].add(i);
+            // Index handle
+            indexArray.setAtIndex(ValueLayout.ADDRESS, i, buffered[i].getIndexHandle());
+
+            // Query DLTensor
+            var queryVectors = (CuVSMatrixInternal) queries.get(i).getQueryVectors();
+            queriesArray.setAtIndex(ValueLayout.ADDRESS, i, queryVectors.toTensor(arena));
+
+            // Neighbors DLTensor — slice of global buffer
+            long nByteOffset = (long) i * k * Integer.BYTES;
+            MemorySegment nSlice =
+                MemorySegment.ofAddress(globalNeighborsDP.handle().address() + nByteOffset);
+            neighborsArray.setAtIndex(
+                ValueLayout.ADDRESS,
+                i,
+                prepareTensor(arena, nSlice, segShape, kDLUInt(), 32, kDLCUDA()));
+
+            // Distances DLTensor — slice of global buffer
+            long dByteOffset = (long) i * k * Float.BYTES;
+            MemorySegment dSlice =
+                MemorySegment.ofAddress(globalDistancesDP.handle().address() + dByteOffset);
+            distancesArray.setAtIndex(
+                ValueLayout.ADDRESS,
+                i,
+                prepareTensor(arena, dSlice, segShape, kDLFloat(), 32, kDLCUDA()));
           }
-          // Submit one task per occupied slot.
-          List<Future<Void>> futures = new ArrayList<>(poolSize);
-          for (int slot = 0; slot < poolSize; slot++) {
-            if (segsBySlot[slot].isEmpty()) continue;
-            final int taskSlot = slot;
-            final List<Integer> taskSegs = segsBySlot[slot];
-            futures.add(
-                ASYNC_SEARCH_POOL.submit(
-                    (Callable<Void>)
-                        () -> {
-                          try (var threadArena = Arena.ofConfined()) {
-                            MemorySegment sp =
-                                CuVSParamsHelper.buildCagraSearchParams(
-                                    threadArena, searchParameters);
-                            for (int segIdx : taskSegs) {
-                              buffered[segIdx].searchIntoBuffer(
-                                  queries.get(segIdx),
-                                  globalNeighborsDP.handle(),
-                                  globalDistancesDP.handle(),
-                                  segIdx,
-                                  pool.resources(taskSlot),
-                                  pool.stream(taskSlot),
-                                  sp,
-                                  threadArena);
-                            }
-                          } catch (Exception e) {
-                            throw e;
-                          } catch (Throwable t) {
-                            throw new RuntimeException(t);
-                          }
-                          return null;
-                        }));
-          }
-          for (Future<Void> f : futures) {
-            try {
-              f.get();
-            } catch (ExecutionException e) {
-              throw e.getCause();
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              throw e;
-            }
-          }
-        } else {
-          // Non-persistent: each cuvsCagraSearch enqueues a CUDA kernel asynchronously and
-          // returns immediately; segments execute in parallel on their respective CUDA streams.
-          // A shared arena covers all per-call CPU allocations; it is closed once all launches
-          // have been enqueued.
-          try (var segArena = Arena.ofConfined()) {
-            MemorySegment searchParams =
-                CuVSParamsHelper.buildCagraSearchParams(segArena, searchParameters);
-            for (int i = 0; i < numSegments; i++) {
-              buffered[i].searchIntoBuffer(
-                  queries.get(i),
-                  globalNeighborsDP.handle(),
-                  globalDistancesDP.handle(),
-                  i,
-                  pool.resources(slots[i]),
-                  pool.stream(slots[i]),
-                  searchParams,
-                  segArena);
-            }
-          }
+
+          checkCuVSError(
+              cuvsCagraSearchMultiSegment(
+                  cuvsRes,
+                  sp,
+                  numSegments,
+                  indexArray,
+                  queriesArray,
+                  neighborsArray,
+                  distancesArray),
+              "cuvsCagraSearchMultiSegment");
         }
 
-        // --- Phase 2: event-based sync — make main stream wait for all segment streams ---
-        // Record one event per distinct slot (on the last kernel submitted to that slot);
-        // this is O(pool.size()) API calls instead of O(numSegments).
-        // Pool events are pre-allocated and reused across calls to avoid create/destroy overhead.
-        int[] lastSegmentForSlot = new int[pool.size()];
-        Arrays.fill(lastSegmentForSlot, -1);
-        for (int i = 0; i < numSegments; i++) {
-          lastSegmentForSlot[slots[i]] = i;
-        }
-        for (int slot = 0; slot < pool.size(); slot++) {
-          if (lastSegmentForSlot[slot] >= 0) {
-            checkCudaError(cudaEventRecord(pool.event(slot), pool.stream(slot)), "cudaEventRecord");
-            checkCudaError(
-                cudaStreamWaitEvent(cuvsStream, pool.event(slot), 0), "cudaStreamWaitEvent");
-          }
-        }
-
-        // --- Phase 3: select global top-k on GPU (after all segment searches complete) ---
+        // --- Phase 2: select global top-k on GPU ---
         SelectKHelper.selectK(
             cuvsRes,
             globalDistancesDP.handle(),
@@ -254,11 +168,9 @@ public class MultiSegmentCagraSearch {
         // No stream sync needed here: the D2H copies below are enqueued on the same cuvsStream,
         // so CUDA stream ordering guarantees selectK completes before the copies begin.
 
-        // --- Phase 4: single device-to-host copy for all three arrays ---
-        // Allocate one contiguous host buffer and slice into three typed views.
+        // --- Phase 3: single device-to-host copy for all three arrays ---
         // Layout (in order of decreasing alignment): int64 outIdx | float32 outVal | uint32
         // ordinals
-        // outIdxBytes is a multiple of Long.BYTES, so each slice is naturally aligned.
         try (var hostArena = Arena.ofConfined()) {
           MemorySegment hostBuf =
               hostArena.allocate(outIdxBytes + outValBytes + neighborsBytes, Long.BYTES);
@@ -278,7 +190,7 @@ public class MultiSegmentCagraSearch {
 
           checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync after D2H copy");
 
-          // --- Phase 5: decode results ---
+          // --- Phase 4: decode results ---
           int[] segmentIndices = new int[k];
           int[] selectedOrdinals = new int[k];
           float[] selectedDistances = new float[k];

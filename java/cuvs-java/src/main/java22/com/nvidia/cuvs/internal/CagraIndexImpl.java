@@ -360,6 +360,11 @@ public class CagraIndexImpl implements CagraIndex, BufferedCagraSearch {
    * @param segmentCuvsRes    {@code cuvsResources_t} handle whose CUDA stream receives the kernel
    */
   @Override
+  public MemorySegment getIndexHandle() {
+    return cagraIndexReference.getMemorySegment();
+  }
+
+  @Override
   public void searchIntoBuffer(
       CagraQuery query,
       MemorySegment globalNeighborsDP,

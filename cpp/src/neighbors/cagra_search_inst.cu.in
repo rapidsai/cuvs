@@ -32,4 +32,22 @@ CUVS_INST_CAGRA_SEARCH(data_t, uint32_t, int64_t);
 
 #undef CUVS_INST_CAGRA_SEARCH
 
+#define CUVS_INST_CAGRA_SEARCH_MULTI_SEGMENT(T, IdxT, OutputIdxT)                                    \
+  void search_multi_segment(                                                                           \
+    raft::resources const& handle,                                                                     \
+    cuvs::neighbors::cagra::search_params const& params,                                              \
+    const std::vector<const cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                       \
+    const std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>>& queries,          \
+    const std::vector<raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major>>& neighbors,     \
+    const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances)          \
+  {                                                                                                    \
+    cuvs::neighbors::cagra::search_multi_segment<T, IdxT, OutputIdxT>(                               \
+      handle, params, indices, queries, neighbors, distances);                                         \
+  }
+
+CUVS_INST_CAGRA_SEARCH_MULTI_SEGMENT(data_t, uint32_t, uint32_t);
+CUVS_INST_CAGRA_SEARCH_MULTI_SEGMENT(data_t, uint32_t, int64_t);
+
+#undef CUVS_INST_CAGRA_SEARCH_MULTI_SEGMENT
+
 }  // namespace cuvs::neighbors::cagra

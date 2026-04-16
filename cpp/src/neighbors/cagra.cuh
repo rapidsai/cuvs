@@ -406,6 +406,19 @@ index<T, IdxT> merge(raft::resources const& handle,
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
 
+template <typename T, typename OutputIdxT = uint32_t, typename IdxT = uint32_t>
+void search_multi_segment(
+  raft::resources const& res,
+  search_params const& params,
+  const std::vector<const index<T, IdxT>*>& indices,
+  const std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances)
+{
+  cagra::detail::search_multi_segment<T, OutputIdxT, IdxT>(
+    res, params, indices, queries, neighbors, distances);
+}
+
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra

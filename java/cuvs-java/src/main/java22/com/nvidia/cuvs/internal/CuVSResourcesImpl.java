@@ -81,6 +81,12 @@ public class CuVSResourcesImpl implements CuVSResources {
   }
 
   @Override
+  public void setWorkspacePool(long sizeBytes) {
+    checkCuVSError(
+        cuvsResourcesSetWorkspacePool(resourceHandle, sizeBytes), "cuvsResourcesSetWorkspacePool");
+  }
+
+  @Override
   public Path tempDirectory() {
     return tempDirectory;
   }

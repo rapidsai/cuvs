@@ -1165,6 +1165,146 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                graph_size);
 }
 
+/**
+ * @brief Multi-segment CAGRA search kernel.
+ *
+ * Grid: (1, num_queries, num_segments).
+ * Each CTA handles one (query, segment) pair independently.
+ * The global hashmap (if used) must be laid out as
+ *   [num_segments][num_queries][hashmap::get_size(hash_bitlen)].
+ */
+template <bool TOPK_BY_BITONIC_SORT,
+          bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
+          class DATASET_DESCRIPTOR_T,
+          class SourceIndexT,
+          class SAMPLE_FILTER_T>
+RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_ms(
+  const multi_segment_desc_t<typename DATASET_DESCRIPTOR_T::DATA_T,
+                              typename DATASET_DESCRIPTOR_T::INDEX_T,
+                              typename DATASET_DESCRIPTOR_T::DISTANCE_T>* segments,
+  const std::uint32_t top_k,
+  const SourceIndexT* source_indices_ptr,
+  const unsigned num_distilation,
+  const uint64_t rand_xor_mask,
+  const uint32_t num_seeds,
+  typename DATASET_DESCRIPTOR_T::INDEX_T* visited_hashmap_ptr,
+  const std::uint32_t max_candidates,
+  const std::uint32_t max_itopk,
+  const std::uint32_t internal_topk,
+  const std::uint32_t search_width,
+  const std::uint32_t min_iteration,
+  const std::uint32_t max_iteration,
+  std::uint32_t* const num_executed_iterations,
+  const std::uint32_t hash_bitlen,
+  const std::uint32_t small_hash_bitlen,
+  const std::uint32_t small_hash_reset_interval,
+  SAMPLE_FILTER_T sample_filter)
+{
+  using INDEX_T = typename DATASET_DESCRIPTOR_T::INDEX_T;
+
+  const uint32_t query_id = blockIdx.y;
+  const uint32_t seg_id   = blockIdx.z;
+  const auto& seg         = segments[seg_id];
+
+  // Offset the global hashmap to the base of this segment's block.
+  // search_core will then add blockIdx.y * hash_size for the per-query offset, giving the correct
+  // layout: visited_hashmap_ptr[(seg_id * gridDim.y + query_id) * hash_size].
+  INDEX_T* seg_hashmap_ptr =
+    (visited_hashmap_ptr != nullptr)
+      ? visited_hashmap_ptr +
+          seg_id * static_cast<size_t>(gridDim.y) * hashmap::get_size(hash_bitlen)
+      : nullptr;
+
+  search_core<TOPK_BY_BITONIC_SORT,
+              BITONIC_SORT_AND_MERGE_MULTI_WARPS,
+              DATASET_DESCRIPTOR_T,
+              SourceIndexT,
+              SAMPLE_FILTER_T>(seg.result_indices_ptr,
+                               seg.result_distances_ptr,
+                               top_k,
+                               seg.dataset_desc,
+                               seg.queries_ptr,
+                               seg.graph,
+                               seg.graph_degree,
+                               source_indices_ptr,
+                               num_distilation,
+                               rand_xor_mask,
+                               nullptr,  // seed_ptr: not used in multi-segment
+                               0,        // num_seeds
+                               seg_hashmap_ptr,
+                               max_candidates,
+                               max_itopk,
+                               internal_topk,
+                               search_width,
+                               min_iteration,
+                               max_iteration,
+                               num_executed_iterations,
+                               hash_bitlen,
+                               small_hash_bitlen,
+                               small_hash_reset_interval,
+                               query_id,
+                               sample_filter);
+}
+
+template <bool TOPK_BY_BITONIC_SORT,
+          bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
+          class DATASET_DESCRIPTOR_T,
+          class SourceIndexT,
+          class SAMPLE_FILTER_T>
+auto dispatch_kernel_ms = []() {
+  static_assert(TOPK_BY_BITONIC_SORT || !BITONIC_SORT_AND_MERGE_MULTI_WARPS);
+  return search_kernel_ms<TOPK_BY_BITONIC_SORT,
+                          BITONIC_SORT_AND_MERGE_MULTI_WARPS,
+                          DATASET_DESCRIPTOR_T,
+                          SourceIndexT,
+                          SAMPLE_FILTER_T>;
+}();
+
+/**
+ * @brief Encodes the (TOPK_BY_BITONIC_SORT, BITONIC_SORT_AND_MERGE_MULTI_WARPS) template
+ * booleans as a runtime value, selected from search parameters.
+ */
+enum class TopkVariant {
+  BITONIC,             ///< bitonic sort, no multi-warp merge  (num_itopk_candidates ≤ 256, itopk_size ≤ 256)
+  BITONIC_MERGE_MULTI, ///< bitonic sort, multi-warp merge     (num_itopk_candidates ≤ 256, itopk_size > 256)
+  RADIX,               ///< radix-based topk                   (num_itopk_candidates > 256)
+};
+
+/**
+ * @brief Selects the topk algorithm variant from runtime search parameters.
+ */
+inline TopkVariant select_topk_variant(unsigned itopk_size,
+                                        unsigned num_itopk_candidates,
+                                        unsigned block_size)
+{
+  assert(itopk_size <= 512);
+  if (num_itopk_candidates <= 256) {
+    if (itopk_size <= 256) { return TopkVariant::BITONIC; }
+    assert(block_size >= 64);
+    return TopkVariant::BITONIC_MERGE_MULTI;
+  }
+  return TopkVariant::RADIX;
+}
+
+template <typename DATASET_DESCRIPTOR_T, typename SourceIndexT, typename SAMPLE_FILTER_T>
+struct search_kernel_config_ms {
+  using kernel_t = decltype(dispatch_kernel_ms<false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
+
+  static auto choose_itopk_and_mx_candidates(unsigned itopk_size,
+                                             unsigned num_itopk_candidates,
+                                             unsigned block_size) -> kernel_t
+  {
+    switch (select_topk_variant(itopk_size, num_itopk_candidates, block_size)) {
+      case TopkVariant::BITONIC:
+        return dispatch_kernel_ms<true, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+      case TopkVariant::BITONIC_MERGE_MULTI:
+        return dispatch_kernel_ms<true, true, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+      default:
+        return dispatch_kernel_ms<false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+    }
+  }
+};
+
 // To make sure we avoid false sharing on both CPU and GPU, we enforce cache line size to the
 // maximum of the two.
 // This makes sync atomic significantly faster.
@@ -1385,32 +1525,13 @@ struct search_kernel_config {
                                              unsigned num_itopk_candidates,
                                              unsigned block_size) -> kernel_t
   {
-    assert(itopk_size <= 512);
-    if (num_itopk_candidates <= 256) {
-      if (itopk_size <= 256) {
-        return dispatch_kernel<Persistent,
-                               true,
-                               false,
-                               DATASET_DESCRIPTOR_T,
-                               SourceIndexT,
-                               SAMPLE_FILTER_T>;
-      } else {
-        assert(block_size >= 64);
-        return dispatch_kernel<Persistent,
-                               true,
-                               true,
-                               DATASET_DESCRIPTOR_T,
-                               SourceIndexT,
-                               SAMPLE_FILTER_T>;
-      }
-    } else {
-      // Radix-based topk is used
-      return dispatch_kernel<Persistent,
-                             false,
-                             false,
-                             DATASET_DESCRIPTOR_T,
-                             SourceIndexT,
-                             SAMPLE_FILTER_T>;
+    switch (select_topk_variant(itopk_size, num_itopk_candidates, block_size)) {
+      case TopkVariant::BITONIC:
+        return dispatch_kernel<Persistent, true, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+      case TopkVariant::BITONIC_MERGE_MULTI:
+        return dispatch_kernel<Persistent, true, true, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+      default:
+        return dispatch_kernel<Persistent, false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     }
   }
 };
@@ -2224,6 +2345,48 @@ auto get_runner(Args... args) -> std::shared_ptr<RunnerT>
   return runner;
 }
 
+/**
+ * @brief Computes the max_candidates and max_itopk constants passed to the search kernel.
+ *
+ * Both values are rounded up to the next power-of-two bucket supported by the kernel template
+ * instantiations. They are the same for single-segment and multi-segment launches, so this helper
+ * is shared by select_and_run and select_and_run_multi_segment.
+ */
+struct kernel_dispatch_params {
+  uint32_t max_candidates;
+  uint32_t max_itopk;
+
+  static kernel_dispatch_params compute(const search_params& ps, uint32_t num_itopk_candidates)
+  {
+    kernel_dispatch_params p{};
+    if (num_itopk_candidates <= 64) {
+      p.max_candidates = 64;
+    } else if (num_itopk_candidates <= 128) {
+      p.max_candidates = 128;
+    } else if (num_itopk_candidates <= 256) {
+      p.max_candidates = 256;
+    } else {
+      p.max_candidates = 32;  // irrelevant, radix-based topk is used
+    }
+
+    assert(ps.itopk_size <= 512);
+    if (num_itopk_candidates <= 256) {  // bitonic sort
+      if (ps.itopk_size <= 64) {
+        p.max_itopk = 64;
+      } else if (ps.itopk_size <= 128) {
+        p.max_itopk = 128;
+      } else if (ps.itopk_size <= 256) {
+        p.max_itopk = 256;
+      } else {
+        p.max_itopk = 512;
+      }
+    } else {  // radix sort
+      p.max_itopk = (ps.itopk_size <= 256) ? 256 : 512;
+    }
+    return p;
+  }
+};
+
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
@@ -2255,37 +2418,7 @@ void select_and_run(
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
-  uint32_t max_candidates{};
-  if (num_itopk_candidates <= 64) {
-    max_candidates = 64;
-  } else if (num_itopk_candidates <= 128) {
-    max_candidates = 128;
-  } else if (num_itopk_candidates <= 256) {
-    max_candidates = 256;
-  } else {
-    max_candidates =
-      32;  // irrelevant, radix based topk is used (see choose_itopk_and_max_candidates)
-  }
-
-  uint32_t max_itopk{};
-  assert(ps.itopk_size <= 512);
-  if (num_itopk_candidates <= 256) {  // bitonic sort
-    if (ps.itopk_size <= 64) {
-      max_itopk = 64;
-    } else if (ps.itopk_size <= 128) {
-      max_itopk = 128;
-    } else if (ps.itopk_size <= 256) {
-      max_itopk = 256;
-    } else {
-      max_itopk = 512;
-    }
-  } else {  // radix sort
-    if (ps.itopk_size <= 256) {
-      max_itopk = 256;
-    } else {
-      max_itopk = 512;
-    }
-  }
+  auto [max_candidates, max_itopk] = kernel_dispatch_params::compute(ps, num_itopk_candidates);
 
   if (ps.persistent) {
     using runner_type = persistent_runner_t<DataT, IndexT, DistanceT, SourceIndexT, SampleFilterT>;
@@ -2360,5 +2493,87 @@ void select_and_run(
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
+
+/**
+ * @brief Launch the multi-segment CAGRA search kernel.
+ *
+ * Searches all N segments concurrently in a single kernel launch.  Each CTA (indexed by
+ * blockIdx.y = query_id, blockIdx.z = seg_id) independently searches one segment for one query.
+ *
+ * @param segment_descs  device pointer to array of num_segments descriptors
+ * @param num_segments   number of segments (= gridDim.z)
+ * @param num_queries    number of queries (= gridDim.y)
+ * @param ps             search parameters (shared across all segments)
+ * @param topk           number of neighbors to return per segment
+ * @param num_itopk_candidates  search_width * max_graph_degree
+ * @param block_size     thread-block size
+ * @param smem_size      shared memory per CTA (computed for max graph_degree)
+ * @param hash_bitlen    global hashmap bit-length
+ * @param hashmap_ptr    device buffer sized [num_segments * num_queries * get_size(hash_bitlen)]
+ * @param small_hash_bitlen    small-hash bit-length (0 = disabled)
+ * @param small_hash_reset_interval  reset interval for small hash
+ * @param sample_filter  sample filter
+ * @param stream         CUDA stream
+ */
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SourceIndexT,
+          typename SampleFilterT>
+void select_and_run_multi_segment(
+  const multi_segment_desc_t<DataT, IndexT, DistanceT>* segment_descs,
+  uint32_t num_segments,
+  uint32_t num_queries,
+  const search_params& ps,
+  uint32_t topk,
+  uint32_t num_itopk_candidates,
+  uint32_t block_size,
+  uint32_t smem_size,
+  int64_t hash_bitlen,
+  IndexT* hashmap_ptr,
+  size_t small_hash_bitlen,
+  size_t small_hash_reset_interval,
+  SampleFilterT sample_filter,
+  cudaStream_t stream)
+{
+  using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+
+  auto [max_candidates, max_itopk] = kernel_dispatch_params::compute(ps, num_itopk_candidates);
+
+  auto kernel =
+    search_kernel_config_ms<descriptor_base_type, SourceIndexT, SampleFilterT>::
+      choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
+
+  dim3 thread_dims(block_size, 1, 1);
+  dim3 block_dims(1, num_queries, num_segments);
+  RAFT_LOG_DEBUG("Launching ms kernel: %u threads, %u queries, %u segments, %u smem",
+                 block_size,
+                 num_queries,
+                 num_segments,
+                 smem_size);
+  auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    kernel<<<block_dims, thread_dims, smem_size, stream>>>(segment_descs,
+                                                           topk,
+                                                           nullptr,  // source_indices_ptr
+                                                           ps.num_random_samplings,
+                                                           ps.rand_xor_mask,
+                                                           0,  // num_seeds
+                                                           hashmap_ptr,
+                                                           max_candidates,
+                                                           max_itopk,
+                                                           ps.itopk_size,
+                                                           ps.search_width,
+                                                           ps.min_iterations,
+                                                           ps.max_iterations,
+                                                           nullptr,  // num_executed_iterations
+                                                           hash_bitlen,
+                                                           small_hash_bitlen,
+                                                           small_hash_reset_interval,
+                                                           sample_filter);
+  };
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(kernel, smem_size, kernel_launcher);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+}
+
 }  // namespace single_cta_search
 }  // namespace cuvs::neighbors::cagra::detail

@@ -55,4 +55,11 @@ public interface BufferedCagraSearch {
       MemorySegment searchParams,
       Arena arena)
       throws Throwable;
+
+  /**
+   * Returns the raw {@code cuvsCagraIndex_t} handle as a {@link MemorySegment}.
+   * Used by {@link com.nvidia.cuvs.MultiSegmentCagraSearch} to build the index pointer array
+   * for {@code cuvsCagraSearchMultiSegment}.
+   */
+  MemorySegment getIndexHandle();
 }

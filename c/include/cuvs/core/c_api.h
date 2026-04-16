@@ -130,6 +130,22 @@ cuvsError_t cuvsStreamSync(cuvsResources_t res);
 cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 
 /**
+ * @brief Configure the temporary workspace on this resources object as an uncapped pool, backed
+ *        by the current device memory resource. After the initial reservation is allocated on
+ *        first use, subsequent calls to cuvsRMMAlloc / cuvsRMMFree on the same resources handle
+ *        hit the pool cache rather than calling cudaMallocAsync / cudaFreeAsync, reducing CUDA
+ *        context lock contention under concurrent query threads. The pool grows without shrinking:
+ *        freed allocations are returned to the pool rather than to the device, so the pool's
+ *        high-water mark only increases until the resources object is destroyed.
+ *
+ * @param[in] res                cuvsResources_t opaque C handle
+ * @param[in] initial_size_bytes initial pool reservation in bytes; size to cover the
+ *                               steady-state working set to avoid growth after warmup
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsResourcesSetWorkspacePool(cuvsResources_t res, size_t initial_size_bytes);
+
+/**
  * @brief Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
  *        for multi-GPU operations
  *
