@@ -847,6 +847,7 @@ if(NOT BUILD_CPU_ONLY)
     src/detail/jit_lto/AlgorithmPlanner.cpp
     src/detail/jit_lto/FragmentEntry.cpp
     src/detail/jit_lto/nvjitlink_checker.cpp
+    src/detail/jit_lto/NVRTCLTOFragmentCompiler.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
@@ -1033,8 +1034,12 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE rmm::rmm $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<COMPILE_ONLY:nvidia::cutlass::cutlass> $<COMPILE_ONLY:cuco::cuco> CUDA::nvJitLink
+      PRIVATE rmm::rmm
+              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco>
+              CUDA::nvJitLink
+              CUDA::nvrtc
     )
     set_property(TARGET cuvs PROPERTY NO_CUDART_DEP ON)
 
@@ -1093,6 +1098,7 @@ SECTIONS
       PRIVATE rmm::rmm
               $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               CUDA::nvJitLink
+              CUDA::nvrtc
               $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
               $<COMPILE_ONLY:nvidia::cutlass::cutlass>
               $<COMPILE_ONLY:cuco::cuco>

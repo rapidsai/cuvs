@@ -15,7 +15,9 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 struct InterleavedScanPlanner : AlgorithmPlanner {
-  InterleavedScanPlanner() : AlgorithmPlanner("interleaved_scan") {}
+  inline static LauncherJitCache launcher_jit_cache{};
+
+  InterleavedScanPlanner() : AlgorithmPlanner("interleaved_scan", launcher_jit_cache) {}
 
   template <typename DataTag, typename AccTag, typename IdxTag, int Capacity, bool Ascending>
   void add_entrypoint()
@@ -35,6 +37,11 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
   void add_metric_device_function()
   {
     this->add_static_fragment<fragment_tag_metric<DataTag, AccTag, MetricTag, Veclen>>();
+  }
+
+  void add_metric_udf_fragment(std::unique_ptr<UDFFatbinFragment> fragment)
+  {
+    this->add_fragment(std::move(fragment));
   }
 
   template <typename IndexTag, typename FilterTag>
