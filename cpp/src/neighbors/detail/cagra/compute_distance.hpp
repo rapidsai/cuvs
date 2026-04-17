@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -235,6 +235,7 @@ struct dataset_descriptor_host {
     std::mutex mutex;
     std::atomic<bool> ready;  // Not sure if std::holds_alternative is thread-safe
     std::variant<ready_t, init_f> value;
+    cudaEvent_t init_event{nullptr};
 
     template <typename InitF>
     state(InitF init, size_t size) : ready{false}, value{std::make_tuple(init, size)}
@@ -247,6 +248,7 @@ struct dataset_descriptor_host {
         auto& [ptr, stream] = std::get<ready_t>(value);
         RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(ptr, stream));
       }
+      if (init_event != nullptr) { RAFT_CUDA_TRY_NO_THROW(cudaEventDestroy(init_event)); }
     }
 
     void eval(rmm::cuda_stream_view stream)
@@ -255,8 +257,12 @@ struct dataset_descriptor_host {
       if (std::holds_alternative<init_f>(value)) {
         auto& [fun, size]     = std::get<init_f>(value);
         dev_descriptor_t* ptr = nullptr;
+        RAFT_CUDA_TRY(cudaEventCreateWithFlags(&init_event, cudaEventDisableTiming));
         RAFT_CUDA_TRY(cudaMallocAsync(&ptr, size, stream));
         fun(ptr, stream);
+        // Record an event after initialization so that other streams can establish
+        // a GPU-side dependency without expensive host synchronization.
+        RAFT_CUDA_TRY(cudaEventRecord(init_event, stream));
         value = std::make_tuple(ptr, stream);
         ready.store(true, std::memory_order_release);
       }
@@ -265,6 +271,11 @@ struct dataset_descriptor_host {
     auto get(rmm::cuda_stream_view stream) -> dev_descriptor_t*
     {
       if (!ready.load(std::memory_order_acquire)) { eval(stream); }
+      // Make the caller's stream wait for the init to complete. This is a
+      // lightweight GPU-side dependency with no host blocking.  On the same
+      // stream that performed the init (or after the event has already
+      // completed) this is essentially a no-op.
+      if (init_event != nullptr) { RAFT_CUDA_TRY(cudaStreamWaitEvent(stream, init_event)); }
       return std::get<0>(std::get<ready_t>(value));
     }
   };
