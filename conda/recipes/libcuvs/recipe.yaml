@@ -79,6 +79,7 @@ cache:
       - nccl ${{ nccl_version }}
       - cuda-version =${{ cuda_version }}
       - cuda-cudart-dev
+      - cuda-nvrtc-dev
       - cuda-profiler-api
       - libcublas-dev
       - libcurand-dev
@@ -115,6 +116,7 @@ outputs:
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
         - cuda-cudart-dev
+        - cuda-nvrtc-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -126,6 +128,7 @@ outputs:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
+        - cuda-nvrtc
         - nccl
         - libcublas
         - libcurand
@@ -134,6 +137,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libaio
           - libboost
@@ -175,6 +179,7 @@ outputs:
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
         - cuda-cudart-dev
+        - cuda-nvrtc-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -187,6 +192,7 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
+        - cuda-nvrtc
         - nccl
         - libcublas
         - libcurand
@@ -195,6 +201,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libaio
           - libboost
@@ -234,6 +241,7 @@ outputs:
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
         - cuda-cudart-dev
+        - cuda-nvrtc-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -246,6 +254,7 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
+        - cuda-nvrtc
         - nccl
         - libcublas
         - libcurand
@@ -254,6 +263,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libaio
           - libboost
@@ -310,6 +320,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libaio
           - libboost
@@ -407,6 +418,7 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
+        - cuda-nvrtc
         - nccl
         - libcublas
         - libcurand
@@ -415,6 +427,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libaio
           - libboost
@@ -487,6 +500,7 @@ outputs:
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-nvrtc
           - cuda-version
           - libcublas
           - libcurand
@@ -494,11 +508,6 @@ outputs:
           - libcusparse
           - librmm
           - mkl
-          - nccl
-          - if: cuda_major == "13"
-            then:
-              - cuda-nvrtc
-              - libnvjitlink
     about:
       homepage: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.urls.Homepage }}
       license: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.license }}

@@ -214,13 +214,6 @@ include(cmake/modules/generate_string_matrix.cmake)
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  set(jit_lto_files)
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
-  endif()
 
   add_library(cuvs_cpp_headers INTERFACE)
   add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
@@ -351,8 +344,11 @@ if(NOT BUILD_CPU_ONLY)
                POSITION_INDEPENDENT_CODE ON
   )
   target_compile_definitions(
-    cuvs-cagra-search PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                              $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    cuvs-cagra-search
+    PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+            $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+            # Temporary: mirror cuvs_cpp_headers so JIT sources always see the macro when LTO is on
+            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
   )
   target_link_libraries(
     cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
@@ -396,6 +392,7 @@ if(NOT BUILD_CPU_ONLY)
   if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
     set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
   endif()
+  set(JIT_LTO_COMPILATION ON)
 
   # Generate interleaved scan kernel files at build time
   include(cmake/modules/generate_jit_lto_kernels.cmake)
@@ -412,6 +409,10 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
   target_link_libraries(jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL)
+  # Kernel OBJECT targets (add_jit_lto_kernel) only pull usage requirements from here, not from
+  # cuvs_objs — they must see the same JIT/LTO preprocessor branch as host code (e.g.
+  # standard_dataset_descriptor_t<..., QueryT> in compute_distance_standard-impl.cuh).
+  target_compile_definitions(jit_lto_kernel_usage_requirements INTERFACE CUVS_ENABLE_JIT_LTO)
 
   block(PROPAGATE jit_lto_files)
   set(jit_lto_files)
@@ -441,7 +442,7 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/detail/jit_lto_kernels/interleaved_scan_kernel.cu.in"
     FRAGMENT_TAG_FORMAT
       "${ivf_flat_ns}::fragment_tag_interleaved_scan<${ivf_flat_ns}::tag_@data_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, @capacity@, @ascending_value@>"
-    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/registration_tags.hpp>"
                               "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/interleaved_scan"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -456,7 +457,7 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/detail/jit_lto_kernels/load_and_compute_dist_kernel.cu.in"
     FRAGMENT_TAG_FORMAT
       "${ivf_flat_ns}::fragment_tag_load_and_compute_dist<${ivf_flat_ns}::tag_@data_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, @compute_norm_value@, @veclen@>"
-    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/registration_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/load_and_compute_dist"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -469,7 +470,7 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/detail/jit_lto_kernels/metric_kernel.cu.in"
     FRAGMENT_TAG_FORMAT
       "${ivf_flat_ns}::fragment_tag_metric<${ivf_flat_ns}::tag_@data_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${ivf_flat_ns}::tag_metric_@metric_name@, @veclen@>"
-    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/registration_tags.hpp>"
                               "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/metric"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -483,7 +484,7 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/detail/jit_lto_kernels/filter_kernel.cu.in"
     FRAGMENT_TAG_FORMAT
       "${ivf_flat_ns}::fragment_tag_filter<${neighbors_ns}::tag_index_@index_abbrev@, ${neighbors_ns}::tag_filter_@filter_name@>"
-    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/registration_tags.hpp>"
                               "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -497,7 +498,7 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/detail/jit_lto_kernels/post_process_kernel.cu.in"
     FRAGMENT_TAG_FORMAT
       "${ivf_flat_ns}::fragment_tag_post_lambda<${ivf_flat_ns}::tag_post_process_@post_process_name@>"
-    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/registration_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/post_process"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -647,142 +648,154 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/increment_score"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
+  set(cagra_ns "cuvs::neighbors::cagra::detail")
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT
       "cagra_setup_workspace@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@_query_@query_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_setup_workspace<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::tag_@query_abbrev@, ${cagra_ns}::@jit_fragment_codebook_tag@, ${cagra_ns}::tag_team_@team_size@, ${cagra_ns}::tag_dim_@dataset_block_dim@, ${cagra_ns}::tag_pq_bits_@pq_bits@, ${cagra_ns}::tag_pq_len_@pq_len@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT
       "cagra_compute_distance@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@_query_@query_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_compute_distance<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::tag_@query_abbrev@, ${cagra_ns}::@jit_fragment_codebook_tag@, ${cagra_ns}::tag_team_@team_size@, ${cagra_ns}::tag_dim_@dataset_block_dim@, ${cagra_ns}::tag_pq_bits_@pq_bits@, ${cagra_ns}::tag_pq_len_@pq_len@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT "cagra_dist_op_@metric_tag@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/dist_op_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/dist_op_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/dist_op_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_dist_op<${cagra_ns}::tag_@query_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::@jit_metric_tag@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/dist_op"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT
-      "cagra_apply_normalization_standard@normalization_suffix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@_query_@query_abbrev@"
+      "cagra_apply_normalization_standard_@norm_kind@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@_query_@query_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_apply_normalization_standard<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::tag_@query_abbrev@, ${cagra_ns}::tag_team_@team_size@, ${cagra_ns}::tag_dim_@dataset_block_dim@, ${cagra_ns}::tag_norm_@norm_kind@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_normalization_standard"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT
       "cagra_search_single_cta_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_data_@data_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_search_single_cta<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, @topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT
       "cagra_search_single_cta_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_data_@data_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_search_single_cta_p<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, @topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta_p"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT "cagra_search_multi_cta_data_@data_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_search_multi_cta<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_multi_cta"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT "cagra_random_pickup_data_@data_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_random_pickup<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/random_pickup"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
+    jit_lto_files
     NAME_FORMAT "cagra_compute_distance_to_child_nodes_data_@data_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_compute_distance_to_child_nodes<${cagra_ns}::tag_@data_abbrev@, ${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_to_child_nodes"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
-    NAME_FORMAT "cagra_appy_filter"
+    jit_lto_files
+    NAME_FORMAT "cagra_apply_filter"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${cagra_ns}::fragment_tag_apply_filter_kernel<${cagra_ns}::tag_idx_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    jit_lto_kernel_files
-    NAME_FORMAT "cagra_@filter_name@"
+    jit_lto_files
+    NAME_FORMAT "cagra_sample_filter_@filter_name@_index_@source_index_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/filter_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${neighbors_ns}::fragment_tag_sample_filter<${neighbors_ns}::tag_bitset_@bitset_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@, ${neighbors_ns}::tag_filter_@filter_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -1000,6 +1013,7 @@ if(NOT BUILD_CPU_ONLY)
     src/detail/jit_lto/AlgorithmPlanner.cpp
     src/detail/jit_lto/FragmentEntry.cpp
     src/detail/jit_lto/nvjitlink_checker.cpp
+    src/detail/jit_lto/NVRTCLTOFragmentCompiler.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
@@ -1096,8 +1110,11 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   target_compile_definitions(
-    cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    cuvs_objs
+    PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+            $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+            # Temporary: mirror cuvs_cpp_headers so JIT sources always see the macro when LTO is on
+            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
   )
 
   target_link_libraries(

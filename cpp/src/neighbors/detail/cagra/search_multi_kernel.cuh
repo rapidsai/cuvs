@@ -13,8 +13,6 @@
 
 #include "set_value_batch.cuh"
 
-#include "compute_distance-ext.cuh"
-#include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_for_cagra/topk.h"  //todo replace with raft kernel

@@ -30,7 +30,7 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-// JIT version of compute_distance_to_random_nodes - uses dataset_descriptor_base_t* pointer
+// JIT version of compute_distance_to_random_nodes - uses const dataset_descriptor_base_t* (smem)
 // Shared between single_cta and multi_cta JIT kernels
 template <typename IndexT, typename DistanceT, typename DataT>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
@@ -104,7 +104,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   }
 }
 
-// JIT version of compute_distance_to_child_nodes - uses dataset_descriptor_base_t* pointer
+// JIT version of compute_distance_to_child_nodes - uses const dataset_descriptor_base_t* (smem)
 // Shared between single_cta and multi_cta JIT kernels
 template <typename IndexT, typename DistanceT, typename DataT, int STATIC_RESULT_POSITION = 1>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(

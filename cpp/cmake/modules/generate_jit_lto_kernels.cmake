@@ -48,6 +48,19 @@ function(process_jit_lto_matrix_entry source_list_var)
   cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   populate_matrix_variables("${_JIT_LTO_MATRIX_JSON_ENTRY}")
+
+  # Registration fragment tags (FRAGMENT_TAG_FORMAT) can track GPU template params in .cu.in; map
+  # those scalars to tag_* names here so matrix JSON does not duplicate tag strings.
+  if(DEFINED codebook_type)
+    if(codebook_type STREQUAL "void")
+      set(jit_fragment_codebook_tag "tag_codebook_none")
+    elseif(codebook_type STREQUAL "half")
+      set(jit_fragment_codebook_tag "tag_codebook_half")
+    else()
+      message(FATAL_ERROR "Unknown codebook_type for JIT fragment: ${codebook_type}")
+    endif()
+  endif()
+
   string(CONFIGURE "${_JIT_LTO_NAME_FORMAT}" kernel_name @ONLY)
   string(CONFIGURE "${_JIT_LTO_FRAGMENT_TAG_FORMAT}" fragment_tag @ONLY)
 

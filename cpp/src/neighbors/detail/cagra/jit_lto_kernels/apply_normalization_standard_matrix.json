@@ -41,7 +41,7 @@
   ],
   "_normalization": [
     {
-      "normalization_suffix": "_noop",
+      "norm_kind": "noop",
       "_query": [
         {
           "query_type": "float",
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "normalization_suffix": "_cosine",
+      "norm_kind": "cosine",
       "_query": [
         {
           "query_type": "float",

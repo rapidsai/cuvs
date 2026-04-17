@@ -15,13 +15,13 @@
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
-#include "jit_lto_kernels/search_multi_cta_planner.hpp"
+#include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
+#include "jit_lto_kernels/kernel_def.hpp"
 #include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
 #include "search_plan.cuh"          // For search_params
 #include "set_value_batch.cuh"      // For set_value_batch
 #include "shared_launcher_jit.hpp"  // For shared JIT helper functions
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
-#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
@@ -86,97 +86,10 @@ void select_and_run_jit(
     }
   }
 
-  // Create planner with tags
-  using DataTag   = decltype(get_data_type_tag<DataT>());
-  using IndexTag  = decltype(get_index_type_tag<IndexT>());
-  using DistTag   = decltype(get_distance_type_tag<DistanceT>());
-  using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
-
-  // Create planner and register device functions (setup_workspace, compute_distance, etc.)
-  std::shared_ptr<AlgorithmLauncher> launcher;
-  if (dataset_desc.is_vpq) {
-    using QueryTag    = query_type_tag_vpq_t<DataTag>;
-    using CodebookTag = codebook_tag_vpq_t;
-    CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-      planner(dataset_desc.metric,
-              dataset_desc.team_size,
-              dataset_desc.dataset_block_dim,
-              dataset_desc.is_vpq,
-              dataset_desc.pq_bits,
-              dataset_desc.pq_len);
-
-    planner
-      .add_setup_workspace_device_function<DataTag, IndexTag, DistTag, QueryTag, CodebookTag>();
-    planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                dataset_desc.team_size,
-                                                dataset_desc.dataset_block_dim,
-                                                dataset_desc.is_vpq,
-                                                dataset_desc.pq_bits,
-                                                dataset_desc.pq_len);
-    planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                 dataset_desc.team_size,
-                                                 dataset_desc.dataset_block_dim,
-                                                 dataset_desc.is_vpq,
-                                                 dataset_desc.pq_bits,
-                                                 dataset_desc.pq_len);
-    std::string filter_name = get_sample_filter_name<SampleFilterT>();
-    planner.add_sample_filter_device_function(filter_name);
-    launcher = planner.get_launcher();
-  } else {
-    using CodebookTag = codebook_tag_standard_t;
-    if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
-      using QueryTag =
-        query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
-      CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-        planner(dataset_desc.metric,
-                dataset_desc.team_size,
-                dataset_desc.dataset_block_dim,
-                dataset_desc.is_vpq,
-                dataset_desc.pq_bits,
-                dataset_desc.pq_len);
-
-      planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                  dataset_desc.team_size,
-                                                  dataset_desc.dataset_block_dim,
-                                                  dataset_desc.is_vpq,
-                                                  dataset_desc.pq_bits,
-                                                  dataset_desc.pq_len);
-      planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                   dataset_desc.team_size,
-                                                   dataset_desc.dataset_block_dim,
-                                                   dataset_desc.is_vpq,
-                                                   dataset_desc.pq_bits,
-                                                   dataset_desc.pq_len);
-      std::string filter_name = get_sample_filter_name<SampleFilterT>();
-      planner.add_sample_filter_device_function(filter_name);
-      launcher = planner.get_launcher();
-    } else {
-      using QueryTag = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
-      CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-        planner(dataset_desc.metric,
-                dataset_desc.team_size,
-                dataset_desc.dataset_block_dim,
-                dataset_desc.is_vpq,
-                dataset_desc.pq_bits,
-                dataset_desc.pq_len);
-
-      planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                  dataset_desc.team_size,
-                                                  dataset_desc.dataset_block_dim,
-                                                  dataset_desc.is_vpq,
-                                                  dataset_desc.pq_bits,
-                                                  dataset_desc.pq_len);
-      planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                   dataset_desc.team_size,
-                                                   dataset_desc.dataset_block_dim,
-                                                   dataset_desc.is_vpq,
-                                                   dataset_desc.pq_bits,
-                                                   dataset_desc.pq_len);
-      std::string filter_name = get_sample_filter_name<SampleFilterT>();
-      planner.add_sample_filter_device_function(filter_name);
-      launcher = planner.get_launcher();
-    }
-  }
+  std::string const filter_name = get_sample_filter_name<SampleFilterT>();
+  std::shared_ptr<AlgorithmLauncher> launcher =
+    make_cagra_multi_cta_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(dataset_desc,
+                                                                              filter_name);
 
   if (!launcher) { RAFT_FAIL("Failed to get JIT launcher"); }
 
@@ -227,33 +140,35 @@ void select_and_run_jit(
   const unsigned num_random_samplings_u    = static_cast<unsigned>(ps.num_random_samplings);
 
   auto kernel_launcher = [&](auto const& kernel) -> void {
-    launcher->dispatch(stream,
-                       grid_dims,
-                       block_dims,
-                       smem_size,
-                       topk_indices_ptr,
-                       topk_distances_ptr,
-                       dev_desc,
-                       queries_ptr,
-                       graph.data_handle(),
-                       max_elements,
-                       graph_degree_u32,  // Cast int64_t to uint32_t
-                       source_indices_ptr,
-                       num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
-                       ps.rand_xor_mask,        // uint64_t matches kernel (8 bytes)
-                       dev_seed_ptr,
-                       num_seeds,
-                       visited_hash_bitlen,
-                       traversed_hashmap_ptr,
-                       traversed_hash_bitlen_u32,  // Cast int64_t to uint32_t
-                       itopk_size_u32,             // Cast size_t to uint32_t
-                       min_iterations_u32,         // Cast size_t to uint32_t
-                       max_iterations_u32,         // Cast size_t to uint32_t
-                       num_executed_iterations,
-                       query_id_offset,  // Offset to add to query_id when calling filter
-                       bitset_ptr,
-                       bitset_len,
-                       original_nbits);
+    launcher->dispatch<
+      multi_cta_search::search_multi_cta_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+      stream,
+      grid_dims,
+      block_dims,
+      smem_size,
+      topk_indices_ptr,
+      topk_distances_ptr,
+      dev_desc,
+      queries_ptr,
+      graph.data_handle(),
+      max_elements,
+      graph_degree_u32,
+      source_indices_ptr,
+      num_random_samplings_u,
+      ps.rand_xor_mask,
+      dev_seed_ptr,
+      num_seeds,
+      visited_hash_bitlen,
+      traversed_hashmap_ptr,
+      traversed_hash_bitlen_u32,
+      itopk_size_u32,
+      min_iterations_u32,
+      max_iterations_u32,
+      num_executed_iterations,
+      query_id_offset,
+      bitset_ptr,
+      bitset_len,
+      original_nbits);
   };
   cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
     launcher->get_kernel(), smem_size, kernel_launcher);

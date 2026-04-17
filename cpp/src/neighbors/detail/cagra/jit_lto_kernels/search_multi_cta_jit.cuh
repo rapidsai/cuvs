@@ -28,10 +28,10 @@ using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_ji
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 using cuvs::neighbors::detail::sample_filter;
 template <typename DataT, typename IndexT, typename DistanceT, typename SourceIndexT>
-__global__ __launch_bounds__(1024, 1) void search_kernel_jit(
+__device__ void search_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
   DistanceT* const result_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const DataT* const queries_ptr,  // [num_queries, dataset_dim]
   const IndexT* const knn_graph,   // [dataset_size, graph_degree]
   const uint32_t max_elements,
@@ -97,7 +97,7 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   uint32_t dim                   = dataset_desc->args.dim;
   uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
-  auto* smem_desc =
+  auto smem_desc =
     setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =

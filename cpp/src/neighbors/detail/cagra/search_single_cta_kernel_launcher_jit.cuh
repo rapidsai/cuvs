@@ -18,7 +18,8 @@
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
-#include "jit_lto_kernels/search_single_cta_planner.hpp"
+#include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
+#include "jit_lto_kernels/kernel_def.hpp"
 #include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
 #include "search_plan.cuh"          // For search_params
 #include "search_single_cta_kernel-inl.cuh"  // For resource_queue_t, local_deque_t, launcher_t, persistent_runner_base_t, etc.
@@ -26,7 +27,6 @@
 #include "shared_launcher_jit.hpp"  // For shared JIT helper functions
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
-#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
@@ -447,13 +447,16 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     const uint32_t max_iterations_u32            = static_cast<uint32_t>(max_iterations);
     const unsigned num_random_samplings_u        = static_cast<unsigned>(num_random_samplings);
 
+    const IndexT* seed_ptr_arg            = nullptr;
+    uint32_t* num_executed_iterations_arg = nullptr;
     // Launch the persistent kernel via AlgorithmLauncher
     // The persistent kernel now takes the descriptor pointer directly
-    launcher->dispatch_cooperative(
+    launcher->dispatch_cooperative<
+      single_cta_search::search_single_cta_p_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
       stream,
       gs,
       bs,
-      smem_size,
+      static_cast<std::size_t>(smem_size),
       worker_handles_ptr,
       job_descriptors_ptr,
       completion_counters_ptr,
@@ -462,21 +465,21 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
       source_indices_ptr,
       num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
       rand_xor_mask,           // uint64_t matches kernel (8 bytes)
-      nullptr,                 // seed_ptr
+      seed_ptr_arg,
       num_seeds,
       hashmap_ptr,
       max_candidates,
       max_itopk,
-      itopk_size_u32,                 // Cast size_t to uint32_t
-      search_width_u32,               // Cast size_t to uint32_t
-      min_iterations_u32,             // Cast size_t to uint32_t
-      max_iterations_u32,             // Cast size_t to uint32_t
-      nullptr,                        // num_executed_iterations
+      itopk_size_u32,      // Cast size_t to uint32_t
+      search_width_u32,    // Cast size_t to uint32_t
+      min_iterations_u32,  // Cast size_t to uint32_t
+      max_iterations_u32,  // Cast size_t to uint32_t
+      num_executed_iterations_arg,
       hash_bitlen_u32,                // Cast int64_t to uint32_t
       small_hash_bitlen_u32,          // Cast size_t to uint32_t
       small_hash_reset_interval_u32,  // Cast size_t to uint32_t
       query_id_offset,                // Offset to add to query_id when calling filter
-      dev_desc,                       // Pass descriptor pointer
+      dev_desc,
       bitset_ptr,
       bitset_len,
       original_nbits);
@@ -617,101 +620,14 @@ void select_and_run_jit(
     using runner_type =
       persistent_runner_jit_t<DataT, IndexT, DistanceT, SourceIndexT, SampleFilterT>;
 
-    // Create planner with tags for persistent kernel
-    using DataTag   = decltype(get_data_type_tag<DataT>());
-    using IndexTag  = decltype(get_index_type_tag<IndexT>());
-    using DistTag   = decltype(get_distance_type_tag<DistanceT>());
-    using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
-
-    std::shared_ptr<AlgorithmLauncher> launcher;
-    if (dataset_desc.is_vpq) {
-      using QueryTag    = query_type_tag_vpq_t<DataTag>;
-      using CodebookTag = codebook_tag_vpq_t;
-      CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-        planner(dataset_desc.metric,
-                topk_by_bitonic_sort,
-                bitonic_sort_and_merge_multi_warps,
-                dataset_desc.team_size,
-                dataset_desc.dataset_block_dim,
-                dataset_desc.is_vpq,
-                dataset_desc.pq_bits,
-                dataset_desc.pq_len,
-                true /* persistent */);
-
-      planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                  dataset_desc.team_size,
-                                                  dataset_desc.dataset_block_dim,
-                                                  dataset_desc.is_vpq,
-                                                  dataset_desc.pq_bits,
-                                                  dataset_desc.pq_len);
-      planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                   dataset_desc.team_size,
-                                                   dataset_desc.dataset_block_dim,
-                                                   dataset_desc.is_vpq,
-                                                   dataset_desc.pq_bits,
-                                                   dataset_desc.pq_len);
-      planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
-      launcher = planner.get_launcher();
-    } else {
-      using CodebookTag = codebook_tag_standard_t;
-      if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
-        using QueryTag =
-          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
-        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-          planner(dataset_desc.metric,
-                  topk_by_bitonic_sort,
-                  bitonic_sort_and_merge_multi_warps,
-                  dataset_desc.team_size,
-                  dataset_desc.dataset_block_dim,
-                  dataset_desc.is_vpq,
-                  dataset_desc.pq_bits,
-                  dataset_desc.pq_len,
-                  true /* persistent */);
-
-        planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                    dataset_desc.team_size,
-                                                    dataset_desc.dataset_block_dim,
-                                                    dataset_desc.is_vpq,
-                                                    dataset_desc.pq_bits,
-                                                    dataset_desc.pq_len);
-        planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                     dataset_desc.team_size,
-                                                     dataset_desc.dataset_block_dim,
-                                                     dataset_desc.is_vpq,
-                                                     dataset_desc.pq_bits,
-                                                     dataset_desc.pq_len);
-        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
-        launcher = planner.get_launcher();
-      } else {
-        using QueryTag =
-          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
-        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-          planner(dataset_desc.metric,
-                  topk_by_bitonic_sort,
-                  bitonic_sort_and_merge_multi_warps,
-                  dataset_desc.team_size,
-                  dataset_desc.dataset_block_dim,
-                  dataset_desc.is_vpq,
-                  dataset_desc.pq_bits,
-                  dataset_desc.pq_len,
-                  true /* persistent */);
-
-        planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                    dataset_desc.team_size,
-                                                    dataset_desc.dataset_block_dim,
-                                                    dataset_desc.is_vpq,
-                                                    dataset_desc.pq_bits,
-                                                    dataset_desc.pq_len);
-        planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                     dataset_desc.team_size,
-                                                     dataset_desc.dataset_block_dim,
-                                                     dataset_desc.is_vpq,
-                                                     dataset_desc.pq_bits,
-                                                     dataset_desc.pq_len);
-        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
-        launcher = planner.get_launcher();
-      }
-    }
+    std::string const filter_name = get_sample_filter_name<SampleFilterT>();
+    std::shared_ptr<AlgorithmLauncher> launcher =
+      make_cagra_single_cta_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(
+        dataset_desc,
+        topk_by_bitonic_sort,
+        bitonic_sort_and_merge_multi_warps,
+        true /* persistent */,
+        filter_name);
     if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA persistent search kernel"); }
 
     // Use get_runner pattern similar to non-JIT version
@@ -742,98 +658,14 @@ void select_and_run_jit(
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
     return;
   } else {
-    // Create planner with tags for regular kernel
-    using DataTag   = decltype(get_data_type_tag<DataT>());
-    using IndexTag  = decltype(get_index_type_tag<IndexT>());
-    using DistTag   = decltype(get_distance_type_tag<DistanceT>());
-    using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
-
-    std::shared_ptr<AlgorithmLauncher> launcher;
-    if (dataset_desc.is_vpq) {
-      using QueryTag    = query_type_tag_vpq_t<DataTag>;
-      using CodebookTag = codebook_tag_vpq_t;
-      CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-        planner(dataset_desc.metric,
-                topk_by_bitonic_sort,
-                bitonic_sort_and_merge_multi_warps,
-                dataset_desc.team_size,
-                dataset_desc.dataset_block_dim,
-                dataset_desc.is_vpq,
-                dataset_desc.pq_bits,
-                dataset_desc.pq_len);
-
-      planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                  dataset_desc.team_size,
-                                                  dataset_desc.dataset_block_dim,
-                                                  dataset_desc.is_vpq,
-                                                  dataset_desc.pq_bits,
-                                                  dataset_desc.pq_len);
-      planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                   dataset_desc.team_size,
-                                                   dataset_desc.dataset_block_dim,
-                                                   dataset_desc.is_vpq,
-                                                   dataset_desc.pq_bits,
-                                                   dataset_desc.pq_len);
-      planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
-      launcher = planner.get_launcher();
-    } else {
-      using CodebookTag = codebook_tag_standard_t;
-      if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
-        using QueryTag =
-          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
-        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-          planner(dataset_desc.metric,
-                  topk_by_bitonic_sort,
-                  bitonic_sort_and_merge_multi_warps,
-                  dataset_desc.team_size,
-                  dataset_desc.dataset_block_dim,
-                  dataset_desc.is_vpq,
-                  dataset_desc.pq_bits,
-                  dataset_desc.pq_len);
-
-        planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                    dataset_desc.team_size,
-                                                    dataset_desc.dataset_block_dim,
-                                                    dataset_desc.is_vpq,
-                                                    dataset_desc.pq_bits,
-                                                    dataset_desc.pq_len);
-        planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                     dataset_desc.team_size,
-                                                     dataset_desc.dataset_block_dim,
-                                                     dataset_desc.is_vpq,
-                                                     dataset_desc.pq_bits,
-                                                     dataset_desc.pq_len);
-        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
-        launcher = planner.get_launcher();
-      } else {
-        using QueryTag =
-          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
-        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-          planner(dataset_desc.metric,
-                  topk_by_bitonic_sort,
-                  bitonic_sort_and_merge_multi_warps,
-                  dataset_desc.team_size,
-                  dataset_desc.dataset_block_dim,
-                  dataset_desc.is_vpq,
-                  dataset_desc.pq_bits,
-                  dataset_desc.pq_len);
-
-        planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                    dataset_desc.team_size,
-                                                    dataset_desc.dataset_block_dim,
-                                                    dataset_desc.is_vpq,
-                                                    dataset_desc.pq_bits,
-                                                    dataset_desc.pq_len);
-        planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                     dataset_desc.team_size,
-                                                     dataset_desc.dataset_block_dim,
-                                                     dataset_desc.is_vpq,
-                                                     dataset_desc.pq_bits,
-                                                     dataset_desc.pq_len);
-        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
-        launcher = planner.get_launcher();
-      }
-    }
+    std::string const filter_name = get_sample_filter_name<SampleFilterT>();
+    std::shared_ptr<AlgorithmLauncher> launcher =
+      make_cagra_single_cta_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(
+        dataset_desc,
+        topk_by_bitonic_sort,
+        bitonic_sort_and_merge_multi_warps,
+        false /* persistent */,
+        filter_name);
     if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA search kernel"); }
 
     // Get the device descriptor pointer - dev_ptr() initializes it if needed
@@ -861,11 +693,11 @@ void select_and_run_jit(
 
     // Dispatch kernel via launcher
     auto kernel_launcher = [&](auto const& kernel) -> void {
-      launcher->dispatch(
+      launcher->dispatch<search_single_cta_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
         stream,
         grid,
         block,
-        smem_size,
+        static_cast<std::size_t>(smem_size),
         topk_indices_ptr,
         topk_distances_ptr,
         topk,
@@ -889,7 +721,7 @@ void select_and_run_jit(
         small_hash_bitlen_u32,          // Cast size_t to uint32_t
         small_hash_reset_interval_u32,  // Cast size_t to uint32_t
         query_id_offset,                // Offset to add to query_id when calling filter
-        dev_desc,  // Pass base pointer - kernel expects concrete type but pointer value is same
+        dev_desc,
         bitset_ptr,
         bitset_len,
         original_nbits);

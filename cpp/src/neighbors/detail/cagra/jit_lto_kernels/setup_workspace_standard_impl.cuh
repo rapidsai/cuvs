@@ -12,7 +12,7 @@ namespace cuvs::neighbors::cagra::detail {
 
 // Unified setup_workspace implementation for standard descriptors
 // This is instantiated when PQ_BITS=0, PQ_LEN=0, CodebookT=void
-// Takes dataset_descriptor_base_t* and reconstructs the derived descriptor inside
+// Takes const dataset_descriptor_base_t* and reconstructs the derived descriptor inside smem
 // QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -23,8 +23,8 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT>
-__device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
+__device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
   void* smem,
   const DataT* queries,
   uint32_t query_id)
@@ -40,8 +40,7 @@ __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
 
   // Call the free function directly - it takes DescriptorT as template parameter
   const desc_t* result = setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
-  return const_cast<dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(
-    static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result));
+  return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

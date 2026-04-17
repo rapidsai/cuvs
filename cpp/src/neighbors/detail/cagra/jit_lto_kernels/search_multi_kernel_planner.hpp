@@ -6,14 +6,11 @@
 #pragma once
 
 #include "cagra_planner_base.hpp"
-#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <string>
 
-// Use nested namespace syntax to allow inclusion from within parent namespace
-namespace cuvs::neighbors::cagra::detail {
-namespace multi_kernel_search {
+namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
 template <typename DataTag,
           typename IndexTag,
@@ -21,23 +18,34 @@ template <typename DataTag,
           typename SourceIndexTag,
           typename QueryTag,
           typename CodebookTag>
-struct CagraMultiKernelSearchPlanner
-  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
-  CagraMultiKernelSearchPlanner(cuvs::distance::DistanceType metric,
+struct CagraMultiKernelSearchPlanner : CagraPlannerBase {
+  CagraMultiKernelSearchPlanner(cuvs::distance::DistanceType /*metric*/,
                                 const std::string& kernel_name,
-                                uint32_t team_size,
-                                uint32_t dataset_block_dim,
-                                bool is_vpq      = false,
-                                uint32_t pq_bits = 0,
-                                uint32_t pq_len  = 0)
-    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
-        kernel_name,
-        (kernel_name == "apply_filter_kernel")
-          ? make_fragment_key<IndexTag, DistanceTag, SourceIndexTag>()
-          : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
+                                uint32_t /*team_size*/,
+                                uint32_t /*dataset_block_dim*/,
+                                bool /*is_vpq*/,
+                                uint32_t /*pq_bits*/,
+                                uint32_t /*pq_len*/)
+    : CagraPlannerBase(kernel_name)
   {
+  }
+
+  void add_linked_kernel(std::string const& kernel_name)
+  {
+    if (kernel_name == "random_pickup") {
+      this->add_static_fragment<fragment_tag_random_pickup<DataTag, IndexTag, DistanceTag>>();
+    } else if (kernel_name == "compute_distance_to_child_nodes") {
+      this->add_static_fragment<fragment_tag_compute_distance_to_child_nodes<DataTag,
+                                                                             IndexTag,
+                                                                             DistanceTag,
+                                                                             SourceIndexTag>>();
+    } else if (kernel_name == "apply_filter_kernel") {
+      this->add_static_fragment<
+        fragment_tag_apply_filter_kernel<IndexTag, DistanceTag, SourceIndexTag>>();
+    } else {
+      RAFT_FAIL("Unknown CAGRA multi-kernel JIT kernel: %s", kernel_name.c_str());
+    }
   }
 };
 
-}  // namespace multi_kernel_search
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

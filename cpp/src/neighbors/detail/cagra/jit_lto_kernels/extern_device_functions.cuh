@@ -19,15 +19,15 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT>
-extern __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
+extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
   void* smem,
   const DataT* queries,
   uint32_t query_id);
 
 template <typename DataT, typename IndexT, typename DistanceT>
-extern __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_base(
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>*, void*, const DataT*, uint32_t);
+extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_base(
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*, void*, const DataT*, uint32_t);
 
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,

@@ -3,12 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard@normalization_suffix@_impl.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_@norm_kind@_impl.cuh>
+
+namespace {
+
+using data_t     = @data_type@;
+using index_t    = @index_type@;
+using distance_t = @distance_type@;
+using query_t    = @query_type@;
+
+}  // namespace
 
 namespace cuvs::neighbors::cagra::detail {
 
-using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
-template __device__ @distance_type@ apply_normalization_standard<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@, @query_type@>(
-    @distance_type@, const args_t, @index_type@);
+using args_t = typename dataset_descriptor_base_t<data_t, index_t, distance_t>::args_t;
+template __device__ distance_t
+apply_normalization_standard<@team_size@, @dataset_block_dim@, data_t, index_t, distance_t, query_t>(distance_t,
+                                                                                     const args_t,
+                                                                                     index_t);
 
 }  // namespace cuvs::neighbors::cagra::detail

@@ -3,9 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "@embedded_header_file@"
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 
 namespace cuvs::detail::jit_lto {
 
@@ -17,4 +16,4 @@ const uint8_t* const _FragmentEntry::data = embedded_fatbin;
 template <>
 const size_t _FragmentEntry::length = sizeof(embedded_fatbin);
 
-}
+}  // namespace cuvs::detail::jit_lto

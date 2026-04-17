@@ -6,24 +6,33 @@
 #pragma once
 
 #include "cagra_planner_base.hpp"
-#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include <cuvs/distance/distance.hpp>
-#include <string>
 
-// Use nested namespace syntax to allow inclusion from within parent namespace
-namespace cuvs {
-namespace neighbors {
-namespace cagra {
-namespace detail {
-namespace multi_cta_search {
+namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
+template <typename DataTag,
+          typename IndexTag,
+          typename DistanceTag,
+          typename SourceIndexTag,
+          typename QueryTag,
+          typename CodebookTag>
 struct CagraMultiCtaSearchPlanner : CagraPlannerBase {
-  CagraMultiCtaSearchPlanner() : CagraPlannerBase("search_multi_cta") {}
+  CagraMultiCtaSearchPlanner(cuvs::distance::DistanceType /*metric*/,
+                             uint32_t /*team_size*/,
+                             uint32_t /*dataset_block_dim*/,
+                             bool /*is_vpq*/,
+                             uint32_t /*pq_bits*/,
+                             uint32_t /*pq_len*/)
+    : CagraPlannerBase("search_multi_cta")
+  {
+  }
+
+  void add_search_multi_cta_kernel_fragment()
+  {
+    this->add_static_fragment<
+      fragment_tag_search_multi_cta<DataTag, SourceIndexTag, IndexTag, DistanceTag>>();
+  }
 };
 
-}  // namespace multi_cta_search
-}  // namespace detail
-}  // namespace cagra
-}  // namespace neighbors
-}  // namespace cuvs
+}  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

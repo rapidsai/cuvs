@@ -6,20 +6,42 @@
 #include <neighbors/detail/cagra/jit_lto_kernels/@impl_file@>
 #include <neighbors/detail/cagra/jit_lto_kernels/extern_device_functions.cuh>
 
+namespace {
+
+using data_t     = @data_type@;
+using index_t    = @index_type@;
+using distance_t = @distance_type@;
+using query_t    = @query_type@;
+
+}  // namespace
+
 namespace cuvs::neighbors::cagra::detail {
 
-template __device__ cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>* setup_workspace<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
-    cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
+// NOTE: Explicit instantiation may be redundant: setup_workspace_base<> below calls
+// setup_workspace with the same args, which normally implicit-instantiates it.
+// Revisit to drop this if NVCC/tooling does not require the explicit line.
 
-template<>
-__device__ dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>* setup_workspace_base<@data_type@, @index_type@, @distance_type@>(
-  dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>* desc,
+template __device__ const dataset_descriptor_base_t<data_t, index_t, distance_t>*
+setup_workspace<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, data_t, index_t, distance_t, query_t>(
+  const dataset_descriptor_base_t<data_t, index_t, distance_t>*, void*, const data_t*, uint32_t);
+
+template <>
+__device__ const dataset_descriptor_base_t<data_t, index_t, distance_t>*
+setup_workspace_base<data_t, index_t, distance_t>(
+  const dataset_descriptor_base_t<data_t, index_t, distance_t>* desc,
   void* smem,
-  const @data_type@* queries,
+  const data_t* queries,
   uint32_t query_id)
 {
-  return setup_workspace<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
-    desc, smem, queries, query_id);
+  return setup_workspace<@team_size@,
+                         @dataset_block_dim@,
+                         @pq_bits@,
+                         @pq_len@,
+                         @codebook_type@,
+                         data_t,
+                         index_t,
+                         distance_t,
+                         query_t>(desc, smem, queries, query_id);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

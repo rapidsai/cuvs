@@ -3,11 +3,49 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <neighbors/detail/cagra/jit_lto_kernels/kernel_def.hpp>
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_jit.cuh>
+
+namespace {
+
+using data_t     = @data_type@;
+using index_t    = @index_type@;
+using distance_t = @distance_type@;
+using dataset_desc_base =
+  cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<data_t, index_t, distance_t>;
+
+}  // namespace
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-template __global__ void random_pickup_kernel_jit<@data_type@, @index_type@, @distance_type@>(
-    cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, const @data_type@* const, const std::size_t, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, @index_type@* const, @distance_type@* const, const std::uint32_t, @index_type@* const, const std::uint32_t);
+extern "C" __global__ void random_pickup(const dataset_desc_base* dataset_desc,
+                                         const data_t* const queries_ptr,
+                                         const std::size_t num_pickup,
+                                         const unsigned num_distilation,
+                                         const uint64_t rand_xor_mask,
+                                         const index_t* seed_ptr,
+                                         const std::uint32_t num_seeds,
+                                         index_t* const result_indices_ptr,
+                                         distance_t* const result_distances_ptr,
+                                         const std::uint32_t ldr,
+                                         index_t* const visited_hashmap_ptr,
+                                         const std::uint32_t hash_bitlen)
+{
+  random_pickup_kernel_jit<data_t, index_t, distance_t>(dataset_desc,
+                                                        queries_ptr,
+                                                        num_pickup,
+                                                        num_distilation,
+                                                        rand_xor_mask,
+                                                        seed_ptr,
+                                                        num_seeds,
+                                                        result_indices_ptr,
+                                                        result_distances_ptr,
+                                                        ldr,
+                                                        visited_hashmap_ptr,
+                                                        hash_bitlen);
+}
+
+static_assert(
+  std::is_same_v<decltype(random_pickup), random_pickup_jit_func_t<data_t, index_t, distance_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

@@ -10,6 +10,8 @@
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <sstream>
+#include <string>
 
 namespace cuvs::neighbors::ivf_flat {
 /**
@@ -3052,20 +3054,21 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
 
 }  // namespace helpers
 
-#ifdef CUVS_ENABLE_JIT_LTO
 namespace experimental::udf {
 
 // ============================================================================
-// Real C++ implementations for compile-time validation
+// Real C++ implementations for compile-time validation. These allow users to
+// verify that their custom UDFs will compile correctly and be usable in our kernels.
 // ============================================================================
 
 /**
  * @brief Wrapper for vector elements that provides both packed and unpacked access.
  *
- * For float/half: trivial wrapper around scalar values
+ * For float: trivial wrapper around scalar values
  * For int8/uint8 with Veclen > 1: wraps packed bytes in a 32-bit word
  *
- * @tparam T Data type (float, __half, int8_t, uint8_t)
+ * @tparam T Data type (float, int8_t, uint8_t). Fp16 vector elements are not supported for UDFs
+ *             at this time (see `metric_interface` static_assert when `cuda_fp16.h` is available).
  * @tparam AccT Storage/accumulator type (float, __half, int32_t, uint32_t)
  * @tparam Veclen Vector length (1, 2, 4, 8, 16)
  */
@@ -3080,9 +3083,22 @@ struct point {
   point() = default;
   __device__ __host__ explicit point(storage_type d) : data_(d) {}
 
+  /*
+  @brief Returns the raw storage type of the point. This is only relevant for int8/uint8 with Veclen
+  > 1. When working with packed data, one may use CUDA intrinsics to access faster vectorized
+  operations.
+
+  @return The raw storage type of the point.
+  */
   __device__ __forceinline__ storage_type raw() const { return data_; }
   __device__ __forceinline__ storage_type& raw() { return data_; }
 
+  /*
+  @brief Returns the number of elements in the point. Prefer to use this along with operator[] when
+  unsure about CUDA intrinsics.
+
+  @return The number of elements in the point.
+  */
   __device__ __host__ static constexpr int size()
   {
     if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1) {
@@ -3117,6 +3133,13 @@ template <typename T, typename AccT, int Veclen = 1>
 struct metric_interface {
   using point_type = point<T, AccT, Veclen>;
 
+#if CUVS_IVF_FLAT_UDF_HAS_CUDA_FP16
+  static_assert(
+    !(std::is_same_v<std::remove_cv_t<T>, __half> || std::is_same_v<std::remove_cv_t<T>, half>),
+    "IVF-Flat custom metric UDF does not support fp16 (__half / half) at this time; do not set "
+    "search_params.metric_udf for fp16 indices.");
+#endif
+
   virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
   virtual ~metric_interface()                                               = default;
 };
@@ -3134,7 +3157,7 @@ __device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT,
     return __dp4a(diff, diff, AccT{0});
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
     auto diff = __vabsdiffs4(x.raw(), y.raw());
-    return __dp4a(diff, diff, static_cast<uint32_t>(0));
+    return __dp4a(diff, diff, uint32_t{0});
   } else {
     auto diff = x.raw() - y.raw();
     return diff * diff;
@@ -3147,8 +3170,10 @@ __device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> 
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
     auto diff = __vabsdiffu4(x.raw(), y.raw());
+    return diff;
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
     auto diff = __vabsdiffs4(x.raw(), y.raw());
+    return diff;
   } else {
     auto a = x.raw();
     auto b = y.raw();
@@ -3271,11 +3296,33 @@ template <typename T, typename AccT, int V>
 __device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT, V> y)
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    AccT acc{0};
+    for (int i = 0; i < 4; ++i) {
+      unsigned xi = (x.raw() >> (i * 8)) & 0xFFu;
+      unsigned yi = (y.raw() >> (i * 8)) & 0xFFu;
+      AccT d        = static_cast<AccT>(xi) - static_cast<AccT>(yi);
+      acc += d * d;
+    }
+    return acc;
+#else
     auto diff = __vabsdiffu4(x.raw(), y.raw());
     return __dp4a(diff, diff, AccT{0});
+#endif
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    AccT acc{0};
+    for (int i = 0; i < 4; ++i) {
+      int xi = static_cast<int>(static_cast<int8_t>((x.raw() >> (i * 8)) & 0xFFu));
+      int yi = static_cast<int>(static_cast<int8_t>((y.raw() >> (i * 8)) & 0xFFu));
+      AccT d = static_cast<AccT>(xi - yi);
+      acc += d * d;
+    }
+    return acc;
+#else
     auto diff = __vabsdiffs4(x.raw(), y.raw());
-    return __dp4a(diff, diff, static_cast<uint32_t>(0));
+    return __dp4a(diff, diff, uint32_t{0});
+#endif
   } else {
     auto diff = x.raw() - y.raw();
     return diff * diff;
@@ -3288,9 +3335,33 @@ template <typename T, typename AccT, int V>
 __device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> y)
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    uint32_t r = 0;
+    for (int i = 0; i < 4; ++i) {
+      unsigned xi = (x.raw() >> (i * 8)) & 0xFFu;
+      unsigned yi = (y.raw() >> (i * 8)) & 0xFFu;
+      unsigned d  = (xi > yi) ? (xi - yi) : (yi - xi);
+      r |= (d & 0xFFu) << (i * 8);
+    }
+    return r;
+#else
     auto diff = __vabsdiffu4(x.raw(), y.raw());
+    return diff;
+#endif
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    uint32_t r = 0;
+    for (int i = 0; i < 4; ++i) {
+      int xi     = static_cast<int8_t>((x.raw() >> (i * 8)) & 0xFFu);
+      int yi     = static_cast<int8_t>((y.raw() >> (i * 8)) & 0xFFu);
+      unsigned d = static_cast<unsigned>(xi > yi ? xi - yi : yi - xi);
+      r |= (d & 0xFFu) << (i * 8);
+    }
+    return r;
+#else
     auto diff = __vabsdiffs4(x.raw(), y.raw());
+    return diff;
+#endif
   } else {
     auto a = x.raw();
     auto b = y.raw();
@@ -3304,7 +3375,17 @@ template <typename T, typename AccT, int V>
 __device__ __forceinline__ AccT dot_product(point<T, AccT, V> x, point<T, AccT, V> y)
 {
   if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+#if CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS
+    AccT acc = AccT{0};
+    for (int i = 0; i < 4; ++i) {
+      int xi = static_cast<int8_t>((x.raw() >> (i * 8)) & 0xFFu);
+      int yi = static_cast<int8_t>((y.raw() >> (i * 8)) & 0xFFu);
+      acc += static_cast<AccT>(xi) * static_cast<AccT>(yi);
+    }
+    return acc;
+#else
     return __dp4a(x.raw(), y.raw(), AccT{0});
+#endif
   } else {
     return x.raw() * y.raw();
   }
@@ -3377,7 +3458,33 @@ template <typename T, typename U> struct is_same { static constexpr bool value =
 template <typename T> struct is_same<T, T> { static constexpr bool value = true; };
 template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U>::value;
 }
+
+/* NVRTC sets __CUDACC_VER_*; CUDA 12.2 and earlier lack __dp4a in this UDF path. */
+#if defined(__CUDACC_VER_MAJOR__) && defined(__CUDACC_VER_MINOR__) && (__CUDACC_VER_MAJOR__ == 12) && (__CUDACC_VER_MINOR__ < 3)
+#define CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS 1
+#else
+#define CUVS_UDF_JIT_SCALAR_PACKED_BYTE_OPS 0
+#endif
 )";
+
+/**
+ * NVRTC/LTO fragment appended to custom metric UDF source. The UDF program is compiled alone, so it
+ * must supply the `compute_dist` definition that device_functions.cuh only declares.
+ */
+inline std::string instantiate_udf(char const* data_type, char const* acc_type, int veclen)
+{
+  std::ostringstream oss;
+  oss << "\nnamespace cuvs::neighbors::ivf_flat::detail {\n"
+      << "template <typename AccT>\n"
+      << "__device__ void compute_dist(AccT& acc, AccT x, AccT y) {\n"
+      << "  compute_dist_udf_impl<" << data_type << ", " << acc_type << ", " << veclen
+      << ">(acc, x, y);\n"
+      << "}\n"
+      << "template __device__ void compute_dist<" << acc_type << ">(" << acc_type << "&, "
+      << acc_type << ", " << acc_type << ");\n"
+      << "}\n";
+  return oss.str();
+}
 
 /**
  * @brief Define a custom distance metric with compile-time validation.
@@ -3386,6 +3493,9 @@ template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U
  * 1. A struct that inherits from metric_interface (compile-time validation)
  * 2. A function NAME_udf() that returns a metric_source for JIT compilation
  * 3. A BODY that needs to be compiled by nvrtc and must be valid CUDA device code
+ *
+ * NOTE: The metric function only supports ascending order top-k selection without norms or post
+ * processing.
  *
  * @param NAME The name of your metric (becomes struct name and function prefix)
  * @param BODY The body of operator()(AccT& acc, point_type x, point_type y)
@@ -3449,19 +3559,18 @@ struct )" #NAME R"( : metric_interface<T, AccT, Veclen> {                       
 )" #BODY R"(                                                                           \
 };                                                                                     \
                                                                                        \
-namespace cuvs { namespace neighbors { namespace ivf_flat { namespace detail {         \
-template <int Veclen, typename T, typename AccT>                                       \
-__device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)                \
+namespace cuvs::neighbors::ivf_flat::detail {                                        \
+template <typename T, typename AccT, int Veclen>                                       \
+__device__ __forceinline__ void compute_dist_udf_impl(AccT& acc, AccT x, AccT y)       \
 {                                                                                      \
   ::)" #NAME R"(<T, AccT, Veclen> metric;                                              \
   metric(acc, ::point<T, AccT, Veclen>(x), ::point<T, AccT, Veclen>(y));               \
 }                                                                                      \
-}}}}                                                                                   \
+}                                                                                    \
 )";                                                                                               \
     return result;                                                                                \
   }
 
 }  // namespace experimental::udf
-#endif
 
 }  // namespace cuvs::neighbors::ivf_flat

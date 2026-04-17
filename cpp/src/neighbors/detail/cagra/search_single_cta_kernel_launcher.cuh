@@ -111,7 +111,8 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                                                              hash_bitlen,
                                                              small_hash_bitlen,
                                                              small_hash_reset_interval,
-                                                             sample_filter);
+                                                             sample_filter,
+                                                             static_cast<IndexT>(graph.extent(0)));
     };
     cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
       kernel, smem_size, kernel_launcher);

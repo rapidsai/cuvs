@@ -12,7 +12,7 @@ namespace cuvs::neighbors::cagra::detail {
 
 // Unified setup_workspace implementation for VPQ descriptors
 // This is instantiated when PQ_BITS>0, PQ_LEN>0, CodebookT=half
-// Takes dataset_descriptor_base_t* and reconstructs the derived descriptor inside
+// Takes const dataset_descriptor_base_t* and reconstructs the derived descriptor inside smem
 // QueryT is always half for VPQ
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -23,8 +23,8 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT>
-__device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
+__device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
   void* smem,
   const DataT* queries,
   uint32_t query_id)
@@ -49,8 +49,7 @@ __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
 
   // Call the free function directly - it takes DescriptorT as template parameter
   const desc_t* result = setup_workspace_vpq<desc_t>(desc, smem, queries, query_id);
-  return const_cast<dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(
-    static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result));
+  return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

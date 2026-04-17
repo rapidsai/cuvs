@@ -1,7 +1,10 @@
 {
-  "filter_name": [
-    "filter_none",
-    "filter_bitset"
+  "filter_name": ["none", "bitset"],
+  "_bitset": [
+    {
+      "bitset_type": "uint32_t",
+      "bitset_abbrev": "u32"
+    }
   ],
   "_source_index": [
     {
@@ -9,7 +12,10 @@
       "source_index_abbrev": "ui"
     }
   ],
-  "namespace": [
-    "cuvs::neighbors::detail"
+  "_index": [
+    {
+      "index_type": "uint32_t",
+      "index_abbrev": "ui"
+    }
   ]
 }

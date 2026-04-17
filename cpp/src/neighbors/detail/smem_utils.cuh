@@ -42,7 +42,6 @@ void safely_launch_kernel_with_smem_size_impl(KernelT const& kernel,
   // last_kernel tracks which kernel pointer was last used.
   static std::atomic<uint32_t> last_smem_size{0};
   static std::atomic<KernelT> last_kernel{KernelT{}};
-  static std::mutex mutex;
   // Fast path: skip the lock when the kernel matches and the smem size is within bounds.
   // Load order matters: last_smem_size (acquire) before last_kernel (relaxed). Inside the lock
   // we store in the opposite order: last_kernel (relaxed) then last_smem_size (release).

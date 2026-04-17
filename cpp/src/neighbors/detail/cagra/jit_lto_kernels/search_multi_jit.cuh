@@ -19,8 +19,8 @@
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
 template <typename DataT, typename IndexT, typename DistanceT>
-RAFT_KERNEL random_pickup_kernel_jit(
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+__device__ void random_pickup_kernel_jit(
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const DataT* const queries_ptr,  // [num_queries, dataset_dim]
   const std::size_t num_pickup,
   const unsigned num_distilation,
@@ -46,7 +46,7 @@ RAFT_KERNEL random_pickup_kernel_jit(
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
 
-  auto* smem_desc =
+  auto smem_desc =
     setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
   __syncthreads();
 
@@ -90,13 +90,13 @@ template <typename DataT,
           typename DistanceT,
           typename SourceIndexT,
           typename SAMPLE_FILTER_T>
-RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
+__device__ void compute_distance_to_child_nodes_kernel_jit(
   const IndexT* const parent_node_list,  // [num_queries, search_width]
   IndexT* const parent_candidates_ptr,   // [num_queries, search_width]
   DistanceT* const parent_distance_ptr,  // [num_queries, search_width]
   const std::size_t lds,
   const std::uint32_t search_width,
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const IndexT* const neighbor_graph_ptr,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,
@@ -121,7 +121,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   const auto query_id       = blockIdx.y;
 
   extern __shared__ uint8_t smem[];
-  auto* smem_desc =
+  auto smem_desc =
     setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, query_ptr, query_id);
 
   __syncthreads();
@@ -179,7 +179,7 @@ using cuvs::neighbors::detail::sample_filter;
 template <typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
-RAFT_KERNEL apply_filter_kernel_jit(
+__device__ void apply_filter_kernel_jit(
   const SourceIndexT* source_indices_ptr,  // [num_queries, search_width]
   IndexT* const result_indices_ptr,
   DistanceT* const result_distances_ptr,

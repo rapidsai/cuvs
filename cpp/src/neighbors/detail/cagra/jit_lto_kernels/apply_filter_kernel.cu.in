@@ -3,11 +3,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <neighbors/detail/cagra/jit_lto_kernels/kernel_def.hpp>
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_jit.cuh>
+
+namespace {
+
+using index_t        = @index_type@;
+using distance_t     = @distance_type@;
+using source_index_t = @source_index_type@;
+
+}  // namespace
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-template __global__ void apply_filter_kernel_jit<@index_type@, @distance_type@, @source_index_type@>(
-    const @source_index_type@* const, @index_type@* const, @distance_type@* const, const std::size_t, const std::uint32_t, const std::uint32_t, const @index_type@, uint32_t*, @source_index_type@, @source_index_type@);
+extern "C" __global__ void apply_filter_kernel(const source_index_t* const source_indices_ptr,
+                                               index_t* const result_indices_ptr,
+                                               distance_t* const result_distances_ptr,
+                                               const std::size_t lds,
+                                               const std::uint32_t result_buffer_size,
+                                               const std::uint32_t num_queries,
+                                               const index_t query_id_offset,
+                                               uint32_t* bitset_ptr,
+                                               source_index_t bitset_len,
+                                               source_index_t original_nbits)
+{
+  apply_filter_kernel_jit<index_t, distance_t, source_index_t>(source_indices_ptr,
+                                                               result_indices_ptr,
+                                                               result_distances_ptr,
+                                                               lds,
+                                                               result_buffer_size,
+                                                               num_queries,
+                                                               query_id_offset,
+                                                               bitset_ptr,
+                                                               bitset_len,
+                                                               original_nbits);
+}
+
+static_assert(std::is_same_v<decltype(apply_filter_kernel),
+                             apply_filter_kernel_jit_func_t<index_t, distance_t, source_index_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

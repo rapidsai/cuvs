@@ -9,7 +9,6 @@
 #include "search_single_cta_device_helpers.cuh"
 
 // Additional device-side includes needed
-#include "../compute_distance-ext.cuh"
 #include "../device_common.hpp"
 #include "../hashmap.hpp"
 #include "../topk_by_radix.cuh"
@@ -82,7 +81,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
   SourceIndexT bitset_len,      // Bitset length
   SourceIndexT original_nbits)  // Original number of bits
@@ -121,7 +120,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   uint32_t dim                   = dataset_desc->args.dim;
   uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
-  auto* smem_desc =
+  auto smem_desc =
     setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
@@ -459,14 +458,14 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
 #endif
 }
 
-// JIT kernel wrapper - calls search_core
+// JIT device implementation - called from extern "C" __global__ entry in generated .cu
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
-RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
+__device__ void search_kernel_jit(
   uintptr_t result_indices_ptr,
   DistanceT* const result_distances_ptr,
   const std::uint32_t top_k,
@@ -490,7 +489,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
   SourceIndexT bitset_len,      // Bitset length
   SourceIndexT original_nbits)  // Original number of bits
@@ -531,23 +530,14 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
                             original_nbits);
 }
 
-// No separate JIT types needed - use non-JIT types directly
-// Helper descriptor type for job_desc_t
-template <typename DataT, typename IndexT, typename DistanceT>
-struct job_desc_jit_helper_desc {
-  using DATA_T     = DataT;
-  using INDEX_T    = IndexT;
-  using DISTANCE_T = DistanceT;
-};
-
-// JIT persistent kernel
+// JIT persistent device implementation - called from extern "C" __global__ entry in generated .cu
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
-RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
+__device__ void search_kernel_p_jit(
   worker_handle_t* worker_handles,
   job_desc_t<job_desc_jit_helper_desc<DataT, IndexT, DistanceT>>* job_descriptors,
   uint32_t* completion_counters,
@@ -570,7 +560,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
   SourceIndexT bitset_len,      // Bitset length
   SourceIndexT original_nbits)  // Original number of bits

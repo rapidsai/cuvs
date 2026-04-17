@@ -7,8 +7,15 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/dist_op_@metric_tag@_impl.cuh>
 
+namespace {
+
+using query_t    = @query_type@;
+using distance_t = @distance_type@;
+
+}  // namespace
+
 namespace cuvs::neighbors::cagra::detail {
 
-template __device__ @distance_type@ dist_op<@query_type@, @distance_type@>(@query_type@, @query_type@);
+template __device__ distance_t dist_op<query_t, distance_t>(query_t, query_t);
 
 }  // namespace cuvs::neighbors::cagra::detail

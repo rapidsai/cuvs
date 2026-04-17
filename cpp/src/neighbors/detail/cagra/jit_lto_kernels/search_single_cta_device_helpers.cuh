@@ -26,6 +26,15 @@
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
+// Descriptor tag for JIT persistent job queues (matches dataset_descriptor DATA_T / INDEX_T /
+// DISTANCE_T)
+template <typename DataT, typename IndexT, typename DistanceT>
+struct job_desc_jit_helper_desc {
+  using DATA_T     = DataT;
+  using INDEX_T    = IndexT;
+  using DISTANCE_T = DistanceT;
+};
+
 // Constants for persistent kernels
 constexpr size_t kCacheLineBytes = 64;
 constexpr uint32_t kMaxJobsNum   = 8192;
