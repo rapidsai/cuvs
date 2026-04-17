@@ -267,3 +267,36 @@ def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
         assert os.path.exists(reordered_file), (
             "Reordered dataset file should exist when disk mode is triggered"
         )
+
+
+def test_hnsw_ace_disk_build_writes_original_id_graph():
+    """Disk HNSW build should remap the ACE graph back to original row ids."""
+    n_rows = 2048
+    n_cols = 32
+    dataset = generate_data((n_rows, n_cols), np.float32)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        ace_params = hnsw.AceParams(
+            npartitions=4,
+            build_dir=temp_dir,
+            use_disk=True,
+        )
+        index_params = hnsw.IndexParams(
+            hierarchy="gpu",
+            M=32,
+            ef_construction=120,
+            metric="sqeuclidean",
+            ace_params=ace_params,
+        )
+
+        hnsw_index = hnsw.build(index_params, dataset)
+        assert hnsw_index.trained
+
+        mapping = np.load(os.path.join(temp_dir, "dataset_mapping.npy"))
+        graph_reordered = np.load(os.path.join(temp_dir, "cagra_graph.npy"))
+        graph_original = np.load(
+            os.path.join(temp_dir, "cagra_graph_original_ids.npy")
+        )
+
+        expected_original_graph = mapping[graph_reordered]
+        assert np.array_equal(graph_original[mapping], expected_original_graph)

@@ -22,6 +22,7 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
     using cagra_wrapper_params = typename cuvs_cagra<T, IdxT>::build_param;
     cagra_wrapper_params cagra_build_params;
     cuvs::neighbors::hnsw::index_params hnsw_index_params;
+    bool use_original_id_graph = false;
   };
 
   struct search_param : public search_param_base {
@@ -102,9 +103,20 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
   cagra_wrapper.build(dataset, nrow);
   auto& cagra_index = *cagra_wrapper.get_index();
 
-  // pass the dataset directly to HNSW if it's on the host
+  const bool is_ace_disk_build = cagra_index.dataset_fd().has_value() &&
+                                 cagra_index.graph_fd().has_value() &&
+                                 cagra_index.mapping_fd().has_value();
+
   std::optional<raft::host_matrix_view<const T, int64_t>> opt_dataset_view = std::nullopt;
-  if (dataset_is_on_host) {
+  // Regular CAGRA build: pass the dataset directly to HNSW if it's on the host
+  if (dataset_is_on_host && !is_ace_disk_build) {
+    opt_dataset_view.emplace(
+      raft::make_host_matrix_view<const T, int64_t>(dataset, nrow, this->dim_));
+  }
+  // ACE disk build with original id graph: pass the dataset directly to HNSW to remap the graph to
+  // original ids
+  if (is_ace_disk_build && build_param_.use_original_id_graph) {
+    RAFT_EXPECTS(dataset_is_on_host, "Dataset must be on host for original id graph remapping.");
     opt_dataset_view.emplace(
       raft::make_host_matrix_view<const T, int64_t>(dataset, nrow, this->dim_));
   }

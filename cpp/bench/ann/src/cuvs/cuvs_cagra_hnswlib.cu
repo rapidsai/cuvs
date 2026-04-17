@@ -20,6 +20,9 @@ auto parse_build_param(const nlohmann::json& conf) ->
   typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param param;
   auto& hnsw_params  = param.hnsw_index_params;
   auto& cagra_params = param.cagra_build_params;
+  if (conf.contains("use_original_id_graph")) {
+    param.use_original_id_graph = conf.at("use_original_id_graph");
+  }
   if (conf.contains("hierarchy")) {
     if (conf.at("hierarchy") == "none") {
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;

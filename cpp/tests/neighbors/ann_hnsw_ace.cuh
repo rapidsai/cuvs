@@ -7,9 +7,14 @@
 #include "ann_cagra.cuh"
 
 #include <cuvs/neighbors/hnsw.hpp>
+#include <cuvs/util/file_io.hpp>
 
+#include <raft/core/detail/mdspan_numpy_serializer.hpp>
+
+#include <cstring>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 
 namespace cuvs::neighbors::hnsw {
 
@@ -57,6 +62,130 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
   }
 
  protected:
+  auto load_npy_1d(const std::string& path) -> std::vector<uint32_t>
+  {
+    cuvs::util::file_descriptor fd(path, O_RDONLY);
+    std::ifstream stream(path, std::ios::binary);
+    EXPECT_TRUE(stream.is_open());
+    if (!stream.is_open()) { return {}; }
+    auto header = raft::detail::numpy_serializer::read_header(stream);
+    auto offset = stream.tellg();
+    EXPECT_NE(offset, std::streampos(-1));
+    if (offset == std::streampos(-1)) { return {}; }
+    EXPECT_EQ(header.shape.size(), 1);
+    if (header.shape.size() != 1) { return {}; }
+    std::vector<uint32_t> data(header.shape[0]);
+    cuvs::util::read_large_file(
+      fd, data.data(), data.size() * sizeof(uint32_t), static_cast<size_t>(offset));
+    return data;
+  }
+
+  auto load_npy_2d(const std::string& path) -> std::pair<std::vector<uint32_t>, std::vector<size_t>>
+  {
+    cuvs::util::file_descriptor fd(path, O_RDONLY);
+    std::ifstream stream(path, std::ios::binary);
+    EXPECT_TRUE(stream.is_open());
+    if (!stream.is_open()) { return {{}, {}}; }
+    auto header = raft::detail::numpy_serializer::read_header(stream);
+    auto offset = stream.tellg();
+    EXPECT_NE(offset, std::streampos(-1));
+    if (offset == std::streampos(-1)) { return {{}, {}}; }
+    EXPECT_EQ(header.shape.size(), 2);
+    if (header.shape.size() != 2) { return {{}, {}}; }
+    std::vector<size_t> shape{header.shape[0], header.shape[1]};
+    std::vector<uint32_t> data(shape[0] * shape[1]);
+    cuvs::util::read_large_file(
+      fd, data.data(), data.size() * sizeof(uint32_t), static_cast<size_t>(offset));
+    return {std::move(data), std::move(shape)};
+  }
+
+  template <typename T>
+  auto load_npy_2d_typed(const std::string& path) -> std::pair<std::vector<T>, std::vector<size_t>>
+  {
+    cuvs::util::file_descriptor fd(path, O_RDONLY);
+    std::ifstream stream(path, std::ios::binary);
+    EXPECT_TRUE(stream.is_open());
+    if (!stream.is_open()) { return {{}, {}}; }
+    auto header = raft::detail::numpy_serializer::read_header(stream);
+    auto offset = stream.tellg();
+    EXPECT_NE(offset, std::streampos(-1));
+    if (offset == std::streampos(-1)) { return {{}, {}}; }
+    EXPECT_EQ(header.shape.size(), 2);
+    if (header.shape.size() != 2) { return {{}, {}}; }
+    std::vector<size_t> shape{header.shape[0], header.shape[1]};
+    std::vector<T> data(shape[0] * shape[1]);
+    cuvs::util::read_large_file(
+      fd, data.data(), data.size() * sizeof(T), static_cast<size_t>(offset));
+    return {std::move(data), std::move(shape)};
+  }
+
+  template <typename MatrixView>
+  void verifyDiskArtifacts(const std::string& temp_dir, MatrixView original_dataset)
+  {
+    const auto mapping_path         = temp_dir + "/dataset_mapping.npy";
+    const auto reordered_data_path  = temp_dir + "/reordered_dataset.npy";
+    const auto reordered_graph_path = temp_dir + "/cagra_graph.npy";
+    const auto original_graph_path  = temp_dir + "/cagra_graph_original_ids.npy";
+
+    ASSERT_TRUE(std::filesystem::exists(mapping_path));
+    ASSERT_TRUE(std::filesystem::exists(reordered_data_path));
+    ASSERT_TRUE(std::filesystem::exists(reordered_graph_path));
+    ASSERT_TRUE(std::filesystem::exists(original_graph_path));
+
+    auto mapping = load_npy_1d(mapping_path);
+    auto [reordered_dataset, reordered_dataset_shape] = load_npy_2d_typed<DataT>(reordered_data_path);
+    auto [reordered_graph, reordered_shape] = load_npy_2d(reordered_graph_path);
+    auto [original_graph, original_shape]   = load_npy_2d(original_graph_path);
+
+    ASSERT_EQ(reordered_dataset_shape.size(), 2);
+    ASSERT_EQ(reordered_dataset_shape[0], mapping.size());
+    ASSERT_EQ(reordered_dataset_shape[0], static_cast<size_t>(original_dataset.extent(0)));
+    ASSERT_EQ(reordered_dataset_shape[1], static_cast<size_t>(original_dataset.extent(1)));
+
+    const auto dim = reordered_dataset_shape[1];
+    std::vector<uint8_t> seen_original_rows(mapping.size(), 0);
+    for (size_t reordered_row = 0; reordered_row < mapping.size(); ++reordered_row) {
+      const auto original_row = mapping[reordered_row];
+      ASSERT_LT(static_cast<size_t>(original_row), static_cast<size_t>(original_dataset.extent(0)));
+      ASSERT_EQ(seen_original_rows[original_row], 0)
+        << "Mapping is not a permutation; original_row=" << original_row
+        << " appears more than once";
+      seen_original_rows[original_row] = 1;
+
+      const auto* reordered_row_ptr = reordered_dataset.data() + reordered_row * dim;
+      const auto* original_row_ptr =
+        original_dataset.data_handle() + static_cast<size_t>(original_row) * dim;
+      ASSERT_EQ(std::memcmp(reordered_row_ptr, original_row_ptr, dim * sizeof(DataT)), 0)
+        << "Reordered dataset mismatch at reordered_row=" << reordered_row
+        << ", original_row=" << original_row;
+    }
+    for (size_t original_row = 0; original_row < seen_original_rows.size(); ++original_row) {
+      ASSERT_EQ(seen_original_rows[original_row], 1)
+        << "Mapping is not onto; original_row=" << original_row << " was never referenced";
+    }
+
+    ASSERT_EQ(reordered_shape, original_shape);
+    ASSERT_EQ(reordered_shape[0], mapping.size());
+
+    const auto n_rows       = reordered_shape[0];
+    const auto graph_degree = reordered_shape[1];
+
+    for (size_t reordered_row = 0; reordered_row < n_rows; ++reordered_row) {
+      const auto original_row = mapping[reordered_row];
+      for (size_t neighbor_idx = 0; neighbor_idx < graph_degree; ++neighbor_idx) {
+        const auto reordered_neighbor =
+          reordered_graph[reordered_row * graph_degree + neighbor_idx];
+        ASSERT_LT(static_cast<size_t>(reordered_neighbor), mapping.size());
+        const auto expected_original_neighbor = mapping[reordered_neighbor];
+        const auto actual_original_neighbor =
+          original_graph[original_row * graph_degree + neighbor_idx];
+        ASSERT_EQ(actual_original_neighbor, expected_original_neighbor)
+          << "Remapped graph mismatch at reordered_row=" << reordered_row
+          << ", original_row=" << original_row << ", neighbor_idx=" << neighbor_idx;
+      }
+    }
+  }
+
   void testHnswAceBuild()
   {
     size_t queries_size = ps.n_queries * ps.k;
@@ -117,6 +246,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
         hnsw::build(handle_, hnsw_params, raft::make_const_mdspan(database_host.view()));
 
       ASSERT_NE(hnsw_index, nullptr);
+      if (ps.use_disk) { verifyDiskArtifacts(temp_dir, database_host.view()); }
 
       // Prepare queries on host
       auto queries_host = raft::make_host_matrix<DataT, int64_t>(ps.n_queries, ps.dim);
@@ -253,6 +383,9 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
         << "Graph file should exist when memory limit triggers disk mode fallback";
       EXPECT_TRUE(std::filesystem::exists(reordered_file))
         << "Reordered dataset file should exist when memory limit triggers disk mode fallback";
+      EXPECT_TRUE(std::filesystem::exists(temp_dir + "/cagra_graph_original_ids.npy"))
+        << "Original-id remapped graph file should exist when disk mode is used";
+      verifyDiskArtifacts(temp_dir, database_host.view());
     }
 
     // Clean up temporary directory
@@ -319,7 +452,19 @@ inline std::vector<AnnHnswAceInputs> generate_hnsw_ace_memory_fallback_inputs()
      cuvs::distance::DistanceType::L2Expanded,
      0.0,    // min_recall (not checked in fallback test)
      0.001,  // max_host_memory_gb (tiny limit to force disk mode)
-     0.001}  // max_gpu_memory_gb (tiny limit to force disk mode)
+     0.001},  // max_gpu_memory_gb (tiny limit to force disk mode)
+    // Regression case: enough rows to force a short final remap batch.
+    {10,
+     360000,
+     16,
+     10,
+     4,
+     100,
+     false,
+     cuvs::distance::DistanceType::L2Expanded,
+     0.0,
+     0.001,
+     0.001}
   };
 }
 

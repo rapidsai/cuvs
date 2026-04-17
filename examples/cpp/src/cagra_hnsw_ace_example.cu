@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <iostream>
 #include <memory>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
@@ -18,6 +19,14 @@
 #include <rmm/mr/pool_memory_resource.hpp>
 
 #include "common.cuh"
+
+// Uses the original dataset order for the HNSW index. This remaps the ACE-backed CAGRA graph
+// back to original row ids before serializing the HNSW index. This involves disk writes with
+// random strides. This is slower than the default behavior of using the reordered dataset.
+// This is useful when the original dataset order is needed for the HNSW index, such as when
+// using the HNSW index for retrieval in a downstream application or preventing the need to
+// move the reordered dataset over the network to the search node.
+#define REMAP_GRAPH_TO_ORIGINAL_IDS 0
 
 void cagra_build_search_ace(raft::device_resources const& dev_resources,
                             raft::device_matrix_view<const float, int64_t> dataset,
@@ -75,13 +84,29 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // On-disk build of ACE stores the reordered dataset, the dataset mapping, and the graph on disk.
   // The index is not directly usable for CAGRA search. Convert to HNSW for search operations.
 
-  // Convert CAGRA index to HNSW
+#if REMAP_GRAPH_TO_ORIGINAL_IDS
+  // Convert ACE-backed CAGRA index to HNSW with original dataset order
+  // Passing the original host-order dataset enables the disk-mode export path that rewrites the
+  // ACE graph back to original row ids before serializing the HNSW index.
+  std::cout << "Converting CAGRA index to HNSW with original dataset order" << std::endl;
+  hnsw::index_params hnsw_params;
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
+  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index, dataset_host_view);
+
+  const auto remapped_graph_path =
+    std::filesystem::path(ace_params.build_dir) / "cagra_graph_original_ids.npy";
+  if (std::filesystem::exists(remapped_graph_path)) {
+    std::cout << "Remapped original-id graph written to: " << remapped_graph_path << std::endl;
+  }
+#else
+  // Convert ACE-backed CAGRA index to HNSW
   // For disk-based indices: serializes CAGRA to HNSW format on disk, returns an index with file
-  // descriptor For in-memory indices: creates HNSW index in memory
+  // descriptor. Uses the reordered dataset. For in-memory indices: creates HNSW index in memory.
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
   hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
   auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index);
+#endif
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
