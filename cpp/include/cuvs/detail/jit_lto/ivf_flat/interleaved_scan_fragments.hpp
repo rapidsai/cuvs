@@ -5,48 +5,43 @@
 
 #pragma once
 
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-
 namespace cuvs::neighbors::ivf_flat::detail {
 
-template <typename DataTag,
-          typename AccTag,
-          typename IdxTag,
-          int Capacity,
-          int Veclen,
-          bool Ascending,
-          bool ComputeNorm>
-struct InterleavedScanFragmentEntry final
-  : StaticFatbinFragmentEntry<InterleavedScanFragmentEntry<DataTag,
-                                                           AccTag,
-                                                           IdxTag,
-                                                           Capacity,
-                                                           Veclen,
-                                                           Ascending,
-                                                           ComputeNorm>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+// Tag types for data types
+struct tag_f {};
+struct tag_h {};
+struct tag_i8 {};
+struct tag_u8 {};
 
-template <int Veclen, typename DataTag, typename AccTag, typename MetricTag>
-struct MetricFragmentEntry final
-  : StaticFatbinFragmentEntry<MetricFragmentEntry<Veclen, DataTag, AccTag, MetricTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+// Tag types for accumulator types
+struct tag_acc_f {};
+struct tag_acc_h {};
+struct tag_acc_i32 {};
+struct tag_acc_u32 {};
 
-template <typename IvfSampleFilterTag>
-struct FilterFragmentEntry final
-  : StaticFatbinFragmentEntry<FilterFragmentEntry<IvfSampleFilterTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+// Tag types for distance metrics with full template info
+struct tag_metric_euclidean {};
+struct tag_metric_inner_product {};
+struct tag_metric_custom_udf {};
+
+// Tag types for post-processing
+struct tag_post_process_identity {};
+struct tag_post_process_sqrt {};
+struct tag_post_process_compose {};
+
+template <typename DataTag, typename AccTag, typename IdxTag, int Capacity, bool Ascending>
+struct fragment_tag_interleaved_scan {};
+
+template <typename DataTag, typename AccTag, bool ComputeNorm, int Veclen>
+struct fragment_tag_load_and_compute_dist {};
+
+template <typename DataTag, typename AccTag, typename MetricTag, int Veclen>
+struct fragment_tag_metric {};
+
+template <typename IndexTag, typename FilterTag>
+struct fragment_tag_filter {};
 
 template <typename PostLambdaTag>
-struct PostLambdaFragmentEntry final
-  : StaticFatbinFragmentEntry<PostLambdaFragmentEntry<PostLambdaTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_post_lambda {};
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

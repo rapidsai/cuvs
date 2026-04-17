@@ -44,6 +44,7 @@
 #include <raft/random/rng.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
@@ -233,7 +234,7 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   IdxT cumsum = 0;
   raft::update_device(cluster_offsets, &cumsum, 1, stream);
   thrust::inclusive_scan(
-    exec_policy, cluster_sizes, cluster_sizes + n_lists, cluster_offsets + 1, raft::add_op{});
+    exec_policy, cluster_sizes, cluster_sizes + n_lists, cluster_offsets + 1, thrust::plus<>{});
   raft::update_host(&cumsum, cluster_offsets + n_lists, 1, stream);
   uint32_t max_cluster_size =
     *thrust::max_element(exec_policy, cluster_sizes, cluster_sizes + n_lists);
@@ -263,28 +264,15 @@ inline void pad_centers_with_norms(raft::resources const& res,
   // We rely on this to enable padded tensor gemm kernels during coarse search.
   cuvs::spatial::knn::detail::utils::memzero(padded_centers, n_lists * dim_ext, stream);
   // combine cluster_centers and their norms
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers,
-                                  sizeof(float) * dim_ext,
-                                  centers,
-                                  sizeof(float) * dim,
-                                  sizeof(float) * dim,
-                                  n_lists,
-                                  cudaMemcpyDefault,
-                                  stream));
+  raft::copy_matrix(padded_centers, dim_ext, centers, dim, dim, n_lists, stream);
 
   rmm::device_uvector<float> center_norms(n_lists, stream);
   raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
     res,
     raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(centers, n_lists, dim),
     raft::make_device_vector_view<float, uint32_t>(center_norms.data(), n_lists));
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers + dim,
-                                  sizeof(float) * dim_ext,
-                                  center_norms.data(),
-                                  sizeof(float),
-                                  sizeof(float),
-                                  n_lists,
-                                  cudaMemcpyDefault,
-                                  stream));
+  raft::copy_matrix(
+    padded_centers + dim, dim_ext, center_norms.data(), size_t(1), size_t(1), n_lists, stream);
 }
 
 template <typename IdxT>
@@ -1102,14 +1090,13 @@ void extend(raft::resources const& handle,
     // the kmeans_balanced::predict. Thus, we need the restructuring raft::copy.
     rmm::device_uvector<float> cluster_centers(
       size_t(n_clusters) * size_t(index->dim()), stream, device_memory);
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data(),
-                                    sizeof(float) * index->dim(),
-                                    index->centers().data_handle(),
-                                    sizeof(float) * index->dim_ext(),
-                                    sizeof(float) * index->dim(),
-                                    n_clusters,
-                                    cudaMemcpyDefault,
-                                    stream));
+    raft::copy_matrix(cluster_centers.data(),
+                      index->dim(),
+                      index->centers().data_handle(),
+                      index->dim_ext(),
+                      index->dim(),
+                      n_clusters,
+                      stream);
     vec_batches.prefetch_next_batch();
     for (const auto& batch : vec_batches) {
       auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
@@ -1656,13 +1643,12 @@ inline void extract_centers(raft::resources const& res,
     cluster_centers.extent(1) == index.dim(),
     "Number of columns in the output buffer for cluster centers and index dim are different");
   auto stream = raft::resource::get_cuda_stream(res);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data_handle(),
-                                  sizeof(float) * index.dim(),
-                                  index.centers().data_handle(),
-                                  sizeof(float) * index.dim_ext(),
-                                  sizeof(float) * index.dim(),
-                                  index.n_lists(),
-                                  cudaMemcpyDefault,
-                                  stream));
+  raft::copy_matrix(cluster_centers.data_handle(),
+                    index.dim(),
+                    index.centers().data_handle(),
+                    index.dim_ext(),
+                    index.dim(),
+                    index.n_lists(),
+                    stream);
 }
 }  // namespace cuvs::neighbors::ivf_pq::detail

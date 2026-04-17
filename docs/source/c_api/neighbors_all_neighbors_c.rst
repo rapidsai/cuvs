@@ -9,6 +9,14 @@ The all-neighbors method constructs a k-NN graph for all vectors in a dataset. I
 
 ``#include <cuvs/neighbors/all_neighbors.h>``
 
+Build parameters
+----------------
+
+.. doxygengroup:: all_neighbors_c_params
+    :project: cuvs
+    :members:
+    :content-only:
+
 Build
 -----
 
