@@ -59,7 +59,9 @@ enum class DistanceType : int {
   /** Bitstring Hamming distance **/
   BitwiseHamming = 20,
   /** Precomputed (special value) **/
-  Precomputed = 100
+  Precomputed = 100,
+  /** Custom metric UDF **/
+  CustomUDF = 101
 };
 
 /**
