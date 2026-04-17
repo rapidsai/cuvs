@@ -11,8 +11,8 @@
 
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
 
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 
@@ -133,7 +133,8 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
     ASSERT_TRUE(std::filesystem::exists(original_graph_path));
 
     auto mapping = load_npy_1d(mapping_path);
-    auto [reordered_dataset, reordered_dataset_shape] = load_npy_2d_typed<DataT>(reordered_data_path);
+    auto [reordered_dataset, reordered_dataset_shape] =
+      load_npy_2d_typed<DataT>(reordered_data_path);
     auto [reordered_graph, reordered_shape] = load_npy_2d(reordered_graph_path);
     auto [original_graph, original_shape]   = load_npy_2d(original_graph_path);
 
@@ -440,32 +441,30 @@ inline std::vector<AnnHnswAceInputs> generate_hnsw_ace_inputs()
 // Inputs specifically for testing memory limit fallback to disk mode
 inline std::vector<AnnHnswAceInputs> generate_hnsw_ace_memory_fallback_inputs()
 {
-  return {
-    // Test with L2 metric
-    {10,     // n_queries
-     5000,   // n_rows
-     64,     // dim
-     10,     // k
-     2,      // npartitions
-     100,    // ef_construction
-     false,  // use_disk (not explicitly set, should be triggered by memory limit)
-     cuvs::distance::DistanceType::L2Expanded,
-     0.0,    // min_recall (not checked in fallback test)
-     0.001,  // max_host_memory_gb (tiny limit to force disk mode)
-     0.001},  // max_gpu_memory_gb (tiny limit to force disk mode)
-    // Regression case: enough rows to force a short final remap batch.
-    {10,
-     360000,
-     16,
-     10,
-     4,
-     100,
-     false,
-     cuvs::distance::DistanceType::L2Expanded,
-     0.0,
-     0.001,
-     0.001}
-  };
+  return {         // Test with L2 metric
+          {10,     // n_queries
+           5000,   // n_rows
+           64,     // dim
+           10,     // k
+           2,      // npartitions
+           100,    // ef_construction
+           false,  // use_disk (not explicitly set, should be triggered by memory limit)
+           cuvs::distance::DistanceType::L2Expanded,
+           0.0,     // min_recall (not checked in fallback test)
+           0.001,   // max_host_memory_gb (tiny limit to force disk mode)
+           0.001},  // max_gpu_memory_gb (tiny limit to force disk mode)
+          // Regression case: enough rows to force a short final remap batch.
+          {10,
+           360000,
+           16,
+           10,
+           4,
+           100,
+           false,
+           cuvs::distance::DistanceType::L2Expanded,
+           0.0,
+           0.001,
+           0.001}};
 }
 
 const std::vector<AnnHnswAceInputs> hnsw_ace_inputs = generate_hnsw_ace_inputs();

@@ -1024,7 +1024,7 @@ std::pair<cuvs::util::file_descriptor, size_t> remap_disk_graph_to_original_ids(
   const auto total_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                                std::chrono::high_resolution_clock::now() - total_start)
                                .count();
-  const double gib         = static_cast<double>(1 << 30);
+  const double gib = static_cast<double>(1 << 30);
   RAFT_LOG_INFO(
     "HNSW remap: completed in %ld ms: read %.2f GiB across %zu spans (%.2fx amplification), "
     "wrote %.2f GiB",
@@ -1806,10 +1806,9 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
 
-  // Convert CAGRA index to HNSW index. Passing the host dataset enables the disk-backed ACE
-  // remap path to rewrite the graph to original ids, and lets the in-memory GPU-hierarchy path
-  // skip a device→host copy.
-  return from_cagra<T>(res, params, cagra_index, dataset);
+  // Convert CAGRA index to HNSW index. The resulting HNSW index uses the partitioned ACE index order.
+  // See `cagra::build` and `hnsw::from_cagra` for more details on how to remap the graph to original ids.
+  return from_cagra<T>(res, params, cagra_index, std::nullopt);
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail
