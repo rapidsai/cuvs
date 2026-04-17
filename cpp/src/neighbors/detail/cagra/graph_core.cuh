@@ -1151,11 +1151,10 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = true,
-  const bool use_gpu                = true)
+  const bool guarantee_connectivity           = true,
+  const bool use_gpu                          = true,
+  const double variable_graph_degree_fraction = 1.0)
 {
-  RAFT_LOG_DEBUG(
-    "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
   auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
 
   RAFT_EXPECTS(knn_graph.extent(0) == new_graph.extent(0),
@@ -1163,13 +1162,22 @@ void optimize(
   RAFT_EXPECTS(new_graph.extent(1) <= knn_graph.extent(1),
                "output graph cannot have more columns than input graph");
   // const uint64_t input_graph_degree  = knn_graph.extent(1);
-  const uint64_t knn_graph_degree    = knn_graph.extent(1);
-  const uint64_t output_graph_degree = new_graph.extent(1);
-  const uint64_t graph_size          = new_graph.extent(0);
+  const uint64_t knn_graph_degree     = knn_graph.extent(1);
+  const uint64_t output_graph_degree  = new_graph.extent(1);
+  const uint64_t graph_size           = new_graph.extent(0);
+  const uint64_t target_pruned_degree = std::max<uint64_t>(
+    1, static_cast<uint64_t>(std::ceil(output_graph_degree * variable_graph_degree_fraction)));
   // auto input_graph_ptr               = knn_graph.data_handle();
   auto output_graph_ptr = new_graph.data_handle();
+  RAFT_LOG_INFO("# Pruning kNN graph (size=%lu, degree=%lu, target_pruned_degree=%lu)\n",
+                graph_size,
+                knn_graph_degree,
+                target_pruned_degree);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "cagra::graph::optimize(%zu, %zu, %u)", graph_size, knn_graph_degree, output_graph_degree);
+
+  const bool variable_graph_degree = (target_pruned_degree < output_graph_degree);
+  auto natural_degree_vec          = raft::make_host_vector<uint32_t, int64_t>(graph_size);
 
   // MST optimization
   auto mst_graph               = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0);
@@ -1333,8 +1341,9 @@ void optimize(
     for (uint64_t i = 0; i < graph_size; i++) {
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
       // count of the neighbors while increasing the target detourable count from zero.
-      uint64_t pk         = 0;
-      uint32_t num_detour = 0;
+      uint64_t pk             = 0;
+      uint32_t num_detour     = 0;
+      uint64_t num_low_detour = 0;
       for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
         for (uint64_t k = 0; k < knn_graph_degree; k++) {
@@ -1362,6 +1371,7 @@ void optimize(
           }
           if (pk >= output_graph_degree) break;
         }
+        if (num_low_detour < target_pruned_degree) { num_low_detour = pk; }
         if (pk >= output_graph_degree) break;
 
         if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
@@ -1379,6 +1389,9 @@ void optimize(
           i);
         invalid_neighbor_list = true;
       }
+      natural_degree_vec(i) = variable_graph_degree
+                                ? std::min<uint64_t>(num_low_detour, output_graph_degree)
+                                : output_graph_degree;
     }
     RAFT_EXPECTS(
       !invalid_neighbor_list,
@@ -1418,8 +1431,9 @@ void optimize(
     for (uint64_t k = 0; k < output_graph_degree; k++) {
 #pragma omp parallel for
       for (uint64_t i = 0; i < graph_size; i++) {
-        // dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
-        dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+        dest_nodes(i) = (k < natural_degree_vec(i))
+                          ? output_graph_ptr[k + (output_graph_degree * i)]
+                          : static_cast<IdxT>(graph_size);
       }
       raft::resource::sync_stream(res);
 
@@ -1460,6 +1474,8 @@ void optimize(
     bool check_num_protected_edges = true;
 #pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
+      auto effective_degree = variable_graph_degree ? natural_degree_vec(i) : output_graph_degree;
+
       auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
 
@@ -1498,10 +1514,9 @@ void optimize(
         }
       }
 
-      const auto num_protected_edges =
-        std::max<uint64_t>(mst_graph_num_edges_ptr[i], output_graph_degree / 2);
-      if (num_protected_edges > output_graph_degree) { check_num_protected_edges = false; }
-      if (num_protected_edges == output_graph_degree) continue;
+      const auto num_protected_edges = std::max<uint64_t>(
+        mst_graph_num_edges_ptr[i], std::min<uint64_t>(effective_degree, output_graph_degree / 2));
+      if (num_protected_edges > effective_degree) { check_num_protected_edges = false; }
 
       // Replace some edges of the output graph with edges of the reverse graph.
       auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
@@ -1510,13 +1525,22 @@ void optimize(
         if (my_rev_graph[kr] < graph_size) {
           uint64_t pos = pos_in_array<IdxT>(my_rev_graph[kr], my_out_graph, output_graph_degree);
           if (pos < num_protected_edges) { continue; }
+
           uint64_t num_shift = pos - num_protected_edges;
           if (pos >= output_graph_degree) {
             num_shift = output_graph_degree - num_protected_edges - 1;
           }
           shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
           my_out_graph[num_protected_edges] = my_rev_graph[kr];
+          if (effective_degree < output_graph_degree) { effective_degree++; }
         }
+      }
+
+      if (variable_graph_degree) {
+        for (uint32_t j = effective_degree; j < output_graph_degree; j++) {
+          my_out_graph[j] = static_cast<IdxT>(-1);
+        }
+        natural_degree_vec(i) = effective_degree;
       }
 
       // If guarantee_connectivity == true, move the output neighbor list from the temporal list to
@@ -1531,6 +1555,17 @@ void optimize(
     RAFT_EXPECTS(check_num_protected_edges,
                  "Failed to merge the MST, pruned, and reverse edge graphs. Some nodes have too "
                  "many MST optimization edges.");
+
+    if (variable_graph_degree) {
+      uint64_t total_natural = 0;
+#pragma omp parallel for reduction(+ : total_natural)
+      for (uint64_t i = 0; i < graph_size; i++) {
+        total_natural += natural_degree_vec(i);
+      }
+      RAFT_LOG_INFO("# Variable graph degree: avg natural degree = %.2f / %u",
+                    static_cast<double>(total_natural) / graph_size,
+                    output_graph_degree);
+    }
 
     const double time_replace_end = cur_time();
     RAFT_LOG_DEBUG("# Replacing edges time: %.1lf ms",
@@ -1606,6 +1641,8 @@ void optimize(
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
       for (uint32_t j = 0; j < output_graph_degree; j++) {
         const auto neighbor_a = my_out_graph[j];
+
+        if (neighbor_a == static_cast<IdxT>(-1)) { continue; }
 
         // Check oor
         if (neighbor_a > graph_size) {
