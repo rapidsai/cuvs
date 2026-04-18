@@ -1495,16 +1495,12 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
 
       if (params.attach_dataset_on_build) {
         try {
-          auto dev_data =
-            raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
-          raft::copy(dev_data.data_handle(),
-                     dataset.data_handle(),
-                     dev_data.size(),
-                     raft::resource::get_cuda_stream(res));
-          cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
-            raft::make_const_mdspan(dev_data.view()), static_cast<uint32_t>(dataset.extent(1)));
-          idx.update_dataset(res, dv);
-          device_dataset = std::move(dev_data);
+          // Tight row-major [n, dim] device storage is often not 16-byte row-pitched; CAGRA search
+          // expects padded stride (same as make_padded_dataset / make_padded_dataset_view).
+          auto padded =
+            cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(dataset));
+          idx.update_dataset(res, padded->as_dataset_view());
+          device_dataset.emplace(std::move(padded->data_));
         } catch (std::bad_alloc& e) {
           RAFT_LOG_WARN(
             "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "

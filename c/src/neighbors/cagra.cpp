@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <cstring>
 #include <dlpack/dlpack.h>
+#include <memory>
+#include <numeric>
 
 #include <raft/core/copy.hpp>
 #include <raft/core/error.hpp>
@@ -29,11 +31,29 @@
 
 namespace {
 
+/** Row stride must match `make_padded_dataset_view` / CAGRA alignment (see cuvs::neighbors::common.hpp). */
+template <typename T>
+bool device_row_stride_is_padded(raft::device_matrix_view<T const, int64_t, raft::row_major> mds)
+{
+  constexpr size_t kSize       = sizeof(T);
+  constexpr uint32_t align_b = 16;
+  uint32_t required_stride =
+    raft::round_up_safe<size_t>(
+      static_cast<size_t>(mds.extent(1)) * kSize,
+      std::lcm(align_b, static_cast<uint32_t>(kSize))) /
+    kSize;
+  uint32_t src_stride =
+    mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
+  return src_stride == required_stride;
+}
+
 /** Wrapper that owns both index and dataset for C API lifetime (merge, build-from-host, from_args-with-host). */
 template <typename T>
 struct merged_cagra_holder {
   cuvs::neighbors::cagra::index<T, uint32_t> idx;
   raft::device_matrix<T, int64_t, raft::row_major> dataset;
+  /** Non-ACE host build: owns padded device dataset backing the index view. */
+  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> padded_dataset_owner{nullptr};
 };
 
 static void _set_graph_build_params(
@@ -129,18 +149,58 @@ void _build(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    auto idx          = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
-    auto* raw         = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(idx));
-    output_index->addr         = reinterpret_cast<uintptr_t>(raw);
-    output_index->merged_owner = 0;
+    // Device `cagra::build` requires a row stride compatible with 16-byte alignment; bare DLPack
+    // buffers (e.g. small dim) are often tightly packed and must be copied via `make_padded_dataset`.
+    if (device_row_stride_is_padded(mds)) {
+      auto view = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
+      auto build_res =
+        cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
+      RAFT_EXPECTS(!build_res.vpq.has_value(),
+                   "VPQ compression is not supported for device CAGRA build through the C API.");
+      auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(build_res.idx));
+      output_index->addr         = reinterpret_cast<uintptr_t>(raw);
+      output_index->merged_owner = 0;
+    } else {
+      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto build_res =
+        cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
+      RAFT_EXPECTS(!build_res.vpq.has_value(),
+                   "VPQ compression is not supported for device CAGRA build through the C API.");
+      auto* holder = new merged_cagra_holder<T>{
+        std::move(build_res.idx),
+        raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+        std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release())};
+      output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+      output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
+    }
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    auto result       = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
-    auto* holder =
-      new merged_cagra_holder<T>{std::move(result.idx), std::move(*result.dataset)};
-    output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
-    output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
+    if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
+          index_params.graph_build_params)) {
+      auto result = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+      // ACE disk mode attaches numpy-backed fds only; no in-memory device matrix is returned.
+      auto storage =
+        result.dataset.has_value()
+          ? std::move(*result.dataset)
+          : raft::make_device_matrix<T, int64_t>(
+              *res_ptr, 0, std::max<int64_t>(static_cast<int64_t>(result.idx.dim()), 1));
+      auto* holder = new merged_cagra_holder<T>{std::move(result.idx), std::move(storage)};
+      output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+      output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
+    } else {
+      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto build_res =
+        cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
+      RAFT_EXPECTS(!build_res.vpq.has_value(),
+                   "VPQ compression is not supported for host CAGRA build through the C API.");
+      auto* holder = new merged_cagra_holder<T>{
+        std::move(build_res.idx),
+        raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+        std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release())};
+      output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+      output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
+    }
   }
 }
 
