@@ -26,8 +26,8 @@ namespace iface_detail {
 template <typename>
 inline constexpr bool is_raft_host_device_accessor_v = false;
 template <typename AccessorPolicy, raft::memory_type M>
-inline constexpr bool is_raft_host_device_accessor_v<raft::host_device_accessor<AccessorPolicy, M>> =
-  true;
+inline constexpr bool
+  is_raft_host_device_accessor_v<raft::host_device_accessor<AccessorPolicy, M>> = true;
 }  // namespace iface_detail
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
@@ -59,14 +59,13 @@ void build(const raft::resources& handle,
         // Host mdspan is only accepted on the ACE build path; non-ACE requires dataset_view.
         if (std::holds_alternative<cagra::graph_build_params::ace_params>(
               cagra_params.graph_build_params)) {
-          auto result =
-            cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
+          auto result = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
           interface.cagra_build_dataset_ = std::move(result.dataset);
           interface.index_.emplace(std::move(result.idx));
         } else {
           auto padded_owner = cuvs::neighbors::make_padded_dataset(handle, index_dataset);
-          auto build_res    = cuvs::neighbors::cagra::build(
-            handle, cagra_params, padded_owner->as_dataset_view());
+          auto build_res =
+            cuvs::neighbors::cagra::build(handle, cagra_params, padded_owner->as_dataset_view());
           RAFT_EXPECTS(
             !build_res.vpq.has_value(),
             "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
@@ -81,14 +80,13 @@ void build(const raft::resources& handle,
       if (dataset_on_host) {
         if (std::holds_alternative<cagra::graph_build_params::ace_params>(
               cagra_params.graph_build_params)) {
-          auto result =
-            cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
+          auto result = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
           interface.cagra_build_dataset_ = std::move(result.dataset);
           interface.index_.emplace(std::move(result.idx));
         } else {
           auto padded_owner = cuvs::neighbors::make_padded_dataset(handle, index_dataset);
-          auto build_res    = cuvs::neighbors::cagra::build(
-            handle, cagra_params, padded_owner->as_dataset_view());
+          auto build_res =
+            cuvs::neighbors::cagra::build(handle, cagra_params, padded_owner->as_dataset_view());
           RAFT_EXPECTS(
             !build_res.vpq.has_value(),
             "CAGRA VPQ build from host is not supported through neighbors::build for MG.");

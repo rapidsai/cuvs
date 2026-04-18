@@ -162,8 +162,9 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
 
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
-  std::shared_ptr<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>> sub_dataset_buffers_ =
-    std::make_shared<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>();
+  std::shared_ptr<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>
+    sub_dataset_buffers_ =
+      std::make_shared<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>();
   std::shared_ptr<cuvs::neighbors::dataset<int64_t>> deserialized_dataset_;
   std::vector<std::shared_ptr<cuvs::neighbors::dataset<int64_t>>> sub_deserialized_datasets_;
 
@@ -388,8 +389,8 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
     }
     need_dataset_update_ = false;
   } else {
-    using ds_idx_type = decltype(index_->data().n_rows());
-    const auto& root_view = index_->data();
+    using ds_idx_type                                       = decltype(index_->data().n_rows());
+    const auto& root_view                                   = index_->data();
     const cuvs::neighbors::dataset<ds_idx_type>* ds_for_vpq = nullptr;
     if (auto* ind =
           dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(&root_view)) {
@@ -397,7 +398,8 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
     }
     bool is_vpq =
       ds_for_vpq != nullptr &&
-      (dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(ds_for_vpq) != nullptr ||
+      (dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(ds_for_vpq) !=
+         nullptr ||
        dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(ds_for_vpq) !=
          nullptr);
     // It can happen that we are re-using a previous algo object which already has
@@ -424,8 +426,8 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
     f << sub_indices_.size();
     f.close();
   } else {
-    using ds_idx_type = decltype(index_->data().n_rows());
-    const auto& root_view = index_->data();
+    using ds_idx_type                                       = decltype(index_->data().n_rows());
+    const auto& root_view                                   = index_->data();
     const cuvs::neighbors::dataset<ds_idx_type>* ds_for_vpq = nullptr;
     if (auto* ind =
           dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(&root_view)) {
@@ -433,7 +435,8 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
     }
     bool is_vpq =
       ds_for_vpq != nullptr &&
-      (dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(ds_for_vpq) != nullptr ||
+      (dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(ds_for_vpq) !=
+         nullptr ||
        dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(ds_for_vpq) !=
          nullptr);
     cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
@@ -460,7 +463,7 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
     sub_deserialized_datasets_.resize(count);
     for (size_t i = 0; i < count; ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
-      auto sub_index = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
+      auto sub_index      = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
       std::unique_ptr<cuvs::neighbors::dataset<int64_t>> tmp_ds;
       cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get(), &tmp_ds);
       sub_deserialized_datasets_[i] =
@@ -479,27 +482,28 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
 template <typename T, typename IdxT>
 std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
 {
-  auto out = std::make_unique<cuvs_cagra<T, IdxT>>(metric_, dim_, index_params_);
-  out->refine_ratio_           = refine_ratio_;
-  out->graph_mem_              = graph_mem_;
-  out->dataset_mem_            = dataset_mem_;
-  out->need_dataset_update_    = need_dataset_update_;
-  out->search_params_          = search_params_;
-  out->index_                  = index_;
-  out->graph_                  = graph_;
-  out->dataset_                = dataset_;
+  auto out                  = std::make_unique<cuvs_cagra<T, IdxT>>(metric_, dim_, index_params_);
+  out->refine_ratio_        = refine_ratio_;
+  out->graph_mem_           = graph_mem_;
+  out->dataset_mem_         = dataset_mem_;
+  out->need_dataset_update_ = need_dataset_update_;
+  out->search_params_       = search_params_;
+  out->index_               = index_;
+  out->graph_               = graph_;
+  out->dataset_             = dataset_;
   out->input_dataset_v_ =
-    std::make_shared<raft::device_matrix_view<const T, int64_t, raft::row_major>>(*input_dataset_v_);
+    std::make_shared<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
+      *input_dataset_v_);
   out->dynamic_batcher_                        = dynamic_batcher_;
-  out->dynamic_batcher_sp_                    = dynamic_batcher_sp_;
-  out->dynamic_batching_max_batch_size_       = dynamic_batching_max_batch_size_;
-  out->dynamic_batching_n_queues_               = dynamic_batching_n_queues_;
+  out->dynamic_batcher_sp_                     = dynamic_batcher_sp_;
+  out->dynamic_batching_max_batch_size_        = dynamic_batching_max_batch_size_;
+  out->dynamic_batching_n_queues_              = dynamic_batching_n_queues_;
   out->dynamic_batching_conservative_dispatch_ = dynamic_batching_conservative_dispatch_;
-  out->filter_                = filter_;
-  out->sub_indices_           = sub_indices_;
-  out->sub_dataset_buffers_   = sub_dataset_buffers_;
-  out->deserialized_dataset_   = deserialized_dataset_;
-  out->sub_deserialized_datasets_ = sub_deserialized_datasets_;
+  out->filter_                                 = filter_;
+  out->sub_indices_                            = sub_indices_;
+  out->sub_dataset_buffers_                    = sub_dataset_buffers_;
+  out->deserialized_dataset_                   = deserialized_dataset_;
+  out->sub_deserialized_datasets_              = sub_deserialized_datasets_;
   return out;
 }
 

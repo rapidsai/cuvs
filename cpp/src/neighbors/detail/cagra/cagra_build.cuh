@@ -1497,8 +1497,7 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
         try {
           // Tight row-major [n, dim] device storage is often not 16-byte row-pitched; CAGRA search
           // expects padded stride (same as make_padded_dataset / make_padded_dataset_view).
-          auto padded =
-            cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(dataset));
+          auto padded = cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(dataset));
           idx.update_dataset(res, padded->as_dataset_view());
           device_dataset.emplace(std::move(padded->data_));
         } catch (std::bad_alloc& e) {

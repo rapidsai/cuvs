@@ -6,7 +6,7 @@
                          train_dataset, n, dim / 8);
 +        auto dataset_view =
 +                cuvs::neighbors::make_padded_dataset_view(raft_handle, dataset_mds);
- 
+
          cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
                  raft_handle,
@@ -17,12 +17,12 @@
      } else if (!distances_on_gpu && !knn_graph_on_gpu) {
          // copy idx_t (int64_t) host knn_graph to uint32_t host knn_graph
 @@ -128,12 +130,14 @@
- 
+
          auto dataset_mds = raft::make_host_matrix_view<const uint8_t, int64_t>(
                  train_dataset, n, dim / 8);
 +        device_dataset_for_host_storage_ =
 +                cuvs::neighbors::make_padded_dataset(raft_handle, dataset_mds);
- 
+
          cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
                  raft_handle,
@@ -56,9 +56,9 @@
 +                std::move(ace.idx));
      }
  }
- 
+
 @@ -212,14 +219,21 @@
- 
+
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
 +            device_dataset_for_host_storage_.reset();
@@ -84,13 +84,13 @@
      }
 @@ -279,6 +293,8 @@
  }
- 
+
  void BinaryCuvsCagra::reset() {
 +    device_dataset_for_host_storage_.reset();
 +    ace_build_owning_dataset_.reset();
      cuvs_index.reset();
  }
- 
+
 --- a/faiss/gpu/impl/BinaryCuvsCagra.cuh
 +++ b/faiss/gpu/impl/BinaryCuvsCagra.cuh
 @@ -28,11 +28,13 @@
@@ -99,18 +99,18 @@
  #include <faiss/gpu/utils/Tensor.cuh>
 +#include <memory>
  #include <optional>
- 
+
  #include <faiss/MetricType.h>
- 
+
  #include <cuvs/neighbors/cagra.hpp>
 +#include <raft/core/device_mdarray.hpp>
- 
+
  namespace faiss {
- 
+
 @@ -115,6 +117,14 @@
      /// Parameters to build CAGRA graph using NN Descent
      size_t nn_descent_niter_ = 20;
- 
+
 +    /// Device padded copy when `storage_` is host memory (required by cuVS update_dataset).
 +    std::unique_ptr<cuvs::neighbors::device_padded_dataset<uint8_t, int64_t>>
 +            device_dataset_for_host_storage_;
@@ -125,12 +125,12 @@
 --- a/faiss/gpu/impl/CuvsCagra.cu
 +++ b/faiss/gpu/impl/CuvsCagra.cu
 @@ -133,12 +133,14 @@
- 
+
          auto dataset_mds = raft::make_device_matrix_view<const data_t, int64_t>(
                  dataset, n, dim);
 +        auto dataset_view =
 +                cuvs::neighbors::make_padded_dataset_view(raft_handle, dataset_mds);
- 
+
          cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<data_t, uint32_t>>(
                  raft_handle,
@@ -141,12 +141,12 @@
      } else if (!dataset_on_gpu && !knn_graph_on_gpu) {
          // copy idx_t (int64_t) host knn_graph to uint32_t host knn_graph
 @@ -151,12 +153,14 @@
- 
+
          auto dataset_mds = raft::make_host_matrix_view<const data_t, int64_t>(
                  dataset, n, dim);
 +        device_dataset_for_host_storage_ =
 +                cuvs::neighbors::make_padded_dataset(raft_handle, dataset_mds);
- 
+
          cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<data_t, uint32_t>>(
                  raft_handle,
@@ -180,9 +180,9 @@
 +                std::move(ace.idx));
      }
  }
- 
+
 @@ -248,13 +255,20 @@
- 
+
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
 +            device_dataset_for_host_storage_.reset();
@@ -206,14 +206,14 @@
          store_dataset_ = true;
      }
 @@ -302,6 +316,8 @@
- 
+
  template <typename data_t>
  void CuvsCagra<data_t>::reset() {
 +    device_dataset_for_host_storage_.reset();
 +    ace_build_owning_dataset_.reset();
      cuvs_index.reset();
  }
- 
+
 --- a/faiss/gpu/impl/CuvsCagra.cuh
 +++ b/faiss/gpu/impl/CuvsCagra.cuh
 @@ -27,12 +27,14 @@
@@ -222,19 +222,19 @@
  #include <faiss/gpu/utils/Tensor.cuh>
 +#include <memory>
  #include <optional>
- 
+
  #include <faiss/MetricType.h>
- 
+
  #include <cuvs/neighbors/cagra.hpp>
  #include <cuvs/neighbors/ivf_pq.hpp>
 +#include <raft/core/device_mdarray.hpp>
- 
+
  namespace faiss {
- 
+
 @@ -147,6 +149,14 @@
      /// Parameter to use MST optimization to guarantee graph connectivity
      bool guarantee_connectivity_ = false;
- 
+
 +    /// Device padded copy when `storage_` is host memory (required by cuVS update_dataset).
 +    std::unique_ptr<cuvs::neighbors::device_padded_dataset<data_t, int64_t>>
 +            device_dataset_for_host_storage_;
