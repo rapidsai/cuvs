@@ -223,9 +223,6 @@ if(NOT BUILD_CPU_ONLY)
               "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
   )
-  target_compile_definitions(
-    cuvs_cpp_headers INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
-  )
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
   generate_inst_matrix(
@@ -344,11 +341,8 @@ if(NOT BUILD_CPU_ONLY)
                POSITION_INDEPENDENT_CODE ON
   )
   target_compile_definitions(
-    cuvs-cagra-search
-    PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-            $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
-            # Temporary: mirror cuvs_cpp_headers so JIT sources always see the macro when LTO is on
-            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
+    cuvs-cagra-search PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                              $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
   )
   target_link_libraries(
     cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
@@ -409,9 +403,6 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
   target_link_libraries(jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL)
-  # Kernel OBJECT targets (add_jit_lto_kernel) only pull usage requirements from here, not from
-  # cuvs_objs — they must see the same JIT/LTO preprocessor branch as host code (e.g.
-  # standard_dataset_descriptor_t<..., QueryT> in compute_distance_standard-impl.cuh).
   target_compile_definitions(jit_lto_kernel_usage_requirements INTERFACE CUVS_ENABLE_JIT_LTO)
 
   block(PROPAGATE jit_lto_files)
@@ -788,14 +779,16 @@ if(NOT BUILD_CPU_ONLY)
   )
   generate_jit_lto_kernels(
     jit_lto_files
-    NAME_FORMAT "cagra_sample_filter_@filter_name@_index_@source_index_abbrev@"
+    NAME_FORMAT "sample_filter_@filter_name@_index_@source_index_abbrev@"
     MATRIX_JSON_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/filter_matrix.json"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/sample_filter_matrix.json"
     KERNEL_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_kernel.cu.in"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/sample_filter_kernel.cu.in"
     FRAGMENT_TAG_FORMAT
-      "${neighbors_ns}::fragment_tag_sample_filter<${neighbors_ns}::tag_bitset_@bitset_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@, ${neighbors_ns}::tag_filter_@filter_name@>"
-    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/common_fragments.hpp>"
+      "${cagra_ns}::fragment_tag_sample_filter<${neighbors_ns}::tag_bitset_@bitset_abbrev@, ${cagra_ns}::tag_idx_@source_index_abbrev@, cuvs::detail::jit_lto::tag_filter_@filter_name@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>" "<cuvs/detail/jit_lto/common_fragments.hpp>"
+      "<cuvs/detail/jit_lto/registration_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -1110,11 +1103,8 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   target_compile_definitions(
-    cuvs_objs
-    PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-            $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
-            # Temporary: mirror cuvs_cpp_headers so JIT sources always see the macro when LTO is on
-            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
+    cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
   )
 
   target_link_libraries(

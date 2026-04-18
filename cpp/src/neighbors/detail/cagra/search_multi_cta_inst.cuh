@@ -7,7 +7,8 @@
 
 #include "../../sample_filter.cuh"
 #include "sample_filter_utils.cuh"
-#include "search_multi_cta_kernel-inl.cuh"
+#include "search_multi_cta_kernel.cuh"
+#include "search_multi_cta_kernel_launcher_jit.cuh"
 #include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {

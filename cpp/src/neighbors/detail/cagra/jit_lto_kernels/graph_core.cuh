@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include "utils.hpp"
+#include "../utils.hpp"
 
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdspan.hpp>
@@ -16,9 +16,9 @@
 #include <raft/matrix/init.cuh>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
-#include "../../../core/nvtx.hpp"
-#include "../../../core/omp_wrapper.hpp"
-#include "../ann_utils.cuh"
+#include "../../../../core/nvtx.hpp"
+#include "../../../../core/omp_wrapper.hpp"
+#include "../../ann_utils.cuh"
 
 #include <raft/util/bitonic_sort.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>

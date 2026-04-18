@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "../hashmap.hpp"
 #include "../utils.hpp"
+#include "hashmap.hpp"
 
 #include <raft/util/integer_utils.hpp>
 
@@ -18,9 +18,9 @@
 #include <cstdio>
 #endif
 
-#include "../../jit_lto_kernels/filter_data.h"
 #include "device_common_jit.cuh"
 #include "extern_device_functions.cuh"
+#include "sample_filter_data.h"
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 

@@ -6,7 +6,7 @@
 
 #include "../../../core/nvtx.hpp"
 #include "../../../preprocessing/quantize/vpq_build-ext.cuh"
-#include "graph_core.cuh"
+#include "jit_lto_kernels/graph_core.cuh"
 
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>

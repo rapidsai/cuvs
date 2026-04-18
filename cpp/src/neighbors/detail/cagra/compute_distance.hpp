@@ -4,8 +4,9 @@
  */
 #pragma once
 
-#include "device_common.hpp"
-#include "hashmap.hpp"
+#include "jit_lto_kernels/device_intrinsics.hpp"
+#include "jit_lto_kernels/device_memory_ops.hpp"
+#include "jit_lto_kernels/hashmap.hpp"
 #include "utils.hpp"
 
 #include <cuvs/distance/distance.hpp>
@@ -137,17 +138,8 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   };
   static_assert(sizeof(smem_and_team_size_t) == sizeof(uint32_t));
 
-  using setup_workspace_type  = const base_type*(const base_type*, void*, const DATA_T*, uint32_t);
-  using compute_distance_type = DISTANCE_T(const args_t, const INDEX_T);
-
   args_t args;
 
-  /** Copy the descriptor and the query into shared memory and do any other work, such as
-   * initializing the codebook. */
-  setup_workspace_type* setup_workspace_impl;
-  /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
-   * given by the dataset_index. */
-  compute_distance_type* compute_distance_impl;
   /** A placeholder for an implementation-specific pointer. */
   void* extra_ptr3;
   smem_and_team_size_t smem_and_team_size;
@@ -155,15 +147,11 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   /** Number of records in the database. */
   INDEX_T size;
 
-  RAFT_INLINE_FUNCTION dataset_descriptor_base_t(setup_workspace_type* setup_workspace_impl,
-                                                 compute_distance_type* compute_distance_impl,
-                                                 INDEX_T size,
+  RAFT_INLINE_FUNCTION dataset_descriptor_base_t(INDEX_T size,
                                                  uint32_t dim,
                                                  uint32_t team_size_bitshift,
                                                  uint32_t smem_ws_size_in_bytes)
-    : setup_workspace_impl(setup_workspace_impl),
-      compute_distance_impl(compute_distance_impl),
-      size(size),
+    : size(size),
       smem_and_team_size(smem_ws_size_in_bytes, team_size_bitshift),
       args{nullptr, nullptr, 0, dim, 0, 0}
   {
@@ -190,20 +178,6 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   RAFT_INLINE_FUNCTION constexpr auto team_size() const noexcept -> uint32_t
   {
     return smem_and_team_size.team_size();
-  }
-
-  RAFT_DEVICE_INLINE_FUNCTION auto setup_workspace(void* smem_ptr,
-                                                   const DATA_T* queries_ptr,
-                                                   uint32_t query_id) const -> const base_type*
-  {
-    return setup_workspace_impl(this, smem_ptr, queries_ptr, query_id);
-  }
-
-  RAFT_DEVICE_INLINE_FUNCTION auto compute_distance(INDEX_T dataset_index, bool valid) const
-    -> DISTANCE_T
-  {
-    auto per_thread_distances = valid ? compute_distance_impl(args.load(), dataset_index) : 0;
-    return device::team_sum(per_thread_distances, team_size_bitshift_from_smem());
   }
 };
 

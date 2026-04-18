@@ -40,6 +40,6 @@ extern "C" __global__ void apply_filter_kernel(const source_index_t* const sourc
 }
 
 static_assert(std::is_same_v<decltype(apply_filter_kernel),
-                             apply_filter_kernel_jit_func_t<index_t, distance_t, source_index_t>>);
+                             apply_filter_kernel_func_t<index_t, distance_t, source_index_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

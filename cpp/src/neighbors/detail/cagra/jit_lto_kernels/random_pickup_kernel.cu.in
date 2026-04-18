@@ -45,7 +45,7 @@ extern "C" __global__ void random_pickup(const dataset_desc_base* dataset_desc,
                                                         hash_bitlen);
 }
 
-static_assert(
-  std::is_same_v<decltype(random_pickup), random_pickup_jit_func_t<data_t, index_t, distance_t>>);
+static_assert(std::is_same_v<decltype(random_pickup),
+                             random_pickup_kernel_func_t<data_t, index_t, distance_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

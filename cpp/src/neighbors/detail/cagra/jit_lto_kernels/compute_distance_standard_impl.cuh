@@ -6,7 +6,8 @@
 #pragma once
 
 #include "../compute_distance_standard-impl.cuh"
-#include "../device_common.hpp"  // For dataset_descriptor_base_t
+#include "device_intrinsics.hpp"
+#include "device_memory_ops.hpp"
 
 namespace cuvs::neighbors::cagra::detail {
 

@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifndef CUVS_ENABLE_JIT_LTO
-#error "search_single_cta_kernel_launcher_jit.cuh included but CUVS_ENABLE_JIT_LTO not defined!"
-#endif
-
 #include "../smem_utils.cuh"
 
 #include <iostream>
@@ -19,12 +15,20 @@
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
+#include "jit_lto_kernels/hashmap.hpp"
 #include "jit_lto_kernels/kernel_def.hpp"
 #include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
 #include "search_plan.cuh"          // For search_params
-#include "search_single_cta_kernel-inl.cuh"  // For resource_queue_t, local_deque_t, launcher_t, persistent_runner_base_t, etc.
 #include "search_single_cta_kernel_launcher_common.cuh"
 #include "shared_launcher_jit.hpp"  // For shared JIT helper functions
+
+#include <raft/util/integer_utils.hpp>
+#include <raft/util/pow2_utils.cuh>
+
+#include <rmm/cuda_stream.hpp>
+#include <rmm/device_uvector.hpp>
+#include <rmm/mr/cuda_memory_resource.hpp>
+#include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/distance/distance.hpp>
@@ -34,8 +38,11 @@
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cuda/atomic>
 #include <cuda/std/atomic>
@@ -45,15 +52,192 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <numeric>
+#include <optional>
 #include <string>
 #include <thread>
 #include <type_traits>
 #include <typeinfo>
+#include <vector>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
-// The launcher uses types from search_single_cta_kernel-inl.cuh (worker_handle_t, job_desc_t)
-// The JIT kernel headers define _jit versions that are compatible
+// Persistent queues / runner (host). worker_handle_t, job_desc_t, kCacheLineBytes, k* job limits:
+// `jit_lto_kernels/search_single_cta_device_helpers.cuh` via `kernel_def.hpp`.
+
+template <typename T, uint32_t Size, T Empty = std::numeric_limits<T>::max()>
+struct alignas(kCacheLineBytes) resource_queue_t {
+  using value_type                   = T;
+  static constexpr uint32_t kSize    = Size;
+  static constexpr value_type kEmpty = Empty;
+  static_assert(cuda::std::atomic<value_type>::is_always_lock_free,
+                "The value type must be lock-free.");
+  static_assert(raft::is_a_power_of_two(kSize), "The size must be a power-of-two for efficiency.");
+  static constexpr uint32_t kElemsPerCacheLine =
+    raft::div_rounding_up_safe<uint32_t>(kCacheLineBytes, sizeof(value_type));
+  static constexpr uint32_t kCounterIncrement = raft::bound_by_power_of_two(kElemsPerCacheLine) + 1;
+  static constexpr uint32_t kCounterLocMask   = kSize - 1;
+  static_assert(
+    kCounterIncrement * sizeof(value_type) >= kCacheLineBytes,
+    "The counter increment should be larger than the cache line size to avoid false sharing.");
+  static_assert(
+    std::gcd(kCounterIncrement, kSize) == 1,
+    "The counter increment and the size must be coprime to allow using all of the queue slots.");
+
+  static constexpr auto kMemOrder = cuda::std::memory_order_relaxed;
+
+  explicit resource_queue_t(uint32_t capacity = Size) noexcept : capacity_{capacity}
+  {
+    head_.store(0, kMemOrder);
+    tail_.store(0, kMemOrder);
+    for (uint32_t i = 0; i < kSize; i++) {
+      buf_[i].store(kEmpty, kMemOrder);
+    }
+  }
+
+  [[nodiscard]] auto capacity() const { return capacity_; }
+
+  void set_capacity(uint32_t capacity) { capacity_ = capacity; }
+
+  struct promise_t {
+    explicit promise_t(cuda::std::atomic<value_type>& loc) : loc_{loc}, val_{Empty} {}
+    ~promise_t() noexcept { wait(); }
+
+    auto test() noexcept -> bool
+    {
+      if (val_ != Empty) { return true; }
+      val_ = loc_.exchange(kEmpty, kMemOrder);
+      return val_ != Empty;
+    }
+
+    auto test(value_type& e) noexcept -> bool
+    {
+      if (test()) {
+        e = val_;
+        return true;
+      }
+      return false;
+    }
+
+    auto wait() noexcept -> value_type
+    {
+      if (val_ == Empty) {
+        do {
+          loc_.wait(kEmpty, kMemOrder);
+          val_ = loc_.exchange(kEmpty, kMemOrder);
+        } while (val_ == Empty);
+      }
+      return val_;
+    }
+
+   private:
+    cuda::std::atomic<value_type>& loc_;
+    value_type val_;
+  };
+
+  void push(value_type x) noexcept
+  {
+    auto& loc    = buf_[head_.fetch_add(kCounterIncrement, kMemOrder) & kCounterLocMask];
+    value_type e = kEmpty;
+    while (!loc.compare_exchange_weak(e, x, kMemOrder, kMemOrder)) {
+      e = kEmpty;
+    }
+    loc.notify_one();
+  }
+
+  auto pop() noexcept -> promise_t
+  {
+    auto& loc = buf_[tail_.fetch_add(kCounterIncrement, kMemOrder) & kCounterLocMask];
+    return promise_t{loc};
+  }
+
+ private:
+  alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> head_{};
+  alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> tail_{};
+  alignas(kCacheLineBytes) std::array<cuda::std::atomic<value_type>, kSize> buf_{};
+  alignas(kCacheLineBytes) uint32_t capacity_;
+};
+
+template <typename T>
+struct local_deque_t {
+  explicit local_deque_t(uint32_t size) : store_(size) {}
+
+  [[nodiscard]] auto capacity() const -> uint32_t { return store_.size(); }
+  [[nodiscard]] auto size() const -> uint32_t { return end_ - start_; }
+
+  void push_back(T x) { store_[end_++ % capacity()] = x; }
+
+  void push_front(T x)
+  {
+    if (start_ == 0) {
+      start_ += capacity();
+      end_ += capacity();
+    }
+    store_[--start_ % capacity()] = x;
+  }
+
+  auto pop_back() -> T { return store_[--end_ % capacity()]; }
+  auto pop_front() -> T { return store_[start_++ % capacity()]; }
+
+  auto try_push_back(T x) -> bool
+  {
+    if (size() >= capacity()) { return false; }
+    push_back(x);
+    return true;
+  }
+
+  auto try_push_front(T x) -> bool
+  {
+    if (size() >= capacity()) { return false; }
+    push_front(x);
+    return true;
+  }
+
+  auto try_pop_back(T& x) -> bool
+  {
+    if (start_ >= end_) { return false; }
+    x = pop_back();
+    return true;
+  }
+
+  auto try_pop_front(T& x) -> bool
+  {
+    if (start_ >= end_) { return false; }
+    x = pop_front();
+    return true;
+  }
+
+ private:
+  std::vector<T> store_;
+  uint32_t start_{0};
+  uint32_t end_{0};
+};
+
+struct persistent_runner_base_t {
+  using job_queue_type    = resource_queue_t<uint32_t, kMaxJobsNum>;
+  using worker_queue_type = resource_queue_t<uint32_t, kMaxWorkersNum>;
+  rmm::mr::pinned_host_memory_resource worker_handles_mr;
+  rmm::mr::pinned_host_memory_resource job_descriptor_mr;
+  rmm::mr::cuda_memory_resource device_mr;
+  cudaStream_t stream{};
+  job_queue_type job_queue{};
+  worker_queue_type worker_queue{};
+  std::chrono::milliseconds lifetime;
+
+  persistent_runner_base_t(float persistent_lifetime)
+    : lifetime(size_t(persistent_lifetime * 1000)), job_queue(), worker_queue()
+  {
+    cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+  }
+  virtual ~persistent_runner_base_t() noexcept { cudaStreamDestroy(stream); };
+};
+
+struct alignas(kCacheLineBytes) persistent_state {
+  std::shared_ptr<persistent_runner_base_t> runner{nullptr};
+  std::mutex lock;
+};
+
+inline persistent_state persistent{};
 
 // Forward declarations
 template <typename RunnerT, typename... Args>
@@ -262,13 +446,8 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
   using index_type    = IndexT;
   using distance_type = DistanceT;
   using data_type     = DataT;
-  // Use non-JIT types - JIT kernel header will alias _jit versions to these
-  struct job_desc_helper_desc {
-    using DATA_T     = DataT;
-    using INDEX_T    = IndexT;
-    using DISTANCE_T = DistanceT;
-  };
-  using job_desc_type = job_desc_t<job_desc_helper_desc>;
+  // Must match job_desc_t<job_desc_traits<...>> in kernel_def.hpp / persistent kernel.
+  using job_desc_type = job_desc_t<job_desc_traits<DataT, IndexT, DistanceT>>;
 
   std::shared_ptr<AlgorithmLauncher> launcher;
   uint32_t block_size;
@@ -452,7 +631,7 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     // Launch the persistent kernel via AlgorithmLauncher
     // The persistent kernel now takes the descriptor pointer directly
     launcher->dispatch_cooperative<
-      single_cta_search::search_single_cta_p_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+      single_cta_search::search_single_cta_p_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
       stream,
       gs,
       bs,
@@ -557,7 +736,7 @@ template <typename DataT,
           typename DistanceT,
           typename SourceIndexT,
           typename SampleFilterT>
-void select_and_run_jit(
+void select_and_run(
   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
   raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
   std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
@@ -693,7 +872,7 @@ void select_and_run_jit(
 
     // Dispatch kernel via launcher
     auto kernel_launcher = [&](auto const& kernel) -> void {
-      launcher->dispatch<search_single_cta_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+      launcher->dispatch<search_single_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
         stream,
         grid,
         block,
@@ -732,59 +911,6 @@ void select_and_run_jit(
 
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
-}
-
-// Wrapper to match the non-JIT interface
-// This function MUST be called if JIT is enabled
-template <typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename SourceIndexT,
-          typename SampleFilterT>
-void select_and_run(
-  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-  raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
-  std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
-  uintptr_t topk_indices_ptr,     // [num_queries, topk]
-  DistanceT* topk_distances_ptr,  // [num_queries, topk]
-  const DataT* queries_ptr,       // [num_queries, dataset_dim]
-  uint32_t num_queries,
-  const IndexT* dev_seed_ptr,         // [num_queries, num_seeds]
-  uint32_t* num_executed_iterations,  // [num_queries,]
-  const search_params& ps,
-  uint32_t topk,
-  uint32_t num_itopk_candidates,
-  uint32_t block_size,  //
-  uint32_t smem_size,
-  int64_t hash_bitlen,
-  IndexT* hashmap_ptr,
-  size_t small_hash_bitlen,
-  size_t small_hash_reset_interval,
-  uint32_t num_seeds,
-  SampleFilterT sample_filter,
-  cudaStream_t stream)
-{
-  select_and_run_jit(dataset_desc,
-                     graph,
-                     source_indices,
-                     topk_indices_ptr,
-                     topk_distances_ptr,
-                     queries_ptr,
-                     num_queries,
-                     dev_seed_ptr,
-                     num_executed_iterations,
-                     ps,
-                     topk,
-                     num_itopk_candidates,
-                     block_size,
-                     smem_size,
-                     hash_bitlen,
-                     hashmap_ptr,
-                     small_hash_bitlen,
-                     small_hash_reset_interval,
-                     num_seeds,
-                     sample_filter,
-                     stream);
 }
 
 // get_runner for JIT persistent runners (similar to non-JIT version)

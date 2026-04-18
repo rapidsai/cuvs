@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../detail/jit_lto_kernels/filter_data.h"
+#include "../detail/cagra/jit_lto_kernels/sample_filter_data.h"
 #include "../ivf_common.cuh"
 #include "detail/jit_lto_kernels/interleaved_scan_planner.hpp"
 #include "detail/jit_lto_kernels/kernel_def.hpp"

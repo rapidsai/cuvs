@@ -14,21 +14,17 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-#if defined(CUVS_ENABLE_JIT_LTO) || defined(BUILD_KERNEL)
+#if defined(CUVS_ENABLE_JIT_LTO)
 
-// When JIT LTO is enabled or building kernel fragments, dist_op is an extern function that gets JIT
+//  dist_op is an extern function that gets JIT
 // linked from fragments Each fragment provides a metric-specific implementation (L2Expanded,
-// InnerProduct, etc.) The planner will link the appropriate fragment based on the metric Note:
-// extern functions cannot be constexpr, so we remove constexpr here Note: These are in the detail
-// namespace (not anonymous) so they can be found by JIT linking
-// QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
+// InnerProduct, etc.) The planner will link the appropriate fragment based on the metric
 template <typename QUERY_T, typename DISTANCE_T>
 extern __device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b);
 
 // Normalization is also JIT linked from fragments (no-op for most metrics, cosine normalization for
 // CosineExpanded) The planner will link the appropriate fragment (cosine or noop) based on the
 // metric
-// QueryT is needed to match the descriptor template signature (always float for normalization)
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
@@ -40,84 +36,52 @@ extern __device__ DistanceT apply_normalization_standard(
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
   IndexT dataset_index);
 
+#else
+
+//  dist_op is an extern function that gets JIT
+// linked from fragments Each fragment provides a metric-specific implementation (L2Expanded,
+// InnerProduct, etc.) The planner will link the appropriate fragment based on the metric
+template <typename QUERY_T, typename DISTANCE_T>
+__device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b)
+{
+  return 0;
+}
+
+// Normalization is also JIT linked from fragments (no-op for most metrics, cosine normalization for
+// CosineExpanded) The planner will link the appropriate fragment (cosine or noop) based on the
+// metric
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename QueryT>
+__device__ DistanceT apply_normalization_standard(
+  DistanceT distance,
+  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+  IndexT dataset_index)
+{
+  return distance;
+}
+
 #endif
-
-namespace {
-
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-
-// When JIT LTO is disabled, dist_op is a template function with Metric as a template parameter
-template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
-  requires(Metric == cuvs::distance::DistanceType::L2Expanded)
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-{
-  DISTANCE_T diff = a - b;
-  return diff * diff;
-}
-
-template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
-  requires(Metric == cuvs::distance::DistanceType::InnerProduct ||
-           Metric == cuvs::distance::DistanceType::CosineExpanded)
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-{
-  return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
-}
-
-template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
-  requires(Metric == cuvs::distance::DistanceType::BitwiseHamming && std::is_integral_v<DATA_T>)
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-{
-  // mask the result of xor for the integer promotion
-  const auto v = (a ^ b) & 0xffu;
-  return __popc(v);
-}
-
-template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
-  requires(Metric == cuvs::distance::DistanceType::L1)
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-{
-  DISTANCE_T diff = a - b;
-  return raft::abs(diff);
-}
-
-#endif  // #if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-}  // namespace
 
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
-          typename DistanceT
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-          ,
-          cuvs::distance::DistanceType Metric
-#else
-          ,
-          typename QueryT
-#endif
-          >
+          typename DistanceT,
+          typename QueryT>
 struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-  // When JIT LTO is disabled, Metric is a template parameter
-  using QUERY_T = typename std::
-    conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
-#else
-  // When JIT LTO is enabled, QueryT is passed as a template parameter
-  using QUERY_T = QueryT;
-#endif
+  using QUERY_T   = QueryT;
   using base_type::args;
   using base_type::smem_ws_size_in_bytes;
   using typename base_type::args_t;
-  using typename base_type::compute_distance_type;
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
   using typename base_type::LOAD_T;
-  using typename base_type::setup_workspace_type;
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-  constexpr static inline auto kMetric = Metric;
-#endif
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
 
@@ -151,19 +115,12 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return args.extra_word1;
   }
 
-  _RAFT_HOST_DEVICE standard_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
-                                                  compute_distance_type* compute_distance_impl,
-                                                  const DATA_T* ptr,
+  _RAFT_HOST_DEVICE standard_dataset_descriptor_t(const DATA_T* ptr,
                                                   INDEX_T size,
                                                   uint32_t dim,
                                                   uint32_t ld,
                                                   const DISTANCE_T* dataset_norms = nullptr)
-    : base_type(setup_workspace_impl,
-                compute_distance_impl,
-                size,
-                dim,
-                raft::Pow2<TeamSize>::Log2,
-                get_smem_ws_size_in_bytes(dim))
+    : base_type(size, dim, raft::Pow2<TeamSize>::Log2, get_smem_ws_size_in_bytes(dim))
   {
     standard_dataset_descriptor_t::ptr(args)               = ptr;
     standard_dataset_descriptor_t::ld(args)                = ld;
@@ -270,16 +227,9 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
           d,
           query_smem_ptr +
             sizeof(QUERY_T) * device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(k + v));
-#if defined(CUVS_ENABLE_JIT_LTO) || defined(BUILD_KERNEL)
-        // When JIT LTO is enabled or building kernel fragments, dist_op is an extern function (no
-        // template parameters)
+        // dist_op is an extern device function linked from JIT LTO fragments (metric-specific).
         r += dist_op<QUERY_T, DISTANCE_T>(
           d, cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(data[e][v]));
-#else
-        // When JIT LTO is disabled, dist_op is a template function with Metric parameter
-        r += dist_op<QUERY_T, DISTANCE_T, DescriptorT::kMetric>(
-          d, cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(data[e][v]));
-#endif
       }
     }
   }
@@ -296,9 +246,6 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
     args.dim,
     args.smem_ws_ptr);
 
-#if defined(CUVS_ENABLE_JIT_LTO) || defined(BUILD_KERNEL)
-  // Normalization is JIT linked from fragments (no-op or cosine normalization)
-  // The planner links the appropriate fragment based on the metric
   distance =
     apply_normalization_standard<DescriptorT::kTeamSize,
                                  DescriptorT::kDatasetBlockDim,
@@ -306,22 +253,10 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
                                  typename DescriptorT::INDEX_T,
                                  typename DescriptorT::DISTANCE_T,
                                  typename DescriptorT::QUERY_T>(distance, args, dataset_index);
-#else
-  // When JIT LTO is disabled, kMetric is always available as a compile-time constant
-  if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
-    const auto* dataset_norms = DescriptorT::dataset_norms_ptr(args);
-    auto norm                 = dataset_norms[dataset_index];
-    if (norm > 0) { distance = distance / norm; }
-  }
-#endif
 
   return distance;
 }
 
-#ifndef BUILD_KERNEL
-// The init kernel is used for both JIT and non-JIT initialization
-// When BUILD_KERNEL is defined, we're building a JIT fragment and don't want this kernel.
-// The kernel handles JIT vs non-JIT via ifdef internally
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -336,46 +271,15 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                           uint32_t ld,
                                           const DistanceT* dataset_norms = nullptr)
 {
-#if !defined(CUVS_ENABLE_JIT_LTO)
-  // When JIT LTO is disabled, Metric is a template parameter (last parameter)
-  using desc_type =
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, Metric>;
-  using base_type = typename desc_type::base_type;
-
-  // For CUDA 12 (non-JIT), set the function pointers properly
-  new (out) desc_type(reinterpret_cast<typename base_type::setup_workspace_type*>(
-                        &setup_workspace_standard<desc_type>),
-                      reinterpret_cast<typename base_type::compute_distance_type*>(
-                        &compute_distance_standard<desc_type>),
-                      ptr,
-                      size,
-                      dim,
-                      ld,
-                      dataset_norms);
-#else
-  // When JIT LTO is enabled, Metric is not a template parameter
   using query_t =
     std::conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
   using desc_type =
     standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, query_t>;
   using base_type = typename desc_type::base_type;
 
-  // For JIT, we don't use the function pointers, so set them to nullptr
-  // The free functions are called directly instead
-  new (out) desc_type(nullptr,  // setup_workspace_impl - not used in JIT
-                      nullptr,  // compute_distance_impl - not used in JIT
-                      ptr,
-                      size,
-                      dim,
-                      ld,
-                      dataset_norms);
-#endif
+  new (out) desc_type(ptr, size, dim, ld, dataset_norms);
 }
-#endif  // #ifndef BUILD_KERNEL
 
-#ifndef BUILD_KERNEL
-// The init_ function is used for both JIT and non-JIT initialization
-// When BUILD_KERNEL is defined, we're building a JIT fragment and don't want this function.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -391,29 +295,18 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
   uint32_t ld,
   const DistanceT* dataset_norms)
 {
-#if !defined(CUVS_ENABLE_JIT_LTO)
-  // When JIT LTO is disabled, Metric is a template parameter (last parameter)
-  using desc_type =
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, Metric>;
-  using base_type = typename desc_type::base_type;
-#else
-  // When JIT LTO is enabled, Metric is not a template parameter
-  // QueryT depends on metric: uint8_t for BitwiseHamming, float for others
   using query_t =
     std::conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
   using desc_type =
     standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, query_t>;
   using base_type = typename desc_type::base_type;
-#endif
 
   RAFT_EXPECTS(Metric != cuvs::distance::DistanceType::CosineExpanded || dataset_norms != nullptr,
                "Dataset norms must be provided for CosineExpanded metric");
 
-  return host_type{desc_type{nullptr, nullptr, ptr, size, dim, ld, dataset_norms},
+  return host_type{desc_type{ptr, size, dim, ld, dataset_norms},
                    [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
                        rmm::cuda_stream_view stream) {
-                     // Use init kernel for both JIT and CUDA 12
-                     // The kernel handles JIT vs non-JIT via ifdef internally
                      standard_dataset_descriptor_init_kernel<Metric,
                                                              TeamSize,
                                                              DatasetBlockDim,
@@ -429,6 +322,5 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
                    0,      // pq_bits
                    0};     // pq_len
 }
-#endif  // #ifndef BUILD_KERNEL
 
 }  // namespace cuvs::neighbors::cagra::detail

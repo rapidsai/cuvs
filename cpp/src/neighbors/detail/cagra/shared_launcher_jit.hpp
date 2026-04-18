@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifndef CUVS_ENABLE_JIT_LTO
-#error "shared_launcher_jit.hpp included but CUVS_ENABLE_JIT_LTO not defined!"
-#endif
-
 // Include tags header before any other includes that might open namespaces
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 

@@ -5,14 +5,15 @@
 
 #pragma once
 
-#include "../device_common.hpp"
-#include "../hashmap.hpp"
 #include "../utils.hpp"
+#include "device_intrinsics.hpp"
 #include "extern_device_functions.cuh"
+#include "hashmap.hpp"
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/util/integer_utils.hpp>
+#include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
 namespace device {
@@ -49,13 +50,11 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   const uint32_t block_id   = 0,
   const uint32_t num_blocks = 1)
 {
-  constexpr unsigned warp_size = 32;
-
   uint32_t team_size_bits = smem_desc->team_size_bitshift_from_smem();
   IndexT dataset_size     = smem_desc->size;
   const auto args_load    = smem_desc->args.load();
 
-  const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
+  const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, device::warp_size >> team_size_bits);
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
@@ -153,12 +152,10 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   }
   __syncthreads();
 
-  // Compute the distance to child nodes - same inline pattern as non-JIT (device_common.hpp)
-  constexpr unsigned warp_size = 32;
-
+  // Same inline distance pattern as search_single_cta_jit.cuh / device helpers
   const auto team_size_bits = smem_desc->team_size_bitshift_from_smem();
   const auto num_k          = knn_k * search_width;
-  const auto max_i          = raft::round_up_safe(num_k, warp_size >> team_size_bits);
+  const auto max_i          = raft::round_up_safe(num_k, device::warp_size >> team_size_bits);
   const auto args           = smem_desc->args.load();
   const bool lead_lane      = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
   const uint32_t ofst       = STATIC_RESULT_POSITION ? 0 : result_position[0];

@@ -72,6 +72,6 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_multi_cta(
 
 static_assert(
   std::is_same_v<decltype(search_multi_cta),
-                 search_multi_cta_jit_func_t<data_t, index_t, distance_t, source_index_t>>);
+                 search_multi_cta_kernel_func_t<data_t, index_t, distance_t, source_index_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

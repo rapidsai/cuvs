@@ -22,35 +22,19 @@ template <uint32_t TeamSize,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-          ,
-          cuvs::distance::DistanceType Metric
-#else
-          ,
-          typename QueryT
-#endif
-          >
+          typename DistanceT,
+          typename QueryT>
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-  using QUERY_T = half;
-#else
-  using QUERY_T = QueryT;
-#endif
+  using QUERY_T     = QueryT;
   using base_type::args;
   using base_type::extra_ptr3;
   using typename base_type::args_t;
-  using typename base_type::compute_distance_type;
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
   using typename base_type::LOAD_T;
-  using typename base_type::setup_workspace_type;
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-  constexpr static inline auto kMetric = Metric;
-#endif
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
@@ -100,20 +84,13 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN * utils::size_of<CODE_BOOK_T>();
 
-  _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
-                                                 compute_distance_type* compute_distance_impl,
-                                                 const std::uint8_t* encoded_dataset_ptr,
+  _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(const std::uint8_t* encoded_dataset_ptr,
                                                  std::uint32_t encoded_dataset_dim,
                                                  const CODE_BOOK_T* vq_code_book_ptr,
                                                  const CODE_BOOK_T* pq_code_book_ptr,
                                                  IndexT size,
                                                  std::uint32_t dim)
-    : base_type(setup_workspace_impl,
-                compute_distance_impl,
-                size,
-                dim,
-                raft::Pow2<TeamSize>::Log2,
-                get_smem_ws_size_in_bytes(dim))
+    : base_type(size, dim, raft::Pow2<TeamSize>::Log2, get_smem_ws_size_in_bytes(dim))
   {
     cagra_q_dataset_descriptor_t::encoded_dataset_ptr(args) = encoded_dataset_ptr;
     cagra_q_dataset_descriptor_t::vq_code_book_ptr(args)    = vq_code_book_ptr;
@@ -391,39 +368,10 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-                                                 ,
-                                                 Metric
-#else
-                                                 ,
-                                                 half
-#endif
-                                                 >;
-  using base_type = typename desc_type::base_type;
-#ifdef CUVS_ENABLE_JIT_LTO
-  // For JIT, we don't use the function pointers, so set them to nullptr
-  // The free functions are called directly instead
-  new (out) desc_type(nullptr,  // setup_workspace_impl - not used in JIT
-                      nullptr,  // compute_distance_impl - not used in JIT
-                      encoded_dataset_ptr,
-                      encoded_dataset_dim,
-                      vq_code_book_ptr,
-                      pq_code_book_ptr,
-                      size,
-                      dim);
-#else
-  // For CUDA 12 (non-JIT), set the function pointers properly
+                                                 DistanceT,
+                                                 half>;
   new (out) desc_type(
-    reinterpret_cast<typename base_type::setup_workspace_type*>(&setup_workspace_vpq<desc_type>),
-    reinterpret_cast<typename base_type::compute_distance_type*>(&compute_distance_vpq<desc_type>),
-    encoded_dataset_ptr,
-    encoded_dataset_dim,
-    vq_code_book_ptr,
-    pq_code_book_ptr,
-    size,
-    dim);
-#endif
+    encoded_dataset_ptr, encoded_dataset_dim, vq_code_book_ptr, pq_code_book_ptr, size, dim);
 }
 #endif  // #ifndef BUILD_KERNEL
 
@@ -464,52 +412,36 @@ vpq_descriptor_spec<Metric,
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT
-#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
-                                                 ,
-                                                 Metric
-#else
-                                                 ,
-                                                 half
-#endif
-                                                 >;
-  using base_type = typename desc_type::base_type;
+                                                 DistanceT,
+                                                 half>;
 
-  return host_type{desc_type{nullptr,
-                             nullptr,
-                             encoded_dataset_ptr,
-                             encoded_dataset_dim,
-                             vq_code_book_ptr,
-                             pq_code_book_ptr,
-                             size,
-                             dim},
-                   [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
-                       rmm::cuda_stream_view stream) {
-                     // Use init kernel for both JIT and CUDA 12
-                     // The kernel handles JIT vs non-JIT via ifdef internally
-                     vpq_dataset_descriptor_init_kernel<Metric,
-                                                        TeamSize,
-                                                        DatasetBlockDim,
-                                                        PqBits,
-                                                        PqLen,
-                                                        CodebookT,
-                                                        DataT,
-                                                        IndexT,
-                                                        DistanceT>
-                       <<<1, 1, 0, stream>>>(dev_ptr,
-                                             encoded_dataset_ptr,
-                                             encoded_dataset_dim,
-                                             vq_code_book_ptr,
-                                             pq_code_book_ptr,
-                                             size,
-                                             dim);
-                     RAFT_CUDA_TRY(cudaPeekAtLastError());
-                   },
-                   Metric,
-                   DatasetBlockDim,
-                   true,    // is_vpq
-                   PqBits,  // pq_bits
-                   PqLen};  // pq_len
+  return host_type{
+    desc_type{
+      encoded_dataset_ptr, encoded_dataset_dim, vq_code_book_ptr, pq_code_book_ptr, size, dim},
+    [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
+        rmm::cuda_stream_view stream) {
+      vpq_dataset_descriptor_init_kernel<Metric,
+                                         TeamSize,
+                                         DatasetBlockDim,
+                                         PqBits,
+                                         PqLen,
+                                         CodebookT,
+                                         DataT,
+                                         IndexT,
+                                         DistanceT><<<1, 1, 0, stream>>>(dev_ptr,
+                                                                         encoded_dataset_ptr,
+                                                                         encoded_dataset_dim,
+                                                                         vq_code_book_ptr,
+                                                                         pq_code_book_ptr,
+                                                                         size,
+                                                                         dim);
+      RAFT_CUDA_TRY(cudaPeekAtLastError());
+    },
+    Metric,
+    DatasetBlockDim,
+    true,    // is_vpq
+    PqBits,  // pq_bits
+    PqLen};  // pq_len
 }
 #endif  // #ifndef BUILD_KERNEL
 

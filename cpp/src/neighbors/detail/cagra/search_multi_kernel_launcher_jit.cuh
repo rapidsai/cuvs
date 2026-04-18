@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifndef CUVS_ENABLE_JIT_LTO
-#error "search_multi_kernel_launcher_jit.cuh included but CUVS_ENABLE_JIT_LTO not defined!"
-#endif
-
 // Tags header should be included before this header (at file scope, not inside functions)
 // to avoid namespace definition errors when this header is included inside function bodies
 
@@ -67,7 +63,7 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
   // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
   const uint32_t ldr_u32 = static_cast<uint32_t>(ldr);
 
-  launcher->dispatch<random_pickup_jit_func_t<DataT, IndexT, DistanceT>>(
+  launcher->dispatch<random_pickup_kernel_func_t<DataT, IndexT, DistanceT>>(
     cuda_stream,
     grid_size,
     dim3(block_size, 1, 1),
@@ -126,28 +122,28 @@ void compute_distance_to_child_nodes_jit(
   // Get the device descriptor pointer
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
 
-  launcher
-    ->dispatch<compute_distance_to_child_nodes_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
-      cuda_stream,
-      grid_size,
-      dim3(block_size, 1, 1),
-      dataset_desc.smem_ws_size_in_bytes,
-      parent_node_list,
-      parent_candidates_ptr,
-      parent_distance_ptr,
-      lds,
-      search_width,
-      dev_desc,
-      neighbor_graph_ptr,
-      graph_degree,
-      source_indices_ptr,
-      query_ptr,
-      visited_hashmap_ptr,
-      hash_bitlen,
-      result_indices_ptr,
-      result_distances_ptr,
-      ldd,
-      cuvs::neighbors::filtering::none_sample_filter{});
+  launcher->dispatch<
+    compute_distance_to_child_nodes_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+    cuda_stream,
+    grid_size,
+    dim3(block_size, 1, 1),
+    dataset_desc.smem_ws_size_in_bytes,
+    parent_node_list,
+    parent_candidates_ptr,
+    parent_distance_ptr,
+    lds,
+    search_width,
+    dev_desc,
+    neighbor_graph_ptr,
+    graph_degree,
+    source_indices_ptr,
+    query_ptr,
+    visited_hashmap_ptr,
+    hash_bitlen,
+    result_indices_ptr,
+    result_distances_ptr,
+    ldd,
+    cuvs::neighbors::filtering::none_sample_filter{});
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
@@ -215,8 +211,7 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
 
   // Alias avoids nested `dispatch< alias_template<...>>` which NVCC can misparse as
   // comparison/shift.
-  using apply_filter_kernel_func_t =
-    apply_filter_kernel_jit_func_t<INDEX_T, DISTANCE_T, SourceIndexT>;
+  using apply_filter_kernel_func_t = apply_filter_kernel_func_t<INDEX_T, DISTANCE_T, SourceIndexT>;
   // `template` required: in template code, `->dispatch<...>` is otherwise parsed as `dispatch <` …
   launcher->template dispatch<apply_filter_kernel_func_t>(cuda_stream,
                                                           dim3(grid_size, 1, 1),

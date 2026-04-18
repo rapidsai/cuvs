@@ -4,12 +4,13 @@
  */
 #pragma once
 
-#include "bitonic.hpp"
-#include "device_common.hpp"
-#include "hashmap.hpp"
+#include "jit_lto_kernels/bitonic.hpp"
+#include "jit_lto_kernels/device_intrinsics.hpp"
+#include "jit_lto_kernels/device_memory_ops.hpp"
+#include "jit_lto_kernels/hashmap.hpp"
+#include "jit_lto_kernels/topk_by_radix.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta_kernel.cuh"
-#include "topk_by_radix.cuh"
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk
 #include "utils.hpp"
 #include <neighbors/detail/cagra/compute_distance-ext.cuh>

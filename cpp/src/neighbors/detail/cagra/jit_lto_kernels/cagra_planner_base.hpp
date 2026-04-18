@@ -162,7 +162,9 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                             uint32_t pq_len)
   {
     (void)is_vpq;
-    if (!is_vpq) {
+    // Dist/normalization apply only to standard codebook; constexpr avoids instantiating them
+    // with VPQ's QueryTag=tag_h (runtime !is_vpq would still instantiate those templates).
+    if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
       add_dist_op_device_function<QueryTag, DistanceTag>(metric);
       add_normalization_device_function<DataTag, IndexTag, DistanceTag, QueryTag>(
         metric, team_size, dataset_block_dim);
@@ -278,27 +280,40 @@ struct CagraPlannerBase : AlgorithmPlanner {
   template <typename QueryTag, typename DistanceTag>
   void add_dist_op_device_function(cuvs::distance::DistanceType metric)
   {
-    switch (metric) {
-      case cuvs::distance::DistanceType::L2Expanded:
-      case cuvs::distance::DistanceType::L2Unexpanded:
-        this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_l2>>();
-        break;
-      case cuvs::distance::DistanceType::InnerProduct:
-        this->add_static_fragment<
-          fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_inner_product>>();
-        break;
-      case cuvs::distance::DistanceType::CosineExpanded:
-        this->add_static_fragment<
-          fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_inner_product>>();
-        break;
-      case cuvs::distance::DistanceType::BitwiseHamming:
-        this
-          ->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_hamming>>();
-        break;
-      case cuvs::distance::DistanceType::L1:
-        this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_l1>>();
-        break;
-      default: RAFT_FAIL("Unsupported metric for CAGRA JIT dist_op");
+    // dist_op_matrix.json pairs tag_metric_hamming with uint8 query (tag_uc) only; L2/IP/L1 use
+    // float query (tag_f). A single switch over metric would still instantiate every case for each
+    // QueryTag, pulling in fragment types that have no fatbin (e.g. tag_uc + L2).
+    if constexpr (std::is_same_v<QueryTag, tag_uc>) {
+      if (metric != cuvs::distance::DistanceType::BitwiseHamming) {
+        RAFT_FAIL(
+          "CAGRA JIT uint8 query layout (tag_uc) only supports BitwiseHamming for dist_op "
+          "fragments");
+      }
+      this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_hamming>>();
+    } else {
+      switch (metric) {
+        case cuvs::distance::DistanceType::L2Expanded:
+        case cuvs::distance::DistanceType::L2Unexpanded:
+          this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_l2>>();
+          break;
+        case cuvs::distance::DistanceType::InnerProduct:
+          this->add_static_fragment<
+            fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_inner_product>>();
+          break;
+        case cuvs::distance::DistanceType::CosineExpanded:
+          this->add_static_fragment<
+            fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_inner_product>>();
+          break;
+        case cuvs::distance::DistanceType::BitwiseHamming:
+          // Matrix only emits hamming dist_op for tag_uc; float-query layout is not built.
+          RAFT_FAIL(
+            "CAGRA JIT BitwiseHamming dist_op is only registered for uint8_t data / tag_uc query "
+            "layout");
+        case cuvs::distance::DistanceType::L1:
+          this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_l1>>();
+          break;
+        default: RAFT_FAIL("Unsupported metric for CAGRA JIT dist_op");
+      }
     }
   }
 
@@ -357,7 +372,12 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                                                             NormT>>();
       });
     };
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    // tag_uc is only used for BitwiseHamming query layout; cosine norm fragments are built for
+    // float query tag. Use if constexpr so we do not instantiate tag_norm_cosine with tag_uc
+    // (a runtime metric check would still pull in those template specializations).
+    if constexpr (std::is_same_v<QueryTag, tag_uc>) {
+      go.template operator()<tag_norm_noop>();
+    } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       go.template operator()<tag_norm_cosine>();
     } else {
       go.template operator()<tag_norm_noop>();
@@ -367,15 +387,15 @@ struct CagraPlannerBase : AlgorithmPlanner {
   void add_sample_filter_device_function(std::string const& filter_name)
   {
     if (filter_name == "filter_none_source_index_ui") {
-      this->add_static_fragment<cuvs::neighbors::detail::fragment_tag_sample_filter<
-        cuvs::neighbors::detail::tag_bitset_u32,
-        tag_idx_ui,
-        cuvs::neighbors::detail::tag_filter_none>>();
+      this
+        ->add_static_fragment<fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
+                                                         tag_idx_ui,
+                                                         cuvs::detail::jit_lto::tag_filter_none>>();
     } else if (filter_name == "filter_bitset_source_index_ui") {
-      this->add_static_fragment<cuvs::neighbors::detail::fragment_tag_sample_filter<
-        cuvs::neighbors::detail::tag_bitset_u32,
-        tag_idx_ui,
-        cuvs::neighbors::detail::tag_filter_bitset>>();
+      this->add_static_fragment<
+        fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
+                                   tag_idx_ui,
+                                   cuvs::detail::jit_lto::tag_filter_bitset>>();
     } else {
       RAFT_FAIL("Unknown CAGRA sample filter name for JIT: %s", filter_name.c_str());
     }

@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifndef CUVS_ENABLE_JIT_LTO
-#error "search_multi_cta_kernel_launcher_jit.cuh included but CUVS_ENABLE_JIT_LTO not defined!"
-#endif
-
 #include "../smem_utils.cuh"
 
 // Include tags header before any other includes that might open namespaces
@@ -17,10 +13,10 @@
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
 #include "jit_lto_kernels/kernel_def.hpp"
-#include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
-#include "search_plan.cuh"          // For search_params
-#include "set_value_batch.cuh"      // For set_value_batch
-#include "shared_launcher_jit.hpp"  // For shared JIT helper functions
+#include "jit_lto_kernels/set_value_batch.cuh"  // For set_value_batch
+#include "sample_filter_utils.cuh"              // For CagraSampleFilterWithQueryIdOffset
+#include "search_plan.cuh"                      // For search_params
+#include "shared_launcher_jit.hpp"              // For shared JIT helper functions
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -33,35 +29,33 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
-// JIT version of select_and_run for multi_cta
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT,
           typename SampleFilterT>
-void select_and_run_jit(
-  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-  raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
-  const SourceIndexT* source_indices_ptr,
-  IndexT* topk_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
-  DistanceT* topk_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
-  const DataT* queries_ptr,       // [num_queries, dataset_dim]
-  uint32_t num_queries,
-  const IndexT* dev_seed_ptr,         // [num_queries, num_seeds]
-  uint32_t* num_executed_iterations,  // [num_queries,]
-  const search_params& ps,
-  uint32_t topk,
-  // multi_cta_search (params struct)
-  uint32_t block_size,  //
-  uint32_t result_buffer_size,
-  uint32_t smem_size,
-  uint32_t visited_hash_bitlen,
-  int64_t traversed_hash_bitlen,
-  IndexT* traversed_hashmap_ptr,
-  uint32_t num_cta_per_query,
-  uint32_t num_seeds,
-  SampleFilterT sample_filter,
-  cudaStream_t stream)
+void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+                    raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
+                    const SourceIndexT* source_indices_ptr,
+                    IndexT* topk_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
+                    DistanceT* topk_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
+                    const DataT* queries_ptr,       // [num_queries, dataset_dim]
+                    uint32_t num_queries,
+                    const IndexT* dev_seed_ptr,         // [num_queries, num_seeds]
+                    uint32_t* num_executed_iterations,  // [num_queries,]
+                    const search_params& ps,
+                    uint32_t topk,
+                    // multi_cta_search (params struct)
+                    uint32_t block_size,  //
+                    uint32_t result_buffer_size,
+                    uint32_t smem_size,
+                    uint32_t visited_hash_bitlen,
+                    int64_t traversed_hash_bitlen,
+                    IndexT* traversed_hashmap_ptr,
+                    uint32_t num_cta_per_query,
+                    uint32_t num_seeds,
+                    SampleFilterT sample_filter,
+                    cudaStream_t stream)
 {
   // Extract bitset data from filter object (if it's a bitset_filter)
   uint32_t* bitset_ptr        = nullptr;
@@ -141,7 +135,7 @@ void select_and_run_jit(
 
   auto kernel_launcher = [&](auto const& kernel) -> void {
     launcher->dispatch<
-      multi_cta_search::search_multi_cta_jit_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+      multi_cta_search::search_multi_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
       stream,
       grid_dims,
       block_dims,

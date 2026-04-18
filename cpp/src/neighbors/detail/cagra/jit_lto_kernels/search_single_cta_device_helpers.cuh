@@ -6,10 +6,11 @@
 #pragma once
 
 // Device-only includes - no host-side headers
-#include "../bitonic.hpp"
-#include "../device_common.hpp"
-#include "../hashmap.hpp"
 #include "../utils.hpp"
+#include "bitonic.hpp"
+#include "device_intrinsics.hpp"
+#include "device_memory_ops.hpp"
+#include "hashmap.hpp"
 
 #include <raft/core/detail/macros.hpp>
 #include <raft/util/warp_primitives.cuh>
@@ -26,18 +27,20 @@
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
-// Descriptor tag for JIT persistent job queues (matches dataset_descriptor DATA_T / INDEX_T /
-// DISTANCE_T)
+// Type bundle for `job_desc_t` (DATA_T / INDEX_T / DISTANCE_T for persistent single-CTA kernels).
 template <typename DataT, typename IndexT, typename DistanceT>
-struct job_desc_jit_helper_desc {
+struct job_desc_traits {
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
 };
 
-// Constants for persistent kernels
-constexpr size_t kCacheLineBytes = 64;
-constexpr uint32_t kMaxJobsNum   = 8192;
+// Constants for persistent kernels (shared by JIT device code and host launcher)
+constexpr size_t kCacheLineBytes            = 64;
+constexpr uint32_t kMaxJobsNum              = 8192;
+constexpr uint32_t kMaxWorkersNum           = 4096;
+constexpr uint32_t kMaxWorkersPerThread     = 256;
+constexpr uint32_t kSoftMaxWorkersPerThread = 16;
 
 // Worker handle for persistent kernels
 struct alignas(kCacheLineBytes) worker_handle_t {
@@ -58,6 +61,11 @@ static_assert(
 
 constexpr worker_handle_t::handle_t kWaitForWork = std::numeric_limits<uint64_t>::max();
 constexpr worker_handle_t::handle_t kNoMoreWork  = kWaitForWork - 1;
+
+constexpr auto is_worker_busy(worker_handle_t::handle_t h) -> bool
+{
+  return (h != kWaitForWork) && (h != kNoMoreWork);
+}
 
 // Job descriptor for persistent kernels
 template <typename DATASET_DESCRIPTOR_T>

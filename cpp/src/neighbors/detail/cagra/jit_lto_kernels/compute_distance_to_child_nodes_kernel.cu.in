@@ -63,6 +63,6 @@ extern "C" __global__ void compute_distance_to_child_nodes(
 static_assert(
   std::is_same_v<
     decltype(compute_distance_to_child_nodes),
-    compute_distance_to_child_nodes_jit_func_t<data_t, index_t, distance_t, source_index_t>>);
+    compute_distance_to_child_nodes_kernel_func_t<data_t, index_t, distance_t, source_index_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

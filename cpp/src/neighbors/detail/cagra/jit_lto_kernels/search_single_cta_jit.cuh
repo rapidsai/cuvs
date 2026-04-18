@@ -5,14 +5,13 @@
 
 #pragma once
 
-// Device-only helpers - extracted from search_single_cta_kernel-inl.cuh to avoid host-side includes
+// Device-only helpers - split out to avoid pulling host launcher code into JIT translation units
 #include "search_single_cta_device_helpers.cuh"
 
-// Additional device-side includes needed
-#include "../device_common.hpp"
-#include "../hashmap.hpp"
-#include "../topk_by_radix.cuh"
+// device_intrinsics / memory_ops come via search_single_cta_device_helpers.cuh
 #include "../utils.hpp"
+#include "hashmap.hpp"
+#include "topk_by_radix.cuh"
 
 #include <raft/core/operators.hpp>      // For raft::shfl_xor
 #include <raft/util/integer_utils.hpp>  // For raft::round_up_safe
@@ -30,15 +29,12 @@
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
-#include "../../jit_lto_kernels/filter_data.h"
 #include "extern_device_functions.cuh"
+#include "sample_filter_data.h"
 // Include shared JIT device functions
 #include "device_common_jit.cuh"
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
-
-// are defined in search_single_cta_kernel-inl.cuh which is included by the launcher.
-// We don't redefine them here to avoid duplicate definitions.
 
 // Sample filter extern function
 // sample_filter is declared in extern_device_functions.cuh
@@ -537,9 +533,9 @@ template <bool TOPK_BY_BITONIC_SORT,
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
-__device__ void search_kernel_p_jit(
+__device__ void search_single_cta_p_impl(
   worker_handle_t* worker_handles,
-  job_desc_t<job_desc_jit_helper_desc<DataT, IndexT, DistanceT>>* job_descriptors,
+  job_desc_t<job_desc_traits<DataT, IndexT, DistanceT>>* job_descriptors,
   uint32_t* completion_counters,
   const IndexT* const knn_graph,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
@@ -565,7 +561,7 @@ __device__ void search_kernel_p_jit(
   SourceIndexT bitset_len,      // Bitset length
   SourceIndexT original_nbits)  // Original number of bits
 {
-  using job_desc_type = job_desc_t<job_desc_jit_helper_desc<DataT, IndexT, DistanceT>>;
+  using job_desc_type = job_desc_t<job_desc_traits<DataT, IndexT, DistanceT>>;
   __shared__ typename job_desc_type::input_t job_descriptor;
   __shared__ worker_handle_t::data_t worker_data;
 

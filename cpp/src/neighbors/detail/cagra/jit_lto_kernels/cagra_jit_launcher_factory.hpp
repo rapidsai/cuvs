@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifndef CUVS_ENABLE_JIT_LTO
-#error "cagra_jit_launcher_factory.hpp included but CUVS_ENABLE_JIT_LTO not defined!"
-#endif
-
 #include "../compute_distance.hpp"
 #include "../shared_launcher_jit.hpp"
 #include "search_multi_cta_planner.hpp"

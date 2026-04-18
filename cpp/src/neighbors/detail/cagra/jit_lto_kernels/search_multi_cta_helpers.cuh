@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <neighbors/detail/cagra/bitonic.hpp>
-#include <neighbors/detail/cagra/hashmap.hpp>
+#include <neighbors/detail/cagra/jit_lto_kernels/bitonic.hpp>
+#include <neighbors/detail/cagra/jit_lto_kernels/hashmap.hpp>
 #include <neighbors/detail/cagra/utils.hpp>
 #include <raft/core/operators.hpp>
 

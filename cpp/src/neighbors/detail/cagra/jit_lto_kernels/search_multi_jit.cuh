@@ -5,16 +5,16 @@
 
 #pragma once
 
-#include "../device_common.hpp"
-#include "../hashmap.hpp"
 #include "../utils.hpp"
+#include "device_intrinsics.hpp"
+#include "hashmap.hpp"
 
 #include <cstdint>
 #include <cuda_fp16.h>
 #include <type_traits>
 
-#include "../../jit_lto_kernels/filter_data.h"
 #include "extern_device_functions.cuh"
+#include "sample_filter_data.h"
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 

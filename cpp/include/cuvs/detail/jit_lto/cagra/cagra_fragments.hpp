@@ -71,4 +71,7 @@ struct fragment_tag_compute_distance_to_child_nodes {};
 template <typename IndexTag, typename DistanceTag, typename SourceIndexTag>
 struct fragment_tag_apply_filter_kernel {};
 
+template <typename BitsetTag, typename SourceIndexTag, typename FilterTag>
+struct fragment_tag_sample_filter {};
+
 }  // namespace cuvs::neighbors::cagra::detail
