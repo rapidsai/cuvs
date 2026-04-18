@@ -162,9 +162,10 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
 
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
-  std::vector<raft::device_matrix<T, int64_t, raft::row_major>> sub_dataset_buffers_;
-  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> deserialized_dataset_;
-  std::vector<std::unique_ptr<cuvs::neighbors::dataset<int64_t>>> sub_deserialized_datasets_;
+  std::shared_ptr<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>> sub_dataset_buffers_ =
+    std::make_shared<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>();
+  std::shared_ptr<cuvs::neighbors::dataset<int64_t>> deserialized_dataset_;
+  std::vector<std::shared_ptr<cuvs::neighbors::dataset<int64_t>>> sub_deserialized_datasets_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
@@ -212,14 +213,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       auto sub_index = cuvs::neighbors::cagra::index<T, IdxT>(handle_, params.metric);
       if (index_params_.merge_type == CagraMergeType::kPhysical) {
         if (dataset_is_on_host) {
-          sub_dataset_buffers_.emplace_back(
+          sub_dataset_buffers_->emplace_back(
             raft::make_device_matrix<T, int64_t>(handle_, rows, dim_));
-          raft::copy(sub_dataset_buffers_.back().data_handle(),
+          raft::copy(sub_dataset_buffers_->back().data_handle(),
                      sub_ptr,
                      static_cast<size_t>(rows) * dim_,
                      raft::resource::get_cuda_stream(handle_));
           cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
-            raft::make_const_mdspan(sub_dataset_buffers_.back().view()), dim_);
+            raft::make_const_mdspan(sub_dataset_buffers_->back().view()), dim_);
           sub_index.update_dataset(handle_, dv);
         } else {
           sub_index.update_dataset(handle_, sub_dev);
@@ -230,7 +231,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
           auto ace_res = cuvs::neighbors::cagra::build(handle_, params, sub_host);
           sub_index    = std::move(ace_res.idx);
           if (ace_res.dataset.has_value()) {
-            sub_dataset_buffers_.push_back(std::move(*ace_res.dataset));
+            sub_dataset_buffers_->push_back(std::move(*ace_res.dataset));
           }
         } else {
           sub_index = cuvs::neighbors::cagra::build(handle_, params, sub_dev);
@@ -358,7 +359,7 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
   if (index_params_.num_dataset_splits > 1 &&
       index_params_.merge_type == CagraMergeType::kLogical) {
     bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
-    if (dataset_is_on_host) { sub_dataset_buffers_.clear(); }
+    if (dataset_is_on_host) { sub_dataset_buffers_->clear(); }
     IdxT rows_per_split =
       raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
     for (size_t i = 0; i < sub_indices_.size(); ++i) {
@@ -366,21 +367,19 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
       if (start >= nrow) break;
       IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
       const T* sub_ptr = dataset + static_cast<size_t>(start) * dim_;
-      auto sub_host =
-        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
       auto sub_dev =
         raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
       auto sub_index = sub_indices_[i].get();
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (dataset_is_on_host) {
-          sub_dataset_buffers_.emplace_back(
+          sub_dataset_buffers_->emplace_back(
             raft::make_device_matrix<T, int64_t>(handle_, rows, dim_));
-          raft::copy(sub_dataset_buffers_.back().data_handle(),
+          raft::copy(sub_dataset_buffers_->back().data_handle(),
                      sub_ptr,
                      static_cast<size_t>(rows) * dim_,
                      raft::resource::get_cuda_stream(handle_));
           cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
-            raft::make_const_mdspan(sub_dataset_buffers_.back().view()), dim_);
+            raft::make_const_mdspan(sub_dataset_buffers_->back().view()), dim_);
           sub_index->update_dataset(handle_, dv);
         } else {
           sub_index->update_dataset(handle_, sub_dev);
@@ -390,14 +389,17 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
     need_dataset_update_ = false;
   } else {
     using ds_idx_type = decltype(index_->data().n_rows());
-    auto const* dptr  = &index_->data();
+    const auto& root_view = index_->data();
+    const cuvs::neighbors::dataset<ds_idx_type>* ds_for_vpq = nullptr;
     if (auto* ind =
-          dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(dptr)) {
-      dptr = ind->target();
+          dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(&root_view)) {
+      ds_for_vpq = ind->target();
     }
     bool is_vpq =
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(dptr) != nullptr ||
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(dptr) != nullptr;
+      ds_for_vpq != nullptr &&
+      (dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(ds_for_vpq) != nullptr ||
+       dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(ds_for_vpq) !=
+         nullptr);
     // It can happen that we are re-using a previous algo object which already has
     // the dataset set. Check if we need update.
     if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
@@ -423,14 +425,17 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
     f.close();
   } else {
     using ds_idx_type = decltype(index_->data().n_rows());
-    auto const* dptr  = &index_->data();
+    const auto& root_view = index_->data();
+    const cuvs::neighbors::dataset<ds_idx_type>* ds_for_vpq = nullptr;
     if (auto* ind =
-          dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(dptr)) {
-      dptr = ind->target();
+          dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(&root_view)) {
+      ds_for_vpq = ind->target();
     }
     bool is_vpq =
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(dptr) != nullptr ||
-      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(dptr) != nullptr;
+      ds_for_vpq != nullptr &&
+      (dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(ds_for_vpq) != nullptr ||
+       dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(ds_for_vpq) !=
+         nullptr);
     cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
   }
 }
@@ -455,22 +460,47 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
     sub_deserialized_datasets_.resize(count);
     for (size_t i = 0; i < count; ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
-      auto sub_index      = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
-      cuvs::neighbors::cagra::deserialize(
-        handle_, subfile, sub_index.get(), &sub_deserialized_datasets_[i]);
+      auto sub_index = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
+      std::unique_ptr<cuvs::neighbors::dataset<int64_t>> tmp_ds;
+      cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get(), &tmp_ds);
+      sub_deserialized_datasets_[i] =
+        std::shared_ptr<cuvs::neighbors::dataset<int64_t>>(std::move(tmp_ds));
       sub_indices_.push_back(std::move(sub_index));
     }
   } else {
     index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
     deserialized_dataset_.reset();
-    cuvs::neighbors::cagra::deserialize(handle_, file, index_.get(), &deserialized_dataset_);
+    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> tmp_ds;
+    cuvs::neighbors::cagra::deserialize(handle_, file, index_.get(), &tmp_ds);
+    deserialized_dataset_ = std::shared_ptr<cuvs::neighbors::dataset<int64_t>>(std::move(tmp_ds));
   }
 }
 
 template <typename T, typename IdxT>
 std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
 {
-  return std::make_unique<cuvs_cagra<T, IdxT>>(std::cref(*this));  // use copy constructor
+  auto out = std::make_unique<cuvs_cagra<T, IdxT>>(metric_, dim_, index_params_);
+  out->refine_ratio_           = refine_ratio_;
+  out->graph_mem_              = graph_mem_;
+  out->dataset_mem_            = dataset_mem_;
+  out->need_dataset_update_    = need_dataset_update_;
+  out->search_params_          = search_params_;
+  out->index_                  = index_;
+  out->graph_                  = graph_;
+  out->dataset_                = dataset_;
+  out->input_dataset_v_ =
+    std::make_shared<raft::device_matrix_view<const T, int64_t, raft::row_major>>(*input_dataset_v_);
+  out->dynamic_batcher_                        = dynamic_batcher_;
+  out->dynamic_batcher_sp_                    = dynamic_batcher_sp_;
+  out->dynamic_batching_max_batch_size_       = dynamic_batching_max_batch_size_;
+  out->dynamic_batching_n_queues_               = dynamic_batching_n_queues_;
+  out->dynamic_batching_conservative_dispatch_ = dynamic_batching_conservative_dispatch_;
+  out->filter_                = filter_;
+  out->sub_indices_           = sub_indices_;
+  out->sub_dataset_buffers_   = sub_dataset_buffers_;
+  out->deserialized_dataset_   = deserialized_dataset_;
+  out->sub_deserialized_datasets_ = sub_deserialized_datasets_;
+  return out;
 }
 
 template <typename T, typename IdxT>
