@@ -48,9 +48,10 @@ __device__ void search_kernel_jit(
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
-  const uint32_t query_id_offset,          // Offset to add to query_id when calling filter
-  uint32_t* bitset_ptr,                    // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,                 // Bitset length
+  const IndexT graph_size,
+  const uint32_t query_id_offset,  // Offset to add to query_id when calling filter
+  uint32_t* bitset_ptr,            // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,         // Bitset length
   SourceIndexT original_nbits)
 {
   using DATA_T     = DataT;
@@ -143,7 +144,8 @@ __device__ void search_kernel_jit(
                                                                  local_traversed_hashmap_ptr,
                                                                  traversed_hash_bitlen,
                                                                  block_id,
-                                                                 num_blocks);
+                                                                 num_blocks,
+                                                                 graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 

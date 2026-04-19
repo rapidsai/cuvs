@@ -45,7 +45,8 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
                        std::size_t ldr,                  // (*) ldr >= num_pickup
                        IndexT* visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
                        std::uint32_t hash_bitlen,
-                       cudaStream_t cuda_stream)
+                       cudaStream_t cuda_stream,
+                       IndexT graph_size)
 {
   std::shared_ptr<AlgorithmLauncher> launcher =
     make_cagra_multi_kernel_jit_launcher<DataT, IndexT, DistanceT, IndexT>(dataset_desc,
@@ -79,7 +80,8 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
     result_distances_ptr,
     ldr_u32,
     visited_hashmap_ptr,
-    hash_bitlen);
+    hash_bitlen,
+    graph_size);
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }

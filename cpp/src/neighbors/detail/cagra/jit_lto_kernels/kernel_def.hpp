@@ -45,6 +45,7 @@ using search_single_cta_kernel_func_t =
        const std::uint32_t,
        const std::uint32_t,
        const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*,
+       const IndexT,
        uint32_t*,
        SourceIndexT,
        SourceIndexT);
@@ -105,6 +106,7 @@ using search_multi_cta_kernel_func_t =
        const std::uint32_t,
        const std::uint32_t,
        std::uint32_t* const,
+       const IndexT,
        const std::uint32_t,
        uint32_t*,
        SourceIndexT,
@@ -126,7 +128,8 @@ using random_pickup_kernel_func_t = void(const dataset_descriptor_base_t<DataT, 
                                          DistanceT* const,
                                          const std::uint32_t,
                                          IndexT* const,
-                                         const std::uint32_t);
+                                         const std::uint32_t,
+                                         const IndexT);
 
 template <typename DataT, typename IndexT, typename DistanceT, typename SourceIndexT>
 using compute_distance_to_child_nodes_kernel_func_t =

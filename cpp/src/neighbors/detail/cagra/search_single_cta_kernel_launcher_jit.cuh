@@ -901,6 +901,7 @@ void select_and_run(
         small_hash_reset_interval_u32,  // Cast size_t to uint32_t
         query_id_offset,                // Offset to add to query_id when calling filter
         dev_desc,
+        static_cast<IndexT>(graph.extent(0)),
         bitset_ptr,
         bitset_len,
         original_nbits);

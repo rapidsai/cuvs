@@ -44,6 +44,7 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_single_cta(
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,
   const dataset_desc_base* dataset_desc,
+  const index_t graph_size,
   uint32_t* bitset_ptr,
   source_index_t bitset_len,
   source_index_t original_nbits)
@@ -74,6 +75,7 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_single_cta(
       small_hash_reset_interval,
       query_id_offset,
       dataset_desc,
+      graph_size,
       bitset_ptr,
       bitset_len,
       original_nbits);

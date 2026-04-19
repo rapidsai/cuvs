@@ -78,9 +78,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t query_id,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
-  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,      // Bitset length
-  SourceIndexT original_nbits)  // Original number of bits
+  uint32_t* bitset_ptr,     // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,  // Bitset length
+  SourceIndexT original_nbits,
+  const IndexT graph_size = 0)  // Original number of bits
 {
   using LOAD_T = device::LOAD_128BIT_T;
 
@@ -166,7 +167,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                                                                  local_visited_hashmap_ptr,
                                                                  hash_bitlen,
                                                                  (IndexT*)nullptr,
-                                                                 0);
+                                                                 0,
+                                                                 0,
+                                                                 1,
+                                                                 graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -486,6 +490,7 @@ __device__ void search_kernel_jit(
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const IndexT graph_size,
   uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
   SourceIndexT bitset_len,      // Bitset length
   SourceIndexT original_nbits)  // Original number of bits
@@ -523,7 +528,8 @@ __device__ void search_kernel_jit(
                             dataset_desc,
                             bitset_ptr,
                             bitset_len,
-                            original_nbits);
+                            original_nbits,
+                            graph_size);
 }
 
 // JIT persistent device implementation - called from extern "C" __global__ entry in generated .cu

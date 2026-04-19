@@ -31,7 +31,8 @@ __device__ void random_pickup_kernel_jit(
   DistanceT* const result_distances_ptr,  // [num_queries, ldr]
   const std::uint32_t ldr,                // (*) ldr >= num_pickup
   IndexT* const visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
-  const std::uint32_t hash_bitlen)
+  const std::uint32_t hash_bitlen,
+  const IndexT graph_size)
 {
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
@@ -50,8 +51,9 @@ __device__ void random_pickup_kernel_jit(
     setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
   __syncthreads();
 
-  IndexT dataset_size  = smem_desc->size;
-  const auto args_load = smem_desc->args.load();
+  IndexT dataset_size            = smem_desc->size;
+  const INDEX_T seed_index_limit = graph_size > 0 ? graph_size : dataset_size;
+  const auto args_load           = smem_desc->args.load();
 
   INDEX_T best_index_team_local;
   DISTANCE_T best_norm2_team_local = utils::get_max_value<DISTANCE_T>();
@@ -60,7 +62,8 @@ __device__ void random_pickup_kernel_jit(
     if (seed_ptr && (global_team_index < num_seeds)) {
       seed_index = seed_ptr[global_team_index + (num_seeds * query_id)];
     } else {
-      seed_index = device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_size;
+      seed_index =
+        device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % seed_index_limit;
     }
 
     const auto norm2 =

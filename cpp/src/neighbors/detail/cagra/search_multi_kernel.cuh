@@ -126,7 +126,8 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
                     ldr,
                     visited_hashmap_ptr,
                     hash_bitlen,
-                    cuda_stream);
+                    cuda_stream,
+                    graph_size);
 }
 
 template <class INDEX_T>

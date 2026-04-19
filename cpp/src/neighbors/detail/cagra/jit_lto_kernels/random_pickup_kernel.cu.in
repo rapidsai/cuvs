@@ -29,7 +29,8 @@ extern "C" __global__ void random_pickup(const dataset_desc_base* dataset_desc,
                                          distance_t* const result_distances_ptr,
                                          const std::uint32_t ldr,
                                          index_t* const visited_hashmap_ptr,
-                                         const std::uint32_t hash_bitlen)
+                                         const std::uint32_t hash_bitlen,
+                                         const index_t graph_size)
 {
   random_pickup_kernel_jit<data_t, index_t, distance_t>(dataset_desc,
                                                         queries_ptr,
@@ -42,7 +43,8 @@ extern "C" __global__ void random_pickup(const dataset_desc_base* dataset_desc,
                                                         result_distances_ptr,
                                                         ldr,
                                                         visited_hashmap_ptr,
-                                                        hash_bitlen);
+                                                        hash_bitlen,
+                                                        graph_size);
 }
 
 static_assert(std::is_same_v<decltype(random_pickup),

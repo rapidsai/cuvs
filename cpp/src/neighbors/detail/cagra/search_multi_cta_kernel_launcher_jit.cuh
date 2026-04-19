@@ -159,6 +159,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
       min_iterations_u32,
       max_iterations_u32,
       num_executed_iterations,
+      static_cast<IndexT>(graph.extent(0)),
       query_id_offset,
       bitset_ptr,
       bitset_len,

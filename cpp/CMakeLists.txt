@@ -386,7 +386,6 @@ if(NOT BUILD_CPU_ONLY)
   if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
     set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
   endif()
-  set(JIT_LTO_COMPILATION ON)
 
   # Generate interleaved scan kernel files at build time
   include(cmake/modules/generate_jit_lto_kernels.cmake)
@@ -1115,7 +1114,7 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
-            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
+            CUDA::nvrtc
   )
 
   target_include_directories(
