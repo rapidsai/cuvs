@@ -260,8 +260,7 @@ int main()
   // This is important because we run the async loop with a very large number of jobs,
   // which would otherwise swamp a normal pool memory resource.
   // (the non-persistent implementation would hang forever).
-  rmm::mr::arena_memory_resource mr(
-    rmm::mr::get_current_device_resource_ref(), mem_size);
+  rmm::mr::arena_memory_resource mr(rmm::mr::get_current_device_resource_ref(), mem_size);
   rmm::mr::set_current_device_resource(mr);
   std::cout << "GPU Arena memory resource size: " << mem_size / (1024ll * 1024ll) << " MiB"
             << std::endl;
