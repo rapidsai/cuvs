@@ -70,11 +70,20 @@ class cuda_huge_page_resource {
     deallocate(cuda::stream_ref{cudaStream_t{nullptr}}, ptr, bytes, alignment);
   }
 
-  bool operator==(cuda_huge_page_resource const&) const noexcept { return true; }
+  [[nodiscard]] bool operator==(cuda_huge_page_resource const&) const noexcept { return true; }
+  [[nodiscard]] bool operator!=(cuda_huge_page_resource const&) const noexcept { return false; }
 
-  friend void get_property(cuda_huge_page_resource const&, cuda::mr::device_accessible) noexcept {}
-  friend void get_property(cuda_huge_page_resource const&, cuda::mr::host_accessible) noexcept {}
+  constexpr friend void get_property(cuda_huge_page_resource const&,
+                                     cuda::mr::device_accessible) noexcept
+  {
+  }
+  constexpr friend void get_property(cuda_huge_page_resource const&,
+                                     cuda::mr::host_accessible) noexcept
+  {
+  }
 };
+static_assert(cuda::mr::synchronous_resource<cuda_huge_page_resource>);
+static_assert(cuda::mr::resource<cuda_huge_page_resource>);
 static_assert(cuda::mr::resource_with<cuda_huge_page_resource, cuda::mr::device_accessible>);
 static_assert(cuda::mr::resource_with<cuda_huge_page_resource, cuda::mr::host_accessible>);
 }  // namespace raft::mr
