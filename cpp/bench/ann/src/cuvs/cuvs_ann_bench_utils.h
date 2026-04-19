@@ -67,14 +67,15 @@ inline auto rmm_oom_callback(std::size_t bytes, void*) -> bool
  */
 class shared_raft_resources {
  public:
-  using pool_mr_type  = rmm::mr::pool_memory_resource;
   using mr_type       = rmm::mr::failure_callback_resource_adaptor<>;
   using large_mr_type = rmm::mr::managed_memory_resource;
 
   shared_raft_resources()
   try
-    : pool_resource_(rmm::mr::get_current_device_resource_ref(), 1024 * 1024 * 1024ull),
-      resource_(pool_resource_, rmm_oom_callback, nullptr),
+    : resource_(rmm::mr::pool_memory_resource{rmm::mr::get_current_device_resource_ref(),
+                                              1024 * 1024 * 1024ull},
+                rmm_oom_callback,
+                nullptr),
       large_mr_() {
     orig_resource_ = rmm::mr::set_current_device_resource(resource_);
   } catch (const std::exception& e) {
@@ -102,7 +103,6 @@ class shared_raft_resources {
 
  private:
   cuda::mr::any_resource<cuda::mr::device_accessible> orig_resource_;
-  pool_mr_type pool_resource_;
   mr_type resource_;
   large_mr_type large_mr_;
 };
