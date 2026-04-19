@@ -94,42 +94,6 @@ auto get_value(const T* const dev_ptr, cudaStream_t stream) -> T
   return value;
 }
 
-// MAX_DATASET_DIM : must be equal to or greater than dataset_dim
-template <typename DataT, typename IndexT, typename DistanceT>
-void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-                   const DataT* queries_ptr,  // [num_queries, dataset_dim]
-                   std::size_t num_queries,
-                   std::size_t num_pickup,
-                   unsigned num_distilation,
-                   uint64_t rand_xor_mask,
-                   const IndexT* seed_ptr,  // [num_queries, num_seeds]
-                   uint32_t num_seeds,
-                   IndexT* result_indices_ptr,       // [num_queries, ldr]
-                   DistanceT* result_distances_ptr,  // [num_queries, ldr]
-                   std::size_t ldr,                  // (*) ldr >= num_pickup
-                   IndexT* visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
-                   std::uint32_t hash_bitlen,
-                   cudaStream_t cuda_stream,
-                   IndexT graph_size = 0)
-{
-  (void)graph_size;
-  random_pickup_jit(dataset_desc,
-                    queries_ptr,
-                    num_queries,
-                    num_pickup,
-                    num_distilation,
-                    rand_xor_mask,
-                    seed_ptr,
-                    num_seeds,
-                    result_indices_ptr,
-                    result_distances_ptr,
-                    ldr,
-                    visited_hashmap_ptr,
-                    hash_bitlen,
-                    cuda_stream,
-                    graph_size);
-}
-
 template <class INDEX_T>
 RAFT_KERNEL pickup_next_parents_kernel(
   INDEX_T* const parent_candidates_ptr,        // [num_queries, lds]
@@ -230,51 +194,6 @@ void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries,
                                                   terminate_flag);
 }
 
-template <typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          class SourceIndexT,
-          class SAMPLE_FILTER_T>
-void compute_distance_to_child_nodes(
-  const IndexT* parent_node_list,        // [num_queries, search_width]
-  IndexT* const parent_candidates_ptr,   // [num_queries, search_width]
-  DistanceT* const parent_distance_ptr,  // [num_queries, search_width]
-  std::size_t lds,
-  uint32_t search_width,
-  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-  const IndexT* neighbor_graph_ptr,  // [dataset_size, graph_degree]
-  std::uint32_t graph_degree,
-  const SourceIndexT* source_indices_ptr,
-  const DataT* query_ptr,  // [num_queries, data_dim]
-  std::uint32_t num_queries,
-  IndexT* visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
-  std::uint32_t hash_bitlen,
-  IndexT* result_indices_ptr,       // [num_queries, ldd]
-  DistanceT* result_distances_ptr,  // [num_queries, ldd]
-  std::uint32_t ldd,                // (*) ldd >= search_width * graph_degree
-  SAMPLE_FILTER_T sample_filter,
-  cudaStream_t cuda_stream)
-{
-  compute_distance_to_child_nodes_jit(parent_node_list,
-                                      parent_candidates_ptr,
-                                      parent_distance_ptr,
-                                      lds,
-                                      search_width,
-                                      dataset_desc,
-                                      neighbor_graph_ptr,
-                                      graph_degree,
-                                      source_indices_ptr,
-                                      query_ptr,
-                                      num_queries,
-                                      visited_hashmap_ptr,
-                                      hash_bitlen,
-                                      result_indices_ptr,
-                                      result_distances_ptr,
-                                      ldd,
-                                      sample_filter,
-                                      cuda_stream);
-}
-
 template <class INDEX_T>
 RAFT_KERNEL remove_parent_bit_kernel(const std::uint32_t num_queries,
                                      const std::uint32_t num_topk,
@@ -302,28 +221,6 @@ void remove_parent_bit(const std::uint32_t num_queries,
   const std::size_t block_size = 256;
   remove_parent_bit_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
     num_queries, num_topk, topk_indices_ptr, ld);
-}
-
-template <class INDEX_T, class DISTANCE_T, class SourceIndexT, class SAMPLE_FILTER_T>
-void apply_filter(const SourceIndexT* source_indices_ptr,
-                  INDEX_T* const result_indices_ptr,
-                  DISTANCE_T* const result_distances_ptr,
-                  const std::size_t lds,
-                  const std::uint32_t result_buffer_size,
-                  const std::uint32_t num_queries,
-                  const INDEX_T query_id_offset,
-                  SAMPLE_FILTER_T sample_filter,
-                  cudaStream_t cuda_stream)
-{
-  apply_filter_jit(source_indices_ptr,
-                   result_indices_ptr,
-                   result_distances_ptr,
-                   lds,
-                   result_buffer_size,
-                   num_queries,
-                   query_id_offset,
-                   sample_filter,
-                   cuda_stream);
 }
 
 template <class T, class S>
@@ -601,21 +498,21 @@ struct search
     }
 
     // Choose initial entry point candidates at random
-    random_pickup<DataT, IndexT, DistanceT>(dataset_desc,
-                                            queries_ptr,
-                                            num_queries,
-                                            result_buffer_size,
-                                            num_random_samplings,
-                                            rand_xor_mask,
-                                            dev_seed_ptr,
-                                            num_seeds,
-                                            result_indices.data(),
-                                            result_distances.data(),
-                                            result_buffer_allocation_size,
-                                            hashmap.data(),
-                                            hash_bitlen,
-                                            stream,
-                                            static_cast<IndexT>(this->dataset_size));
+    random_pickup_jit(dataset_desc,
+                      queries_ptr,
+                      num_queries,
+                      result_buffer_size,
+                      num_random_samplings,
+                      rand_xor_mask,
+                      dev_seed_ptr,
+                      num_seeds,
+                      result_indices.data(),
+                      result_distances.data(),
+                      result_buffer_allocation_size,
+                      hashmap.data(),
+                      hash_bitlen,
+                      stream,
+                      static_cast<IndexT>(this->dataset_size));
 
     unsigned iter = 0;
     while (1) {
@@ -670,7 +567,7 @@ struct search
       }
 
       // Compute distance to child nodes that are adjacent to the parent node
-      compute_distance_to_child_nodes(
+      compute_distance_to_child_nodes_jit(
         parent_node_list.data(),
         result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
         result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size,
@@ -704,7 +601,7 @@ struct search
                         result_buffer_allocation_size,
                         stream);
 
-      apply_filter<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
+      apply_filter_jit<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
         source_indices_ptr,
         result_indices.data() + (iter & 0x1) * itopk_size,
         result_distances.data() + (iter & 0x1) * itopk_size,
