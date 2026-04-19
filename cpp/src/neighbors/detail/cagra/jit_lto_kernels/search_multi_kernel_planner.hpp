@@ -18,7 +18,10 @@ template <typename DataTag,
           typename SourceIndexTag,
           typename QueryTag,
           typename CodebookTag>
-struct CagraMultiKernelSearchPlanner : CagraPlannerBase {
+struct CagraMultiKernelSearchPlanner
+  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
+  static inline LauncherJitCache launcher_jit_cache{};
+
   CagraMultiKernelSearchPlanner(cuvs::distance::DistanceType /*metric*/,
                                 const std::string& kernel_name,
                                 uint32_t /*team_size*/,
@@ -26,21 +29,24 @@ struct CagraMultiKernelSearchPlanner : CagraPlannerBase {
                                 bool /*is_vpq*/,
                                 uint32_t /*pq_bits*/,
                                 uint32_t /*pq_len*/)
-    : CagraPlannerBase(kernel_name)
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(kernel_name,
+                                                                              launcher_jit_cache)
   {
   }
 
   void add_linked_kernel(std::string const& kernel_name)
   {
     if (kernel_name == "random_pickup") {
-      this->add_static_fragment<fragment_tag_random_pickup<DataTag, IndexTag, DistanceTag>>();
+      this->template add_static_fragment<
+        fragment_tag_random_pickup<DataTag, IndexTag, DistanceTag>>();
     } else if (kernel_name == "compute_distance_to_child_nodes") {
-      this->add_static_fragment<fragment_tag_compute_distance_to_child_nodes<DataTag,
-                                                                             IndexTag,
-                                                                             DistanceTag,
-                                                                             SourceIndexTag>>();
+      this->template add_static_fragment<
+        fragment_tag_compute_distance_to_child_nodes<DataTag,
+                                                     IndexTag,
+                                                     DistanceTag,
+                                                     SourceIndexTag>>();
     } else if (kernel_name == "apply_filter_kernel") {
-      this->add_static_fragment<
+      this->template add_static_fragment<
         fragment_tag_apply_filter_kernel<IndexTag, DistanceTag, SourceIndexTag>>();
     } else {
       RAFT_FAIL("Unknown CAGRA multi-kernel JIT kernel: %s", kernel_name.c_str());

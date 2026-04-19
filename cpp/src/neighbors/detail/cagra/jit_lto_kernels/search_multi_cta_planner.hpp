@@ -17,20 +17,24 @@ template <typename DataTag,
           typename SourceIndexTag,
           typename QueryTag,
           typename CodebookTag>
-struct CagraMultiCtaSearchPlanner : CagraPlannerBase {
+struct CagraMultiCtaSearchPlanner
+  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
+  static inline LauncherJitCache launcher_jit_cache{};
+
   CagraMultiCtaSearchPlanner(cuvs::distance::DistanceType /*metric*/,
                              uint32_t /*team_size*/,
                              uint32_t /*dataset_block_dim*/,
                              bool /*is_vpq*/,
                              uint32_t /*pq_bits*/,
                              uint32_t /*pq_len*/)
-    : CagraPlannerBase("search_multi_cta")
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>("search_multi_cta",
+                                                                              launcher_jit_cache)
   {
   }
 
   void add_search_multi_cta_kernel_fragment()
   {
-    this->add_static_fragment<
+    this->template add_static_fragment<
       fragment_tag_search_multi_cta<DataTag, SourceIndexTag, IndexTag, DistanceTag>>();
   }
 };

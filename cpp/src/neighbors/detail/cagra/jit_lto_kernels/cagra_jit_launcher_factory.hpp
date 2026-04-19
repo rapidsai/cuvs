@@ -48,28 +48,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_single_cta_jit_launcher(
                 dataset_desc.pq_len,
                 persistent);
 
-    planner.template add_setup_workspace_device_function<DataTag,
-                                                         IndexTag,
-                                                         DistTag,
-                                                         QueryTag,
-                                                         CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
-    planner.template add_compute_distance_device_function<DataTag,
-                                                          IndexTag,
-                                                          DistTag,
-                                                          QueryTag,
-                                                          CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
     planner.add_search_kernel_fragment(
       topk_by_bitonic_sort, bitonic_sort_and_merge_multi_warps, persistent);
     planner.add_sample_filter_device_function(filter_name);
@@ -91,28 +81,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_single_cta_jit_launcher(
                 dataset_desc.pq_len,
                 persistent);
 
-    planner.template add_setup_workspace_device_function<DataTag,
-                                                         IndexTag,
-                                                         DistTag,
-                                                         QueryTag,
-                                                         CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
-    planner.template add_compute_distance_device_function<DataTag,
-                                                          IndexTag,
-                                                          DistTag,
-                                                          QueryTag,
-                                                          CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
     planner.add_search_kernel_fragment(
       topk_by_bitonic_sort, bitonic_sort_and_merge_multi_warps, persistent);
     planner.add_sample_filter_device_function(filter_name);
@@ -131,26 +111,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_single_cta_jit_launcher(
               dataset_desc.pq_len,
               persistent);
 
-  planner.template add_setup_workspace_device_function<DataTag,
-                                                       IndexTag,
-                                                       DistTag,
-                                                       QueryTag,
-                                                       CodebookTag>(dataset_desc.metric,
-                                                                    dataset_desc.team_size,
-                                                                    dataset_desc.dataset_block_dim,
-                                                                    dataset_desc.is_vpq,
-                                                                    dataset_desc.pq_bits,
-                                                                    dataset_desc.pq_len);
-  planner.template add_compute_distance_device_function<DataTag,
-                                                        IndexTag,
-                                                        DistTag,
-                                                        QueryTag,
-                                                        CodebookTag>(dataset_desc.metric,
-                                                                     dataset_desc.team_size,
-                                                                     dataset_desc.dataset_block_dim,
-                                                                     dataset_desc.is_vpq,
-                                                                     dataset_desc.pq_bits,
-                                                                     dataset_desc.pq_len);
+  planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                              dataset_desc.team_size,
+                                              dataset_desc.dataset_block_dim,
+                                              dataset_desc.is_vpq,
+                                              dataset_desc.pq_bits,
+                                              dataset_desc.pq_len);
+  planner.add_compute_distance_device_function(dataset_desc.metric,
+                                               dataset_desc.team_size,
+                                               dataset_desc.dataset_block_dim,
+                                               dataset_desc.is_vpq,
+                                               dataset_desc.pq_bits,
+                                               dataset_desc.pq_len);
   planner.add_search_kernel_fragment(
     topk_by_bitonic_sort, bitonic_sort_and_merge_multi_warps, persistent);
   planner.add_sample_filter_device_function(filter_name);
@@ -180,28 +152,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_cta_jit_launcher(
                 dataset_desc.pq_bits,
                 dataset_desc.pq_len);
 
-    planner.template add_setup_workspace_device_function<DataTag,
-                                                         IndexTag,
-                                                         DistTag,
-                                                         QueryTag,
-                                                         CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
-    planner.template add_compute_distance_device_function<DataTag,
-                                                          IndexTag,
-                                                          DistTag,
-                                                          QueryTag,
-                                                          CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
     planner.add_search_multi_cta_kernel_fragment();
     planner.add_sample_filter_device_function(filter_name);
     return planner.get_launcher();
@@ -219,28 +181,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_cta_jit_launcher(
                 dataset_desc.pq_bits,
                 dataset_desc.pq_len);
 
-    planner.template add_setup_workspace_device_function<DataTag,
-                                                         IndexTag,
-                                                         DistTag,
-                                                         QueryTag,
-                                                         CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
-    planner.template add_compute_distance_device_function<DataTag,
-                                                          IndexTag,
-                                                          DistTag,
-                                                          QueryTag,
-                                                          CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
     planner.add_search_multi_cta_kernel_fragment();
     planner.add_sample_filter_device_function(filter_name);
     return planner.get_launcher();
@@ -255,26 +207,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_cta_jit_launcher(
               dataset_desc.pq_bits,
               dataset_desc.pq_len);
 
-  planner.template add_setup_workspace_device_function<DataTag,
-                                                       IndexTag,
-                                                       DistTag,
-                                                       QueryTag,
-                                                       CodebookTag>(dataset_desc.metric,
-                                                                    dataset_desc.team_size,
-                                                                    dataset_desc.dataset_block_dim,
-                                                                    dataset_desc.is_vpq,
-                                                                    dataset_desc.pq_bits,
-                                                                    dataset_desc.pq_len);
-  planner.template add_compute_distance_device_function<DataTag,
-                                                        IndexTag,
-                                                        DistTag,
-                                                        QueryTag,
-                                                        CodebookTag>(dataset_desc.metric,
-                                                                     dataset_desc.team_size,
-                                                                     dataset_desc.dataset_block_dim,
-                                                                     dataset_desc.is_vpq,
-                                                                     dataset_desc.pq_bits,
-                                                                     dataset_desc.pq_len);
+  planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                              dataset_desc.team_size,
+                                              dataset_desc.dataset_block_dim,
+                                              dataset_desc.is_vpq,
+                                              dataset_desc.pq_bits,
+                                              dataset_desc.pq_len);
+  planner.add_compute_distance_device_function(dataset_desc.metric,
+                                               dataset_desc.team_size,
+                                               dataset_desc.dataset_block_dim,
+                                               dataset_desc.is_vpq,
+                                               dataset_desc.pq_bits,
+                                               dataset_desc.pq_len);
   planner.add_search_multi_cta_kernel_fragment();
   planner.add_sample_filter_device_function(filter_name);
   return planner.get_launcher();
@@ -304,28 +248,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
                 dataset_desc.is_vpq,
                 dataset_desc.pq_bits,
                 dataset_desc.pq_len);
-    planner.template add_setup_workspace_device_function<DataTag,
-                                                         IndexTag,
-                                                         DistTag,
-                                                         QueryTag,
-                                                         CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
-    planner.template add_compute_distance_device_function<DataTag,
-                                                          IndexTag,
-                                                          DistTag,
-                                                          QueryTag,
-                                                          CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
     planner.add_linked_kernel(linked_kernel_name);
     return planner.get_launcher();
   }
@@ -342,28 +276,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
                 dataset_desc.is_vpq,
                 dataset_desc.pq_bits,
                 dataset_desc.pq_len);
-    planner.template add_setup_workspace_device_function<DataTag,
-                                                         IndexTag,
-                                                         DistTag,
-                                                         QueryTag,
-                                                         CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
-    planner.template add_compute_distance_device_function<DataTag,
-                                                          IndexTag,
-                                                          DistTag,
-                                                          QueryTag,
-                                                          CodebookTag>(
-      dataset_desc.metric,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
     planner.add_linked_kernel(linked_kernel_name);
     return planner.get_launcher();
   }
@@ -377,26 +301,18 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
               dataset_desc.is_vpq,
               dataset_desc.pq_bits,
               dataset_desc.pq_len);
-  planner.template add_setup_workspace_device_function<DataTag,
-                                                       IndexTag,
-                                                       DistTag,
-                                                       QueryTag,
-                                                       CodebookTag>(dataset_desc.metric,
-                                                                    dataset_desc.team_size,
-                                                                    dataset_desc.dataset_block_dim,
-                                                                    dataset_desc.is_vpq,
-                                                                    dataset_desc.pq_bits,
-                                                                    dataset_desc.pq_len);
-  planner.template add_compute_distance_device_function<DataTag,
-                                                        IndexTag,
-                                                        DistTag,
-                                                        QueryTag,
-                                                        CodebookTag>(dataset_desc.metric,
-                                                                     dataset_desc.team_size,
-                                                                     dataset_desc.dataset_block_dim,
-                                                                     dataset_desc.is_vpq,
-                                                                     dataset_desc.pq_bits,
-                                                                     dataset_desc.pq_len);
+  planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                              dataset_desc.team_size,
+                                              dataset_desc.dataset_block_dim,
+                                              dataset_desc.is_vpq,
+                                              dataset_desc.pq_bits,
+                                              dataset_desc.pq_len);
+  planner.add_compute_distance_device_function(dataset_desc.metric,
+                                               dataset_desc.team_size,
+                                               dataset_desc.dataset_block_dim,
+                                               dataset_desc.is_vpq,
+                                               dataset_desc.pq_bits,
+                                               dataset_desc.pq_len);
   planner.add_linked_kernel(linked_kernel_name);
   return planner.get_launcher();
 }

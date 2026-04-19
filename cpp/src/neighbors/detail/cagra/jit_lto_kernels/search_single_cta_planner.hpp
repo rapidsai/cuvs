@@ -18,7 +18,10 @@ template <typename DataTag,
           typename SourceIndexTag,
           typename QueryTag,
           typename CodebookTag>
-struct CagraSingleCtaSearchPlanner : CagraPlannerBase {
+struct CagraSingleCtaSearchPlanner
+  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
+  static inline LauncherJitCache launcher_jit_cache{};
+
   CagraSingleCtaSearchPlanner(cuvs::distance::DistanceType /*metric*/,
                               bool /*topk_by_bitonic_sort*/,
                               bool /*bitonic_sort_and_merge_multi_warps*/,
@@ -28,7 +31,8 @@ struct CagraSingleCtaSearchPlanner : CagraPlannerBase {
                               uint32_t /*pq_bits*/,
                               uint32_t /*pq_len*/,
                               bool persistent = false)
-    : CagraPlannerBase(persistent ? "search_single_cta_p" : "search_single_cta")
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
+        persistent ? "search_single_cta_p" : "search_single_cta", launcher_jit_cache)
   {
   }
 
@@ -38,63 +42,63 @@ struct CagraSingleCtaSearchPlanner : CagraPlannerBase {
   {
     if (persistent) {
       if (topk_by_bitonic_sort && bitonic_sort_and_merge_multi_warps) {
-        this->add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
-                                                                   SourceIndexTag,
-                                                                   IndexTag,
-                                                                   DistanceTag,
-                                                                   true,
-                                                                   true>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
+                                                                            SourceIndexTag,
+                                                                            IndexTag,
+                                                                            DistanceTag,
+                                                                            true,
+                                                                            true>>();
       } else if (topk_by_bitonic_sort && !bitonic_sort_and_merge_multi_warps) {
-        this->add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
-                                                                   SourceIndexTag,
-                                                                   IndexTag,
-                                                                   DistanceTag,
-                                                                   true,
-                                                                   false>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
+                                                                            SourceIndexTag,
+                                                                            IndexTag,
+                                                                            DistanceTag,
+                                                                            true,
+                                                                            false>>();
       } else if (!topk_by_bitonic_sort && bitonic_sort_and_merge_multi_warps) {
-        this->add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
-                                                                   SourceIndexTag,
-                                                                   IndexTag,
-                                                                   DistanceTag,
-                                                                   false,
-                                                                   true>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
+                                                                            SourceIndexTag,
+                                                                            IndexTag,
+                                                                            DistanceTag,
+                                                                            false,
+                                                                            true>>();
       } else {
-        this->add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
-                                                                   SourceIndexTag,
-                                                                   IndexTag,
-                                                                   DistanceTag,
-                                                                   false,
-                                                                   false>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta_p<DataTag,
+                                                                            SourceIndexTag,
+                                                                            IndexTag,
+                                                                            DistanceTag,
+                                                                            false,
+                                                                            false>>();
       }
     } else {
       if (topk_by_bitonic_sort && bitonic_sort_and_merge_multi_warps) {
-        this->add_static_fragment<fragment_tag_search_single_cta<DataTag,
-                                                                 SourceIndexTag,
-                                                                 IndexTag,
-                                                                 DistanceTag,
-                                                                 true,
-                                                                 true>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta<DataTag,
+                                                                          SourceIndexTag,
+                                                                          IndexTag,
+                                                                          DistanceTag,
+                                                                          true,
+                                                                          true>>();
       } else if (topk_by_bitonic_sort && !bitonic_sort_and_merge_multi_warps) {
-        this->add_static_fragment<fragment_tag_search_single_cta<DataTag,
-                                                                 SourceIndexTag,
-                                                                 IndexTag,
-                                                                 DistanceTag,
-                                                                 true,
-                                                                 false>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta<DataTag,
+                                                                          SourceIndexTag,
+                                                                          IndexTag,
+                                                                          DistanceTag,
+                                                                          true,
+                                                                          false>>();
       } else if (!topk_by_bitonic_sort && bitonic_sort_and_merge_multi_warps) {
-        this->add_static_fragment<fragment_tag_search_single_cta<DataTag,
-                                                                 SourceIndexTag,
-                                                                 IndexTag,
-                                                                 DistanceTag,
-                                                                 false,
-                                                                 true>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta<DataTag,
+                                                                          SourceIndexTag,
+                                                                          IndexTag,
+                                                                          DistanceTag,
+                                                                          false,
+                                                                          true>>();
       } else {
-        this->add_static_fragment<fragment_tag_search_single_cta<DataTag,
-                                                                 SourceIndexTag,
-                                                                 IndexTag,
-                                                                 DistanceTag,
-                                                                 false,
-                                                                 false>>();
+        this->template add_static_fragment<fragment_tag_search_single_cta<DataTag,
+                                                                          SourceIndexTag,
+                                                                          IndexTag,
+                                                                          DistanceTag,
+                                                                          false,
+                                                                          false>>();
       }
     }
   }

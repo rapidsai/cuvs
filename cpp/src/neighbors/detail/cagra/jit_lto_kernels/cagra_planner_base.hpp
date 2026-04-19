@@ -18,19 +18,23 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+template <typename DataTag_,
+          typename IndexTag_,
+          typename DistanceTag_,
+          typename QueryTag_,
+          typename CodebookTag_>
 struct CagraPlannerBase : AlgorithmPlanner {
-  static inline LauncherJitCache launcher_jit_cache{};
+  using DataTag     = DataTag_;
+  using IndexTag    = IndexTag_;
+  using DistanceTag = DistanceTag_;
+  using QueryTag    = QueryTag_;
+  using CodebookTag = CodebookTag_;
 
-  explicit CagraPlannerBase(std::string entrypoint)
-    : AlgorithmPlanner(std::move(entrypoint), launcher_jit_cache)
+  explicit CagraPlannerBase(std::string entrypoint, LauncherJitCache& jit_cache)
+    : AlgorithmPlanner(std::move(entrypoint), jit_cache)
   {
   }
 
-  template <typename DataTag,
-            typename IndexTag,
-            typename DistanceTag,
-            typename QueryTag,
-            typename CodebookTag>
   void add_setup_workspace_device_function(cuvs::distance::DistanceType metric,
                                            uint32_t team_size,
                                            uint32_t dataset_block_dim,
@@ -149,11 +153,6 @@ struct CagraPlannerBase : AlgorithmPlanner {
     }
   }
 
-  template <typename DataTag,
-            typename IndexTag,
-            typename DistanceTag,
-            typename QueryTag,
-            typename CodebookTag>
   void add_compute_distance_device_function(cuvs::distance::DistanceType metric,
                                             uint32_t team_size,
                                             uint32_t dataset_block_dim,
@@ -165,9 +164,8 @@ struct CagraPlannerBase : AlgorithmPlanner {
     // Dist/normalization apply only to standard codebook; constexpr avoids instantiating them
     // with VPQ's QueryTag=tag_h (runtime !is_vpq would still instantiate those templates).
     if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
-      add_dist_op_device_function<QueryTag, DistanceTag>(metric);
-      add_normalization_device_function<DataTag, IndexTag, DistanceTag, QueryTag>(
-        metric, team_size, dataset_block_dim);
+      add_dist_op_device_function(metric);
+      add_normalization_device_function(metric, team_size, dataset_block_dim);
     }
     auto add = [&]<typename TeamT, typename DimT, typename PqBitsT, typename PqLenT>() {
       this->add_static_fragment<fragment_tag_compute_distance<DataTag,
@@ -277,7 +275,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
     }
   }
 
-  template <typename QueryTag, typename DistanceTag>
+ private:
   void add_dist_op_device_function(cuvs::distance::DistanceType metric)
   {
     // dist_op_matrix.json pairs tag_metric_hamming with uint8 query (tag_uc) only; L2/IP/L1 use
@@ -317,6 +315,34 @@ struct CagraPlannerBase : AlgorithmPlanner {
     }
   }
 
+  void add_normalization_device_function(cuvs::distance::DistanceType metric,
+                                         uint32_t team_size,
+                                         uint32_t dataset_block_dim)
+  {
+    auto go = [&]<typename NormT>() {
+      dispatch_cagra_team_dim(team_size, dataset_block_dim, [&]<typename TeamT, typename DimT>() {
+        this->add_static_fragment<fragment_tag_apply_normalization_standard<DataTag,
+                                                                            IndexTag,
+                                                                            DistanceTag,
+                                                                            QueryTag,
+                                                                            TeamT,
+                                                                            DimT,
+                                                                            NormT>>();
+      });
+    };
+    // tag_uc is only used for BitwiseHamming query layout; cosine norm fragments are built for
+    // float query tag. Use if constexpr so we do not instantiate tag_norm_cosine with tag_uc
+    // (a runtime metric check would still pull in those template specializations).
+    if constexpr (std::is_same_v<QueryTag, tag_uc>) {
+      go.template operator()<tag_norm_noop>();
+    } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      go.template operator()<tag_norm_cosine>();
+    } else {
+      go.template operator()<tag_norm_noop>();
+    }
+  }
+
+ public:
   // Maps runtime dataset layout (same grid as the JIT matrix) to (TeamTag, DimTag). IVF-style
   // planners pass these as template parameters; CAGRA reads team_size / dataset_block_dim from
   // the host descriptor at planning time.
@@ -354,34 +380,6 @@ struct CagraPlannerBase : AlgorithmPlanner {
       "Unsupported team_size / dataset_block_dim for CAGRA JIT normalization: team=%u dim=%u",
       static_cast<unsigned>(team_size),
       static_cast<unsigned>(dataset_block_dim));
-  }
-
-  template <typename DataTag, typename IndexTag, typename DistanceTag, typename QueryTag>
-  void add_normalization_device_function(cuvs::distance::DistanceType metric,
-                                         uint32_t team_size,
-                                         uint32_t dataset_block_dim)
-  {
-    auto go = [&]<typename NormT>() {
-      dispatch_cagra_team_dim(team_size, dataset_block_dim, [&]<typename TeamT, typename DimT>() {
-        this->add_static_fragment<fragment_tag_apply_normalization_standard<DataTag,
-                                                                            IndexTag,
-                                                                            DistanceTag,
-                                                                            QueryTag,
-                                                                            TeamT,
-                                                                            DimT,
-                                                                            NormT>>();
-      });
-    };
-    // tag_uc is only used for BitwiseHamming query layout; cosine norm fragments are built for
-    // float query tag. Use if constexpr so we do not instantiate tag_norm_cosine with tag_uc
-    // (a runtime metric check would still pull in those template specializations).
-    if constexpr (std::is_same_v<QueryTag, tag_uc>) {
-      go.template operator()<tag_norm_noop>();
-    } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      go.template operator()<tag_norm_cosine>();
-    } else {
-      go.template operator()<tag_norm_noop>();
-    }
   }
 
   void add_sample_filter_device_function(std::string const& filter_name)
