@@ -23,11 +23,8 @@
 
 #include "../core/exceptions.hpp"
 
-#include <cuda/memory_resource>
-
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <thread>
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
@@ -149,9 +146,6 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   });
 }
 
-thread_local cuda::mr::any_resource<cuda::mr::device_accessible> pool_upstream;
-thread_local std::optional<rmm::mr::pool_memory_resource> pool_mr;
-
 extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                                        int max_pool_size_percent,
                                                        bool managed)
@@ -161,23 +155,18 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
     auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
 
     if (managed) {
-      pool_upstream = rmm::mr::managed_memory_resource{};
+      rmm::mr::set_current_device_resource(
+        rmm::mr::pool_memory_resource{rmm::mr::managed_memory_resource{}, initial_size, max_size});
     } else {
-      pool_upstream = rmm::mr::cuda_memory_resource{};
+      rmm::mr::set_current_device_resource(
+        rmm::mr::pool_memory_resource{rmm::mr::cuda_memory_resource{}, initial_size, max_size});
     }
-
-    pool_mr.emplace(pool_upstream, initial_size, max_size);
-
-    rmm::mr::set_current_device_resource(*pool_mr);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
-  return cuvs::core::translate_exceptions([=] {
-    rmm::mr::reset_current_device_resource();
-    pool_mr.reset();
-  });
+  return cuvs::core::translate_exceptions([=] { rmm::mr::reset_current_device_resource(); });
 }
 
 thread_local std::unique_ptr<rmm::mr::pinned_host_memory_resource> pinned_mr;
