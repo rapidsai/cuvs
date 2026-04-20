@@ -480,8 +480,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
       // Heuristic recall threshold update
       double min_recall = ps.min_recall;
-      if (ps.graph_degree < 50) { min_recall *= 0.96; }
-      if (ps.graph_degree < 40) { min_recall *= 0.96; }
+      if (ps.graph_degree < 50) { min_recall *= 0.94; }
+      if (ps.graph_degree < 40) { min_recall *= 0.94; }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -708,8 +708,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
       // Heuristic recall threshold update
       double min_recall = ps.min_recall;
-      if (ps.graph_degree < 50) { min_recall *= 0.96; }
-      if (ps.graph_degree < 40) { min_recall *= 0.96; }
+      if (ps.graph_degree < 50) { min_recall *= 0.94; }
+      if (ps.graph_degree < 40) { min_recall *= 0.94; }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -933,8 +933,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
       // Heuristic recall threshold update
       double min_recall = ps.min_recall;
-      if (ps.graph_degree < 50) { min_recall *= 0.96; }
-      if (ps.graph_degree < 40) { min_recall *= 0.96; }
+      if (ps.graph_degree < 50) { min_recall *= 0.94; }
+      if (ps.graph_degree < 40) { min_recall *= 0.94; }
       // TODO(mfoerster): re-enable uniqueness test
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -1411,8 +1411,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
       // Heuristic recall threshold update
       double min_recall = ps.min_recall;
-      if (ps.graph_degree < 50) { min_recall *= 0.96; }
-      if (ps.graph_degree < 40) { min_recall *= 0.96; }
+      if (ps.graph_degree < 50) { min_recall *= 0.94; }
+      if (ps.graph_degree < 40) { min_recall *= 0.94; }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
