@@ -57,14 +57,98 @@ struct ColMinMaxOp {
 };
 
 /**
+ * Vectorized load helper: reads VecCols contiguous elements of type T as
+ * a single aligned wide load and unpacks them into floats.
+ *
+ * The primary benefit over scalar loads is halving (VecCols=2) or
+ * quartering (VecCols=4) the number of LDG instructions issued per warp,
+ * which is the dominant cost in the column-strided access pattern of
+ * fused_column_minmax_kernel. VecCols=1 is provided as the degenerate
+ * scalar fallback for odd `dim`.
+ *
+ * Requires `p` to be aligned to sizeof(T) * VecCols.
+ */
+template <typename T, int VecCols>
+struct vec_loader;
+
+template <>
+struct vec_loader<float, 1> {
+  __device__ __forceinline__ static void load(const float* p, float (&out)[1]) { out[0] = *p; }
+};
+
+template <>
+struct vec_loader<half, 1> {
+  __device__ __forceinline__ static void load(const half* p, float (&out)[1])
+  {
+    out[0] = float(*p);
+  }
+};
+
+template <>
+struct vec_loader<float, 4> {
+  __device__ __forceinline__ static void load(const float* p, float (&out)[4])
+  {
+    float4 v = *reinterpret_cast<const float4*>(p);
+    out[0]   = v.x;
+    out[1]   = v.y;
+    out[2]   = v.z;
+    out[3]   = v.w;
+  }
+};
+
+template <>
+struct vec_loader<float, 2> {
+  __device__ __forceinline__ static void load(const float* p, float (&out)[2])
+  {
+    float2 v = *reinterpret_cast<const float2*>(p);
+    out[0]   = v.x;
+    out[1]   = v.y;
+  }
+};
+
+template <>
+struct vec_loader<half, 4> {
+  __device__ __forceinline__ static void load(const half* p, float (&out)[4])
+  {
+    // Single 8-byte load covering 4 halves; memcpy avoids aliasing issues
+    // and is compiled to a register move in device code.
+    uint2 raw = *reinterpret_cast<const uint2*>(p);
+    half h[4];
+    static_assert(sizeof(h) == sizeof(raw), "unexpected half packing");
+    memcpy(&h[0], &raw, sizeof(raw));
+#pragma unroll
+    for (int k = 0; k < 4; ++k)
+      out[k] = float(h[k]);
+  }
+};
+
+template <>
+struct vec_loader<half, 2> {
+  __device__ __forceinline__ static void load(const half* p, float (&out)[2])
+  {
+    uint32_t raw = *reinterpret_cast<const uint32_t*>(p);
+    half h[2];
+    static_assert(sizeof(h) == sizeof(raw), "unexpected half packing");
+    memcpy(&h[0], &raw, sizeof(raw));
+    out[0] = float(h[0]);
+    out[1] = float(h[1]);
+  }
+};
+
+/**
  * Fused per-column min+max in a single pass (2x less DRAM traffic than two
- * separate reductions).  One thread block per column; threads stride over
- * rows and feed CUB BlockReduce with a combined min/max pair.
+ * separate reductions). Each block owns VecCols contiguous columns and
+ * threads read them with a single aligned wide load (float4/float2 for
+ * float, uint2/uint32 for half) per row instead of VecCols scalar loads.
+ * Requires dim to be a multiple of VecCols so that
+ * `data + row*dim + col_base` is `sizeof(T)*VecCols` aligned for every
+ * row; the host-side dispatcher picks the widest VecCols that satisfies
+ * this, down to VecCols=1 (pure scalar fallback) for arbitrary dim.
  *
  * Row-loop is manually 4x-unrolled so the compiler can overlap four
  * independent read-only loads in the memory pipeline.
  */
-template <int BlockSize, typename T>
+template <int BlockSize, int VecCols, typename T>
 __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __restrict__ data,
                                                                     float* __restrict__ col_min,
                                                                     float* __restrict__ col_max,
@@ -74,33 +158,76 @@ __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __r
   using BlockReduce = cub::BlockReduce<ColMinMaxPair, BlockSize>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
 
-  const uint32_t col = blockIdx.x;
-  if (col >= dim) return;
+  const uint32_t col_base = blockIdx.x * VecCols;
+  // When launched with gridDim.x = dim / VecCols and dim % VecCols == 0
+  // (enforced by the host-side dispatch), col_base + VecCols <= dim always.
 
-  ColMinMaxPair agg = {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()};
+  ColMinMaxPair agg[VecCols];
+#pragma unroll
+  for (int k = 0; k < VecCols; ++k) {
+    agg[k] = {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()};
+  }
 
   const int64_t stride = static_cast<int64_t>(BlockSize);
   int64_t row          = static_cast<int64_t>(threadIdx.x);
 
+  // 4x row-unrolled loop with vectorized loads: 4 * VecCols values per iter
+  // are pulled into registers via 4 wide LDGs, exposing ILP across both
+  // the column and row axes.
   for (; row + 3 * stride < n_rows; row += 4 * stride) {
-    float v0    = float(data[row * dim + col]);
-    float v1    = float(data[(row + stride) * dim + col]);
-    float v2    = float(data[(row + 2 * stride) * dim + col]);
-    float v3    = float(data[(row + 3 * stride) * dim + col]);
-    agg.min_val = fminf(agg.min_val, fminf(fminf(v0, v1), fminf(v2, v3)));
-    agg.max_val = fmaxf(agg.max_val, fmaxf(fmaxf(v0, v1), fmaxf(v2, v3)));
+    float r0[VecCols], r1[VecCols], r2[VecCols], r3[VecCols];
+    vec_loader<T, VecCols>::load(data + row * dim + col_base, r0);
+    vec_loader<T, VecCols>::load(data + (row + stride) * dim + col_base, r1);
+    vec_loader<T, VecCols>::load(data + (row + 2 * stride) * dim + col_base, r2);
+    vec_loader<T, VecCols>::load(data + (row + 3 * stride) * dim + col_base, r3);
+#pragma unroll
+    for (int k = 0; k < VecCols; ++k) {
+      float mn       = fminf(fminf(r0[k], r1[k]), fminf(r2[k], r3[k]));
+      float mx       = fmaxf(fmaxf(r0[k], r1[k]), fmaxf(r2[k], r3[k]));
+      agg[k].min_val = fminf(agg[k].min_val, mn);
+      agg[k].max_val = fmaxf(agg[k].max_val, mx);
+    }
   }
   for (; row < n_rows; row += stride) {
-    float val   = float(data[row * dim + col]);
-    agg.min_val = fminf(agg.min_val, val);
-    agg.max_val = fmaxf(agg.max_val, val);
+    float r[VecCols];
+    vec_loader<T, VecCols>::load(data + row * dim + col_base, r);
+#pragma unroll
+    for (int k = 0; k < VecCols; ++k) {
+      agg[k].min_val = fminf(agg[k].min_val, r[k]);
+      agg[k].max_val = fmaxf(agg[k].max_val, r[k]);
+    }
   }
 
-  agg = BlockReduce(temp_storage).Reduce(agg, ColMinMaxOp());
+  // One block-reduce per owned column. CUB requires a __syncthreads()
+  // between reuses of the shared temp_storage.
+  for (int k = 0; k < VecCols; ++k) {
+    if (k > 0) __syncthreads();
+    auto r = BlockReduce(temp_storage).Reduce(agg[k], ColMinMaxOp());
+    if (threadIdx.x == 0) {
+      col_min[col_base + k] = r.min_val;
+      col_max[col_base + k] = r.max_val;
+    }
+  }
+}
 
-  if (threadIdx.x == 0) {
-    col_min[col] = agg.min_val;
-    col_max[col] = agg.max_val;
+/**
+ * Host-side dispatch that selects the widest VecCols compatible with the
+ * given dim alignment (VecCols in {4, 2, 1}), and launches
+ * fused_column_minmax_kernel with the corresponding grid shape.
+ */
+template <int BlockSize, typename T>
+inline void launch_fused_column_minmax(
+  const T* data, float* col_min, float* col_max, int64_t n_rows, uint32_t dim, cudaStream_t stream)
+{
+  if (dim % 4 == 0) {
+    fused_column_minmax_kernel<BlockSize, 4, T>
+      <<<dim / 4, BlockSize, 0, stream>>>(data, col_min, col_max, n_rows, dim);
+  } else if (dim % 2 == 0) {
+    fused_column_minmax_kernel<BlockSize, 2, T>
+      <<<dim / 2, BlockSize, 0, stream>>>(data, col_min, col_max, n_rows, dim);
+  } else {
+    fused_column_minmax_kernel<BlockSize, 1, T>
+      <<<dim, BlockSize, 0, stream>>>(data, col_min, col_max, n_rows, dim);
   }
 }
 
@@ -141,15 +268,21 @@ auto clone(const raft::resources& res, const index<CodeT>& source) -> index<Code
 }
 
 /**
- * Kernel to encode float residuals to uint8_t SQ codes and write them interleaved.
+ * Kernel to compute residuals on the fly and encode them to uint8_t SQ codes
+ * interleaved into the target list.
  *
  * Uses warp-per-vector parallelism: each warp cooperatively encodes one vector
- * so that reads from residuals/vmin/delta are coalesced across the 32 lanes.
- * Lane 0 handles the atomic position assignment and the index write.
+ * so that reads from new_vectors/centers/vmin/delta are coalesced across the
+ * 32 lanes. Lane 0 handles the atomic position assignment and the index write.
+ *
+ * The residual (cast<float>(new_vectors[i,d]) - centers[list_id,d]) is computed
+ * in registers and consumed immediately, avoiding a full HBM round trip through
+ * an intermediate residuals buffer.
  */
-template <int BlockSize>
+template <int BlockSize, typename T>
 __launch_bounds__(BlockSize) RAFT_KERNEL encode_and_fill_kernel(const uint32_t* labels,
-                                                                const float* residuals,
+                                                                const T* new_vectors,
+                                                                const float* centers,
                                                                 const int64_t* source_ixs,
                                                                 uint8_t** list_data_ptrs,
                                                                 int64_t** list_index_ptrs,
@@ -186,12 +319,13 @@ __launch_bounds__(BlockSize) RAFT_KERNEL encode_and_fill_kernel(const uint32_t* 
   constexpr uint32_t veclen = list_spec<uint32_t, uint8_t, int64_t>::kVecLen;
   uint32_t padded_dim       = ((dim + veclen - 1) / veclen) * veclen;
   auto* list_dat   = list_data_ptrs[list_id] + static_cast<size_t>(group_offset) * padded_dim;
-  const float* src = residuals + row_id * dim;
+  const T* src     = new_vectors + row_id * dim;
+  const float* ctr = centers + static_cast<size_t>(list_id) * dim;
 
   for (uint32_t d = lane_id; d < padded_dim; d += kWarpSize) {
     uint8_t out;
     if (d < dim) {
-      float val  = src[d];
+      float val  = utils::mapping<float>{}(src[d]) - ctr[d];
       float dv   = delta[d];
       float v    = vmin[d];
       float code = (dv > 0.0f) ? roundf((val - v) / dv) : 0.0f;
@@ -271,6 +405,8 @@ void extend(raft::resources const& handle,
                                             enable_prefetch);
   vec_batches.prefetch_next_batch();
 
+  const bool needs_prefetch_sync = enable_prefetch && vec_batches.does_copy();
+
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
       raft::make_device_matrix_view<const T, int64_t>(batch.data(), batch.size(), index->dim());
@@ -279,7 +415,7 @@ void extend(raft::resources const& handle,
     cuvs::cluster::kmeans::predict(
       handle, kmeans_params, batch_data_view, orig_centroids_view, batch_labels_view);
     vec_batches.prefetch_next_batch();
-    raft::resource::sync_stream(handle);
+    if (needs_prefetch_sync) { raft::resource::sync_stream(handle); }
   }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
@@ -320,8 +456,6 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
   utils::batch_load_iterator<int64_t> idx_batch = vec_indices.begin();
 
-  auto residuals_buf = raft::make_device_vector<float>(handle, max_batch_size * dim);
-
   size_t next_report_offset = 0;
   size_t d_report_offset    = n_rows * 5 / 100;
 
@@ -329,32 +463,14 @@ void extend(raft::resources const& handle,
     int64_t bs = batch.size();
 
     {
-      auto batch_view = raft::make_device_matrix_view<const T, int64_t>(batch.data(), bs, dim);
-      auto residuals_view =
-        raft::make_device_matrix_view<float, int64_t>(residuals_buf.data_handle(), bs, dim);
-
-      const float* centers_ptr   = index->centers().data_handle();
-      const uint32_t* labels_ptr = new_labels.data_handle() + batch.offset();
-
-      raft::linalg::map_offset(
-        handle,
-        residuals_view,
-        [centers_ptr, labels_ptr, dim] __device__(auto idx, T x) {
-          auto i = idx / dim;
-          auto j = idx % dim;
-          return utils::mapping<float>{}(x)-centers_ptr[labels_ptr[i] * dim + j];
-        },
-        batch_view);
-    }
-
-    {
       constexpr int kEncodeBlockSize   = 256;
       constexpr int kEncodeWarpsPerBlk = kEncodeBlockSize / kIndexGroupSize;
       const dim3 block_dim(kEncodeBlockSize);
       const dim3 grid_dim(raft::ceildiv<int64_t>(bs, int64_t(kEncodeWarpsPerBlk)));
-      encode_and_fill_kernel<kEncodeBlockSize>
+      encode_and_fill_kernel<kEncodeBlockSize, T>
         <<<grid_dim, block_dim, 0, stream>>>(new_labels.data_handle() + batch.offset(),
-                                             residuals_buf.data_handle(),
+                                             batch.data(),
+                                             index->centers().data_handle(),
                                              idx_batch->data(),
                                              index->data_ptrs().data_handle(),
                                              index->inds_ptrs().data_handle(),
@@ -368,8 +484,7 @@ void extend(raft::resources const& handle,
     }
 
     vec_batches.prefetch_next_batch();
-    raft::resource::sync_stream(handle);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    if (needs_prefetch_sync) { raft::resource::sync_stream(handle); }
 
     if (batch.offset() > next_report_offset) {
       float progress = batch.offset() * 100.0f / n_rows;
@@ -456,13 +571,11 @@ inline auto build(
     // Train SQ: predict labels for the training subset, compute residuals in-place,
     // and derive per-dimension vmin/delta from them.
     {
-      auto train_labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_rows_train);
-      cuvs::cluster::kmeans::balanced_params pred_params;
-      pred_params.metric      = idx.metric();
+      auto train_labels       = raft::make_device_vector<uint32_t, int64_t>(handle, n_rows_train);
       auto centers_const_view = raft::make_device_matrix_view<const float, int64_t>(
         idx.centers().data_handle(), idx.n_lists(), dim);
       cuvs::cluster::kmeans::predict(
-        handle, pred_params, trainset_const_view, centers_const_view, train_labels.view());
+        handle, kmeans_params, trainset_const_view, centers_const_view, train_labels.view());
 
       constexpr int kResidualBlockSize = 256;
       compute_residuals_inplace_kernel<T>
@@ -483,8 +596,8 @@ inline auto build(
       auto* vmax_ptr = vmax_buf.data_handle();
 
       constexpr int kMinMaxBlockSize = 256;
-      fused_column_minmax_kernel<kMinMaxBlockSize><<<dim, kMinMaxBlockSize, 0, stream>>>(
-        residuals.data_handle(), vmin_ptr, vmax_ptr, n_rows_train, dim);
+      launch_fused_column_minmax<kMinMaxBlockSize, T>(
+        residuals.data_handle(), vmin_ptr, vmax_ptr, n_rows_train, dim, stream);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Expand the observed range by a small margin to reduce clipping on unseen data,

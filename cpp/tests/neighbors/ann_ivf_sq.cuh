@@ -57,10 +57,37 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
   {
   }
 
-  void testSearch()
+  void testAll()
   {
-    auto naive   = compute_naive_knn();
-    auto idx     = build_index(true);
+    auto naive = compute_naive_knn();
+    auto idx   = build_index(true);
+
+    {
+      SCOPED_TRACE("Search");
+      checkSearch(idx, naive);
+    }
+    {
+      SCOPED_TRACE("Serialize");
+      checkSerialize(idx);
+    }
+    {
+      SCOPED_TRACE("Filter");
+      checkFilter(idx);
+    }
+    {
+      SCOPED_TRACE("Extend");
+      checkExtend(naive);
+    }
+  }
+
+ protected:
+  struct SearchResults {
+    std::vector<IdxT> indices;
+    std::vector<T> distances;
+  };
+
+  void checkSearch(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx, const SearchResults& naive)
+  {
     auto results = search_index(idx);
 
     float eps = 0.1;
@@ -74,10 +101,8 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
                                 min_recall_threshold()));
   }
 
-  void testSerialize()
+  void checkSerialize(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx)
   {
-    auto idx = build_index(true);
-
     tmp_index_file index_file;
     cuvs::neighbors::ivf_sq::serialize(handle_, index_file.filename, idx);
     cuvs::neighbors::ivf_sq::index<uint8_t> index_loaded(handle_);
@@ -101,9 +126,8 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
                                 1.0));
   }
 
-  void testExtend()
+  void checkExtend(const SearchResults& naive)
   {
-    auto naive     = compute_naive_knn();
     auto idx_empty = build_index(false);
     extend_index(&idx_empty);
 
@@ -120,7 +144,7 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
                                 min_recall_threshold()));
   }
 
-  void testFilter()
+  void checkFilter(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx)
   {
     if (ps.num_db_vecs <= static_cast<IdxT>(test_ivf_sample_filter::offset)) {
       GTEST_SKIP() << "Skipping filter test: num_db_vecs <= filter offset";
@@ -164,18 +188,8 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
       rmm::device_uvector<IdxT> indices_ivfsq_dev(queries_size, stream_);
 
       {
-        cuvs::neighbors::ivf_sq::index_params index_params;
         cuvs::neighbors::ivf_sq::search_params search_params;
-        index_params.n_lists   = ps.nlist;
-        index_params.metric    = ps.metric;
         search_params.n_probes = ps.nprobe;
-
-        index_params.add_data_on_build        = true;
-        index_params.kmeans_trainset_fraction = 0.5;
-
-        auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-        auto index = cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
 
         auto removed_indices =
           raft::make_device_vector<IdxT, int64_t>(handle_, test_ivf_sample_filter::offset);
@@ -196,7 +210,7 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
 
         cuvs::neighbors::ivf_sq::search(handle_,
                                         search_params,
-                                        index,
+                                        idx,
                                         search_queries_view,
                                         indices_out_view,
                                         dists_out_view,
@@ -240,12 +254,6 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
     database.resize(0, stream_);
     search_queries.resize(0, stream_);
   }
-
- private:
-  struct SearchResults {
-    std::vector<IdxT> indices;
-    std::vector<T> distances;
-  };
 
   double min_recall_threshold()
   {

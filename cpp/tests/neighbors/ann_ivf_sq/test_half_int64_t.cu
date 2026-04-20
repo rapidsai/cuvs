@@ -10,10 +10,7 @@
 namespace cuvs::neighbors::ivf_sq {
 
 typedef AnnIVFSQTest<float, half, int64_t> AnnIVFSQTestF_half;
-TEST_P(AnnIVFSQTestF_half, AnnIVFSQSearch) { this->testSearch(); }
-TEST_P(AnnIVFSQTestF_half, AnnIVFSQSerialize) { this->testSerialize(); }
-TEST_P(AnnIVFSQTestF_half, AnnIVFSQExtend) { this->testExtend(); }
-TEST_P(AnnIVFSQTestF_half, AnnIVFSQFilter) { this->testFilter(); }
+TEST_P(AnnIVFSQTestF_half, AnnIVFSQ) { this->testAll(); }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFSQTest, AnnIVFSQTestF_half, ::testing::ValuesIn(inputs_half));
 
