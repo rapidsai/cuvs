@@ -321,16 +321,12 @@ TEST(CagraC, BuildExtendSearch)
   cuvsCagraSearch(
     res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
-  // CAGRA is approximate; do not require matching exact brute-force 1-NN ids on random
-  // high-dimensional blobs. Check returned distances stay near the optimal distance.
-  std::vector<float> cuvs_distances_h(num_queries);
-  raft::copy(cuvs_distances_h.data(), distances_d.data(), num_queries, stream);
-  cudaStreamSynchronize(stream);
-  for (int32_t i = 0; i < num_queries; ++i) {
-    ASSERT_LE(cuvs_distances_h[static_cast<size_t>(i)],
-              min_cols_distances[static_cast<size_t>(i)] * 1.15f + 1e-3f)
-      << "query " << i;
-  }
+  ASSERT_TRUE(
+    cuvs::devArrMatch(min_cols.data_handle(), neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
+
+  // check distances
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    min_cols_distances, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);
