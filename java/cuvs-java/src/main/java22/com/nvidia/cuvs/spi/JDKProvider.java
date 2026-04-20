@@ -612,6 +612,15 @@ final class JDKProvider implements CuVSProvider {
       internalAddVector(MemorySegment.ofArray(vector));
     }
 
+    public void addVector(short[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
+
     protected abstract void internalAddVector(MemorySegment vector);
   }
 
