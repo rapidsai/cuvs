@@ -3,16 +3,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+use std::ffi::CString;
 use std::io::{Write, stderr};
+use std::path::Path;
 
 use crate::cagra::{IndexParams, SearchParams};
 use crate::dlpack::ManagedTensor;
-use crate::error::{Result, check_cuvs};
+use crate::error::{Error, Result, check_cuvs};
 use crate::resources::Resources;
 
 /// CAGRA ANN Index
 #[derive(Debug)]
 pub struct Index(ffi::cuvsCagraIndex_t);
+
+/// Convert a filesystem path into a `CString` suitable for the cuVS C API,
+/// returning `Error::InvalidArgument` instead of panicking for paths that are
+/// not valid UTF-8 or that contain an interior NUL byte.
+fn path_to_cstring(path: &Path) -> Result<CString> {
+    let path_str = path
+        .to_str()
+        .ok_or_else(|| Error::InvalidArgument(format!("path is not valid UTF-8: {path:?}")))?;
+    CString::new(path_str)
+        .map_err(|e| Error::InvalidArgument(format!("path contains an interior NUL byte: {e}")))
+}
 
 impl Index {
     /// Builds a new Index from the dataset for efficient search.
@@ -75,6 +88,60 @@ impl Index {
             ))
         }
     }
+
+    /// Save the CAGRA index to file.
+    ///
+    /// Experimental, both the API and the serialization format are subject to change.
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - The file path for saving the index
+    /// * `include_dataset` - Whether to write out the dataset to the file
+    pub fn serialize<P: AsRef<Path>>(
+        &self,
+        res: &Resources,
+        filename: P,
+        include_dataset: bool,
+    ) -> Result<()> {
+        let c_filename = path_to_cstring(filename.as_ref())?;
+        unsafe {
+            check_cuvs(ffi::cuvsCagraSerialize(res.0, c_filename.as_ptr(), self.0, include_dataset))
+        }
+    }
+
+    /// Save the CAGRA index to file in hnswlib format.
+    ///
+    /// NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+    /// as the serialization format is not compatible with the original hnswlib.
+    ///
+    /// Experimental, both the API and the serialization format are subject to change.
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - The file path for saving the index
+    pub fn serialize_to_hnswlib<P: AsRef<Path>>(&self, res: &Resources, filename: P) -> Result<()> {
+        let c_filename = path_to_cstring(filename.as_ref())?;
+        unsafe { check_cuvs(ffi::cuvsCagraSerializeToHnswlib(res.0, c_filename.as_ptr(), self.0)) }
+    }
+
+    /// Load a CAGRA index from file.
+    ///
+    /// Experimental, both the API and the serialization format are subject to change.
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - The path of the file that stores the index
+    pub fn deserialize<P: AsRef<Path>>(res: &Resources, filename: P) -> Result<Index> {
+        let c_filename = path_to_cstring(filename.as_ref())?;
+        let index = Index::new()?;
+        unsafe {
+            check_cuvs(ffi::cuvsCagraDeserialize(res.0, c_filename.as_ptr(), index.0))?;
+        }
+        Ok(index)
+    }
 }
 
 impl Drop for Index {
@@ -93,50 +160,58 @@ mod tests {
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::Uniform;
 
-    fn test_cagra(build_params: IndexParams) {
-        let res = Resources::new().unwrap();
+    const N_DATAPOINTS: usize = 256;
+    const N_FEATURES: usize = 16;
 
-        // Create a new random dataset to index
-        let n_datapoints = 256;
-        let n_features = 16;
+    /// Build a small random dataset and a CAGRA index over it.
+    fn build_test_index(
+        res: &Resources,
+        build_params: &IndexParams,
+    ) -> (ndarray::Array2<f32>, Index) {
         let dataset =
-            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+            ndarray::Array::<f32, _>::random((N_DATAPOINTS, N_FEATURES), Uniform::new(0., 1.0));
+        let index = Index::build(res, build_params, &dataset).expect("failed to build cagra index");
+        (dataset, index)
+    }
 
-        // build the cagra index
-        let index =
-            Index::build(&res, &build_params, &dataset).expect("failed to create cagra index");
-
-        // use the first 4 points from the dataset as queries : will test that we get them back
-        // as their own nearest neighbor
-        let n_queries = 4;
+    /// Search the first `n_queries` rows of `dataset` against `index` and
+    /// assert each query finds itself as the top-1 neighbor. CAGRA search
+    /// requires queries and outputs to live in device memory.
+    fn search_and_verify_self_neighbors(
+        res: &Resources,
+        index: &Index,
+        dataset: &ndarray::Array2<f32>,
+        n_queries: usize,
+        k: usize,
+    ) {
         let queries = dataset.slice(s![0..n_queries, ..]);
+        let queries = ManagedTensor::from(&queries).to_device(res).unwrap();
 
-        let k = 10;
-
-        // CAGRA search API requires queries and outputs to be on device memory
-        // copy query data over, and allocate new device memory for the distances/ neighbors
-        // outputs
-        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+        let neighbors = ManagedTensor::from(&neighbors_host).to_device(res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+        let distances = ManagedTensor::from(&distances_host).to_device(res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
+        index.search(res, &search_params, &queries, &neighbors, &distances).expect("search failed");
 
-        index.search(&res, &search_params, &queries, &neighbors, &distances).unwrap();
+        distances.to_host(res, &mut distances_host).unwrap();
+        neighbors.to_host(res, &mut neighbors_host).unwrap();
 
-        // Copy back to host memory
-        distances.to_host(&res, &mut distances_host).unwrap();
-        neighbors.to_host(&res, &mut neighbors_host).unwrap();
+        for i in 0..n_queries {
+            assert_eq!(
+                neighbors_host[[i, 0]],
+                i as u32,
+                "query {i} should be its own nearest neighbor"
+            );
+        }
+    }
 
-        // nearest neighbors should be themselves, since queries are from the
-        // dataset
-        assert_eq!(neighbors_host[[0, 0]], 0);
-        assert_eq!(neighbors_host[[1, 0]], 1);
-        assert_eq!(neighbors_host[[2, 0]], 2);
-        assert_eq!(neighbors_host[[3, 0]], 3);
+    fn test_cagra(build_params: IndexParams) {
+        let res = Resources::new().unwrap();
+        let (dataset, index) = build_test_index(&res, &build_params);
+        search_and_verify_self_neighbors(&res, &index, &dataset, 4, 10);
     }
 
     #[test]
@@ -154,53 +229,93 @@ mod tests {
     }
 
     /// Test that an index can be searched multiple times without rebuilding.
-    /// This validates that search() takes &self instead of self.
+    /// This validates that `search()` takes `&self` instead of `self`.
     #[test]
     fn test_cagra_multiple_searches() {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::new().unwrap();
+        let (dataset, index) = build_test_index(&res, &build_params);
 
-        // Create a random dataset
-        let n_datapoints = 256;
-        let n_features = 16;
-        let dataset =
-            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
-
-        // Build the index once
-        let index =
-            Index::build(&res, &build_params, &dataset).expect("failed to create cagra index");
-
-        let search_params = SearchParams::new().unwrap();
-        let k = 5;
-
-        // Perform multiple searches on the same index
-        for search_iter in 0..3 {
-            let n_queries = 4;
-            let queries = dataset.slice(s![0..n_queries, ..]);
-            let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
-
-            let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-            let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
-
-            let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-            let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
-
-            // This should work on every iteration because search() takes &self
-            index
-                .search(&res, &search_params, &queries, &neighbors, &distances)
-                .expect(&format!("search iteration {} failed", search_iter));
-
-            // Copy back to host memory
-            distances.to_host(&res, &mut distances_host).unwrap();
-            neighbors.to_host(&res, &mut neighbors_host).unwrap();
-
-            // Verify results are consistent across searches
-            assert_eq!(
-                neighbors_host[[0, 0]],
-                0,
-                "iteration {}: first query should find itself",
-                search_iter
-            );
+        for _ in 0..3 {
+            search_and_verify_self_neighbors(&res, &index, &dataset, 4, 5);
         }
+    }
+
+    #[test]
+    fn test_cagra_serialize_deserialize() {
+        let res = Resources::new().unwrap();
+        let build_params = IndexParams::new().unwrap();
+        let (dataset, index) = build_test_index(&res, &build_params);
+
+        let filepath = std::env::temp_dir().join("test_cagra_index.bin");
+        index.serialize(&res, &filepath, true).expect("failed to serialize cagra index");
+
+        assert!(filepath.exists(), "serialized index file should exist");
+        assert!(
+            std::fs::metadata(&filepath).unwrap().len() > 0,
+            "serialized index file should not be empty"
+        );
+
+        let loaded_index =
+            Index::deserialize(&res, &filepath).expect("failed to deserialize cagra index");
+
+        // The deserialized index should still find each query as its own
+        // nearest neighbor.
+        search_and_verify_self_neighbors(&res, &loaded_index, &dataset, 4, 10);
+
+        let _ = std::fs::remove_file(&filepath);
+    }
+
+    #[test]
+    fn test_cagra_serialize_without_dataset() {
+        let res = Resources::new().unwrap();
+        let build_params = IndexParams::new().unwrap();
+        let (_dataset, index) = build_test_index(&res, &build_params);
+
+        let filepath = std::env::temp_dir().join("test_cagra_index_no_dataset.bin");
+        index
+            .serialize(&res, &filepath, false)
+            .expect("failed to serialize cagra index without dataset");
+
+        assert!(filepath.exists(), "serialized index file should exist");
+
+        let _ = std::fs::remove_file(&filepath);
+    }
+
+    #[test]
+    fn test_cagra_serialize_to_hnswlib() {
+        let res = Resources::new().unwrap();
+        let build_params = IndexParams::new().unwrap();
+        let (_dataset, index) = build_test_index(&res, &build_params);
+
+        let filepath = std::env::temp_dir().join("test_cagra_index_hnsw.bin");
+        index
+            .serialize_to_hnswlib(&res, &filepath)
+            .expect("failed to serialize cagra index to hnswlib format");
+
+        assert!(filepath.exists(), "serialized hnswlib index file should exist");
+        assert!(
+            std::fs::metadata(&filepath).unwrap().len() > 0,
+            "serialized hnswlib index file should not be empty"
+        );
+
+        let _ = std::fs::remove_file(&filepath);
+    }
+
+    /// Passing a filename containing an interior NUL byte must surface as an
+    /// `InvalidArgument` error rather than panicking inside the serializer.
+    #[test]
+    fn test_cagra_serialize_rejects_interior_nul() {
+        let res = Resources::new().unwrap();
+        let build_params = IndexParams::new().unwrap();
+        let (_dataset, index) = build_test_index(&res, &build_params);
+
+        // `PathBuf::from` on Unix preserves arbitrary bytes, so we can embed a
+        // NUL byte in the path and confirm the helper rejects it.
+        let bad_path = std::path::PathBuf::from("/tmp/has\0nul.bin");
+        let err = index
+            .serialize(&res, &bad_path, true)
+            .expect_err("serialize should reject paths with interior NUL");
+        assert!(matches!(err, Error::InvalidArgument(_)), "expected InvalidArgument, got {err:?}");
     }
 }
