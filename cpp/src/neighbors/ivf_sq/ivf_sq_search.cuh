@@ -117,7 +117,11 @@ inline uint32_t configure_grid_dim_x(
 //
 //   After all probes are scanned, the smem is reused for block_sort merge.
 // ---------------------------------------------------------------------------
-template <int BlockDim, int Capacity, SqScanMetric Metric, typename IdxT, typename IvfSampleFilterT>
+template <int BlockDim,
+          int Capacity,
+          SqScanMetric Metric,
+          typename CodeT,
+          typename IvfSampleFilterT>
 __launch_bounds__(BlockDim) RAFT_KERNEL ivf_sq_scan_kernel(const uint8_t* const* data_ptrs,
                                                            const uint32_t* list_sizes,
                                                            const uint32_t* coarse_indices,
@@ -326,8 +330,8 @@ size_t sq_scan_total_smem(uint32_t dim, uint32_t k)
 // ---------------------------------------------------------------------------
 // Launch helper: dispatches on Metric, handles grid_dim_x query vs launch
 // ---------------------------------------------------------------------------
-template <int Capacity, typename IdxT, typename IvfSampleFilterT>
-void ivf_sq_scan_launch(const index<IdxT>& idx,
+template <int Capacity, typename CodeT, typename IvfSampleFilterT>
+void ivf_sq_scan_launch(const index<CodeT>& idx,
                         const float* queries_float,
                         const float* query_norms,
                         uint32_t n_queries,
@@ -425,14 +429,14 @@ void ivf_sq_scan_launch(const index<IdxT>& idx,
   switch (idx.metric()) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded:
-      do_launch(ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kL2, IdxT, IvfSampleFilterT>);
+      do_launch(ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kL2, CodeT, IvfSampleFilterT>);
       break;
     case cuvs::distance::DistanceType::InnerProduct:
-      do_launch(ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kIP, IdxT, IvfSampleFilterT>);
+      do_launch(ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kIP, CodeT, IvfSampleFilterT>);
       break;
     case cuvs::distance::DistanceType::CosineExpanded:
       do_launch(
-        ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kCosine, IdxT, IvfSampleFilterT>);
+        ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kCosine, CodeT, IvfSampleFilterT>);
       break;
     default: RAFT_FAIL("Unsupported metric type for IVF-SQ scan.");
   }
@@ -441,9 +445,9 @@ void ivf_sq_scan_launch(const index<IdxT>& idx,
 // ---------------------------------------------------------------------------
 // ivf_sq_scan: top-level scan dispatch with Capacity selection
 // ---------------------------------------------------------------------------
-template <typename IdxT, typename IvfSampleFilterT>
+template <typename CodeT, typename IvfSampleFilterT>
 void ivf_sq_scan(raft::resources const& handle,
-                 const index<IdxT>& idx,
+                 const index<CodeT>& idx,
                  const float* queries_float,
                  const float* query_norms,
                  uint32_t n_queries,
@@ -472,20 +476,20 @@ void ivf_sq_scan(raft::resources const& handle,
   }
 
   auto fwd = [&](auto cap_tag) {
-    ivf_sq_scan_launch<decltype(cap_tag)::value, IdxT, IvfSampleFilterT>(idx,
-                                                                         queries_float,
-                                                                         query_norms,
-                                                                         n_queries,
-                                                                         n_probes,
-                                                                         k,
-                                                                         max_samples,
-                                                                         coarse_indices,
-                                                                         chunk_indices,
-                                                                         out_distances,
-                                                                         out_indices,
-                                                                         sample_filter,
-                                                                         grid_dim_x,
-                                                                         stream);
+    ivf_sq_scan_launch<decltype(cap_tag)::value, CodeT, IvfSampleFilterT>(idx,
+                                                                          queries_float,
+                                                                          query_norms,
+                                                                          n_queries,
+                                                                          n_probes,
+                                                                          k,
+                                                                          max_samples,
+                                                                          coarse_indices,
+                                                                          chunk_indices,
+                                                                          out_distances,
+                                                                          out_indices,
+                                                                          sample_filter,
+                                                                          grid_dim_x,
+                                                                          stream);
   };
 
   switch (capacity) {
@@ -501,9 +505,9 @@ void ivf_sq_scan(raft::resources const& handle,
 // ---------------------------------------------------------------------------
 // search_impl — host-side search logic
 // ---------------------------------------------------------------------------
-template <typename T, typename IdxT, typename IvfSampleFilterT>
+template <typename T, typename CodeT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
-                 const index<IdxT>& index,
+                 const index<CodeT>& index,
                  const T* queries,
                  uint32_t n_queries,
                  uint32_t k,
@@ -802,11 +806,11 @@ void search_impl(raft::resources const& handle,
 }
 
 template <typename T,
-          typename IdxT,
+          typename CodeT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 inline void search_with_filtering(raft::resources const& handle,
                                   const search_params& params,
-                                  const index<IdxT>& index,
+                                  const index<CodeT>& index,
                                   const T* queries,
                                   uint32_t n_queries,
                                   uint32_t k,
@@ -864,24 +868,24 @@ inline void search_with_filtering(raft::resources const& handle,
   for (uint32_t offset_q = 0; offset_q < n_queries; offset_q += max_queries) {
     uint32_t queries_batch = std::min(max_queries, n_queries - offset_q);
 
-    search_impl<T, IdxT, IvfSampleFilterT>(handle,
-                                           index,
-                                           queries + std::size_t(offset_q) * index.dim(),
-                                           queries_batch,
-                                           k,
-                                           n_probes,
-                                           cuvs::distance::is_min_close(index.metric()),
-                                           neighbors + std::size_t(offset_q) * k,
-                                           distances + std::size_t(offset_q) * k,
-                                           raft::resource::get_workspace_resource(handle),
-                                           sample_filter);
+    search_impl<T, CodeT, IvfSampleFilterT>(handle,
+                                            index,
+                                            queries + std::size_t(offset_q) * index.dim(),
+                                            queries_batch,
+                                            k,
+                                            n_probes,
+                                            cuvs::distance::is_min_close(index.metric()),
+                                            neighbors + std::size_t(offset_q) * k,
+                                            distances + std::size_t(offset_q) * k,
+                                            raft::resource::get_workspace_resource(handle),
+                                            sample_filter);
   }
 }
 
-template <typename T, typename IdxT, typename IvfSampleFilterT>
+template <typename T, typename CodeT, typename IvfSampleFilterT>
 void search_with_filtering(raft::resources const& handle,
                            const search_params& params,
-                           const index<IdxT>& index,
+                           const index<CodeT>& index,
                            raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
                            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -906,10 +910,10 @@ void search_with_filtering(raft::resources const& handle,
                         sample_filter);
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 void search(raft::resources const& handle,
             const search_params& params,
-            const index<IdxT>& idx,
+            const index<CodeT>& idx,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,

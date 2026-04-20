@@ -9,10 +9,10 @@
 
 namespace cuvs::neighbors::ivf_sq {
 
-#define CUVS_INST_IVF_SQ_SEARCH(T, IdxT)                                             \
+#define CUVS_INST_IVF_SQ_SEARCH(T, CodeT)                                            \
   void search(raft::resources const& handle,                                         \
               const cuvs::neighbors::ivf_sq::search_params& params,                  \
-              const cuvs::neighbors::ivf_sq::index<IdxT>& index,                     \
+              const cuvs::neighbors::ivf_sq::index<CodeT>& index,                    \
               raft::device_matrix_view<const T, int64_t, raft::row_major> queries,   \
               raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, \
               raft::device_matrix_view<float, int64_t, raft::row_major> distances,   \

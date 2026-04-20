@@ -104,12 +104,12 @@ __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __r
   }
 }
 
-template <typename IdxT>
-auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
+template <typename CodeT>
+auto clone(const raft::resources& res, const index<CodeT>& source) -> index<CodeT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  index<IdxT> target(
+  index<CodeT> target(
     res, source.metric(), source.n_lists(), source.dim(), source.conservative_memory_allocation());
 
   raft::copy(target.list_sizes().data_handle(),
@@ -219,9 +219,9 @@ RAFT_KERNEL compute_residuals_inplace_kernel(
   }
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 void extend(raft::resources const& handle,
-            index<IdxT>* index,
+            index<CodeT>* index,
             const T* new_vectors,
             const int64_t* new_indices,
             int64_t n_rows)
@@ -233,8 +233,8 @@ void extend(raft::resources const& handle,
   auto stream  = raft::resource::get_cuda_stream(handle);
   auto n_lists = index->n_lists();
   auto dim     = index->dim();
-  list_spec<uint32_t, IdxT, int64_t> list_device_spec{index->dim(),
-                                                      index->conservative_memory_allocation()};
+  list_spec<uint32_t, CodeT, int64_t> list_device_spec{index->dim(),
+                                                       index->conservative_memory_allocation()};
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_sq::extend(%zu, %u)", size_t(n_rows), dim);
 
@@ -401,24 +401,24 @@ void extend(raft::resources const& handle,
   }
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 auto extend(raft::resources const& handle,
-            const index<IdxT>& orig_index,
+            const index<CodeT>& orig_index,
             const T* new_vectors,
             const int64_t* new_indices,
-            int64_t n_rows) -> index<IdxT>
+            int64_t n_rows) -> index<CodeT>
 {
   auto ext_index = clone(handle, orig_index);
   detail::extend(handle, &ext_index, new_vectors, new_indices, n_rows);
   return ext_index;
 }
 
-template <typename T, typename IdxT, typename accessor>
+template <typename T, typename CodeT, typename accessor>
 inline auto build(
   raft::resources const& handle,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset)
-  -> index<IdxT>
+  -> index<CodeT>
 {
   int64_t n_rows = dataset.extent(0);
   uint32_t dim   = dataset.extent(1);
@@ -431,7 +431,7 @@ inline auto build(
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
                "Cosine metric requires more than one dim");
 
-  index<IdxT> idx(handle, params, dim);
+  index<CodeT> idx(handle, params, dim);
 
   // Train k-means centroids and SQ parameters on the same training subset.
   // This mirrors IVF-PQ, which also trains its codebook on a subset of the data.
@@ -502,35 +502,35 @@ inline auto build(
   }
 
   if (params.add_data_on_build) {
-    detail::extend<T, IdxT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
+    detail::extend<T, CodeT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
   }
 
   return idx;
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 void build(raft::resources const& handle,
            const index_params& params,
            raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
-           index<IdxT>& idx)
+           index<CodeT>& idx)
 {
-  idx = build<T, IdxT>(handle, params, dataset);
+  idx = build<T, CodeT>(handle, params, dataset);
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 void build(raft::resources const& handle,
            const index_params& params,
            raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
-           index<IdxT>& idx)
+           index<CodeT>& idx)
 {
-  idx = build<T, IdxT>(handle, params, dataset);
+  idx = build<T, CodeT>(handle, params, dataset);
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const index<IdxT>& orig_index) -> index<IdxT>
+            const index<CodeT>& orig_index) -> index<CodeT>
 {
   RAFT_EXPECTS(new_vectors.extent(1) == orig_index.dim(),
                "new_vectors should have the same dimension as the index");
@@ -539,18 +539,18 @@ auto extend(raft::resources const& handle,
                  "new_vectors and new_indices have different number of rows");
   }
   int64_t n_rows = new_vectors.extent(0);
-  return extend<T, IdxT>(handle,
-                         orig_index,
-                         new_vectors.data_handle(),
-                         new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                         n_rows);
+  return extend<T, CodeT>(handle,
+                          orig_index,
+                          new_vectors.data_handle(),
+                          new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                          n_rows);
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const T, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
-            const index<IdxT>& orig_index) -> index<IdxT>
+            const index<CodeT>& orig_index) -> index<CodeT>
 {
   RAFT_EXPECTS(new_vectors.extent(1) == orig_index.dim(),
                "new_vectors should have the same dimension as the index");
@@ -559,18 +559,18 @@ auto extend(raft::resources const& handle,
                  "new_vectors and new_indices have different number of rows");
   }
   int64_t n_rows = new_vectors.extent(0);
-  return extend<T, IdxT>(handle,
-                         orig_index,
-                         new_vectors.data_handle(),
-                         new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                         n_rows);
+  return extend<T, CodeT>(handle,
+                          orig_index,
+                          new_vectors.data_handle(),
+                          new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                          n_rows);
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            index<IdxT>* idx)
+            index<CodeT>* idx)
 {
   RAFT_EXPECTS(new_vectors.extent(1) == idx->dim(),
                "new_vectors should have the same dimension as the index");
@@ -585,11 +585,11 @@ void extend(raft::resources const& handle,
                  new_vectors.extent(0));
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename CodeT>
 void extend(raft::resources const& handle,
             raft::host_matrix_view<const T, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
-            index<IdxT>* idx)
+            index<CodeT>* idx)
 {
   RAFT_EXPECTS(new_vectors.extent(1) == idx->dim(),
                "new_vectors should have the same dimension as the index");

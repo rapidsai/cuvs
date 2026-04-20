@@ -22,13 +22,13 @@ namespace cuvs::neighbors::ivf_sq::detail {
 
 constexpr int serialization_version = 1;
 
-template <typename IdxT>
-void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT>& index_)
+template <typename CodeT>
+void serialize(raft::resources const& handle, std::ostream& os, const index<CodeT>& index_)
 {
   RAFT_LOG_DEBUG(
     "Saving IVF-SQ index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
 
-  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>().to_string();
+  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<CodeT>().to_string();
   dtype_string.resize(4);
   os << dtype_string;
 
@@ -60,7 +60,7 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT
   raft::resource::sync_stream(handle);
   serialize_mdspan(handle, os, sizes_host.view());
 
-  list_spec<uint32_t, IdxT, int64_t> list_store_spec{index_.dim(), true};
+  list_spec<uint32_t, CodeT, int64_t> list_store_spec{index_.dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::serialize_list(handle,
                         os,
@@ -71,10 +71,10 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT
   raft::resource::sync_stream(handle);
 }
 
-template <typename IdxT>
+template <typename CodeT>
 void serialize(raft::resources const& handle,
                const std::string& filename,
-               const index<IdxT>& index_)
+               const index<CodeT>& index_)
 {
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
@@ -83,8 +83,8 @@ void serialize(raft::resources const& handle,
   if (!of) { RAFT_FAIL("Error writing output %s", filename.c_str()); }
 }
 
-template <typename IdxT>
-auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
+template <typename CodeT>
+auto deserialize(raft::resources const& handle, std::istream& is) -> index<CodeT>
 {
   char dtype_string[4];
   is.read(dtype_string, 4);
@@ -99,7 +99,7 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
   auto metric  = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
   bool cma     = raft::deserialize_scalar<bool>(handle, is);
 
-  index<IdxT> index_ = index<IdxT>(handle, metric, n_lists, dim, cma);
+  index<CodeT> index_ = index<CodeT>(handle, metric, n_lists, dim, cma);
 
   deserialize_mdspan(handle, is, index_.centers());
 
@@ -119,8 +119,8 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
 
   deserialize_mdspan(handle, is, index_.list_sizes());
 
-  list_spec<uint32_t, IdxT, int64_t> list_device_spec{index_.dim(), cma};
-  list_spec<uint32_t, IdxT, int64_t> list_store_spec{index_.dim(), true};
+  list_spec<uint32_t, CodeT, int64_t> list_device_spec{index_.dim(), cma};
+  list_spec<uint32_t, CodeT, int64_t> list_store_spec{index_.dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::deserialize_list(handle, is, index_.lists()[label], list_store_spec, list_device_spec);
   }
@@ -131,29 +131,29 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
   return index_;
 }
 
-template <typename IdxT>
-auto deserialize(raft::resources const& handle, const std::string& filename) -> index<IdxT>
+template <typename CodeT>
+auto deserialize(raft::resources const& handle, const std::string& filename) -> index<CodeT>
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
-  auto index = detail::deserialize<IdxT>(handle, is);
+  auto index = detail::deserialize<CodeT>(handle, is);
   is.close();
   return index;
 }
 
 }  // namespace cuvs::neighbors::ivf_sq::detail
 
-#define CUVS_INST_IVF_SQ_SERIALIZE(IdxT)                                           \
-  void serialize(raft::resources const& handle,                                    \
-                 const std::string& filename,                                      \
-                 const cuvs::neighbors::ivf_sq::index<IdxT>& index)                \
-  {                                                                                \
-    cuvs::neighbors::ivf_sq::detail::serialize(handle, filename, index);           \
-  }                                                                                \
-                                                                                   \
-  void deserialize(raft::resources const& handle,                                  \
-                   const std::string& filename,                                    \
-                   cuvs::neighbors::ivf_sq::index<IdxT>* index)                    \
-  {                                                                                \
-    *index = cuvs::neighbors::ivf_sq::detail::deserialize<IdxT>(handle, filename); \
+#define CUVS_INST_IVF_SQ_SERIALIZE(CodeT)                                           \
+  void serialize(raft::resources const& handle,                                     \
+                 const std::string& filename,                                       \
+                 const cuvs::neighbors::ivf_sq::index<CodeT>& index)                \
+  {                                                                                 \
+    cuvs::neighbors::ivf_sq::detail::serialize(handle, filename, index);            \
+  }                                                                                 \
+                                                                                    \
+  void deserialize(raft::resources const& handle,                                   \
+                   const std::string& filename,                                     \
+                   cuvs::neighbors::ivf_sq::index<CodeT>* index)                    \
+  {                                                                                 \
+    *index = cuvs::neighbors::ivf_sq::detail::deserialize<CodeT>(handle, filename); \
   }

@@ -12,24 +12,24 @@
 
 namespace cuvs::neighbors::ivf_sq {
 
-template <typename IdxT>
-index<IdxT>::index(raft::resources const& res)
+template <typename CodeT>
+index<CodeT>::index(raft::resources const& res)
   : index(res, cuvs::distance::DistanceType::L2Expanded, 0, 0, false)
 {
 }
 
-template <typename IdxT>
-index<IdxT>::index(raft::resources const& res, const index_params& params, uint32_t dim)
+template <typename CodeT>
+index<CodeT>::index(raft::resources const& res, const index_params& params, uint32_t dim)
   : index(res, params.metric, params.n_lists, dim, params.conservative_memory_allocation)
 {
 }
 
-template <typename IdxT>
-index<IdxT>::index(raft::resources const& res,
-                   cuvs::distance::DistanceType metric,
-                   uint32_t n_lists,
-                   uint32_t dim,
-                   bool conservative_memory_allocation)
+template <typename CodeT>
+index<CodeT>::index(raft::resources const& res,
+                    cuvs::distance::DistanceType metric,
+                    uint32_t n_lists,
+                    uint32_t dim,
+                    bool conservative_memory_allocation)
   : cuvs::neighbors::index(),
     metric_(metric),
     conservative_memory_allocation_(conservative_memory_allocation),
@@ -39,7 +39,7 @@ index<IdxT>::index(raft::resources const& res,
     center_norms_(std::nullopt),
     sq_vmin_{raft::make_device_vector<float, uint32_t>(res, dim)},
     sq_delta_{raft::make_device_vector<float, uint32_t>(res, dim)},
-    data_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
+    data_ptrs_{raft::make_device_vector<CodeT*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<int64_t*, uint32_t>(res, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<int64_t, uint32_t>(n_lists + 1)}
 {
@@ -49,68 +49,68 @@ index<IdxT>::index(raft::resources const& res,
   RAFT_CUDA_TRY(
     cudaMemsetAsync(list_sizes_.data_handle(), 0, list_sizes_.size() * sizeof(uint32_t), stream));
   RAFT_CUDA_TRY(
-    cudaMemsetAsync(data_ptrs_.data_handle(), 0, data_ptrs_.size() * sizeof(IdxT*), stream));
+    cudaMemsetAsync(data_ptrs_.data_handle(), 0, data_ptrs_.size() * sizeof(CodeT*), stream));
   RAFT_CUDA_TRY(
     cudaMemsetAsync(inds_ptrs_.data_handle(), 0, inds_ptrs_.size() * sizeof(int64_t*), stream));
 }
 
-template <typename IdxT>
-cuvs::distance::DistanceType index<IdxT>::metric() const noexcept
+template <typename CodeT>
+cuvs::distance::DistanceType index<CodeT>::metric() const noexcept
 {
   return metric_;
 }
 
-template <typename IdxT>
-int64_t index<IdxT>::size() const noexcept
+template <typename CodeT>
+int64_t index<CodeT>::size() const noexcept
 {
   return accum_sorted_sizes()(n_lists());
 }
 
-template <typename IdxT>
-uint32_t index<IdxT>::dim() const noexcept
+template <typename CodeT>
+uint32_t index<CodeT>::dim() const noexcept
 {
   return centers_.extent(1);
 }
 
-template <typename IdxT>
-uint32_t index<IdxT>::n_lists() const noexcept
+template <typename CodeT>
+uint32_t index<CodeT>::n_lists() const noexcept
 {
   return lists_.size();
 }
 
-template <typename IdxT>
-bool index<IdxT>::conservative_memory_allocation() const noexcept
+template <typename CodeT>
+bool index<CodeT>::conservative_memory_allocation() const noexcept
 {
   return conservative_memory_allocation_;
 }
 
-template <typename IdxT>
-raft::device_vector_view<uint32_t, uint32_t> index<IdxT>::list_sizes() noexcept
+template <typename CodeT>
+raft::device_vector_view<uint32_t, uint32_t> index<CodeT>::list_sizes() noexcept
 {
   return list_sizes_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<const uint32_t, uint32_t> index<IdxT>::list_sizes() const noexcept
+template <typename CodeT>
+raft::device_vector_view<const uint32_t, uint32_t> index<CodeT>::list_sizes() const noexcept
 {
   return list_sizes_.view();
 }
 
-template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers() noexcept
+template <typename CodeT>
+raft::device_matrix_view<float, uint32_t, raft::row_major> index<CodeT>::centers() noexcept
 {
   return centers_.view();
 }
 
-template <typename IdxT>
-raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers()
+template <typename CodeT>
+raft::device_matrix_view<const float, uint32_t, raft::row_major> index<CodeT>::centers()
   const noexcept
 {
   return centers_.view();
 }
 
-template <typename IdxT>
-std::optional<raft::device_vector_view<float, uint32_t>> index<IdxT>::center_norms() noexcept
+template <typename CodeT>
+std::optional<raft::device_vector_view<float, uint32_t>> index<CodeT>::center_norms() noexcept
 {
   if (center_norms_.has_value()) {
     return std::make_optional<raft::device_vector_view<float, uint32_t>>(center_norms_->view());
@@ -119,8 +119,8 @@ std::optional<raft::device_vector_view<float, uint32_t>> index<IdxT>::center_nor
   }
 }
 
-template <typename IdxT>
-std::optional<raft::device_vector_view<const float, uint32_t>> index<IdxT>::center_norms()
+template <typename CodeT>
+std::optional<raft::device_vector_view<const float, uint32_t>> index<CodeT>::center_norms()
   const noexcept
 {
   if (center_norms_.has_value()) {
@@ -131,8 +131,8 @@ std::optional<raft::device_vector_view<const float, uint32_t>> index<IdxT>::cent
   }
 }
 
-template <typename IdxT>
-void index<IdxT>::allocate_center_norms(raft::resources const& res)
+template <typename CodeT>
+void index<CodeT>::allocate_center_norms(raft::resources const& res)
 {
   switch (metric_) {
     case cuvs::distance::DistanceType::L2Expanded:
@@ -146,80 +146,80 @@ void index<IdxT>::allocate_center_norms(raft::resources const& res)
   }
 }
 
-template <typename IdxT>
-raft::device_vector_view<float, uint32_t> index<IdxT>::sq_vmin() noexcept
+template <typename CodeT>
+raft::device_vector_view<float, uint32_t> index<CodeT>::sq_vmin() noexcept
 {
   return sq_vmin_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<const float, uint32_t> index<IdxT>::sq_vmin() const noexcept
+template <typename CodeT>
+raft::device_vector_view<const float, uint32_t> index<CodeT>::sq_vmin() const noexcept
 {
   return sq_vmin_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<float, uint32_t> index<IdxT>::sq_delta() noexcept
+template <typename CodeT>
+raft::device_vector_view<float, uint32_t> index<CodeT>::sq_delta() noexcept
 {
   return sq_delta_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<const float, uint32_t> index<IdxT>::sq_delta() const noexcept
+template <typename CodeT>
+raft::device_vector_view<const float, uint32_t> index<CodeT>::sq_delta() const noexcept
 {
   return sq_delta_.view();
 }
 
-template <typename IdxT>
-raft::host_vector_view<int64_t, uint32_t> index<IdxT>::accum_sorted_sizes() noexcept
+template <typename CodeT>
+raft::host_vector_view<int64_t, uint32_t> index<CodeT>::accum_sorted_sizes() noexcept
 {
   return accum_sorted_sizes_.view();
 }
 
-template <typename IdxT>
-raft::host_vector_view<const int64_t, uint32_t> index<IdxT>::accum_sorted_sizes() const noexcept
+template <typename CodeT>
+raft::host_vector_view<const int64_t, uint32_t> index<CodeT>::accum_sorted_sizes() const noexcept
 {
   return accum_sorted_sizes_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<IdxT*, uint32_t> index<IdxT>::data_ptrs() noexcept
+template <typename CodeT>
+raft::device_vector_view<CodeT*, uint32_t> index<CodeT>::data_ptrs() noexcept
 {
   return data_ptrs_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<IdxT* const, uint32_t> index<IdxT>::data_ptrs() const noexcept
+template <typename CodeT>
+raft::device_vector_view<CodeT* const, uint32_t> index<CodeT>::data_ptrs() const noexcept
 {
   return data_ptrs_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<int64_t*, uint32_t> index<IdxT>::inds_ptrs() noexcept
+template <typename CodeT>
+raft::device_vector_view<int64_t*, uint32_t> index<CodeT>::inds_ptrs() noexcept
 {
   return inds_ptrs_.view();
 }
 
-template <typename IdxT>
-raft::device_vector_view<int64_t* const, uint32_t> index<IdxT>::inds_ptrs() const noexcept
+template <typename CodeT>
+raft::device_vector_view<int64_t* const, uint32_t> index<CodeT>::inds_ptrs() const noexcept
 {
   return inds_ptrs_.view();
 }
 
-template <typename IdxT>
-std::vector<std::shared_ptr<list_data<IdxT, int64_t>>>& index<IdxT>::lists() noexcept
+template <typename CodeT>
+std::vector<std::shared_ptr<list_data<CodeT, int64_t>>>& index<CodeT>::lists() noexcept
 {
   return lists_;
 }
 
-template <typename IdxT>
-const std::vector<std::shared_ptr<list_data<IdxT, int64_t>>>& index<IdxT>::lists() const noexcept
+template <typename CodeT>
+const std::vector<std::shared_ptr<list_data<CodeT, int64_t>>>& index<CodeT>::lists() const noexcept
 {
   return lists_;
 }
 
-template <typename IdxT>
-void index<IdxT>::check_consistency()
+template <typename CodeT>
+void index<CodeT>::check_consistency()
 {
   auto n_lists = lists_.size();
   RAFT_EXPECTS(list_sizes_.extent(0) == n_lists, "inconsistent list size");

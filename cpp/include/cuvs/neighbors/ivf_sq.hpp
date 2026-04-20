@@ -78,13 +78,13 @@ static_assert(std::is_aggregate_v<search_params>);
  * @{
  */
 
-template <typename SizeT, typename IdxT, typename ExtT>
+template <typename SizeT, typename CodeT, typename IdxT>
 struct list_spec {
-  static_assert(std::is_same_v<IdxT, uint8_t>, "IVF-SQ code type IdxT must be uint8_t");
+  static_assert(std::is_same_v<CodeT, uint8_t>, "IVF-SQ code type CodeT must be uint8_t");
 
-  using value_type   = IdxT;
+  using value_type   = CodeT;
   using list_extents = raft::matrix_extent<SizeT>;
-  using index_type   = ExtT;
+  using index_type   = IdxT;
 
   SizeT align_max;
   SizeT align_min;
@@ -98,7 +98,7 @@ struct list_spec {
   }
 
   template <typename OtherSizeT>
-  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT, ExtT>& other_spec)
+  constexpr explicit list_spec(const list_spec<OtherSizeT, CodeT, IdxT>& other_spec)
     : dim{other_spec.dim}, align_min{other_spec.align_min}, align_max{other_spec.align_max}
   {
   }
@@ -112,8 +112,8 @@ struct list_spec {
   }
 };
 
-template <typename IdxT, typename ExtT, typename SizeT = uint32_t>
-using list_data = ivf::list<list_spec, SizeT, IdxT, ExtT>;
+template <typename CodeT, typename IdxT, typename SizeT = uint32_t>
+using list_data = ivf::list<list_spec, SizeT, CodeT, IdxT>;
 
 /**
  * @}
@@ -142,18 +142,18 @@ using list_data = ivf::list<list_spec, SizeT, IdxT, ExtT>;
  * search speed, and recall compared to flat (uncompressed) and product-quantized (PQ)
  * representations.
  *
- * @tparam IdxT  SQ code type. Only uint8_t (8-bit, codes in [0,255]) for now.
+ * @tparam CodeT  SQ code type. Only uint8_t (8-bit, codes in [0,255]) for now.
  *
  */
-template <typename IdxT>
+template <typename CodeT>
 struct index : cuvs::neighbors::index {
-  static_assert(std::is_same_v<IdxT, uint8_t>, "IVF-SQ code type IdxT must be uint8_t for now.");
+  static_assert(std::is_same_v<CodeT, uint8_t>, "IVF-SQ code type CodeT must be uint8_t for now.");
 
   using index_params_type  = ivf_sq::index_params;
   using search_params_type = ivf_sq::search_params;
-  using code_type          = IdxT;
+  using code_type          = CodeT;
 
-  static constexpr uint32_t sq_bits = sizeof(IdxT) * 8;
+  static constexpr uint32_t sq_bits = sizeof(CodeT) * 8;
 
  public:
   index(const index&)            = delete;
@@ -195,14 +195,14 @@ struct index : cuvs::neighbors::index {
   raft::host_vector_view<int64_t, uint32_t> accum_sorted_sizes() noexcept;
   [[nodiscard]] raft::host_vector_view<const int64_t, uint32_t> accum_sorted_sizes() const noexcept;
 
-  raft::device_vector_view<IdxT*, uint32_t> data_ptrs() noexcept;
-  raft::device_vector_view<IdxT* const, uint32_t> data_ptrs() const noexcept;
+  raft::device_vector_view<CodeT*, uint32_t> data_ptrs() noexcept;
+  raft::device_vector_view<CodeT* const, uint32_t> data_ptrs() const noexcept;
 
   raft::device_vector_view<int64_t*, uint32_t> inds_ptrs() noexcept;
   raft::device_vector_view<int64_t* const, uint32_t> inds_ptrs() const noexcept;
 
-  std::vector<std::shared_ptr<list_data<IdxT, int64_t>>>& lists() noexcept;
-  const std::vector<std::shared_ptr<list_data<IdxT, int64_t>>>& lists() const noexcept;
+  std::vector<std::shared_ptr<list_data<CodeT, int64_t>>>& lists() noexcept;
+  const std::vector<std::shared_ptr<list_data<CodeT, int64_t>>>& lists() const noexcept;
 
   void check_consistency();
 
@@ -210,14 +210,14 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   bool conservative_memory_allocation_;
 
-  std::vector<std::shared_ptr<list_data<IdxT, int64_t>>> lists_;
+  std::vector<std::shared_ptr<list_data<CodeT, int64_t>>> lists_;
   raft::device_vector<uint32_t, uint32_t> list_sizes_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
   raft::device_vector<float, uint32_t> sq_vmin_;
   raft::device_vector<float, uint32_t> sq_delta_;
 
-  raft::device_vector<IdxT*, uint32_t> data_ptrs_;
+  raft::device_vector<CodeT*, uint32_t> data_ptrs_;
   raft::device_vector<int64_t*, uint32_t> inds_ptrs_;
   raft::host_vector<int64_t, uint32_t> accum_sorted_sizes_;
 };
