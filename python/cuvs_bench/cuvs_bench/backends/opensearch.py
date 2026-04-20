@@ -560,7 +560,9 @@ class OpenSearchBackend(BenchmarkBackend):
             indexed += 1
             milestone = max(total // 10, 1)
             if indexed % milestone == 0:
-                print(f"  Indexed {indexed} / {total} vectors ({100 * indexed // total}%)")
+                print(
+                    f"  Indexed {indexed} / {total} vectors ({100 * indexed // total}%)"
+                )
         print(f"  Indexed all {total} vectors")
 
     def _make_s3_client(self):
@@ -578,12 +580,16 @@ class OpenSearchBackend(BenchmarkBackend):
             "s3",
             endpoint_url=self.config.get("remote_build_s3_endpoint"),
             aws_access_key_id=self.config.get("remote_build_s3_access_key"),
-            aws_secret_access_key=self.config.get("remote_build_s3_secret_key"),
+            aws_secret_access_key=self.config.get(
+                "remote_build_s3_secret_key"
+            ),
             aws_session_token=self.config.get("remote_build_s3_session_token"),
             region_name="us-east-1",
             config=BotocoreConfig(signature_version="s3v4"),
         )
-        bucket = self.config.get("remote_build_s3_bucket", "opensearch-vectors")
+        bucket = self.config.get(
+            "remote_build_s3_bucket", "opensearch-vectors"
+        )
         prefix = self.config.get("remote_build_s3_prefix", "knn-indexes/")
         return s3, bucket, prefix
 
@@ -592,14 +598,21 @@ class OpenSearchBackend(BenchmarkBackend):
         s3, bucket, prefix = self._make_s3_client()
         resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
         return sum(
-            1 for obj in resp.get("Contents", []) if obj["Key"].endswith(".faiss")
+            1
+            for obj in resp.get("Contents", [])
+            if obj["Key"].endswith(".faiss")
         )
 
     def _count_index_segments(self, index_name: str) -> int:
         """Return the number of Lucene segments currently in the index."""
         resp = self._client.indices.segments(index=index_name)
         total = 0
-        for shard_group in resp.get("indices", {}).get(index_name, {}).get("shards", {}).values():
+        for shard_group in (
+            resp.get("indices", {})
+            .get(index_name, {})
+            .get("shards", {})
+            .values()
+        ):
             for shard in shard_group:
                 total += len(shard.get("segments", {}))
         return total
@@ -632,7 +645,9 @@ class OpenSearchBackend(BenchmarkBackend):
             timeout=timeout,
             poll_interval=poll_interval,
         )
-        print(f"  All {segment_count} ingestion-time GPU build(s) confirmed in S3.")
+        print(
+            f"  All {segment_count} ingestion-time GPU build(s) confirmed in S3."
+        )
 
     def _wait_for_remote_build(
         self,
