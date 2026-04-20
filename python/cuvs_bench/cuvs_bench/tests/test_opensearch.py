@@ -213,23 +213,27 @@ def remote_build_env(opensearch_url):
 
     Required environment variables:
       BUILDER_URL      URL of the remote index builder service
-      S3_ENDPOINT      S3-compatible object store endpoint URL
       S3_BUCKET        Bucket name used by OpenSearch for vector staging
-      S3_ACCESS_KEY    S3 access key
-      S3_SECRET_KEY    S3 secret key
+      S3_ACCESS_KEY    S3 access key ID
+      S3_SECRET_KEY    S3 secret access key
+
+    Optional environment variables:
+      S3_ENDPOINT      Custom S3 endpoint URL (omit to use real AWS S3)
+      S3_SESSION_TOKEN STS session token (required for temporary credentials)
     """
     builder_url = os.environ.get("BUILDER_URL")
-    s3_endpoint = os.environ.get("S3_ENDPOINT")
+    # S3_ENDPOINT is optional — omit it (or leave unset) to use real AWS S3.
+    s3_endpoint = os.environ.get("S3_ENDPOINT") or None
     s3_bucket = os.environ.get("S3_BUCKET")
     s3_access_key = os.environ.get("S3_ACCESS_KEY")
     s3_secret_key = os.environ.get("S3_SECRET_KEY")
+    s3_session_token = os.environ.get("S3_SESSION_TOKEN") or None
     s3_prefix = "knn-indexes/"
 
     missing = [
         name
         for name, val in {
             "BUILDER_URL": builder_url,
-            "S3_ENDPOINT": s3_endpoint,
             "S3_BUCKET": s3_bucket,
             "S3_ACCESS_KEY": s3_access_key,
             "S3_SECRET_KEY": s3_secret_key,
@@ -246,10 +250,11 @@ def remote_build_env(opensearch_url):
     except requests.exceptions.ConnectionError:
         pytest.skip(f"Remote index builder not reachable at {builder_url}")
 
-    try:
-        requests.get(s3_endpoint, timeout=2)
-    except requests.exceptions.ConnectionError:
-        pytest.skip(f"S3 endpoint not reachable at {s3_endpoint}")
+    if s3_endpoint is not None:
+        try:
+            requests.get(s3_endpoint, timeout=2)
+        except requests.exceptions.ConnectionError:
+            pytest.skip(f"S3 endpoint not reachable at {s3_endpoint}")
 
     # Register the S3 snapshot repo and enable remote index build
     session = requests.Session()
@@ -284,6 +289,7 @@ def remote_build_env(opensearch_url):
         "s3_prefix": s3_prefix,
         "s3_access_key": s3_access_key,
         "s3_secret_key": s3_secret_key,
+        "s3_session_token": s3_session_token,
     }
 
 
@@ -309,6 +315,9 @@ def live_remote_build_backend(opensearch_url, remote_build_env):
             "remote_build_s3_prefix": remote_build_env["s3_prefix"],
             "remote_build_s3_access_key": remote_build_env["s3_access_key"],
             "remote_build_s3_secret_key": remote_build_env["s3_secret_key"],
+            "remote_build_s3_session_token": remote_build_env[
+                "s3_session_token"
+            ],
         }
     )
     try:

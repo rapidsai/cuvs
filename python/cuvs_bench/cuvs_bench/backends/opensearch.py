@@ -235,6 +235,7 @@ class OpenSearchConfigLoader(ConfigLoader):
             "remote_build_s3_prefix",
             "remote_build_s3_access_key",
             "remote_build_s3_secret_key",
+            "remote_build_s3_session_token",
             "remote_build_timeout",
         )
         conn_kwargs = {k: kwargs[k] for k in _conn_keys if k in kwargs}
@@ -557,22 +558,13 @@ class OpenSearchBackend(BenchmarkBackend):
             if not ok:
                 raise RuntimeError(f"Failed to index document: {info}")
             indexed += 1
-            if indexed % max(bulk_batch_size, 1000) == 0:
-                print(f"  Indexed {indexed} / {total} vectors")
+            milestone = max(total // 10, 1)
+            if indexed % milestone == 0:
+                print(f"  Indexed {indexed} / {total} vectors ({100 * indexed // total}%)")
         print(f"  Indexed all {total} vectors")
 
-    def _wait_for_remote_build(
-        self,
-        expected_count: int = 1,
-        timeout: int = 600,
-        poll_interval: int = 5,
-    ) -> None:
-        """
-        Poll S3 for .faiss files confirming the GPU remote build completed.
-
-        Raises ``TimeoutError`` if the expected number of files does not appear
-        within *timeout* seconds.
-        """
+    def _make_s3_client(self):
+        """Create a boto3 S3 client from config. Returns (client, bucket, prefix)."""
         try:
             import boto3
             from botocore.config import Config as BotocoreConfig
@@ -582,27 +574,85 @@ class OpenSearchBackend(BenchmarkBackend):
                 "Install it with:  pip install boto3"
             ) from exc
 
-        s3_endpoint = self.config.get("remote_build_s3_endpoint")
-        s3_bucket = self.config.get(
-            "remote_build_s3_bucket", "opensearch-vectors"
-        )
-        s3_prefix = self.config.get("remote_build_s3_prefix", "knn-indexes/")
-        s3_access_key = self.config.get("remote_build_s3_access_key")
-        s3_secret_key = self.config.get("remote_build_s3_secret_key")
-
         s3 = boto3.client(
             "s3",
-            endpoint_url=s3_endpoint,
-            aws_access_key_id=s3_access_key,
-            aws_secret_access_key=s3_secret_key,
+            endpoint_url=self.config.get("remote_build_s3_endpoint"),
+            aws_access_key_id=self.config.get("remote_build_s3_access_key"),
+            aws_secret_access_key=self.config.get("remote_build_s3_secret_key"),
+            aws_session_token=self.config.get("remote_build_s3_session_token"),
             region_name="us-east-1",
             config=BotocoreConfig(signature_version="s3v4"),
         )
+        bucket = self.config.get("remote_build_s3_bucket", "opensearch-vectors")
+        prefix = self.config.get("remote_build_s3_prefix", "knn-indexes/")
+        return s3, bucket, prefix
+
+    def _count_faiss_files(self) -> int:
+        """Return the number of .faiss files currently in S3 under the configured prefix."""
+        s3, bucket, prefix = self._make_s3_client()
+        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        return sum(
+            1 for obj in resp.get("Contents", []) if obj["Key"].endswith(".faiss")
+        )
+
+    def _count_index_segments(self, index_name: str) -> int:
+        """Return the number of Lucene segments currently in the index."""
+        resp = self._client.indices.segments(index=index_name)
+        total = 0
+        for shard_group in resp.get("indices", {}).get(index_name, {}).get("shards", {}).values():
+            for shard in shard_group:
+                total += len(shard.get("segments", {}))
+        return total
+
+    def _wait_for_ingestion_builds(
+        self,
+        index_name: str,
+        timeout: int = 600,
+        poll_interval: int = 5,
+    ) -> None:
+        """
+        Wait for all GPU builds triggered during ingestion to complete.
+
+        After bulk indexing, OpenSearch may have flushed several segments and
+        dispatched a GPU build for each one.  This method counts segments in
+        the index, then polls S3 until that many ``.faiss`` files exist —
+        confirming every ingestion-time GPU build has finished.
+
+        Must be called *before* force-merge so the pre-merge `.faiss` count
+        is stable.
+        """
+        segment_count = self._count_index_segments(index_name)
+        if segment_count == 0:
+            return
+        print(
+            f"  Waiting for {segment_count} ingestion-time GPU build(s) to complete..."
+        )
+        self._wait_for_remote_build(
+            expected_count=segment_count,
+            timeout=timeout,
+            poll_interval=poll_interval,
+        )
+        print(f"  All {segment_count} ingestion-time GPU build(s) confirmed in S3.")
+
+    def _wait_for_remote_build(
+        self,
+        expected_count: int = 1,
+        timeout: int = 600,
+        poll_interval: int = 5,
+    ) -> None:
+        """
+        Poll S3 until at least *expected_count* .faiss files exist under the
+        configured prefix.
+
+        Raises ``TimeoutError`` if the expected number of files does not appear
+        within *timeout* seconds.
+        """
+        s3, bucket, prefix = self._make_s3_client()
 
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
-                resp = s3.list_objects_v2(Bucket=s3_bucket, Prefix=s3_prefix)
+                resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
                 faiss_files = [
                     obj["Key"]
                     for obj in resp.get("Contents", [])
@@ -616,7 +666,7 @@ class OpenSearchBackend(BenchmarkBackend):
 
         raise TimeoutError(
             f"GPU build not confirmed after {timeout}s: "
-            f"expected {expected_count} .faiss file(s) in s3://{s3_bucket}/{s3_prefix}"
+            f"expected {expected_count} .faiss file(s) in s3://{bucket}/{prefix}"
         )
 
     def build(
@@ -753,13 +803,23 @@ class OpenSearchBackend(BenchmarkBackend):
         self._bulk_index(index_name, base_vectors, bulk_batch_size)
         self._client.indices.refresh(index=index_name, request_timeout=120)
         if remote_index_build:
-            # Force-merge `index_name` to one segment, initiating the remote GPU build.
-            self._client.indices.forcemerge(
-                index=index_name, max_num_segments=1, request_timeout=300
-            )
+            remote_timeout = int(self.config.get("remote_build_timeout", 600))
+            # Wait for every GPU build dispatched during ingestion to finish.
+            # Segments flushed mid-ingest each trigger their own GPU build, so
+            # all of those must complete before we proceed.
+            self._wait_for_ingestion_builds(index_name, timeout=remote_timeout)
+            # Snapshot .faiss count now that ingestion builds are done, then
+            # force-merge to one segment to trigger the final GPU build.
+            pre_merge_count = self._count_faiss_files()
+
+        self._client.indices.forcemerge(
+            index=index_name, max_num_segments=1, request_timeout=300
+        )
+
+        if remote_index_build:
             self._wait_for_remote_build(
-                expected_count=1,
-                timeout=int(self.config.get("remote_build_timeout", 600)),
+                expected_count=pre_merge_count + 1,
+                timeout=remote_timeout,
             )
         build_time = time.perf_counter() - t0
 
