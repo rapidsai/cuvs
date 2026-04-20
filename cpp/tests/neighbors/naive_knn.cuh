@@ -63,6 +63,11 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
           auto diff = static_cast<EvalT>(xv) - static_cast<EvalT>(yv);
           acc += raft::abs(diff);
         } break;
+        case cuvs::distance::DistanceType::Linf: {
+          auto diff = static_cast<EvalT>(xv) - static_cast<EvalT>(yv);
+          auto ad   = raft::abs(diff);
+          acc       = (ad > acc) ? ad : acc;
+        } break;
         default: break;
       }
     }
