@@ -5,12 +5,9 @@
 
 //! Raw FFI bindings to libcuvs_c.
 
-// Suppress warnings from bindgen-generated code
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(unused_attributes)]
-
 // Bindings are pre-generated and checked in at src/bindings.rs.
 // Use `rust/scripts/generate-bindings.sh` to regenerate them.
-include!("bindings.rs");
+#[allow(non_upper_case_globals, non_camel_case_types, non_snake_case, unused_attributes)]
+mod bindings;
+
+pub use bindings::*;

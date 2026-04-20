@@ -1,11 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 use std::convert::From;
 
-use crate::error::{check_cuda, check_cuvs, Result};
+use crate::error::{Result, check_cuda, check_cuvs};
 use crate::resources::Resources;
 
 /// ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
@@ -103,10 +103,8 @@ impl<T: IntoDtype, S: ndarray::RawData<Elem = T>, D: ndarray::Dimension>
             let mut ret = std::mem::MaybeUninit::<ffi::DLTensor>::uninit();
             let tensor = ret.as_mut_ptr();
             (*tensor).data = arr.as_ptr() as *mut std::os::raw::c_void;
-            (*tensor).device = ffi::DLDevice {
-                device_type: ffi::DLDeviceType::kDLCPU,
-                device_id: 0,
-            };
+            (*tensor).device =
+                ffi::DLDevice { device_type: ffi::DLDeviceType::kDLCPU, device_id: 0 };
             (*tensor).byte_offset = 0;
             (*tensor).strides = std::ptr::null_mut(); // TODO: error if not rowmajor
             (*tensor).ndim = arr.ndim() as i32;
@@ -133,51 +131,31 @@ impl Drop for ManagedTensor {
 
 impl IntoDtype for f32 {
     fn ffi_dtype() -> ffi::DLDataType {
-        ffi::DLDataType {
-            code: ffi::DLDataTypeCode::kDLFloat as _,
-            bits: 32,
-            lanes: 1,
-        }
+        ffi::DLDataType { code: ffi::DLDataTypeCode::kDLFloat as _, bits: 32, lanes: 1 }
     }
 }
 
 impl IntoDtype for f64 {
     fn ffi_dtype() -> ffi::DLDataType {
-        ffi::DLDataType {
-            code: ffi::DLDataTypeCode::kDLFloat as _,
-            bits: 64,
-            lanes: 1,
-        }
+        ffi::DLDataType { code: ffi::DLDataTypeCode::kDLFloat as _, bits: 64, lanes: 1 }
     }
 }
 
 impl IntoDtype for i32 {
     fn ffi_dtype() -> ffi::DLDataType {
-        ffi::DLDataType {
-            code: ffi::DLDataTypeCode::kDLInt as _,
-            bits: 32,
-            lanes: 1,
-        }
+        ffi::DLDataType { code: ffi::DLDataTypeCode::kDLInt as _, bits: 32, lanes: 1 }
     }
 }
 
 impl IntoDtype for i64 {
     fn ffi_dtype() -> ffi::DLDataType {
-        ffi::DLDataType {
-            code: ffi::DLDataTypeCode::kDLInt as _,
-            bits: 64,
-            lanes: 1,
-        }
+        ffi::DLDataType { code: ffi::DLDataTypeCode::kDLInt as _, bits: 64, lanes: 1 }
     }
 }
 
 impl IntoDtype for u32 {
     fn ffi_dtype() -> ffi::DLDataType {
-        ffi::DLDataType {
-            code: ffi::DLDataTypeCode::kDLUInt as _,
-            bits: 32,
-            lanes: 1,
-        }
+        ffi::DLDataType { code: ffi::DLDataTypeCode::kDLUInt as _, bits: 32, lanes: 1 }
     }
 }
 

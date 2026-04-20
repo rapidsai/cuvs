@@ -90,6 +90,8 @@ files:
       cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
+      # DLPack headers are needed when generating Rust bindings with bindgen.
+      - build_rust
       # clang/libclang only needed for bindgen support
       - clang
       - cuda
@@ -268,6 +270,11 @@ dependencies:
           - &setuptools setuptools>=77.0.0
           - &wheel wheel
   build_py_cuvs:
+    common:
+      - output_types: [conda]
+        packages:
+          - dlpack>=0.8,<1.0
+  build_rust:
     common:
       - output_types: [conda]
         packages:

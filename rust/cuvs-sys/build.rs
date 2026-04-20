@@ -6,13 +6,23 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result};
 use cmake_package::find_package;
 use cmake_package::{Error as CmakeError, Version, VersionError};
 
 const CUVS_COMPONENT: &str = "c_api";
 const CUVS_C_API_TARGET: &str = "cuvs::c_api";
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const PYTHON_PRINT_LIBCUVS_PACKAGE_DIR: &str = r#"
+from importlib.util import find_spec
+from pathlib import Path
+
+spec = find_spec("libcuvs")
+if spec is None or spec.submodule_search_locations is None:
+    raise ModuleNotFoundError("libcuvs")
+
+print(Path(next(iter(spec.submodule_search_locations))).resolve())
+"#;
 
 struct CuvsMetadata {
     include_dir: PathBuf,
@@ -25,16 +35,28 @@ struct CuvsMetadata {
 // CMake package discovery
 // ---------------------------------------------------------------------------
 
-fn requested_version() -> Version {
-    PACKAGE_VERSION.try_into().expect("workspace package version must be a valid semantic version")
+fn cmake_unavailable_error() -> anyhow::Error {
+    anyhow::anyhow!(
+        "CMake is not installed or does not satisfy this build's requirements. Install the required CMake version and try again."
+    )
 }
 
-fn ensure_exact_cuvs_version(package: &cmake_package::CMakePackage) -> Result<()> {
+fn prepend_cmake_prefix_path(prefix: &Path) -> String {
+    match std::env::var("CMAKE_PREFIX_PATH") {
+        Ok(existing) if !existing.is_empty() => format!("{};{existing}", prefix.display()),
+        _ => prefix.display().to_string(),
+    }
+}
+
+fn ensure_exact_cuvs_version(
+    package: &cmake_package::CMakePackage,
+    required_version: &Version,
+) -> Result<()> {
     let found = package
         .version
         .context("Found cuVS, but it did not report a parseable package version.")?;
-    ensure!(
-        found == requested_version(),
+    anyhow::ensure!(
+        found == *required_version,
         "Found cuVS {found}, but cuvs-sys requires exact version {PACKAGE_VERSION}."
     );
     Ok(())
@@ -50,44 +72,29 @@ fn find_target(
     })
 }
 
-fn find_cuvs_package(prefix: Option<PathBuf>) -> Result<cmake_package::CMakePackage> {
-    let mut builder = find_package("cuvs").components([CUVS_COMPONENT.to_owned()]);
-    if let Some(ref path) = prefix {
-        builder = builder.prefix_paths(vec![path.to_path_buf()]);
-    }
-    let package = builder.find().map_err(|e| match e {
+fn find_cuvs_package() -> Result<cmake_package::CMakePackage> {
+    find_package("cuvs").components([CUVS_COMPONENT.to_owned()]).find().map_err(|e| match e {
         CmakeError::Version(VersionError::InvalidVersion) => {
             anyhow::anyhow!("Found cuVS, but it did not report a parseable package version.")
         }
-        CmakeError::Version(VersionError::VersionTooOld(v)) => {
-            anyhow::anyhow!(
-                "Found cuVS {v}, but cuvs-sys requires exact version {PACKAGE_VERSION}."
-            )
-        }
         CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
-            anyhow::anyhow!(
-                "CMake is not installed or too old (3.19+ required). Install CMake and try again."
-            )
+            cmake_unavailable_error()
         }
         _ => anyhow::anyhow!(
             "Could not find cuVS CMake package.\n\n\
              Install cuVS via one of:\n\
              - conda: conda install -c rapidsai libcuvs\n\
-             - pip:   pip install libcuvs-cu<CUDA_VERSION>\n\
+             - pip:   pip install libcuvs-cu<CUDA_VERSION> and set LIBCUVS_USE_PYTHON=1\n\
              Or set CMAKE_PREFIX_PATH to point to your cuVS build/install directory."
         ),
-    })?;
-    ensure_exact_cuvs_version(&package)?;
-    Ok(package)
+    })
 }
 
 #[cfg(feature = "generate-bindings")]
 fn find_cudatoolkit_package() -> Result<cmake_package::CMakePackage> {
     find_package("CUDAToolkit").find().map_err(|e| match e {
         CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
-            anyhow::anyhow!(
-                "CMake is not installed or too old (3.19+ required). Install CMake and try again."
-            )
+            cmake_unavailable_error()
         }
         _ => anyhow::anyhow!(
             "Could not find CUDA Toolkit CMake package.\n\n\
@@ -100,9 +107,7 @@ fn find_cudatoolkit_package() -> Result<cmake_package::CMakePackage> {
 fn find_dlpack_package() -> Result<cmake_package::CMakePackage> {
     find_package("dlpack").find().map_err(|e| match e {
         CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
-            anyhow::anyhow!(
-                "CMake is not installed or too old (3.19+ required). Install CMake and try again."
-            )
+            cmake_unavailable_error()
         }
         _ => anyhow::anyhow!(
             "Could not find DLPack CMake package.\n\n\
@@ -115,10 +120,9 @@ fn find_dlpack_package() -> Result<cmake_package::CMakePackage> {
 /// Calls `CMakeTarget::link()` to emit the full set of cargo link directives,
 /// preserving all link libraries, directories, and options from the CMake target.
 ///
-/// When `prefix` is provided, it is passed as `CMAKE_PREFIX_PATH` so CMake
-/// searches under that installation root (e.g. `<prefix>/lib/cmake/cuvs`).
-fn try_find_cuvs_package(prefix: Option<PathBuf>) -> Result<CuvsMetadata> {
-    let package = find_cuvs_package(prefix)?;
+fn try_find_cuvs_package(required_version: &Version) -> Result<CuvsMetadata> {
+    let package = find_cuvs_package()?;
+    ensure_exact_cuvs_version(&package, required_version)?;
     let target = find_target(&package, "cuvs", CUVS_C_API_TARGET)?;
 
     let include_dir = target
@@ -162,64 +166,54 @@ fn try_find_cuvs_package(prefix: Option<PathBuf>) -> Result<CuvsMetadata> {
     })
 }
 
-/// Try to find a pip-installed cuVS by locating `site-packages/libcuvs`.
-/// Checks both the active venv (via VIRTUAL_ENV) and the system python.
-fn pip_cuvs_cmake_dir() -> Option<PathBuf> {
-    if let Ok(venv) = std::env::var("VIRTUAL_ENV") {
-        let lib_dir = Path::new(&venv).join("lib");
-        if let Ok(entries) = std::fs::read_dir(&lib_dir)
-            && let Some(prefix) = entries
-                .filter_map(|e| e.ok())
-                .map(|entry| entry.path().join("site-packages/libcuvs/lib64/cmake/cuvs"))
-                .find(|path| path.is_dir())
-        {
-            return Some(prefix);
-        }
-    }
-
-    let output = Command::new("python3")
-        .arg("-c")
-        .arg("import sysconfig; print(sysconfig.get_path('purelib'))")
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    let site_packages = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
-    let prefix = site_packages.join("libcuvs/lib64/cmake/cuvs");
-    prefix.is_dir().then_some(prefix)
-}
-
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-/// Locate cuVS: try standard CMake discovery first, then fall back to pip.
+/// Locate cuVS either from standard CMake search paths or, when explicitly
+/// requested, from the active Python environment.
 fn locate_cuvs() -> Result<CuvsMetadata> {
-    let system_err = match try_find_cuvs_package(None) {
-        Ok(metadata) => return Ok(metadata),
-        Err(e) => e,
-    };
+    let required_version: Version = PACKAGE_VERSION
+        .try_into()
+        .expect("workspace package version must be a valid semantic version");
 
-    // Pip installs cmake configs under site-packages/libcuvs/lib64/cmake/cuvs/.
-    // If there's no pip cuVS, report the original system error.
-    let pip_cmake_dir = match pip_cuvs_cmake_dir() {
-        Some(dir) => dir,
-        None => return Err(system_err),
-    };
+    if std::env::var_os("LIBCUVS_USE_PYTHON").is_some() {
+        let python =
+            Path::new(if std::env::var_os("VIRTUAL_ENV").is_some() { "python" } else { "python3" });
+        let output = Command::new(python)
+            .arg("-c")
+            .arg(PYTHON_PRINT_LIBCUVS_PACKAGE_DIR)
+            .output()
+            .with_context(|| {
+                format!("LIBCUVS_USE_PYTHON is set, but failed to run {:?}.", python)
+            })?;
 
-    // Workaround: cmake-package's find_target() doesn't forward prefix_paths
-    // to its second cmake invocation, so we also set the env var.
-    let prefix_path = match std::env::var("CMAKE_PREFIX_PATH") {
-        Ok(existing) => format!("{};{existing}", pip_cmake_dir.display()),
-        Err(_) => pip_cmake_dir.display().to_string(),
-    };
-    // SAFETY: build scripts are single-threaded.
-    unsafe { std::env::set_var("CMAKE_PREFIX_PATH", &prefix_path) };
+        anyhow::ensure!(
+            output.status.success(),
+            "LIBCUVS_USE_PYTHON is set, but {:?} could not locate the Python libcuvs package.\n\n\
+                 Install the libcuvs wheel in that Python environment, or unset LIBCUVS_USE_PYTHON.\n\n\
+                 {}",
+            python,
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
 
-    try_find_cuvs_package(Some(pip_cmake_dir))
+        let package_dir = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+        let cmake_dir = package_dir.join("lib64/cmake/cuvs");
+        anyhow::ensure!(
+            cmake_dir.is_dir(),
+            "LIBCUVS_USE_PYTHON is set, but the Python libcuvs package at {} does not contain a cuVS CMake package under {}.",
+            package_dir.display(),
+            cmake_dir.display(),
+        );
+
+        // Workaround: cmake-package's target query doesn't inherit a prefix passed
+        // only to its initial package discovery, so set CMAKE_PREFIX_PATH here too.
+        let prefix_path = prepend_cmake_prefix_path(&cmake_dir);
+        // SAFETY: build scripts are single-threaded.
+        unsafe { std::env::set_var("CMAKE_PREFIX_PATH", &prefix_path) };
+    }
+
+    try_find_cuvs_package(&required_version)
 }
 
 #[cfg(feature = "generate-bindings")]
@@ -248,6 +242,7 @@ fn generate_bindings(include_dirs: &[PathBuf]) {
 fn main() {
     println!("cargo::rerun-if-env-changed=CMAKE_PREFIX_PATH");
     println!("cargo::rerun-if-env-changed=CONDA_PREFIX");
+    println!("cargo::rerun-if-env-changed=LIBCUVS_USE_PYTHON");
     println!("cargo::rerun-if-env-changed=VIRTUAL_ENV");
 
     if cfg!(feature = "doc-only") {

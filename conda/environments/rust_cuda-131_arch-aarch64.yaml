@@ -15,6 +15,7 @@ dependencies:
 - cuda-profiler-api
 - cuda-version=13.1
 - cxx-compiler
+- dlpack>=0.8,<1.0
 - gcc_linux-aarch64=14.*
 - libclang==20.1.8
 - libcublas-dev
