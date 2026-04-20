@@ -34,24 +34,22 @@ inline constexpr bool
 
 /**
  * @brief `make_padded_dataset` rejects a buffer that is already CAGRA row-padded on the device; use
- * a non-owning padded view instead. That happens e.g. for some CUDA managed / UVM buffers exposed as
- * `raft::host_matrix_view`.
+ * a non-owning padded view instead. That happens e.g. for some CUDA managed / UVM buffers exposed
+ * as `raft::host_matrix_view`.
  */
 template <typename T, typename Accessor>
 bool host_mds_uses_padded_device_view(
   raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> mds)
 {
-  using value_type = T;
-  constexpr size_t kSize  = sizeof(value_type);
+  using value_type          = T;
+  constexpr size_t kSize    = sizeof(value_type);
   constexpr uint32_t kAlign = 16u;
-  uint32_t const required_stride = raft::round_up_safe<size_t>(
-                                       static_cast<size_t>(mds.extent(1)) * kSize,
-                                       std::lcm(kAlign, static_cast<uint32_t>(kSize))) /
-                                   kSize;
+  uint32_t const required_stride =
+    raft::round_up_safe<size_t>(static_cast<size_t>(mds.extent(1)) * kSize,
+                                std::lcm(kAlign, static_cast<uint32_t>(kSize))) /
+    kSize;
   uint32_t const src_stride =
-    mds.stride(0) > 0
-      ? static_cast<uint32_t>(mds.stride(0))
-      : static_cast<uint32_t>(mds.extent(1));
+    mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
   cudaPointerAttributes a{};
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&a, mds.data_handle()));
   auto* devp = reinterpret_cast<value_type const*>(a.devicePointer);
@@ -72,24 +70,21 @@ void cagra_from_host_padded(raft::resources const& h,
     cudaPointerAttributes a{};
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&a, m.data_handle()));
     T const* devp = reinterpret_cast<T const*>(a.devicePointer);
-    uint32_t const s_stride = m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0))
-                                              : static_cast<uint32_t>(m.extent(1));
-    auto d_m     = raft::make_device_strided_matrix_view<T const, int64_t, row_major>(
+    uint32_t const s_stride =
+      m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0)) : static_cast<uint32_t>(m.extent(1));
+    auto d_m = raft::make_device_strided_matrix_view<T const, int64_t, row_major>(
       devp, m.extent(0), m.extent(1), s_stride);
     auto padded  = cuvs::neighbors::make_padded_dataset_view(h, d_m);
     auto build_r = cuvs::neighbors::cagra::build(h, cagra_params, padded);
-    RAFT_EXPECTS(
-      !build_r.vpq.has_value(),
-      "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
+    RAFT_EXPECTS(!build_r.vpq.has_value(),
+                 "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
     interface.cagra_owned_dataset_.reset();
     interface.index_.emplace(std::move(build_r.idx));
   } else {
     auto padded_r = cuvs::neighbors::make_padded_dataset(h, m);
-    auto build_r =
-      cuvs::neighbors::cagra::build(h, cagra_params, padded_r->as_dataset_view());
-    RAFT_EXPECTS(
-      !build_r.vpq.has_value(),
-      "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
+    auto build_r  = cuvs::neighbors::cagra::build(h, cagra_params, padded_r->as_dataset_view());
+    RAFT_EXPECTS(!build_r.vpq.has_value(),
+                 "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
     interface.cagra_owned_dataset_ =
       std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded_r.release());
     interface.index_.emplace(std::move(build_r.idx));
@@ -130,8 +125,7 @@ void build(const raft::resources& handle,
           interface.cagra_build_dataset_ = std::move(result.dataset);
           interface.index_.emplace(std::move(result.idx));
         } else {
-          iface_detail::cagra_from_host_padded(
-            handle, cagra_params, index_dataset, interface);
+          iface_detail::cagra_from_host_padded(handle, cagra_params, index_dataset, interface);
         }
       }
     } else {
@@ -144,8 +138,7 @@ void build(const raft::resources& handle,
           interface.cagra_build_dataset_ = std::move(result.dataset);
           interface.index_.emplace(std::move(result.idx));
         } else {
-          iface_detail::cagra_from_host_padded(
-            handle, cagra_params, index_dataset, interface);
+          iface_detail::cagra_from_host_padded(handle, cagra_params, index_dataset, interface);
         }
       } else {
         auto idx = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);

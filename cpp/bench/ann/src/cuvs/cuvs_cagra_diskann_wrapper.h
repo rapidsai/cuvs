@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -200,7 +200,8 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
                                       cudaMemcpyDefault,
                                       raft::resource::get_cuda_stream(handle_)));
     } else {
-      RAFT_LOG_DEBUG("dataset serialization: neither strided_dataset nor device_padded_dataset_view");
+      RAFT_LOG_DEBUG(
+        "dataset serialization: neither strided_dataset nor device_padded_dataset_view");
     }
 
     if (h_dataset.has_value()) {
