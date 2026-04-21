@@ -1806,8 +1806,9 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
 
-  // Convert CAGRA index to HNSW index. The resulting HNSW index uses the partitioned ACE index order.
-  // See `cagra::build` and `hnsw::from_cagra` for more details on how to remap the graph to original ids.
+  // Convert CAGRA index to HNSW index. The resulting HNSW index uses the partitioned ACE index
+  // order. See `cagra::build` and `hnsw::from_cagra` for more details on how to remap the graph to
+  // original ids.
   return from_cagra<T>(res, params, cagra_index, std::nullopt);
 }
 

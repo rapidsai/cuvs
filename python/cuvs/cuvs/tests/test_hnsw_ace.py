@@ -95,7 +95,9 @@ def run_hnsw_ace_build_search_test(
             search_params = hnsw.SearchParams(
                 ef=max(ef_construction, k * 2), num_threads=1
             )
-            out_dist, out_idx = hnsw.search(search_params, hnsw_index, queries, k)
+            out_dist, out_idx = hnsw.search(
+                search_params, hnsw_index, queries, k
+            )
 
         # Calculate reference values with sklearn
         skl_metric = {
@@ -103,14 +105,16 @@ def run_hnsw_ace_build_search_test(
             "inner_product": "cosine",
             "euclidean": "euclidean",
         }[metric]
-        nn_skl = NearestNeighbors(n_neighbors=k, algorithm="brute", metric=skl_metric)
+        nn_skl = NearestNeighbors(
+            n_neighbors=k, algorithm="brute", metric=skl_metric
+        )
         nn_skl.fit(dataset)
         skl_idx = nn_skl.kneighbors(queries, return_distance=False)
 
         recall = calc_recall(out_idx, skl_idx)
-        assert (
-            recall >= expected_recall
-        ), f"Recall {recall:.3f} is below expected {expected_recall}"
+        assert recall >= expected_recall, (
+            f"Recall {recall:.3f} is below expected {expected_recall}"
+        )
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
@@ -204,7 +208,9 @@ def test_hnsw_ace_disk_serialize_deserialize():
 
         # Search the loaded index
         search_params = hnsw.SearchParams(ef=200, num_threads=1)
-        out_dist, out_idx = hnsw.search(search_params, loaded_index, queries, k)
+        out_dist, out_idx = hnsw.search(
+            search_params, loaded_index, queries, k
+        )
 
         # Verify results against sklearn
         nn_skl = NearestNeighbors(
@@ -255,12 +261,12 @@ def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
         graph_file = os.path.join(temp_dir, "cagra_graph.npy")
         reordered_file = os.path.join(temp_dir, "reordered_dataset.npy")
 
-        assert os.path.exists(
-            graph_file
-        ), "Graph file should exist when disk mode is triggered"
-        assert os.path.exists(
-            reordered_file
-        ), "Reordered dataset file should exist when disk mode is triggered"
+        assert os.path.exists(graph_file), (
+            "Graph file should exist when disk mode is triggered"
+        )
+        assert os.path.exists(reordered_file), (
+            "Reordered dataset file should exist when disk mode is triggered"
+        )
 
 
 def test_hnsw_ace_from_cagra_remaps_graph_to_original_ids():
@@ -294,7 +300,9 @@ def test_hnsw_ace_from_cagra_remaps_graph_to_original_ids():
         assert cagra_index.trained
 
         mapping = np.load(os.path.join(temp_dir, "dataset_mapping.npy"))
-        reordered_dataset = np.load(os.path.join(temp_dir, "reordered_dataset.npy"))
+        reordered_dataset = np.load(
+            os.path.join(temp_dir, "reordered_dataset.npy")
+        )
         reordered_graph = np.load(os.path.join(temp_dir, "cagra_graph.npy"))
 
         # The mapping must be a permutation of [0, n_rows), and the
@@ -313,7 +321,9 @@ def test_hnsw_ace_from_cagra_remaps_graph_to_original_ids():
 
         hnsw_params = hnsw.IndexParams(hierarchy="gpu", metric=metric)
         hnsw_bin_path = os.path.join(temp_dir, "hnsw_index.bin")
-        original_graph_path = os.path.join(temp_dir, "cagra_graph_original_ids.npy")
+        original_graph_path = os.path.join(
+            temp_dir, "cagra_graph_original_ids.npy"
+        )
 
         # Path 1: from_cagra with reordered graph
         hnsw.from_cagra(hnsw_params, cagra_index)
@@ -354,9 +364,9 @@ def test_hnsw_ace_from_cagra_remaps_graph_to_original_ids():
             search_params, original_hnsw_index, queries, k
         )
         recall_original = calc_recall(np.asarray(out_idx_original), skl_idx)
-        assert (
-            recall_original >= 0.7
-        ), f"Remapped HNSW recall {recall_original:.3f} below 0.7"
+        assert recall_original >= 0.7, (
+            f"Remapped HNSW recall {recall_original:.3f} below 0.7"
+        )
 
         reordered_hnsw_index = hnsw.load(
             hnsw_params, reordered_bin_path, n_cols, dtype, metric=metric
@@ -365,6 +375,6 @@ def test_hnsw_ace_from_cagra_remaps_graph_to_original_ids():
             search_params, reordered_hnsw_index, queries, k
         )
         recall_reordered = calc_recall(np.asarray(out_idx_reordered), skl_idx)
-        assert (
-            recall_reordered >= 0.7
-        ), f"Reordered HNSW recall {recall_reordered:.3f} below 0.7"
+        assert recall_reordered >= 0.7, (
+            f"Reordered HNSW recall {recall_reordered:.3f} below 0.7"
+        )
