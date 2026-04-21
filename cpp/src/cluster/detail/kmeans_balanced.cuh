@@ -314,7 +314,7 @@ void compute_norm(const raft::resources& handle,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("compute_norm");
   auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<MathT> mapped_dataset(
-    0, stream, mr.value_or(raft::resource::get_workspace_resource(handle)));
+    0, stream, mr.value_or(raft::resource::get_workspace_resource_ref(handle)));
 
   const MathT* dataset_ptr = nullptr;
 
@@ -376,7 +376,7 @@ void predict(const raft::resources& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "predict(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
-  auto mem_res = mr.value_or(raft::resource::get_workspace_resource(handle));
+  auto mem_res = mr.value_or(raft::resource::get_workspace_resource_ref(handle));
   auto [max_minibatch_size, _mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
   rmm::device_uvector<MathT> cur_dataset(
@@ -988,7 +988,7 @@ void build_hierarchical(const raft::resources& handle,
 
   // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
   rmm::mr::managed_memory_resource managed_memory;
-  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource_ref(handle);
   auto [max_minibatch_size, mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
 
@@ -1029,8 +1029,8 @@ void build_hierarchical(const raft::resources& handle,
     CounterT;
 
   // build coarse clusters (mesoclusters)
-  rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, &managed_memory);
-  rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, &managed_memory);
+  rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, managed_memory);
+  rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, managed_memory);
   {
     rmm::device_uvector<MathT> mesocluster_centers_buf(n_mesoclusters * dim, stream, device_memory);
     build_clusters(handle,
@@ -1086,7 +1086,7 @@ void build_hierarchical(const raft::resources& handle,
                                              fine_clusters_nums_max,
                                              cluster_centers,
                                              mapping_op,
-                                             &managed_memory,
+                                             managed_memory,
                                              device_memory);
   RAFT_EXPECTS(n_clusters_done == n_clusters, "Didn't process all clusters.");
 

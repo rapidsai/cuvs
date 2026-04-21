@@ -17,9 +17,6 @@ struct tag_lut_h {};
 struct tag_lut_fp8_signed {};
 struct tag_lut_fp8_unsigned {};
 
-struct tag_filter_none {};
-struct tag_filter_bitset {};
-
 struct tag_metric_none {};
 struct tag_metric_euclidean {};
 struct tag_metric_inner_product {};
