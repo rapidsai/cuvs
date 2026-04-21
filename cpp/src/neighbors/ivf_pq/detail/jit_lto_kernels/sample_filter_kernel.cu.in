@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <neighbors/detail/jit_lto_kernels/filter.cuh>
 #include <neighbors/ivf_pq/detail/jit_lto_kernels/device_functions.cuh>
-#include <neighbors/ivf_pq/detail/jit_lto_kernels/sample_filter_impl.cuh>
 
 namespace {
 
-using filter_t = @filter_type@;
+constexpr auto sample_filter_impl =
+  cuvs::neighbors::detail::sample_filter_@filter_name@<uint32_t, int64_t>;
 
 }  // namespace
 
@@ -22,7 +23,7 @@ __device__ bool sample_filter(const int64_t* const* const inds_ptrs,
                               int64_t bitset_len,
                               int64_t original_nbits)
 {
-  return sample_filter_impl<filter_t>(
+  return sample_filter_impl(
     inds_ptrs, query_ix, cluster_ix, sample_ix, bitset_ptr, bitset_len, original_nbits);
 }
 
