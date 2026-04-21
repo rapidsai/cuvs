@@ -509,7 +509,7 @@ void process_and_fill_codes(
          dim,
          max_batch_size,
          stream,
-         rmm::mr::get_current_device_resource())) {
+         rmm::mr::get_current_device_resource_ref())) {
     auto batch_view        = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
     auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(nullptr, 0);
     if (inline_vq_labels) {
@@ -902,7 +902,7 @@ void process_and_fill_codes_subspaces(
     dim,
     max_batch_size,
     copy_stream,
-    raft::resource::get_workspace_resource(res),
+    raft::resource::get_workspace_resource_ref(res),
     enable_prefetch_stream);
   vec_batches.prefetch_next_batch();
   for (const auto& batch : vec_batches) {

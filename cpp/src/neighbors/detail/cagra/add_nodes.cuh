@@ -70,7 +70,7 @@ void add_node_core(
   params.itopk_size = std::max(base_degree * 2lu, 256lu);
 
   // Memory space for rank-based neighbor list
-  auto mr = raft::resource::get_workspace_resource(handle);
+  auto mr = raft::resource::get_workspace_resource_ref(handle);
 
   auto neighbor_indices = raft::make_device_mdarray<IdxT, std::int64_t>(
     handle, mr, raft::make_extents<std::int64_t>(max_search_batch_size, base_degree));
