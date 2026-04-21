@@ -27,9 +27,12 @@ struct AlgorithmLauncher {
   AlgorithmLauncher(AlgorithmLauncher&& other) noexcept;
   AlgorithmLauncher& operator=(AlgorithmLauncher&& other) noexcept;
 
-  template <typename... Args>
+  template <typename FuncT, typename... Args>
   void dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
   {
+    static_assert(std::is_same_v<FuncT, void(std::remove_reference_t<Args>...)>,
+                  "dispatch() argument types do not match the kernel function signature FuncT");
+
     void* kernel_args[] = {const_cast<void*>(static_cast<void const*>(&args))...};
     this->call(stream, grid, block, shared_mem, kernel_args);
   }
@@ -41,5 +44,3 @@ struct AlgorithmLauncher {
   cudaKernel_t kernel;
   cudaLibrary_t library;
 };
-
-std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers();
