@@ -413,7 +413,7 @@ jobs:
     with:
       build_type: pull-request
       matrix_name: wheels-test
-      # Build for latest minor for each CUDA major x ARCH x maximum supported Python version
+      # Test for latest minor for each CUDA major x ARCH x maximum supported Python version
       matrix_filter: group_by(.ARCH, .CUDA_VER | split(".")[0] | tonumber) | max_by(.PY_VER, .CUDA_VER)
   rocky8-clib-tests:
     needs: rocky8-clib-tests-matrix
