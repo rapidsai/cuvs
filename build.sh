@@ -504,7 +504,6 @@ fi
 # Build the cuvs Rust bindings
 if (( NUMARGS == 0 )) || hasArg rust; then
     cd "${REPODIR}"/rust
-    scripts/generate-bindings.sh --check
     cargo build --examples --lib
     cargo test
 fi

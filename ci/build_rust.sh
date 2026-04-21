@@ -42,12 +42,6 @@ rapids-logger "Begin Rust build"
 
 sccache --stop-server 2>/dev/null || true
 
-# we need to set up LIBCLANG_PATH to allow rust bindgen to work,
-# grab it from the conda env
-LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
-export LIBCLANG_PATH
-echo "LIBCLANG_PATH=$LIBCLANG_PATH"
-
 bash ./build.sh rust
 
 sccache --show-adv-stats

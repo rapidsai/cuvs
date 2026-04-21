@@ -28,6 +28,8 @@ struct CuvsMetadata {
     include_dir: PathBuf,
     #[cfg(feature = "generate-bindings")]
     bindgen_include_dirs: Vec<PathBuf>,
+    #[cfg(feature = "generate-bindings")]
+    bindgen_system_include_dirs: Vec<PathBuf>,
     lib_dir: PathBuf,
 }
 
@@ -134,15 +136,24 @@ fn try_find_cuvs_package(required_version: &Version) -> Result<CuvsMetadata> {
     // CUDAToolkit and DLPack include directories are only needed for bindgen.
     #[cfg(feature = "generate-bindings")]
     let bindgen_include_dirs: Vec<_> = {
-        let cudatoolkit = find_cudatoolkit_package()?;
-        let cudatoolkit_target = find_target(&cudatoolkit, "CUDAToolkit", "CUDA::toolkit")?;
         let dlpack = find_dlpack_package()?;
         let dlpack_target = find_target(&dlpack, "dlpack", "dlpack::dlpack")?;
-        target
+        dlpack_target
             .include_directories
             .iter()
-            .chain(cudatoolkit_target.include_directories.iter())
-            .chain(dlpack_target.include_directories.iter())
+            .map(PathBuf::from)
+            .filter(|dir| dir.is_dir())
+            .filter(|dir| dir != &include_dir)
+            .collect()
+    };
+
+    #[cfg(feature = "generate-bindings")]
+    let bindgen_system_include_dirs: Vec<_> = {
+        let cudatoolkit = find_cudatoolkit_package()?;
+        let cudatoolkit_target = find_target(&cudatoolkit, "CUDAToolkit", "CUDA::toolkit")?;
+        cudatoolkit_target
+            .include_directories
+            .iter()
             .map(PathBuf::from)
             .filter(|dir| dir.is_dir())
             .collect()
@@ -162,6 +173,8 @@ fn try_find_cuvs_package(required_version: &Version) -> Result<CuvsMetadata> {
         include_dir,
         #[cfg(feature = "generate-bindings")]
         bindgen_include_dirs,
+        #[cfg(feature = "generate-bindings")]
+        bindgen_system_include_dirs,
         lib_dir,
     })
 }
@@ -217,7 +230,11 @@ fn locate_cuvs() -> Result<CuvsMetadata> {
 }
 
 #[cfg(feature = "generate-bindings")]
-fn generate_bindings(include_dirs: &[PathBuf]) {
+fn generate_bindings(
+    include_dir: &Path,
+    include_dirs: &[PathBuf],
+    system_include_dirs: &[PathBuf],
+) {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR not set by Cargo"));
 
     let mut builder = bindgen::Builder::default()
@@ -228,8 +245,14 @@ fn generate_bindings(include_dirs: &[PathBuf]) {
         .rustified_enum("(cuvs|DL|cudaError).*")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
+    builder = builder.clang_arg(format!("-I{}", include_dir.display()));
+
     for include_dir in include_dirs {
         builder = builder.clang_arg(format!("-I{}", include_dir.display()));
+    }
+
+    for include_dir in system_include_dirs {
+        builder = builder.clang_arg(format!("-isystem{}", include_dir.display()));
     }
 
     builder
@@ -267,5 +290,9 @@ fn main() {
     println!("cargo::metadata=lib={}", metadata.lib_dir.display());
 
     #[cfg(feature = "generate-bindings")]
-    generate_bindings(&metadata.bindgen_include_dirs);
+    generate_bindings(
+        &metadata.include_dir,
+        &metadata.bindgen_include_dirs,
+        &metadata.bindgen_system_include_dirs,
+    );
 }
