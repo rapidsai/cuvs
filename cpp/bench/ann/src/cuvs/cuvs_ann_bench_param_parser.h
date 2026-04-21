@@ -373,6 +373,12 @@ void parse_build_param(const nlohmann::json& conf,
         ace_params.ef_construction = ace_conf.at("ef_construction");
       }
       if (ace_conf.contains("use_disk")) { ace_params.use_disk = ace_conf.at("use_disk"); }
+      if (ace_conf.contains("max_host_memory_gb")) {
+        ace_params.max_host_memory_gb = ace_conf.at("max_host_memory_gb");
+      }
+      if (ace_conf.contains("max_gpu_memory_gb")) {
+        ace_params.max_gpu_memory_gb = ace_conf.at("max_gpu_memory_gb");
+      }
       cagra_params.graph_build_params = ace_params;
     }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
