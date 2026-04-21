@@ -290,19 +290,52 @@ void _extend(cuvsResources_t res,
   auto extend_params           = cuvs::neighbors::cagra::extend_params();
   extend_params.max_chunk_size = params.max_chunk_size;
 
+  auto cur_ds = index_ptr->dataset();
+  const auto stride_elems =
+    cur_ds.stride(0) > 0 ? static_cast<int64_t>(cur_ds.stride(0)) : static_cast<int64_t>(cur_ds.extent(1));
+  const auto dim          = static_cast<int64_t>(index_ptr->dim());
+  const auto initial_rows = static_cast<int64_t>(index_ptr->size());
+
+  int64_t add_n = 0;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
-    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr);
+    add_n             = static_cast<int64_t>(mds.extent(0));
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
-    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr);
+    add_n             = static_cast<int64_t>(mds.extent(0));
   } else {
     RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
               dataset.dtype.code,
               dataset.dtype.bits);
   }
+
+  auto extended_storage =
+    raft::make_device_matrix<T, int64_t, raft::row_major>(*res_ptr, initial_rows + add_n, stride_elems);
+  auto ndv_buf = std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>>(
+    raft::make_device_strided_matrix_view<T, int64_t>(
+      extended_storage.data_handle(), initial_rows + add_n, dim, stride_elems));
+
+  if (cuvs::core::is_dlpack_device_compatible(dataset)) {
+    using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, ndv_buf, std::nullopt);
+  } else {
+    using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, ndv_buf, std::nullopt);
+  }
+
+  RAFT_EXPECTS(index.merged_owner != 0,
+               "cuvsCagraExtend: extended dataset storage must be kept alive via merged_owner "
+               "(build the index through a path that registers merged_owner, e.g. host dataset or "
+               "device dataset copied to a padded buffer).");
+
+  auto* holder = reinterpret_cast<merged_cagra_holder<T>*>(index.merged_owner);
+  holder->padded_dataset_owner =
+    std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(std::move(extended_storage),
+                                                                           index_ptr->dim());
 }
 
 template <typename T, typename IdxT>
