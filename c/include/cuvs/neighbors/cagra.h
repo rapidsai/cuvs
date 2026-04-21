@@ -466,9 +466,10 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 /**
  * @brief Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
  *
- * When the index was created by cuvsCagraMerge, \p merged_owner is non-null and must be
- * deleted (by the implementation) when the index is destroyed; \p addr then points at the
- * index inside that allocation. When \p merged_owner is 0, \p addr is a raw index pointer.
+ * When the index was created by cuvsCagraMerge or cuvsCagraDeserialize (when the serialized
+ * index included a dataset), \p merged_owner is non-null and must be deleted (by the
+ * implementation) when the index is destroyed; \p addr then points at the index inside that
+ * allocation. When \p merged_owner is 0, \p addr is a raw index pointer.
  */
 typedef struct {
   uintptr_t addr;

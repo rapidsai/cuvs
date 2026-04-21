@@ -31,7 +31,7 @@
 
 namespace {
 
-/** Row stride must match `make_padded_dataset_view` / CAGRA alignment (see cuvs::neighbors::common.hpp). */
+/** Row stride must match `make_padded_dataset_view` / CAGRA alignment (see cuvs::neighbors/common.hpp). */
 template <typename T>
 bool device_row_stride_is_padded(raft::device_matrix_view<T const, int64_t, raft::row_major> mds)
 {
@@ -44,6 +44,23 @@ bool device_row_stride_is_padded(raft::device_matrix_view<T const, int64_t, raft
     kSize;
   uint32_t src_stride =
     mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
+  return src_stride == required_stride;
+}
+
+/** Same alignment rule as above for `layout_stride` views (`index::dataset()`). */
+template <typename T>
+bool device_strided_matrix_has_cagra_row_pitch(
+  raft::device_matrix_view<T const, int64_t, raft::layout_stride> v)
+{
+  constexpr size_t kSize       = sizeof(T);
+  constexpr uint32_t align_b = 16;
+  uint32_t required_stride =
+    raft::round_up_safe<size_t>(
+      static_cast<size_t>(v.extent(1)) * kSize,
+      std::lcm(align_b, static_cast<uint32_t>(kSize))) /
+    kSize;
+  uint32_t src_stride =
+    v.stride(0) > 0 ? static_cast<uint32_t>(v.stride(0)) : static_cast<uint32_t>(v.extent(1));
   return src_stride == required_stride;
 }
 
@@ -374,12 +391,30 @@ void _serialize_to_hnswlib(cuvsResources_t res, const char* filename, cuvsCagraI
 }
 
 template <typename T>
-void* _deserialize(cuvsResources_t res, const char* filename)
+void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t output_index)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
-  cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), index);
-  return index;
+  auto* holder = new merged_cagra_holder<T>{
+    cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr),
+    raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+    nullptr};
+  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+  cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), &holder->idx, &out_dataset);
+  holder->padded_dataset_owner = std::move(out_dataset);
+
+  // Deserialized strided layout often matches logical dim (tight rows). CAGRA search requires the
+  // same padded row pitch as device builds (see `device_row_stride_is_padded` / `update_dataset`).
+  auto ds = holder->idx.dataset();
+  if (ds.extent(0) > 0 && !device_strided_matrix_has_cagra_row_pitch<T>(ds)) {
+    auto padded =
+      cuvs::neighbors::make_padded_dataset(*res_ptr, ds);
+    holder->idx.update_dataset(*res_ptr, padded->as_dataset_view());
+    holder->padded_dataset_owner =
+      std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release());
+  }
+
+  output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+  output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
 }
 
 template <typename T>
@@ -985,19 +1020,18 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
     is.read(dtype_string, 4);
     auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
 
-    index->dtype.bits    = dtype.itemsize * 8;
-    index->merged_owner  = 0;
+    index->dtype.bits = dtype.itemsize * 8;
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
-      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
+      _deserialize<float>(res, filename, index);
       index->dtype.code = kDLFloat;
     } else if (dtype.kind == 'e' && dtype.itemsize == 2) {
-      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half>(res, filename));
+      _deserialize<half>(res, filename, index);
       index->dtype.code = kDLFloat;
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
-      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename));
+      _deserialize<int8_t>(res, filename, index);
       index->dtype.code = kDLInt;
     } else if (dtype.kind == 'u' && dtype.itemsize == 1) {
-      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<uint8_t>(res, filename));
+      _deserialize<uint8_t>(res, filename, index);
       index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dtype in file %s", filename);
