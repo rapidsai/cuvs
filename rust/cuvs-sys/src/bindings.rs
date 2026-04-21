@@ -3130,6 +3130,117 @@ unsafe extern "C" {
     ) -> cuvsError_t;
 }
 #[repr(u32)]
+#[doc = " @brief Solver algorithm for PCA eigen decomposition."]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum cuvsPcaSolver {
+    #[doc = " Covariance + divide-and-conquer eigen decomposition"]
+    CUVS_PCA_COV_EIG_DQ = 0,
+    #[doc = " Covariance + Jacobi eigen decomposition"]
+    CUVS_PCA_COV_EIG_JACOBI = 1,
+}
+#[doc = " @brief Parameters for PCA decomposition."]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct cuvsPcaParams {
+    #[doc = " Number of principal components to keep."]
+    pub n_components: ::std::os::raw::c_int,
+    #[doc = " If false, data passed to fit are overwritten and running fit(X).transform(X) will\n not yield the expected results; use fit_transform(X) instead."]
+    pub copy: bool,
+    #[doc = " When true the component vectors are multiplied by the square root of n_samples and then\n divided by the singular values to ensure uncorrelated outputs with unit component-wise\n variances."]
+    pub whiten: bool,
+    #[doc = " Solver algorithm to use."]
+    pub algorithm: cuvsPcaSolver,
+    #[doc = " Tolerance for singular values (used by Jacobi solver)."]
+    pub tol: f32,
+    #[doc = " Number of iterations for the power method (Jacobi solver)."]
+    pub n_iterations: ::std::os::raw::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of cuvsPcaParams"][::std::mem::size_of::<cuvsPcaParams>() - 20usize];
+    ["Alignment of cuvsPcaParams"][::std::mem::align_of::<cuvsPcaParams>() - 4usize];
+    ["Offset of field: cuvsPcaParams::n_components"]
+        [::std::mem::offset_of!(cuvsPcaParams, n_components) - 0usize];
+    ["Offset of field: cuvsPcaParams::copy"][::std::mem::offset_of!(cuvsPcaParams, copy) - 4usize];
+    ["Offset of field: cuvsPcaParams::whiten"]
+        [::std::mem::offset_of!(cuvsPcaParams, whiten) - 5usize];
+    ["Offset of field: cuvsPcaParams::algorithm"]
+        [::std::mem::offset_of!(cuvsPcaParams, algorithm) - 8usize];
+    ["Offset of field: cuvsPcaParams::tol"][::std::mem::offset_of!(cuvsPcaParams, tol) - 12usize];
+    ["Offset of field: cuvsPcaParams::n_iterations"]
+        [::std::mem::offset_of!(cuvsPcaParams, n_iterations) - 16usize];
+};
+pub type cuvsPcaParams_t = *mut cuvsPcaParams;
+unsafe extern "C" {
+    #[must_use]
+    #[doc = " @brief Allocate PCA params and populate with default values.\n\n @param[out] params cuvsPcaParams_t to allocate\n @return cuvsError_t"]
+    pub fn cuvsPcaParamsCreate(params: *mut cuvsPcaParams_t) -> cuvsError_t;
+}
+unsafe extern "C" {
+    #[must_use]
+    #[doc = " @brief De-allocate PCA params.\n\n @param[in] params cuvsPcaParams_t to de-allocate\n @return cuvsError_t"]
+    pub fn cuvsPcaParamsDestroy(params: cuvsPcaParams_t) -> cuvsError_t;
+}
+unsafe extern "C" {
+    #[must_use]
+    #[doc = " @brief Perform PCA fit operation.\n\n Computes the principal components, explained variances, singular values, and column means\n from the input data.\n\n @code {.c}\n #include <cuvs/core/c_api.h>\n #include <cuvs/preprocessing/pca.h>\n\n // Create cuvsResources_t\n cuvsResources_t res;\n cuvsResourcesCreate(&res);\n\n // Create PCA params\n cuvsPcaParams_t params;\n cuvsPcaParamsCreate(&params);\n params->n_components = 2;\n\n // Assume populated DLManagedTensor objects (col-major, float32, device memory)\n DLManagedTensor input;          // [n_rows x n_cols]\n DLManagedTensor components;     // [n_components x n_cols]\n DLManagedTensor explained_var;  // [n_components]\n DLManagedTensor explained_var_ratio; // [n_components]\n DLManagedTensor singular_vals;  // [n_components]\n DLManagedTensor mu;             // [n_cols]\n DLManagedTensor noise_vars;     // [1] (scalar)\n\n cuvsPcaFit(res, params, &input, &components, &explained_var,\n            &explained_var_ratio, &singular_vals, &mu, &noise_vars, false);\n\n // Cleanup\n cuvsPcaParamsDestroy(params);\n cuvsResourcesDestroy(res);\n @endcode\n\n @param[in] res cuvsResources_t opaque C handle\n @param[in] params PCA parameters\n @param[inout] input input data [n_rows x n_cols] (col-major, float32, device)\n @param[out] components principal components [n_components x n_cols] (col-major, float32, device)\n @param[out] explained_var explained variances [n_components] (float32, device)\n @param[out] explained_var_ratio explained variance ratios [n_components] (float32, device)\n @param[out] singular_vals singular values [n_components] (float32, device)\n @param[out] mu column means [n_cols] (float32, device)\n @param[out] noise_vars noise variance [1] (float32, device)\n @param[in] flip_signs_based_on_U whether to determine signs by U (true) or V.T (false)\n @return cuvsError_t"]
+    pub fn cuvsPcaFit(
+        res: cuvsResources_t,
+        params: cuvsPcaParams_t,
+        input: *mut DLManagedTensor,
+        components: *mut DLManagedTensor,
+        explained_var: *mut DLManagedTensor,
+        explained_var_ratio: *mut DLManagedTensor,
+        singular_vals: *mut DLManagedTensor,
+        mu: *mut DLManagedTensor,
+        noise_vars: *mut DLManagedTensor,
+        flip_signs_based_on_U: bool,
+    ) -> cuvsError_t;
+}
+unsafe extern "C" {
+    #[must_use]
+    #[doc = " @brief Perform PCA fit and transform in a single operation.\n\n Computes the principal components and transforms the input data into the eigenspace.\n\n @param[in] res cuvsResources_t opaque C handle\n @param[in] params PCA parameters\n @param[inout] input input data [n_rows x n_cols] (col-major, float32, device)\n @param[out] trans_input transformed data [n_rows x n_components] (col-major, float32, device)\n @param[out] components principal components [n_components x n_cols] (col-major, float32, device)\n @param[out] explained_var explained variances [n_components] (float32, device)\n @param[out] explained_var_ratio explained variance ratios [n_components] (float32, device)\n @param[out] singular_vals singular values [n_components] (float32, device)\n @param[out] mu column means [n_cols] (float32, device)\n @param[out] noise_vars noise variance [1] (float32, device)\n @param[in] flip_signs_based_on_U whether to determine signs by U (true) or V.T (false)\n @return cuvsError_t"]
+    pub fn cuvsPcaFitTransform(
+        res: cuvsResources_t,
+        params: cuvsPcaParams_t,
+        input: *mut DLManagedTensor,
+        trans_input: *mut DLManagedTensor,
+        components: *mut DLManagedTensor,
+        explained_var: *mut DLManagedTensor,
+        explained_var_ratio: *mut DLManagedTensor,
+        singular_vals: *mut DLManagedTensor,
+        mu: *mut DLManagedTensor,
+        noise_vars: *mut DLManagedTensor,
+        flip_signs_based_on_U: bool,
+    ) -> cuvsError_t;
+}
+unsafe extern "C" {
+    #[must_use]
+    #[doc = " @brief Perform PCA transform operation.\n\n Transforms the input data into the eigenspace using previously computed principal components.\n\n @param[in] res cuvsResources_t opaque C handle\n @param[in] params PCA parameters\n @param[inout] input data to transform [n_rows x n_cols] (col-major, float32, device)\n @param[in] components principal components [n_components x n_cols] (col-major, float32, device)\n @param[in] singular_vals singular values [n_components] (float32, device)\n @param[in] mu column means [n_cols] (float32, device)\n @param[out] trans_input transformed data [n_rows x n_components] (col-major, float32, device)\n @return cuvsError_t"]
+    pub fn cuvsPcaTransform(
+        res: cuvsResources_t,
+        params: cuvsPcaParams_t,
+        input: *mut DLManagedTensor,
+        components: *mut DLManagedTensor,
+        singular_vals: *mut DLManagedTensor,
+        mu: *mut DLManagedTensor,
+        trans_input: *mut DLManagedTensor,
+    ) -> cuvsError_t;
+}
+unsafe extern "C" {
+    #[must_use]
+    #[doc = " @brief Perform PCA inverse transform operation.\n\n Transforms data from the eigenspace back to the original space.\n\n @param[in] res cuvsResources_t opaque C handle\n @param[in] params PCA parameters\n @param[in] trans_input transformed data [n_rows x n_components] (col-major, float32, device)\n @param[in] components principal components [n_components x n_cols] (col-major, float32, device)\n @param[in] singular_vals singular values [n_components] (float32, device)\n @param[in] mu column means [n_cols] (float32, device)\n @param[out] output reconstructed data [n_rows x n_cols] (col-major, float32, device)\n @return cuvsError_t"]
+    pub fn cuvsPcaInverseTransform(
+        res: cuvsResources_t,
+        params: cuvsPcaParams_t,
+        trans_input: *mut DLManagedTensor,
+        components: *mut DLManagedTensor,
+        singular_vals: *mut DLManagedTensor,
+        mu: *mut DLManagedTensor,
+        output: *mut DLManagedTensor,
+    ) -> cuvsError_t;
+}
+#[repr(u32)]
 #[doc = " @defgroup preprocessing_c_binary C API for Binary Quantizer\n @{\n/\n/**\n @brief In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in\n the dataset vector is greater than the corresponding element in the threshold vector. The mean\n and sampling_median thresholds are calculated separately for each dimension.\n"]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum cuvsBinaryQuantizerThreshold {

@@ -56,6 +56,10 @@ if [[ -z "${target_dir}" ]]; then
   exit 1
 fi
 
+cargo clean \
+  -p cuvs-sys \
+  --manifest-path "${rust_dir}/Cargo.toml"
+
 cargo build \
   -p cuvs-sys \
   --features generate-bindings \
