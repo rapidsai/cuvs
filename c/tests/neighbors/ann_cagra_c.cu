@@ -165,12 +165,23 @@ TEST(CagraC, BuildExtendSearch)
     (main_data_size + additional_data_size + num_queries) * dimensions, stream);
   rmm::device_uvector<int32_t> random_labels_d(
     (main_data_size + additional_data_size + num_queries) * dimensions, stream);
-  raft::random::make_blobs(random_data_d.data(),
-                           random_labels_d.data(),
-                           main_data_size + additional_data_size + num_queries,
-                           dimensions,
-                           10,
-                           stream);
+
+  raft::random::make_blobs<float, int32_t>(
+    random_data_d.data(),
+    random_labels_d.data(),
+    main_data_size + additional_data_size + num_queries,
+    dimensions,
+    static_cast<int32_t>(10),
+    stream,
+    true,
+    nullptr,
+    nullptr,
+    1.0f,
+    true,
+    -10.0f,
+    10.0f,
+    42ULL,
+    raft::random::GenPC);
 
   // create  dataset DLTensor
   rmm::device_uvector<float> main_d(main_data_size * dimensions, stream);
