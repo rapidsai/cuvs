@@ -238,9 +238,7 @@ def test_cagra_vpq_compression():
     dim = 64
     pq_len = 2
     run_cagra_build_search_test(
-        n_cols=dim,
-        compression=cagra.CompressionParams(pq_dim=dim / pq_len),
-        array_type="device",
+        n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
     )
 
 
