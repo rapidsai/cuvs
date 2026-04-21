@@ -44,5 +44,3 @@ struct AlgorithmLauncher {
   cudaKernel_t kernel;
   cudaLibrary_t library;
 };
-
-std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers();
