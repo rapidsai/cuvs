@@ -631,11 +631,21 @@ void kmeans_fit(
 
   const DataT* weight_ptr =
     sample_weight.has_value() ? sample_weight.value().data_handle() : nullptr;
-  DataT weight_scale = compute_weight_scale<DataT, IndexT>(handle, weight_ptr, n_samples);
+  DataT wt_sum = sample_weight.has_value() ? weightSum(handle, sample_weight.value())
+                                           : static_cast<DataT>(n_samples);
 
   rmm::device_uvector<char> workspace(0, stream);
 
-  constexpr bool data_on_device = !raft::is_host_mdspan_v<decltype(X)>;
+  constexpr bool data_on_device = raft::is_device_mdspan_v<decltype(X)>;
+
+  if (data_on_device && streaming_batch_size != static_cast<IndexT>(n_samples)) {
+    RAFT_LOG_WARN(
+      "KMeans: streaming_batch_size (%zu) ignored when data resides on device; using n_samples "
+      "(%zu)",
+      static_cast<size_t>(streaming_batch_size),
+      static_cast<size_t>(n_samples));
+    streaming_batch_size = static_cast<IndexT>(n_samples);
+  }
 
   auto init_centroids = [&](const cuvs::cluster::kmeans::params& iter_params,
                             raft::device_matrix_view<DataT, IndexT> centroidsRawData) {
@@ -652,23 +662,30 @@ void kmeans_fit(
     if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
       raft::matrix::sample_rows(handle, random_state, X, centroidsRawData);
     } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-      IndexT default_init_size =
-        data_on_device ? n_samples : std::min(static_cast<IndexT>(3 * n_clusters), n_samples);
-      IndexT init_sample_size = iter_params.init_size > 0
-                                  ? std::min(static_cast<IndexT>(iter_params.init_size), n_samples)
-                                  : default_init_size;
+      auto run_kmeanspp = [&](raft::device_matrix_view<const DataT, IndexT> init_data) {
+        if (iter_params.oversampling_factor == 0)
+          kmeansPlusPlus<DataT, IndexT>(
+            handle, iter_params, init_data, centroidsRawData, workspace);
+        else
+          initScalableKMeansPlusPlus<DataT, IndexT>(
+            handle, iter_params, init_data, centroidsRawData, workspace);
+      };
 
-      auto init_sample =
-        raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
-      raft::matrix::sample_rows(handle, random_state, X, init_sample.view());
+      if constexpr (data_on_device) {
+        run_kmeanspp(X);
+      } else {
+        IndexT default_init_size =
+          std::min(static_cast<IndexT>(std::int64_t{3} * n_clusters), n_samples);
+        IndexT init_sample_size =
+          iter_params.init_size > 0
+            ? std::min(static_cast<IndexT>(iter_params.init_size), n_samples)
+            : default_init_size;
 
-      auto init_sample_const = raft::make_const_mdspan(init_sample.view());
-      if (iter_params.oversampling_factor == 0)
-        kmeansPlusPlus<DataT, IndexT>(
-          handle, iter_params, init_sample_const, centroidsRawData, workspace);
-      else
-        initScalableKMeansPlusPlus<DataT, IndexT>(
-          handle, iter_params, init_sample_const, centroidsRawData, workspace);
+        auto init_sample =
+          raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
+        raft::matrix::sample_rows(handle, random_state, X, init_sample.view());
+        run_kmeanspp(raft::make_const_mdspan(init_sample.view()));
+      }
     } else {
       THROW("unknown initialization method to select initial centers");
     }
@@ -712,11 +729,14 @@ void kmeans_fit(
   auto prepare_batch_weights = [&](const auto& wt_batch, IndexT cur_batch_size) {
     if (weight_ptr != nullptr) {
       raft::copy(batch_weights_buf.data_handle(), wt_batch.data(), cur_batch_size, stream);
-      if (weight_scale != DataT{1}) {
+      if (wt_sum != static_cast<DataT>(n_samples)) {
         auto bw = raft::make_device_vector_view<DataT, IndexT>(batch_weights_buf.data_handle(),
                                                                cur_batch_size);
-        raft::linalg::map(
-          handle, bw, raft::mul_const_op<DataT>{weight_scale}, raft::make_const_mdspan(bw));
+        raft::linalg::map(handle,
+                          bw,
+                          raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
+                                           raft::div_const_op<DataT>{wt_sum}),
+                          raft::make_const_mdspan(bw));
       }
     }
     return raft::make_device_vector_view<const DataT, IndexT>(batch_weights_buf.data_handle(),
@@ -1012,8 +1032,16 @@ void kmeans_predict(raft::resources const& handle,
   else
     raft::matrix::fill(handle, weight.view(), DataT(1));
 
-  // check if weights sum up to n_samples
-  if (normalize_weight) checkWeight(handle, weight.view(), workspace);
+  if (normalize_weight) {
+    DataT wt_sum = weightSum(handle, raft::make_const_mdspan(weight.view()));
+    if (wt_sum != static_cast<DataT>(n_samples)) {
+      raft::linalg::map(handle,
+                        weight.view(),
+                        raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
+                                         raft::div_const_op<DataT>{wt_sum}),
+                        raft::make_const_mdspan(weight.view()));
+    }
+  }
 
   auto minClusterAndDistance =
     raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(handle, n_samples);

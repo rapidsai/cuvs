@@ -133,43 +133,43 @@ void countLabels(raft::resources const& handle,
                                                     stream));
 }
 
-template <typename DataT, typename IndexT>
-void checkWeight(raft::resources const& handle,
-                 raft::device_vector_view<DataT, IndexT> weight,
-                 rmm::device_uvector<char>& workspace)
+/**
+ * @brief Compute the sum of sample weights.
+ *
+ * Device-accessible mdspans are reduced on device via mapThenSumReduce;
+ * host mdspans are summed on the host.
+ *
+ * @return Sum of weights.
+ */
+template <typename DataT, typename IndexT, typename Accessor>
+DataT weightSum(
+  raft::resources const& handle,
+  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor> weight)
 {
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto wt_aggr        = raft::make_device_scalar<DataT>(handle, 0);
-  auto n_samples      = weight.extent(0);
+  auto n_samples = weight.extent(0);
+  auto ns        = static_cast<DataT>(n_samples);
 
-  size_t temp_storage_bytes = 0;
-  RAFT_CUDA_TRY(cub::DeviceReduce::Sum(
-    nullptr, temp_storage_bytes, weight.data_handle(), wt_aggr.data_handle(), n_samples, stream));
+  DataT wt_sum = DataT{0};
+  if constexpr (raft::is_device_mdspan_v<decltype(weight)>) {
+    auto stream   = raft::resource::get_cuda_stream(handle);
+    auto d_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});
+    raft::linalg::mapThenSumReduce(
+      d_wt_sum.data_handle(), n_samples, raft::identity_op{}, stream, weight.data_handle());
+    raft::copy(&wt_sum, d_wt_sum.data_handle(), 1, stream);
+    raft::resource::sync_stream(handle);
+  } else {
+    for (IndexT i = 0; i < n_samples; ++i) {
+      wt_sum += weight(i);
+    }
+  }
 
-  workspace.resize(temp_storage_bytes, stream);
-
-  RAFT_CUDA_TRY(cub::DeviceReduce::Sum(workspace.data(),
-                                       temp_storage_bytes,
-                                       weight.data_handle(),
-                                       wt_aggr.data_handle(),
-                                       n_samples,
-                                       stream));
-  DataT wt_sum = 0;
-  raft::copy(handle,
-             raft::make_host_scalar_view(&wt_sum),
-             raft::make_device_scalar_view(wt_aggr.data_handle()));
-  raft::resource::sync_stream(handle);
-
-  if (wt_sum != n_samples) {
+  if (wt_sum != ns) {
     RAFT_LOG_DEBUG(
       "[Warning!] KMeans: normalizing the user provided sample weight to "
-      "sum up to %d samples",
-      n_samples);
-
-    auto scale = static_cast<DataT>(n_samples) / wt_sum;
-    raft::linalg::map(
-      handle, weight, raft::mul_const_op<DataT>{scale}, raft::make_const_mdspan(weight));
+      "sum up to %zu samples",
+      static_cast<size_t>(n_samples));
   }
+  return wt_sum;
 }
 
 template <typename IndexT>
@@ -606,53 +606,6 @@ DataT compute_centroid_shift(raft::resources const& handle,
   raft::copy(&result, sqrdNorm.data_handle(), 1, stream);
   raft::resource::sync_stream(handle);
   return result;
-}
-
-/**
- * @brief Compute the weight normalization scale factor for sample weights that may
- * reside on host memory.  Weights are normalized to sum to n_samples.
- *
- * Works on any contiguous pointer (host or device) by copying to host for the sum.
- *
- * @tparam DataT  Weight type
- * @tparam IndexT Index type
- *
- * @param[in] handle      RAFT resources handle
- * @param[in] weight_ptr  Pointer to sample weights (host or device), may be nullptr
- * @param[in] n_samples   Number of samples
- * @return Scale factor (1.0 if weights already sum to n_samples or nullptr)
- */
-template <typename DataT, typename IndexT>
-DataT compute_weight_scale(raft::resources const& handle, const DataT* weight_ptr, IndexT n_samples)
-{
-  if (weight_ptr == nullptr) { return DataT{1}; }
-
-  bool is_device_accessible =
-    raft::is_device_accessible(raft::memory_type_from_pointer(weight_ptr));
-
-  DataT wt_sum = DataT{0};
-  if (!is_device_accessible) {
-    for (IndexT i = 0; i < n_samples; ++i) {
-      wt_sum += weight_ptr[i];
-    }
-  } else {
-    std::vector<DataT> h_weights(n_samples);
-    auto d_view = raft::make_device_vector_view<const DataT, IndexT>(weight_ptr, n_samples);
-    auto h_view = raft::make_host_vector_view<DataT, IndexT>(h_weights.data(), n_samples);
-    raft::copy(handle, h_view, d_view);
-    raft::resource::sync_stream(handle);
-    for (IndexT i = 0; i < n_samples; ++i) {
-      wt_sum += h_weights[i];
-    }
-  }
-
-  if (wt_sum == static_cast<DataT>(n_samples)) { return DataT{1}; }
-
-  RAFT_LOG_DEBUG(
-    "[Warning!] KMeans: normalizing the user provided sample weight to "
-    "sum up to %zu samples",
-    static_cast<size_t>(n_samples));
-  return static_cast<DataT>(n_samples) / wt_sum;
 }
 
 /**

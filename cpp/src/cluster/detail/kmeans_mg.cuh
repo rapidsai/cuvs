@@ -467,15 +467,9 @@ void checkWeights(const raft::resources& handle,
 
   const auto& comm = raft::resource::get_comms(handle);
 
-  auto n_samples            = weight.extent(0);
-  size_t temp_storage_bytes = 0;
-  RAFT_CUDA_TRY(cub::DeviceReduce::Sum(
-    nullptr, temp_storage_bytes, weight.data_handle(), wt_aggr.data(), n_samples, stream));
-
-  workspace.resize(temp_storage_bytes, stream);
-
-  RAFT_CUDA_TRY(cub::DeviceReduce::Sum(
-    workspace.data(), temp_storage_bytes, weight.data_handle(), wt_aggr.data(), n_samples, stream));
+  auto n_samples = weight.extent(0);
+  raft::linalg::mapThenSumReduce(
+    wt_aggr.data(), n_samples, raft::identity_op{}, stream, weight.data_handle());
 
   comm.allreduce<DataT>(wt_aggr.data(),  // sendbuff
                         wt_aggr.data(),  // recvbuff
@@ -491,9 +485,11 @@ void checkWeights(const raft::resources& handle,
                     "sum up to %d samples",
                     n_samples);
 
-    DataT scale = n_samples / wt_sum;
-    raft::linalg::map(
-      handle, weight, raft::mul_const_op<DataT>(scale), raft::make_const_mdspan(weight));
+    raft::linalg::map(handle,
+                      weight,
+                      raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
+                                       raft::div_const_op<DataT>{wt_sum}),
+                      raft::make_const_mdspan(weight));
   }
 }
 
