@@ -659,10 +659,10 @@ void process_batch(
   raft::device_matrix_view<DataT, IndexT> batch_sums,
   raft::device_vector_view<DataT, IndexT> batch_counts,
   raft::device_scalar_view<DataT> clustering_cost,
+  rmm::device_uvector<char>& batch_workspace,
   std::optional<raft::device_vector_view<const DataT, IndexT>> centroid_norms = std::nullopt)
 {
-  cudaStream_t stream     = raft::resource::get_cuda_stream(handle);
-  IndexT current_batch_sz = batch_data.extent(0);
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   minClusterAndDistanceCompute<DataT, IndexT>(handle,
                                               batch_data,
@@ -680,9 +680,6 @@ void process_batch(
   thrust::transform_iterator<KeyValueIndexOp<IndexT, DataT>,
                              const raft::KeyValuePair<IndexT, DataT>*>
     labels_itr(minClusterAndDistance.data_handle(), conversion_op);
-
-  auto batch_workspace = rmm::device_uvector<char>(
-    current_batch_sz, stream, raft::resource::get_workspace_resource(handle));
 
   compute_centroid_adjustments(handle,
                                batch_data,
