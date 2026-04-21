@@ -1,7 +1,7 @@
 Spectral Clustering
 ===================
 
-To use spectral clustering in Python, see cuML's `SpectralClustering <https://docs.rapids.ai/api/cuml/stable/api/#spectral-clustering>`_ estimator.
+To use spectral clustering in Python, see cuML's `SpectralClustering <https://docs.rapids.ai/api/cuml/stable/api/generated/cuml.cluster.spectralclustering/>`_ estimator.
 
 The `cuML <https://github.com/rapidsai/cuml>`_ library offers a Python interface powered by cuVS under the hood.
 

@@ -8,12 +8,5 @@ Preprocessing
 .. toctree::
    :maxdepth: 2
 
+   preprocessing_pca.rst
    preprocessing_quantize.rst
-
-PCA (Principal Component Analysis)
------------------------------------
-
-.. doxygengroup:: preprocessing_c_pca
-    :project: cuvs
-    :members:
-    :content-only:

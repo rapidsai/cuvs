@@ -15,5 +15,6 @@ Nearest Neighbors
    neighbors_hnsw_c.rst
    neighbors_ivf_flat_c.rst
    neighbors_ivf_pq_c.rst
+   neighbors_mg.rst
    neighbors_nn_descent_c.rst
    neighbors_vamana_c.rst
