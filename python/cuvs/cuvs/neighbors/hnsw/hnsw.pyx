@@ -408,7 +408,7 @@ def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
 
 @auto_sync_resources
 def from_cagra(IndexParams index_params, cagra.Index cagra_index,
-               temporary_index_path=None, resources=None):
+               temporary_index_path=None, dataset=None, resources=None):
     """
     Returns an HNSW index from a CAGRA index.
 
@@ -436,6 +436,17 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
     temporary_index_path : string, default = None
         Path to save the temporary index file. If None, the temporary file
         will be saved in `/tmp/<random_number>.bin`.
+    dataset : Host array interface compliant matrix, default = None (optional)
+        The original dataset used to build the CAGRA index, shape
+        ``(n_samples, dim)`` and dtype in
+        ``[float32, float16, int8, uint8]``. When provided for a disk-backed
+        CAGRA index produced by ACE, the HNSW index will be built against the
+        original row id space. The ACE-reordered graph is remapped back to
+        the original ids and the remapped graph is written to disk alongside
+        the other ACE artifacts as ``cagra_graph_original_ids.npy``. When
+        ``None`` (the default), the disk-backed HNSW index keeps the
+        ACE-reordered row ids and callers must apply ``dataset_mapping.npy``
+        to translate search results back to the original id space.
     {resources_docstring}
 
     Examples
@@ -457,12 +468,29 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
 
     cdef Index hnsw_index = Index()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
-    check_cuvs(cuvsHnswFromCagra(
-        res,
-        index_params.params,
-        cagra_index.index,
-        hnsw_index.index
-    ))
+    cdef cydlpack.DLManagedTensor* dataset_dlpack = NULL
+
+    if dataset is None:
+        check_cuvs(cuvsHnswFromCagra(
+            res,
+            index_params.params,
+            cagra_index.index,
+            hnsw_index.index
+        ))
+    else:
+        dataset_ai = wrap_array(dataset)
+        _check_input_array(dataset_ai, [np.dtype('float32'),
+                                        np.dtype('float16'),
+                                        np.dtype('uint8'),
+                                        np.dtype('int8')])
+        dataset_dlpack = cydlpack.dlpack_c(dataset_ai)
+        check_cuvs(cuvsHnswFromCagraWithDataset(
+            res,
+            index_params.params,
+            cagra_index.index,
+            hnsw_index.index,
+            dataset_dlpack
+        ))
 
     hnsw_index.trained = True
     return hnsw_index
