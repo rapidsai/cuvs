@@ -37,22 +37,23 @@ struct params {
          bool use_vq,
          uint32_t vq_n_centers,
          uint32_t kmeans_n_iters,
-         cuvs::cluster::kmeans::kmeans_type pq_kmeans_type,
-         uint32_t max_train_points_per_pq_code,
-         uint32_t max_train_points_per_vq_cluster)
+         cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
+           cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+         uint32_t max_train_points_per_pq_code    = 256,
+         uint32_t max_train_points_per_vq_cluster = 1024)
+    : pq_bits(pq_bits),
+      pq_dim(pq_dim),
+      use_subspaces(use_subspaces),
+      use_vq(use_vq),
+      vq_n_centers(vq_n_centers),
+      kmeans_params(
+        pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced
+          ? kmeans_params_variant{cuvs::cluster::kmeans::balanced_params{.n_iters = kmeans_n_iters}}
+          : kmeans_params_variant{cuvs::cluster::kmeans::params{.n_clusters = 1 << pq_bits,
+                                                                .max_iter = (int)kmeans_n_iters}}),
+      max_train_points_per_pq_code(max_train_points_per_pq_code),
+      max_train_points_per_vq_cluster(max_train_points_per_vq_cluster)
   {
-    this->pq_bits       = pq_bits;
-    this->pq_dim        = pq_dim;
-    this->use_subspaces = use_subspaces;
-    this->use_vq        = use_vq;
-    this->vq_n_centers  = vq_n_centers;
-    this->kmeans_params =
-      pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced
-        ? kmeans_params_variant{cuvs::cluster::kmeans::balanced_params{.n_iters = kmeans_n_iters}}
-        : kmeans_params_variant{cuvs::cluster::kmeans::params{.n_clusters = 1 << pq_bits,
-                                                              .max_iter   = (int)kmeans_n_iters}};
-    this->max_train_points_per_pq_code    = max_train_points_per_pq_code;
-    this->max_train_points_per_vq_cluster = max_train_points_per_vq_cluster;
   }
 
   params(uint32_t pq_bits,
@@ -61,17 +62,17 @@ struct params {
          bool use_vq,
          uint32_t vq_n_centers,
          kmeans_params_variant kmeans_params,
-         uint32_t max_train_points_per_pq_code,
-         uint32_t max_train_points_per_vq_cluster)
+         uint32_t max_train_points_per_pq_code    = 256,
+         uint32_t max_train_points_per_vq_cluster = 1024)
+    : pq_bits(pq_bits),
+      pq_dim(pq_dim),
+      use_subspaces(use_subspaces),
+      use_vq(use_vq),
+      vq_n_centers(vq_n_centers),
+      kmeans_params(kmeans_params),
+      max_train_points_per_pq_code(max_train_points_per_pq_code),
+      max_train_points_per_vq_cluster(max_train_points_per_vq_cluster)
   {
-    this->pq_bits                         = pq_bits;
-    this->pq_dim                          = pq_dim;
-    this->use_subspaces                   = use_subspaces;
-    this->use_vq                          = use_vq;
-    this->vq_n_centers                    = vq_n_centers;
-    this->kmeans_params                   = kmeans_params;
-    this->max_train_points_per_pq_code    = max_train_points_per_pq_code;
-    this->max_train_points_per_vq_cluster = max_train_points_per_vq_cluster;
   }
 
   params() = default;
@@ -87,7 +88,7 @@ struct params {
   uint32_t pq_bits = 8;
   /**
    * The dimensionality of the vector after compression by PQ.
-   * When zero, an optimal value is selected using a heuristic.
+   * When zero, dim / 4 is used as default.
    *
    * TODO: at the moment `dim` must be a multiple `pq_dim`.
    */
@@ -105,7 +106,7 @@ struct params {
   bool use_vq = false;
   /**
    * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
-   * When zero, an optimal value is selected using a heuristic.
+   * When zero, an optimal value is selected using a heuristic. (sqrt(n_rows))
    */
   uint32_t vq_n_centers = 0;
   /**
@@ -115,6 +116,7 @@ struct params {
    * or cuvs::cluster::kmeans::params for regular k-means.
    * The active variant type selects the algorithm; balanced k-means tends to be faster
    * for PQ training where cluster sizes are approximately equal.
+   * Only L2Expanded metric is supported. The number of clusters is always set to 1 << pq_bits.
    */
   kmeans_params_variant kmeans_params = cuvs::cluster::kmeans::balanced_params{};
   /**

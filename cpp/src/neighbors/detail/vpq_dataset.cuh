@@ -105,8 +105,6 @@ void train_pq_centers(
         auto classic_params       = base_kmeans_params;
         classic_params.n_clusters = pq_centers_view.extent(0);
         classic_params.metric     = cuvs::distance::DistanceType::L2Expanded;
-        RAFT_EXPECTS(classic_params.init != cuvs::cluster::kmeans::params::InitMethod::Array,
-                     "Array initialization is not supported for PQ training");
         std::optional<raft::device_vector_view<const MathT, IdxT>> sample_weight = std::nullopt;
         MathT inertia;
         IdxT n_iter;
@@ -221,7 +219,7 @@ auto predict_vq(const raft::resources& res,
 
 template <typename MathT, typename DatasetT>
 auto train_pq(const raft::resources& res,
-              const cuvs::preprocessing::quantize::pq::params params,
+              const cuvs::preprocessing::quantize::pq::params& params,
               const DatasetT& dataset,
               const raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers)
   -> raft::device_matrix<MathT, uint32_t, raft::row_major>

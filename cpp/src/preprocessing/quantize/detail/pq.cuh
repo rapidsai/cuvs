@@ -48,6 +48,13 @@ inline uint32_t get_kmeans_n_iters(const cuvs::preprocessing::quantize::pq::para
     params.kmeans_params);
 }
 
+inline cuvs::distance::DistanceType get_kmeans_metric(
+  const cuvs::preprocessing::quantize::pq::params& params)
+{
+  return std::visit([](const auto& kp) -> cuvs::distance::DistanceType { return kp.metric; },
+                    params.kmeans_params);
+}
+
 inline auto to_vpq_params(const cuvs::preprocessing::quantize::pq::params& params)
   -> cuvs::neighbors::vpq_params
 {
@@ -158,7 +165,17 @@ quantizer<MathT> build(
   RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
                "PQ bits must be within [4, 16], got %u",
                params.pq_bits);
-
+  RAFT_EXPECTS(get_kmeans_metric(params) == cuvs::distance::DistanceType::L2Expanded,
+               "KMeans metric must be L2Expanded");
+  std::visit(
+    [&](auto const& base_kmeans_params) {
+      using KP = std::decay_t<decltype(base_kmeans_params)>;
+      if constexpr (std::is_same_v<KP, cuvs::cluster::kmeans::params>) {
+        RAFT_EXPECTS(base_kmeans_params.init != cuvs::cluster::kmeans::params::InitMethod::Array,
+                     "Array initialization is not supported for PQ training");
+      }
+    },
+    params.kmeans_params);
   auto filled_params = params;
   fill_missing_params_heuristics(filled_params, n_rows, dim);
   auto vpq_params   = to_vpq_params(filled_params);

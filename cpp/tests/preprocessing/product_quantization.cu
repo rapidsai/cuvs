@@ -253,6 +253,65 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   params config_;
 };
 
+TEST(ProductQuantizationTestF, Parameters)
+{
+  raft::resources handle;
+  int pq_bits        = 8;
+  int pq_dim         = 0;
+  bool use_subspaces = true;
+  bool use_vq        = false;
+  int n_vq_centers   = 0;
+  auto dataset_host  = raft::make_host_matrix<float, int64_t>(100, 64);
+  // Test classical kmeans parameters
+  using kmeans_params_variant         = cuvs::preprocessing::quantize::pq::kmeans_params_variant;
+  kmeans_params_variant kmeans_params = kmeans_params_variant(
+    cuvs::cluster::kmeans::params{.n_clusters = 1 << pq_bits,
+                                  .init       = cuvs::cluster::kmeans::params::InitMethod::Random,
+                                  .max_iter   = 75});
+  auto pq_params = cuvs::preprocessing::quantize::pq::params(
+    pq_bits, pq_dim, use_subspaces, use_vq, n_vq_centers, kmeans_params);
+  EXPECT_EQ(pq_params.pq_bits, pq_bits);
+  EXPECT_EQ(std::get<cuvs::cluster::kmeans::params>(pq_params.kmeans_params).init,
+            cuvs::cluster::kmeans::params::InitMethod::Random);
+  EXPECT_EQ(std::get<cuvs::cluster::kmeans::params>(pq_params.kmeans_params).max_iter, 75);
+
+  // Test balanced kmeans parameters
+  pq_params = cuvs::preprocessing::quantize::pq::params(
+    pq_bits,
+    pq_dim,
+    use_subspaces,
+    use_vq,
+    n_vq_centers,
+    kmeans_params_variant(cuvs::cluster::kmeans::balanced_params{.n_iters = 76}));
+  EXPECT_EQ(std::get<cuvs::cluster::kmeans::balanced_params>(pq_params.kmeans_params).n_iters, 76);
+
+  // Test simplified constructor
+  pq_params =
+    cuvs::preprocessing::quantize::pq::params(pq_bits,
+                                              pq_dim,
+                                              use_subspaces,
+                                              use_vq,
+                                              n_vq_centers,
+                                              77,
+                                              cuvs::cluster::kmeans::kmeans_type::KMeansBalanced);
+  EXPECT_EQ(std::get<cuvs::cluster::kmeans::balanced_params>(pq_params.kmeans_params).n_iters, 77);
+
+  // Test invalid initialization (Array kmeans init)
+  pq_params.kmeans_params = kmeans_params_variant(
+    cuvs::cluster::kmeans::params{.n_clusters = 1 << pq_bits,
+                                  .init       = cuvs::cluster::kmeans::params::InitMethod::Array,
+                                  .max_iter   = 75});
+  EXPECT_THROW(build(handle, pq_params, raft::make_const_mdspan(dataset_host.view())),
+               raft::logic_error);
+
+  // Test invalid initialization (metric)
+  auto my_balanced_params   = cuvs::cluster::kmeans::balanced_params{};
+  my_balanced_params.metric = cuvs::distance::DistanceType::JaccardExpanded;
+  pq_params.kmeans_params   = kmeans_params_variant(my_balanced_params);
+  EXPECT_THROW(build(handle, pq_params, raft::make_const_mdspan(dataset_host.view())),
+               raft::logic_error);
+}
+
 // Define test cases with different parameters
 template <typename T>
 const std::vector<ProductQuantizationInputs<T>> inputs = {
