@@ -173,7 +173,7 @@ void accumulate_batch_centroids(
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   auto workspace = rmm::device_uvector<char>(
-    batch_data.extent(0), stream, raft::resource::get_workspace_resource(handle));
+    batch_data.extent(0), stream, raft::resource::get_workspace_resource_ref(handle));
 
   cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, MathT> conversion_op;
   thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, MathT>,
