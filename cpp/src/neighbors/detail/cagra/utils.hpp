@@ -321,14 +321,17 @@ void copy_with_padding(
  * Utility to create a batched device view from a host view
  *
  * This utility will create a batched device view from a host view and will handle the prefetch and
- * writeback of the data Each batch can be referenced exactlyonce by calling the next_view()
- * function
+ * writeback of the data. Each batch can be referenced exactly once by calling the next_view()
+ * function.
  *
  * Usage:
  * ```
- * batched_device_view_from_host<float, int32_t> view(res, host_view, batch_size, host_writeback,
- * initialize); while (view.next_view().extent(0) > 0) { auto device_view = view.next_view();
- *   // use device_view
+ * batched_device_view_from_host<float, int32_t> view(
+ *   res, host_view, batch_size, host_writeback, initialize);
+ * for (;;) {
+ *   auto device_view = view.next_view();
+ *   if (device_view.extent(0) == 0) { break; }
+ *   // use device_view (one next_view() call per batch; never in the loop condition)
  * }
  * ```
  *
