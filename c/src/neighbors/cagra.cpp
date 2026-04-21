@@ -252,15 +252,11 @@ void _from_args(cuvsResources_t res,
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    auto d_matrix    = raft::make_device_matrix<T, int64_t, raft::row_major>(
-      *res_ptr, mds.extent(0), mds.extent(1));
-    raft::copy(d_matrix.data_handle(),
-               mds.data_handle(),
-               mds.size(),
-               raft::resource::get_cuda_stream(*res_ptr));
-    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dataset_view(d_matrix.view());
-    auto idx = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
-    idx->update_dataset(*res_ptr, dataset_view);
+    // Match build(): rows must be padded to CAGRA's alignment (see make_padded_dataset); a tight
+    // row-major copy (dim * sizeof(T) not a multiple of 16) misaligns vectorized distance loads.
+    auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+    auto idx    = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
+    idx->update_dataset(*res_ptr, padded->as_dataset_view());
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
       using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
@@ -270,7 +266,10 @@ void _from_args(cuvsResources_t res,
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
       idx->update_graph(*res_ptr, graph_mds);
     }
-    auto* holder = new merged_cagra_holder<T>{std::move(*idx), std::move(d_matrix)};
+    auto* holder = new merged_cagra_holder<T>{
+      std::move(*idx),
+      raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+      std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release())};
     delete idx;
     output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
     output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);

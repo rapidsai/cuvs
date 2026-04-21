@@ -439,6 +439,18 @@ struct index : cuvs::neighbors::index {
         p_padded_view->dim(),
         p_padded_view->stride());
     }
+    if (auto* p_indirect = dynamic_cast<indirect_dataset_view<dataset_index_type>*>(dataset_.get());
+        p_indirect != nullptr) {
+      const auto* const tgt = p_indirect->target();
+      if (auto* s = dynamic_cast<const strided_dataset<T, dataset_index_type>*>(tgt)) {
+        return s->view();
+      }
+      if (auto* dp = dynamic_cast<const device_padded_dataset<T, dataset_index_type>*>(tgt)) {
+        auto pdv = dp->as_dataset_view();
+        return raft::make_device_strided_matrix_view<const T, int64_t>(
+          pdv.view().data_handle(), pdv.n_rows(), pdv.dim(), pdv.stride());
+      }
+    }
     auto d = dataset_->dim();
     return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
   }
