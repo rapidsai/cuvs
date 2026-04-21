@@ -706,6 +706,16 @@ void balancing_em_iters(const raft::resources& handle,
                            mapping_op,
                            device_memory);
   }
+
+  // For cosine, ensure the returned centers are unit-norm so downstream
+  // `predict` can skip the per-call centroid normalization.
+  if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+    auto clusters_in_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
+      cluster_centers, n_clusters, dim);
+    auto clusters_out_view =
+      raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(cluster_centers, n_clusters, dim);
+    raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, clusters_in_view, clusters_out_view);
+  }
 }
 
 /** Randomly initialize cluster centers and then call `balancing_em_iters`. */

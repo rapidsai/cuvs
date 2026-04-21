@@ -1328,9 +1328,6 @@ auto build(raft::resources const& handle,
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
-    if (impl->metric() == distance::DistanceType::CosineExpanded) {
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
-    }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
     cuvs::cluster::kmeans::predict(

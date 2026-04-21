@@ -40,8 +40,8 @@ void minClusterAndDistanceCompute(
       raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, centroids, centroidsNorm, raft::sqrt_op{});
+      // Centroids are L2-normalized for cosine metric
+      raft::matrix::fill(handle, centroidsNorm, DataT{1});
     } else {
       raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
         handle, centroids, centroidsNorm);
@@ -192,12 +192,8 @@ void minClusterDistanceCompute(raft::resources const& handle,
       raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        raft::make_device_matrix_view<const DataT, IndexT>(
-          centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
-        centroidsNorm,
-        raft::sqrt_op{});
+      // Centroids are L2-normalized for cosine metric
+      raft::matrix::fill(handle, centroidsNorm, DataT{1});
     } else {
       raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
         handle,
