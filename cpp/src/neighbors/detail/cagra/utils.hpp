@@ -405,13 +405,13 @@ class batched_device_view_from_host {
       try {
         device_mem_[0].emplace(raft::make_device_mdarray<T, IdxT>(
           res,
-          raft::resource::get_workspace_resource(res),
+          raft::resource::get_workspace_resource_ref(res),
           raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
         device_ptr[0] = device_mem_[0]->data_handle();
         if (batch_size < static_cast<uint64_t>(host_view.extent(0))) {
           device_mem_[1].emplace(raft::make_device_mdarray<T, IdxT>(
             res,
-            raft::resource::get_workspace_resource(res),
+            raft::resource::get_workspace_resource_ref(res),
             raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
           device_ptr[1] = device_mem_[1]->data_handle();
         }
@@ -420,7 +420,7 @@ class batched_device_view_from_host {
           num_buffers_ = 3;
           device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
             res,
-            raft::resource::get_workspace_resource(res),
+            raft::resource::get_workspace_resource_ref(res),
             raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
           device_ptr[2] = device_mem_[2]->data_handle();
         }
