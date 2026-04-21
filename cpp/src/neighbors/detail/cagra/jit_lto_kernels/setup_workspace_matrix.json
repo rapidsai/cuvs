@@ -23,7 +23,7 @@
       },
       {
         "data_type": "uint8_t",
-        "data_abbrev": "uc",
+        "data_abbrev": "u8",
         "_query": [
           {
             "query_type": "float",
@@ -31,13 +31,13 @@
           },
           {
             "query_type": "uint8_t",
-            "query_abbrev": "uc"
+            "query_abbrev": "u8"
           }
         ]
       },
       {
         "data_type": "int8_t",
-        "data_abbrev": "sc",
+        "data_abbrev": "i8",
         "_query": [
           {
             "query_type": "float",
@@ -49,7 +49,7 @@
     "_index": [
       {
         "index_type": "uint32_t",
-        "index_abbrev": "ui"
+        "index_abbrev": "u32"
       }
     ],
     "_distance": [
@@ -97,11 +97,11 @@
       },
       {
         "data_type": "uint8_t",
-        "data_abbrev": "uc"
+        "data_abbrev": "u8"
       },
       {
         "data_type": "int8_t",
-        "data_abbrev": "sc"
+        "data_abbrev": "i8"
       }
     ],
     "_query": [
@@ -113,7 +113,7 @@
     "_index": [
       {
         "index_type": "uint32_t",
-        "index_abbrev": "ui"
+        "index_abbrev": "u32"
       }
     ],
     "_distance": [

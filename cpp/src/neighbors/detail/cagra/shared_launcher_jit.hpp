@@ -6,7 +6,7 @@
 #pragma once
 
 // Include tags header before any other includes that might open namespaces
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
 #include "../../sample_filter.cuh"  // For none_sample_filter, bitset_filter
 
@@ -22,44 +22,44 @@ namespace cuvs::neighbors::cagra::detail {
 template <typename T>
 constexpr auto get_data_type_tag()
 {
-  if constexpr (std::is_same_v<T, float>) { return tag_f{}; }
-  if constexpr (std::is_same_v<T, __half>) { return tag_h{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return tag_sc{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return tag_uc{}; }
+  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::detail::tag_f{}; }
+  if constexpr (std::is_same_v<T, __half>) { return cuvs::neighbors::detail::tag_h{}; }
+  if constexpr (std::is_same_v<T, int8_t>) { return cuvs::neighbors::detail::tag_i8{}; }
+  if constexpr (std::is_same_v<T, uint8_t>) { return cuvs::neighbors::detail::tag_u8{}; }
 }
 
 template <typename T>
 constexpr auto get_index_type_tag()
 {
-  if constexpr (std::is_same_v<T, uint32_t>) { return tag_idx_ui{}; }
+  if constexpr (std::is_same_v<T, uint32_t>) { return cuvs::neighbors::detail::tag_index_u32{}; }
 }
 
 template <typename T>
 constexpr auto get_distance_type_tag()
 {
-  if constexpr (std::is_same_v<T, float>) { return tag_dist_f{}; }
+  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::cagra::detail::tag_dist_f{}; }
 }
 
 template <typename T>
 constexpr auto get_source_index_type_tag()
 {
-  if constexpr (std::is_same_v<T, uint32_t>) { return tag_idx_ui{}; }
-  if constexpr (std::is_same_v<T, int64_t>) { return tag_idx_l{}; }
+  if constexpr (std::is_same_v<T, uint32_t>) { return cuvs::neighbors::detail::tag_index_u32{}; }
+  if constexpr (std::is_same_v<T, int64_t>) { return cuvs::neighbors::detail::tag_index_i64{}; }
 }
 
 template <typename DataTag, cuvs::distance::DistanceType metric>
 struct query_type_tag_standard {
   using type = std::conditional_t<metric == cuvs::distance::DistanceType::BitwiseHamming &&
-                                    std::is_same_v<DataTag, tag_uc>,
-                                  tag_uc,
-                                  tag_f>;
+                                    std::is_same_v<DataTag, cuvs::neighbors::detail::tag_u8>,
+                                  cuvs::neighbors::detail::tag_u8,
+                                  cuvs::neighbors::detail::tag_f>;
 };
 
 template <typename DataTag, cuvs::distance::DistanceType metric>
 using query_type_tag_standard_t = typename query_type_tag_standard<DataTag, metric>::type;
 
 template <typename DataTag>
-using query_type_tag_vpq_t = tag_h;
+using query_type_tag_vpq_t = cuvs::neighbors::detail::tag_h;
 
 template <typename DataTag>
 using query_type_tag_standard_l2_t =
@@ -74,8 +74,8 @@ template <typename DataTag>
 using query_type_tag_standard_hamming_t =
   query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
 
-using codebook_tag_vpq_t      = tag_codebook_half;
-using codebook_tag_standard_t = tag_codebook_none;
+using codebook_tag_vpq_t      = cuvs::neighbors::cagra::detail::tag_codebook_half;
+using codebook_tag_standard_t = cuvs::neighbors::cagra::detail::tag_codebook_none;
 
 // Helper trait to detect if a type is a bitset_filter (regardless of template parameters)
 template <typename T>

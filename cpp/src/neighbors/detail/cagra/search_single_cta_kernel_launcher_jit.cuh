@@ -11,7 +11,7 @@
 #include <typeinfo>
 
 // Include tags header before any other includes that might open namespaces
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"

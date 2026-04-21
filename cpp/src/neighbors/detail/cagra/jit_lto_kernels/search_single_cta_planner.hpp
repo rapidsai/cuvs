@@ -6,7 +6,7 @@
 #pragma once
 
 #include "cagra_planner_base.hpp"
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <string>
 

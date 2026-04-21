@@ -5,7 +5,7 @@
 #pragma once
 
 #include "search_multi_kernel_launcher_jit.cuh"
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
 #include "jit_lto_kernels/set_value_batch.cuh"
 

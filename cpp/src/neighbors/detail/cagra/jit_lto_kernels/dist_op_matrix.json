@@ -16,7 +16,7 @@
       "metric_tag": "hamming",
       "jit_metric_tag": "tag_metric_hamming",
       "query_type": "uint8_t",
-      "query_abbrev": "uc"
+      "query_abbrev": "u8"
     },
     {
       "metric_tag": "l1",

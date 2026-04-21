@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 #include <cuvs/detail/jit_lto/common_fragments.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <optional>
@@ -37,10 +37,10 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 template <typename T>
 constexpr auto get_data_type_tag()
 {
-  if constexpr (std::is_same_v<T, float>) { return tag_f{}; }
-  if constexpr (std::is_same_v<T, __half>) { return tag_h{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return tag_i8{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return tag_u8{}; }
+  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::detail::tag_f{}; }
+  if constexpr (std::is_same_v<T, __half>) { return cuvs::neighbors::detail::tag_h{}; }
+  if constexpr (std::is_same_v<T, int8_t>) { return cuvs::neighbors::detail::tag_i8{}; }
+  if constexpr (std::is_same_v<T, uint8_t>) { return cuvs::neighbors::detail::tag_u8{}; }
 }
 
 template <typename AccT>

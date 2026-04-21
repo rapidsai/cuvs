@@ -5,7 +5,6 @@
 
 #include "@fatbin_header_file@"
 #include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
 
 @fragment_tag_header_files@
 
