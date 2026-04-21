@@ -7,64 +7,11 @@
 #include "compute_distance_standard.hpp"
 
 #include <cuvs/distance/distance.hpp>
-#include <raft/core/operators.hpp>
 #include <raft/util/pow2_utils.cuh>
 
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
-
-#if defined(CUVS_ENABLE_JIT_LTO)
-
-//  dist_op is an extern function that gets JIT
-// linked from fragments Each fragment provides a metric-specific implementation (L2Expanded,
-// InnerProduct, etc.) The planner will link the appropriate fragment based on the metric
-template <typename QUERY_T, typename DISTANCE_T>
-extern __device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b);
-
-// Normalization is also JIT linked from fragments (no-op for most metrics, cosine normalization for
-// CosineExpanded) The planner will link the appropriate fragment (cosine or noop) based on the
-// metric
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
-extern __device__ DistanceT apply_normalization_standard(
-  DistanceT distance,
-  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-  IndexT dataset_index);
-
-#else
-
-//  dist_op is an extern function that gets JIT
-// linked from fragments Each fragment provides a metric-specific implementation (L2Expanded,
-// InnerProduct, etc.) The planner will link the appropriate fragment based on the metric
-template <typename QUERY_T, typename DISTANCE_T>
-__device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b)
-{
-  return 0;
-}
-
-// Normalization is also JIT linked from fragments (no-op for most metrics, cosine normalization for
-// CosineExpanded) The planner will link the appropriate fragment (cosine or noop) based on the
-// metric
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
-__device__ DistanceT apply_normalization_standard(
-  DistanceT distance,
-  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-  IndexT dataset_index)
-{
-  return distance;
-}
-
-#endif
 
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -138,124 +85,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
 
  private:
 };
-
-template <typename DescriptorT>
-_RAFT_DEVICE __noinline__ auto setup_workspace_standard(
-  const DescriptorT* that,
-  void* smem_ptr,
-  const typename DescriptorT::DATA_T* queries_ptr,
-  uint32_t query_id) -> const DescriptorT*
-{
-  using DATA_T                    = typename DescriptorT::DATA_T;
-  using LOAD_T                    = typename DescriptorT::LOAD_T;
-  using base_type                 = typename DescriptorT::base_type;
-  using QUERY_T                   = typename DescriptorT::QUERY_T;
-  using word_type                 = uint32_t;
-  constexpr auto kTeamSize        = DescriptorT::kTeamSize;
-  constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
-  auto* r                         = reinterpret_cast<DescriptorT*>(smem_ptr);
-  auto* buf                       = reinterpret_cast<QUERY_T*>(r + 1);
-  if (r != that) {
-    constexpr uint32_t kCount = sizeof(DescriptorT) / sizeof(word_type);
-    using blob_type           = word_type[kCount];
-    auto& src                 = reinterpret_cast<const blob_type&>(*that);
-    auto& dst                 = reinterpret_cast<blob_type&>(*r);
-    for (uint32_t i = threadIdx.x; i < kCount; i += blockDim.x) {
-      dst[i] = src[i];
-    }
-    const auto smem_ptr_offset =
-      reinterpret_cast<uint8_t*>(&(r->args.smem_ws_ptr)) - reinterpret_cast<uint8_t*>(r);
-    if (threadIdx.x == uint32_t(smem_ptr_offset / sizeof(word_type))) {
-      r->args.smem_ws_ptr = uint32_t(__cvta_generic_to_shared(buf));
-    }
-    __syncthreads();
-  }
-
-  uint32_t dim        = r->args.dim;
-  auto buf_len        = raft::round_up_safe<uint32_t>(dim, kDatasetBlockDim);
-  constexpr auto vlen = device::get_vlen<LOAD_T, DATA_T>();
-  queries_ptr += dim * query_id;
-  for (unsigned i = threadIdx.x; i < buf_len; i += blockDim.x) {
-    unsigned j = device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(i);
-    if (i < dim) {
-      buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(queries_ptr[i]);
-    } else {
-      buf[j] = 0;
-    }
-  }
-  return const_cast<const DescriptorT*>(r);
-}
-
-template <typename DescriptorT>
-RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
-  const typename DescriptorT::DATA_T* __restrict__ dataset_ptr,
-  uint32_t dim,
-  uint32_t query_smem_ptr) -> typename DescriptorT::DISTANCE_T
-{
-  using DATA_T                    = typename DescriptorT::DATA_T;
-  using DISTANCE_T                = typename DescriptorT::DISTANCE_T;
-  using LOAD_T                    = typename DescriptorT::LOAD_T;
-  using QUERY_T                   = typename DescriptorT::QUERY_T;
-  constexpr auto kTeamSize        = DescriptorT::kTeamSize;
-  constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
-  constexpr auto vlen             = device::get_vlen<LOAD_T, DATA_T>();
-  constexpr auto reg_nelem =
-    raft::div_rounding_up_unsafe<uint32_t>(kDatasetBlockDim, kTeamSize * vlen);
-
-  DISTANCE_T r = 0;
-  for (uint32_t elem_offset = (threadIdx.x % kTeamSize) * vlen; elem_offset < dim;
-       elem_offset += kDatasetBlockDim) {
-    DATA_T data[reg_nelem][vlen];
-#pragma unroll
-    for (uint32_t e = 0; e < reg_nelem; e++) {
-      const uint32_t k = e * (kTeamSize * vlen) + elem_offset;
-      if (k >= dim) break;
-      device::ldg_cg(reinterpret_cast<LOAD_T&>(data[e]),
-                     reinterpret_cast<const LOAD_T*>(dataset_ptr + k));
-    }
-#pragma unroll
-    for (uint32_t e = 0; e < reg_nelem; e++) {
-      const uint32_t k = e * (kTeamSize * vlen) + elem_offset;
-      if (k >= dim) break;
-#pragma unroll
-      for (uint32_t v = 0; v < vlen; v++) {
-        // because:
-        // - Above the last element (dataset_dim-1), the query array is filled with zeros.
-        // - The data buffer has to be also padded with zeros.
-        QUERY_T d;
-        device::lds(
-          d,
-          query_smem_ptr +
-            sizeof(QUERY_T) * device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(k + v));
-        // dist_op is an extern device function linked from JIT LTO fragments (metric-specific).
-        r += dist_op<QUERY_T, DISTANCE_T>(
-          d, cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(data[e][v]));
-      }
-    }
-  }
-  return r;
-}
-
-template <typename DescriptorT>
-_RAFT_DEVICE __noinline__ auto compute_distance_standard(
-  const typename DescriptorT::args_t args, const typename DescriptorT::INDEX_T dataset_index) ->
-  typename DescriptorT::DISTANCE_T
-{
-  auto distance = compute_distance_standard_worker<DescriptorT>(
-    DescriptorT::ptr(args) + (static_cast<std::uint64_t>(DescriptorT::ld(args)) * dataset_index),
-    args.dim,
-    args.smem_ws_ptr);
-
-  distance =
-    apply_normalization_standard<DescriptorT::kTeamSize,
-                                 DescriptorT::kDatasetBlockDim,
-                                 typename DescriptorT::DATA_T,
-                                 typename DescriptorT::INDEX_T,
-                                 typename DescriptorT::DISTANCE_T,
-                                 typename DescriptorT::QUERY_T>(distance, args, dataset_index);
-
-  return distance;
-}
 
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
