@@ -235,10 +235,12 @@ def test_cagra_index_params(params):
 
 
 def test_cagra_vpq_compression():
-    pytest.skip(
-        "VPQ (CompressionParams) is not supported for cuvsCagraBuild / the Python C API "
-        "for either device or host datasets (see RAFT_EXPECTS in c/src/neighbors/cagra.cpp). "
-        "VPQ build is covered by the C++ gtest NEIGHBORS_CAGRA_VPQ_BUILD_RESULT_TEST."
+    dim = 64
+    pq_len = 2
+    run_cagra_build_search_test(
+        n_cols=dim,
+        compression=cagra.CompressionParams(pq_dim=dim / pq_len),
+        array_type="device",
     )
 
 

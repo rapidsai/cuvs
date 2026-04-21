@@ -67,11 +67,30 @@ bool device_strided_matrix_has_cagra_row_pitch(
 /** Wrapper that owns both index and dataset for C API lifetime (merge, build-from-host, from_args-with-host). */
 template <typename T>
 struct merged_cagra_holder {
-  cuvs::neighbors::cagra::index<T, uint32_t> idx;
-  raft::device_matrix<T, int64_t, raft::row_major> dataset;
-  /** Non-ACE host build: owns padded device dataset backing the index view. */
+  /** VPQ compressed storage; index may hold an indirect view into this. Must outlive idx — declared
+   * first so idx is destroyed first (reverse member destruction order). */
+  std::unique_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq_owner{nullptr};
+  /** Non-ACE host build / deserialize: owns padded (or other) device dataset backing the index. */
   std::unique_ptr<cuvs::neighbors::dataset<int64_t>> padded_dataset_owner{nullptr};
+  raft::device_matrix<T, int64_t, raft::row_major> dataset;
+  cuvs::neighbors::cagra::index<T, uint32_t> idx;
 };
+
+/**
+ * build() returns an index whose indirect_dataset_view points at the vpq object inside
+ * build_res. After moving that vpq into stable storage, the view must be rebound to the new
+ * address.
+ */
+template <typename T>
+void rebind_vpq_index(raft::resources* res,
+                      cuvs::neighbors::cagra::index<T, uint32_t>& idx,
+                      cuvs::neighbors::vpq_dataset<half, int64_t>* vpq_ptr)
+{
+  RAFT_EXPECTS(vpq_ptr != nullptr, "rebind_vpq_index: null VPQ pointer");
+  idx.update_dataset(
+    *res,
+    cuvs::neighbors::indirect_dataset_view<int64_t>(vpq_ptr));
+}
 
 static void _set_graph_build_params(
   std::variant<std::monostate,
@@ -172,21 +191,47 @@ void _build(cuvsResources_t res,
       auto view = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
       auto build_res =
         cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
-      RAFT_EXPECTS(!build_res.vpq.has_value(),
-                   "VPQ compression is not supported for device CAGRA build through the C API.");
-      auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(build_res.idx));
-      output_index->addr         = reinterpret_cast<uintptr_t>(raw);
-      output_index->merged_owner = 0;
+      std::unique_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq_own;
+      if (build_res.vpq.has_value()) {
+        vpq_own = std::make_unique<cuvs::neighbors::vpq_dataset<half, int64_t>>(
+          std::move(*build_res.vpq));
+      }
+      if (vpq_own) {
+        rebind_vpq_index(res_ptr, build_res.idx, vpq_own.get());
+        auto* holder = new merged_cagra_holder<T>{
+          std::move(vpq_own),
+          nullptr,
+          raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+          std::move(build_res.idx)};
+        output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+        output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
+      } else {
+        auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(build_res.idx));
+        output_index->addr         = reinterpret_cast<uintptr_t>(raw);
+        output_index->merged_owner = 0;
+      }
     } else {
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
       auto build_res =
         cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
-      RAFT_EXPECTS(!build_res.vpq.has_value(),
-                   "VPQ compression is not supported for device CAGRA build through the C API.");
+      std::unique_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq_own;
+      if (build_res.vpq.has_value()) {
+        vpq_own = std::make_unique<cuvs::neighbors::vpq_dataset<half, int64_t>>(
+          std::move(*build_res.vpq));
+      }
+      std::unique_ptr<cuvs::neighbors::dataset<int64_t>> pad_own;
+      if (vpq_own) {
+        padded.reset();
+        pad_own = nullptr;
+      } else {
+        pad_own = std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release());
+      }
+      if (vpq_own) { rebind_vpq_index(res_ptr, build_res.idx, vpq_own.get()); }
       auto* holder = new merged_cagra_holder<T>{
-        std::move(build_res.idx),
+        std::move(vpq_own),
+        std::move(pad_own),
         raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
-        std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release())};
+        std::move(build_res.idx)};
       output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
       output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
     }
@@ -202,19 +247,32 @@ void _build(cuvsResources_t res,
           ? std::move(*result.dataset)
           : raft::make_device_matrix<T, int64_t>(
               *res_ptr, 0, std::max<int64_t>(static_cast<int64_t>(result.idx.dim()), 1));
-      auto* holder = new merged_cagra_holder<T>{std::move(result.idx), std::move(storage)};
+      auto* holder = new merged_cagra_holder<T>{
+        nullptr, nullptr, std::move(storage), std::move(result.idx)};
       output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
       output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
     } else {
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
       auto build_res =
         cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
-      RAFT_EXPECTS(!build_res.vpq.has_value(),
-                   "VPQ compression is not supported for host CAGRA build through the C API.");
+      std::unique_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq_own;
+      if (build_res.vpq.has_value()) {
+        vpq_own = std::make_unique<cuvs::neighbors::vpq_dataset<half, int64_t>>(
+          std::move(*build_res.vpq));
+      }
+      std::unique_ptr<cuvs::neighbors::dataset<int64_t>> pad_own;
+      if (vpq_own) {
+        padded.reset();
+        pad_own = nullptr;
+      } else {
+        pad_own = std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release());
+      }
+      if (vpq_own) { rebind_vpq_index(res_ptr, build_res.idx, vpq_own.get()); }
       auto* holder = new merged_cagra_holder<T>{
-        std::move(build_res.idx),
+        std::move(vpq_own),
+        std::move(pad_own),
         raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
-        std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release())};
+        std::move(build_res.idx)};
       output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
       output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
     }
@@ -267,9 +325,10 @@ void _from_args(cuvsResources_t res,
       idx->update_graph(*res_ptr, graph_mds);
     }
     auto* holder = new merged_cagra_holder<T>{
-      std::move(*idx),
+      nullptr,
+      std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release()),
       raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
-      std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release())};
+      std::move(*idx)};
     delete idx;
     output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
     output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
@@ -427,9 +486,10 @@ void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t ou
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto* holder = new merged_cagra_holder<T>{
-    cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr),
+    nullptr,
+    nullptr,
     raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
-    nullptr};
+    cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr)};
   std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
   cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), &holder->idx, &out_dataset);
   holder->padded_dataset_owner = std::move(out_dataset);
@@ -508,7 +568,8 @@ void _merge(cuvsResources_t res,
     }
   }();
 
-  auto* holder = new merged_cagra_holder<T>{std::move(merge_res.idx), std::move(merge_res.dataset)};
+  auto* holder = new merged_cagra_holder<T>{
+    nullptr, nullptr, std::move(merge_res.dataset), std::move(merge_res.idx)};
   output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
   output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
 }
