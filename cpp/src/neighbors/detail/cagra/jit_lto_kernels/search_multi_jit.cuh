@@ -6,12 +6,12 @@
 #pragma once
 
 #include "../utils.hpp"
+#include "cagra_bitset.cuh"
 #include "device_intrinsics.hpp"
 #include "hashmap.hpp"
 
 #include <cstdint>
 #include <cuda_fp16.h>
-#include <type_traits>
 
 #include "extern_device_functions.cuh"
 #include "sample_filter_data.h"
@@ -88,11 +88,8 @@ __device__ void random_pickup_kernel_jit(
   }
 }
 
-template <typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename SourceIndexT,
-          typename SAMPLE_FILTER_T>
+using cuvs::neighbors::detail::sample_filter;
+template <typename DataT, typename IndexT, typename DistanceT, typename SourceIndexT>
 __device__ void compute_distance_to_child_nodes_kernel_jit(
   const IndexT* const parent_node_list,  // [num_queries, search_width]
   IndexT* const parent_candidates_ptr,   // [num_queries, search_width]
@@ -109,7 +106,7 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, ldd]
   DistanceT* const result_distances_ptr,  // [num_queries, ldd]
   const std::uint32_t ldd,                // (*) ldd >= search_width * graph_degree
-  SAMPLE_FILTER_T sample_filter)
+  cagra_bitset<SourceIndexT> bitset)
 {
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
@@ -166,11 +163,13 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
     }
   }
 
-  if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                              cuvs::neighbors::filtering::none_sample_filter>::value) {
-    if (!sample_filter(
-          query_id,
-          source_indices_ptr == nullptr ? parent_index : source_indices_ptr[parent_index])) {
+  if (bitset.bitset_ptr != nullptr) {
+    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
+      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
+    const SourceIndexT node_id = source_indices_ptr == nullptr
+                                   ? static_cast<SourceIndexT>(parent_index)
+                                   : static_cast<SourceIndexT>(source_indices_ptr[parent_index]);
+    if (!sample_filter<SourceIndexT>(query_id, node_id, &filter_data)) {
       parent_candidates_ptr[parent_list_index + (lds * query_id)] = utils::get_max_value<INDEX_T>();
       parent_distance_ptr[parent_list_index + (lds * query_id)] =
         utils::get_max_value<DISTANCE_T>();
@@ -178,7 +177,6 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
   }
 }
 
-using cuvs::neighbors::detail::sample_filter;
 template <typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
@@ -190,9 +188,7 @@ __device__ void apply_filter_kernel_jit(
   const std::uint32_t result_buffer_size,
   const std::uint32_t num_queries,
   const IndexT query_id_offset,
-  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter) - in global memory
-  SourceIndexT bitset_len,      // Bitset length
-  SourceIndexT original_nbits)  // Original number of bits
+  cagra_bitset<SourceIndexT> bitset)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
   const auto tid                    = threadIdx.x + blockIdx.x * blockDim.x;
@@ -210,10 +206,10 @@ __device__ void apply_filter_kernel_jit(
 
     // Construct filter_data struct in registers (bitset data is in global memory)
     cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset_ptr, bitset_len, original_nbits);
+      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
 
     if (!sample_filter<SourceIndexT>(
-          query_id_offset + j, node_id, bitset_ptr != nullptr ? &filter_data : nullptr)) {
+          query_id_offset + j, node_id, bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
       result_indices_ptr[index]   = utils::get_max_value<IndexT>();
       result_distances_ptr[index] = utils::get_max_value<DistanceT>();
     }

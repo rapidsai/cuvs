@@ -10,37 +10,9 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
-extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
-  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
-  void* smem,
-  const DataT* queries,
-  uint32_t query_id);
-
 template <typename DataT, typename IndexT, typename DistanceT>
 extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_base(
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*, void*, const DataT*, uint32_t);
-
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
-extern __device__ DistanceT
-compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-                 IndexT dataset_index);
 
 template <typename DataT, typename IndexT, typename DistanceT>
 extern __device__ DistanceT compute_distance_base(

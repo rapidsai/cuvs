@@ -18,6 +18,7 @@
 #include <cstdio>
 #endif
 
+#include "cagra_bitset.cuh"
 #include "device_common_jit.cuh"
 #include "extern_device_functions.cuh"
 #include "sample_filter_data.h"
@@ -50,9 +51,7 @@ __device__ void search_kernel_jit(
   uint32_t* const num_executed_iterations, /* stats */
   const IndexT graph_size,
   const uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  uint32_t* bitset_ptr,            // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,         // Bitset length
-  SourceIndexT original_nbits)
+  cagra_bitset<SourceIndexT> bitset)
 {
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
@@ -261,10 +260,10 @@ __device__ void search_kernel_jit(
         const auto parent_id = result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
         // Construct filter_data struct (bitset data is in global memory)
         cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-          bitset_ptr, bitset_len, original_nbits);
+          bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
         if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
-                                         bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                         bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
           // If the parent must not be in the resulting top-k list, remove from the parent list
           result_distances_buffer[parent_indices_buffer[p]] = utils::get_max_value<DISTANCE_T>();
           result_indices_buffer[parent_indices_buffer[p]]   = invalid_index;
@@ -283,10 +282,10 @@ __device__ void search_kernel_jit(
     index &= ~index_msb_1_mask;
     // Construct filter_data struct (bitset data is in global memory)
     cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset_ptr, bitset_len, original_nbits);
+      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
     if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                      to_source_index(index),
-                                     bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                     bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
       result_indices_buffer[i]   = invalid_index;
       result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
     }

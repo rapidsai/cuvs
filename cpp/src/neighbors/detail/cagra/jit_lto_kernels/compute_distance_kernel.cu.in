@@ -18,9 +18,6 @@ using query_t    = @query_type@;
 namespace cuvs::neighbors::cagra::detail {
 
 using args_t = typename dataset_descriptor_base_t<data_t, index_t, distance_t>::args_t;
-template __device__ distance_t
-compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, data_t, index_t, distance_t, query_t>(
-  const args_t, index_t);
 
 template <>
 __device__ distance_t compute_distance_base<data_t, index_t, distance_t>(const args_t args,

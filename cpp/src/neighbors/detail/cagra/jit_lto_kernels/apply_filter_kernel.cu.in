@@ -11,6 +11,7 @@ namespace {
 using index_t        = @index_type@;
 using distance_t     = @distance_type@;
 using source_index_t = @source_index_type@;
+using cagra_bitset_t = cuvs::neighbors::cagra::detail::cagra_bitset<source_index_t>;
 
 }  // namespace
 
@@ -23,9 +24,7 @@ extern "C" __global__ void apply_filter_kernel(const source_index_t* const sourc
                                                const std::uint32_t result_buffer_size,
                                                const std::uint32_t num_queries,
                                                const index_t query_id_offset,
-                                               uint32_t* bitset_ptr,
-                                               source_index_t bitset_len,
-                                               source_index_t original_nbits)
+                                               cagra_bitset_t bitset)
 {
   apply_filter_kernel_jit<index_t, distance_t, source_index_t>(source_indices_ptr,
                                                                result_indices_ptr,
@@ -34,9 +33,7 @@ extern "C" __global__ void apply_filter_kernel(const source_index_t* const sourc
                                                                result_buffer_size,
                                                                num_queries,
                                                                query_id_offset,
-                                                               bitset_ptr,
-                                                               bitset_len,
-                                                               original_nbits);
+                                                               bitset);
 }
 
 static_assert(std::is_same_v<decltype(apply_filter_kernel),

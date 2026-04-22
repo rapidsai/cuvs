@@ -15,6 +15,7 @@ using distance_t     = @distance_type@;
 using source_index_t = @source_index_type@;
 using dataset_desc_base =
   cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<data_t, index_t, distance_t>;
+using cagra_bitset_t = cuvs::neighbors::cagra::detail::cagra_bitset<source_index_t>;
 
 }  // namespace
 
@@ -42,9 +43,7 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_multi_cta(
   std::uint32_t* const num_executed_iterations,
   const index_t graph_size,
   const std::uint32_t query_id_offset,
-  uint32_t* bitset_ptr,
-  source_index_t bitset_len,
-  source_index_t original_nbits)
+  cagra_bitset_t bitset)
 {
   search_kernel_jit<data_t, index_t, distance_t, source_index_t>(result_indices_ptr,
                                                                  result_distances_ptr,
@@ -67,9 +66,7 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_multi_cta(
                                                                  num_executed_iterations,
                                                                  graph_size,
                                                                  query_id_offset,
-                                                                 bitset_ptr,
-                                                                 bitset_len,
-                                                                 original_nbits);
+                                                                 bitset);
 }
 
 static_assert(

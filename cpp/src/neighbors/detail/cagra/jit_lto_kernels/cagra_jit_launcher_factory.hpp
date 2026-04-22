@@ -16,6 +16,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -225,16 +226,20 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_cta_jit_launcher(
 }
 
 /// Build a JIT AlgorithmLauncher for multi-kernel CAGRA helpers (random_pickup, compute_distance,
-/// …).
+/// …). When `sample_filter_lto_name` is non-empty, the linked `sample_filter` device function is
+/// added (e.g. for compute_distance_to_child_nodes with a bitset). Random pickup uses the default
+/// (empty) and does not link it.
 template <typename DataT, typename IndexT, typename DistanceT, typename SourceIndexT>
 std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-  const char* linked_kernel_name)
+  const char* linked_kernel_name,
+  std::string_view sample_filter_lto_name = {})
 {
-  using DataTag   = decltype(get_data_type_tag<DataT>());
-  using IndexTag  = decltype(get_index_type_tag<IndexT>());
-  using DistTag   = decltype(get_distance_type_tag<DistanceT>());
-  using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
+  const bool link_sample_filter = !sample_filter_lto_name.empty();
+  using DataTag                 = decltype(get_data_type_tag<DataT>());
+  using IndexTag                = decltype(get_index_type_tag<IndexT>());
+  using DistTag                 = decltype(get_distance_type_tag<DistanceT>());
+  using SourceTag               = decltype(get_source_index_type_tag<SourceIndexT>());
 
   if (dataset_desc.is_vpq) {
     using QueryTag    = query_type_tag_vpq_t<DataTag>;
@@ -260,6 +265,9 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
+    if (link_sample_filter) {
+      planner.add_sample_filter_device_function(std::string(sample_filter_lto_name));
+    }
     planner.add_linked_kernel(linked_kernel_name);
     return planner.get_launcher();
   }
@@ -288,6 +296,9 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
+    if (link_sample_filter) {
+      planner.add_sample_filter_device_function(std::string(sample_filter_lto_name));
+    }
     planner.add_linked_kernel(linked_kernel_name);
     return planner.get_launcher();
   }
@@ -313,6 +324,9 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_kernel_jit_launcher(
                                                dataset_desc.is_vpq,
                                                dataset_desc.pq_bits,
                                                dataset_desc.pq_len);
+  if (link_sample_filter) {
+    planner.add_sample_filter_device_function(std::string(sample_filter_lto_name));
+  }
   planner.add_linked_kernel(linked_kernel_name);
   return planner.get_launcher();
 }

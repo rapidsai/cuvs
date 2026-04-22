@@ -57,28 +57,8 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     SampleFilterT sample_filter,
                     cudaStream_t stream)
 {
-  // Extract bitset data from filter object (if it's a bitset_filter)
-  uint32_t* bitset_ptr        = nullptr;
-  SourceIndexT bitset_len     = 0;
-  SourceIndexT original_nbits = 0;
-  uint32_t query_id_offset    = 0;
-
-  // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
-  if constexpr (requires {
-                  sample_filter.filter;
-                  sample_filter.offset;
-                }) {
-    using InnerFilter = decltype(sample_filter.filter);
-    // Always extract offset for wrapped filters
-    query_id_offset = sample_filter.offset;
-    if constexpr (is_bitset_filter<InnerFilter>::value) {
-      // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
-      auto bitset_view = sample_filter.filter.view();
-      bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
-      bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
-      original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-    }
-  }
+  const auto bf                  = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
+  const uint32_t query_id_offset = bf.query_id_offset;
 
   std::string const filter_name = get_sample_filter_name<SampleFilterT>();
   std::shared_ptr<AlgorithmLauncher> launcher =
@@ -161,9 +141,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
       num_executed_iterations,
       static_cast<IndexT>(graph.extent(0)),
       query_id_offset,
-      bitset_ptr,
-      bitset_len,
-      original_nbits);
+      bf.bitset);
   };
   cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
     launcher->get_kernel(), smem_size, kernel_launcher);

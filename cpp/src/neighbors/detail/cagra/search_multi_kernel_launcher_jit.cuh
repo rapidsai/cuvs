@@ -12,9 +12,8 @@
 #include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
 #include "jit_lto_kernels/kernel_def.hpp"
 #include "jit_lto_kernels/search_multi_kernel_planner.hpp"
-#include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
 #include "search_plan.cuh"          // For search_params
-#include "shared_launcher_jit.hpp"  // For shared JIT helper functions
+#include "shared_launcher_jit.hpp"  // cagra_bitset / cagra_sample_filter, get_sample_filter_name, tags
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -112,9 +111,11 @@ void compute_distance_to_child_nodes_jit(
   SAMPLE_FILTER_T sample_filter,
   cudaStream_t cuda_stream)
 {
+  const auto bf                 = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
+  const std::string filter_name = get_sample_filter_name<SAMPLE_FILTER_T>();
   std::shared_ptr<AlgorithmLauncher> launcher =
     make_cagra_multi_kernel_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(
-      dataset_desc, "compute_distance_to_child_nodes");
+      dataset_desc, "compute_distance_to_child_nodes", filter_name);
 
   const auto block_size      = 128;
   const auto teams_per_block = block_size / dataset_desc.team_size;
@@ -145,7 +146,7 @@ void compute_distance_to_child_nodes_jit(
     result_indices_ptr,
     result_distances_ptr,
     ldd,
-    cuvs::neighbors::filtering::none_sample_filter{});
+    bf.bitset);
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
@@ -162,26 +163,9 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                       SAMPLE_FILTER_T sample_filter,
                       cudaStream_t cuda_stream)
 {
-  // Extract bitset data from filter object (if it's a bitset_filter)
-  uint32_t* bitset_ptr        = nullptr;
-  SourceIndexT bitset_len     = 0;
-  SourceIndexT original_nbits = 0;
-
-  // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
-  // Note: query_id_offset is already a parameter to this function, so we don't extract it here
-  if constexpr (requires {
-                  sample_filter.filter;
-                  sample_filter.offset;
-                }) {
-    using InnerFilter = decltype(sample_filter.filter);
-    if constexpr (is_bitset_filter<InnerFilter>::value) {
-      // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
-      auto bitset_view = sample_filter.filter.view();
-      bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
-      bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
-      original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-    }
-  }
+  // Note: query_id for the linked filter is the function's `query_id_offset` + query index, not
+  // the wrapper's offset; we only need bitset pointers (same as other JIT launchers).
+  const auto bf = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
 
   // Create planner with tags
   using DataTag =
@@ -226,9 +210,7 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                                                           result_buffer_size,
                                                           num_queries,
                                                           query_id_offset,
-                                                          bitset_ptr,
-                                                          bitset_len,
-                                                          original_nbits);
+                                                          bf.bitset);
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }

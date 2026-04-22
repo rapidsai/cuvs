@@ -458,9 +458,7 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
   rmm::device_uvector<index_type> hashmap;
   std::atomic<std::chrono::time_point<std::chrono::system_clock>> last_touch;
   uint64_t param_hash;
-  uint32_t* bitset_ptr;         // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len;      // Bitset length
-  SourceIndexT original_nbits;  // Original number of bits
+  cagra_bitset<SourceIndexT> bitset;
 
   static inline auto calculate_parameter_hash(
     std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
@@ -550,29 +548,9 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
                                           launcher_ptr,
                                           nullptr))  // descriptor not needed in hash
   {
-    // Extract bitset data from filter object (if it's a bitset_filter)
-    // Handle both direct bitset_filter and CagraSampleFilterWithQueryIdOffset wrapper
-    bitset_ptr               = nullptr;
-    bitset_len               = 0;
-    original_nbits           = 0;
-    uint32_t query_id_offset = 0;
-
-    // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
-    if constexpr (requires {
-                    sample_filter.filter;
-                    sample_filter.offset;
-                  }) {
-      using InnerFilter = decltype(sample_filter.filter);
-      // Always extract offset for wrapped filters
-      query_id_offset = sample_filter.offset;
-      if constexpr (is_bitset_filter<InnerFilter>::value) {
-        // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
-        auto bitset_view = sample_filter.filter.view();
-        bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
-        bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
-        original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-      }
-    }
+    const auto bf                  = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
+    this->bitset                   = bf.bitset;
+    const uint32_t query_id_offset = bf.query_id_offset;
 
     // set kernel launch parameters
     dim3 gs = calc_coop_grid_size(block_size, smem_size, persistent_device_usage);
@@ -659,9 +637,7 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
       small_hash_reset_interval_u32,  // Cast size_t to uint32_t
       query_id_offset,                // Offset to add to query_id when calling filter
       dev_desc,
-      bitset_ptr,
-      bitset_len,
-      original_nbits);
+      bitset);
 
     last_touch.store(std::chrono::system_clock::now(), std::memory_order_relaxed);
   }
@@ -762,29 +738,9 @@ void select_and_run(
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
-  // Extract bitset data from filter object (if it's a bitset_filter)
-  // Handle both direct bitset_filter and CagraSampleFilterWithQueryIdOffset wrapper
-  uint32_t* bitset_ptr        = nullptr;
-  SourceIndexT bitset_len     = 0;
-  SourceIndexT original_nbits = 0;
-  uint32_t query_id_offset    = 0;
-
-  // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
-  if constexpr (requires {
-                  sample_filter.filter;
-                  sample_filter.offset;
-                }) {
-    using InnerFilter = decltype(sample_filter.filter);
-    // Always extract offset for wrapped filters
-    query_id_offset = sample_filter.offset;
-    if constexpr (is_bitset_filter<InnerFilter>::value) {
-      // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
-      auto bitset_view = sample_filter.filter.view();
-      bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
-      bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
-      original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-    }
-  }
+  const auto bf = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
+  const cagra_bitset<SourceIndexT> bitset = bf.bitset;
+  const uint32_t query_id_offset          = bf.query_id_offset;
 
   // Use common logic to compute launch config
   auto config             = compute_launch_config(num_itopk_candidates, ps.itopk_size, block_size);
@@ -902,9 +858,7 @@ void select_and_run(
         query_id_offset,                // Offset to add to query_id when calling filter
         dev_desc,
         static_cast<IndexT>(graph.extent(0)),
-        bitset_ptr,
-        bitset_len,
-        original_nbits);
+        bitset);
     };
 
     cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(

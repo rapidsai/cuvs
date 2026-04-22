@@ -171,8 +171,6 @@ struct index : cuvs::neighbors::index {
   /** Distance metric used for clustering. */
   cuvs::distance::DistanceType metric() const noexcept;
 
-  void set_metric(cuvs::distance::DistanceType metric);
-
   /** Whether `centers()` change upon extending the index (ivf_flat::extend). */
   bool adaptive_centers() const noexcept;
 

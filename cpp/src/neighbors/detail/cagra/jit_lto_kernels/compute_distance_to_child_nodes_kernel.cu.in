@@ -14,34 +14,30 @@ using distance_t     = @distance_type@;
 using source_index_t = @source_index_type@;
 using dataset_desc_base =
   cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<data_t, index_t, distance_t>;
+using cagra_bitset_t = cuvs::neighbors::cagra::detail::cagra_bitset<source_index_t>;
 
 }  // namespace
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-extern "C" __global__ void compute_distance_to_child_nodes(
-  const index_t* const parent_node_list,
-  index_t* const parent_candidates_ptr,
-  distance_t* const parent_distance_ptr,
-  const std::size_t lds,
-  const std::uint32_t search_width,
-  const dataset_desc_base* dataset_desc,
-  const index_t* const neighbor_graph_ptr,
-  const std::uint32_t graph_degree,
-  const source_index_t* source_indices_ptr,
-  const data_t* query_ptr,
-  index_t* const visited_hashmap_ptr,
-  const std::uint32_t hash_bitlen,
-  index_t* const result_indices_ptr,
-  distance_t* const result_distances_ptr,
-  const std::uint32_t ldd,
-  cuvs::neighbors::filtering::none_sample_filter sample_filter)
+extern "C" __global__ void compute_distance_to_child_nodes(const index_t* const parent_node_list,
+                                                           index_t* const parent_candidates_ptr,
+                                                           distance_t* const parent_distance_ptr,
+                                                           const std::size_t lds,
+                                                           const std::uint32_t search_width,
+                                                           const dataset_desc_base* dataset_desc,
+                                                           const index_t* const neighbor_graph_ptr,
+                                                           const std::uint32_t graph_degree,
+                                                           const source_index_t* source_indices_ptr,
+                                                           const data_t* query_ptr,
+                                                           index_t* const visited_hashmap_ptr,
+                                                           const std::uint32_t hash_bitlen,
+                                                           index_t* const result_indices_ptr,
+                                                           distance_t* const result_distances_ptr,
+                                                           const std::uint32_t ldd,
+                                                           cagra_bitset_t bitset)
 {
-  compute_distance_to_child_nodes_kernel_jit<data_t,
-                                             index_t,
-                                             distance_t,
-                                             source_index_t,
-                                             cuvs::neighbors::filtering::none_sample_filter>(
+  compute_distance_to_child_nodes_kernel_jit<data_t, index_t, distance_t, source_index_t>(
     parent_node_list,
     parent_candidates_ptr,
     parent_distance_ptr,
@@ -57,7 +53,7 @@ extern "C" __global__ void compute_distance_to_child_nodes(
     result_indices_ptr,
     result_distances_ptr,
     ldd,
-    sample_filter);
+    bitset);
 }
 
 static_assert(

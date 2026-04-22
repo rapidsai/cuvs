@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 #include <mutex>
 #include <raft/core/error.hpp>
+#include <unordered_map>
 
 namespace cuvs::neighbors::detail {
 

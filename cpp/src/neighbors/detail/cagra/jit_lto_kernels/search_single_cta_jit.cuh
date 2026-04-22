@@ -29,6 +29,7 @@
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
+#include "cagra_bitset.cuh"
 #include "extern_device_functions.cuh"
 #include "sample_filter_data.h"
 // Include shared JIT device functions
@@ -78,9 +79,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t query_id,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
-  uint32_t* bitset_ptr,     // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,  // Bitset length
-  SourceIndexT original_nbits,
+  cagra_bitset<SourceIndexT> bitset,
   const IndexT graph_size = 0)  // Original number of bits
 {
   using LOAD_T = device::LOAD_128BIT_T;
@@ -308,10 +307,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
         const auto parent_id = result_indices_buffer[parent_list_buffer[p]] & ~index_msb_1_mask;
         // Construct filter_data struct (bitset data is in global memory)
         cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-          bitset_ptr, bitset_len, original_nbits);
+          bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
         if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
-                                         bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                         bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
           result_distances_buffer[parent_list_buffer[p]] = utils::get_max_value<DistanceT>();
           result_indices_buffer[parent_list_buffer[p]]   = invalid_index;
           *filter_flag                                   = 1;
@@ -331,11 +330,11 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
     const auto node_id = result_indices_buffer[i] & ~index_msb_1_mask;
     // Construct filter_data struct (bitset data is in global memory)
     cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset_ptr, bitset_len, original_nbits);
+      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
     if (node_id != (invalid_index & ~index_msb_1_mask) &&
         !sample_filter<SourceIndexT>(query_id + query_id_offset,
                                      to_source_index(node_id),
-                                     bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                     bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
       result_distances_buffer[i] = utils::get_max_value<DistanceT>();
       result_indices_buffer[i]   = invalid_index;
     }
@@ -491,9 +490,7 @@ __device__ void search_kernel_jit(
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const IndexT graph_size,
-  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,      // Bitset length
-  SourceIndexT original_nbits)  // Original number of bits
+  cagra_bitset<SourceIndexT> bitset)
 {
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
@@ -526,9 +523,7 @@ __device__ void search_kernel_jit(
                             query_id,
                             query_id_offset,
                             dataset_desc,
-                            bitset_ptr,
-                            bitset_len,
-                            original_nbits,
+                            bitset,
                             graph_size);
 }
 
@@ -563,9 +558,7 @@ __device__ void search_single_cta_p_impl(
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
-  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,      // Bitset length
-  SourceIndexT original_nbits)  // Original number of bits
+  cagra_bitset<SourceIndexT> bitset)
 {
   using job_desc_type = job_desc_t<job_desc_traits<DataT, IndexT, DistanceT>>;
   __shared__ typename job_desc_type::input_t job_descriptor;
@@ -639,9 +632,7 @@ __device__ void search_single_cta_p_impl(
                               query_id,
                               query_id_offset,
                               dataset_desc,
-                              bitset_ptr,
-                              bitset_len,
-                              original_nbits);
+                              bitset);
 
     // make sure all writes are visible even for the host
     //     (e.g. when result buffers are in pinned memory)
