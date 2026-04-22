@@ -20,10 +20,10 @@ void fit_main(raft::resources const& handle,
 {
   cuvs::cluster::kmeans::params p = params;
   p.init                          = kmeans::params::InitMethod::Array;
-  p.n_init                        = 1;
   auto sw                         = std::make_optional(
     raft::make_device_vector_view<const DataT, IndexT>(sample_weights.data_handle(), X.extent(0)));
-  cuvs::cluster::kmeans::detail::kmeans_fit(handle, p, X, sw, centroids, inertia, n_iter);
+  cuvs::cluster::kmeans::detail::kmeans_fit(
+    handle, p, X, sw, centroids, inertia, n_iter, std::ref(workspace));
 }
 
 template <typename DataT, typename IndexT>

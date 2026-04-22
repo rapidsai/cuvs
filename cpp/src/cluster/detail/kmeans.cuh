@@ -316,7 +316,8 @@ void kmeans_fit(
     sample_weight,
   raft::device_matrix_view<DataT, IndexT> centroids,
   raft::host_scalar_view<DataT> inertia,
-  raft::host_scalar_view<IndexT> n_iter);
+  raft::host_scalar_view<IndexT> n_iter,
+  std::optional<std::reference_wrapper<rmm::device_uvector<char>>> workspace = std::nullopt);
 
 /*
  * @brief Selects 'n_clusters' samples from X using scalable kmeans++ algorithm.
@@ -534,7 +535,8 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
       weight_opt,
       centroidsRawData,
       inertia.view(),
-      n_iter.view());
+      n_iter.view(),
+      std::ref(workspace));
 
   } else if ((int)potentialCentroids.extent(0) < n_clusters) {
     // supplement with random
@@ -602,7 +604,8 @@ void kmeans_fit(
     sample_weight,
   raft::device_matrix_view<DataT, IndexT> centroids,
   raft::host_scalar_view<DataT> inertia,
-  raft::host_scalar_view<IndexT> n_iter)
+  raft::host_scalar_view<IndexT> n_iter,
+  std::optional<std::reference_wrapper<rmm::device_uvector<char>>> workspace)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit");
   auto n_samples      = X.extent(0);
@@ -634,7 +637,8 @@ void kmeans_fit(
   DataT wt_sum = sample_weight.has_value() ? weightSum(handle, sample_weight.value())
                                            : static_cast<DataT>(n_samples);
 
-  rmm::device_uvector<char> workspace(0, stream);
+  rmm::device_uvector<char> local_workspace(0, stream);
+  rmm::device_uvector<char>& ws = workspace.has_value() ? workspace->get() : local_workspace;
 
   constexpr bool data_on_device = raft::is_device_mdspan_v<decltype(X)>;
 
@@ -664,11 +668,10 @@ void kmeans_fit(
     } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
       auto run_kmeanspp = [&](raft::device_matrix_view<const DataT, IndexT> init_data) {
         if (iter_params.oversampling_factor == 0)
-          kmeansPlusPlus<DataT, IndexT>(
-            handle, iter_params, init_data, centroidsRawData, workspace);
+          kmeansPlusPlus<DataT, IndexT>(handle, iter_params, init_data, centroidsRawData, ws);
         else
           initScalableKMeansPlusPlus<DataT, IndexT>(
-            handle, iter_params, init_data, centroidsRawData, workspace);
+            handle, iter_params, init_data, centroidsRawData, ws);
       };
 
       if constexpr (data_on_device) {
@@ -865,7 +868,7 @@ void kmeans_fit(
                                      minCAD_view,
                                      l2_const_view,
                                      L2NormBuf_OR_DistBuf,
-                                     workspace,
+                                     ws,
                                      centroid_sums.view(),
                                      weight_per_cluster.view(),
                                      batch_sums.view(),
