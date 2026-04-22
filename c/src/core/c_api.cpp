@@ -25,7 +25,25 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <thread>
+
+// Own the pool and upstreams for cuvsRMMPoolMemoryResourceEnable; the per-device resource must
+// outlast use of the set resource (RMM device_async_resource_ref / pool_memory_resource API).
+namespace {
+std::unique_ptr<rmm::mr::cuda_memory_resource> g_cuda_pool_upstream;
+std::unique_ptr<rmm::mr::managed_memory_resource> g_managed_pool_upstream;
+std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>> g_device_pool;
+std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::managed_memory_resource>> g_managed_pool;
+
+void release_pool_state()
+{
+  g_device_pool.reset();
+  g_managed_pool.reset();
+  g_cuda_pool_upstream.reset();
+  g_managed_pool_upstream.reset();
+}
+}  // namespace
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
 {
@@ -151,22 +169,33 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
                                                        bool managed)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto initial_size = rmm::percent_of_free_device_memory(initial_pool_size_percent);
-    auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
+    auto const initial_size = rmm::percent_of_free_device_memory(initial_pool_size_percent);
+    auto const max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
+    std::optional<std::size_t> const max_pool_opt{max_size};
+
+    release_pool_state();
 
     if (managed) {
-      rmm::mr::set_current_device_resource(
-        rmm::mr::pool_memory_resource{rmm::mr::managed_memory_resource{}, initial_size, max_size});
+      g_managed_pool_upstream  = std::make_unique<rmm::mr::managed_memory_resource>();
+      g_managed_pool = std::make_unique<
+        rmm::mr::pool_memory_resource<rmm::mr::managed_memory_resource>>(
+        *g_managed_pool_upstream, initial_size, max_pool_opt);
+      rmm::mr::set_current_device_resource_ref(rmm::device_async_resource_ref{*g_managed_pool});
     } else {
-      rmm::mr::set_current_device_resource(
-        rmm::mr::pool_memory_resource{rmm::mr::cuda_memory_resource{}, initial_size, max_size});
+      g_cuda_pool_upstream = std::make_unique<rmm::mr::cuda_memory_resource>();
+      g_device_pool = std::make_unique<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>>(
+        *g_cuda_pool_upstream, initial_size, max_pool_opt);
+      rmm::mr::set_current_device_resource_ref(rmm::device_async_resource_ref{*g_device_pool});
     }
   });
 }
 
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
-  return cuvs::core::translate_exceptions([=] { rmm::mr::reset_current_device_resource(); });
+  return cuvs::core::translate_exceptions([=] {
+    rmm::mr::reset_current_device_resource_ref();
+    release_pool_state();
+  });
 }
 
 thread_local std::unique_ptr<rmm::mr::pinned_host_memory_resource> pinned_mr;
