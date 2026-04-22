@@ -187,7 +187,7 @@ __device__ void apply_filter_kernel_jit(
   const std::size_t lds,
   const std::uint32_t result_buffer_size,
   const std::uint32_t num_queries,
-  const IndexT query_id_offset,
+  const std::uint32_t query_id_offset,
   cagra_bitset<SourceIndexT> bitset)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;

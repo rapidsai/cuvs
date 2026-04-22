@@ -315,47 +315,13 @@ if(NOT BUILD_CPU_ONLY)
     "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance.cu" @ONLY
   )
 
-  add_library(
-    cuvs-cagra-search OBJECT
-    ${cagra_search_inst_files}
-    ${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance.cu
-    ${cagra_compute_distance_standard_inst_files}
-    ${cagra_compute_distance_vpq_inst_files}
-    ${cagra_search_multi_cta_inst_files}
-    ${cagra_search_single_cta_inst_files}
-  )
-
-  set_source_files_properties(
-    ${cagra_compute_distance_standard_inst_files} ${cagra_compute_distance_vpq_inst_files}
-    PROPERTIES COMPILE_FLAGS -maxrregcount=64
-  )
-
-  set_target_properties(
-    cuvs-cagra-search
-    PROPERTIES BUILD_RPATH "\$ORIGIN"
-               CXX_STANDARD 20
-               CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 20
-               CUDA_STANDARD_REQUIRED ON
-               CUDA_SEPARABLE_COMPILATION ON
-               POSITION_INDEPENDENT_CODE ON
-  )
-  target_compile_definitions(
-    cuvs-cagra-search PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                              $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
-  )
-  target_link_libraries(
-    cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
-                              $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
-  )
-  target_compile_options(
-    cuvs-cagra-search
-    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
-  )
-  target_include_directories(
-    cuvs-cagra-search PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/src"
+  set(cuvs_cagra_search_cuda_inst_files
+      ${cagra_search_inst_files}
+      ${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance.cu
+      ${cagra_compute_distance_standard_inst_files}
+      ${cagra_compute_distance_vpq_inst_files}
+      ${cagra_search_multi_cta_inst_files}
+      ${cagra_search_single_cta_inst_files}
   )
 
   if(BUILD_MG_ALGOS)
@@ -1031,6 +997,7 @@ if(NOT BUILD_CPU_ONLY)
     ${iface_flat_inst_files}
     ${iface_pq_inst_files}
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
+    ${cuvs_cagra_search_cuda_inst_files}
     src/neighbors/dynamic_batching.cu
     src/neighbors/composite/index.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
@@ -1143,7 +1110,6 @@ if(NOT BUILD_CPU_ONLY)
     target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
 
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
-    target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
   endif()
 
   set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
@@ -1156,7 +1122,7 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
-    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
+    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs ALIAS cuvs)
     set_target_properties(
       cuvs
@@ -1217,7 +1183,7 @@ SECTIONS
   endif()
 
   if(NOT cuvs_compile_mode STREQUAL "shared_only")
-    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs_static ALIAS cuvs_static)
 
     set_target_properties(

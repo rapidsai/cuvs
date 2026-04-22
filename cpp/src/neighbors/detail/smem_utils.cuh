@@ -96,7 +96,8 @@ void safely_launch_kernel_with_smem_size(cudaKernel_t kernel,
   // For JIT kernels, track by kernel pointer since all cudaKernel_t have the same type
   static std::unordered_map<cudaKernel_t, std::pair<std::mutex, std::atomic<uint32_t>>>
     jit_smem_sizes;
-  std::mutex map_mutex;
+  static std::mutex
+    map_mutex;  // protects jit_smem_sizes (insert / lookup) across calls and threads
 
   std::pair<std::mutex, std::atomic<uint32_t>>* current_smem_size;
   {

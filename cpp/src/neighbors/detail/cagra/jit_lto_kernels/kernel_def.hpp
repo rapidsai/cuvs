@@ -152,7 +152,7 @@ using apply_filter_kernel_func_t = void(const SourceIndexT* const,
                                         const std::size_t,
                                         const std::uint32_t,
                                         const std::uint32_t,
-                                        const IndexT,
+                                        const std::uint32_t,
                                         cagra_bitset<SourceIndexT>);
 
 }  // namespace multi_kernel_search

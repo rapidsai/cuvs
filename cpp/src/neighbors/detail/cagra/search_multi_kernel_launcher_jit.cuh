@@ -159,7 +159,7 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                       const std::size_t lds,
                       const std::uint32_t result_buffer_size,
                       const std::uint32_t num_queries,
-                      const INDEX_T query_id_offset,
+                      const std::uint32_t query_id_offset,
                       SAMPLE_FILTER_T sample_filter,
                       cudaStream_t cuda_stream)
 {
