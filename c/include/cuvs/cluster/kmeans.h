@@ -39,6 +39,8 @@ typedef enum {
 
 /**
  * @brief Hyper-parameters for the kmeans algorithm
+ * NB: The inertia_check field is kept for ABI compatibility. Removed in cuvsKMeansParams_v1.
+ * CalVer for the replacement: 26.08
  */
 struct cuvsKMeansParams {
   cuvsDistanceType metric;
@@ -93,6 +95,84 @@ struct cuvsKMeansParams {
 
   /** Deprecated, ignored. Kept for ABI compatibility. */
   bool inertia_check;
+
+  /**
+   * Whether to use hierarchical (balanced) kmeans or not
+   */
+  bool hierarchical;
+
+  /**
+   * For hierarchical k-means , defines the number of training iterations
+   */
+  int hierarchical_n_iters;
+
+  /**
+   * Number of samples to process per GPU batch for the batched (host-data) API.
+   * When set to 0, defaults to n_samples (process all at once).
+   */
+  int64_t streaming_batch_size;
+
+  /**
+   * Number of samples to draw for KMeansPlusPlus initialization.
+   * When set to 0, uses heuristic min(3 * n_clusters, n_samples) for host data,
+   * or n_samples for device data.
+   */
+  int64_t init_size;
+};
+
+/**
+ * @brief Hyper-parameters for the kmeans algorithm
+ */
+ struct cuvsKMeansParams_v1 {
+  cuvsDistanceType metric;
+
+  /**
+   * The number of clusters to form as well as the number of centroids to generate (default:8).
+   */
+  int n_clusters;
+
+  /**
+   * Method for initialization, defaults to k-means++:
+   *  - cuvsKMeansInitMethod::KMeansPlusPlus (k-means++): Use scalable k-means++ algorithm
+   * to select the initial cluster centers.
+   *  - cuvsKMeansInitMethod::Random (random): Choose 'n_clusters' observations (rows) at
+   * random from the input data for the initial centroids.
+   *  - cuvsKMeansInitMethod::Array (ndarray): Use 'centroids' as initial cluster centers.
+   */
+  cuvsKMeansInitMethod init;
+
+  /**
+   * Maximum number of iterations of the k-means algorithm for a single run.
+   */
+  int max_iter;
+
+  /**
+   * Relative tolerance with regards to inertia to declare convergence.
+   */
+  double tol;
+
+  /**
+   * Number of instance k-means algorithm will be run with different seeds.
+   */
+  int n_init;
+
+  /**
+   * Oversampling factor for use in the k-means|| algorithm
+   */
+  double oversampling_factor;
+
+  /**
+   * batch_samples and batch_centroids are used to tile 1NN computation which is
+   * useful to optimize/control the memory footprint
+   * Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0
+   * then don't tile the centroids
+   */
+  int batch_samples;
+
+  /**
+   * if 0 then batch_centroids = n_clusters
+   */
+  int batch_centroids;
 
   /**
    * Whether to use hierarchical (balanced) kmeans or not
