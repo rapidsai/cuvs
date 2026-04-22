@@ -147,7 +147,6 @@ DataT weightSum(
   raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor> weight)
 {
   auto n_samples = weight.extent(0);
-  auto ns        = static_cast<DataT>(n_samples);
 
   DataT wt_sum = DataT{0};
   if constexpr (raft::is_device_mdspan_v<decltype(weight)>) {
@@ -162,6 +161,7 @@ DataT weightSum(
       wt_sum += weight(i);
     }
   }
+  RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
   return wt_sum;
 }
 

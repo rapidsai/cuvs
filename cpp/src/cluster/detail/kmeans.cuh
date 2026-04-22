@@ -1011,8 +1011,7 @@ void kmeans_predict(raft::resources const& handle,
     raft::matrix::fill(handle, weight.view(), DataT(1));
 
   if (normalize_weight) {
-    DataT wt_sum = weightSum(handle, raft::make_const_mdspan(weight.view()));
-    RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
+    DataT wt_sum        = weightSum(handle, raft::make_const_mdspan(weight.view()));
     const DataT rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
     if (std::abs(wt_sum - n_samples) > rel_tol) {
       RAFT_LOG_DEBUG(
