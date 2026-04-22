@@ -1831,6 +1831,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
@@ -1884,6 +1887,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] is input stream
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
@@ -1938,6 +1944,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
@@ -1991,6 +2000,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] is input stream
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
@@ -2045,6 +2057,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
@@ -2098,6 +2113,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] is input stream
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
@@ -2152,6 +2170,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
@@ -2205,6 +2226,9 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] is input stream
  * @param[out] index the cagra index
+ * @param[out] out_dataset if non-null, on success may be set to an owned deserialized dataset
+ *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
+ *            nullptr to ignore.
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
