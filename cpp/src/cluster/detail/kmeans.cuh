@@ -262,50 +262,6 @@ void kmeansPlusPlus(raft::resources const& handle,
   }  /// <<<< Step-5 >>>
 }
 
-/**
- *
- * @tparam DataT
- * @tparam IndexT
- * @param handle
- * @param[in] X input matrix (size n_samples, n_features)
- * @param[in] weight number of samples currently assigned to each centroid
- * @param[in] cur_centroids matrix of current centroids (size n_clusters, n_features)
- * @param[in] l2norm_x
- * @param[out] min_cluster_and_dist
- * @param[out] new_centroids
- * @param[out] new_weight
- * @param[inout] workspace
- */
-template <typename DataT, typename IndexT, typename LabelsIterator>
-void update_centroids(raft::resources const& handle,
-                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> X,
-                      raft::device_vector_view<const DataT, IndexT> sample_weights,
-                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> centroids,
-
-                      // TODO: Figure out how to best wrap iterator types in mdspan
-                      LabelsIterator cluster_labels,
-                      raft::device_vector_view<DataT, IndexT> weight_per_cluster,
-                      raft::device_matrix_view<DataT, IndexT, raft::row_major> new_centroids,
-                      rmm::device_uvector<char>& workspace)
-{
-  auto n_clusters = centroids.extent(0);
-
-  cuvs::cluster::kmeans::detail::compute_centroid_adjustments(handle,
-                                                              X,
-                                                              sample_weights,
-                                                              cluster_labels,
-                                                              static_cast<IndexT>(n_clusters),
-                                                              new_centroids,
-                                                              weight_per_cluster,
-                                                              workspace);
-
-  cuvs::cluster::kmeans::detail::finalize_centroids(handle,
-                                                    raft::make_const_mdspan(new_centroids),
-                                                    raft::make_const_mdspan(weight_per_cluster),
-                                                    centroids,
-                                                    new_centroids);
-}
-
 template <typename DataT, typename IndexT, typename Accessor>
 void kmeans_fit(
   raft::resources const& handle,
@@ -719,8 +675,6 @@ void kmeans_fit(
   auto weight_per_cluster = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
   auto centroid_norms_buf = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
   auto clustering_cost    = raft::make_device_scalar<DataT>(handle, DataT{0});
-  auto batch_sums         = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
-  auto batch_counts       = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
 
   rmm::device_uvector<char> batch_workspace(streaming_batch_size, stream);
 
@@ -871,8 +825,6 @@ void kmeans_fit(
                                      ws,
                                      centroid_sums.view(),
                                      weight_per_cluster.view(),
-                                     batch_sums.view(),
-                                     batch_counts.view(),
                                      clustering_cost.view(),
                                      batch_workspace,
                                      centroid_norms_opt);

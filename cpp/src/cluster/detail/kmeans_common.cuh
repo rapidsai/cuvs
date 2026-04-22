@@ -512,7 +512,8 @@ void compute_centroid_adjustments(
   IndexT n_clusters,
   raft::device_matrix_view<DataT, IndexT, raft::row_major> centroid_sums,
   raft::device_vector_view<DataT, IndexT> weight_per_cluster,
-  rmm::device_uvector<char>& workspace)
+  rmm::device_uvector<char>& workspace,
+  bool reset_sums = true)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -528,7 +529,8 @@ void compute_centroid_adjustments(
                                    X.extent(1),
                                    n_clusters,
                                    centroid_sums.data_handle(),
-                                   stream);
+                                   stream,
+                                   reset_sums);
 
   raft::linalg::reduce_cols_by_key(sample_weights.data_handle(),
                                    cluster_labels,
@@ -536,7 +538,8 @@ void compute_centroid_adjustments(
                                    static_cast<IndexT>(1),
                                    static_cast<IndexT>(n_samples),
                                    n_clusters,
-                                   stream);
+                                   stream,
+                                   reset_sums);
 }
 /**
  * @brief Finalize centroids by dividing accumulated sums by counts.
@@ -635,8 +638,6 @@ DataT compute_centroid_shift(raft::resources const& handle,
  * @param[inout]  workspace            Resizable scratch
  * @param[inout]  centroid_sums        Running weighted sums [n_clusters x n_features] (added into)
  * @param[inout]  weight_per_cluster   Running weight counts [n_clusters] (added into)
- * @param[inout]  batch_sums           Scratch for this batch [n_clusters x n_features]
- * @param[inout]  batch_counts         Scratch for this batch [n_clusters]
  * @param[inout]  clustering_cost      Running cost scalar (device) (added into)
  * @param[in]     centroid_norms       Optional precomputed centroid norms [n_clusters].
  *                                     When provided, skips internal centroid norm computation.
@@ -656,8 +657,6 @@ void process_batch(
   rmm::device_uvector<char>& workspace,
   raft::device_matrix_view<DataT, IndexT> centroid_sums,
   raft::device_vector_view<DataT, IndexT> weight_per_cluster,
-  raft::device_matrix_view<DataT, IndexT> batch_sums,
-  raft::device_vector_view<DataT, IndexT> batch_counts,
   raft::device_scalar_view<DataT> clustering_cost,
   rmm::device_uvector<char>& batch_workspace,
   std::optional<raft::device_vector_view<const DataT, IndexT>> centroid_norms = std::nullopt)
@@ -686,21 +685,10 @@ void process_batch(
                                batch_weights,
                                labels_itr,
                                static_cast<IndexT>(centroid_sums.extent(0)),
-                               batch_sums,
-                               batch_counts,
-                               batch_workspace);
-
-  raft::linalg::add(centroid_sums.data_handle(),
-                    centroid_sums.data_handle(),
-                    batch_sums.data_handle(),
-                    centroid_sums.size(),
-                    stream);
-
-  raft::linalg::add(weight_per_cluster.data_handle(),
-                    weight_per_cluster.data_handle(),
-                    batch_counts.data_handle(),
-                    weight_per_cluster.size(),
-                    stream);
+                               centroid_sums,
+                               weight_per_cluster,
+                               batch_workspace,
+                               /*reset_sums=*/false);
 
   raft::linalg::map(
     handle,
