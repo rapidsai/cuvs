@@ -592,6 +592,11 @@ void kmeans_fit(
     sample_weight.has_value() ? sample_weight.value().data_handle() : nullptr;
   DataT wt_sum = sample_weight.has_value() ? weightSum(handle, sample_weight.value())
                                            : static_cast<DataT>(n_samples);
+  if (sample_weight.has_value() && wt_sum != static_cast<DataT>(n_samples)) {
+    RAFT_LOG_DEBUG(
+      "[Warning!] KMeans: normalizing the user provided sample weight to sum up to %zu samples",
+      static_cast<size_t>(n_samples));
+  }
 
   rmm::device_uvector<char> local_workspace(0, stream);
   rmm::device_uvector<char>& ws = workspace.has_value() ? workspace->get() : local_workspace;
@@ -991,7 +996,10 @@ void kmeans_predict(raft::resources const& handle,
   if (normalize_weight) {
     DataT wt_sum        = weightSum(handle, raft::make_const_mdspan(weight.view()));
     const DataT rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
-    if (std::abs(wt_sum - n_samples) <= rel_tol) {
+    if (std::abs(wt_sum - n_samples) > rel_tol) {
+      RAFT_LOG_DEBUG(
+        "[Warning!] KMeans: normalizing the user provided sample weight to sum up to %zu samples",
+        static_cast<size_t>(n_samples));
       raft::linalg::map(handle,
                         weight.view(),
                         raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},

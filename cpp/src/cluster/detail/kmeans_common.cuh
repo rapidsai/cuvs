@@ -162,13 +162,6 @@ DataT weightSum(
       wt_sum += weight(i);
     }
   }
-
-  if (wt_sum != ns) {
-    RAFT_LOG_DEBUG(
-      "[Warning!] KMeans: normalizing the user provided sample weight to "
-      "sum up to %zu samples",
-      static_cast<size_t>(n_samples));
-  }
   return wt_sum;
 }
 
