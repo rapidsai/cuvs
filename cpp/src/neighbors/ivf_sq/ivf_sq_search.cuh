@@ -877,7 +877,7 @@ inline void search_with_filtering(raft::resources const& handle,
                                             cuvs::distance::is_min_close(index.metric()),
                                             neighbors + std::size_t(offset_q) * k,
                                             distances + std::size_t(offset_q) * k,
-                                            raft::resource::get_workspace_resource(handle),
+                                            raft::resource::get_workspace_resource_ref(handle),
                                             sample_filter);
   }
 }

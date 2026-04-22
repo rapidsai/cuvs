@@ -377,7 +377,7 @@ void extend(raft::resources const& handle,
 
   auto new_labels =
     raft::make_device_mdarray<LabelT>(handle,
-                                      raft::resource::get_large_workspace_resource(handle),
+                                      raft::resource::get_large_workspace_resource_ref(handle),
                                       raft::make_extents<int64_t>(n_rows));
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric     = index->metric();
@@ -401,7 +401,7 @@ void extend(raft::resources const& handle,
                                             index->dim(),
                                             max_batch_size,
                                             copy_stream,
-                                            raft::resource::get_workspace_resource(handle),
+                                            raft::resource::get_workspace_resource_ref(handle),
                                             enable_prefetch);
   vec_batches.prefetch_next_batch();
 
@@ -451,7 +451,12 @@ void extend(raft::resources const& handle,
   raft::copy(list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream);
 
   utils::batch_load_iterator<int64_t> vec_indices(
-    new_indices, n_rows, 1, max_batch_size, stream, raft::resource::get_workspace_resource(handle));
+    new_indices,
+    n_rows,
+    1,
+    max_batch_size,
+    stream,
+    raft::resource::get_workspace_resource_ref(handle));
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
   utils::batch_load_iterator<int64_t> idx_batch = vec_indices.begin();
@@ -557,7 +562,7 @@ inline auto build(
     auto n_rows_train = n_rows / trainset_ratio;
     auto trainset =
       raft::make_device_mdarray<T>(handle,
-                                   raft::resource::get_large_workspace_resource(handle),
+                                   raft::resource::get_large_workspace_resource_ref(handle),
                                    raft::make_extents<int64_t>(n_rows_train, idx.dim()));
     raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
