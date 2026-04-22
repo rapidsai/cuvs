@@ -702,14 +702,21 @@ void kmeans_fit(
 
   cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> data_batches(
     X.data_handle(), n_samples, n_features, streaming_batch_size, stream);
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> weight_batches(
-    weight_ptr, n_samples, 1, streaming_batch_size, stream);
+  // Only materialize weight batches when weights are provided; otherwise we
+  // never touch this iterator (and never dereference a null-pointer batch).
+  std::optional<cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT>> weight_batches;
+  if (weight_ptr != nullptr) {
+    weight_batches.emplace(weight_ptr, n_samples, 1, streaming_batch_size, stream);
+  } else {
+    raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1});
+  }
 
-  if (weight_ptr == nullptr) { raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1}); }
-
-  auto prepare_batch_weights = [&](const auto& wt_batch, IndexT cur_batch_size) {
-    if (weight_ptr != nullptr) {
-      raft::copy(batch_weights_buf.data_handle(), wt_batch.data(), cur_batch_size, stream);
+  // Copies and optionally rescales `wt_data` into `batch_weights_buf`. When
+  // `wt_data == nullptr`, the buffer is assumed to have been pre-filled with 1
+  // for the unweighted case.
+  auto prepare_batch_weights = [&](const DataT* wt_data, IndexT cur_batch_size) {
+    if (wt_data != nullptr) {
+      raft::copy(batch_weights_buf.data_handle(), wt_data, cur_batch_size, stream);
       if (needs_wt_rescale) {
         auto bw = raft::make_device_vector_view<DataT, IndexT>(batch_weights_buf.data_handle(),
                                                                cur_batch_size);
@@ -802,16 +809,23 @@ void kmeans_fit(
       }
 
       data_batches.reset();
-      weight_batches.reset();
-      auto wt_it = weight_batches.begin();
+      using wt_iter_t = cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT>;
+      std::optional<wt_iter_t> wt_it;
+      if (weight_batches.has_value()) {
+        weight_batches->reset();
+        wt_it = weight_batches->begin();
+      }
       for (const auto& data_batch : data_batches) {
         IndexT cur_batch_size = static_cast<IndexT>(data_batch.size());
-        const auto& wt_batch  = *wt_it;
-        ++wt_it;
+        const DataT* wt_data  = nullptr;
+        if (wt_it.has_value()) {
+          wt_data = (**wt_it).data();
+          ++(*wt_it);
+        }
 
         auto batch_data_view = raft::make_device_matrix_view<const DataT, IndexT>(
           data_batch.data(), cur_batch_size, n_features);
-        auto batch_weights_view = prepare_batch_weights(wt_batch, cur_batch_size);
+        auto batch_weights_view = prepare_batch_weights(wt_data, cur_batch_size);
 
         auto minCAD_view = raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
           minClusterAndDistance.data_handle(), cur_batch_size);
@@ -898,18 +912,25 @@ void kmeans_fit(
 
       iter_inertia = DataT{0};
       data_batches.reset();
-      weight_batches.reset();
-      auto wt_it = weight_batches.begin();
+      using wt_iter_t = cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT>;
+      std::optional<wt_iter_t> wt_it;
+      if (weight_batches.has_value()) {
+        weight_batches->reset();
+        wt_it = weight_batches->begin();
+      }
       for (const auto& data_batch : data_batches) {
         IndexT cur_batch_size = static_cast<IndexT>(data_batch.size());
-        const auto& wt_batch  = *wt_it;
-        ++wt_it;
+        const DataT* wt_data  = nullptr;
+        if (wt_it.has_value()) {
+          wt_data = (**wt_it).data();
+          ++(*wt_it);
+        }
 
         auto batch_data_view = raft::make_device_matrix_view<const DataT, IndexT>(
           data_batch.data(), cur_batch_size, n_features);
 
         std::optional<raft::device_vector_view<const DataT, IndexT>> batch_sw = std::nullopt;
-        if (weight_ptr != nullptr) { batch_sw = prepare_batch_weights(wt_batch, cur_batch_size); }
+        if (weight_ptr != nullptr) { batch_sw = prepare_batch_weights(wt_data, cur_batch_size); }
 
         DataT batch_cost = DataT{0};
         cuvs::cluster::kmeans::cluster_cost(handle,
