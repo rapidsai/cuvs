@@ -487,14 +487,20 @@ void countSamplesInCluster(raft::resources const& handle,
  * @tparam IndexT Index type
  * @tparam LabelsIterator Iterator type for cluster labels
  *
- * @param[in]  handle             RAFT resources handle
- * @param[in]  X                  Input samples [n_samples x n_features]
- * @param[in]  sample_weights     Weights for each sample [n_samples]
- * @param[in]  cluster_labels     Cluster assignment for each sample (iterator)
- * @param[in]  n_clusters         Number of clusters
- * @param[out] centroid_sums      Output weighted sum per cluster [n_clusters x n_features]
- * @param[out] weight_per_cluster Output sum of weights per cluster [n_clusters]
- * @param[inout] workspace        Workspace buffer for intermediate operations
+ * @param[in]    handle             RAFT resources handle
+ * @param[in]    X                  Input samples [n_samples x n_features]
+ * @param[in]    sample_weights     Weights for each sample [n_samples]
+ * @param[in]    cluster_labels     Cluster assignment for each sample (iterator)
+ * @param[in]    n_clusters         Number of clusters
+ * @param[inout] centroid_sums      Weighted sum per cluster [n_clusters x n_features]. When
+ *                                  @p reset_sums is true this is overwritten; otherwise the
+ *                                  contribution from @p X is added to the existing contents.
+ * @param[inout] weight_per_cluster Sum of weights per cluster [n_clusters]. Follows the same
+ *                                  overwrite-vs-accumulate semantics as @p centroid_sums.
+ * @param[inout] workspace          Workspace buffer for intermediate operations
+ * @param[in]    reset_sums         If true (default), outputs are reset to zero before reducing;
+ *                                  if false, this call's contribution is accumulated into the
+ *                                  existing values (used by `process_batch` for streaming fits).
  */
 template <typename DataT, typename IndexT, typename LabelsIterator>
 void compute_centroid_adjustments(

@@ -115,9 +115,13 @@ struct params : base_params {
   /**
    * Number of samples to randomly draw for the KMeansPlusPlus initialization
    * step. A random subset of this size is used for centroid seeding.
-   * When set to 0 the default depends on the data location:
-   *   - Device data: n_samples (use the full dataset).
-   *   - Host data:   min(3 * n_clusters, n_samples).
+   *
+   * Only applies when dataset is on host; for device data the full dataset
+   * is always used for seeding and this parameter is ignored.
+   *
+   * When set to 0 (default) with host data uses `min(3 * n_clusters, n_samples)`
+   * as a default.
+   *
    * Default: 0.
    */
   int64_t init_size = 0;

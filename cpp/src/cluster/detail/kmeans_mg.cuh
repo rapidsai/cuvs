@@ -478,6 +478,7 @@ void checkWeights(const raft::resources& handle,
                         stream);
   DataT wt_sum = wt_aggr.value(stream);
   raft::resource::sync_stream(handle, stream);
+  RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
 
   if (wt_sum != n_samples) {
     CUVS_LOG_KMEANS(handle,

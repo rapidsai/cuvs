@@ -590,9 +590,12 @@ void kmeans_fit(
 
   const DataT* weight_ptr =
     sample_weight.has_value() ? sample_weight.value().data_handle() : nullptr;
-  DataT wt_sum = sample_weight.has_value() ? weightSum(handle, sample_weight.value())
-                                           : static_cast<DataT>(n_samples);
-  if (sample_weight.has_value() && wt_sum != static_cast<DataT>(n_samples)) {
+  DataT wt_sum           = sample_weight.has_value() ? weightSum(handle, sample_weight.value())
+                                                     : static_cast<DataT>(n_samples);
+  const DataT wt_rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
+  const bool needs_wt_rescale =
+    sample_weight.has_value() && std::abs(wt_sum - static_cast<DataT>(n_samples)) > wt_rel_tol;
+  if (needs_wt_rescale) {
     RAFT_LOG_DEBUG(
       "[Warning!] KMeans: normalizing the user provided sample weight to sum up to %zu samples",
       static_cast<size_t>(n_samples));
@@ -610,6 +613,29 @@ void kmeans_fit(
       static_cast<size_t>(streaming_batch_size),
       static_cast<size_t>(n_samples));
     streaming_batch_size = static_cast<IndexT>(n_samples);
+  }
+
+  // Preallocate the host-side KMeans++ init sample buffer.
+  std::optional<raft::device_matrix<DataT, IndexT>> init_sample;
+  if constexpr (!data_on_device) {
+    if (pams.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
+      IndexT default_init_size =
+        std::min(static_cast<IndexT>(std::int64_t{3} * n_clusters), n_samples);
+      IndexT init_sample_size = pams.init_size > 0
+                                  ? std::min(static_cast<IndexT>(pams.init_size), n_samples)
+                                  : default_init_size;
+
+      if (pams.init_size <= 0 && init_sample_size < n_samples) {
+        RAFT_LOG_WARN(
+          "KMeans.fit: KMeans++ initialization is using a random subsample of %zu/%zu host rows "
+          "(params.init_size=0 defaults to min(3 * n_clusters, n_samples) for host data). "
+          "Set params.init_size to n_samples to use the full dataset for seeding.",
+          static_cast<size_t>(init_sample_size),
+          static_cast<size_t>(n_samples));
+      }
+
+      init_sample = raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
+    }
   }
 
   auto init_centroids = [&](const cuvs::cluster::kmeans::params& iter_params,
@@ -638,17 +664,8 @@ void kmeans_fit(
       if constexpr (data_on_device) {
         run_kmeanspp(X);
       } else {
-        IndexT default_init_size =
-          std::min(static_cast<IndexT>(std::int64_t{3} * n_clusters), n_samples);
-        IndexT init_sample_size =
-          iter_params.init_size > 0
-            ? std::min(static_cast<IndexT>(iter_params.init_size), n_samples)
-            : default_init_size;
-
-        auto init_sample =
-          raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
-        raft::matrix::sample_rows(handle, random_state, X, init_sample.view());
-        run_kmeanspp(raft::make_const_mdspan(init_sample.view()));
+        raft::matrix::sample_rows(handle, random_state, X, init_sample->view());
+        run_kmeanspp(raft::make_const_mdspan(init_sample->view()));
       }
     } else {
       THROW("unknown initialization method to select initial centers");
@@ -693,7 +710,7 @@ void kmeans_fit(
   auto prepare_batch_weights = [&](const auto& wt_batch, IndexT cur_batch_size) {
     if (weight_ptr != nullptr) {
       raft::copy(batch_weights_buf.data_handle(), wt_batch.data(), cur_batch_size, stream);
-      if (wt_sum != static_cast<DataT>(n_samples)) {
+      if (needs_wt_rescale) {
         auto bw = raft::make_device_vector_view<DataT, IndexT>(batch_weights_buf.data_handle(),
                                                                cur_batch_size);
         raft::linalg::map(handle,
@@ -994,7 +1011,8 @@ void kmeans_predict(raft::resources const& handle,
     raft::matrix::fill(handle, weight.view(), DataT(1));
 
   if (normalize_weight) {
-    DataT wt_sum        = weightSum(handle, raft::make_const_mdspan(weight.view()));
+    DataT wt_sum = weightSum(handle, raft::make_const_mdspan(weight.view()));
+    RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
     const DataT rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
     if (std::abs(wt_sum - n_samples) > rel_tol) {
       RAFT_LOG_DEBUG(

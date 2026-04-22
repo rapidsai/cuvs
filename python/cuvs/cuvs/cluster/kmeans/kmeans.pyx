@@ -4,6 +4,7 @@
 #
 # cython: language_level=3
 
+import warnings
 from collections import namedtuple
 
 import numpy as np
@@ -76,6 +77,10 @@ cdef class KMeansParams:
         [batch_samples x n_clusters].
     batch_centroids : int
         Number of centroids to process in each batch. If 0, uses n_clusters.
+    inertia_check : bool
+        Deprecated and ignored. Will be
+        removed in a future release. Inertia-based convergence checking
+        always runs.
     init_size : int
         Number of samples to draw for KMeansPlusPlus initialization with
         host (out-of-core) data. When set to 0, uses the heuristic
@@ -113,6 +118,7 @@ cdef class KMeansParams:
                  oversampling_factor=None,
                  batch_samples=None,
                  batch_centroids=None,
+                 inertia_check=None,
                  init_size=None,
                  streaming_batch_size=None,
                  hierarchical=None,
@@ -136,6 +142,14 @@ cdef class KMeansParams:
             self.params.batch_samples = batch_samples
         if batch_centroids is not None:
             self.params.batch_centroids = batch_centroids
+        if inertia_check is not None:
+            warnings.warn(
+                "KMeansParams `inertia_check` is deprecated and ignored; "
+                "inertia-based convergence checking always runs."
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self.params.inertia_check = inertia_check
         if init_size is not None:
             self.params.init_size = init_size
         if streaming_batch_size is not None:
