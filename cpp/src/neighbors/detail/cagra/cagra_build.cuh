@@ -838,6 +838,7 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
   size_t prune_dev = batch_size * intermediate_degree * 1;  // detour count (uint8_t)
   prune_dev += batch_size * sizeof(uint32_t);               // d_num_detour_edges
   prune_dev += n_rows * intermediate_degree * index_size;   // d_input_graph
+  prune_dev += 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
 
   // Reverse graph stage memory
   size_t rev_dev = n_rows * graph_degree * index_size;  // d_rev_graph
@@ -848,8 +849,8 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
   size_t combine_host =
     n_rows * sizeof(uint32_t) + graph_degree * sizeof(uint32_t);  // in_edge_count + hist
 
-  // additional memory for combine stage on device
-  size_t combine_dev = n_rows * graph_degree * index_size;  // d_output_graph
+  // additional memory for combine stage on device (3 batches)
+  size_t combine_dev = 3 * batch_size * graph_degree * index_size;  // d_output_graph(3*batch)
 
   size_t total_host = mst_host + combine_host;
   size_t total_dev  = std::max(prune_dev, rev_dev + combine_dev);

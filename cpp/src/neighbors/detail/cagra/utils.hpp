@@ -162,14 +162,6 @@ struct gen_index_msb_1_mask {
 }  // namespace utils
 
 template <typename T>
-bool is_ptr_device_accessible(T* ptr)
-{
-  cudaPointerAttributes attr;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-  return attr.devicePointer != nullptr;
-}
-
-template <typename T>
 bool is_ptr_host_accessible(T* ptr)
 {
   cudaPointerAttributes attr;

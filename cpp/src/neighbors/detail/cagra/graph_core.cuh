@@ -203,9 +203,9 @@ __global__ void kern_fused_prune(
   uint32_t* const d_invalid_neighbor_list,
   uint64_t* const stats)
 {
-  // Check assumption we have exactly one warp per row of the batch
+  // Check assumption we have at least one warp per row of the batch
   assert(blockDim.x == raft::WarpSize * num_warps);
-  assert(gridDim.x * num_warps == batch_size);
+  assert(gridDim.x * num_warps >= batch_size);
 
   extern __shared__ unsigned char smem_buf[];
 
@@ -368,9 +368,9 @@ __global__ void kern_merge_graph(
   bool guarantee_connectivity,
   bool* check_num_protected_edges)
 {
-  // Check assumption we have exactly one warp per row of the batch
+  // Check assumption we have at least one warp per row of the batch
   assert(blockDim.x == raft::WarpSize * num_warps);
-  assert(gridDim.x * num_warps == batch_size);
+  assert(gridDim.x * num_warps >= batch_size);
 
   const uint64_t graph_size          = rev_graph.extent(0);
   const uint32_t output_graph_degree = output_graph.extent(1);
@@ -785,12 +785,10 @@ void merge_graph_gpu(raft::resources const& res,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/combine");
 
-  auto default_ws_mr             = raft::resource::get_workspace_resource(res);
   const double merge_graph_start = cur_time();
 
   auto d_check_num_protected_edges = raft::make_device_scalar<bool>(res, true);
 
-  // The batchsize should be divisible by the number of warps per block (currently 4)
   uint32_t batch_size =
     std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
@@ -818,7 +816,6 @@ void merge_graph_gpu(raft::resources const& res,
     /*initialize*/ true);
 
   const uint32_t num_warps = 4;
-  RAFT_EXPECTS(batch_size % num_warps == 0, "batch_size must be divisible by num_warps");
   const dim3 threads_merge(raft::WarpSize * num_warps, 1, 1);
   const dim3 blocks_merge(raft::ceildiv(batch_size, num_warps), 1, 1);
   const size_t merge_smem_size = num_warps * output_graph_degree * sizeof(IdxT);
@@ -870,8 +867,6 @@ void make_reverse_graph_gpu(raft::resources const& res,
   //
   // Make reverse graph
   //
-  const double time_make_start = cur_time();
-
   raft::matrix::fill(res, d_rev_graph, IdxT(-1));
   raft::matrix::fill(res, d_rev_graph_count, uint32_t(0));
 
@@ -900,13 +895,6 @@ void make_reverse_graph_gpu(raft::resources const& res,
         output_graph, d_rev_graph, d_rev_graph_count, k);
     }
   }
-
-  raft::resource::sync_stream(res);
-  RAFT_LOG_DEBUG("\n");
-
-  const double time_make_end = cur_time();
-  RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
-                 (time_make_end - time_make_start) * 1000.0);
 }
 
 template <typename DataT,
@@ -1268,6 +1256,12 @@ void mst_optimization(raft::resources const& res,
                                    1 * sizeof(IdxT),
                                    graph_size,
                                    cudaMemcpyDeviceToHost));
+
+        // FIXME: use submdspan and raft::copy once supported
+        /*auto column_view = cuda::std::submdspan(input_graph,
+                                                  cuda::std::tuple{uint64_t(0),
+        uint64_t(graph_size)}, cuda::std::tuple{uint64_t(k), uint64_t(k+1)}); raft::copy(res,
+        candidate_edges.view(), raft::make_const_mdspan(column_view));*/
       }
     }
 
@@ -1532,9 +1526,7 @@ void prune_graph_gpu(raft::resources const& res,
 
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/prune");
-  auto default_ws_mr = raft::resource::get_workspace_resource(res);
 
-  // The batchsize should be divisible by the number of warps per block (currently 4)
   uint32_t batch_size =
     std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
@@ -1569,7 +1561,6 @@ void prune_graph_gpu(raft::resources const& res,
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 
   const uint32_t num_warps = 4;
-  RAFT_EXPECTS(batch_size % num_warps == 0, "batch_size must be divisible by num_warps");
   const dim3 threads_prune(raft::WarpSize * num_warps, 1, 1);
   const dim3 blocks_prune(raft::ceildiv(batch_size, num_warps), 1, 1);
   const size_t prune_smem_size = num_warps * knn_graph_degree * (sizeof(IdxT) + sizeof(uint32_t));
@@ -1700,8 +1691,10 @@ void optimize(raft::resources const& res,
 
   make_reverse_graph_gpu<IdxT>(res, new_graph, d_rev_graph.view(), d_rev_graph_count.view());
 
+  raft::resource::sync_stream(res);
+
   const double time_make_end = cur_time();
-  RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
+  RAFT_LOG_DEBUG("\n# Making reverse graph time: %.1lf ms",
                  (time_make_end - time_make_start) * 1000.0);
 
   // merge graph -- will always use GPU path
