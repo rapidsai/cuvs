@@ -9,17 +9,7 @@ use std::path::PathBuf;
 
 fn main() {
     // build the cuvs c-api library with cmake, and link it into this crate
-    // The `cmake` crate does not honor the shell `CMAKE_ARGS` variable; `define()` is how `-D`
-    // flags are passed. CMake 4.3+ rejects rapids' "RAPIDS" sentinel for CMAKE_CUDA_ARCHITECTURES
-    // before rapids-cmake can expand it; use a concrete value unless the user set a valid one.
-    let mut cfg = cmake::Config::new(".");
-    let arch = env::var("CMAKE_CUDA_ARCHITECTURES").unwrap_or_default();
-    if arch.is_empty() || arch == "RAPIDS" {
-        cfg.define("CMAKE_CUDA_ARCHITECTURES", "native");
-    } else {
-        cfg.define("CMAKE_CUDA_ARCHITECTURES", &arch);
-    }
-    let cuvs_build = cfg.build();
+    let cuvs_build = cmake::Config::new(".").build();
 
     println!(
         "cargo:rustc-link-search=native={}/lib",
