@@ -1716,8 +1716,8 @@ void build_knn_graph(
 
   // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
   rmm::device_async_resource_ref workspace_mr =
-    use_large_workspace ? raft::resource::get_large_workspace_resource(res)
-                        : raft::resource::get_workspace_resource(res);
+    use_large_workspace ? raft::resource::get_large_workspace_resource_ref(res)
+                        : raft::resource::get_workspace_resource_ref(res);
 
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
@@ -2126,7 +2126,7 @@ auto iterative_build_graph(raft::resources const& res,
       dev_query_view.extent(1),
       max_chunk_size,
       raft::resource::get_cuda_stream(res),
-      raft::resource::get_workspace_resource(res));
+      raft::resource::get_workspace_resource_ref(res));
     for (const auto& batch : query_batch) {
       raft::device_matrix_view<const T, int64_t> batch_dev_query_view;
       if (query_contiguous) {
