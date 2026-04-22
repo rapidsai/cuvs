@@ -7,6 +7,8 @@
 
 #include <cuvs/detail/jit_lto/common_fragments.hpp>
 
+#include <cstdint>
+
 namespace cuvs::neighbors::cagra::detail {
 
 struct tag_dist_f {};
@@ -14,17 +16,6 @@ struct tag_metric_l2 {};
 struct tag_metric_inner_product {};
 struct tag_metric_cosine {};
 struct tag_metric_hamming {};
-struct tag_team_8 {};
-struct tag_team_16 {};
-struct tag_team_32 {};
-struct tag_dim_128 {};
-struct tag_dim_256 {};
-struct tag_dim_512 {};
-struct tag_pq_bits_0 {};
-struct tag_pq_bits_8 {};
-struct tag_pq_len_0 {};
-struct tag_pq_len_2 {};
-struct tag_pq_len_4 {};
 struct tag_codebook_none {};
 struct tag_codebook_half {};
 struct tag_metric_l1 {};
@@ -36,10 +27,10 @@ template <typename DataTag,
           typename DistanceTag,
           typename QueryTag,
           typename CodebookTag,
-          typename TeamTag,
-          typename BlockDimTag,
-          typename PqBitsTag,
-          typename PqLenTag>
+          uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PqBits,
+          uint32_t PqLen>
 struct fragment_tag_setup_workspace {};
 
 template <typename DataTag,
@@ -47,10 +38,10 @@ template <typename DataTag,
           typename DistanceTag,
           typename QueryTag,
           typename CodebookTag,
-          typename TeamTag,
-          typename BlockDimTag,
-          typename PqBitsTag,
-          typename PqLenTag>
+          uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PqBits,
+          uint32_t PqLen>
 struct fragment_tag_compute_distance {};
 
 template <typename QueryTag, typename DistanceTag, typename MetricTag>
@@ -60,8 +51,8 @@ template <typename DataTag,
           typename IndexTag,
           typename DistanceTag,
           typename QueryTag,
-          typename TeamTag,
-          typename BlockDimTag,
+          uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
           typename NormTag>
 struct fragment_tag_apply_normalization_standard {};
 

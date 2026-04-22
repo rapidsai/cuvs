@@ -10,6 +10,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
 
+#include <cstdint>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -43,16 +44,16 @@ struct CagraPlannerBase : AlgorithmPlanner {
     (void)metric;
     (void)is_vpq;
     (void)pq_bits;
-    auto add = [&]<typename TeamT, typename DimT, typename PqBitsT, typename PqLenT>() {
+    auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
       this->add_static_fragment<fragment_tag_setup_workspace<DataTag,
                                                              IndexTag,
                                                              DistanceTag,
                                                              QueryTag,
                                                              CodebookTag,
-                                                             TeamT,
-                                                             DimT,
-                                                             PqBitsT,
-                                                             PqLenT>>();
+                                                             TeamSz,
+                                                             Dim,
+                                                             PqBitsV,
+                                                             PqLenV>>();
     };
     if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
       if (pq_bits != 0 || pq_len != 0) {
@@ -60,27 +61,27 @@ struct CagraPlannerBase : AlgorithmPlanner {
       }
       if (team_size == 8) {
         if (dataset_block_dim == 128) {
-          add.template operator()<tag_team_8, tag_dim_128, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<8u, 128u, 0u, 0u>();
         } else if (dataset_block_dim == 256) {
-          add.template operator()<tag_team_8, tag_dim_256, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<8u, 256u, 0u, 0u>();
         } else if (dataset_block_dim == 512) {
-          add.template operator()<tag_team_8, tag_dim_512, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<8u, 512u, 0u, 0u>();
         }
       } else if (team_size == 16) {
         if (dataset_block_dim == 128) {
-          add.template operator()<tag_team_16, tag_dim_128, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<16u, 128u, 0u, 0u>();
         } else if (dataset_block_dim == 256) {
-          add.template operator()<tag_team_16, tag_dim_256, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<16u, 256u, 0u, 0u>();
         } else if (dataset_block_dim == 512) {
-          add.template operator()<tag_team_16, tag_dim_512, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<16u, 512u, 0u, 0u>();
         }
       } else if (team_size == 32) {
         if (dataset_block_dim == 128) {
-          add.template operator()<tag_team_32, tag_dim_128, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<32u, 128u, 0u, 0u>();
         } else if (dataset_block_dim == 256) {
-          add.template operator()<tag_team_32, tag_dim_256, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<32u, 256u, 0u, 0u>();
         } else if (dataset_block_dim == 512) {
-          add.template operator()<tag_team_32, tag_dim_512, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<32u, 512u, 0u, 0u>();
         }
       }
     } else {
@@ -90,61 +91,61 @@ struct CagraPlannerBase : AlgorithmPlanner {
       if (team_size == 8) {
         if (dataset_block_dim == 128) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_8, tag_dim_128, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<8u, 128u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_8, tag_dim_128, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<8u, 128u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 256) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_8, tag_dim_256, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<8u, 256u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_8, tag_dim_256, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<8u, 256u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 512) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_8, tag_dim_512, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<8u, 512u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_8, tag_dim_512, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<8u, 512u, 8u, 4u>();
           }
         }
       } else if (team_size == 16) {
         if (dataset_block_dim == 128) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_16, tag_dim_128, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<16u, 128u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_16, tag_dim_128, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<16u, 128u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 256) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_16, tag_dim_256, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<16u, 256u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_16, tag_dim_256, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<16u, 256u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 512) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_16, tag_dim_512, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<16u, 512u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_16, tag_dim_512, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<16u, 512u, 8u, 4u>();
           }
         }
       } else if (team_size == 32) {
         if (dataset_block_dim == 128) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_32, tag_dim_128, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<32u, 128u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_32, tag_dim_128, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<32u, 128u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 256) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_32, tag_dim_256, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<32u, 256u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_32, tag_dim_256, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<32u, 256u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 512) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_32, tag_dim_512, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<32u, 512u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_32, tag_dim_512, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<32u, 512u, 8u, 4u>();
           }
         }
       }
@@ -165,16 +166,16 @@ struct CagraPlannerBase : AlgorithmPlanner {
       add_dist_op_device_function(metric);
       add_normalization_device_function(metric, team_size, dataset_block_dim);
     }
-    auto add = [&]<typename TeamT, typename DimT, typename PqBitsT, typename PqLenT>() {
+    auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
       this->add_static_fragment<fragment_tag_compute_distance<DataTag,
                                                               IndexTag,
                                                               DistanceTag,
                                                               QueryTag,
                                                               CodebookTag,
-                                                              TeamT,
-                                                              DimT,
-                                                              PqBitsT,
-                                                              PqLenT>>();
+                                                              TeamSz,
+                                                              Dim,
+                                                              PqBitsV,
+                                                              PqLenV>>();
     };
     if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
       if (pq_bits != 0 || pq_len != 0) {
@@ -182,27 +183,27 @@ struct CagraPlannerBase : AlgorithmPlanner {
       }
       if (team_size == 8) {
         if (dataset_block_dim == 128) {
-          add.template operator()<tag_team_8, tag_dim_128, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<8u, 128u, 0u, 0u>();
         } else if (dataset_block_dim == 256) {
-          add.template operator()<tag_team_8, tag_dim_256, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<8u, 256u, 0u, 0u>();
         } else if (dataset_block_dim == 512) {
-          add.template operator()<tag_team_8, tag_dim_512, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<8u, 512u, 0u, 0u>();
         }
       } else if (team_size == 16) {
         if (dataset_block_dim == 128) {
-          add.template operator()<tag_team_16, tag_dim_128, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<16u, 128u, 0u, 0u>();
         } else if (dataset_block_dim == 256) {
-          add.template operator()<tag_team_16, tag_dim_256, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<16u, 256u, 0u, 0u>();
         } else if (dataset_block_dim == 512) {
-          add.template operator()<tag_team_16, tag_dim_512, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<16u, 512u, 0u, 0u>();
         }
       } else if (team_size == 32) {
         if (dataset_block_dim == 128) {
-          add.template operator()<tag_team_32, tag_dim_128, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<32u, 128u, 0u, 0u>();
         } else if (dataset_block_dim == 256) {
-          add.template operator()<tag_team_32, tag_dim_256, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<32u, 256u, 0u, 0u>();
         } else if (dataset_block_dim == 512) {
-          add.template operator()<tag_team_32, tag_dim_512, tag_pq_bits_0, tag_pq_len_0>();
+          add.template operator()<32u, 512u, 0u, 0u>();
         }
       }
     } else {
@@ -212,61 +213,61 @@ struct CagraPlannerBase : AlgorithmPlanner {
       if (team_size == 8) {
         if (dataset_block_dim == 128) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_8, tag_dim_128, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<8u, 128u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_8, tag_dim_128, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<8u, 128u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 256) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_8, tag_dim_256, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<8u, 256u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_8, tag_dim_256, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<8u, 256u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 512) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_8, tag_dim_512, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<8u, 512u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_8, tag_dim_512, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<8u, 512u, 8u, 4u>();
           }
         }
       } else if (team_size == 16) {
         if (dataset_block_dim == 128) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_16, tag_dim_128, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<16u, 128u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_16, tag_dim_128, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<16u, 128u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 256) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_16, tag_dim_256, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<16u, 256u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_16, tag_dim_256, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<16u, 256u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 512) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_16, tag_dim_512, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<16u, 512u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_16, tag_dim_512, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<16u, 512u, 8u, 4u>();
           }
         }
       } else if (team_size == 32) {
         if (dataset_block_dim == 128) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_32, tag_dim_128, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<32u, 128u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_32, tag_dim_128, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<32u, 128u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 256) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_32, tag_dim_256, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<32u, 256u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_32, tag_dim_256, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<32u, 256u, 8u, 4u>();
           }
         } else if (dataset_block_dim == 512) {
           if (pq_len == 2) {
-            add.template operator()<tag_team_32, tag_dim_512, tag_pq_bits_8, tag_pq_len_2>();
+            add.template operator()<32u, 512u, 8u, 2u>();
           } else {
-            add.template operator()<tag_team_32, tag_dim_512, tag_pq_bits_8, tag_pq_len_4>();
+            add.template operator()<32u, 512u, 8u, 4u>();
           }
         }
       }
@@ -318,13 +319,13 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                          uint32_t dataset_block_dim)
   {
     auto go = [&]<typename NormT>() {
-      dispatch_cagra_team_dim(team_size, dataset_block_dim, [&]<typename TeamT, typename DimT>() {
+      dispatch_cagra_team_dim(team_size, dataset_block_dim, [&]<uint32_t TeamSz, uint32_t Dim>() {
         this->add_static_fragment<fragment_tag_apply_normalization_standard<DataTag,
                                                                             IndexTag,
                                                                             DistanceTag,
                                                                             QueryTag,
-                                                                            TeamT,
-                                                                            DimT,
+                                                                            TeamSz,
+                                                                            Dim,
                                                                             NormT>>();
       });
     };
@@ -341,34 +342,34 @@ struct CagraPlannerBase : AlgorithmPlanner {
   }
 
  public:
-  // Maps runtime dataset layout (same grid as the JIT matrix) to (TeamTag, DimTag). IVF-style
-  // planners pass these as template parameters; CAGRA reads team_size / dataset_block_dim from
-  // the host descriptor at planning time.
+  // Maps runtime dataset layout (same grid as the JIT matrix) to uint32_t team / block-dim
+  // template parameters; CAGRA reads team_size / dataset_block_dim from the host descriptor at
+  // planning time.
   template <typename Lambda>
   static void dispatch_cagra_team_dim(uint32_t team_size, uint32_t dataset_block_dim, Lambda&& l)
   {
     switch (team_size) {
       case 8:
         switch (dataset_block_dim) {
-          case 128: std::forward<Lambda>(l).template operator()<tag_team_8, tag_dim_128>(); return;
-          case 256: std::forward<Lambda>(l).template operator()<tag_team_8, tag_dim_256>(); return;
-          case 512: std::forward<Lambda>(l).template operator()<tag_team_8, tag_dim_512>(); return;
+          case 128: std::forward<Lambda>(l).template operator()<8u, 128u>(); return;
+          case 256: std::forward<Lambda>(l).template operator()<8u, 256u>(); return;
+          case 512: std::forward<Lambda>(l).template operator()<8u, 512u>(); return;
           default: break;
         }
         break;
       case 16:
         switch (dataset_block_dim) {
-          case 128: std::forward<Lambda>(l).template operator()<tag_team_16, tag_dim_128>(); return;
-          case 256: std::forward<Lambda>(l).template operator()<tag_team_16, tag_dim_256>(); return;
-          case 512: std::forward<Lambda>(l).template operator()<tag_team_16, tag_dim_512>(); return;
+          case 128: std::forward<Lambda>(l).template operator()<16u, 128u>(); return;
+          case 256: std::forward<Lambda>(l).template operator()<16u, 256u>(); return;
+          case 512: std::forward<Lambda>(l).template operator()<16u, 512u>(); return;
           default: break;
         }
         break;
       case 32:
         switch (dataset_block_dim) {
-          case 128: std::forward<Lambda>(l).template operator()<tag_team_32, tag_dim_128>(); return;
-          case 256: std::forward<Lambda>(l).template operator()<tag_team_32, tag_dim_256>(); return;
-          case 512: std::forward<Lambda>(l).template operator()<tag_team_32, tag_dim_512>(); return;
+          case 128: std::forward<Lambda>(l).template operator()<32u, 128u>(); return;
+          case 256: std::forward<Lambda>(l).template operator()<32u, 256u>(); return;
+          case 512: std::forward<Lambda>(l).template operator()<32u, 512u>(); return;
           default: break;
         }
         break;

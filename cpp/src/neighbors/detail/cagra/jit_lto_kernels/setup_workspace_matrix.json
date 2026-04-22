@@ -79,8 +79,7 @@
     "_codebook": [
       {
         "codebook_type": "void",
-        "codebook_tag": "",
-        "codebook_tag_comma": ""
+        "codebook_abbrev": "none"
       }
     ],
     "impl_file": "setup_workspace_standard_impl.cuh"
@@ -149,8 +148,7 @@
     "_codebook": [
       {
         "codebook_type": "half",
-        "codebook_tag": "tag_codebook_half",
-        "codebook_tag_comma": ", "
+        "codebook_abbrev": "half"
       }
     ],
     "impl_file": "setup_workspace_vpq_impl.cuh"
