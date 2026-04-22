@@ -26,7 +26,7 @@
         },
         "kwargs": {
           "KERNEL_FILE": 1,
-          "EMBEDDED_HEADER_FILE": 1,
+          "FATBIN_HEADER_FILE": 1,
           "LINK_LIBRARIES": "*"
         }
       },
@@ -37,7 +37,8 @@
         "kwargs": {
           "NAME_FORMAT": 1,
           "KERNEL_INPUT_FILE": 1,
-          "EMBEDDED_INPUT_FILE": 1,
+          "FRAGMENT_TAG_FORMAT": 1,
+          "FRAGMENT_TAG_HEADER_FILES": "*",
           "OUTPUT_DIRECTORY": 1,
           "MATRIX_JSON_ENTRY": 1,
           "KERNEL_LINK_LIBRARIES": "*"
@@ -52,7 +53,8 @@
           "MATRIX_JSON_FILE": "?",
           "MATRIX_JSON_STRING": "?",
           "KERNEL_INPUT_FILE": 1,
-          "EMBEDDED_INPUT_FILE": 1,
+          "FRAGMENT_TAG_FORMAT": 1,
+          "FRAGMENT_TAG_HEADER_FILES": "*",
           "OUTPUT_DIRECTORY": 1,
           "KERNEL_LINK_LIBRARIES": "*"
         }
