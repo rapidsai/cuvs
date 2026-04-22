@@ -1038,7 +1038,8 @@ void kmeans_predict(raft::resources const& handle,
 
   if (normalize_weight) {
     DataT wt_sum = weightSum(handle, raft::make_const_mdspan(weight.view()));
-    if (wt_sum != static_cast<DataT>(n_samples)) {
+    const DataT rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
+    if (std::abs(wt_sum - n_samples) <= rel_tol) {
       raft::linalg::map(handle,
                         weight.view(),
                         raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
