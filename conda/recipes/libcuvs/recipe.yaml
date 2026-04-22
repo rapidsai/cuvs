@@ -498,7 +498,6 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
-          - libnvjitlink
           - librmm
           - mkl
     about:
