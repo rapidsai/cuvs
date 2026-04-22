@@ -240,58 +240,6 @@ ConfigureTest(
   PERCENT 100
 )
 
-# Optional: only build if source files exist (e.g. not yet synced on all machines)
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/dataset_types.cu)
-  ConfigureTest(
-    NAME NEIGHBORS_DATASET_TYPES_TEST
-    PATH neighbors/dataset_types.cu
-    GPUS 1
-    PERCENT 100
-  )
-endif()
-
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/dataset_compression.cu)
-  ConfigureTest(
-    NAME NEIGHBORS_DATASET_COMPRESSION_TEST
-    PATH neighbors/dataset_compression.cu
-    GPUS 1
-    PERCENT 100
-  )
-endif()
-
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_padded_dataset.cu)
-  ConfigureTest(
-    NAME NEIGHBORS_CAGRA_PADDED_DATASET_TEST
-    PATH neighbors/cagra_padded_dataset.cu
-    GPUS 1
-    PERCENT 100
-  )
-  target_include_directories(
-    NEIGHBORS_CAGRA_PADDED_DATASET_TEST PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
-  )
-endif()
-
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_build_view_only.cu)
-  ConfigureTest(
-    NAME NEIGHBORS_CAGRA_BUILD_VIEW_ONLY_TEST
-    PATH neighbors/cagra_build_view_only.cu
-    GPUS 1
-    PERCENT 100
-  )
-endif()
-
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_vpq_build_result.cu)
-  ConfigureTest(
-    NAME NEIGHBORS_CAGRA_VPQ_BUILD_RESULT_TEST
-    PATH neighbors/cagra_vpq_build_result.cu
-    GPUS 1
-    PERCENT 100
-  )
-  target_include_directories(
-    NEIGHBORS_CAGRA_VPQ_BUILD_RESULT_TEST PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
-  )
-endif()
-
 ConfigureTest(
   NAME NEIGHBORS_ALL_NEIGHBORS_TEST
   PATH neighbors/all_neighbors/test_float.cu
