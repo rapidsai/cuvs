@@ -82,31 +82,67 @@ void search_main_core(
 
   RAFT_LOG_DEBUG("Cagra search");
   const uint32_t max_queries = plan->max_queries;
-  const uint32_t query_dim   = queries.extent(1);
+  const uint32_t query_dim   = static_cast<uint32_t>(queries.extent(1));
+  // Same 16B row-pitch rule as make_padded_dataset. Tight [n,dim] rows can be misaligned between
+  // rows (e.g. float, dim=1) and trigger misaligned access in CAGRA search. make_aligned_dataset
+  // reuses a non-owning strided view when the caller already has correct stride, else copies.
+  // If query_row_stride>dim, device code still advances with "+= dim*query_id" in setup_workspace;
+  // in that case run one query per plan call so every kernel sees query_id==0 and the base pointer
+  // selects the row (keeps batched path when stride==dim).
+  auto const query_storage        = cuvs::neighbors::make_aligned_dataset(res, queries);
+  const DataT* const queries_buf  = query_storage->view().data_handle();
+  const uint32_t query_row_stride = query_storage->stride();
+  const bool can_batch_n_queries  = (query_row_stride == query_dim);
 
   for (unsigned qid = 0; qid < queries.extent(0); qid += max_queries) {
     const uint32_t n_queries = std::min<std::size_t>(max_queries, queries.extent(0) - qid);
-    auto _topk_indices_ptr   = neighbors.data_handle() + (topk * qid);
-    auto _topk_distances_ptr = distances.data_handle() + (topk * qid);
-    // todo(tfeher): one could keep distances optional and pass nullptr
-    const auto* _query_ptr = queries.data_handle() + (query_dim * qid);
-    const auto* _seed_ptr =
-      plan->num_seeds > 0
-        ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * qid)
-        : nullptr;
-    uint32_t* _num_executed_iterations = nullptr;
+    if (can_batch_n_queries) {
+      auto _topk_indices_ptr   = neighbors.data_handle() + (topk * qid);
+      auto _topk_distances_ptr = distances.data_handle() + (topk * qid);
+      const auto* _query_ptr =
+        queries_buf + (static_cast<size_t>(query_row_stride) * static_cast<size_t>(qid));
+      const auto* _seed_ptr =
+        plan->num_seeds > 0
+          ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * qid)
+          : nullptr;
+      uint32_t* _num_executed_iterations = nullptr;
 
-    (*plan)(res,
-            graph,
-            source_indices,
-            _topk_indices_ptr,
-            _topk_distances_ptr,
-            _query_ptr,
-            n_queries,
-            _seed_ptr,
-            _num_executed_iterations,
-            topk,
-            set_offset(sample_filter, qid));
+      (*plan)(res,
+              graph,
+              source_indices,
+              _topk_indices_ptr,
+              _topk_distances_ptr,
+              _query_ptr,
+              n_queries,
+              _seed_ptr,
+              _num_executed_iterations,
+              topk,
+              set_offset(sample_filter, qid));
+    } else {
+      for (uint32_t qi = 0; qi < n_queries; ++qi) {
+        const size_t g           = static_cast<size_t>(qid) + static_cast<size_t>(qi);
+        auto _topk_indices_ptr   = neighbors.data_handle() + (topk * g);
+        auto _topk_distances_ptr = distances.data_handle() + (topk * g);
+        const auto* _query_ptr   = queries_buf + (query_row_stride * g);
+        const auto* _seed_ptr =
+          plan->num_seeds > 0
+            ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * g)
+            : nullptr;
+        uint32_t* _num_executed_iterations = nullptr;
+
+        (*plan)(res,
+                graph,
+                source_indices,
+                _topk_indices_ptr,
+                _topk_distances_ptr,
+                _query_ptr,
+                1u,
+                _seed_ptr,
+                _num_executed_iterations,
+                topk,
+                set_offset(sample_filter, g));
+      }
+    }
   }
 }
 

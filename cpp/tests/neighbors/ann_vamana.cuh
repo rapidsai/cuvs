@@ -9,6 +9,7 @@
 #include "ann_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include "cagra_padded_build_helpers.cuh"
 #include "naive_knn.cuh"
 
 #include <cuvs/distance/distance.hpp>
@@ -207,9 +208,10 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
         handle_, index.graph().extent(0), index.graph().extent(1));
       raft::linalg::map(handle_, graph_valid.view(), edge_op{}, index.graph());
 
-      cuvs::neighbors::device_padded_dataset_view<DataT, int64_t> cagra_dataset_view(database_view);
+      cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> cagra_base(handle_,
+                                                                              database_view);
       auto cagra_index = cagra::index<DataT, IdxT>(
-        handle_, ps.metric, cagra_dataset_view, raft::make_const_mdspan(graph_valid.view()));
+        handle_, ps.metric, cagra_base.view, raft::make_const_mdspan(graph_valid.view()));
 
       cagra::search_params search_params;
       search_params.algo        = ps.algo;
