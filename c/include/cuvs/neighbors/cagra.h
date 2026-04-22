@@ -474,7 +474,11 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-  /** Non-null only when index comes from cuvsCagraMerge; points to wrapper to delete. */
+  /**
+   * Address of an internal owner object that holds the cagra::index and any
+   * co-owned device storage (e.g. merge, deserialize with dataset, host-backed build). The C API
+   * deletes it when the index is destroyed. Zero when \p addr is a standalone index pointer.
+   */
   uintptr_t merged_owner;
 } cuvsCagraIndex;
 
