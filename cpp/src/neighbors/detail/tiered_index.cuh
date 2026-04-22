@@ -321,6 +321,38 @@ struct index_state {
 };
 
 /**
+ * After BF storage grows, repoint CAGRA at the first \p ann_rows rows. Tight row-major storage
+ * often fails CAGRA stride checks; when it does, refresh \p ann_build_pad and attach the padded
+ * view (same contract as `build_upstream_ann`).
+ */
+inline void update_cagra_ann_dataset_for_stride(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::index<float, uint32_t>& ann_index,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+  std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>& ann_build_pad)
+{
+  constexpr size_t k_size        = sizeof(float);
+  const uint32_t align_bytes     = 16;
+  const uint32_t required_stride = static_cast<uint32_t>(
+    raft::round_up_safe<size_t>(static_cast<size_t>(dataset.extent(1)) * k_size,
+                                std::lcm(align_bytes, static_cast<uint32_t>(k_size))) /
+    k_size);
+  const uint32_t src_stride = dataset.stride(0) > 0 ? static_cast<uint32_t>(dataset.stride(0))
+                                                    : static_cast<uint32_t>(dataset.extent(1));
+  if (src_stride != required_stride) {
+    auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
+    ann_build_pad =
+      std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(own));
+    ann_index.update_dataset(
+      res,
+      static_cast<cuvs::neighbors::dataset_view<int64_t> const&>(ann_build_pad->as_dataset_view()));
+  } else {
+    ann_build_pad.reset();
+    ann_index.update_dataset(res, dataset);
+  }
+}
+
+/**
  * @brief Build the tiered index from the dataset for efficient search.
  *
  * @param[in] res

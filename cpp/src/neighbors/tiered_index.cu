@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -78,7 +78,8 @@ void extend(raft::resources const& res,
       // Block 'search' calls during the update_dataset call to ensure that this
       // doesn't cause issues in a multithreaded environment
       std::unique_lock<std::shared_mutex> lock(idx->ann_mutex);
-      next_state->ann_index->update_dataset(res, dataset);
+      detail::update_cagra_ann_dataset_for_stride(
+        res, *next_state->ann_index, dataset, next_state->ann_build_pad_);
     }
   }
 
