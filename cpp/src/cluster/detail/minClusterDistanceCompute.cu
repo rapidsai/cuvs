@@ -12,7 +12,9 @@ namespace cuvs::cluster::kmeans::detail {
 
 // Calculates a <key, value> pair for every sample in input 'X' where key is an
 // index to an sample in 'centroids' (index of the nearest centroid) and 'value'
-// is the distance between the sample and the 'centroid[key]'
+// is the distance between the sample and the 'centroids[key]'.
+//
+// NB: (CosineExpanded): `centroids` rows must be L2-normalized when the cosine metric is used.
 template <typename DataT, typename IndexT>
 void minClusterAndDistanceCompute(
   raft::resources const& handle,
@@ -163,6 +165,10 @@ INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int)
 
 #undef INSTANTIATE_MIN_CLUSTER_AND_DISTANCE
 
+/**
+ * NB: (CosineExpanded): `centroids` rows must be L2-normalized when the cosine metric is used.
+ * Non-unit-norm centroids will silently produce incorrect distances.
+ */
 template <typename DataT, typename IndexT>
 void minClusterDistanceCompute(raft::resources const& handle,
                                raft::device_matrix_view<const DataT, IndexT> X,
@@ -202,7 +208,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
         centroidsNorm);
     }
 
-    workspace.resize((sizeof(IndexT)) * n_samples, stream);
+    workspace.resize(sizeof(int) * n_samples, stream);
 
     cuvs::distance::fusedDistanceNNMinReduce<DataT, DataT, IndexT>(
       minClusterDistance.data_handle(),
