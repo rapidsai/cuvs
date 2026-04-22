@@ -8,10 +8,12 @@ dependencies:
 - c-compiler
 - cmake>=3.30.4
 - cuda-cudart-dev
+- cuda-nvcc
 - cuda-nvrtc-dev
 - cuda-nvtx-dev
 - cuda-profiler-api
 - cuda-version=13.1
+- cxx-compiler
 - gcc_linux-aarch64=14.*
 - libcublas-dev
 - libcurand-dev
@@ -22,6 +24,7 @@ dependencies:
 - libraft==26.6.*,>=0.0.0a0
 - make
 - nccl>=2.19
+- ninja
 - rust
 - sysroot_linux-aarch64==2.28
 name: rust_cuda-131_arch-aarch64

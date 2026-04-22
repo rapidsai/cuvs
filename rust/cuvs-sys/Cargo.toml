@@ -19,7 +19,7 @@ doc-only = []
 
 [build-dependencies]
 bindgen = { version = "0.72", optional = true }
-cmake-package = "0.1"
+cmake-package = "0.1.15"
 anyhow = "1"
 
 [package.metadata.docs.rs]
