@@ -49,8 +49,8 @@ struct params {
       kmeans_params(
         pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced
           ? kmeans_params_variant{cuvs::cluster::kmeans::balanced_params{.n_iters = kmeans_n_iters}}
-          : kmeans_params_variant{cuvs::cluster::kmeans::params{.n_clusters = 1 << pq_bits,
-                                                                .max_iter = (int)kmeans_n_iters}}),
+          : kmeans_params_variant{cuvs::cluster::kmeans::params{
+              .n_clusters = 1 << pq_bits, .max_iter = static_cast<int>(kmeans_n_iters)}}),
       max_train_points_per_pq_code(max_train_points_per_pq_code),
       max_train_points_per_vq_cluster(max_train_points_per_vq_cluster)
   {

@@ -382,7 +382,8 @@ void vpq_convert_math_type(const raft::resources& res,
                     raft::make_const_mdspan(src.pq_code_book.view()));
 }
 
-inline auto from_vpq_params(const cuvs::neighbors::vpq_params& in_params, const uint64_t n_rows)
+inline auto make_pq_params_from_vpq(const cuvs::neighbors::vpq_params& in_params,
+                                    const uint64_t n_rows)
   -> cuvs::preprocessing::quantize::pq::params
 {
   const uint32_t pq_n_centers              = 1 << in_params.pq_bits;
@@ -414,7 +415,7 @@ auto vpq_build(const raft::resources& res,
   // Use a heuristic to impute missing parameters.
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
 
-  auto pq_params = from_vpq_params(ps, dataset.extent(0));
+  auto pq_params = make_pq_params_from_vpq(ps, dataset.extent(0));
   // Train codes
   auto vq_code_book = cuvs::neighbors::detail::train_vq<MathT>(res, ps, dataset);
   auto pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
