@@ -145,11 +145,9 @@ cdef class KMeansParams:
         if inertia_check is not None:
             warnings.warn(
                 "KMeansParams `inertia_check` is deprecated and ignored; "
-                "inertia-based convergence checking always runs."
-                DeprecationWarning,
-                stacklevel=2,
+                "inertia-based convergence checking always runs.",
+                FutureWarning
             )
-            self.params.inertia_check = inertia_check
         if init_size is not None:
             self.params.init_size = init_size
         if streaming_batch_size is not None:
