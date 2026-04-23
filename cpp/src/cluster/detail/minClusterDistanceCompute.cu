@@ -13,8 +13,6 @@ namespace cuvs::cluster::kmeans::detail {
 // Calculates a <key, value> pair for every sample in input 'X' where key is an
 // index to an sample in 'centroids' (index of the nearest centroid) and 'value'
 // is the distance between the sample and the 'centroids[key]'.
-//
-// NB: (CosineExpanded): `centroids` rows must be L2-normalized when the cosine metric is used.
 template <typename DataT, typename IndexT>
 void minClusterAndDistanceCompute(
   raft::resources const& handle,
@@ -41,13 +39,8 @@ void minClusterAndDistanceCompute(
     auto centroidsNorm =
       raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      // Centroids are L2-normalized for cosine metric
-      raft::matrix::fill(handle, centroidsNorm, DataT{1});
-    } else {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, centroids, centroidsNorm);
-    }
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle, centroids, centroidsNorm);
 
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
     raft::matrix::fill(handle, minClusterAndDistance, initial_value);
@@ -165,10 +158,6 @@ INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int)
 
 #undef INSTANTIATE_MIN_CLUSTER_AND_DISTANCE
 
-/**
- * NB: (CosineExpanded): `centroids` rows must be L2-normalized when the cosine metric is used.
- * Non-unit-norm centroids will silently produce incorrect distances.
- */
 template <typename DataT, typename IndexT>
 void minClusterDistanceCompute(raft::resources const& handle,
                                raft::device_matrix_view<const DataT, IndexT> X,
@@ -197,16 +186,11 @@ void minClusterDistanceCompute(raft::resources const& handle,
     auto centroidsNorm =
       raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      // Centroids are L2-normalized for cosine metric
-      raft::matrix::fill(handle, centroidsNorm, DataT{1});
-    } else {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        raft::make_device_matrix_view<const DataT, IndexT>(
-          centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
-        centroidsNorm);
-    }
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_device_matrix_view<const DataT, IndexT>(
+        centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+      centroidsNorm);
 
     workspace.resize(sizeof(int) * n_samples, stream);
 
