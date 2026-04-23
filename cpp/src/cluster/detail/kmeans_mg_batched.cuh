@@ -38,6 +38,7 @@
 #include <raft/core/resource/comms.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -201,9 +202,11 @@ void snmg_fit(const raft::resources& handle,
     T global_wt{};
     raft::copy(&global_wt, d_wt.data_handle(), 1, stream);
     raft::resource::sync_stream(dev_res);
-    if (global_wt != static_cast<T>(global_n)) {
-      weight_scale = static_cast<T>(global_n) / global_wt;
-    }
+    RAFT_EXPECTS(std::isfinite(global_wt) && global_wt > T{0},
+                 "invalid parameter (sum of sample weights must be finite and positive)");
+    const auto global_n_wt = static_cast<T>(global_n);
+    const T tol            = global_n_wt * std::numeric_limits<T>::epsilon();
+    if (std::abs(global_wt - global_n_wt) > tol) { weight_scale = global_n_wt / global_wt; }
   }
 
   // --- n_init handling ---
@@ -239,7 +242,7 @@ void snmg_fit(const raft::resources& handle,
                              n_features,
                              streaming_batch_size,
                              stream,
-                             rmm::mr::get_current_device_resource(),
+                             rmm::mr::get_current_device_resource_ref(),
                              true);
   }
 
@@ -276,7 +279,7 @@ void snmg_fit(const raft::resources& handle,
 
       raft::matrix::fill(dev_res, centroid_sums.view(), T{0});
       raft::matrix::fill(dev_res, weight_per_cluster.view(), T{0});
-      if (params.inertia_check) { raft::matrix::fill(dev_res, clustering_cost.view(), T{0}); }
+      raft::matrix::fill(dev_res, clustering_cost.view(), T{0});
 
       auto rank_centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         rank_centroids.data_handle(), n_clusters, n_features);
@@ -285,13 +288,10 @@ void snmg_fit(const raft::resources& handle,
       if (has_data) {
         auto& data_batches = *data_batches_opt;
         data_batches.reset();
-        data_batches.prefetch_next_batch();
         for (const auto& data_batch : data_batches) {
           IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
 
-          if (params.inertia_check) {
-            raft::matrix::fill(dev_res, batch_clustering_cost.view(), T{0});
-          }
+          raft::matrix::fill(dev_res, batch_clustering_cost.view(), T{0});
 
           auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
             data_batch.data(), current_batch_size, n_features);
@@ -348,34 +348,30 @@ void snmg_fit(const raft::resources& handle,
             batch_sums.view(),
             batch_counts.view());
 
-          if (params.inertia_check) {
-            raft::linalg::map(
-              dev_res,
-              minClusterAndDistance_view,
-              [=] __device__(const raft::KeyValuePair<IdxT, T> kvp, T wt) {
-                raft::KeyValuePair<IdxT, T> res;
-                res.value = kvp.value * wt;
-                res.key   = kvp.key;
-                return res;
-              },
-              raft::make_const_mdspan(minClusterAndDistance_view),
-              batch_weights_view);
+          raft::linalg::map(
+            dev_res,
+            minClusterAndDistance_view,
+            [=] __device__(const raft::KeyValuePair<IdxT, T> kvp, T wt) {
+              raft::KeyValuePair<IdxT, T> res;
+              res.value = kvp.value * wt;
+              res.key   = kvp.key;
+              return res;
+            },
+            raft::make_const_mdspan(minClusterAndDistance_view),
+            batch_weights_view);
 
-            cuvs::cluster::kmeans::detail::computeClusterCost(
-              dev_res,
-              minClusterAndDistance_view,
-              workspace,
-              raft::make_device_scalar_view(batch_clustering_cost.data_handle()),
-              raft::value_op{},
-              raft::add_op{});
+          cuvs::cluster::kmeans::detail::computeClusterCost(
+            dev_res,
+            minClusterAndDistance_view,
+            workspace,
+            raft::make_device_scalar_view(batch_clustering_cost.data_handle()),
+            raft::value_op{},
+            raft::add_op{});
 
-            raft::linalg::add(dev_res,
-                              raft::make_const_mdspan(clustering_cost.view()),
-                              raft::make_const_mdspan(batch_clustering_cost.view()),
-                              clustering_cost.view());
-          }
-
-          data_batches.prefetch_next_batch();
+          raft::linalg::add(dev_res,
+                            raft::make_const_mdspan(clustering_cost.view()),
+                            raft::make_const_mdspan(batch_clustering_cost.view()),
+                            clustering_cost.view());
         }
       }
 
@@ -385,9 +381,7 @@ void snmg_fit(const raft::resources& handle,
         centroid_sums.data_handle(), centroid_sums.data_handle(), n_clusters * n_features);
       SNMG_ALLREDUCE(
         weight_per_cluster.data_handle(), weight_per_cluster.data_handle(), n_clusters);
-      if (params.inertia_check) {
-        SNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
-      }
+      SNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
       SNMG_GROUP_END();
       raft::resource::sync_stream(dev_res);
 
@@ -414,16 +408,16 @@ void snmg_fit(const raft::resources& handle,
 
       bool done = false;
 
-      if (params.inertia_check) {
-        raft::copy(&local_inertia, clustering_cost.data_handle(), 1, stream);
-        raft::resource::sync_stream(dev_res);
+      raft::copy(&local_inertia, clustering_cost.data_handle(), 1, stream);
+      raft::resource::sync_stream(dev_res);
 
-        if (local_n_iter > 1 && prior_cluster_cost > T{0}) {
-          T delta = local_inertia / prior_cluster_cost;
-          if (delta > 1 - params.tol) { done = true; }
-        }
-        prior_cluster_cost = local_inertia;
+      if (local_inertia == T{0}) {
+        RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
+      } else if (local_n_iter > 1 && prior_cluster_cost > T{0}) {
+        T delta = local_inertia / prior_cluster_cost;
+        if (delta > 1 - params.tol) { done = true; }
       }
+      prior_cluster_cost = local_inertia;
 
       if (sqrdNormError < params.tol) { done = true; }
 
@@ -453,7 +447,6 @@ void snmg_fit(const raft::resources& handle,
 
       auto& data_batches = *data_batches_opt;
       data_batches.reset();
-      data_batches.prefetch_next_batch();
       for (const auto& data_batch : data_batches) {
         IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
 
@@ -485,8 +478,6 @@ void snmg_fit(const raft::resources& handle,
                           raft::make_const_mdspan(clustering_cost.view()),
                           raft::make_const_mdspan(batch_clustering_cost.view()),
                           clustering_cost.view());
-
-        data_batches.prefetch_next_batch();
       }
     }
     SNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);

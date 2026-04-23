@@ -170,7 +170,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * Multi-GPU dispatch is selected automatically based on the handle state:
  *   - If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X
  *     is split across GPUs internally with an OpenMP parallel region and NCCL.
- *   - If `raft::resource::comms_initialized(handle)` (Dask/Ray): X is treated as
+ *   - If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as
  *     this worker's partition, and RAFT communicators are used for collectives.
  *   - Otherwise: single-GPU batched k-means.
  *
