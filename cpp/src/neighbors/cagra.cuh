@@ -406,7 +406,7 @@ index<T, IdxT> merge(raft::resources const& handle,
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
 
-template <typename T, typename OutputIdxT = uint32_t, typename IdxT = uint32_t>
+template <typename T, typename IdxT = uint32_t, typename OutputIdxT = uint32_t>
 void search_multi_segment(
   raft::resources const& res,
   search_params const& params,

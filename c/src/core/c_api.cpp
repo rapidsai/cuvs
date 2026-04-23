@@ -43,10 +43,10 @@ extern "C" cuvsError_t cuvsResourcesSetWorkspacePool(cuvsResources_t res, size_t
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     // Create an uncapped pool: pre-warms with initial_size_bytes to avoid cudaMalloc on every
     // query, but can grow beyond that if an allocation exceeds the initial reservation.
-    auto pool_mr =
-      std::make_shared<rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>>(
-        rmm::mr::get_current_device_resource(), initial_size_bytes);
-    raft::resource::set_workspace_resource(*res_ptr, pool_mr);
+    raft::resource::set_workspace_resource(
+      *res_ptr,
+      rmm::mr::pool_memory_resource{rmm::mr::get_current_device_resource_ref(),
+                                    initial_size_bytes});
   });
 }
 
@@ -148,7 +148,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto stream  = raft::resource::get_cuda_stream(*res_ptr);
-    *ptr         = raft::resource::get_workspace_resource(*res_ptr)->allocate(stream, bytes);
+    *ptr         = raft::resource::get_workspace_resource_ref(*res_ptr).allocate(stream, bytes);
   });
 }
 
@@ -157,7 +157,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto stream  = raft::resource::get_cuda_stream(*res_ptr);
-    raft::resource::get_workspace_resource(*res_ptr)->deallocate(stream, ptr, bytes);
+    raft::resource::get_workspace_resource_ref(*res_ptr).deallocate(stream, ptr, bytes);
   });
 }
 
@@ -185,7 +185,7 @@ extern "C" cuvsError_t cuvsRMMAsyncMemoryResourceEnable()
 {
   return cuvs::core::translate_exceptions([=] {
     async_mr = std::make_shared<rmm::mr::cuda_async_memory_resource>();
-    rmm::mr::set_current_device_resource(async_mr.get());
+    rmm::mr::set_current_device_resource(*async_mr);
   });
 }
 
