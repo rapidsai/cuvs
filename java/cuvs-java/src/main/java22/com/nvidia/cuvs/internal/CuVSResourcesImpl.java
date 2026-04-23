@@ -28,9 +28,6 @@ public class CuVSResourcesImpl implements CuVSResources {
   private final int deviceId;
 
   private final PinnedMemoryBuffer hostBuffer = new PinnedMemoryBuffer();
-  private final CudaStreamPool streamPool =
-      new CudaStreamPool(
-          Integer.getInteger(CudaStreamPool.SIZE_PROPERTY, CudaStreamPool.DEFAULT_SIZE));
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -62,22 +59,10 @@ public class CuVSResourcesImpl implements CuVSResources {
   @Override
   public void close() {
     synchronized (this) {
-      streamPool.close();
       int returnValue = cuvsResourcesDestroy(resourceHandle);
       checkCuVSError(returnValue, "cuvsResourcesDestroy");
       hostBuffer.close();
     }
-  }
-
-  /**
-   * Returns the {@link CudaStreamPool} owned by the given {@link CuVSResources} instance.
-   */
-  public static CudaStreamPool getStreamPool(CuVSResources resources) {
-    if (resources instanceof CuVSResourcesImpl impl) {
-      return impl.streamPool;
-    }
-    throw new IllegalArgumentException(
-        "Unsupported resources type: " + resources.getClass().getName());
   }
 
   @Override
