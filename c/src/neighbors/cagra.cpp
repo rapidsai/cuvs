@@ -294,19 +294,45 @@ void _from_args(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dataset_view(mds);
-    void* raw = nullptr;
-    if (cuvs::core::is_dlpack_device_compatible(graph)) {
-      using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
-      auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      raw = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
+    if (device_row_stride_is_padded(mds)) {
+      auto dataset_view = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
+      void* raw         = nullptr;
+      if (cuvs::core::is_dlpack_device_compatible(graph)) {
+        using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
+        auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+        raw = new cuvs::neighbors::cagra::index<T, uint32_t>(
+          *res_ptr, metric, dataset_view, graph_mds);
+      } else {
+        using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
+        auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+        raw = new cuvs::neighbors::cagra::index<T, uint32_t>(
+          *res_ptr, metric, dataset_view, graph_mds);
+      }
+      output_index->addr         = reinterpret_cast<uintptr_t>(raw);
+      output_index->merged_owner = 0;
     } else {
-      using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
-      auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      raw = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
+      // Same as host path and cagra::_build: row pitch must be CAGRA-aligned; copy into a holder.
+      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto idx    = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
+      idx->update_dataset(*res_ptr, padded->as_dataset_view());
+      if (cuvs::core::is_dlpack_device_compatible(graph)) {
+        using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
+        auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+        idx->update_graph(*res_ptr, graph_mds);
+      } else {
+        using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
+        auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+        idx->update_graph(*res_ptr, graph_mds);
+      }
+      auto* holder = new merged_cagra_holder<T>{
+        nullptr,
+        std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded.release()),
+        raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+        std::move(*idx)};
+      delete idx;
+      output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+      output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
     }
-    output_index->addr         = reinterpret_cast<uintptr_t>(raw);
-    output_index->merged_owner = 0;
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
