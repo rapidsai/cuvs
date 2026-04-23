@@ -11,6 +11,9 @@
 
 #include <raft/core/host_mdarray.hpp>
 
+#include <rmm/device_buffer.hpp>
+#include <rmm/device_uvector.hpp>
+
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
@@ -114,15 +117,10 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
                                                    Candidate* candidates,
                                                    size_t num_candidates) const
 {
-  // Allocate device memory for the query vector.
-  float* d_query = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_query, sizeof(float) * D, stream_));
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(d_query, query, sizeof(float) * D, cudaMemcpyHostToDevice, stream_));
+  rmm::device_uvector<float> d_query(D, stream_);
+  raft::copy(d_query.data(), query, D, stream_);
 
-  // Allocate device memory for distances (one per centroid).
-  float* d_distances = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_distances, sizeof(float) * K, stream_));
+  rmm::device_uvector<float> d_distances(K, stream_);
   // Launch kernel: each thread computes distance for one centroid.
   int warpSize              = 32;
   const int WARPS_PER_BLOCK = 8;  // 4 × 32 = 128 threads
@@ -130,15 +128,13 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
   dim3 grid((K + WARPS_PER_BLOCK - 1) / WARPS_PER_BLOCK);
   ComputeDistancesKernelWarp<<<grid, block, 0, stream_>>>(
     reinterpret_cast<const float4*>(centroids_.data_handle()),
-    reinterpret_cast<const float4*>(d_query),
-    d_distances,
+    reinterpret_cast<const float4*>(d_query.data()),
+    d_distances.data(),
     K,
     D / 4);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-  // Allocate device memory for candidate IDs.
-  PID* d_candidate_ids = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_candidate_ids, sizeof(PID) * K, stream_));
+  rmm::device_uvector<PID> d_candidate_ids(K, stream_);
 
   // Another option instead of using thrust:
   // Replace the first block with:
@@ -146,7 +142,7 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
     // Initialize candidate IDs as a sequence 0,1,...,K-1 using a custom kernel
     int block_size = 256;
     int grid_size  = (K + block_size - 1) / block_size;
-    init_sequence_kernel<<<grid_size, block_size, 0, stream_>>>(d_candidate_ids, K);
+    init_sequence_kernel<<<grid_size, block_size, 0, stream_>>>(d_candidate_ids.data(), K);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
     raft::resource::sync_stream(handle_);  // Wait for kernel completion
   }
@@ -156,49 +152,39 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
     // Sort distances and candidate IDs by distance using CUB
 
     // Determine temporary device storage requirements
-    void* d_temp_storage      = nullptr;
     size_t temp_storage_bytes = 0;
-    cub::DeviceRadixSort::SortPairs(d_temp_storage,
+    cub::DeviceRadixSort::SortPairs(nullptr,
                                     temp_storage_bytes,
-                                    d_distances,
-                                    d_distances,  // keys (in-place sort)
-                                    d_candidate_ids,
-                                    d_candidate_ids,  // values (in-place sort)
+                                    d_distances.data(),
+                                    d_distances.data(),  // keys (in-place sort)
+                                    d_candidate_ids.data(),
+                                    d_candidate_ids.data(),  // values (in-place sort)
                                     K,
                                     0,
                                     32,
                                     stream_);
 
-    // Allocate temporary storage
-    RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
 
     // Run sorting operation
-    cub::DeviceRadixSort::SortPairs(d_temp_storage,
+    cub::DeviceRadixSort::SortPairs(d_temp_storage.data(),
                                     temp_storage_bytes,
-                                    d_distances,
-                                    d_distances,  // keys (in-place sort)
-                                    d_candidate_ids,
-                                    d_candidate_ids,  // values (in-place sort)
+                                    d_distances.data(),
+                                    d_distances.data(),  // keys (in-place sort)
+                                    d_candidate_ids.data(),
+                                    d_candidate_ids.data(),  // values (in-place sort)
                                     K,
                                     0,
                                     32,
                                     stream_);
-
-    // Clean up temporary storage
-    RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
   }
 
   // Fill the output Candidate array with the top nprobe candidates.
   int blockSize2 = 512;
   int gridSize2  = (nprobe + blockSize2 - 1) / blockSize2;
   FillCandidatesKernel<<<gridSize2, blockSize2, 0, stream_>>>(
-    d_distances, d_candidate_ids, candidates, nprobe);
+    d_distances.data(), d_candidate_ids.data(), candidates, nprobe);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Free temporary device memory.
-  RAFT_CUDA_TRY(cudaFreeAsync(d_query, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_distances, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_candidate_ids, stream_));
 }
 
 // Loads the centroids from a file.

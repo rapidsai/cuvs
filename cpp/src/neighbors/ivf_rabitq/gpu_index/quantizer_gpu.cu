@@ -11,6 +11,9 @@
 
 #include <curand_kernel.h>
 
+#include <rmm/device_buffer.hpp>
+#include <rmm/device_uvector.hpp>
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -540,8 +543,7 @@ void data_transformation_batch_opt(const float* d_data,
   float* d_CP = d_XP_and_CP + num_points * D;
 
   // 5. Save the rotated centroid: copy CP into d_rotated_c.
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice, stream));
+  raft::copy(d_rotated_c, d_CP, D, stream);
 
   // 6. Launch the single FUSED kernel for subtract, normalize, and binarize.
   const unsigned int FusedBlockSize = 256;  // A good default, can be tuned.
@@ -1404,10 +1406,8 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
 {
   constexpr long kConstNum = 100;
 
-  float* d_factors;
-  float* d_sum;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_factors, kConstNum * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_sum, sizeof(float), stream_));
+  rmm::device_uvector<float> d_factors(kConstNum, stream_);
+  rmm::device_uvector<float> d_sum(1, stream_);
 
   // Calculate block size (must be power of 2 for reductions)
   int block_size = 256;
@@ -1426,27 +1426,29 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
   unsigned long long seed = time(nullptr);
   // Launch fully fused kernel
   fully_fused_kernel<<<kConstNum, block_size, shared_mem_size, stream_>>>(
-    d_factors, kConstNum, dim, ex_bits, seed);
+    d_factors.data(), kConstNum, dim, ex_bits, seed);
   RAFT_CUDA_TRY(cudaGetLastError());
 
   // Use CUB for reduction - handles any size optimally
-
   size_t temp_storage_bytes = 0;
-  cub::DeviceReduce::Sum(nullptr, temp_storage_bytes, d_factors, d_sum, kConstNum, stream_);
+  cub::DeviceReduce::Sum(
+    nullptr, temp_storage_bytes, d_factors.data(), d_sum.data(), kConstNum, stream_);
 
-  void* d_temp_storage = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
-
-  cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, d_factors, d_sum, kConstNum, stream_);
+  {
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
+    cub::DeviceReduce::Sum(d_temp_storage.data(),
+                           temp_storage_bytes,
+                           d_factors.data(),
+                           d_sum.data(),
+                           kConstNum,
+                           stream_);
+  }
   RAFT_CUDA_TRY(cudaGetLastError());
 
-  // Copy single value back
+  // Copy single value back and sync before reading host variable
   float sum;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(&sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost, stream_));
-
-  RAFT_CUDA_TRY(cudaFreeAsync(d_factors, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sum, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
+  raft::copy(&sum, d_sum.data(), 1, stream_);
+  raft::resource::sync_stream(handle_);
 
   return sum / kConstNum;
 }

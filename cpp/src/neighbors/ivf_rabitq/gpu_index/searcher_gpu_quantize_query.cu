@@ -1770,7 +1770,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   std::optional<size_t> max_probed_vectors_count =
     use_block_sort ? std::nullopt : std::optional<size_t>{0};
 
-  // call utility function to evalate max_cluster_size and max_probed_vectors_count
+  // call utility function to evaluate max_cluster_size and max_probed_vectors_count
   get_max_probed_cluster_size_and_vectors_count(handle_,
                                                 d_sorted_pairs,
                                                 num_queries * nprobe,
@@ -1791,8 +1791,10 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                d_topk_dists.data_handle() + total_elements,
                std::numeric_limits<float>::infinity());
 
-  RAFT_CUDA_TRY(
-    cudaMemsetAsync(d_query_write_counters.data_handle(), 0, num_queries * sizeof(int), stream_));
+  thrust::fill(thrust::cuda::par.on(stream_),
+               d_query_write_counters.data_handle(),
+               d_query_write_counters.data_handle() + num_queries,
+               0);
 
   if (use_block_sort) {
     thrust::fill(thrust::cuda::par.on(stream_),

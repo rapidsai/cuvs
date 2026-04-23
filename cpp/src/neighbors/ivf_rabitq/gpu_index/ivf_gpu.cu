@@ -17,6 +17,9 @@
 #include <raft/linalg/detail/cublaslt_wrappers.hpp>
 #include <raft/matrix/select_k.cuh>
 
+#include <rmm/device_buffer.hpp>
+#include <rmm/device_uvector.hpp>
+
 #include <cub/device/device_histogram.cuh>
 #include <thrust/sort.h>
 
@@ -126,7 +129,7 @@ void IVFGPU::load_transposed(const char* filename)
     if (input.gcount() != static_cast<std::streamsize>(n_bytes))
       throw std::runtime_error("unexpected EOF");
 
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::copy(static_cast<uint8_t*>(d_ptr), h_buf.data(), n_bytes, stream_);
     raft::resource::sync_stream(handle_);
   };
 
@@ -141,7 +144,7 @@ void IVFGPU::load_transposed(const char* filename)
           << got << (input.eof() ? " (hit EOF)" : "") << (input.bad() ? " (I/O error)" : "");
     }
 
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::copy(static_cast<uint8_t*>(d_ptr), h_buf.data(), n_bytes, stream_);
     raft::resource::sync_stream(handle_);
     memcpy(h_ptr, h_buf.data(), n_bytes);
   };
@@ -199,8 +202,7 @@ void IVFGPU::load_transposed(const char* filename)
       }
 
       // Copy transposed data to device and host
-      RAFT_CUDA_TRY(
-        cudaMemcpyAsync(d_ptr, h_transposed.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+      raft::copy(static_cast<uint8_t*>(d_ptr), h_transposed.data(), n_bytes, stream_);
       raft::resource::sync_stream(handle_);
       memcpy(h_ptr, h_transposed.data(), n_bytes);
     };
@@ -467,60 +469,54 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   int lower_level = 0;
   int upper_level = num_centroids;
 
-  CounterT* d_histogram = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_histogram, num_centroids * sizeof(CounterT), stream_));
+  rmm::device_uvector<CounterT> d_histogram(num_centroids, stream_);
 
   // Determine temporary device storage requirements
-  void* d_temp_storage      = nullptr;
   size_t temp_storage_bytes = 0;
-  cub::DeviceHistogram::HistogramEven(d_temp_storage,
+  cub::DeviceHistogram::HistogramEven(nullptr,
                                       temp_storage_bytes,
                                       device_cluster_ids,
-                                      d_histogram,
+                                      d_histogram.data(),
                                       num_levels,
                                       lower_level,
                                       upper_level,
                                       num_vectors,
                                       stream_);
 
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
-
-  // Compute histogram
-  cub::DeviceHistogram::HistogramEven(d_temp_storage,
-                                      temp_storage_bytes,
-                                      device_cluster_ids,
-                                      d_histogram,
-                                      num_levels,
-                                      lower_level,
-                                      upper_level,
-                                      num_vectors,
-                                      stream_);
-
-  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
+  {
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
+    cub::DeviceHistogram::HistogramEven(d_temp_storage.data(),
+                                        temp_storage_bytes,
+                                        device_cluster_ids,
+                                        d_histogram.data(),
+                                        num_levels,
+                                        lower_level,
+                                        upper_level,
+                                        num_vectors,
+                                        stream_);
+  }
 
   // -------------------------
   // 4. Compute prefix sum (offsets) on GPU using CUB
   // -------------------------
-  size_t* d_offsets = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_offsets, (num_centroids + 1) * sizeof(size_t), stream_));
+  rmm::device_uvector<size_t> d_offsets(num_centroids + 1, stream_);
 
-  // Determine temporary storage requirements
-  d_temp_storage     = nullptr;
   temp_storage_bytes = 0;
   cub::DeviceScan::ExclusiveSum(
-    d_temp_storage, temp_storage_bytes, d_histogram, d_offsets, num_centroids, stream_);
+    nullptr, temp_storage_bytes, d_histogram.data(), d_offsets.data(), num_centroids, stream_);
 
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
-
-  // Compute exclusive sum
-  cub::DeviceScan::ExclusiveSum(
-    d_temp_storage, temp_storage_bytes, d_histogram, d_offsets, num_centroids, stream_);
-
-  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
+  {
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
+    cub::DeviceScan::ExclusiveSum(d_temp_storage.data(),
+                                  temp_storage_bytes,
+                                  d_histogram.data(),
+                                  d_offsets.data(),
+                                  num_centroids,
+                                  stream_);
+  }
 
   // Set the last offset element
-  RAFT_CUDA_TRY(cudaMemcpyAsync(
-    d_offsets + num_centroids, &num_vectors, sizeof(size_t), cudaMemcpyHostToDevice, stream_));
+  raft::copy(d_offsets.data() + num_centroids, &num_vectors, 1, stream_);
 
   // -------------------------
   // 5. Build cluster metadata on GPU
@@ -529,49 +525,32 @@ void IVFGPU::construct_on_gpu(const float* device_data,
 
   num_blocks = (num_centroids + block_size - 1) / block_size;
   build_cluster_meta_kernel<<<num_blocks, block_size, 0, stream_>>>(
-    d_cluster_meta_temp, d_histogram, d_offsets, num_centroids);
+    d_cluster_meta_temp, d_histogram.data(), d_offsets.data(), num_centroids);
 
-  RAFT_CUDA_TRY(cudaFreeAsync(d_histogram, stream_));
   // -------------------------
   // 6. Scatter PIDs to flat array on GPU
   // -------------------------
   PID* d_flat_pids = ids_.data_handle();
 
   // Create atomic counters initialized with offsets
-  size_t* d_atomic_counters = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_atomic_counters, num_centroids * sizeof(size_t), stream_));
-  RAFT_CUDA_TRY(cudaMemcpyAsync(d_atomic_counters,
-                                d_offsets,
-                                num_centroids * sizeof(size_t),
-                                cudaMemcpyDeviceToDevice,
-                                stream_));
+  rmm::device_uvector<size_t> d_atomic_counters(num_centroids, stream_);
+  raft::copy(d_atomic_counters.data(), d_offsets.data(), num_centroids, stream_);
 
   num_blocks = (num_vectors + block_size - 1) / block_size;
   scatter_pids_kernel<<<num_blocks, block_size, 0, stream_>>>(
-    d_flat_pids, device_cluster_ids, d_offsets, d_atomic_counters, num_vectors);
-
-  RAFT_CUDA_TRY(cudaFreeAsync(d_atomic_counters, stream_));
+    d_flat_pids, device_cluster_ids, d_offsets.data(), d_atomic_counters.data(), num_vectors);
 
   // -------------------------
   // 7. Copy cluster metadata back to host
   // -------------------------
   std::vector<GPUClusterMeta> h_cluster_meta(num_centroids);
-  RAFT_CUDA_TRY(cudaMemcpyAsync(h_cluster_meta.data(),
-                                d_cluster_meta_temp,
-                                num_centroids * sizeof(GPUClusterMeta),
-                                cudaMemcpyDeviceToHost,
-                                stream_));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
-  // Copy counts for AllocateDeviceMemory
-
-  RAFT_CUDA_TRY(cudaFreeAsync(d_offsets, stream_));
+  raft::copy(h_cluster_meta.data(), d_cluster_meta_temp, num_centroids, stream_);
+  raft::resource::sync_stream(handle_);
 
   // -------------------------
   // 10. Allocate and process rotated centroids
   // -------------------------
-  float* d_rotated_centroids = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(
-    (void**)&d_rotated_centroids, num_centroids * num_padded_dim * sizeof(float), stream_));
+  rmm::device_uvector<float> d_rotated_centroids(num_centroids * num_padded_dim, stream_);
 
   // -------------------------
   // 10.5 get max cluster length and allocate temporary buffer for quantization
@@ -586,16 +565,14 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   // Process clusters sequentially
   for (size_t i = 0; i < num_centroids; ++i) {
     const float* cur_centroid = device_centroids + i * num_dimensions;
-    float* cur_rotated_c      = d_rotated_centroids + i * num_padded_dim;
+    float* cur_rotated_c      = d_rotated_centroids.data() + i * num_padded_dim;
     GPUClusterMeta& cp        = h_cluster_meta[i];
     quantize_cluster(cp, device_data, cur_centroid, cur_rotated_c);
   }
 
   // Add rotated centroids
-  initializer->AddVectors(d_rotated_centroids);
+  initializer->AddVectors(d_rotated_centroids.data());
 
-  // Clean up
-  RAFT_CUDA_TRY(cudaFreeAsync(d_rotated_centroids, stream_));
   raft::resource::sync_stream(handle_);
 }
 
@@ -914,17 +891,12 @@ void IVFGPU::construct(const float* host_data,
   // -------------------------
   //    auto start_gpu_normal = std::chrono::high_resolution_clock::now();
 
-  float* d_data          = nullptr;
-  float* d_centroid      = nullptr;
-  size_t data_bytes      = num_vectors * num_dimensions * sizeof(float);
-  size_t centroid_bytes  = num_centroids * num_dimensions * sizeof(float);
   size_t ids_bytes       = num_vectors * sizeof(PID);
   DQ->fast_quantize_flag = fast_quantize;
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_data, data_bytes, stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_centroid, centroid_bytes, stream_));
-  RAFT_CUDA_TRY(cudaMemcpyAsync(d_data, host_data, data_bytes, cudaMemcpyHostToDevice, stream_));
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(d_centroid, host_centroids, centroid_bytes, cudaMemcpyHostToDevice, stream_));
+  rmm::device_uvector<float> d_data(num_vectors * num_dimensions, stream_);
+  rmm::device_uvector<float> d_centroid(num_centroids * num_dimensions, stream_);
+  raft::copy(d_data.data(), host_data, num_vectors * num_dimensions, stream_);
+  raft::copy(d_centroid.data(), host_centroids, num_centroids * num_dimensions, stream_);
   // -------------------------
   // Allocate device memory for IVF arrays based on cluster sizes.
   // -------------------------
@@ -937,9 +909,7 @@ void IVFGPU::construct(const float* host_data,
   // Allocate device buffer for rotated centroids.
   // Note: rotated centroids will be stored as a matrix with num_centroids rows and D columns.
   // -------------------------
-  float* d_rotated_centroids = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(
-    (void**)&d_rotated_centroids, num_centroids * num_padded_dim * sizeof(float), stream_));
+  rmm::device_uvector<float> d_rotated_centroids(num_centroids * num_padded_dim, stream_);
 
   // -------------------------
   // Get max cluster length and allocate temporary buffer for quantization
@@ -956,22 +926,15 @@ void IVFGPU::construct(const float* host_data,
   // -------------------------
   // Process clusters sequentially on host (could be parallelized with caution).
   for (size_t i = 0; i < num_centroids; ++i) {
-    // Get pointer to the i-th centroid in device memory.
-    const float* cur_centroid = d_centroid + i * num_dimensions;
-    // Compute output location for the rotated centroid in d_rotated_centroids.
-    float* cur_rotated_c = d_rotated_centroids + i * num_padded_dim;
-    // Get cluster metadata from host copy.
-    GPUClusterMeta& cp = h_cluster_meta[i];
-    quantize_cluster(cp, d_data, cur_centroid, cur_rotated_c);
+    const float* cur_centroid = d_centroid.data() + i * num_dimensions;
+    float* cur_rotated_c      = d_rotated_centroids.data() + i * num_padded_dim;
+    GPUClusterMeta& cp        = h_cluster_meta[i];
+    quantize_cluster(cp, d_data.data(), cur_centroid, cur_rotated_c);
   }
 
   // After quantization, add the rotated centroids into the initializer.
-  initializer->AddVectors(d_rotated_centroids);
+  initializer->AddVectors(d_rotated_centroids.data());
 
-  // Clean up: free temporary device buffers.
-  RAFT_CUDA_TRY(cudaFreeAsync(d_data, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_rotated_centroids, stream_));
   raft::resource::sync_stream(handle_);
 }
 
@@ -1146,12 +1109,10 @@ void sort_cluster_query_pairs(raft::resources const& handle,
                                   sizeof(int) * 8,
                                   stream);
 
-  // Allocate temporary storage
-  void* d_temp_storage;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream));
+  rmm::device_buffer d_temp_storage(temp_storage_bytes, stream);
 
   // Perform radix sort
-  cub::DeviceRadixSort::SortPairs(d_temp_storage,
+  cub::DeviceRadixSort::SortPairs(d_temp_storage.data(),
                                   temp_storage_bytes,
                                   d_cluster_keys.data_handle(),
                                   d_sorted_clusters.data_handle(),
@@ -1166,9 +1127,6 @@ void sort_cluster_query_pairs(raft::resources const& handle,
   combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(
     d_sorted_clusters.data_handle(), d_sorted_queries.data_handle(), d_sorted_pairs, total_pairs);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Free temporary memory
-  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream));
 }
 
 // Warp-level reduction using shuffle instructions
@@ -1413,61 +1371,52 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   // Step4: select topk and copy back
   // Use raft library
   // RAFT select_k outputs
-  float* d_raft_vals = nullptr;
-  int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream_));
+  auto d_raft_vals = raft::make_device_matrix<float, int64_t>(handle_, batch_size, nprobe);
+  auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(handle_, batch_size, nprobe);
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->get_centroid_distances(), batch_size, num_centroids);
-  auto outv_v =
-    raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
-  auto outi_v =
-    raft::make_device_matrix_view<int, int64_t, raft::row_major>(d_raft_idx, batch_size, nprobe);
 
   // max-k, sorted within k (nprobe)
   raft::matrix::select_k<float, int>(handle_,
                                      in_view,
                                      std::nullopt,  // carry column IDs automatically
-                                     outv_v,
-                                     outi_v,
+                                     d_raft_vals.view(),
+                                     d_raft_idx.view(),
                                      /*select_min=*/true,
                                      /*sorted=*/true,
                                      raft::matrix::SelectAlgo::kAuto);
 
   // Sortpairs
-  ClusterQueryPair* d_sorted_pairs;
-  int total_pairs = batch_size * nprobe;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), stream_));
-  sort_cluster_query_pairs(handle_, d_raft_idx, d_sorted_pairs, batch_size, nprobe);
+  int total_pairs     = batch_size * nprobe;
+  auto d_sorted_pairs = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, total_pairs);
+  sort_cluster_query_pairs(
+    handle_, d_raft_idx.data_handle(), d_sorted_pairs.data_handle(), batch_size, nprobe);
 
   // Compute query factors
-  float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream_));
-  computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream_);
+  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  computeQueryFactors<float>(d_query,
+                             d_G_k1xSumq.data_handle(),
+                             d_G_kbxSumq.data_handle(),
+                             batch_size,
+                             num_padded_dim,
+                             ex_bits,
+                             stream_);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairsSharedMemOpt(*this,
                                                       cluster_meta_.data_handle(),
-                                                      d_sorted_pairs,
+                                                      d_sorted_pairs.data_handle(),
                                                       batch_size,
                                                       d_query,
-                                                      d_G_k1xSumq,
-                                                      d_G_kbxSumq,
+                                                      d_G_k1xSumq.data_handle(),
+                                                      d_G_kbxSumq.data_handle(),
                                                       nprobe,
                                                       k,
                                                       d_final_dists,
                                                       d_final_pids);
-
-  // clear
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream_));
 }
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
@@ -1531,62 +1480,53 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   // Step4: select topk and copy back
   // Use raft library
   // RAFT select_k outputs
-  float* d_raft_vals = nullptr;
-  int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream_));
+  auto d_raft_vals = raft::make_device_matrix<float, int64_t>(handle_, batch_size, nprobe);
+  auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(handle_, batch_size, nprobe);
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->get_centroid_distances(), batch_size, num_centroids);
-  auto outv_v =
-    raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
-  auto outi_v =
-    raft::make_device_matrix_view<int, int64_t, raft::row_major>(d_raft_idx, batch_size, nprobe);
 
   // max-k, sorted within k (nprobe)
   raft::matrix::select_k<float, int>(handle_,
                                      in_view,
                                      std::nullopt,  // carry column IDs automatically
-                                     outv_v,
-                                     outi_v,
+                                     d_raft_vals.view(),
+                                     d_raft_idx.view(),
                                      /*select_min=*/true,
                                      /*sorted=*/true,
                                      raft::matrix::SelectAlgo::kAuto);
 
   // Sortpairs
-  ClusterQueryPair* d_sorted_pairs;
-  int total_pairs = batch_size * nprobe;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), stream_));
-  sort_cluster_query_pairs(handle_, d_raft_idx, d_sorted_pairs, batch_size, nprobe);
+  int total_pairs     = batch_size * nprobe;
+  auto d_sorted_pairs = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, total_pairs);
+  sort_cluster_query_pairs(
+    handle_, d_raft_idx.data_handle(), d_sorted_pairs.data_handle(), batch_size, nprobe);
 
   // Compute query factors
-  float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream_));
-  computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream_);
+  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  computeQueryFactors<float>(d_query,
+                             d_G_k1xSumq.data_handle(),
+                             d_G_kbxSumq.data_handle(),
+                             batch_size,
+                             num_padded_dim,
+                             ex_bits,
+                             stream_);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairsQuantizeQuery(*this,
                                                        cluster_meta_.data_handle(),
-                                                       d_sorted_pairs,
+                                                       d_sorted_pairs.data_handle(),
                                                        batch_size,
                                                        d_query,
-                                                       d_G_k1xSumq,
-                                                       d_G_kbxSumq,
+                                                       d_G_k1xSumq.data_handle(),
+                                                       d_G_kbxSumq.data_handle(),
                                                        nprobe,
                                                        k,
                                                        d_final_dists,
                                                        d_final_pids,
                                                        query_bits == 4);
-
-  // clear
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream_));
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
