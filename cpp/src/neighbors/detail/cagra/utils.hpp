@@ -376,6 +376,7 @@ class batched_device_view_from_host {
       return;
     }
 
+    RAFT_EXPECTS(batch_size_ > 0, "batch_size must be greater than zero for non-empty input");
     RAFT_EXPECTS(host_writeback_ || initialize_,
                  "At least one of host_writeback or initialize must be true");
 
@@ -418,6 +419,9 @@ class batched_device_view_from_host {
         }
       } catch (std::bad_alloc& e) {
         if (attr_.devicePointer != nullptr) {
+          for (auto& mem : device_mem_) {
+            mem.reset();
+          }
           RAFT_LOG_DEBUG("Insufficient memory for device buffers, switching to managed memory");
           mem_strategy_ = memory_strategy::managed_only;
         } else {
@@ -425,6 +429,9 @@ class batched_device_view_from_host {
         }
       } catch (raft::logic_error& e) {
         if (attr_.devicePointer != nullptr) {
+          for (auto& mem : device_mem_) {
+            mem.reset();
+          }
           RAFT_LOG_DEBUG(
             "Insufficient memory for device buffers (logic error), switching to managed memory");
           mem_strategy_ = memory_strategy::managed_only;
@@ -462,6 +469,9 @@ class batched_device_view_from_host {
   ~batched_device_view_from_host() noexcept
   {
     raft::resource::sync_stream(res_);
+
+    // No view was handed to the caller, so no device-side modifications can require writeback.
+    if (batch_id_ < 0) { return; }
 
     // if data is on host and for_write --> make sure to copy back last active
     // if data is managed and evict --> evict last active

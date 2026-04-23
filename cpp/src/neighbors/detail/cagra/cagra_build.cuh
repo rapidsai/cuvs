@@ -843,7 +843,7 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
   // Reverse graph stage memory
   size_t rev_dev = n_rows * graph_degree * index_size;  // d_rev_graph
   rev_dev += n_rows * sizeof(uint32_t);                 // d_rev_graph_count
-  rev_dev += n_rows * sizeof(uint32_t);                 // d_dest_nodes
+  rev_dev += n_rows * index_size;                       // d_dest_nodes
 
   // Memory for merging graphs (host only optional)
   size_t combine_host =
@@ -851,6 +851,10 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
 
   // additional memory for combine stage on device (3 batches)
   size_t combine_dev = 3 * batch_size * graph_degree * index_size;  // d_output_graph(3*batch)
+  if (mst_optimize) {
+    combine_dev += 2 * batch_size * graph_degree * index_size;  // d_mst_graph(2*batch)
+    combine_dev += 2 * batch_size * sizeof(uint32_t);           // d_mst_graph_num_edges(2*batch)
+  }
 
   size_t total_host = mst_host + combine_host;
   size_t total_dev  = std::max(prune_dev, rev_dev + combine_dev);

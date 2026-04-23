@@ -221,8 +221,9 @@ __global__ void kern_fused_prune(
 
   IdxT* const smem_indices =
     reinterpret_cast<IdxT*>(smem_buf + wid * knn_graph_degree * sizeof(IdxT));
-  uint32_t* const smem_num_detour = reinterpret_cast<uint32_t*>(
-    smem_buf + wid * knn_graph_degree * sizeof(IdxT) + num_warps * knn_graph_degree * sizeof(IdxT));
+  uint32_t* const smem_num_detour =
+    reinterpret_cast<uint32_t*>(smem_buf + num_warps * knn_graph_degree * sizeof(IdxT) +
+                                wid * knn_graph_degree * sizeof(uint32_t));
 
 #ifndef NDEBUG
   uint64_t* const num_retain = stats;
@@ -429,7 +430,10 @@ __global__ void kern_merge_graph(
 
   const auto num_protected_edges = max(current_mst_graph_num_edges, output_graph_degree / 2);
 
-  if (num_protected_edges > output_graph_degree) { check_num_protected_edges[0] = false; }
+  if (num_protected_edges > output_graph_degree) {
+    check_num_protected_edges[0] = false;
+    return;
+  }
   if (num_protected_edges == output_graph_degree) { return; }
 
   auto kr = min(rev_graph_count(nid), output_graph_degree);
@@ -750,7 +754,7 @@ void check_duplicates_and_out_of_range(const IdxT* output_graph_ptr,
     for (uint32_t j = 0; j < output_graph_degree; j++) {
       const auto neighbor_a = my_out_graph[j];
 
-      if (neighbor_a > graph_size) {
+      if (neighbor_a >= graph_size) {
         num_oor++;
         continue;
       }
@@ -1249,13 +1253,15 @@ void mst_optimization(raft::resources const& res,
         }
       } else {
         // handle device knn graph
-        RAFT_CUDA_TRY(cudaMemcpy2D(candidate_edges_ptr,
-                                   sizeof(IdxT),
-                                   &input_graph(0, k),  // host pointer
-                                   input_graph_degree * sizeof(IdxT),
-                                   1 * sizeof(IdxT),
-                                   graph_size,
-                                   cudaMemcpyDeviceToHost));
+        RAFT_CUDA_TRY(cudaMemcpy2DAsync(candidate_edges_ptr,
+                                        sizeof(IdxT),
+                                        &input_graph(0, k),
+                                        input_graph_degree * sizeof(IdxT),
+                                        1 * sizeof(IdxT),  // width
+                                        graph_size,
+                                        cudaMemcpyDeviceToHost,
+                                        raft::resource::get_cuda_stream(res)));
+        raft::resource::sync_stream(res);
 
         // FIXME: use submdspan and raft::copy once supported
         /*auto column_view = cuda::std::submdspan(input_graph,
