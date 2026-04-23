@@ -466,20 +466,21 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 /**
  * @brief Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
  *
- * When the index was created by cuvsCagraMerge or cuvsCagraDeserialize (when the serialized
- * index included a dataset), \p merged_owner is non-null and must be deleted (by the
+ * When the index was created with co-owned device storage (merge, build, deserialize, from_args,
+ * extend, etc.), \p c_api_lifetime_owner is non-null and must be deleted (by the
  * implementation) when the index is destroyed; \p addr then points at the index inside that
- * allocation. When \p merged_owner is 0, \p addr is a raw index pointer.
+ * allocation. When \p c_api_lifetime_owner is 0, \p addr is a raw index pointer.
  */
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
   /**
-   * Address of an internal owner object that holds the cagra::index and any
-   * co-owned device storage (e.g. merge, deserialize with dataset, host-backed build). The C API
-   * deletes it when the index is destroyed. Zero when \p addr is a standalone index pointer.
+   * Address of an internal lifetime holder (`cuvs_cagra_c_api_lifetime_holder` in the C++ impl)
+   * that owns the cagra::index and any co-owned device storage (VPQ, padded dataset, merged
+   * matrix, etc.). The C API deletes it when the index is destroyed. Zero when \p addr is a
+   * standalone index pointer and no extra storage is co-owned.
    */
-  uintptr_t merged_owner;
+  uintptr_t c_api_lifetime_owner;
 } cuvsCagraIndex;
 
 typedef cuvsCagraIndex* cuvsCagraIndex_t;
