@@ -581,19 +581,29 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 
   void runInitSizeCompare()
   {
-    T inertia_default = fitHostWithInitSize(0);
-    T inertia_full    = fitHostWithInitSize(testparams.n_row);
+    int n_samples         = testparams.n_row;
+    int n_clusters        = testparams.n_clusters;
+    int default_init_size = std::min(3 * n_clusters, n_samples);
+
+    T inertia_default  = fitHostWithInitSize(0);
+    T inertia_explicit = fitHostWithInitSize(default_init_size);
+    T inertia_full     = fitHostWithInitSize(n_samples);
 
     ASSERT_TRUE(std::isfinite(inertia_default));
+    ASSERT_TRUE(std::isfinite(inertia_explicit));
     ASSERT_TRUE(std::isfinite(inertia_full));
     ASSERT_GT(inertia_default, T(0));
+    ASSERT_GT(inertia_explicit, T(0));
     ASSERT_GT(inertia_full, T(0));
 
-    // Full-dataset seeding has at least as much information as the subsample
-    // default, so the converged inertia should not be worse (modulo reduction
-    // -order noise from the nondeterministic atomics used in the fused NN
-    // kernel, worst observed ~8.6e-7 in single precision).
     const T rel = T(1e-5);
+
+    // init_size = 0 must resolve to the documented default (min(3*k, n));
+    // feeding that value explicitly should reproduce the same inertia.
+    ASSERT_NEAR(inertia_default, inertia_explicit, std::abs(inertia_default) * rel);
+
+    // Full-dataset seeding has at least as much information as the subsample
+    // default, so the converged inertia should not be worse.
     ASSERT_LE(inertia_full, inertia_default * (T(1) + rel));
   }
 
@@ -633,8 +643,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     ASSERT_GT(inertia1, T(0));
     ASSERT_GT(inertia3, T(0));
     // n_init > 1 keeps the best trial, so it should not be worse than
-    // n_init == 1 (modulo reduction-order noise from the nondeterministic
-    // atomics used in the fused NN kernel).
+    // n_init == 1.
     const T rel = T(1e-5);
     ASSERT_LE(inertia3, inertia1 * (T(1) + rel));
   }
