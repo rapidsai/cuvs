@@ -69,7 +69,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,              // [n_queries, dim]
                      const float* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr)
+                     rmm::device_async_resource_ref mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -179,7 +179,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,               // [n_queries, dim]
                      const int8_t* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr)
+                     rmm::device_async_resource_ref mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -267,7 +267,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,             // [n_queries, dim]
                      const half* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr)
+                     rmm::device_async_resource_ref mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -440,7 +440,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     topK,
     index.dim());
   auto stream = raft::resource::get_cuda_stream(handle);
-  auto mr     = raft::resource::get_workspace_resource(handle);
+  auto mr     = raft::resource::get_workspace_resource_ref(handle);
 
   bool manage_local_topk         = is_local_topk_feasible(topK, n_probes, n_queries);
   auto topk_len                  = manage_local_topk ? n_probes * topK : max_samples;
@@ -927,7 +927,7 @@ inline void search(raft::resources const& handle,
     max_samples = ms;
   }
 
-  auto mr = raft::resource::get_workspace_resource(handle);
+  auto mr = raft::resource::get_workspace_resource_ref(handle);
 
   // Maximum number of query vectors to search at the same time.
   // Number of queries in the outer loop, which includes query transform and coarse search.
