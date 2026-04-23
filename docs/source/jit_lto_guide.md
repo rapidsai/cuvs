@@ -578,8 +578,10 @@ The planner is responsible for:
 #include <string>
 
 struct SearchPlanner : AlgorithmPlanner {
+  inline static LauncherJitCache launcher_jit_cache{};
+
   SearchPlanner()
-    : AlgorithmPlanner("search_kernel")
+    : AlgorithmPlanner("search_kernel", launcher_jit_cache)
   {
   }
 
@@ -772,7 +774,7 @@ The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
 
 4. **Type Safety**: Use registration tags to provide compile-time type safety and avoid runtime string mismatches.
 
-5. **Caching**: The `AlgorithmPlanner::get_launcher()` method caches linked kernels, so repeated calls with the same configuration are efficient.
+5. **Caching**: Each planner type should hold a static `LauncherJitCache` and pass it to `AlgorithmPlanner`; `get_launcher()` then reuses linked kernels for the same fragment key within that cache.
 
 ## Example: IVF Flat
 
