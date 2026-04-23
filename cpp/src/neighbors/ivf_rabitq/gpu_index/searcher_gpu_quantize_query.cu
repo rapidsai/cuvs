@@ -9,13 +9,15 @@
 
 // This file implements `SearcherGPU::SearchClusterQueryPairsQuantizeQuery`.
 #include "../../detail/smem_utils.cuh"
-#include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
+#include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../utils/searcher_gpu_utils.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/matrix/select_k.cuh>
+
+#include <cub/block/block_reduce.cuh>
 
 #include <thrust/fill.h>
 
@@ -1474,7 +1476,7 @@ __global__ void findQueryRanges(const float* __restrict__ queries,
 
   const float* query = queries + query_idx * num_dimensions;
 
-  typedef cub::BlockReduce<float, 256> BlockReduceFloat;
+  using BlockReduceFloat = cub::BlockReduce<float, 256>;
   __shared__ typename BlockReduceFloat::TempStorage temp_storage_min;
   __shared__ typename BlockReduceFloat::TempStorage temp_storage_max;
 

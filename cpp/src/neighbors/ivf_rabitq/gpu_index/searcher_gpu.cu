@@ -9,7 +9,7 @@
 
 // This file implements `SearcherGPU::SearchClusterQueryPairs`.
 #include "../../detail/smem_utils.cuh"
-#include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
+#include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../utils/memory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"
 #include "searcher_gpu.cuh"
@@ -116,11 +116,6 @@ void launchPrecomputeLUTs(const float* d_query,
                           size_t D,
                           rmm::cuda_stream_view stream)
 {
-  // Initialize all LUTs to invalid value first
-  const size_t num_chunks         = D / BITS_PER_CHUNK;
-  const size_t lut_per_query_size = num_chunks * LUT_SIZE;
-  const size_t total_lut_size     = num_queries * lut_per_query_size;
-
   // Launch precompute kernel
   dim3 gridDim(num_queries, 1, 1);
   dim3 blockDim(256, 1, 1);  // Can tune this

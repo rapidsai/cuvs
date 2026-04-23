@@ -9,7 +9,7 @@
 
 // This file implements `SearcherGPU::SearchClusterQueryPairsSharedMemOpt`.
 #include "../../detail/smem_utils.cuh"
-#include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
+#include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../utils/searcher_gpu_utils.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
@@ -958,6 +958,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
 
   // Allocate space for LUT with reduced precision
   size_t lut_elements = num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE;
+  size_t lut_size     = lut_elements * sizeof(lut_dtype);
 
   rmm::device_uvector<lut_dtype> d_lut_for_queries(lut_elements, stream_);
 
