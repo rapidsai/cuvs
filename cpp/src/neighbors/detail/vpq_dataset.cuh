@@ -20,6 +20,7 @@
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 #include <raft/util/vectorized.cuh>
@@ -56,14 +57,13 @@ auto subsample(raft::resources const& res,
   size_t trainset_ratio = dataset.extent(0) / n_samples;
   auto result = raft::make_device_matrix<value_type, index_type>(res, n_samples, dataset.extent(1));
 
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(result.data_handle(),
-                                  sizeof(value_type) * dim,
-                                  dataset.data_handle(),
-                                  sizeof(value_type) * dim * trainset_ratio,
-                                  sizeof(value_type) * dim,
-                                  n_samples,
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(result.data_handle(),
+                    dim,
+                    dataset.data_handle(),
+                    dim * trainset_ratio,
+                    dim,
+                    n_samples,
+                    raft::resource::get_cuda_stream(res));
   return result;
 }
 
@@ -508,7 +508,7 @@ void process_and_fill_codes(
          dim,
          max_batch_size,
          stream,
-         rmm::mr::get_current_device_resource())) {
+         rmm::mr::get_current_device_resource_ref())) {
     auto batch_view        = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
     auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(nullptr, 0);
     if (inline_vq_labels) {
@@ -901,7 +901,7 @@ void process_and_fill_codes_subspaces(
     dim,
     max_batch_size,
     copy_stream,
-    raft::resource::get_workspace_resource(res),
+    raft::resource::get_workspace_resource_ref(res),
     enable_prefetch_stream);
   vec_batches.prefetch_next_batch();
   for (const auto& batch : vec_batches) {

@@ -37,18 +37,13 @@ AlgorithmLauncher& AlgorithmLauncher::operator=(AlgorithmLauncher&& other) noexc
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
-  cudaLaunchConfig_t config;
+  cudaLaunchConfig_t config{};
   config.gridDim          = grid;
   config.blockDim         = block;
   config.stream           = stream;
   config.dynamicSmemBytes = shared_mem;
   config.numAttrs         = 0;
+  config.attrs            = NULL;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
-}
-
-std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers()
-{
-  static std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>> launchers;
-  return launchers;
 }

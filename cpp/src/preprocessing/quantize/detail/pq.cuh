@@ -13,6 +13,7 @@
 #include <cuvs/preprocessing/quantize/pq.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/matrix/init.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 #include "../../../cluster/kmeans_balanced.cuh"
 
@@ -90,7 +91,7 @@ auto train_pq_subspaces(
   auto trainset_ptr     = !vq_centers.empty() ? pq_trainset.data_handle() : dataset.data_handle();
   auto sub_labels       = raft::make_device_vector<uint32_t, ix_t>(res, 0);
   auto pq_cluster_sizes = raft::make_device_vector<uint32_t, ix_t>(res, 0);
-  auto device_memory    = raft::resource::get_workspace_resource(res);
+  auto device_memory    = raft::resource::get_workspace_resource_ref(res);
   if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
     sub_labels = raft::make_device_mdarray<uint32_t>(
       res, device_memory, raft::make_extents<ix_t>(n_rows_train));
@@ -99,14 +100,13 @@ auto train_pq_subspaces(
   }
 
   for (ix_t m = 0; m < pq_dim; m++) {
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(sub_dataset.data_handle(),
-                                    sizeof(MathT) * pq_len,
-                                    trainset_ptr + m * pq_len,
-                                    sizeof(MathT) * dim,
-                                    sizeof(MathT) * pq_len,
-                                    n_rows_train,
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(sub_dataset.data_handle(),
+                      pq_len,
+                      trainset_ptr + m * pq_len,
+                      dim,
+                      pq_len,
+                      n_rows_train,
+                      raft::resource::get_cuda_stream(res));
     auto pq_centers_subspace_view = raft::make_device_matrix_view<MathT, uint32_t, raft::row_major>(
       pq_centers.data_handle() + m * pq_n_centers * pq_len, pq_n_centers, pq_len);
     cuvs::neighbors::detail::train_pq_centers<MathT, ix_t>(
