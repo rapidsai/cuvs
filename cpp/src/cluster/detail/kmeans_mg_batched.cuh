@@ -108,10 +108,10 @@ inline ncclDataType_t nccl_dtype<int64_t>()
   } while (0)
 
 // ---------------------------------------------------------------------------
-// snmg_fit — shared multi-GPU core (Paths 1 & 2)
+// mnmg_fit — shared multi-GPU core (Paths 1 & 2)
 // ---------------------------------------------------------------------------
 template <typename T, typename IdxT>
-void snmg_fit(const raft::resources& handle,
+void mnmg_fit(const raft::resources& handle,
               const cuvs::cluster::kmeans::params& params,
               raft::host_matrix_view<const T, IdxT> X_local,
               std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
@@ -556,7 +556,7 @@ void batched_fit_omp(const raft::resources& clique,
         raft::make_host_vector_view<const T, IdxT>(sample_weight->data_handle() + offset, n_local);
     }
 
-    snmg_fit<T, IdxT>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
+    mnmg_fit<T, IdxT>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
   }
 }
 
