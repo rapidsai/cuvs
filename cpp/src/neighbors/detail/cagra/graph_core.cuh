@@ -537,7 +537,7 @@ __global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, grap
     // Check to avoid duplication
     for (uint64_t kl = 0; kl < graph_degree; kl++) {
       uint64_t m = mst_graph[(graph_degree * l) + kl];
-      if (m > graph_size) continue;
+      if (m >= graph_size) continue;
       uint32_t rm = get_root_label(m, label);
       if (ri == rm) {
         ret = 0;
@@ -793,8 +793,7 @@ void merge_graph_gpu(raft::resources const& res,
 
   auto d_check_num_protected_edges = raft::make_device_scalar<bool>(res, true);
 
-  uint32_t batch_size =
-    std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
+  uint32_t batch_size      = static_cast<uint32_t>(std::min<uint64_t>(graph_size, 256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
   batched_device_view_from_host<IdxT, int64_t> d_output_graph(
@@ -845,7 +844,7 @@ void merge_graph_gpu(raft::resources const& res,
              d_check_num_protected_edges.data_handle(),
              1,
              raft::resource::get_cuda_stream(res));
-
+  raft::resource::sync_stream(res);
   const auto merge_graph_end = cur_time();
   RAFT_EXPECTS(check_num_protected_edges,
                "Failed to merge the MST, pruned, and reverse edge graphs. "
@@ -888,6 +887,7 @@ void make_reverse_graph_gpu(raft::resources const& res,
       dim3 blocks(1024, 1, 1);
       kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
         d_dest_nodes.view(), d_rev_graph, d_rev_graph_count, 0);
+      raft::resource::sync_stream(res);
       RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
     }
   } else {
@@ -1074,7 +1074,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
       // Check to avoid duplication
       for (uint64_t kl = 0; kl < mst_graph_degree; kl++) {
         uint64_t m = mst_graph_ptr[(mst_graph_degree * l) + kl];
-        if (m > graph_size) continue;
+        if (m >= graph_size) continue;
         if (label_ptr[i] == label_ptr[m]) {
           ret = 0;
           break;
@@ -1533,8 +1533,7 @@ void prune_graph_gpu(raft::resources const& res,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/prune");
 
-  uint32_t batch_size =
-    std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
+  uint32_t batch_size      = static_cast<uint32_t>(std::min<uint64_t>(graph_size, 256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
   RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
