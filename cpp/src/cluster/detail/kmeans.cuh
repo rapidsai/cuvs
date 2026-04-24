@@ -741,8 +741,7 @@ void kmeans_fit(
     static_cast<size_t>(streaming_batch_size));
 
   bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
-                            metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                            metric == cuvs::distance::DistanceType::CosineExpanded;
+                            metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   bool use_norm_cache = need_compute_norms && !data_on_device;
   auto h_norm_cache =
     raft::make_pinned_vector<DataT, IndexT>(handle, use_norm_cache ? n_samples : 0);
@@ -753,13 +752,8 @@ void kmeans_fit(
       raft::make_device_matrix_view<const DataT, IndexT>(batch_ptr, batch_size, n_features);
     auto norm_view =
       raft::make_device_vector_view<DataT, IndexT>(L2NormBatch.data_handle(), batch_size);
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, batch_view, norm_view, raft::sqrt_op{});
-    } else {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, batch_view, norm_view);
-    }
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle, batch_view, norm_view);
   };
 
   std::mt19937 gen(pams.rng_state.seed);
