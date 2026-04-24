@@ -875,12 +875,14 @@ struct build_result {
 
 /**
  * Result of merging CAGRA indices. The index holds a view over \p dataset; caller must keep
- * \p dataset alive for the lifetime of \p idx.
+ * \p dataset alive for the lifetime of \p idx. When VPQ compression is used, \p vpq is set and
+ * must also be kept alive (the index holds an indirect view over it), same as build_result.
  */
 template <typename T, typename IdxT>
 struct merge_result {
   cuvs::neighbors::cagra::index<T, IdxT> idx;
   raft::device_matrix<T, int64_t, raft::row_major> dataset;
+  std::optional<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq;
 };
 
 /**
@@ -2539,7 +2541,8 @@ void serialize_to_hnswlib(
  * @param[in] row_filter an optional device filter function object that greenlights rows
  *    to include in the merged index  (none_sample_filter for no filtering)
  * @return merge_result with .idx (merged index holding a view over .dataset) and .dataset;
- *         caller must keep .dataset alive for the lifetime of .idx.
+ *         caller must keep .dataset alive for the lifetime of .idx. If .vpq is set (VPQ
+ *         compression), keep .vpq alive as well; the index may hold an indirect view over it.
  */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,

@@ -151,6 +151,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>> index_;
   std::shared_ptr<raft::device_matrix<IdxT, int64_t, raft::row_major>> graph_;
   std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
+  /** Set when a physical merge produced a VPQ-compressed index; index holds an indirect view. */
+  std::shared_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> merge_vpq_{};
   std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
 
   std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, algo_base::index_type>>
@@ -250,7 +252,16 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
 
       auto merge_res = cuvs::neighbors::cagra::merge(handle_, params, indices);
+      merge_vpq_.reset();
+      if (merge_res.vpq.has_value()) {
+        merge_vpq_ =
+          std::make_shared<cuvs::neighbors::vpq_dataset<half, int64_t>>(std::move(*merge_res.vpq));
+      }
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(merge_res.idx));
+      if (merge_vpq_) {
+        index_->update_dataset(handle_,
+                               cuvs::neighbors::indirect_dataset_view<int64_t>(merge_vpq_.get()));
+      }
       *dataset_ = std::move(merge_res.dataset);
     }
   }
@@ -504,6 +515,7 @@ std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
   out->sub_dataset_buffers_                    = sub_dataset_buffers_;
   out->deserialized_dataset_                   = deserialized_dataset_;
   out->sub_deserialized_datasets_              = sub_deserialized_datasets_;
+  out->merge_vpq_                              = merge_vpq_;
   return out;
 }
 

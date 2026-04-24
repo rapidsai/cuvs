@@ -565,8 +565,14 @@ void _merge(cuvsResources_t res,
     }
   }();
 
+  std::unique_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq_own;
+  if (merge_res.vpq.has_value()) {
+    vpq_own = std::make_unique<cuvs::neighbors::vpq_dataset<half, int64_t>>(
+      std::move(*merge_res.vpq));
+  }
+  if (vpq_own) { rebind_vpq_index(res_ptr, merge_res.idx, vpq_own.get()); }
   auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-    nullptr, nullptr, std::move(merge_res.dataset), std::move(merge_res.idx)};
+    std::move(vpq_own), nullptr, std::move(merge_res.dataset), std::move(merge_res.idx)};
   output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
   output_index->c_api_lifetime_owner = reinterpret_cast<uintptr_t>(holder);
 }

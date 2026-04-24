@@ -160,13 +160,15 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
         raft::make_const_mdspan(filtered_dataset.view()), static_cast<uint32_t>(dim));
       auto build_res = cagra::detail::build<T, IdxT>(handle, params, dv);
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
-      return cagra::merge_result<T, IdxT>{std::move(build_res.idx), std::move(filtered_dataset)};
+      return cagra::merge_result<T, IdxT>{
+        std::move(build_res.idx), std::move(filtered_dataset), std::move(build_res.vpq)};
     } else {
       cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
         raft::make_const_mdspan(updated_dataset.view()), static_cast<uint32_t>(dim));
       auto build_res = cagra::detail::build<T, IdxT>(handle, params, dv);
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
-      return cagra::merge_result<T, IdxT>{std::move(build_res.idx), std::move(updated_dataset)};
+      return cagra::merge_result<T, IdxT>{
+        std::move(build_res.idx), std::move(updated_dataset), std::move(build_res.vpq)};
     }
   } catch (std::bad_alloc& e) {
     // We don't currently support the cpu memory fallback with filtered merge, since the
