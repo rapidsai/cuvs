@@ -194,7 +194,6 @@ void search_impl(raft::resources const& handle,
     // query the gridDimX size to store probes topK output
     ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
       index,
-      params,
       nullptr,
       nullptr,
       n_queries,
@@ -251,7 +250,6 @@ void search_impl(raft::resources const& handle,
 
   ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
     index,
-    params,
     queries,
     coarse_indices_dev.data(),
     n_queries,

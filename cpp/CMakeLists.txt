@@ -616,6 +616,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_setup_workspace<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${neighbors_ns}::tag_@query_abbrev@, ${cagra_ns}::tag_codebook_@codebook_abbrev@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -630,6 +631,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_compute_distance<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${neighbors_ns}::tag_@query_abbrev@, ${cagra_ns}::tag_codebook_@codebook_abbrev@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -643,6 +645,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_dist_op<${neighbors_ns}::tag_@query_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${cagra_ns}::@jit_metric_tag@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/dist_op"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -657,6 +660,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_apply_normalization_standard<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${neighbors_ns}::tag_@query_abbrev@, @team_size@, @dataset_block_dim@, ${cagra_ns}::tag_norm_@norm_kind@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_normalization_standard"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -672,6 +676,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_search_single_cta<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@source_index_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, @topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -686,6 +691,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_search_single_cta_p<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@source_index_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, @topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta_p"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -699,6 +705,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_search_multi_cta<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@source_index_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_multi_cta"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -712,6 +719,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_random_pickup<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/random_pickup"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -725,6 +733,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_compute_distance_to_child_nodes<${neighbors_ns}::tag_@data_abbrev@, ${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${neighbors_ns}::tag_index_@source_index_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_to_child_nodes"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -739,6 +748,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${cagra_ns}::fragment_tag_apply_filter_kernel<${neighbors_ns}::tag_index_@index_abbrev@, ${cagra_ns}::tag_dist_@distance_abbrev@, ${neighbors_ns}::tag_index_@source_index_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )

@@ -137,7 +137,6 @@ template <int Capacity,
           typename MetricTag,
           typename PostLambdaTag>
 void launch_kernel(const index<T, IdxT>& index,
-                   const search_params& params,
                    const T* queries,
                    const uint32_t* coarse_index,
                    const uint32_t num_queries,
@@ -423,7 +422,6 @@ struct select_interleaved_scan_kernel {
  */
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void ivfflat_interleaved_scan(const index<T, IdxT>& index,
-                              const search_params& params,
                               const T* queries,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
@@ -460,7 +458,6 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
         select_min,
         metric,
         index,
-        params,
         queries,
         coarse_query_results,
         n_queries,

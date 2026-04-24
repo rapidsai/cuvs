@@ -48,7 +48,6 @@ function(process_jit_lto_matrix_entry source_list_var)
   cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   populate_matrix_variables("${_JIT_LTO_MATRIX_JSON_ENTRY}")
-
   string(CONFIGURE "${_JIT_LTO_NAME_FORMAT}" kernel_name @ONLY)
   string(CONFIGURE "${_JIT_LTO_FRAGMENT_TAG_FORMAT}" fragment_tag @ONLY)
 

@@ -5,8 +5,8 @@
 
 #pragma once
 
-// Include tags header before any other includes that might open namespaces
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
+#include <cuvs/detail/jit_lto/common_fragments.hpp>
 
 #include "../../sample_filter.cuh"           // For none_sample_filter, bitset_filter
 #include "jit_lto_kernels/cagra_bitset.cuh"  // is_bitset_filter, cagra_bitset, cagra_sample_filter, extract

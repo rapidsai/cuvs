@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <cuvs/detail/jit_lto/common_fragments.hpp>
-
 #include <cstdint>
 
 namespace cuvs::neighbors::cagra::detail {
