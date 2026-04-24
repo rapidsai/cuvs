@@ -36,6 +36,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace cuvs::bench {
@@ -188,17 +189,74 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 
   auto dataset_view_host =
     raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);
-  auto dataset_view_device =
-    raft::make_mdspan<const T, IdxT, raft::row_major, false, true>(dataset, dataset_extents);
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
+  // Host mdspan cagra::build() is only valid for ACE graph (see cagra_build_inst.cu.in).
+  // For NN_DESCENT, IVF-PQ, etc. we must use cagra::build(res, params, dataset_view) with
+  // a padded device dataset (or upload host data first). Used for both single-split
+  // and logical multi-split build paths.
+  bool const use_ace_host =
+    dataset_is_on_host && std::holds_alternative<cuvs::neighbors::graph_build_params::ace_params>(
+                            params.graph_build_params);
   if (index_params_.num_dataset_splits <= 1) {
-    if (dataset_is_on_host) {
+    if (use_ace_host) {
       auto ace_res = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(ace_res.idx));
       if (ace_res.dataset.has_value()) { *dataset_ = std::move(*ace_res.dataset); }
     } else {
-      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-        std::move(cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
+      // Non-ACE CAGRA build must use cagra::build(res, params, dataset_view) from
+      // make_padded_dataset / make_padded_dataset_view; the host mdspan and raw
+      // device mdspan entry points are not valid for these graph types.
+      // Host + non-ACE: copy to a device buffer first, then use the same path
+      // as a native device pointer.
+      raft::device_matrix_view<const T, int64_t, raft::row_major> mds;
+      if (dataset_is_on_host) {
+        *dataset_ = std::move(raft::make_device_matrix<T, int64_t>(
+          handle_, static_cast<int64_t>(nrow), static_cast<int64_t>(dim_)));
+        raft::copy(dataset_->data_handle(),
+                   dataset,
+                   static_cast<size_t>(nrow) * dim_,
+                   raft::resource::get_cuda_stream(handle_));
+        mds = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+          dataset_->data_handle(), static_cast<int64_t>(nrow), static_cast<int64_t>(dim_));
+      } else {
+        mds = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+          dataset, static_cast<int64_t>(nrow), static_cast<int64_t>(dim_));
+      }
+      const uint32_t required_stride =
+        cuvs::neighbors::cagra_required_row_width<T>(static_cast<uint32_t>(mds.extent(1)), 16);
+      const uint32_t src_stride = mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0))
+                                                    : static_cast<uint32_t>(mds.extent(1));
+      cudaPointerAttributes ptr_attrs{};
+      RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, mds.data_handle()));
+      const bool device_src = (reinterpret_cast<T const*>(ptr_attrs.devicePointer) != nullptr);
+      // `build_result` is move-only; use a non-const `br` per branch so
+      // `std::move(br.idx)` moves (a const `br` would try to copy the deleted
+      // cagra::index copy ctor).
+      if (device_src && src_stride == required_stride) {
+        auto const pdv    = cuvs::neighbors::make_padded_dataset_view(handle_, mds);
+        *input_dataset_v_ = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+          mds.data_handle(), static_cast<int64_t>(nrow), static_cast<int64_t>(dim_));
+        auto br = cuvs::neighbors::cagra::build<T, IdxT>(handle_, params, pdv);
+        index_  = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(br.idx));
+        if (br.vpq.has_value()) {
+          merge_vpq_ =
+            std::make_shared<cuvs::neighbors::vpq_dataset<half, int64_t>>(std::move(*br.vpq));
+          index_->update_dataset(handle_,
+                                 cuvs::neighbors::indirect_dataset_view<int64_t>(merge_vpq_.get()));
+        }
+      } else {
+        auto padded = cuvs::neighbors::make_padded_dataset(handle_, mds);
+        auto br =
+          cuvs::neighbors::cagra::build<T, IdxT>(handle_, params, padded->as_dataset_view());
+        *dataset_ = std::move(padded->data_);
+        index_    = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(br.idx));
+        if (br.vpq.has_value()) {
+          merge_vpq_ =
+            std::make_shared<cuvs::neighbors::vpq_dataset<half, int64_t>>(std::move(*br.vpq));
+          index_->update_dataset(handle_,
+                                 cuvs::neighbors::indirect_dataset_view<int64_t>(merge_vpq_.get()));
+        }
+      }
     }
   } else {
     IdxT rows_per_split =
@@ -210,8 +268,8 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       const T* sub_ptr = dataset + static_cast<size_t>(start) * dim_;
       auto sub_host =
         raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
-      auto sub_dev =
-        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
+      auto sub_dev = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+        sub_ptr, static_cast<int64_t>(rows), static_cast<int64_t>(dim_));
 
       auto sub_index = cuvs::neighbors::cagra::index<T, IdxT>(handle_, params.metric);
       if (index_params_.merge_type == CagraMergeType::kPhysical) {
@@ -230,14 +288,61 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
         }
       }
       if (index_params_.merge_type == CagraMergeType::kLogical) {
-        if (dataset_is_on_host) {
+        if (use_ace_host) {
           auto ace_res = cuvs::neighbors::cagra::build(handle_, params, sub_host);
           sub_index    = std::move(ace_res.idx);
           if (ace_res.dataset.has_value()) {
             sub_dataset_buffers_->push_back(std::move(*ace_res.dataset));
           }
+        } else if (dataset_is_on_host) {
+          sub_dataset_buffers_->emplace_back(raft::make_device_matrix<T, int64_t>(
+            handle_, static_cast<int64_t>(rows), static_cast<int64_t>(dim_)));
+          raft::copy(sub_dataset_buffers_->back().data_handle(),
+                     sub_ptr,
+                     static_cast<size_t>(rows) * dim_,
+                     raft::resource::get_cuda_stream(handle_));
+          auto mds_sub = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+            sub_dataset_buffers_->back().data_handle(), static_cast<int64_t>(rows), dim_);
+          const uint32_t req_sub = cuvs::neighbors::cagra_required_row_width<T>(
+            static_cast<uint32_t>(mds_sub.extent(1)), 16);
+          const uint32_t src_sub = mds_sub.stride(0) > 0 ? static_cast<uint32_t>(mds_sub.stride(0))
+                                                         : static_cast<uint32_t>(mds_sub.extent(1));
+          cudaPointerAttributes sub_attrs{};
+          RAFT_CUDA_TRY(cudaPointerGetAttributes(&sub_attrs, mds_sub.data_handle()));
+          const bool sub_device = (reinterpret_cast<T const*>(sub_attrs.devicePointer) != nullptr);
+          if (sub_device && src_sub == req_sub) {
+            sub_index = std::move(
+              cuvs::neighbors::cagra::build<T, IdxT>(
+                handle_, params, cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub))
+                .idx);
+          } else {
+            auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, mds_sub);
+            auto out        = cuvs::neighbors::cagra::build<T, IdxT>(
+              handle_, params, padded_sub->as_dataset_view());
+            sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
+            sub_index = std::move(out.idx);
+          }
         } else {
-          sub_index = cuvs::neighbors::cagra::build(handle_, params, sub_dev);
+          auto mds_sub           = sub_dev;
+          const uint32_t req_sub = cuvs::neighbors::cagra_required_row_width<T>(
+            static_cast<uint32_t>(mds_sub.extent(1)), 16);
+          const uint32_t src_sub = mds_sub.stride(0) > 0 ? static_cast<uint32_t>(mds_sub.stride(0))
+                                                         : static_cast<uint32_t>(mds_sub.extent(1));
+          cudaPointerAttributes sub_attrs{};
+          RAFT_CUDA_TRY(cudaPointerGetAttributes(&sub_attrs, mds_sub.data_handle()));
+          const bool sub_device = (reinterpret_cast<T const*>(sub_attrs.devicePointer) != nullptr);
+          if (sub_device && src_sub == req_sub) {
+            sub_index = std::move(
+              cuvs::neighbors::cagra::build<T, IdxT>(
+                handle_, params, cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub))
+                .idx);
+          } else {
+            auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, mds_sub);
+            auto out        = cuvs::neighbors::cagra::build<T, IdxT>(
+              handle_, params, padded_sub->as_dataset_view());
+            sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
+            sub_index = std::move(out.idx);
+          }
         }
       }
       auto sub_index_shared =
@@ -379,8 +484,8 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
       if (start >= nrow) break;
       IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
       const T* sub_ptr = dataset + static_cast<size_t>(start) * dim_;
-      auto sub_dev =
-        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
+      auto sub_dev     = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+        sub_ptr, static_cast<int64_t>(rows), static_cast<int64_t>(dim_));
       auto sub_index = sub_indices_[i].get();
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (dataset_is_on_host) {
