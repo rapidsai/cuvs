@@ -322,15 +322,17 @@ inline void update_cagra_ann_dataset_for_stride(
   std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>& ann_build_pad)
 {
   if (!cuvs::neighbors::device_matrix_row_width_matches_cagra_required(dataset)) {
-    auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
-    ann_build_pad =
-      std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(own));
+    // Keep the new buffer alive locally, repoint the index first, then replace ann_build_pad.
+    // Otherwise assigning to ann_build_pad can destroy the dataset the index still views.
+    auto new_pad = cuvs::neighbors::make_padded_dataset(res, dataset);
     ann_index.update_dataset(
-      res,
-      static_cast<cuvs::neighbors::dataset_view<int64_t> const&>(ann_build_pad->as_dataset_view()));
+      res, static_cast<cuvs::neighbors::dataset_view<int64_t> const&>(new_pad->as_dataset_view()));
+    ann_build_pad =
+      std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(new_pad));
   } else {
-    ann_build_pad.reset();
+    // Repoint to the strided view before dropping the padded owner the index may reference.
     ann_index.update_dataset(res, dataset);
+    ann_build_pad.reset();
   }
 }
 
