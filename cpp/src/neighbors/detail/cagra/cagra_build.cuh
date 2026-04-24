@@ -2321,7 +2321,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build(
   if (params.attach_dataset_on_build) {
     try {
       return cuvs::neighbors::cagra::build_result<T, IdxT>{
-        index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view())),
+        index<T, IdxT>(res, params.metric, padded, raft::make_const_mdspan(cagra_graph.view())),
         std::nullopt};
     } catch (std::bad_alloc& e) {
       RAFT_LOG_WARN(
