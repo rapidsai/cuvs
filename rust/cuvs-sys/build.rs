@@ -12,6 +12,7 @@ use cmake_package::{Error as CmakeError, Version, VersionError};
 
 const CUVS_COMPONENT: &str = "c_api";
 const CUVS_C_API_TARGET: &str = "cuvs::c_api";
+const CUVS_CMAKE_INSPECTION_FAILED: &str = "CMake failed while inspecting cuVS. Check the build environment for missing tools such as ninja/make, C/C++ compilers, or CUDA dependencies.";
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PYTHON_PRINT_LIBCUVS_PACKAGE_DIR: &str = r#"
 from importlib.util import find_spec
@@ -74,22 +75,33 @@ fn find_target(
     })
 }
 
-fn find_cuvs_package() -> Result<cmake_package::CMakePackage> {
-    find_package("cuvs").components([CUVS_COMPONENT.to_owned()]).find().map_err(|e| match e {
-        CmakeError::Version(VersionError::InvalidVersion) => {
-            anyhow::anyhow!("Found cuVS, but it did not report a parseable package version.")
-        }
-        CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
-            cmake_unavailable_error()
-        }
-        _ => anyhow::anyhow!(
-            "Could not find cuVS CMake package.\n\n\
+fn find_cuvs_package(required_version: &Version) -> Result<cmake_package::CMakePackage> {
+    find_package("cuvs")
+        .version(*required_version)
+        .components([CUVS_COMPONENT.to_owned()])
+        .find()
+        .map_err(|e| match e {
+            CmakeError::Version(VersionError::InvalidVersion) => {
+                anyhow::anyhow!("Found cuVS, but it did not report a parseable package version.")
+            }
+            CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
+                cmake_unavailable_error()
+            }
+            CmakeError::IO(error) => {
+                anyhow::anyhow!("{CUVS_CMAKE_INSPECTION_FAILED}\n\nUnderlying error: {error}")
+            }
+            CmakeError::Internal => anyhow::anyhow!("{CUVS_CMAKE_INSPECTION_FAILED}"),
+            CmakeError::Version(VersionError::VersionTooOld(found)) => {
+                anyhow::anyhow!("Found cuVS {found}, but this build requires a newer version.")
+            }
+            CmakeError::PackageNotFound => anyhow::anyhow!(
+                "Could not find cuVS CMake package.\n\n\
              Install cuVS via one of:\n\
              - conda: conda install -c rapidsai libcuvs\n\
              - pip:   pip install libcuvs-cu<CUDA_VERSION> and set LIBCUVS_USE_PYTHON=1\n\
              Or set CMAKE_PREFIX_PATH to point to your cuVS build/install directory."
-        ),
-    })
+            ),
+        })
 }
 
 #[cfg(feature = "generate-bindings")]
@@ -123,7 +135,7 @@ fn find_dlpack_package() -> Result<cmake_package::CMakePackage> {
 /// preserving all link libraries, directories, and options from the CMake target.
 ///
 fn try_find_cuvs_package(required_version: &Version) -> Result<CuvsMetadata> {
-    let package = find_cuvs_package()?;
+    let package = find_cuvs_package(required_version)?;
     ensure_exact_cuvs_version(&package, required_version)?;
     let target = find_target(&package, "cuvs", CUVS_C_API_TARGET)?;
 
