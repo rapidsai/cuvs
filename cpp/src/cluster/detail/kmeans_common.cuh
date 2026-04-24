@@ -586,26 +586,51 @@ void finalize_centroids(raft::resources const& handle,
 /**
  * @brief Compute the squared norm difference between two centroid sets.
  *
- * Returns sum((old_centroids - new_centroids)^2).
- * Used for convergence checking.
+ * Writes sum((old_centroids - new_centroids)^2) into @p sqrd_norm_out.
+ * Used for convergence checking. Fully asynchronous — no stream sync.
  */
 template <typename DataT, typename IndexT>
-DataT compute_centroid_shift(raft::resources const& handle,
-                             raft::device_matrix_view<const DataT, IndexT> old_centroids,
-                             raft::device_matrix_view<const DataT, IndexT> new_centroids)
+void compute_centroid_shift(raft::resources const& handle,
+                            raft::device_matrix_view<const DataT, IndexT> old_centroids,
+                            raft::device_matrix_view<const DataT, IndexT> new_centroids,
+                            raft::device_scalar_view<DataT> sqrd_norm_out)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto sqrdNorm       = raft::make_device_scalar<DataT>(handle, DataT{0});
-  raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
+  raft::linalg::mapThenSumReduce(sqrd_norm_out.data_handle(),
                                  old_centroids.size(),
                                  raft::sqdiff_op{},
                                  stream,
                                  old_centroids.data_handle(),
                                  new_centroids.data_handle());
-  DataT result = 0;
-  raft::copy(&result, sqrdNorm.data_handle(), 1, stream);
-  raft::resource::sync_stream(handle);
-  return result;
+}
+
+/**
+ * @brief Evaluate convergence criteria entirely on device.
+ *
+ * Checks the cost-ratio and centroid-shift stopping conditions and writes
+ * a boolean result (0 or 1) into @p done_flag.  Also advances
+ * @p prior_clustering_cost to the current cost for the next iteration.
+ */
+template <typename DataT>
+__device__ void check_convergence(raft::device_scalar_view<const DataT> clustering_cost,
+                                  raft::device_scalar_view<DataT> prior_clustering_cost,
+                                  raft::device_scalar_view<const DataT> sqrd_norm_error,
+                                  DataT tol,
+                                  int n_iter,
+                                  raft::device_scalar_view<int> done_flag)
+{
+  DataT cur_cost = *clustering_cost.data_handle();
+  DataT norm_err = *sqrd_norm_error.data_handle();
+  int done       = 0;
+
+  if (cur_cost != DataT{0} && n_iter > 1) {
+    DataT delta = cur_cost / *prior_clustering_cost.data_handle();
+    if (delta > DataT{1} - tol) done = 1;
+  }
+  if (norm_err < tol) done = 1;
+
+  *prior_clustering_cost.data_handle() = cur_cost;
+  *done_flag.data_handle()             = done;
 }
 
 /**

@@ -21,6 +21,8 @@
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/core/pinned_mdarray.hpp>
+#include <raft/core/pinned_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
@@ -741,6 +743,10 @@ void kmeans_fit(
   bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
                             metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                             metric == cuvs::distance::DistanceType::CosineExpanded;
+  bool use_norm_cache = need_compute_norms && !data_on_device;
+  auto h_norm_cache =
+    raft::make_pinned_vector<DataT, IndexT>(handle, use_norm_cache ? n_samples : 0);
+  bool norms_cached = false;
 
   auto compute_batch_norms = [&](const DataT* batch_ptr, IndexT batch_size) {
     auto batch_view =
@@ -774,11 +780,28 @@ void kmeans_fit(
       iter_params,
       raft::make_device_matrix_view<DataT, IndexT>(cur_centroids_ptr, n_clusters, n_features));
 
-    DataT iter_inertia        = std::numeric_limits<DataT>::max();
-    IndexT n_current_iter     = 0;
-    // DataT priorClusteringCost = 0;
+    DataT iter_inertia    = std::numeric_limits<DataT>::max();
+    IndexT n_current_iter = 0;
+    auto sqrdNormError    = raft::make_device_scalar<DataT>(handle, DataT{0});
+
+    auto d_prior_cost = raft::make_device_scalar<DataT>(handle, DataT{0});
+    auto d_done_flag  = raft::make_device_scalar<int>(handle, 0);
+    auto h_done_flag  = raft::make_pinned_scalar<int>(handle, 0);
+
+    cudaEvent_t convergence_event;
+    RAFT_CUDA_TRY(cudaEventCreateWithFlags(&convergence_event, cudaEventDisableTiming));
 
     for (n_current_iter = 1; n_current_iter <= iter_params.max_iter; ++n_current_iter) {
+      if (n_current_iter > 1) {
+        RAFT_CUDA_TRY(cudaEventSynchronize(convergence_event));
+        if (*h_done_flag.data_handle()) {
+          n_current_iter--;
+          RAFT_LOG_DEBUG("Threshold triggered after %d iterations. Terminating early.",
+                         n_current_iter);
+          break;
+        }
+      }
+
       RAFT_LOG_DEBUG("KMeans.fit: Iteration-%d", n_current_iter);
 
       raft::matrix::fill(handle, centroid_sums.view(), DataT{0});
@@ -823,6 +846,17 @@ void kmeans_fit(
 
         if (need_compute_norms) {
           compute_batch_norms(data_batch.data(), cur_batch_size);
+          if (use_norm_cache) {
+            raft::copy(h_norm_cache.data_handle() + data_batch.offset(),
+                       L2NormBatch.data_handle(),
+                       cur_batch_size,
+                       stream);
+          }
+        } else if (use_norm_cache) {
+          raft::copy(L2NormBatch.data_handle(),
+                     h_norm_cache.data_handle() + data_batch.offset(),
+                     cur_batch_size,
+                     stream);
         }
 
         auto l2_const_view = raft::make_device_vector_view<const DataT, IndexT>(
@@ -845,6 +879,7 @@ void kmeans_fit(
                                      batch_workspace,
                                      centroid_norms_opt);
       }
+      if (!norms_cached && use_norm_cache) { norms_cached = true; }
 
       finalize_centroids<DataT, IndexT>(handle,
                                         raft::make_const_mdspan(centroid_sums.view()),
@@ -852,35 +887,35 @@ void kmeans_fit(
                                         centroids_const,
                                         new_centroids_view);
 
-      DataT sqrdNormError =
-        compute_centroid_shift<DataT, IndexT>(handle,
-                                              raft::make_const_mdspan(centroids_const),
-                                              raft::make_const_mdspan(new_centroids_view));
+      compute_centroid_shift<DataT, IndexT>(handle,
+                                            raft::make_const_mdspan(centroids_const),
+                                            raft::make_const_mdspan(new_centroids_view),
+                                            sqrdNormError.view());
 
       std::swap(cur_centroids_ptr, new_centroids_ptr);
 
-      bool done = false;
+      auto d_cost_view  = raft::make_device_scalar_view<const DataT>(clustering_cost.data_handle());
+      auto d_prior_view = d_prior_cost.view();
+      auto d_norm_view  = raft::make_device_scalar_view<const DataT>(sqrdNormError.data_handle());
+      auto d_done_view  = d_done_flag.view();
+      DataT tol         = iter_params.tol;
+      int iter          = n_current_iter;
 
-      DataT curClusteringCost = DataT{0};
-      raft::copy(&curClusteringCost, clustering_cost.data_handle(), 1, stream);
-      // raft::resource::sync_stream(handle, stream);
+      raft::linalg::map_offset(
+        handle,
+        raft::make_device_vector_view<int, int>(d_done_flag.data_handle(), 1),
+        [=] __device__(int) {
+          check_convergence(d_cost_view, d_prior_view, d_norm_view, tol, iter, d_done_view);
+          return *d_done_view.data_handle();
+        });
 
-      if (curClusteringCost == DataT{0}) {
-        RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
-      } else if (n_current_iter > 1) {
-        // DataT delta = curClusteringCost / priorClusteringCost;
-        // if (delta > 1 - iter_params.tol) done = true;
-      }
-      // priorClusteringCost = curClusteringCost;
-
-      if (sqrdNormError < iter_params.tol) done = true;
-
-      if (done) {
-        RAFT_LOG_DEBUG("Threshold triggered after %d iterations. Terminating early.",
-                       n_current_iter);
-        break;
-      }
+      raft::copy(handle,
+                 raft::make_pinned_scalar_view(h_done_flag.data_handle()),
+                 raft::make_device_scalar_view<const int>(d_done_flag.data_handle()));
+      RAFT_CUDA_TRY(cudaEventRecord(convergence_event, stream));
     }
+
+    RAFT_CUDA_TRY(cudaEventDestroy(convergence_event));
 
     {
       auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
