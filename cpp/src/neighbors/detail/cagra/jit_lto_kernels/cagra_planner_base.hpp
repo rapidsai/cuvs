@@ -60,96 +60,22 @@ struct CagraPlannerBase : AlgorithmPlanner {
       if (pq_bits != 0 || pq_len != 0) {
         RAFT_FAIL("CAGRA JIT standard path expects pq_bits==0 and pq_len==0");
       }
-      if (team_size == 8) {
-        if (dataset_block_dim == 128) {
-          add.template operator()<8u, 128u, 0u, 0u>();
-        } else if (dataset_block_dim == 256) {
-          add.template operator()<8u, 256u, 0u, 0u>();
-        } else if (dataset_block_dim == 512) {
-          add.template operator()<8u, 512u, 0u, 0u>();
-        }
-      } else if (team_size == 16) {
-        if (dataset_block_dim == 128) {
-          add.template operator()<16u, 128u, 0u, 0u>();
-        } else if (dataset_block_dim == 256) {
-          add.template operator()<16u, 256u, 0u, 0u>();
-        } else if (dataset_block_dim == 512) {
-          add.template operator()<16u, 512u, 0u, 0u>();
-        }
-      } else if (team_size == 32) {
-        if (dataset_block_dim == 128) {
-          add.template operator()<32u, 128u, 0u, 0u>();
-        } else if (dataset_block_dim == 256) {
-          add.template operator()<32u, 256u, 0u, 0u>();
-        } else if (dataset_block_dim == 512) {
-          add.template operator()<32u, 512u, 0u, 0u>();
-        }
-      }
+      dispatch_cagra_team_dim(
+        team_size, dataset_block_dim, [&add]<uint32_t TeamSz, uint32_t Dim>() {
+          add.template operator()<TeamSz, Dim, 0u, 0u>();
+        });
     } else {
       if (pq_bits != 8 || (pq_len != 2 && pq_len != 4)) {
         RAFT_FAIL("CAGRA JIT VPQ path expects pq_bits==8 and pq_len in {2,4}");
       }
-      if (team_size == 8) {
-        if (dataset_block_dim == 128) {
+      dispatch_cagra_team_dim(
+        team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
           if (pq_len == 2) {
-            add.template operator()<8u, 128u, 8u, 2u>();
+            add.template operator()<TeamSz, Dim, 8u, 2u>();
           } else {
-            add.template operator()<8u, 128u, 8u, 4u>();
+            add.template operator()<TeamSz, Dim, 8u, 4u>();
           }
-        } else if (dataset_block_dim == 256) {
-          if (pq_len == 2) {
-            add.template operator()<8u, 256u, 8u, 2u>();
-          } else {
-            add.template operator()<8u, 256u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 512) {
-          if (pq_len == 2) {
-            add.template operator()<8u, 512u, 8u, 2u>();
-          } else {
-            add.template operator()<8u, 512u, 8u, 4u>();
-          }
-        }
-      } else if (team_size == 16) {
-        if (dataset_block_dim == 128) {
-          if (pq_len == 2) {
-            add.template operator()<16u, 128u, 8u, 2u>();
-          } else {
-            add.template operator()<16u, 128u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 256) {
-          if (pq_len == 2) {
-            add.template operator()<16u, 256u, 8u, 2u>();
-          } else {
-            add.template operator()<16u, 256u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 512) {
-          if (pq_len == 2) {
-            add.template operator()<16u, 512u, 8u, 2u>();
-          } else {
-            add.template operator()<16u, 512u, 8u, 4u>();
-          }
-        }
-      } else if (team_size == 32) {
-        if (dataset_block_dim == 128) {
-          if (pq_len == 2) {
-            add.template operator()<32u, 128u, 8u, 2u>();
-          } else {
-            add.template operator()<32u, 128u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 256) {
-          if (pq_len == 2) {
-            add.template operator()<32u, 256u, 8u, 2u>();
-          } else {
-            add.template operator()<32u, 256u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 512) {
-          if (pq_len == 2) {
-            add.template operator()<32u, 512u, 8u, 2u>();
-          } else {
-            add.template operator()<32u, 512u, 8u, 4u>();
-          }
-        }
-      }
+        });
     }
   }
 
@@ -182,96 +108,22 @@ struct CagraPlannerBase : AlgorithmPlanner {
       if (pq_bits != 0 || pq_len != 0) {
         RAFT_FAIL("CAGRA JIT standard path expects pq_bits==0 and pq_len==0");
       }
-      if (team_size == 8) {
-        if (dataset_block_dim == 128) {
-          add.template operator()<8u, 128u, 0u, 0u>();
-        } else if (dataset_block_dim == 256) {
-          add.template operator()<8u, 256u, 0u, 0u>();
-        } else if (dataset_block_dim == 512) {
-          add.template operator()<8u, 512u, 0u, 0u>();
-        }
-      } else if (team_size == 16) {
-        if (dataset_block_dim == 128) {
-          add.template operator()<16u, 128u, 0u, 0u>();
-        } else if (dataset_block_dim == 256) {
-          add.template operator()<16u, 256u, 0u, 0u>();
-        } else if (dataset_block_dim == 512) {
-          add.template operator()<16u, 512u, 0u, 0u>();
-        }
-      } else if (team_size == 32) {
-        if (dataset_block_dim == 128) {
-          add.template operator()<32u, 128u, 0u, 0u>();
-        } else if (dataset_block_dim == 256) {
-          add.template operator()<32u, 256u, 0u, 0u>();
-        } else if (dataset_block_dim == 512) {
-          add.template operator()<32u, 512u, 0u, 0u>();
-        }
-      }
+      dispatch_cagra_team_dim(
+        team_size, dataset_block_dim, [&add]<uint32_t TeamSz, uint32_t Dim>() {
+          add.template operator()<TeamSz, Dim, 0u, 0u>();
+        });
     } else {
       if (pq_bits != 8 || (pq_len != 2 && pq_len != 4)) {
         RAFT_FAIL("CAGRA JIT VPQ path expects pq_bits==8 and pq_len in {2,4}");
       }
-      if (team_size == 8) {
-        if (dataset_block_dim == 128) {
+      dispatch_cagra_team_dim(
+        team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
           if (pq_len == 2) {
-            add.template operator()<8u, 128u, 8u, 2u>();
+            add.template operator()<TeamSz, Dim, 8u, 2u>();
           } else {
-            add.template operator()<8u, 128u, 8u, 4u>();
+            add.template operator()<TeamSz, Dim, 8u, 4u>();
           }
-        } else if (dataset_block_dim == 256) {
-          if (pq_len == 2) {
-            add.template operator()<8u, 256u, 8u, 2u>();
-          } else {
-            add.template operator()<8u, 256u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 512) {
-          if (pq_len == 2) {
-            add.template operator()<8u, 512u, 8u, 2u>();
-          } else {
-            add.template operator()<8u, 512u, 8u, 4u>();
-          }
-        }
-      } else if (team_size == 16) {
-        if (dataset_block_dim == 128) {
-          if (pq_len == 2) {
-            add.template operator()<16u, 128u, 8u, 2u>();
-          } else {
-            add.template operator()<16u, 128u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 256) {
-          if (pq_len == 2) {
-            add.template operator()<16u, 256u, 8u, 2u>();
-          } else {
-            add.template operator()<16u, 256u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 512) {
-          if (pq_len == 2) {
-            add.template operator()<16u, 512u, 8u, 2u>();
-          } else {
-            add.template operator()<16u, 512u, 8u, 4u>();
-          }
-        }
-      } else if (team_size == 32) {
-        if (dataset_block_dim == 128) {
-          if (pq_len == 2) {
-            add.template operator()<32u, 128u, 8u, 2u>();
-          } else {
-            add.template operator()<32u, 128u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 256) {
-          if (pq_len == 2) {
-            add.template operator()<32u, 256u, 8u, 2u>();
-          } else {
-            add.template operator()<32u, 256u, 8u, 4u>();
-          }
-        } else if (dataset_block_dim == 512) {
-          if (pq_len == 2) {
-            add.template operator()<32u, 512u, 8u, 2u>();
-          } else {
-            add.template operator()<32u, 512u, 8u, 4u>();
-          }
-        }
-      }
+        });
     }
   }
 
@@ -376,10 +228,9 @@ struct CagraPlannerBase : AlgorithmPlanner {
         break;
       default: break;
     }
-    RAFT_FAIL(
-      "Unsupported team_size / dataset_block_dim for CAGRA JIT normalization: team=%u dim=%u",
-      static_cast<unsigned>(team_size),
-      static_cast<unsigned>(dataset_block_dim));
+    RAFT_FAIL("Unsupported team_size / dataset_block_dim for CAGRA JIT: team=%u dim=%u",
+              static_cast<unsigned>(team_size),
+              static_cast<unsigned>(dataset_block_dim));
   }
 
   void add_sample_filter_device_function(std::string const& filter_name)
