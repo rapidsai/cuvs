@@ -6,7 +6,6 @@
 #pragma once
 
 #include <memory>
-#include <numeric>
 #include <type_traits>
 
 #include <raft/core/copy.cuh>
@@ -128,16 +127,7 @@ struct index_state {
     std::shared_ptr<cuvs::neighbors::device_padded_dataset<value_type, int64_t>>& ann_build_pad)
     -> std::shared_ptr<UpstreamT>
   {
-    constexpr size_t k_size        = sizeof(value_type);
-    const uint32_t align_bytes     = 16;
-    const uint32_t required_stride = static_cast<uint32_t>(
-      raft::round_up_safe<size_t>(static_cast<size_t>(dataset.extent(1)) * k_size,
-                                  std::lcm(align_bytes, static_cast<uint32_t>(k_size))) /
-      k_size);
-    const uint32_t src_stride = dataset.stride(0) > 0 ? static_cast<uint32_t>(dataset.stride(0))
-                                                      : static_cast<uint32_t>(dataset.extent(1));
-
-    if (src_stride != required_stride) {
+    if (!cuvs::neighbors::device_matrix_row_width_matches_cagra_required(dataset)) {
       if constexpr (std::is_same_v<UpstreamT, cuvs::neighbors::cagra::index<float, uint32_t>>) {
         auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
         ann_build_pad =
@@ -331,15 +321,7 @@ inline void update_cagra_ann_dataset_for_stride(
   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
   std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>& ann_build_pad)
 {
-  constexpr size_t k_size        = sizeof(float);
-  const uint32_t align_bytes     = 16;
-  const uint32_t required_stride = static_cast<uint32_t>(
-    raft::round_up_safe<size_t>(static_cast<size_t>(dataset.extent(1)) * k_size,
-                                std::lcm(align_bytes, static_cast<uint32_t>(k_size))) /
-    k_size);
-  const uint32_t src_stride = dataset.stride(0) > 0 ? static_cast<uint32_t>(dataset.stride(0))
-                                                    : static_cast<uint32_t>(dataset.extent(1));
-  if (src_stride != required_stride) {
+  if (!cuvs::neighbors::device_matrix_row_width_matches_cagra_required(dataset)) {
     auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
     ann_build_pad =
       std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(own));

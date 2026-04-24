@@ -6,10 +6,8 @@
 
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/util/integer_utils.hpp>
 
 #include <memory>
-#include <numeric>
 
 namespace cuvs::neighbors::test {
 
@@ -47,15 +45,7 @@ struct padded_device_matrix_for_cagra {
     -> build_result
   {
     using namespace cuvs::neighbors;
-    constexpr uint32_t align_bytes = 16;
-    constexpr size_t kSize         = sizeof(DataT);
-    uint32_t required_stride =
-      raft::round_up_safe<size_t>(static_cast<size_t>(src.extent(1)) * kSize,
-                                  std::lcm(align_bytes, static_cast<uint32_t>(kSize))) /
-      static_cast<uint32_t>(kSize);
-    uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0))
-                                            : static_cast<uint32_t>(src.extent(1));
-    if (src_stride == required_stride) {
+    if (device_matrix_row_width_matches_cagra_required(src)) {
       return build_result{nullptr, make_padded_dataset_view(res, src)};
     } else {
       auto own = make_padded_dataset(res, src);

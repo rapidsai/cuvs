@@ -17,7 +17,6 @@
 
 #include <fstream>
 #include <mutex>
-#include <numeric>
 
 #include <raft/core/device_mdspan.hpp>
 
@@ -41,13 +40,9 @@ template <typename T, typename Accessor>
 bool host_mds_uses_padded_device_view(
   raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> mds)
 {
-  using value_type          = T;
-  constexpr size_t kSize    = sizeof(value_type);
-  constexpr uint32_t kAlign = 16u;
+  using value_type = T;
   uint32_t const required_stride =
-    raft::round_up_safe<size_t>(static_cast<size_t>(mds.extent(1)) * kSize,
-                                std::lcm(kAlign, static_cast<uint32_t>(kSize))) /
-    kSize;
+    cagra_required_row_width<value_type>(static_cast<uint32_t>(mds.extent(1)));
   uint32_t const src_stride =
     mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
   cudaPointerAttributes a{};

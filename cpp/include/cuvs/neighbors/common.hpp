@@ -387,6 +387,54 @@ struct is_padded_dataset<device_padded_dataset_view<DataT, IdxT>> : std::true_ty
 template <typename DatasetT>
 inline constexpr bool is_padded_dataset_v = is_padded_dataset<DatasetT>::value;
 
+// -----------------------------------------------------------------------------
+// CAGRA row width in elements (same for make_padded_dataset* and index layout checks).
+// -----------------------------------------------------------------------------
+
+/**
+ * @brief Required row width in elements for CAGRA: minimum leading dimension (LDA) per row for the
+ *        default per-row byte alignment (16 bytes, combined with `sizeof` element type), given
+ *        `logical_columns` feature columns.
+ */
+[[nodiscard]] inline uint32_t cagra_required_row_width(uint32_t logical_columns,
+                                                       std::size_t sizeof_value,
+                                                       uint32_t align_bytes = 16)
+{
+  return static_cast<uint32_t>(
+    raft::round_up_safe<std::size_t>(static_cast<std::size_t>(logical_columns) * sizeof_value,
+                                     std::lcm(align_bytes, static_cast<uint32_t>(sizeof_value))) /
+    sizeof_value);
+}
+
+template <typename ValueT>
+[[nodiscard]] inline uint32_t cagra_required_row_width(uint32_t logical_columns,
+                                                       uint32_t align_bytes = 16)
+{
+  return cagra_required_row_width(logical_columns, sizeof(ValueT), align_bytes);
+}
+
+/** Actual row width in elements (leading dimension) of a 2D `device_matrix_view`. */
+template <typename T, typename I, typename L>
+[[nodiscard]] inline uint32_t device_matrix_actual_row_width(raft::device_matrix_view<T, I, L> m)
+{
+  return m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0)) : static_cast<uint32_t>(m.extent(1));
+}
+
+/**
+ * @brief True if the matrix’s row width in elements matches `cagra_required_row_width` for
+ *        `m.extent(1)` and element type `T` (CAGRA row layout is satisfied for this view).
+ */
+template <typename T, typename I, typename L>
+[[nodiscard]] inline bool device_matrix_row_width_matches_cagra_required(
+  raft::device_matrix_view<T, I, L> m, uint32_t align_bytes = 16)
+{
+  using value_type = std::remove_const_t<T>;
+  const uint32_t need =
+    cagra_required_row_width<value_type>(static_cast<uint32_t>(m.extent(1)), align_bytes);
+  const uint32_t actual = device_matrix_actual_row_width(m);
+  return actual == need;
+}
+
 /**
  * @brief Construct a strided matrix from any mdarray or mdspan.
  *
@@ -548,11 +596,10 @@ template <typename SrcT>
 auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
-  using source_type      = std::remove_cv_t<std::remove_reference_t<SrcT>>;
-  using value_type       = typename source_type::value_type;
-  constexpr size_t kSize = sizeof(value_type);
+  using source_type = std::remove_cv_t<std::remove_reference_t<SrcT>>;
+  using value_type  = typename source_type::value_type;
   uint32_t required_stride =
-    raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
+    cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
   return make_strided_dataset(res, std::forward<SrcT>(src), required_stride);
 }
 
@@ -574,11 +621,10 @@ auto make_padded_dataset_view(const raft::resources& res,
                               uint32_t align_bytes = 16)
   -> device_padded_dataset_view<typename SrcT::value_type, typename SrcT::index_type>
 {
-  using value_type       = typename SrcT::value_type;
-  using index_type       = typename SrcT::index_type;
-  constexpr size_t kSize = sizeof(value_type);
+  using value_type = typename SrcT::value_type;
+  using index_type = typename SrcT::index_type;
   uint32_t required_stride =
-    raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
+    cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
   uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
   cudaPointerAttributes ptr_attrs;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
@@ -612,11 +658,10 @@ template <typename SrcT>
 auto make_padded_dataset(const raft::resources& res, SrcT const& src, uint32_t align_bytes = 16)
   -> std::unique_ptr<device_padded_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
-  using value_type       = typename SrcT::value_type;
-  using index_type       = typename SrcT::index_type;
-  constexpr size_t kSize = sizeof(value_type);
+  using value_type = typename SrcT::value_type;
+  using index_type = typename SrcT::index_type;
   uint32_t required_stride =
-    raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
+    cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
   uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
   cudaPointerAttributes ptr_attrs;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));

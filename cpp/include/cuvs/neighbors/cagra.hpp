@@ -610,14 +610,9 @@ struct index : cuvs::neighbors::index {
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset_view)
   {
     constexpr uint32_t align_bytes = 16;
-    constexpr size_t kSize         = sizeof(T);
     uint32_t const required_stride =
-      raft::round_up_safe<size_t>(static_cast<size_t>(dataset_view.extent(1)) * kSize,
-                                  std::lcm(align_bytes, kSize)) /
-      kSize;
-    uint32_t const src_stride = dataset_view.stride(0) > 0
-                                  ? static_cast<uint32_t>(dataset_view.stride(0))
-                                  : static_cast<uint32_t>(dataset_view.extent(1));
+      cagra_required_row_width<T>(static_cast<uint32_t>(dataset_view.extent(1)), align_bytes);
+    uint32_t const src_stride = device_matrix_actual_row_width(dataset_view);
     RAFT_EXPECTS(
       src_stride == required_stride,
       "update_dataset: row stride does not satisfy %u-byte row alignment (required leading "

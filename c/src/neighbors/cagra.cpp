@@ -7,7 +7,6 @@
 #include <cstring>
 #include <dlpack/dlpack.h>
 #include <memory>
-#include <numeric>
 
 #include <raft/core/copy.hpp>
 #include <raft/core/error.hpp>
@@ -30,39 +29,6 @@
 #include <fstream>
 
 namespace {
-
-/** Row stride must match `make_padded_dataset_view` / CAGRA alignment (see cuvs::neighbors/common.hpp). */
-template <typename T>
-bool device_row_stride_is_padded(raft::device_matrix_view<T const, int64_t, raft::row_major> mds)
-{
-  constexpr size_t kSize       = sizeof(T);
-  constexpr uint32_t align_b = 16;
-  uint32_t required_stride =
-    raft::round_up_safe<size_t>(
-      static_cast<size_t>(mds.extent(1)) * kSize,
-      std::lcm(align_b, static_cast<uint32_t>(kSize))) /
-    kSize;
-  uint32_t src_stride =
-    mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
-  return src_stride == required_stride;
-}
-
-/** Same alignment rule as above for `layout_stride` views (`index::dataset()`). */
-template <typename T>
-bool device_strided_matrix_has_cagra_row_pitch(
-  raft::device_matrix_view<T const, int64_t, raft::layout_stride> v)
-{
-  constexpr size_t kSize       = sizeof(T);
-  constexpr uint32_t align_b = 16;
-  uint32_t required_stride =
-    raft::round_up_safe<size_t>(
-      static_cast<size_t>(v.extent(1)) * kSize,
-      std::lcm(align_b, static_cast<uint32_t>(kSize))) /
-    kSize;
-  uint32_t src_stride =
-    v.stride(0) > 0 ? static_cast<uint32_t>(v.stride(0)) : static_cast<uint32_t>(v.extent(1));
-  return src_stride == required_stride;
-}
 
 /**
  * Heap-allocated bundle for the C API: owns `cagra::index` and any co-owned device storage
@@ -192,7 +158,7 @@ void _build(cuvsResources_t res,
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     // Device `cagra::build` requires a row stride compatible with 16-byte alignment; bare DLPack
     // buffers (e.g. small dim) are often tightly packed and must be copied via `make_padded_dataset`.
-    if (device_row_stride_is_padded(mds)) {
+    if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
       auto view = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
       auto build_res =
         cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
@@ -299,7 +265,7 @@ void _from_args(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    if (device_row_stride_is_padded(mds)) {
+    if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
       auto dataset_view = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
       void* raw         = nullptr;
       if (cuvs::core::is_dlpack_device_compatible(graph)) {
@@ -526,9 +492,9 @@ void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t ou
   holder->padded_dataset_owner = std::move(out_dataset);
 
   // Deserialized strided layout often matches logical dim (tight rows). CAGRA search requires the
-  // same padded row pitch as device builds (see `device_row_stride_is_padded` / `update_dataset`).
+  // same row width as device builds (see `device_matrix_row_width_matches_cagra_required` / `update_dataset`).
   auto ds = holder->idx.dataset();
-  if (ds.extent(0) > 0 && !device_strided_matrix_has_cagra_row_pitch<T>(ds)) {
+  if (ds.extent(0) > 0 && !cuvs::neighbors::device_matrix_row_width_matches_cagra_required(ds)) {
     auto padded =
       cuvs::neighbors::make_padded_dataset(*res_ptr, ds);
     holder->idx.update_dataset(*res_ptr, padded->as_dataset_view());
