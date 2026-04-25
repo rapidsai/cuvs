@@ -55,12 +55,35 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
         If the file does not exist.
     """
     ext = os.path.splitext(path)[1].lower()
-    dtype = _DTYPE_FOR_EXT.get(ext, np.float32)
+    if ext not in _DTYPE_FOR_EXT:
+        supported = ", ".join(_DTYPE_FOR_EXT.keys())
+        raise ValueError(
+            f"Unsupported vector file extension '{ext}' for path: {path}. "
+            f"Supported extensions: {supported}"
+        )
+    if subset_size is not None and subset_size < 1:
+        raise ValueError(
+            f"subset_size must be a positive integer, got {subset_size}"
+        )
+    dtype = _DTYPE_FOR_EXT[ext]
     with open(path, "rb") as f:
-        n_rows = int(np.frombuffer(f.read(4), dtype=np.uint32)[0])
-        n_cols = int(np.frombuffer(f.read(4), dtype=np.uint32)[0])
+        header = f.read(8)
+        if len(header) < 8:
+            raise ValueError(
+                f"File too small to contain a valid header (expected 8 bytes, "
+                f"got {len(header)}): {path}"
+            )
+        n_rows = int(np.frombuffer(header[:4], dtype=np.uint32)[0])
+        n_cols = int(np.frombuffer(header[4:], dtype=np.uint32)[0])
         if subset_size is not None:
             n_rows = min(n_rows, subset_size)
-        raw = f.read(n_rows * n_cols * np.dtype(dtype).itemsize)
+        expected_bytes = n_rows * n_cols * np.dtype(dtype).itemsize
+        raw = f.read(expected_bytes)
+        if len(raw) < expected_bytes:
+            raise ValueError(
+                f"File is truncated: expected {expected_bytes} bytes of data "
+                f"({n_rows} rows x {n_cols} cols x {np.dtype(dtype).itemsize} bytes), "
+                f"got {len(raw)}: {path}"
+            )
         data = np.frombuffer(raw, dtype=dtype)
     return data.reshape(n_rows, n_cols)

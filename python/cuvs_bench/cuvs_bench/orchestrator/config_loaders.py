@@ -240,6 +240,11 @@ class ConfigLoader(ABC):
                 ]
             elif os.path.isfile(algorithm_configuration):
                 algos_conf_fs.append(algorithm_configuration)
+            else:
+                warnings.warn(
+                    f"algorithm_configuration path does not exist: "
+                    f"{algorithm_configuration}"
+                )
         return algos_conf_fs
 
 
