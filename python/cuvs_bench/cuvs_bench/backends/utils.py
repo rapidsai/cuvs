@@ -53,6 +53,9 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
     ------
     FileNotFoundError
         If the file does not exist.
+    ValueError
+        If the file extension is unsupported, ``subset_size`` is not positive,
+        or the file is truncated.
     """
     ext = os.path.splitext(path)[1].lower()
     if ext not in _DTYPE_FOR_EXT:
