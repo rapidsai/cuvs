@@ -50,10 +50,21 @@ export LIBCLANG_PATH
 cargo doc -p cuvs --no-deps
 popd
 
+rapids-logger "Build Java docs"
+pushd java/cuvs-java
+# -Dspotless.apply.skip avoids the spotless plugin (bound to the validate phase,
+# which javadoc:javadoc forks) from rewriting source license headers during a
+# docs-only build.
+mvn javadoc:javadoc \
+    -DexcludePackageNames=com.nvidia.cuvs.internal.panama \
+    -Dspotless.apply.skip=true
+popd
+
 rapids-logger "Build Python docs"
 pushd docs
 make dirhtml
 mv ../rust/target/doc ./build/dirhtml/_static/rust
+mv ../java/cuvs-java/target/reports/apidocs ./build/dirhtml/_static/java
 mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"html
 mv build/dirhtml/* "${RAPIDS_DOCS_DIR}/cuvs/html"
 popd

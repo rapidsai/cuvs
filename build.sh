@@ -542,6 +542,14 @@ if hasArg docs; then
     cd "${REPODIR}"/rust
     cargo doc -p cuvs --no-deps
     rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/build/html/_static/rust
+    cd "${REPODIR}"/java/cuvs-java
+    # -Dspotless.apply.skip avoids the spotless plugin (bound to the validate
+    # phase, which javadoc:javadoc forks) from rewriting source license headers
+    # during a docs-only build.
+    mvn javadoc:javadoc \
+        -DexcludePackageNames=com.nvidia.cuvs.internal.panama \
+        -Dspotless.apply.skip=true
+    rsync -av "${JAVA_BUILD_DIR}"/reports/apidocs/ "${SPHINX_BUILD_DIR}"/build/html/_static/java
 fi
 
 ################################################################################
