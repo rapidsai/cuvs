@@ -132,6 +132,10 @@ class ConfigLoader(ABC):
     - Expand parameter combinations
     - Validate constraints
     - Produce standardized BenchmarkConfig objects
+
+    Provides shared helper methods for common config-loading operations
+    (YAML loading, dataset lookup, algorithm config gathering) so that
+    individual loaders do not need to reimplement them.
     """
 
     @abstractmethod
@@ -151,6 +155,92 @@ class ConfigLoader(ABC):
     def backend_type(self) -> str:
         """Return the backend type this loader is for (e.g., 'cpp_gbench')."""
         pass
+
+    def load_yaml_file(self, file_path: str) -> dict:
+        """
+        Load a YAML file and return its contents as a dictionary.
+
+        Parameters
+        ----------
+        file_path : str
+            The path to the YAML file.
+
+        Returns
+        -------
+        dict
+            The contents of the YAML file.
+        """
+        with open(file_path, "r") as f:
+            return yaml.safe_load(f)
+
+    def get_dataset_configuration(
+        self, dataset: str, dataset_conf_all: list
+    ) -> dict:
+        """
+        Retrieve the configuration for a specific dataset.
+
+        Parameters
+        ----------
+        dataset : str
+            The name of the dataset to retrieve the configuration for.
+        dataset_conf_all : list
+            A list of dataset configurations.
+
+        Returns
+        -------
+        dict
+            The configuration for the specified dataset.
+
+        Raises
+        ------
+        ValueError
+            If the dataset configuration is not found.
+        """
+        for d in dataset_conf_all:
+            if dataset == d["name"]:
+                return d
+        raise ValueError(
+            f"Could not find a dataset configuration for '{dataset}'"
+        )
+
+    def gather_algorithm_configs(
+        self, config_path: str, algorithm_configuration: Optional[str]
+    ) -> list:
+        """
+        Gather the list of algorithm configuration files.
+
+        Parameters
+        ----------
+        config_path : str
+            The path to the config directory.
+        algorithm_configuration : Optional[str]
+            The path to the algorithm configuration directory or file.
+
+        Returns
+        -------
+        list
+            A list of paths to the algorithm configuration files.
+        """
+        algos_conf_fs = os.listdir(os.path.join(config_path, "algos"))
+        algos_conf_fs = [
+            os.path.join(config_path, "algos", f)
+            for f in algos_conf_fs
+            if ".json" not in f
+            and "constraint" not in f
+            and ".py" not in f
+            and "__pycache__" not in f
+        ]
+
+        if algorithm_configuration:
+            if os.path.isdir(algorithm_configuration):
+                algos_conf_fs += [
+                    os.path.join(algorithm_configuration, f)
+                    for f in os.listdir(algorithm_configuration)
+                    if ".json" not in f
+                ]
+            elif os.path.isfile(algorithm_configuration):
+                algos_conf_fs.append(algorithm_configuration)
+        return algos_conf_fs
 
 
 class CppGBenchConfigLoader(ConfigLoader):
@@ -448,92 +538,8 @@ class CppGBenchConfigLoader(ConfigLoader):
         return benchmark_configs
 
     # =========================================================================
-    # `Helper methods (copied from run.py as-is)`
+    # C++ specific helper methods
     # =========================================================================
-
-    def load_yaml_file(self, file_path: str) -> dict:
-        """
-        Load a YAML file and return its contents as a dictionary.
-
-        Parameters
-        ----------
-        file_path : str
-            The path to the YAML file.
-
-        Returns
-        -------
-        dict
-            The contents of the YAML file.
-        """
-        with open(file_path, "r") as f:
-            return yaml.safe_load(f)
-
-    def get_dataset_configuration(
-        self, dataset: str, dataset_conf_all: list
-    ) -> dict:
-        """
-        Retrieve the configuration for a specific dataset.
-
-        Parameters
-        ----------
-        dataset : str
-            The name of the dataset to retrieve the configuration for.
-        dataset_conf_all : list
-            A list of dataset configurations.
-
-        Returns
-        -------
-        dict
-            The configuration for the specified dataset.
-
-        Raises
-        ------
-        ValueError
-            If the dataset configuration is not found.
-        """
-        for d in dataset_conf_all:
-            if dataset == d["name"]:
-                return d
-        raise ValueError("Could not find a dataset configuration")
-
-    def gather_algorithm_configs(
-        self, config_path: str, algorithm_configuration: Optional[str]
-    ) -> list:
-        """
-        Gather the list of algorithm configuration files.
-
-        Parameters
-        ----------
-        config_path : str
-            The path to the config directory.
-        algorithm_configuration : Optional[str]
-            The path to the algorithm configuration directory or file.
-
-        Returns
-        -------
-        list
-            A list of paths to the algorithm configuration files.
-        """
-        algos_conf_fs = os.listdir(os.path.join(config_path, "algos"))
-        algos_conf_fs = [
-            os.path.join(config_path, "algos", f)
-            for f in algos_conf_fs
-            if ".json" not in f
-            and "constraint" not in f
-            and ".py" not in f
-            and "__pycache__" not in f
-        ]
-
-        if algorithm_configuration:
-            if os.path.isdir(algorithm_configuration):
-                algos_conf_fs += [
-                    os.path.join(algorithm_configuration, f)
-                    for f in os.listdir(algorithm_configuration)
-                    if ".json" not in f
-                ]
-            elif os.path.isfile(algorithm_configuration):
-                algos_conf_fs.append(algorithm_configuration)
-        return algos_conf_fs
 
     def load_algorithms_conf(
         self,
