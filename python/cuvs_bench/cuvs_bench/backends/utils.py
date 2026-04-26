@@ -6,10 +6,17 @@
 """
 Shared utilities for cuvs-bench backends.
 
-Provides common functions used by Python-native backends (e.g., OpenSearch,
-Elasticsearch) that need to load dataset vectors from binary files. The C++
-backend does not use these since it passes file paths directly to the
-subprocess.
+Provides common functions for reading binary vector files. Used internally
+by the Dataset class for transparent vector loading. Python-native backends
+(e.g., OpenSearch, Elasticsearch) access vectors via Dataset properties
+and do not need to call these functions directly. The C++ backend does not
+use these since it passes file paths directly to the subprocess.
+
+The dtype_from_filename function originates from generate_groundtruth/utils.py.
+Note: generate_groundtruth/utils.py uses .hbin for float16 while the rest of
+the codebase (get_dataset/fbin_to_f16bin.py, OpenSearch backend) uses .f16bin.
+We standardize on .f16bin here to match the naming convention of the other
+formats (.fbin, .i8bin, .u8bin).
 """
 
 import os
@@ -17,13 +24,38 @@ from typing import Optional
 
 import numpy as np
 
-_DTYPE_FOR_EXT = {
-    ".fbin": np.float32,
-    ".f16bin": np.float16,
-    ".u8bin": np.uint8,
-    ".i8bin": np.int8,
-    ".ibin": np.int32,
-}
+
+def dtype_from_filename(filename):
+    """Map file extension to numpy dtype.
+
+    Parameters
+    ----------
+    filename : str
+        Path or filename with a supported extension.
+
+    Returns
+    -------
+    numpy.dtype
+        The corresponding numpy dtype.
+
+    Raises
+    ------
+    RuntimeError
+        If the file extension is not supported.
+    """
+    ext = os.path.splitext(filename)[1]
+    if ext == ".fbin":
+        return np.float32
+    if ext == ".f16bin":
+        return np.float16
+    elif ext == ".ibin":
+        return np.int32
+    elif ext == ".u8bin":
+        return np.ubyte
+    elif ext == ".i8bin":
+        return np.byte
+    else:
+        raise RuntimeError(f"Unsupported file extension: {ext}")
 
 
 def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
@@ -33,7 +65,7 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
     Supports the standard big-ann-bench binary format used by cuvs-bench
     datasets: a 4-byte uint32 ``n_rows``, a 4-byte uint32 ``n_cols``,
     followed by ``n_rows * n_cols`` elements of the dtype inferred from
-    the file extension.
+    the file extension via ``dtype_from_filename``.
 
     Parameters
     ----------
@@ -57,18 +89,11 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
         If the file extension is unsupported, ``subset_size`` is not positive,
         or the file is truncated.
     """
-    ext = os.path.splitext(path)[1].lower()
-    if ext not in _DTYPE_FOR_EXT:
-        supported = ", ".join(_DTYPE_FOR_EXT.keys())
-        raise ValueError(
-            f"Unsupported vector file extension '{ext}' for path: {path}. "
-            f"Supported extensions: {supported}"
-        )
+    dtype = dtype_from_filename(path)
     if subset_size is not None and subset_size < 1:
         raise ValueError(
             f"subset_size must be a positive integer, got {subset_size}"
         )
-    dtype = _DTYPE_FOR_EXT[ext]
     with open(path, "rb") as f:
         header = f.read(8)
         if len(header) < 8:
