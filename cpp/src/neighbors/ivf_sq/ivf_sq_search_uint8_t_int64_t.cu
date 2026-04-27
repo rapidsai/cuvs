@@ -22,6 +22,7 @@ namespace cuvs::neighbors::ivf_sq {
       handle, params, index, queries, neighbors, distances, sample_filter);          \
   }
 
+CUVS_INST_IVF_SQ_SEARCH(float, uint8_t);
 CUVS_INST_IVF_SQ_SEARCH(half, uint8_t);
 
 #undef CUVS_INST_IVF_SQ_SEARCH
