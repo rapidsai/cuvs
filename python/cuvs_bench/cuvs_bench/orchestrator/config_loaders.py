@@ -448,6 +448,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         count = kwargs.get("count", 10)
         batch_size = kwargs.get("batch_size", 10000)
         subset_size = kwargs.get("subset_size")
+        executable_dir = kwargs.get("executable_dir")
 
         config_path = self.config_path
 
@@ -539,7 +540,8 @@ class CppGBenchConfigLoader(ConfigLoader):
                 try:
                     executable, executable_path, file_name = (
                         self.find_executable(
-                            algos_yaml, algo, group, count, batch_size
+                            algos_yaml, algo, group, count, batch_size,
+                            executable_dir
                         )
                     )
                 except FileNotFoundError:
@@ -702,7 +704,13 @@ class CppGBenchConfigLoader(ConfigLoader):
         )
 
     def find_executable(
-        self, algos_conf: dict, algo: str, group: str, k: int, batch_size: int
+        self,
+        algos_conf: dict,
+        algo: str,
+        group: str,
+        k: int,
+        batch_size: int,
+        executable_dir: Optional[str] = None,
     ) -> Tuple[str, str, Tuple[str, str]]:
         """
         Find the executable for the given algorithm and group.
@@ -719,6 +727,8 @@ class CppGBenchConfigLoader(ConfigLoader):
             The number of nearest neighbors to search for.
         batch_size : int
             The size of each batch for processing.
+        executable_dir : Optional[str]
+            User-specified directory to search first.
 
         Returns
         -------
@@ -728,12 +738,14 @@ class CppGBenchConfigLoader(ConfigLoader):
         """
         executable = algos_conf[algo]["executable"]
         file_name = (f"{algo},{group}", f"{algo},{group},k{k},bs{batch_size}")
-        build_path = self.get_build_path(executable)
+        build_path = self.get_build_path(executable, executable_dir)
         if build_path:
             return executable, build_path, file_name
         raise FileNotFoundError(executable)
 
-    def get_build_path(self, executable: str) -> Optional[str]:
+    def get_build_path(
+        self, executable: str, executable_dir: Optional[str] = None
+    ) -> Optional[str]:
         """
         Get the build path for the given executable.
 
@@ -741,12 +753,20 @@ class CppGBenchConfigLoader(ConfigLoader):
         ----------
         executable : str
             The name of the executable.
+        executable_dir : Optional[str]
+            User-specified directory to search first. If provided and the
+            executable exists there, it is used before auto-discovery.
 
         Returns
         -------
         Optional[str]
             The build path for the executable, if found.
         """
+        if executable_dir is not None:
+            build_path = os.path.join(executable_dir, executable)
+            if os.path.exists(build_path):
+                print(f"-- Using cuVS bench from {build_path}.")
+                return build_path
 
         devcontainer_path = "/home/coder/cuvs/cpp/build/latest/bench/ann"
         if os.path.exists(devcontainer_path):
