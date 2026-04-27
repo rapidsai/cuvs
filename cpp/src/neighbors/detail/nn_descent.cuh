@@ -1213,7 +1213,7 @@ void GnndGraph<Index_t>::init_random_graph()
     for (uint64_t i = 0; i < nrow; i++) {
       // Generate a starting index. The node ((i + 1) % nrow) will be included in the neighbor list
       // of node i. This rule guarantees the connectivity of the graph.
-      uint32_t id;
+      uint64_t id;
       if ((i + 1) % num_segments == seg_id) {
         id = i + 1;
         if (id >= nrow) { id = seg_id; }
