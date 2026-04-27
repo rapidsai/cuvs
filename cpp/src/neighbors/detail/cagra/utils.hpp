@@ -166,7 +166,14 @@ bool is_ptr_host_accessible(T* ptr)
 {
   cudaPointerAttributes attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-  return attr.hostPointer != nullptr;
+  // Pageable host memory comes back as cudaMemoryTypeUnregistered with both
+  // hostPointer and devicePointer set to nullptr, but it is still readable
+  // from the host. Treat anything that is not strictly device-only as host
+  // accessible. Without this, a pageable host pointer was previously routed
+  // into the "device-only" code paths in graph_core.cuh, which dereferenced
+  // a pageable host address from the GPU and caused cudaErrorIllegalAddress
+  // on systems without HMM (e.g. V100 with CUDA 12.2 drivers).
+  return attr.type != cudaMemoryTypeDevice;
 }
 
 /**
@@ -418,7 +425,7 @@ class batched_device_view_from_host {
           device_ptr[2] = device_mem_[2]->data_handle();
         }
       } catch (std::bad_alloc& e) {
-        if (attr_.devicePointer != nullptr) {
+        if (attr_.devicePointer != nullptr && attr_.type == cudaMemoryTypeManaged) {
           for (auto& mem : device_mem_) {
             mem.reset();
           }
@@ -428,7 +435,7 @@ class batched_device_view_from_host {
           throw std::bad_alloc();
         }
       } catch (raft::logic_error& e) {
-        if (attr_.devicePointer != nullptr) {
+        if (attr_.devicePointer != nullptr && attr_.type == cudaMemoryTypeManaged) {
           for (auto& mem : device_mem_) {
             mem.reset();
           }

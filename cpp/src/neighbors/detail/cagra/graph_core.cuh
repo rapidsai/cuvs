@@ -511,7 +511,8 @@ __global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, grap
     ret     = 0;
     auto kj = atomicAdd(incoming_num_edges + j, (IdxT)1);
     if (kj < incoming_max_edges[j]) {
-      auto ki                                      = outgoing_num_edges[i]++;
+      auto ki                                      = outgoing_num_edges[i];
+      outgoing_num_edges[i]                        = ki + 1;
       mst_graph[(graph_degree * (i)) + ki]         = j;  // outgoing
       mst_graph[(graph_degree * (j + 1)) - 1 - kj] = i;  // incoming
       ret                                          = 1;
@@ -566,30 +567,31 @@ __global__ void kern_mst_opt_labeling(IdxT* label,            // [graph_size]
                                       uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (i >= graph_size) return;
 
   __shared__ uint32_t smem_updated[1];
   if (threadIdx.x == 0) { smem_updated[0] = 0; }
   __syncthreads();
 
-  for (uint64_t ki = 0; ki < graph_degree; ki++) {
-    uint64_t j = mst_graph[(graph_degree * i) + ki];
-    if (j >= graph_size) continue;
+  if (i < graph_size) {
+    for (uint64_t ki = 0; ki < graph_degree; ki++) {
+      uint64_t j = mst_graph[(graph_degree * i) + ki];
+      if (j >= graph_size) continue;
 
-    IdxT li = label[i];
-    IdxT ri = get_root_label(i, label);
-    if (ri < li) { atomicMin(label + i, ri); }
-    IdxT lj = label[j];
-    IdxT rj = get_root_label(j, label);
-    if (rj < lj) { atomicMin(label + j, rj); }
-    if (ri == rj) continue;
+      IdxT li = label[i];
+      IdxT ri = get_root_label(i, label);
+      if (ri < li) { atomicMin(label + i, ri); }
+      IdxT lj = label[j];
+      IdxT rj = get_root_label(j, label);
+      if (rj < lj) { atomicMin(label + j, rj); }
+      if (ri == rj) continue;
 
-    if (ri > rj) {
-      atomicCAS(label + i, ri, rj);
-    } else if (rj > ri) {
-      atomicCAS(label + j, rj, ri);
+      if (ri > rj) {
+        atomicCAS(label + i, ri, rj);
+      } else if (rj > ri) {
+        atomicCAS(label + j, rj, ri);
+      }
+      smem_updated[0] = 1;
     }
-    smem_updated[0] = 1;
   }
 
   __syncthreads();
@@ -603,18 +605,19 @@ __global__ void kern_mst_opt_cluster_size(IdxT* cluster_size,  // [graph_size]
                                           uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (i >= graph_size) return;
 
   __shared__ uint64_t smem_num_clusters[1];
   if (threadIdx.x == 0) { smem_num_clusters[0] = 0; }
   __syncthreads();
 
-  IdxT ri = get_root_label(i, label);
-  if (ri == i) {
-    atomicAdd((unsigned long long int*)smem_num_clusters, 1);
-  } else {
-    atomicAdd(cluster_size + ri, cluster_size[i]);
-    cluster_size[i] = 0;
+  if (i < graph_size) {
+    IdxT ri = get_root_label(i, label);
+    if (ri == i) {
+      atomicAdd((unsigned long long int*)smem_num_clusters, 1);
+    } else {
+      atomicAdd(cluster_size + ri, cluster_size[i]);
+      cluster_size[i] = 0;
+    }
   }
 
   __syncthreads();
@@ -634,8 +637,6 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
                                             uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (i >= graph_size) return;
-
   __shared__ uint64_t smem_cluster_size_min[1];
   __shared__ uint64_t smem_cluster_size_max[1];
   __shared__ uint64_t smem_total_outgoing_edges[1];
@@ -648,34 +649,36 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
   }
   __syncthreads();
 
-  // Adjust incoming_num_edges
-  if (incoming_num_edges[i] > incoming_max_edges[i]) {
-    incoming_num_edges[i] = incoming_max_edges[i];
-  }
-
-  // Calculate min/max of cluster_size
-  if (cluster_size[i] > 0) {
-    if (smem_cluster_size_min[0] > cluster_size[i]) {
-      atomicMin((unsigned long long int*)smem_cluster_size_min,
-                (unsigned long long int)(cluster_size[i]));
+  if (i < graph_size) {
+    // Adjust incoming_num_edges
+    if (incoming_num_edges[i] > incoming_max_edges[i]) {
+      incoming_num_edges[i] = incoming_max_edges[i];
     }
-    if (smem_cluster_size_max[0] < cluster_size[i]) {
-      atomicMax((unsigned long long int*)smem_cluster_size_max,
-                (unsigned long long int)(cluster_size[i]));
+
+    // Calculate min/max of cluster_size
+    if (cluster_size[i] > 0) {
+      if (smem_cluster_size_min[0] > cluster_size[i]) {
+        atomicMin((unsigned long long int*)smem_cluster_size_min,
+                  (unsigned long long int)(cluster_size[i]));
+      }
+      if (smem_cluster_size_max[0] < cluster_size[i]) {
+        atomicMax((unsigned long long int*)smem_cluster_size_max,
+                  (unsigned long long int)(cluster_size[i]));
+      }
     }
-  }
 
-  // Calculate total number of outgoing/incoming edges
-  atomicAdd((unsigned long long int*)smem_total_outgoing_edges,
-            (unsigned long long int)(outgoing_num_edges[i]));
-  atomicAdd((unsigned long long int*)smem_total_incoming_edges,
-            (unsigned long long int)(incoming_num_edges[i]));
+    // Calculate total number of outgoing/incoming edges
+    atomicAdd((unsigned long long int*)smem_total_outgoing_edges,
+              (unsigned long long int)(outgoing_num_edges[i]));
+    atomicAdd((unsigned long long int*)smem_total_incoming_edges,
+              (unsigned long long int)(incoming_num_edges[i]));
 
-  // Adjust incoming/outgoing_max_edges
-  if (outgoing_num_edges[i] == outgoing_max_edges[i]) {
-    if (outgoing_num_edges[i] + incoming_num_edges[i] < graph_degree) {
-      outgoing_max_edges[i] += 1;
-      incoming_max_edges[i] -= 1;
+    // Adjust incoming/outgoing_max_edges
+    if (outgoing_num_edges[i] == outgoing_max_edges[i]) {
+      if (outgoing_num_edges[i] + incoming_num_edges[i] < graph_degree) {
+        outgoing_max_edges[i] += 1;
+        incoming_max_edges[i] -= 1;
+      }
     }
   }
 
@@ -1594,14 +1597,15 @@ void prune_graph_gpu(raft::resources const& res,
              d_invalid_neighbor_list.data_handle(),
              1,
              raft::resource::get_cuda_stream(res));
+  raft::copy(res, host_stats.view(), raft::make_const_mdspan(dev_stats.view()));
   raft::resource::sync_stream(res);
+
   RAFT_EXPECTS(
     invalid_neighbor_list == 0,
     "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
     "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
     "overflows occur during the norm computation between the dataset vectors.");
 
-  raft::copy(res, host_stats.view(), raft::make_const_mdspan(dev_stats.view()));
   num_keep = host_stats.data_handle()[0];
   num_full = host_stats.data_handle()[1];
 
