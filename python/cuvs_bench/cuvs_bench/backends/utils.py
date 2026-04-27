@@ -6,11 +6,13 @@
 """
 Shared utilities for cuvs-bench backends.
 
-Provides common functions for reading binary vector files. Used internally
-by the Dataset class for transparent vector loading. Python-native backends
-(e.g., OpenSearch, Elasticsearch) access vectors via Dataset properties
-and do not need to call these functions directly. The C++ backend does not
-use these since it passes file paths directly to the subprocess.
+Provides common functions for Python-native backends (e.g., OpenSearch,
+Elasticsearch):
+- Vector file I/O: used internally by the Dataset class for transparent
+  vector loading. The C++ backend does not use these since it passes file
+  paths directly to the subprocess.
+- Parameter expansion: converts YAML param specs into lists of param dicts.
+- Recall computation: computes recall@k from neighbors and ground truth.
 
 The dtype_from_filename function originates from generate_groundtruth/utils.py.
 Note: generate_groundtruth/utils.py uses .hbin for float16 while the rest of
@@ -19,8 +21,9 @@ We standardize on .f16bin here to match the naming convention of the other
 formats (.fbin, .i8bin, .u8bin).
 """
 
+import itertools
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -115,3 +118,63 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
             )
         data = np.frombuffer(raw, dtype=dtype)
     return data.reshape(n_rows, n_cols)
+
+
+def expand_param_grid(param_spec: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
+    """
+    Expand a parameter specification into all combinations via Cartesian product.
+
+    Takes a dict where each key maps to a list of values (as defined in
+    algorithm YAML configs) and produces a list of dicts, one per combination.
+
+    Parameters
+    ----------
+    param_spec : Dict[str, List[Any]]
+        Parameter specification, e.g., {"m": [16, 32], "ef_construction": [100, 200]}
+
+    Returns
+    -------
+    List[Dict[str, Any]]
+        List of parameter dicts, e.g.,
+        [{"m": 16, "ef_construction": 100}, {"m": 16, "ef_construction": 200},
+         {"m": 32, "ef_construction": 100}, {"m": 32, "ef_construction": 200}]
+        Returns [{}] if param_spec is empty.
+    """
+    if not param_spec:
+        return [{}]
+    keys = list(param_spec.keys())
+    return [dict(zip(keys, vals)) for vals in itertools.product(*param_spec.values())]
+
+
+def compute_recall(
+    neighbors: np.ndarray, groundtruth: np.ndarray, k: int
+) -> float:
+    """
+    Compute recall@k by comparing returned neighbors against ground truth.
+
+    For each query, counts how many of the k returned neighbors appear
+    in the ground truth set, then averages across all queries.
+
+    Parameters
+    ----------
+    neighbors : np.ndarray
+        Returned neighbor IDs, shape (n_queries, k)
+    groundtruth : np.ndarray
+        Ground truth neighbor IDs, shape (n_queries, gt_k)
+    k : int
+        Number of neighbors to evaluate
+
+    Returns
+    -------
+    float
+        Recall@k in range [0.0, 1.0]
+    """
+    n_queries = neighbors.shape[0]
+    gt_k = min(k, groundtruth.shape[1])
+    if gt_k == 0 or n_queries == 0:
+        return 0.0
+    n_correct = sum(
+        len(set(neighbors[i, :k].tolist()) & set(groundtruth[i, :gt_k].tolist()))
+        for i in range(n_queries)
+    )
+    return n_correct / (n_queries * gt_k)

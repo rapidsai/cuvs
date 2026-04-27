@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for shared backend utilities and Dataset lazy loading.
+Unit tests for shared backend utilities and Dataset transparent loading.
 """
 
 import numpy as np
@@ -11,7 +11,12 @@ import pytest
 import yaml
 
 from cuvs_bench.backends import Dataset
-from cuvs_bench.backends.utils import dtype_from_filename, load_vectors
+from cuvs_bench.backends.utils import (
+    compute_recall,
+    dtype_from_filename,
+    expand_param_grid,
+    load_vectors,
+)
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
 
@@ -315,3 +320,94 @@ class TestConfigLoaderMethods:
 
         with pytest.raises(ValueError, match="Could not find a dataset configuration"):
             loader.get_dataset_configuration("nonexistent", datasets)
+
+
+class TestExpandParamGrid:
+    """Tests for expand_param_grid."""
+
+    def test_single_param(self):
+        """Test expansion of a single parameter."""
+        result = expand_param_grid({"m": [16, 32]})
+        assert result == [{"m": 16}, {"m": 32}]
+
+    def test_two_params(self):
+        """Test Cartesian product of two parameters."""
+        result = expand_param_grid({"m": [16, 32], "ef": [100, 200]})
+        assert len(result) == 4
+        assert {"m": 16, "ef": 100} in result
+        assert {"m": 16, "ef": 200} in result
+        assert {"m": 32, "ef": 100} in result
+        assert {"m": 32, "ef": 200} in result
+
+    def test_empty_spec(self):
+        """Test that empty spec returns a single empty dict."""
+        result = expand_param_grid({})
+        assert result == [{}]
+
+    def test_single_values(self):
+        """Test that single-element lists produce one combination."""
+        result = expand_param_grid({"m": [16], "ef": [100]})
+        assert result == [{"m": 16, "ef": 100}]
+
+    def test_three_params(self):
+        """Test Cartesian product of three parameters."""
+        result = expand_param_grid({"a": [1, 2], "b": [3], "c": [4, 5]})
+        assert len(result) == 4
+        assert {"a": 1, "b": 3, "c": 4} in result
+        assert {"a": 2, "b": 3, "c": 5} in result
+
+
+class TestComputeRecall:
+    """Tests for compute_recall."""
+
+    def test_perfect_recall(self):
+        """Test recall is 1.0 when neighbors match ground truth exactly."""
+        neighbors = np.array([[0, 1, 2], [3, 4, 5]])
+        groundtruth = np.array([[0, 1, 2], [3, 4, 5]])
+        assert compute_recall(neighbors, groundtruth, k=3) == 1.0
+
+    def test_zero_recall(self):
+        """Test recall is 0.0 when no neighbors match ground truth."""
+        neighbors = np.array([[10, 11, 12], [13, 14, 15]])
+        groundtruth = np.array([[0, 1, 2], [3, 4, 5]])
+        assert compute_recall(neighbors, groundtruth, k=3) == 0.0
+
+    def test_partial_recall(self):
+        """Test recall with partial overlap."""
+        neighbors = np.array([[0, 1, 99]])
+        groundtruth = np.array([[0, 1, 2]])
+        recall = compute_recall(neighbors, groundtruth, k=3)
+        assert abs(recall - 2.0 / 3.0) < 1e-9
+
+    def test_k_smaller_than_groundtruth(self):
+        """Test recall when k is smaller than ground truth columns."""
+        neighbors = np.array([[0, 1]])
+        groundtruth = np.array([[0, 1, 2, 3, 4]])
+        recall = compute_recall(neighbors, groundtruth, k=2)
+        assert recall == 1.0
+
+    def test_k_larger_than_groundtruth(self):
+        """Test recall when k is larger than ground truth columns."""
+        neighbors = np.array([[0, 1, 2, 3, 4]])
+        groundtruth = np.array([[0, 1]])
+        recall = compute_recall(neighbors, groundtruth, k=5)
+        assert recall == 1.0
+
+    def test_empty_groundtruth(self):
+        """Test recall is 0.0 when ground truth has zero columns."""
+        neighbors = np.array([[0, 1, 2]])
+        groundtruth = np.empty((1, 0), dtype=np.int32)
+        assert compute_recall(neighbors, groundtruth, k=3) == 0.0
+
+    def test_empty_queries(self):
+        """Test recall is 0.0 when there are no queries."""
+        neighbors = np.empty((0, 3), dtype=np.int64)
+        groundtruth = np.empty((0, 3), dtype=np.int32)
+        assert compute_recall(neighbors, groundtruth, k=3) == 0.0
+
+    def test_multiple_queries(self):
+        """Test recall averaged across multiple queries."""
+        neighbors = np.array([[0, 1, 2], [3, 4, 99]])
+        groundtruth = np.array([[0, 1, 2], [3, 4, 5]])
+        recall = compute_recall(neighbors, groundtruth, k=3)
+        assert abs(recall - 5.0 / 6.0) < 1e-9
