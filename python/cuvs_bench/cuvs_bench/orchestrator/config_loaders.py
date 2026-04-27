@@ -499,6 +499,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             tune_mode=tune_mode,
             tune_build_params=tune_build_params,
             tune_search_params=tune_search_params,
+            executable_dir=executable_dir,
         )
 
         return benchmark_configs
@@ -516,6 +517,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         tune_mode: bool = False,
         tune_build_params: dict = None,
         tune_search_params: dict = None,
+        executable_dir: Optional[str] = None,
     ) -> List[BenchmarkConfig]:
         """
         Prepare list of BenchmarkConfig from algorithm configurations.
