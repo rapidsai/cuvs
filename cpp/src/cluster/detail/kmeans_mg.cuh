@@ -507,6 +507,9 @@ void fit(const raft::resources& handle,
          raft::host_scalar_view<IndexT> n_iter,
          rmm::device_uvector<char>& workspace)
 {
+  RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 params.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
   const auto& comm    = raft::resource::get_comms(handle);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -738,7 +741,7 @@ void fit(const raft::resources& handle,
              "Too few points and centroids being found is getting 0 cost from "
              "centers\n");
 
-      if (n_iter[0] > 0) {
+      if (n_iter[0] > 1) {
         DataT delta = curClusteringCost / priorClusteringCost;
         if (delta > 1 - params.tol) done = true;
       }
