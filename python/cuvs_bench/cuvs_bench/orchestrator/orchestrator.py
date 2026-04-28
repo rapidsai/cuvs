@@ -20,6 +20,7 @@ from ..backends.registry import (
     get_config_loader,
     list_backends,
 )
+from ..backends.utils import compute_recall
 from .config_loaders import DatasetConfig
 
 
@@ -253,6 +254,19 @@ class BenchmarkOrchestrator:
                     search_threads=search_threads,
                     dry_run=dry_run,
                 )
+
+                # Compute recall for backends that return actual neighbors.
+                # The C++ backend computes recall in the subprocess and returns
+                # empty neighbors, so this is skipped for it.
+                # Note: The recall computation relies on empty neighbors to
+                # distinguish backends that already computed recall.
+                if search_result.neighbors.size > 0:
+                    gt = bench_dataset.groundtruth_neighbors
+                    if gt is not None:
+                        search_result.recall = compute_recall(
+                            search_result.neighbors, gt, count
+                        )
+
                 results.append(search_result)
 
                 if not search_result.success:
@@ -574,6 +588,16 @@ class BenchmarkOrchestrator:
                 search_threads=search_threads,
                 dry_run=dry_run,
             )
+
+            # Compute recall for backends that return actual neighbors.
+            # Note: The recall computation relies on empty neighbors to
+            # distinguish backends that already computed recall.
+            if result.neighbors.size > 0:
+                gt = bench_dataset.groundtruth_neighbors
+                if gt is not None:
+                    result.recall = compute_recall(
+                        result.neighbors, gt, count
+                    )
 
         return result
 
