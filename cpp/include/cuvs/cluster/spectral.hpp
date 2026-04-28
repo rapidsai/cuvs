@@ -84,7 +84,7 @@ struct params {
 void fit_predict(raft::resources const& handle,
                  params config,
                  raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
-                 raft::device_vector_view<int, int> labels);
+                 raft::device_vector_view<uint32_t, int> labels);
 
 /**
  * @brief Perform spectral clustering on a connectivity graph
@@ -122,7 +122,7 @@ void fit_predict(raft::resources const& handle,
 void fit_predict(raft::resources const& handle,
                  params config,
                  raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
-                 raft::device_vector_view<int, int> labels);
+                 raft::device_vector_view<uint32_t, int> labels);
 
 /**
  * @brief Perform spectral clustering on a dense dataset
@@ -155,7 +155,7 @@ void fit_predict(raft::resources const& handle,
 void fit_predict(raft::resources const& handle,
                  params config,
                  raft::device_matrix_view<float, int, raft::row_major> dataset,
-                 raft::device_vector_view<int, int> labels);
+                 raft::device_vector_view<uint32_t, int> labels);
 /**
  * @}
  */

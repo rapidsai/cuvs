@@ -400,10 +400,10 @@ def predict(
         sample_weight_dlpack = cydlpack.dlpack_c(wrap_array(sample_weights))
 
     if labels is None:
-        labels = device_ndarray.empty((x_ai.shape[0]), dtype='int32')
+        labels = device_ndarray.empty((x_ai.shape[0]), dtype='uint32')
 
     labels_ai = wrap_array(labels)
-    _check_input_array(labels_ai, [np.dtype('int32')])
+    _check_input_array(labels_ai, [np.dtype('uint32')])
     cdef cydlpack.DLManagedTensor * labels_dlpack = \
         cydlpack.dlpack_c(labels_ai)
 

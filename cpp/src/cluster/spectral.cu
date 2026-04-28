@@ -13,7 +13,7 @@ namespace cuvs::cluster::spectral {
   void fit_predict(raft::resources const& handle,                                         \
                    params config,                                                         \
                    raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph, \
-                   raft::device_vector_view<int, int> labels)                             \
+                   raft::device_vector_view<uint32_t, int> labels)                             \
   {                                                                                       \
     detail::fit_predict<DataT>(handle, config, connectivity_graph, labels);               \
   }
@@ -26,7 +26,7 @@ CUVS_INST_SPECTRAL(double);
 void fit_predict(raft::resources const& handle,
                  params config,
                  raft::device_matrix_view<float, int, raft::row_major> dataset,
-                 raft::device_vector_view<int, int> labels)
+                 raft::device_vector_view<uint32_t, int> labels)
 {
   detail::fit_predict(handle, config, dataset, labels);
 }

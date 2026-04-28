@@ -64,7 +64,7 @@ void fit_main(raft::resources const& handle,
               raft::device_vector_view<const DataT, IndexT> sample_weights,
               raft::device_matrix_view<DataT, IndexT> centroids,
               raft::host_scalar_view<DataT> inertia,
-              raft::host_scalar_view<IndexT> n_iter,
+              raft::host_scalar_view<int> n_iter,
               rmm::device_uvector<char>& workspace);
 
 #define EXTERN_TEMPLATE_FIT_MAIN(DataT, IndexT)                   \
@@ -75,13 +75,11 @@ void fit_main(raft::resources const& handle,
     raft::device_vector_view<const DataT, IndexT> sample_weights, \
     raft::device_matrix_view<DataT, IndexT> centroids,            \
     raft::host_scalar_view<DataT> inertia,                        \
-    raft::host_scalar_view<IndexT> n_iter,                        \
+    raft::host_scalar_view<int> n_iter,                           \
     rmm::device_uvector<char>& workspace);
 
-EXTERN_TEMPLATE_FIT_MAIN(double, int)
 EXTERN_TEMPLATE_FIT_MAIN(double, int64_t)
 EXTERN_TEMPLATE_FIT_MAIN(float, int64_t)
-EXTERN_TEMPLATE_FIT_MAIN(float, int)
 
 #undef EXTERN_TEMPLATE_FIT_MAIN
 /**
@@ -136,7 +134,7 @@ void fit(raft::resources const& handle,
          std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
          raft::device_matrix_view<DataT, IndexT> centroids,
          raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter);
+         raft::host_scalar_view<int> n_iter);
 
 #define EXTERN_TEMPLATE_FIT(DataT, IndexT)                                      \
   extern template void fit<DataT, IndexT>(                                      \
@@ -146,11 +144,9 @@ void fit(raft::resources const& handle,
     std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
     raft::device_matrix_view<DataT, IndexT> centroids,                          \
     raft::host_scalar_view<DataT> inertia,                                      \
-    raft::host_scalar_view<IndexT> n_iter);
+    raft::host_scalar_view<int> n_iter);
 
-EXTERN_TEMPLATE_FIT(double, int)
 EXTERN_TEMPLATE_FIT(double, int64_t)
-EXTERN_TEMPLATE_FIT(float, int)
 EXTERN_TEMPLATE_FIT(float, int64_t)
 
 #undef EXTERN_TEMPLATE_FIT
@@ -212,7 +208,7 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const DataT, IndexT> X,
              std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
              raft::device_matrix_view<const DataT, IndexT> centroids,
-             raft::device_vector_view<IndexT, IndexT> labels,
+             raft::device_vector_view<uint32_t, IndexT> labels,
              bool normalize_weight,
              raft::host_scalar_view<DataT> inertia);
 
@@ -223,13 +219,11 @@ void predict(raft::resources const& handle,
     raft::device_matrix_view<const DataT, IndexT> X,                            \
     std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
     raft::device_matrix_view<const DataT, IndexT> centroids,                    \
-    raft::device_vector_view<IndexT, IndexT> labels,                            \
+    raft::device_vector_view<uint32_t, IndexT> labels,                          \
     bool normalize_weight,                                                      \
     raft::host_scalar_view<DataT> inertia);
 
-EXTERN_TEMPLATE_PREDICT(double, int)
 EXTERN_TEMPLATE_PREDICT(double, int64_t)
-EXTERN_TEMPLATE_PREDICT(float, int)
 EXTERN_TEMPLATE_PREDICT(float, int64_t)
 
 #undef EXTERN_TEMPLATE_PREDICT

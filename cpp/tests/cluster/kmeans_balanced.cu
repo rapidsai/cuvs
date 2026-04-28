@@ -217,33 +217,33 @@ const auto inputsf_cosine_i32 = get_kmeans_balanced_cosine_inputs<float, int>();
  * First set of tests: no conversion
  */
 
-KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op, false>),
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, false>),
         KmeansBalancedTestFFU32I32,
-        inputsf_i32);
-KB_TEST((KmeansBalancedTest<float, float, int, int, raft::identity_op, true>),
+        inputsf_i64);
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, true>),
         KmeansBalancedTestFFI32I32_SEP,
-        inputsf_i32);
-// KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
+        inputsf_i64);
+// KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestDDU32I32,
 //         inputsd_i32);
 KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, false>),
         KmeansBalancedTestFFU32I64,
         inputsf_i64);
-KB_TEST((KmeansBalancedTest<float, float, int, int64_t, raft::identity_op, true>),
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, true>),
         KmeansBalancedTestFFI32I64_SEP,
         inputsf_i64);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestDDU32I64,
 //         inputsd_i64);
-// KB_TEST((KmeansBalancedTest<float, float, int, int, raft::identity_op>),
+// KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestFFI32I32,
-//         inputsf_i32);
-// KB_TEST((KmeansBalancedTest<float, float, int, int64_t, raft::identity_op>),
+//         inputsf_i64);
+// KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestFFI32I64,
 //         inputsf_i64);
 // KB_TEST((KmeansBalancedTest<float, float, int64_t, int, raft::identity_op>),
 //         KmeansBalancedTestFFI64I32,
-//         inputsf_i32);
+//         inputsf_i64);
 // KB_TEST((KmeansBalancedTest<float, float, int64_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestFFI64I64,
 //         inputsf_i64);
@@ -267,11 +267,11 @@ struct i2f_scaler {
   RAFT_INLINE_FUNCTION auto operator()(const DataT& x) const { return op(x); };
 };
 
-KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, float>, false>),
+KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int64_t, i2f_scaler<int8_t, float>, false>),
         KmeansBalancedTestFI8U32I32,
-        inputsf_i32);
-KB_TEST((KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>, true>),
+        inputsf_i64);
+KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int64_t, i2f_scaler<int8_t, float>, true>),
         KmeansBalancedTestFI8I32I32_SEP,
-        inputsf_i32);
+        inputsf_i64);
 
 }  // namespace cuvs

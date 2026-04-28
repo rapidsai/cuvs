@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,7 +18,7 @@ template <typename DataT>
 void fit_predict(raft::resources const& handle,
                  params config,
                  raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph,
-                 raft::device_vector_view<int, int> labels)
+                 raft::device_vector_view<uint32_t, int> labels)
 {
   int n_samples = connectivity_graph.structure_view().get_n_rows();
   DataT inertia;
@@ -51,12 +51,16 @@ void fit_predict(raft::resources const& handle,
                           config.n_components,
                           raft::resource::get_cuda_stream(handle));
 
+  auto X_i64 = raft::make_device_matrix_view<DataT, int64_t>(
+    embedding_row_major.data_handle(), int64_t(n_samples), int64_t(config.n_components));
+  auto labels_i64 = raft::make_device_vector_view<uint32_t, int64_t>(
+    labels.data_handle(), int64_t(n_samples));
   cuvs::cluster::kmeans::fit_predict(handle,
                                      kmeans_config,
-                                     embedding_row_major.view(),
+                                     raft::make_const_mdspan(X_i64),
                                      std::nullopt,
                                      std::nullopt,
-                                     labels,
+                                     labels_i64,
                                      raft::make_host_scalar_view(&inertia),
                                      raft::make_host_scalar_view(&n_iter));
 }
@@ -64,7 +68,7 @@ void fit_predict(raft::resources const& handle,
 void fit_predict(raft::resources const& handle,
                  params config,
                  raft::device_matrix_view<float, int, raft::row_major> dataset,
-                 raft::device_vector_view<int, int> labels)
+                 raft::device_vector_view<uint32_t, int> labels)
 {
   int n_samples = dataset.extent(0);
 

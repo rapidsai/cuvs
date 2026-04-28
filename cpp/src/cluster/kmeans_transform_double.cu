@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,11 +10,10 @@ namespace cuvs::cluster::kmeans {
 
 void transform(raft::resources const& handle,
                const kmeans::params& params,
-               raft::device_matrix_view<const double, int> X,
-               raft::device_matrix_view<const double, int> centroids,
-               raft::device_matrix_view<double, int> X_new)
-
+               raft::device_matrix_view<const double, int64_t> X,
+               raft::device_matrix_view<const double, int64_t> centroids,
+               raft::device_matrix_view<double, int64_t> X_new)
 {
-  cuvs::cluster::kmeans::transform<double, int>(handle, params, X, centroids, X_new);
+  cuvs::cluster::kmeans::transform<double, int64_t>(handle, params, X, centroids, X_new);
 }
 }  // namespace cuvs::cluster::kmeans

@@ -83,7 +83,7 @@ void _fit(cuvsResources_t res,
     }
 
     T inertia_temp;
-    IdxT n_iter_temp;
+    int n_iter_temp;
 
     auto kmeans_params = convert_params(params);
     cuvs::cluster::kmeans::fit(*res_ptr,
@@ -92,7 +92,7 @@ void _fit(cuvsResources_t res,
                                sample_weight,
                                centroids_view,
                                raft::make_host_scalar_view<T>(&inertia_temp),
-                               raft::make_host_scalar_view<IdxT>(&n_iter_temp));
+                               raft::make_host_scalar_view<int>(&n_iter_temp));
 
     *inertia = inertia_temp;
     *n_iter  = n_iter_temp;
@@ -118,7 +118,7 @@ void _fit(cuvsResources_t res,
       }
     } else {
       T inertia_temp;
-      IdxT n_iter_temp;
+      int n_iter_temp;
 
       std::optional<raft::device_vector_view<T const, IdxT>> sample_weight;
       if (sample_weight_tensor != NULL) {
@@ -133,14 +133,14 @@ void _fit(cuvsResources_t res,
                                  sample_weight,
                                  cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
                                  raft::make_host_scalar_view<T>(&inertia_temp),
-                                 raft::make_host_scalar_view<IdxT>(&n_iter_temp));
+                                 raft::make_host_scalar_view<int>(&n_iter_temp));
       *inertia = inertia_temp;
       *n_iter  = n_iter_temp;
     }
   }
 }
 
-template <typename T, typename IdxT = int32_t, typename LabelsT = int32_t>
+template <typename T, typename IdxT = int64_t, typename LabelsT = uint32_t>
 void _predict(cuvsResources_t res,
               const cuvsKMeansParams& params,
               DLManagedTensor* X_tensor,
