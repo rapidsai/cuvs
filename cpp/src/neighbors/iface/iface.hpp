@@ -33,8 +33,9 @@ inline constexpr bool
 
 /**
  * @brief `make_padded_dataset` rejects a buffer that is already CAGRA row-padded on the device; use
- * a non-owning padded view instead. That happens e.g. for some CUDA managed / UVM buffers exposed
- * as `raft::host_matrix_view`.
+ * a non-owning padded view instead. That applies to true device or managed global memory, not
+ * pinned host: the latter can report a non-null \p devicePointer while
+ * \p type == \p cudaMemoryTypeHost.
  */
 template <typename T, typename Accessor>
 bool host_mds_uses_padded_device_view(
@@ -47,8 +48,9 @@ bool host_mds_uses_padded_device_view(
     mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
   cudaPointerAttributes a{};
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&a, mds.data_handle()));
-  auto* devp = reinterpret_cast<value_type const*>(a.devicePointer);
-  return (devp != nullptr) && (src_stride == required_stride);
+  bool const device_src =
+    (a.type == cudaMemoryTypeDevice) || (a.type == cudaMemoryTypeManaged);
+  return device_src && (src_stride == required_stride);
 }
 
 /**

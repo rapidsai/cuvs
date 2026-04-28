@@ -643,10 +643,11 @@ auto make_padded_dataset_view(const raft::resources& res,
 /**
  * @brief Create an owning device padded dataset by copying (and padding when needed).
  *
- * Accepts device or host source. If the source is device-accessible and already has the
- * required row stride, throws; use make_padded_dataset_view() to get a view instead.
- * Otherwise (host source, or device with wrong stride) allocates a device copy with
- * required stride and copies. Used e.g. by ACE to copy host partition data to device.
+ * Accepts device or host source. If the allocation is actually CUDA device or managed memory
+ * (`cudaPointerAttributes::type`) and the row stride already matches CAGRA padding, throws; use
+ * make_padded_dataset_view() to get a non-owning view instead. Pinned / registered host memory can
+ * report a non-null devicePointer but remains `cudaMemoryTypeHost`; it is not treated as
+ * “already a device tensor” and always follows the copy path.
  *
  * @param[in] res raft resources
  * @param[in] src the source matrix (device or host)
@@ -665,7 +666,11 @@ auto make_padded_dataset(const raft::resources& res, SrcT const& src, uint32_t a
   uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
   cudaPointerAttributes ptr_attrs;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
-  bool device_src = (reinterpret_cast<value_type*>(ptr_attrs.devicePointer) != nullptr);
+  // Do not use devicePointer alone: pinned host allocations can expose a device-accessible
+  // alias (non-null devicePointer) while type remains cudaMemoryTypeHost.
+  // device_src: true for device or managed global memory (not host-registered / pageable).
+  bool const device_src = (ptr_attrs.type == cudaMemoryTypeDevice) ||
+                          (ptr_attrs.type == cudaMemoryTypeManaged);
   if (device_src && src_stride == required_stride) {
     RAFT_EXPECTS(false,
                  "make_padded_dataset: source is device and stride is already correct. "
