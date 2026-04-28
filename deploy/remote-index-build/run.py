@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 """
 OpenSearch GPU Remote Index Build — End-to-End Demo
 ====================================================
 Steps:
-  1. Register a MinIO-backed S3 snapshot repository with OpenSearch
+  1. Register an S3 snapshot repository with OpenSearch
   2. Configure cluster settings to enable GPU-based remote index building
   3. Create a kNN index (Faiss HNSW / L2) with remote build enabled
   4. Ingest 100,000 random 256-dimensional float vectors via the bulk API (8 parallel workers)
   5. Flush + force-merge to consolidate segments and trigger the GPU build
-  6. Poll MinIO for a .faiss file — hard-fail if the GPU build never completes
+  6. Poll S3 for a .faiss file — hard-fail if the GPU build never completes
   7. Execute a kNN search and print the top-10 nearest neighbors
 """
 
@@ -22,44 +19,43 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import boto3
-from botocore.config import Config
 import numpy as np
 import requests
 
 OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://opensearch:9200")
-BUILDER_URL = os.environ.get("BUILDER_URL", "http://remote-index-builder:1025")
-MINIO_URL = os.environ.get("MINIO_URL", "http://minio:9000")
+BUILDER_URL    = os.environ.get("BUILDER_URL",    "http://remote-index-builder:1025")
+
+S3_BUCKET = os.environ["S3_BUCKET"]
+S3_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+# boto3 reads AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY automatically
 
 INDEX_NAME = "gpu-demo"
-DIMENSION = 256  # matches common embedding model output sizes
-NUM_DOCS = 200_000
-BUCKET = "opensearch-vectors"
-REPO_NAME = "vector-repo"
+DIMENSION  = 256    # matches common embedding model output sizes
+NUM_DOCS   = 200_000
+REPO_NAME  = "vector-repo"
 
 session = requests.Session()
 session.headers.update({"Content-Type": "application/json"})
 
 
 def banner(msg: str) -> None:
-    print(f"\n{'─' * 60}")
+    print(f"\n{'─'*60}")
     print(f"  {msg}")
-    print(f"{'─' * 60}")
+    print(f"{'─'*60}")
 
 
 # ── configuration ─────────────────────────────────────────────────────────────
 
-
 def register_repository() -> None:
-    banner(f"Registering S3 repository '{REPO_NAME}' (backed by MinIO)")
+    banner(f"Registering S3 repository '{REPO_NAME}'")
     r = session.put(
         f"{OPENSEARCH_URL}/_snapshot/{REPO_NAME}",
         json={
             "type": "s3",
             "settings": {
-                # endpoint / protocol / path_style_access are client-level settings
-                # configured in opensearch/opensearch.yml, not per-repository settings.
-                "bucket": BUCKET,
+                "bucket":    S3_BUCKET,
                 "base_path": "knn-indexes",
+                "region":    S3_REGION,
             },
         },
     )
@@ -73,8 +69,8 @@ def configure_cluster() -> None:
         f"{OPENSEARCH_URL}/_cluster/settings",
         json={
             "persistent": {
-                "knn.remote_index_build.enabled": True,
-                "knn.remote_index_build.repository": REPO_NAME,
+                "knn.remote_index_build.enabled":          True,
+                "knn.remote_index_build.repository":       REPO_NAME,
                 "knn.remote_index_build.service.endpoint": BUILDER_URL,
             }
         },
@@ -84,7 +80,6 @@ def configure_cluster() -> None:
 
 
 # ── index ─────────────────────────────────────────────────────────────────────
-
 
 def create_index() -> None:
     banner(f"Creating kNN index '{INDEX_NAME}'")
@@ -97,27 +92,25 @@ def create_index() -> None:
         f"{OPENSEARCH_URL}/{INDEX_NAME}",
         json={
             "settings": {
-                "index.knn": True,
-                "index.knn.remote_index_build.enabled": True,
-                # Trigger GPU build for segments >= 1 KB (covers any real dataset)
-                "index.knn.remote_index_build.size.min": "1kb",
-                "number_of_shards": 1,
+                "index.knn":                             True,
+                "index.knn.remote_index_build.enabled":  True,
+                "number_of_shards":   1,
                 "number_of_replicas": 0,
             },
             "mappings": {
                 "properties": {
                     "vector": {
-                        "type": "knn_vector",
+                        "type":      "knn_vector",
                         "dimension": DIMENSION,
                         "method": {
-                            "name": "hnsw",
-                            "engine": "faiss",
+                            "name":       "hnsw",
+                            "engine":     "faiss",
                             "space_type": "l2",
                             "parameters": {"m": 32, "ef_construction": 512},
                         },
                     },
                     "doc_id": {"type": "integer"},
-                    "label": {"type": "keyword"},
+                    "label":  {"type": "keyword"},
                 }
             },
         },
@@ -128,30 +121,17 @@ def create_index() -> None:
 
 # ── ingest ────────────────────────────────────────────────────────────────────
 
-
 def ingest_vectors() -> None:
     batch_size = 500
-    banner(
-        f"Ingesting {NUM_DOCS:,} random {DIMENSION}-dim vectors (bulk API, 8 workers)"
-    )
+    banner(f"Ingesting {NUM_DOCS:,} random {DIMENSION}-dim vectors (bulk API, 8 workers)")
 
     def send_batch(start: int) -> int:
-        end = min(start + batch_size, NUM_DOCS)
+        end  = min(start + batch_size, NUM_DOCS)
         vecs = np.random.randn(end - start, DIMENSION).astype(np.float32)
         lines = []
         for i, vec in enumerate(vecs, start):
-            lines.append(
-                json.dumps({"index": {"_index": INDEX_NAME, "_id": str(i)}})
-            )
-            lines.append(
-                json.dumps(
-                    {
-                        "vector": vec.tolist(),
-                        "doc_id": i,
-                        "label": f"item-{i:04d}",
-                    }
-                )
-            )
+            lines.append(json.dumps({"index": {"_index": INDEX_NAME, "_id": str(i)}}))
+            lines.append(json.dumps({"vector": vec.tolist(), "doc_id": i, "label": f"item-{i:04d}"}))
         payload = ("\n".join(lines) + "\n").encode("utf-8")
         r = session.post(
             f"{OPENSEARCH_URL}/_bulk",
@@ -161,14 +141,8 @@ def ingest_vectors() -> None:
         r.raise_for_status()
         body = r.json()
         if body.get("errors"):
-            failed = [
-                item["index"]["error"]
-                for item in body["items"]
-                if "error" in item.get("index", {})
-            ]
-            print(
-                f"  Warning: {len(failed)} error(s) in batch {start}–{end}: {failed[0]}"
-            )
+            failed = [item["index"]["error"] for item in body["items"] if "error" in item.get("index", {})]
+            print(f"  Warning: {len(failed)} error(s) in batch {start}–{end}: {failed[0]}")
             return (end - start) - len(failed)
         return end - start
 
@@ -188,15 +162,10 @@ def ingest_vectors() -> None:
 
 # ── GPU build ─────────────────────────────────────────────────────────────────
 
-
 def trigger_gpu_build() -> None:
     banner("Triggering GPU index build via force merge")
-    print(
-        "  OpenSearch will upload vectors to MinIO, then call the GPU builder."
-    )
-    print(
-        "  force_merge max_num_segments=1 consolidates all segments into one."
-    )
+    print("  OpenSearch will upload vectors to S3, then call the GPU builder.")
+    print("  force_merge max_num_segments=1 consolidates all segments into one.")
     r = session.post(
         f"{OPENSEARCH_URL}/{INDEX_NAME}/_forcemerge?max_num_segments=1",
         timeout=300,
@@ -205,78 +174,58 @@ def trigger_gpu_build() -> None:
 
 
 def verify_gpu_build(timeout: int = 600) -> None:
-    """Confirm the GPU builder uploaded a .faiss index file to MinIO.
+    """Confirm the GPU builder uploaded a .faiss index file to S3.
 
     The remote-index-builder is the *only* component that writes .faiss files
     back to the S3 bucket, so their presence is definitive proof that the GPU
     build completed.  The kNN stats API does not expose remote build counters
-    in OpenSearch 3.x, so we poll MinIO directly via boto3 instead.
+    in OpenSearch 3.x, so we poll S3 directly via boto3 instead.
 
     Exits with code 1 if no .faiss file appears within `timeout` seconds.
     """
-    banner("Verifying GPU index build (polling MinIO for .faiss files)")
-    print(f"  Bucket  : {BUCKET}/knn-indexes/")
+    banner("Verifying GPU index build (polling S3 for .faiss files)")
+    print(f"  Bucket  : s3://{S3_BUCKET}/knn-indexes/")
     print(f"  Timeout : {timeout}s  (poll interval: 5s)\n")
 
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=MINIO_URL,
-        aws_access_key_id="minioadmin",
-        aws_secret_access_key="minioadmin",
-        region_name="us-east-1",
-        config=Config(signature_version="s3v4"),
-    )
+    # boto3 picks up AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+    # from the environment automatically.
+    s3 = boto3.client("s3", region_name=S3_REGION)
 
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            resp = s3.list_objects_v2(Bucket=BUCKET, Prefix="knn-indexes/")
+            resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix="knn-indexes/")
             faiss_files = [
                 obj["Key"]
                 for obj in resp.get("Contents", [])
                 if obj["Key"].endswith(".faiss")
             ]
             if faiss_files:
-                print(
-                    f"  PASS: GPU build confirmed — {len(faiss_files)} .faiss file(s) in MinIO:"
-                )
+                print(f"  PASS: GPU build confirmed — {len(faiss_files)} .faiss file(s) in S3:")
                 for f in faiss_files:
-                    print(f"    s3://{BUCKET}/{f}")
+                    print(f"    s3://{S3_BUCKET}/{f}")
                 return
 
             remaining = int(deadline - time.time())
             all_keys = [obj["Key"] for obj in resp.get("Contents", [])]
-            print(
-                f"  Waiting for .faiss file...  objects={all_keys}  ({remaining}s left)"
-            )
+            print(f"  Waiting for .faiss file...  objects={all_keys}  ({remaining}s left)")
         except Exception as e:
-            print(f"  MinIO check error: {e}")
+            print(f"  S3 check error: {e}")
         time.sleep(5)
 
-    print(
-        f"\n  FAIL: no GPU-built .faiss index appeared in MinIO after {timeout}s"
-    )
+    print(f"\n  FAIL: no GPU-built .faiss index appeared in S3 after {timeout}s")
     print("\n  Possible causes:")
-    print(
-        "  1. remote-index-builder is unreachable from the OpenSearch container."
-    )
-    print(
-        f"     Verify the container is running and BUILDER_URL={BUILDER_URL} is correct."
-    )
-    print(
-        "  2. Segment size never exceeded index.knn.remote_index_build.size.min."
-    )
+    print("  1. remote-index-builder is unreachable from the OpenSearch container.")
+    print(f"     Verify the container is running and BUILDER_URL={BUILDER_URL} is correct.")
+    print("  2. Segment size never exceeded index.knn.remote_index_build.size.min.")
     print("     Try increasing NUM_DOCS or lowering the size.min threshold.")
-    print(
-        "  3. No GPU is available inside the remote-index-builder container."
-    )
+    print("  3. No GPU is available inside the remote-index-builder container.")
     print("     Check: docker compose logs remote-index-builder")
     print("     Ensure the NVIDIA Container Toolkit is installed on the host.")
     sys.exit(1)
 
 
 # ── search ────────────────────────────────────────────────────────────────────
-
 
 def search_vectors() -> None:
     banner("kNN test search (top-5 nearest neighbors)")
@@ -291,20 +240,17 @@ def search_vectors() -> None:
         },
     )
     r.raise_for_status()
-    hits = r.json()["hits"]["hits"]
+    hits  = r.json()["hits"]["hits"]
     total = r.json()["hits"]["total"]["value"]
 
     print(f"  Index contains {total} documents")
     print(f"  Top {len(hits)} results:")
     for rank, hit in enumerate(hits, 1):
         src = hit["_source"]
-        print(
-            f"    #{rank:>2}  id={hit['_id']:>6}  score={hit['_score']:.6f}  label={src['label']}"
-        )
+        print(f"    #{rank:>2}  id={hit['_id']:>6}  score={hit['_score']:.6f}  label={src['label']}")
 
 
 # ── entrypoint ────────────────────────────────────────────────────────────────
-
 
 def main() -> None:
     print("\n" + "═" * 60)
@@ -312,9 +258,8 @@ def main() -> None:
     print("═" * 60)
     print(f"  OpenSearch : {OPENSEARCH_URL}")
     print(f"  GPU builder: {BUILDER_URL}")
-    print(
-        f"  Vectors    : {NUM_DOCS} × dim={DIMENSION}  engine=faiss  method=hnsw  space=l2"
-    )
+    print(f"  S3 bucket  : s3://{S3_BUCKET}/knn-indexes/  (region: {S3_REGION})")
+    print(f"  Vectors    : {NUM_DOCS} × dim={DIMENSION}  engine=faiss  method=hnsw  space=l2")
 
     register_repository()
     configure_cluster()
@@ -328,7 +273,6 @@ def main() -> None:
     print("  Demo complete!")
     print("═" * 60)
     print(f"\n  OpenSearch is still running at {OPENSEARCH_URL}")
-    print("  MinIO console : http://localhost:9001  (minioadmin / minioadmin)")
     print(f"  GPU builder   : {BUILDER_URL}")
     print()
 
