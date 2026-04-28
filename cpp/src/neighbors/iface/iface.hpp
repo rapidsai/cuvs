@@ -48,8 +48,7 @@ bool host_mds_uses_padded_device_view(
     mds.stride(0) > 0 ? static_cast<uint32_t>(mds.stride(0)) : static_cast<uint32_t>(mds.extent(1));
   cudaPointerAttributes a{};
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&a, mds.data_handle()));
-  bool const device_src =
-    (a.type == cudaMemoryTypeDevice) || (a.type == cudaMemoryTypeManaged);
+  bool const device_src = (a.type == cudaMemoryTypeDevice) || (a.type == cudaMemoryTypeManaged);
   return device_src && (src_stride == required_stride);
 }
 

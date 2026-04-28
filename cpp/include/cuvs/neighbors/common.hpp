@@ -669,8 +669,8 @@ auto make_padded_dataset(const raft::resources& res, SrcT const& src, uint32_t a
   // Do not use devicePointer alone: pinned host allocations can expose a device-accessible
   // alias (non-null devicePointer) while type remains cudaMemoryTypeHost.
   // device_src: true for device or managed global memory (not host-registered / pageable).
-  bool const device_src = (ptr_attrs.type == cudaMemoryTypeDevice) ||
-                          (ptr_attrs.type == cudaMemoryTypeManaged);
+  bool const device_src =
+    (ptr_attrs.type == cudaMemoryTypeDevice) || (ptr_attrs.type == cudaMemoryTypeManaged);
   if (device_src && src_stride == required_stride) {
     RAFT_EXPECTS(false,
                  "make_padded_dataset: source is device and stride is already correct. "
