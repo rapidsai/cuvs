@@ -39,7 +39,7 @@ typedef enum {
 
 /**
  * @brief Hyper-parameters for the kmeans algorithm
- * NB: The inertia_check field is kept for ABI compatibility. Removed in cuvsKMeansParams_v1.
+ * NB: The inertia_check field is kept for ABI compatibility. Removed in cuvsKMeansParams_v06.
  * CalVer for the replacement: 26.08
  */
 struct cuvsKMeansParams {
@@ -123,7 +123,7 @@ struct cuvsKMeansParams {
 /**
  * @brief Hyper-parameters for the kmeans algorithm
  */
- struct cuvsKMeansParams_v1 {
+ struct cuvsKMeansParams_v06 {
   cuvsDistanceType metric;
 
   /**
