@@ -5,6 +5,7 @@
 
 use std::ffi::CString;
 use std::io::{stderr, Write};
+use std::marker::PhantomData;
 use std::path::Path;
 
 use crate::cagra::{IndexParams, SearchParams};
@@ -12,9 +13,37 @@ use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Error, Result};
 use crate::resources::Resources;
 
-/// CAGRA ANN Index
+/// CAGRA ANN Index.
+///
+/// CAGRA's behavior is runtime-dependent: the underlying C++ helper
+/// `make_aligned_dataset()` stores a non-owning view of the dataset when the
+/// input is device-accessible, row-major and 16-byte aligned, and copies
+/// otherwise. Because the non-owning path can't be ruled out at compile time,
+/// the returned index carries the lifetime of the `ManagedTensor` used to
+/// build it, so the borrow checker prevents use-after-free regardless of which
+/// path the C++ side takes.
+///
+/// Indices produced by [`Index::deserialize`] own their data and carry a
+/// `'static` lifetime, since the serialized file is fully read into memory
+/// managed by the C++ library.
+///
+/// # Example
+///
+/// ```no_run
+/// # use cuvs::{ManagedTensor, Resources};
+/// # use cuvs::cagra::{Index, IndexParams};
+/// let res = Resources::new().unwrap();
+/// let arr = ndarray::Array::<f32, _>::zeros((256, 16));
+/// let params = IndexParams::new().unwrap();
+/// let tensor = ManagedTensor::from(&arr);
+/// let index = Index::build(&res, &params, &tensor).unwrap();
+/// // `arr` and `tensor` must outlive `index`.
+/// ```
 #[derive(Debug)]
-pub struct Index(ffi::cuvsCagraIndex_t);
+pub struct Index<'a> {
+    inner: ffi::cuvsCagraIndex_t,
+    _dataset: PhantomData<&'a ()>,
+}
 
 /// Convert a filesystem path into a `CString` suitable for the cuVS C API,
 /// returning `Error::InvalidArgument` instead of panicking for paths that are
@@ -27,42 +56,48 @@ fn path_to_cstring(path: &Path) -> Result<CString> {
         .map_err(|e| Error::InvalidArgument(format!("path contains an interior NUL byte: {e}")))
 }
 
-impl Index {
-    /// Builds a new Index from the dataset for efficient search.
+impl<'a> Index<'a> {
+    /// Creates a new empty FFI index handle.
+    fn create_handle() -> Result<ffi::cuvsCagraIndex_t> {
+        unsafe {
+            let mut index = std::mem::MaybeUninit::<ffi::cuvsCagraIndex_t>::uninit();
+            check_cuvs(ffi::cuvsCagraIndexCreate(index.as_mut_ptr()))?;
+            Ok(index.assume_init())
+        }
+    }
+
+    /// Builds a new CAGRA Index from `dataset`.
+    ///
+    /// The compiler enforces that `dataset` outlives the returned index, so
+    /// the C++ library's internal view (when it takes the non-owning path)
+    /// can never dangle.
     ///
     /// # Arguments
     ///
     /// * `res` - Resources to use
     /// * `params` - Parameters for building the index
     /// * `dataset` - A row-major matrix on either the host or device to index
-    pub fn build<T: Into<ManagedTensor>>(
+    pub fn build(
         res: &Resources,
         params: &IndexParams,
-        dataset: T,
-    ) -> Result<Index> {
-        let dataset: ManagedTensor = dataset.into();
-        let index = Index::new()?;
+        dataset: &'a ManagedTensor,
+    ) -> Result<Index<'a>> {
+        let inner = Self::create_handle()?;
         unsafe {
             check_cuvs(ffi::cuvsCagraBuild(
                 res.0,
                 params.0,
                 dataset.as_ptr(),
-                index.0,
+                inner,
             ))?;
         }
-        Ok(index)
+        Ok(Index {
+            inner,
+            _dataset: PhantomData,
+        })
     }
 
-    /// Creates a new empty index
-    pub fn new() -> Result<Index> {
-        unsafe {
-            let mut index = std::mem::MaybeUninit::<ffi::cuvsCagraIndex_t>::uninit();
-            check_cuvs(ffi::cuvsCagraIndexCreate(index.as_mut_ptr()))?;
-            Ok(Index(index.assume_init()))
-        }
-    }
-
-    /// Perform a Approximate Nearest Neighbors search on the Index
+    /// Perform an Approximate Nearest Neighbors search on the Index.
     ///
     /// # Arguments
     ///
@@ -88,7 +123,7 @@ impl Index {
             check_cuvs(ffi::cuvsCagraSearch(
                 res.0,
                 params.0,
-                self.0,
+                self.inner,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
@@ -117,7 +152,7 @@ impl Index {
             check_cuvs(ffi::cuvsCagraSerialize(
                 res.0,
                 c_filename.as_ptr(),
-                self.0,
+                self.inner,
                 include_dataset,
             ))
         }
@@ -140,12 +175,17 @@ impl Index {
             check_cuvs(ffi::cuvsCagraSerializeToHnswlib(
                 res.0,
                 c_filename.as_ptr(),
-                self.0,
+                self.inner,
             ))
         }
     }
+}
 
+impl Index<'static> {
     /// Load a CAGRA index from file.
+    ///
+    /// The returned index owns the data read from disk, so it has a `'static`
+    /// lifetime and isn't tied to any input `ManagedTensor`.
     ///
     /// Experimental, both the API and the serialization format are subject to change.
     ///
@@ -153,23 +193,22 @@ impl Index {
     ///
     /// * `res` - Resources to use
     /// * `filename` - The path of the file that stores the index
-    pub fn deserialize<P: AsRef<Path>>(res: &Resources, filename: P) -> Result<Index> {
+    pub fn deserialize<P: AsRef<Path>>(res: &Resources, filename: P) -> Result<Index<'static>> {
         let c_filename = path_to_cstring(filename.as_ref())?;
-        let index = Index::new()?;
+        let inner = Self::create_handle()?;
         unsafe {
-            check_cuvs(ffi::cuvsCagraDeserialize(
-                res.0,
-                c_filename.as_ptr(),
-                index.0,
-            ))?;
+            check_cuvs(ffi::cuvsCagraDeserialize(res.0, c_filename.as_ptr(), inner))?;
         }
-        Ok(index)
+        Ok(Index {
+            inner,
+            _dataset: PhantomData,
+        })
     }
 }
 
-impl Drop for Index {
+impl Drop for Index<'_> {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraIndexDestroy(self.0) }) {
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraIndexDestroy(self.inner) }) {
             write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
@@ -179,31 +218,25 @@ impl Drop for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::s;
+    use ndarray::{s, Array2};
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
 
     const N_DATAPOINTS: usize = 256;
     const N_FEATURES: usize = 16;
 
-    /// Build a small random dataset and a CAGRA index over it.
-    fn build_test_index(
-        res: &Resources,
-        build_params: &IndexParams,
-    ) -> (ndarray::Array2<f32>, Index) {
-        let dataset =
-            ndarray::Array::<f32, _>::random((N_DATAPOINTS, N_FEATURES), Uniform::new(0., 1.0));
-        let index = Index::build(res, build_params, &dataset).expect("failed to build cagra index");
-        (dataset, index)
+    /// Build a random host dataset for the CAGRA tests.
+    fn make_dataset() -> Array2<f32> {
+        ndarray::Array::<f32, _>::random((N_DATAPOINTS, N_FEATURES), Uniform::new(0., 1.0))
     }
 
-    /// Search the first `n_queries` rows of `dataset` against `index` and
-    /// assert each query finds itself as the top-1 neighbor. CAGRA search
-    /// requires queries and outputs to live in device memory.
+    /// Run a self-neighbor search against `index` using the first `n_queries`
+    /// rows of `dataset` and assert each query finds itself as its top-1
+    /// neighbor. CAGRA search requires queries and outputs on device memory.
     fn search_and_verify_self_neighbors(
         res: &Resources,
-        index: &Index,
-        dataset: &ndarray::Array2<f32>,
+        index: &Index<'_>,
+        dataset: &Array2<f32>,
         n_queries: usize,
         k: usize,
     ) {
@@ -235,7 +268,10 @@ mod tests {
 
     fn test_cagra(build_params: IndexParams) {
         let res = Resources::new().unwrap();
-        let (dataset, index) = build_test_index(&res, &build_params);
+        let dataset = make_dataset();
+        let tensor = ManagedTensor::from(&dataset);
+        let index =
+            Index::build(&res, &build_params, &tensor).expect("failed to build cagra index");
         search_and_verify_self_neighbors(&res, &index, &dataset, 4, 10);
     }
 
@@ -254,13 +290,16 @@ mod tests {
         test_cagra(build_params);
     }
 
-    /// Test that an index can be searched multiple times without rebuilding.
-    /// This validates that `search()` takes `&self` instead of `self`.
+    /// Validates that an index built against a borrowed `ManagedTensor` can be
+    /// searched multiple times (covers the `search(&self, …)` contract).
     #[test]
     fn test_cagra_multiple_searches() {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::new().unwrap();
-        let (dataset, index) = build_test_index(&res, &build_params);
+        let dataset = make_dataset();
+        let tensor = ManagedTensor::from(&dataset);
+        let index =
+            Index::build(&res, &build_params, &tensor).expect("failed to build cagra index");
 
         for _ in 0..3 {
             search_and_verify_self_neighbors(&res, &index, &dataset, 4, 5);
@@ -271,7 +310,10 @@ mod tests {
     fn test_cagra_serialize_deserialize() {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::new().unwrap();
-        let (dataset, index) = build_test_index(&res, &build_params);
+        let dataset = make_dataset();
+        let tensor = ManagedTensor::from(&dataset);
+        let index =
+            Index::build(&res, &build_params, &tensor).expect("failed to build cagra index");
 
         let filepath = std::env::temp_dir().join("test_cagra_index.bin");
         index
@@ -284,11 +326,10 @@ mod tests {
             "serialized index file should not be empty"
         );
 
-        let loaded_index =
+        // `deserialize` returns `Index<'static>` — the file owns its data, so
+        // it can safely outlive any input `ManagedTensor`.
+        let loaded_index: Index<'static> =
             Index::deserialize(&res, &filepath).expect("failed to deserialize cagra index");
-
-        // The deserialized index should still find each query as its own
-        // nearest neighbor.
         search_and_verify_self_neighbors(&res, &loaded_index, &dataset, 4, 10);
 
         let _ = std::fs::remove_file(&filepath);
@@ -298,7 +339,10 @@ mod tests {
     fn test_cagra_serialize_without_dataset() {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::new().unwrap();
-        let (_dataset, index) = build_test_index(&res, &build_params);
+        let dataset = make_dataset();
+        let tensor = ManagedTensor::from(&dataset);
+        let index =
+            Index::build(&res, &build_params, &tensor).expect("failed to build cagra index");
 
         let filepath = std::env::temp_dir().join("test_cagra_index_no_dataset.bin");
         index
@@ -314,7 +358,10 @@ mod tests {
     fn test_cagra_serialize_to_hnswlib() {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::new().unwrap();
-        let (_dataset, index) = build_test_index(&res, &build_params);
+        let dataset = make_dataset();
+        let tensor = ManagedTensor::from(&dataset);
+        let index =
+            Index::build(&res, &build_params, &tensor).expect("failed to build cagra index");
 
         let filepath = std::env::temp_dir().join("test_cagra_index_hnsw.bin");
         index
@@ -339,7 +386,10 @@ mod tests {
     fn test_cagra_serialize_rejects_interior_nul() {
         let res = Resources::new().unwrap();
         let build_params = IndexParams::new().unwrap();
-        let (_dataset, index) = build_test_index(&res, &build_params);
+        let dataset = make_dataset();
+        let tensor = ManagedTensor::from(&dataset);
+        let index =
+            Index::build(&res, &build_params, &tensor).expect("failed to build cagra index");
 
         // `PathBuf::from` on Unix preserves arbitrary bytes, so we can embed a
         // NUL byte in the path and confirm the helper rejects it.

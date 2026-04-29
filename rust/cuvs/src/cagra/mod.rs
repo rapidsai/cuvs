@@ -27,7 +27,8 @@
 //!
 //!     // build the cagra index
 //!     let build_params = IndexParams::new()?;
-//!     let index = Index::build(&res, &build_params, &dataset)?;
+//!     let tensor = ManagedTensor::from(&dataset);
+//!     let index = Index::build(&res, &build_params, &tensor)?;
 //!     println!(
 //!         "Indexed {}x{} datapoints into cagra index",
 //!         n_datapoints, n_features
@@ -76,12 +77,14 @@
 //!
 //!     // Build an index (using some dataset)
 //!     let build_params = IndexParams::new()?;
-//!     // let index = Index::build(&res, &build_params, &dataset)?;
+//!     // let tensor = ManagedTensor::from(&dataset);
+//!     // let index = Index::build(&res, &build_params, &tensor)?;
 //!
 //!     // Save the index to disk (including the dataset)
 //!     // index.serialize(&res, "/path/to/index.bin", true)?;
 //!
-//!     // Later, load the index from disk
+//!     // Later, load the index from disk. `deserialize` returns
+//!     // `Index<'static>` because the loaded index owns its data.
 //!     let loaded_index = Index::deserialize(&res, "/path/to/index.bin")?;
 //!
 //!     // The loaded index can be used for search just like the original
