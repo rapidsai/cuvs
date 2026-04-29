@@ -1746,7 +1746,7 @@ void build(raft::resources const& res,
     raft::make_host_matrix<int, int64_t, raft::row_major>(dataset.extent(0), extended_graph_degree);
 
   // When the graph will be a complete graph, output it without NND process for better performance.
-  if (static_cast<size_t>(dataset.extent(0) - 1) == graph_degree) {
+  if (static_cast<size_t>(dataset.extent(0) - 1) == graph_degree && (!params.return_distances)) {
     auto graph = idx.graph().data_handle();
 #pragma omp parallel for
     for (size_t i = 0; i < static_cast<size_t>(dataset.extent(0)); i++) {
