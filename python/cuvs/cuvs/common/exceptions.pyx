@@ -14,9 +14,8 @@ class CuvsException(Exception):
 def get_last_error_text():
     """ returns the last error description from the cuvs c-api """
     cdef const char* c_err = cuvsGetLastErrorText()
-    if c_err is NULL:
-        return
-    return c_err.decode("utf8", "ignore")
+    if c_err is not NULL:
+        return c_err.decode("utf8", "ignore")
 
 
 def check_cuvs(status: cuvsError_t):
