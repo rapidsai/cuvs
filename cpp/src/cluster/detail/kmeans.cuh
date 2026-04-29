@@ -590,23 +590,16 @@ void kmeans_fit(
     streaming_batch_size = static_cast<IndexT>(n_samples);
   }
 
+  constexpr bool data_on_device = raft::is_device_mdspan_v<decltype(X)>;
+
   const DataT* weight_ptr =
     sample_weight.has_value() ? sample_weight.value().data_handle() : nullptr;
-  DataT wt_sum           = sample_weight.has_value() ? weightSum(handle, sample_weight.value())
-                                                     : static_cast<DataT>(n_samples);
-  const DataT wt_rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
-  const bool needs_wt_rescale =
-    sample_weight.has_value() && std::abs(wt_sum - static_cast<DataT>(n_samples)) > wt_rel_tol;
-  if (needs_wt_rescale) {
-    RAFT_LOG_DEBUG(
-      "[Warning!] KMeans: normalizing the user provided sample weight to sum up to %zu samples",
-      static_cast<size_t>(n_samples));
-  }
+
+  auto d_wt_sum = raft::make_device_scalar<DataT>(handle, static_cast<DataT>(n_samples));
+  if (sample_weight.has_value()) { weightSum(handle, sample_weight.value(), d_wt_sum.view()); }
 
   rmm::device_uvector<char> local_workspace(0, stream);
   rmm::device_uvector<char>& ws = workspace.has_value() ? workspace->get() : local_workspace;
-
-  constexpr bool data_on_device = raft::is_device_mdspan_v<decltype(X)>;
 
   if (data_on_device && streaming_batch_size != static_cast<IndexT>(n_samples)) {
     RAFT_LOG_WARN(
@@ -713,21 +706,21 @@ void kmeans_fit(
     raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1});
   }
 
-  // Copies and optionally rescales `wt_data` into `batch_weights_buf`. When
-  // `wt_data == nullptr`, the buffer is assumed to have been pre-filled with 1
-  // for the unweighted case.
+  // Copies and rescales `wt_data` into `batch_weights_buf` so that weights
+  // are normalized to sum to n_samples.
+  const DataT* d_wt_sum_ptr  = d_wt_sum.data_handle();
   auto prepare_batch_weights = [&](const DataT* wt_data, IndexT cur_batch_size) {
     if (wt_data != nullptr) {
       raft::copy(batch_weights_buf.data_handle(), wt_data, cur_batch_size, stream);
-      if (needs_wt_rescale) {
-        auto bw = raft::make_device_vector_view<DataT, IndexT>(batch_weights_buf.data_handle(),
-                                                               cur_batch_size);
-        raft::linalg::map(handle,
-                          bw,
-                          raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
-                                           raft::div_const_op<DataT>{wt_sum}),
-                          raft::make_const_mdspan(bw));
-      }
+      auto bw = raft::make_device_vector_view<DataT, IndexT>(batch_weights_buf.data_handle(),
+                                                             cur_batch_size);
+      raft::linalg::map(
+        handle,
+        bw,
+        [n_samples, d_wt_sum_ptr] __device__(DataT w) {
+          return w * static_cast<DataT>(n_samples) / *d_wt_sum_ptr;
+        },
+        raft::make_const_mdspan(bw));
     }
     return raft::make_device_vector_view<const DataT, IndexT>(batch_weights_buf.data_handle(),
                                                               cur_batch_size);
@@ -1036,19 +1029,17 @@ void kmeans_predict(raft::resources const& handle,
   else
     raft::matrix::fill(handle, weight.view(), DataT(1));
 
-  if (normalize_weight) {
-    DataT wt_sum        = weightSum(handle, raft::make_const_mdspan(weight.view()));
-    const DataT rel_tol = n_samples * std::numeric_limits<DataT>::epsilon();
-    if (std::abs(wt_sum - n_samples) > rel_tol) {
-      RAFT_LOG_DEBUG(
-        "[Warning!] KMeans: normalizing the user provided sample weight to sum up to %zu samples",
-        static_cast<size_t>(n_samples));
-      raft::linalg::map(handle,
-                        weight.view(),
-                        raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
-                                         raft::div_const_op<DataT>{wt_sum}),
-                        raft::make_const_mdspan(weight.view()));
-    }
+  if (normalize_weight && sample_weight.has_value()) {
+    auto d_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});
+    weightSum(handle, raft::make_const_mdspan(weight.view()), d_wt_sum.view());
+    const DataT* d_wt_sum_ptr = d_wt_sum.data_handle();
+    raft::linalg::map(
+      handle,
+      weight.view(),
+      [n_samples, d_wt_sum_ptr] __device__(DataT w) {
+        return w * static_cast<DataT>(n_samples) / *d_wt_sum_ptr;
+      },
+      raft::make_const_mdspan(weight.view()));
   }
 
   auto minClusterAndDistance =

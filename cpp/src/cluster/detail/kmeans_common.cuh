@@ -134,35 +134,30 @@ void countLabels(raft::resources const& handle,
 }
 
 /**
- * @brief Compute the sum of sample weights.
+ * @brief Compute the sum of sample weights into a device scalar.
  *
- * Device-accessible mdspans are reduced on device via mapThenSumReduce;
- * host mdspans are summed on the host.
- *
- * @return Sum of weights.
+ * Device-accessible mdspans are reduced on device. Host mdspans are summed on the host.
  */
 template <typename DataT, typename IndexT, typename Accessor>
-DataT weightSum(
+void weightSum(
   raft::resources const& handle,
-  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor> weight)
+  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor> weight,
+  raft::device_scalar_view<DataT> d_wt_sum)
 {
   auto n_samples = weight.extent(0);
+  auto stream    = raft::resource::get_cuda_stream(handle);
 
-  DataT wt_sum = DataT{0};
   if constexpr (raft::is_device_mdspan_v<decltype(weight)>) {
-    auto stream   = raft::resource::get_cuda_stream(handle);
-    auto d_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});
     raft::linalg::mapThenSumReduce(
       d_wt_sum.data_handle(), n_samples, raft::identity_op{}, stream, weight.data_handle());
-    raft::copy(&wt_sum, d_wt_sum.data_handle(), 1, stream);
-    raft::resource::sync_stream(handle);
   } else {
+    DataT wt_sum = DataT{0};
     for (IndexT i = 0; i < n_samples; ++i) {
       wt_sum += weight(i);
     }
+    RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
+    raft::copy(d_wt_sum.data_handle(), &wt_sum, 1, stream);
   }
-  RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
-  return wt_sum;
 }
 
 template <typename IndexT>
