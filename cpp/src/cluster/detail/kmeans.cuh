@@ -565,6 +565,9 @@ void kmeans_fit(
   raft::host_scalar_view<IndexT> n_iter,
   std::optional<std::reference_wrapper<rmm::device_uvector<char>>> workspace)
 {
+  RAFT_EXPECTS(pams.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 pams.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit");
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
@@ -1001,6 +1004,9 @@ void kmeans_predict(raft::resources const& handle,
                     bool normalize_weight,
                     raft::host_scalar_view<DataT> inertia)
 {
+  RAFT_EXPECTS(pams.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 pams.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_predict");
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
@@ -1150,6 +1156,9 @@ void kmeans_transform(raft::resources const& handle,
                       raft::device_matrix_view<const DataT, IndexT> centroids,
                       raft::device_matrix_view<DataT, IndexT> X_new)
 {
+  RAFT_EXPECTS(pams.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 pams.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_transform");
   raft::default_logger().set_level(pams.verbosity);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);

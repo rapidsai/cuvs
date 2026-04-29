@@ -5,7 +5,6 @@
 #pragma once
 
 #include "../../distance/distance.cuh"
-#include "../../distance/fused_distance_nn.cuh"
 #include <cstdint>
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
