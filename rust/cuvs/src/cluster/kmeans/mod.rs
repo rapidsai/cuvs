@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -68,7 +68,7 @@ pub fn fit(
             Some(tensor) => tensor.as_ptr(),
             None => std::ptr::null_mut(),
         };
-        check_cuvs(ffi::cuvsKMeansFit(
+        check_cuvs(ffi::cuvsKMeansFit_v2(
             res.0,
             params.0,
             x.as_ptr(),
@@ -108,7 +108,7 @@ pub fn predict(
             Some(tensor) => tensor.as_ptr(),
             None => std::ptr::null_mut(),
         };
-        check_cuvs(ffi::cuvsKMeansPredict(
+        check_cuvs(ffi::cuvsKMeansPredict_v2(
             res.0,
             params.0,
             x.as_ptr(),
