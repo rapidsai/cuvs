@@ -475,87 +475,11 @@ extern "C" __global__ void search_kernel(
 
 **Note**: The kernel uses generic function templates (`compute_distance<T>` and `apply_filter<IdxT>`) that are resolved at link time. The specific implementations (euclidean vs inner_product, filter_none vs filter_bitset) are provided by the fragments that get linked together.
 
-### Step 5: Create `.cpp.in` Template Files for Embedding
+### Step 5: Create Fragment Tags for Embedding
 
-The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime. Fragment tags are used to help the
-linker find and include the relevant fatbins at build time.
+Fragment tags register the compiled fatbins so they can be loaded at runtime. They are used to help the linker find and include the relevant fatbins at build time. When calling `generate_jit_lto_kernels()`, we pass a `FRAGMENT_TAG_FORMAT` argument, which constructs the tag type from the given placeholders, and a `FRAGMENT_TAG_HEADER_FILES` argument, which specifies one or more header files that the fragment tags come from. The JIT+LTO system will then automatically generate and compile a `.cpp` file that registers the fragment using the provided tag.
 
-**Important**: In the `.cpp.in` files (which become `.cpp` files), we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `StaticFatbinFragmentEntry` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
-
-#### `compute_distance_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_compute_distance<tag_@distance_name@, tag_@type_abbrev@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
-```
-
-#### `filter_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_filter<tag_@filter_name@, tag_@idx_abbrev@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
-```
-
-#### `search_kernel_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_search<tag_@type_abbrev@, tag_@out_abbrev@, tag_@idx_abbrev@, @optimized@, @veclen@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
-```
+**Important**: When requesting fragments from the `AlgorithmPlanner`, we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `add_static_fragment` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
 
 ### Step 6: Create the Planner
 
