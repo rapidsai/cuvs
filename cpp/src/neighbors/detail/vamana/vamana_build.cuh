@@ -41,8 +41,9 @@ namespace cuvs::neighbors::vamana::detail {
  * @{
  */
 
-static const int blockD    = 32;
-static const int maxBlocks = 10000;
+static const int blockD        = 32;
+static const int blockD_greedy = 128;  // 4 warps per block, each warp processes one query
+static const int maxBlocks     = 10000;
 
 // generate random permutation of inserts - TODO do this on GPU / faster
 template <typename IdxT>
@@ -158,7 +159,7 @@ void batched_insert_vamana(
                                     raft::resource::get_large_workspace_resource_ref(res),
                                     raft::make_extents<int64_t>(max_batchsize, visited_size));
 
-  // Assign memory to query_list structures and initialize
+  // Assign memory to query_list structures and initiailize
   init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(query_list,
                                                                     visited_ids.data_handle(),
                                                                     visited_dists.data_handle(),
@@ -186,10 +187,12 @@ void batched_insert_vamana(
   int sort_smem_size = 0;
   SELECT_SORT_SMEM_SIZE(degree, visited_size);  // Sets sort_smem_size based on dataset
 
-  // Total dynamic shared memory used by GreedySearch
+  // GreedySearch: per-warp shared memory (4 warps): coords, neighbor_array, candidate_queue
+  const int coords_size      = (dim + align_padding) * sizeof(T);
+  const int neighbor_size    = degree * sizeof(IdxT);
+  const int queue_size_bytes = queue_size * sizeof(DistPair<IdxT, accT>);
   int search_smem_total_size =
-    static_cast<int>((dim + align_padding) * sizeof(T) +  // visited_size * sizeof(Node<accT>) +
-                     degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
+    static_cast<int>(4 * ((coords_size + neighbor_size + queue_size_bytes + 15) & ~15));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
   int prune_smem_total_size = (degree + visited_size) * sizeof(float) +  // Occlusion list
@@ -235,18 +238,16 @@ void batched_insert_vamana(
     RAFT_LOG_DEBUG("Starting batch of inserts indices_start:%d, batch_size:%d", start, step_size);
 
     int num_blocks = min(maxBlocks, step_size);
+    int num_blocks_greedy = min(maxBlocks, (step_size + 3) / 4);
 
     // Copy ids to be inserted for this batch
-    raft::copy(
-      res,
-      raft::make_device_vector_view(query_ids.data_handle(), int64_t(step_size)),
-      raft::make_host_vector_view<const IdxT>(insert_order.data() + start, int64_t(step_size)));
+    raft::copy(query_ids.data_handle(), &insert_order.data()[start], step_size, stream);
     set_query_ids<IdxT, accT><<<num_blocks, blockD, 0, stream>>>(
       query_list_ptr.data_handle(), query_ids.data_handle(), step_size);
 
     // Call greedy search to get candidates for every vector being inserted
     GreedySearchKernel<T, accT, IdxT, Accessor>
-      <<<num_blocks, blockD, search_smem_total_size, stream>>>(d_graph.view(),
+      <<<num_blocks_greedy, blockD_greedy, search_smem_total_size, stream>>>(d_graph.view(),
                                                                dataset,
                                                                query_list_ptr.data_handle(),
                                                                step_size,
@@ -545,7 +546,7 @@ void batched_insert_vamana(
          batch_prune);
 #endif
 
-  raft::copy(res, graph, d_graph.view());
+  raft::copy(graph.data_handle(), d_graph.data_handle(), d_graph.size(), stream);
 
   RAFT_CHECK_CUDA(stream);
 }
@@ -607,10 +608,10 @@ index<T, IdxT> build(
       res,
       codebook_params.pq_encoding_table.size());  // logically a 2D matrix with dimensions
                                                   // pq_codebook_size x dim_per_subspace * pq_dim
-    raft::copy(res,
-               pq_encoding_table_device_vec.view(),
-               raft::make_host_vector_view<const float>(codebook_params.pq_encoding_table.data(),
-                                                        pq_encoding_table_device_vec.extent(0)));
+    raft::copy(pq_encoding_table_device_vec.data_handle(),
+               codebook_params.pq_encoding_table.data(),
+               codebook_params.pq_encoding_table.size(),
+               raft::resource::get_cuda_stream(res));
     int dim_per_subspace = dim / pq_dim;
     auto pq_codebook =
       raft::make_device_matrix<float, uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
@@ -634,12 +635,10 @@ index<T, IdxT> build(
 
     // prepare rotation matrix
     auto rotation_matrix_device = raft::make_device_matrix<float, int64_t>(res, dim, dim);
-    raft::copy(
-      res,
-      raft::make_device_vector_view(rotation_matrix_device.data_handle(),
-                                    int64_t(codebook_params.rotation_matrix.size())),
-      raft::make_host_vector_view<const float>(codebook_params.rotation_matrix.data(),
-                                               int64_t(codebook_params.rotation_matrix.size())));
+    raft::copy(rotation_matrix_device.data_handle(),
+               codebook_params.rotation_matrix.data(),
+               codebook_params.rotation_matrix.size(),
+               raft::resource::get_cuda_stream(res));
 
     // process in batches
     const uint32_t n_rows = dataset.extent(0);

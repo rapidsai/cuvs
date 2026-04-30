@@ -231,6 +231,22 @@ __device__ bool check_duplicate(const Node<accT>* pq, const int size, Node<accT>
     return true;
 }
 
+// Warp-level version: each warp scans its own pq with laneId and stride 32
+template <typename accT>
+__device__ bool check_duplicate_warp(
+  const Node<accT>* pq, const int size, Node<accT> new_node, int laneId)
+{
+  bool found = false;
+  for (int i = laneId; i < size; i += 32) {
+    if (pq[i].nodeid == new_node.nodeid) {
+      found = true;
+      break;
+    }
+  }
+  unsigned mask = raft::ballot(found);
+  return (mask != 0);
+}
+
 /*
   Enqueuing a input value into parallel queue with tracker
 */
@@ -291,6 +307,59 @@ __inline__ __device__ void parallel_pq_max_enqueue(Node<SUMTYPE>* pq,
   __syncthreads();
 }
 
+// Warp-level version: no __syncthreads, uses laneId for single-thread ops and warp shuffle
+template <typename SUMTYPE>
+__inline__ __device__ void parallel_pq_max_enqueue_warp(Node<SUMTYPE>* pq,
+                                                        int* size,
+                                                        const int pq_size,
+                                                        Node<SUMTYPE> input_data,
+                                                        SUMTYPE* cur_max_val,
+                                                        int* max_idx,
+                                                        int laneId)
+{
+  if (*size < pq_size) {
+    if (laneId == 0) {
+      pq[*size].distance = input_data.distance;
+      pq[*size].nodeid   = input_data.nodeid;
+      *size              = *size + 1;
+      if (input_data.distance > (*cur_max_val)) {
+        *cur_max_val = input_data.distance;
+        *max_idx     = *size - 1;
+      }
+    }
+    return;
+  } else {
+    if (input_data.distance >= (*cur_max_val)) { return; }
+    if (laneId == 0) {
+      pq[*max_idx].distance = input_data.distance;
+      pq[*max_idx].nodeid   = input_data.nodeid;
+    }
+    int idx         = 0;
+    SUMTYPE max_val = pq[0].distance;
+
+    for (int i = laneId; i < pq_size; i += 32) {
+      if (pq[i].distance > max_val) {
+        max_val = pq[i].distance;
+        idx     = i;
+      }
+    }
+
+    for (int offset = 16; offset > 0; offset /= 2) {
+      SUMTYPE new_max_val = raft::shfl_up(max_val, offset);
+      int new_idx         = raft::shfl_up(idx, offset);
+      if (new_max_val > max_val) {
+        max_val = new_max_val;
+        idx     = new_idx;
+      }
+    }
+
+    if (laneId == 31) {
+      *max_idx     = idx;
+      *cur_max_val = max_val;
+    }
+  }
+}
+
 /*
   Compute the distances between the source vector and all nodes in the neighbor_array and enqueue
   them in the PQ
@@ -299,7 +368,7 @@ template <typename T, typename accT, typename IdxT>
 __forceinline__ __device__ void enqueue_all_neighbors(int num_neighbors,
                                                       Point<T, accT>* query_vec,
                                                       const T* vec_ptr,
-                                                      int* neighbor_array,
+                                                      IdxT* neighbor_array,
                                                       PriorityQueue<IdxT, accT>& heap_queue,
                                                       int dim,
                                                       cuvs::distance::DistanceType metric)
@@ -311,6 +380,24 @@ __forceinline__ __device__ void enqueue_all_neighbors(int num_neighbors,
     __syncthreads();
     if (threadIdx.x == 0) { heap_queue.insert_back(dist_out, neighbor_array[i]); }
     __syncthreads();
+  }
+}
+
+// Warp-level version: lane 0 does insert_back, no __syncthreads
+template <typename T, typename accT, typename IdxT>
+__forceinline__ __device__ void enqueue_all_neighbors_warp(int num_neighbors,
+                                                          Point<T, accT>* query_vec,
+                                                          const T* vec_ptr,
+                                                          IdxT* neighbor_array,
+                                                          PriorityQueue<IdxT, accT>& heap_queue,
+                                                          int dim,
+                                                          cuvs::distance::DistanceType metric,
+                                                          int laneId)
+{
+  for (int i = 0; i < num_neighbors; i++) {
+    accT dist_out = dist<T, accT>(
+      query_vec->coords, &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)], dim, metric);
+    if (laneId == 0) { heap_queue.insert_back(dist_out, neighbor_array[i]); }
   }
 }
 

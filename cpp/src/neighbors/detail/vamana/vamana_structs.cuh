@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,6 +20,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/util/warp_primitives.cuh>
 
 #include <cuvs/distance/distance.hpp>
 
@@ -226,6 +227,16 @@ struct QueryCandidates {
     size = 0;
   }
 
+  // Warp-level reset: uses laneId and stride 32, no block sync
+  __device__ void reset_warp(int laneId)
+  {
+    for (int i = laneId; i < maxSize; i += 32) {
+      ids[i]   = raft::upper_bound<IdxT>();
+      dists[i] = raft::upper_bound<accT>();
+    }
+    if (laneId == 0) { size = 0; }
+  }
+
   // Checks current list to see if a node as previously been visited
   __inline__ __device__ bool check_visited(IdxT target, accT dist)
   {
@@ -246,6 +257,26 @@ struct QueryCandidates {
         size++;
       }
       __syncthreads();
+    }
+    return found;
+  }
+
+  // Warp-level check_visited: no __syncthreads, uses laneId and warp ballot
+  __inline__ __device__ bool check_visited_warp(IdxT target, accT dist_val, int laneId)
+  {
+    bool my_found = false;
+    for (int i = laneId; i < size; i += 32) {
+      if (ids[i] == target) {
+        my_found = true;
+        break;
+      }
+    }
+    unsigned mask = raft::ballot(my_found);
+    bool found    = (mask != 0);
+    if (!found && size < maxSize && laneId == 0) {
+      ids[size]   = target;
+      dists[size] = dist_val;
+      size++;
     }
     return found;
   }
@@ -361,6 +392,21 @@ __device__ void update_shared_point(Point<T, accT>* shared_point,
   }
 }
 
+// Warp-level: uses laneId and stride 32 for coordinate copy
+template <typename T, typename accT>
+__device__ void update_shared_point_warp(Point<T, accT>* shared_point,
+                                         const T* data_ptr,
+                                         int id,
+                                         int dim,
+                                         int laneId)
+{
+  shared_point->id  = id;
+  shared_point->Dim = dim;
+  for (size_t i = laneId; i < dim; i += 32) {
+    shared_point->coords[i] = data_ptr[(size_t)(id) * (size_t)(dim) + i];
+  }
+}
+
 // Update the graph from the results of the query list (or reverse edge list)
 template <typename accT, typename IdxT = uint32_t>
 __global__ void write_graph_edges_kernel(raft::device_matrix_view<IdxT, int64_t> graph,
@@ -391,6 +437,7 @@ __global__ void create_reverse_edge_list(void* query_list_ptr,
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries;
        i += blockDim.x * gridDim.x) {
+    int read_idx   = i * query_list[i].maxSize;
     int cand_count = query_list[i + 1].size - query_list[i].size;
 
     for (int j = 0; j < cand_count; j++) {
