@@ -492,18 +492,20 @@ struct tag_d{};
 struct tag_ui{};
 struct tag_l{};
 
-struct tag_metric_euclidean{};
+struct tag_metric_euclidean {};
+struct tag_metric_inner_product {};
 
-struct tag_filter_none{};
+struct tag_filter_none {};
+struct tag_filter_bitset {};
 
 template <typename DataTag, typename OutTag, typename IdxTag, bool Optimized, int Veclen>
-struct fragment_tag_search{};
+struct fragment_tag_search {};
 
 template <typename DistanceTag, typename DataTag>
-struct fragment_tag_compute_distance{};
+struct fragment_tag_compute_distance {};
 
 template <typename FilterTag, typename IndexTag>
-struct fragment_tag_filter{};
+struct fragment_tag_filter {};
 ```
 
 ### Step 6: Create the Planner
@@ -591,11 +593,13 @@ constexpr auto get_out_type_tag() {
 template <DistanceType Metric>
 constexpr auto get_metric_tag() {
   if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
+  if constexpr (Metric == DistanceType::InnerProduct) return tag_metric_inner_product{};
 }
 
 template <FilterType Filter>
 constexpr auto get_filter_tag() {
   if constexpr (Filter == FilterType::None) return tag_filter_none{};
+  if constexpr (Filter == FilterType::Bitset) return tag_filter_bitset{};
 }
 
 template <typename T, typename OutT, typename IdxT, DistanceType Metric, FilterType Filter, bool Optimized, int Veclen>
