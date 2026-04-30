@@ -516,7 +516,7 @@ The planner is responsible for:
 3. Requesting the fragments from the fragment database
 4. Linking them together to create a launchable kernel
 
-**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `.cpp.in` registration files. Any mismatch will result in runtime linking failures.
+**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `FRAGMENT_TAG_FORMAT` argument. Any mismatch will result in runtime linking failures.
 
 **`search_planner.hpp`**:
 
@@ -708,7 +708,7 @@ struct tag_l {};  // int64_t
 
 These tags are used in `registerAlgorithm<>()` to create a hierarchical organization of fragments.
 
-**Why Tags Instead of Real Types?**: Using tags instead of real types (like `float`, `__half`) in the `.cpp.in` files avoids including heavy headers that define those types. This significantly improves compilation times since the generated `.cpp` files don't need to pull in CUDA headers, type definitions, or other dependencies. Tags are lightweight compile-time identifiers that don't require any runtime overhead or additional includes.
+**Why Tags Instead of Real Types?**: Using tags instead of real types (like `float`, `__half`) in the `FRAGMENT_TAG_FORMAT` argument avoids including heavy headers that define those types. This significantly improves compilation times since the generated `.cpp` files don't need to pull in CUDA headers, type definitions, or other dependencies. Tags are lightweight compile-time identifiers that don't require any runtime overhead or additional includes.
 
 ### AlgorithmLauncher
 
