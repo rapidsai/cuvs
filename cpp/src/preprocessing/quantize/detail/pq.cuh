@@ -428,6 +428,20 @@ void inverse_transform(
     quantizer.params_quantizer.use_vq
       ? vq_centers_opt.value()
       : raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0);
+
+  // VQ-label preflight: when use_vq is true the kernel reads vq_labels(row) per
+  // row and falls back to label 0 when vq_labels is absent. Without this check every vector can be
+  // reconstructed with vq_label 0.
+  if (quantizer.params_quantizer.use_vq) {
+    RAFT_EXPECTS(vq_labels.has_value(),
+                 "When params.use_vq is true, vq_labels must be provided to inverse_transform()");
+    RAFT_EXPECTS(vq_labels.value().extent(0) == codes.extent(0),
+                 "When params.use_vq is true, vq_labels must have the same number of rows as "
+                 "codes (got %zu vs %zu)",
+                 size_t(vq_labels.value().extent(0)),
+                 size_t(codes.extent(0)));
+  }
+
   reconstruct_vectors<T, T, idx_t, label_t>(res,
                                             quantizer.params_quantizer,
                                             codes,
