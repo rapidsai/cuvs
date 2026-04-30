@@ -230,14 +230,25 @@ quantizer<MathT> build_view(
 
   if (params.use_vq) {
     RAFT_EXPECTS(vq_centers.has_value(), "vq_centers must be provided when use_vq=true");
+    RAFT_EXPECTS(params.vq_n_centers > 0,
+                 "params.vq_n_centers must be > 0 when use_vq=true (got %u)",
+                 params.vq_n_centers);
+    RAFT_EXPECTS(vq_centers.value().data_handle() != nullptr,
+                 "vq_centers data pointer must be non-null when use_vq=true");
     RAFT_EXPECTS(vq_centers.value().extent(0) == params.vq_n_centers,
-                 "vq_centers must have vq_n_centers rows, got %u",
+                 "vq_centers must have shape [vq_n_centers, dim] (vq_n_centers=%u), got "
+                 "extent(0)=%u",
+                 params.vq_n_centers,
                  vq_centers.value().extent(0));
+    return {
+      params,
+      vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(pq_centers, vq_centers)}};
+  } else {
+    if (vq_centers.has_value()) {
+      RAFT_LOG_WARN("vq_centers will be ignored since params.use_vq=false");
+    }
+    return {params, vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(pq_centers)}};
   }
-
-  return {
-    params,
-    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(pq_centers, vq_centers)}};
 }
 
 template <typename T, typename QuantI, typename AccessorType>
@@ -260,9 +271,19 @@ void transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
+  // Honor params.use_vq as the source of truth: when it is false, pass an
+  // empty view to the kernel regardless of what the codebooks contain
+  // (the kernel gates VQ subtraction on vq_centers.empty(), so an empty view
+  // guarantees no residual VQ is applied even if a misconfigured quantizer
+  // somehow carries non-empty centers). Conversely, when it is true the
+  // codebook must be present.
   auto vq_centers_opt = quantizer.codebooks.vq_code_book();
-  auto vq_centers     = vq_centers_opt.value_or(
-    raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0));
+  RAFT_EXPECTS(!quantizer.params_quantizer.use_vq || vq_centers_opt.has_value(),
+               "Quantizer has params.use_vq=true but no VQ codebook");
+  auto vq_centers =
+    quantizer.params_quantizer.use_vq
+      ? vq_centers_opt.value()
+      : raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0);
   auto pq_centers     = quantizer.codebooks.pq_code_book();
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
   if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
@@ -399,9 +420,14 @@ void inverse_transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
+  // Honor params.use_vq strictly (see the matching block in transform()).
   auto vq_centers_opt = quantizer.codebooks.vq_code_book();
-  auto vq_centers     = vq_centers_opt.value_or(
-    raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0));
+  RAFT_EXPECTS(!quantizer.params_quantizer.use_vq || vq_centers_opt.has_value(),
+               "Quantizer has params.use_vq=true but no VQ codebook");
+  auto vq_centers =
+    quantizer.params_quantizer.use_vq
+      ? vq_centers_opt.value()
+      : raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0);
   reconstruct_vectors<T, T, idx_t, label_t>(res,
                                             quantizer.params_quantizer,
                                             codes,
