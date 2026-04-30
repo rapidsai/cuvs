@@ -723,7 +723,7 @@ The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
 
 2. **Fragment Granularity**: Balance between too many small fragments (overhead) and too few large fragments (less reuse). Device functions that are reused across multiple kernels are good candidates for separate fragments.
 
-3. **Naming Consistency**: Ensure fragment keys match exactly between registration and lookup. Use helper functions to construct keys consistently.
+3. **Naming Consistency**: Ensure fragment tags match exactly between registration and lookup. Use helper functions to construct tags consistently.
 
 4. **Type Safety**: Use registration tags to provide compile-time type safety and avoid runtime string mismatches.
 
