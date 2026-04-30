@@ -481,6 +481,31 @@ Fragment tags register the compiled fatbins so they can be loaded at runtime. Th
 
 **Important**: When requesting fragments from the `AlgorithmPlanner`, we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `add_static_fragment` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
 
+**`registration_tags.hpp`**
+
+```cpp
+#pragma once
+
+struct tag_h{};
+struct tag_f{};
+struct tag_d{};
+struct tag_ui{};
+struct tag_l{};
+
+struct tag_metric_euclidean{};
+
+struct tag_filter_none{};
+
+template <typename DataTag, typename OutTag, typename IdxTag, bool Optimized, int Veclen>
+struct fragment_tag_search{};
+
+template <typename DistanceTag, typename DataTag>
+struct fragment_tag_compute_distance{};
+
+template <typename FilterTag, typename IndexTag>
+struct fragment_tag_filter{};
+```
+
 ### Step 6: Create the Planner
 
 The planner is responsible for:
