@@ -17,7 +17,7 @@ class vpq_codebooks_owning : public vpq_codebooks_iface<MathT> {
   using math_type   = MathT;
   using matrix_type = raft::device_matrix<math_type, uint32_t, raft::row_major>;
 
-  // PQ codebook is required; VQ codebook is optional and defaults to absent
+  // PQ codebook is required; VQ codebook is optional and defaults to absent.
   // When VQ is not provided, vq_code_book() returns std::nullopt.
   explicit vpq_codebooks_owning(matrix_type&& pq_code_book,
                                 std::optional<matrix_type>&& vq_code_book = std::nullopt)
@@ -61,8 +61,8 @@ class vpq_codebooks_view : public vpq_codebooks_iface<MathT> {
   using math_type = MathT;
   using view_type = raft::device_matrix_view<const math_type, uint32_t, raft::row_major>;
 
-  // PQ codebook view is required; VQ codebook view is optional and defaults to absent.
-  // When VQ is not provided, vq_code_book() returns std::nullopt.
+  // PQ codebook view is required; VQ codebook view is optional and defaults to
+  // absent. When VQ is not provided, vq_code_book() returns std::nullopt.
   explicit vpq_codebooks_view(view_type pq_code_book_view,
                               std::optional<view_type> vq_code_book_view = std::nullopt)
     : pq_code_book_view_{pq_code_book_view}, vq_code_book_view_{vq_code_book_view}
