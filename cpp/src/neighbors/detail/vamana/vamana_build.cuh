@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "../../../preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 #include "../../../sparse/neighbors/cross_component_nn.cuh"
 #include "../../detail/ann_utils.cuh"
 #include "greedy_search.cuh"
@@ -645,12 +644,8 @@ index<T, IdxT> build(
     // process in batches
     const uint32_t n_rows = dataset.extent(0);
 
-    auto quantizer = cuvs::preprocessing::quantize::pq::quantizer<float>(
-      pq_params,
-      cuvs::preprocessing::quantize::pq::vpq_codebooks<float>{
-        std::make_unique<cuvs::preprocessing::quantize::pq::vpq_codebooks_owning<float>>(
-          raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 0, 0),
-          std::move(pq_codebook))});
+    auto quantizer = cuvs::preprocessing::quantize::pq::build(
+      res, pq_params, raft::make_const_mdspan(pq_codebook.view()));
     const int64_t codes_rowlen = cuvs::preprocessing::quantize::pq::get_quantized_dim(pq_params);
     quantized_vectors =
       raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, n_rows, codes_rowlen);

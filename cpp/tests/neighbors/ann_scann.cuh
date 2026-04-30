@@ -4,7 +4,6 @@
  */
 #pragma once
 
-#include "../../src/preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include <cuvs/neighbors/common.hpp>
@@ -183,11 +182,11 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
       handle_, idx.centers().extent(0), idx.centers().extent(1));
     raft::copy(
       vq_codebook.data_handle(), idx.centers().data_handle(), idx.centers().size(), stream_);
-    cuvs::preprocessing::quantize::pq::quantizer<float> quantizer{
-      pq_params,
-      cuvs::preprocessing::quantize::pq::vpq_codebooks<float>{
-        std::make_unique<cuvs::preprocessing::quantize::pq::vpq_codebooks_owning<float>>(
-          std::move(vq_codebook), std::move(pq_codebook_copy))}};
+    auto quantizer =
+      cuvs::preprocessing::quantize::pq::build(handle_,
+                                               pq_params,
+                                               raft::make_const_mdspan(pq_codebook_copy.view()),
+                                               raft::make_const_mdspan(vq_codebook.view()));
 
     auto quantized_residuals_device =
       raft::make_device_matrix<uint8_t, IdxT>(handle_, ps.num_db_vecs, num_subspaces);
