@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -28,6 +28,8 @@ if(NOT _rapids_branch)
   )
 endif()
 
+set(rapids-cmake-repo KyleFromNVIDIA/rapids-cmake)
+set(rapids-cmake-branch update-cccl)
 if(NOT rapids-cmake-version)
   set(rapids-cmake-version "${RAPIDS_VERSION_MAJOR_MINOR}")
 endif()
