@@ -744,7 +744,7 @@ The `generate_jit_lto_kernels()` function (defined in `cmake/modules/generate_ji
 - `MATRIX_JSON_FILE`: Path to the JSON matrix file
 - `KERNEL_INPUT_FILE`: Path to the `.cu.in` template
 - `FRAGMENT_TAG_FORMAT`: Format string for fragment tag type (using `@variable@` syntax)
-- `FRAGMENT_TAG_HEADER_FILES`: List of header files that provide the fragment tag types (should be enclosed in `<`/`>`)
+- `FRAGMENT_TAG_HEADER_FILES`: List of header files that provide the fragment tag types (can be enclosed in `<`/`>` or `"`/`"`, automatically enclosed in quotes if quotes and brackets are not provided)
 - `OUTPUT_DIRECTORY`: Where generated files are placed
 - `KERNEL_LINK_LIBRARIES`: Interface library with compilation settings
 
