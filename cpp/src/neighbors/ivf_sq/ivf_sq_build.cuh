@@ -548,6 +548,8 @@ inline auto build(
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half>, "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
+  RAFT_EXPECTS(params.kmeans_trainset_fraction > 0.0 && params.kmeans_trainset_fraction <= 1.0,
+               "kmeans_trainset_fraction must be in (0, 1]");
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
                "Cosine metric requires more than one dim");
 

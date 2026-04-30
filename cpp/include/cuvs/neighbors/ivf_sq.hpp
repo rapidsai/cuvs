@@ -130,12 +130,16 @@ using list_data = ivf::list<list_spec, SizeT, CodeT, IdxT>;
  * In the IVF-SQ index, a database vector is first assigned to the nearest cluster center
  * using an inverted file (IVF) structure, and then compressed using scalar quantization (SQ).
  *
- * Scalar quantization independently maps each dimension of the vector to a fixed-width integer
- * code. For 8-bit quantization (uint8_t), each floating-point component is linearly mapped to
- * an integer in [0, 255] using learned per-dimension minimum (`sq_vmin`) and range (`sq_delta`)
- * values:
+ * Scalar quantization independently maps each dimension of the per-cluster residual (the
+ * input vector minus its assigned centroid) to a fixed-width integer code. For 8-bit
+ * quantization (uint8_t), each residual component r_i = x_i - centroid_i is linearly
+ * mapped to an integer in [0, 255] using learned per-dimension minimum (`sq_vmin`) and
+ * step-size (`sq_delta`) values:
  *
- *   code_i = round((x_i - vmin_i) / delta_i * 255)
+ *   code_i = clamp(round((r_i - vmin_i) / delta_i), 0, 255)
+ *
+ * where delta_i is the per-level step size (range divided by 255), so the corresponding
+ * reconstruction is x_i ≈ centroid_i + vmin_i + code_i * delta_i.
  *
  * This provides a compact representation (1 byte per dimension) while preserving the relative
  * distances between vectors with high fidelity, offering a good trade-off between index size,
