@@ -69,7 +69,9 @@ void serialize(const raft::resources& res,
   raft::serialize_scalar(res, os, dataset.pq_n_centers());
   raft::serialize_scalar(res, os, dataset.pq_len());
   raft::serialize_scalar(res, os, dataset.encoded_row_length());
-  raft::serialize_mdspan(res, os, dataset.vq_code_book());
+  auto vq_view = dataset.vq_code_book().value_or(
+    raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0));
+  raft::serialize_mdspan(res, os, vq_view);
   raft::serialize_mdspan(res, os, dataset.pq_code_book());
   raft::serialize_mdspan(res, os, dataset.data.view());
 }
@@ -160,10 +162,12 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, pq_code_book.view());
   raft::deserialize_mdspan(res, is, data.view());
 
+  std::optional<raft::device_matrix<MathT, uint32_t, raft::row_major>> vq_code_book_opt;
+  if (vq_n_centers > 0) { vq_code_book_opt = std::move(vq_code_book); }
   return std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>>(
     cuvs::preprocessing::quantize::pq::vpq_codebooks<MathT>{
       std::make_unique<cuvs::preprocessing::quantize::pq::vpq_codebooks_owning<MathT>>(
-        std::move(vq_code_book), std::move(pq_code_book))},
+        std::move(pq_code_book), std::move(vq_code_book_opt))},
     std::move(data));
 }
 

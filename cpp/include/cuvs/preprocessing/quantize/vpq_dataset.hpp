@@ -7,6 +7,8 @@
 
 #include <cuvs/neighbors/common.hpp>
 
+#include <optional>
+
 namespace cuvs::preprocessing::quantize::pq {
 
 /**
@@ -21,18 +23,29 @@ class vpq_codebooks_iface {
 
   virtual ~vpq_codebooks_iface() = default;
 
-  /** VQ codebook [vq_n_centers, dim]. */
+  /**
+   * VQ codebook [vq_n_centers, dim].
+   *
+   * Returns std::nullopt when no VQ codebook is configured (i.e. PQ-only,
+   * use_vq=false). Callers that need to forward a `device_matrix_view`
+   * downstream should materialize an empty 0x0 view themselves on nullopt.
+   */
   [[nodiscard]] virtual auto vq_code_book() const noexcept
-    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> = 0;
+    -> std::optional<raft::device_matrix_view<const math_type, uint32_t, raft::row_major>> = 0;
 
   /** PQ codebook [pq_n_centers (× pq_dim for subspaces), pq_len]. */
   [[nodiscard]] virtual auto pq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> = 0;
 
-  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t { return vq_code_book().extent(1); }
+  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t
+  {
+    auto vq = vq_code_book();
+    return vq.has_value() ? vq->extent(1) : 0;
+  }
   [[nodiscard]] virtual auto vq_n_centers() const noexcept -> uint32_t
   {
-    return vq_code_book().extent(0);
+    auto vq = vq_code_book();
+    return vq.has_value() ? vq->extent(0) : 0;
   }
   [[nodiscard]] virtual auto pq_len() const noexcept -> uint32_t
   {
@@ -89,8 +102,11 @@ class vpq_codebooks {
   vpq_codebooks& operator=(vpq_codebooks&&)      = default;
   ~vpq_codebooks()                               = default;
 
+  /**
+   * VQ codebook view, or std::nullopt when no VQ codebook is configured.
+   */
   [[nodiscard]] auto vq_code_book() const noexcept
-    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
+    -> std::optional<raft::device_matrix_view<const math_type, uint32_t, raft::row_major>>
   {
     return impl_->vq_code_book();
   }
@@ -150,8 +166,11 @@ class vpq_dataset : public cuvs::neighbors::dataset<IdxT> {
   [[nodiscard]] uint32_t dim() const noexcept override { return codebooks.dim(); }
   [[nodiscard]] bool is_owning() const noexcept override { return true; }
 
+  /**
+   * VQ codebook view, or std::nullopt when no VQ codebook is configured.
+   */
   [[nodiscard]] auto vq_code_book() const noexcept
-    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
+    -> std::optional<raft::device_matrix_view<const math_type, uint32_t, raft::row_major>>
   {
     return codebooks.vq_code_book();
   }

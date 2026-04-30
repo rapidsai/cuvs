@@ -7,16 +7,21 @@
 
 #include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 
+#include <optional>
+
 namespace cuvs::preprocessing::quantize::pq {
 
 template <typename MathT>
 class vpq_codebooks_owning : public vpq_codebooks_iface<MathT> {
  public:
-  using math_type = MathT;
+  using math_type   = MathT;
+  using matrix_type = raft::device_matrix<math_type, uint32_t, raft::row_major>;
 
-  vpq_codebooks_owning(raft::device_matrix<math_type, uint32_t, raft::row_major>&& vq_code_book,
-                       raft::device_matrix<math_type, uint32_t, raft::row_major>&& pq_code_book)
-    : vq_code_book_{std::move(vq_code_book)}, pq_code_book_{std::move(pq_code_book)}
+  // PQ codebook is required; VQ codebook is optional and defaults to absent
+  // When VQ is not provided, vq_code_book() returns std::nullopt.
+  explicit vpq_codebooks_owning(matrix_type&& pq_code_book,
+                                std::optional<matrix_type>&& vq_code_book = std::nullopt)
+    : pq_code_book_{std::move(pq_code_book)}, vq_code_book_{std::move(vq_code_book)}
   {
   }
 
@@ -27,15 +32,10 @@ class vpq_codebooks_owning : public vpq_codebooks_iface<MathT> {
   ~vpq_codebooks_owning() override                             = default;
 
   [[nodiscard]] auto vq_code_book() const noexcept
-    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> override
+    -> std::optional<raft::device_matrix_view<const math_type, uint32_t, raft::row_major>> override
   {
-    return vq_code_book_.view();
-  }
-
-  [[nodiscard]] auto vq_code_book() noexcept
-    -> raft::device_matrix_view<math_type, uint32_t, raft::row_major>
-  {
-    return vq_code_book_.view();
+    if (!vq_code_book_.has_value()) { return std::nullopt; }
+    return vq_code_book_.value().view();
   }
 
   [[nodiscard]] auto pq_code_book() const noexcept
@@ -51,19 +51,21 @@ class vpq_codebooks_owning : public vpq_codebooks_iface<MathT> {
   }
 
  private:
-  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book_;
-  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book_;
+  matrix_type pq_code_book_;
+  std::optional<matrix_type> vq_code_book_;
 };
 
 template <typename MathT>
 class vpq_codebooks_view : public vpq_codebooks_iface<MathT> {
  public:
   using math_type = MathT;
+  using view_type = raft::device_matrix_view<const math_type, uint32_t, raft::row_major>;
 
-  vpq_codebooks_view(
-    raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book_view,
-    raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book_view)
-    : vq_code_book_view_{vq_code_book_view}, pq_code_book_view_{pq_code_book_view}
+  // PQ codebook view is required; VQ codebook view is optional and defaults to absent.
+  // When VQ is not provided, vq_code_book() returns std::nullopt.
+  explicit vpq_codebooks_view(view_type pq_code_book_view,
+                              std::optional<view_type> vq_code_book_view = std::nullopt)
+    : pq_code_book_view_{pq_code_book_view}, vq_code_book_view_{vq_code_book_view}
   {
   }
 
@@ -73,20 +75,18 @@ class vpq_codebooks_view : public vpq_codebooks_iface<MathT> {
   vpq_codebooks_view& operator=(vpq_codebooks_view&&)      = default;
   ~vpq_codebooks_view() override                           = default;
 
-  [[nodiscard]] auto vq_code_book() const noexcept
-    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> override
+  [[nodiscard]] auto vq_code_book() const noexcept -> std::optional<view_type> override
   {
     return vq_code_book_view_;
   }
-  [[nodiscard]] auto pq_code_book() const noexcept
-    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> override
+  [[nodiscard]] auto pq_code_book() const noexcept -> view_type override
   {
     return pq_code_book_view_;
   }
 
  private:
-  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book_view_;
-  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book_view_;
+  view_type pq_code_book_view_;
+  std::optional<view_type> vq_code_book_view_;
 };
 
 }  // namespace cuvs::preprocessing::quantize::pq

@@ -154,9 +154,11 @@ quantizer<MathT> build(
     pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
       res, vpq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   }
+  std::optional<raft::device_matrix<MathT, uint32_t, raft::row_major>> vq_code_book_opt;
+  if (filled_params.use_vq) { vq_code_book_opt = std::move(vq_code_book); }
   return {filled_params,
           vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(
-            std::move(vq_code_book), std::move(pq_code_book))}};
+            std::move(pq_code_book), std::move(vq_code_book_opt))}};
 }
 
 template <typename MathT>
@@ -195,12 +197,9 @@ quantizer<MathT> build_view(
                  vq_centers.value().extent(0));
   }
 
-  auto vq_view =
-    vq_centers.has_value()
-      ? vq_centers.value()
-      : raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
-  return {params,
-          vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(vq_view, pq_centers)}};
+  return {
+    params,
+    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(pq_centers, vq_centers)}};
 }
 
 template <typename T, typename QuantI, typename AccessorType>
@@ -223,7 +222,9 @@ void transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
-  auto vq_centers     = quantizer.codebooks.vq_code_book();
+  auto vq_centers_opt = quantizer.codebooks.vq_code_book();
+  auto vq_centers     = vq_centers_opt.value_or(
+    raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0));
   auto pq_centers     = quantizer.codebooks.pq_code_book();
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
   if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
@@ -360,11 +361,14 @@ void inverse_transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
+  auto vq_centers_opt = quantizer.codebooks.vq_code_book();
+  auto vq_centers     = vq_centers_opt.value_or(
+    raft::make_device_matrix_view<const T, uint32_t, raft::row_major>(nullptr, 0, 0));
   reconstruct_vectors<T, T, idx_t, label_t>(res,
                                             quantizer.params_quantizer,
                                             codes,
                                             quantizer.codebooks.pq_code_book(),
-                                            quantizer.codebooks.vq_code_book(),
+                                            vq_centers,
                                             vq_labels,
                                             out,
                                             quantizer.params_quantizer.use_subspaces);
@@ -374,21 +378,26 @@ template <typename NewMathT, typename OldMathT>
 auto vpq_convert_math_type(const raft::resources& res, const vpq_codebooks<OldMathT>& src)
   -> vpq_codebooks<NewMathT>
 {
-  auto vq_src = src.vq_code_book();
-  auto pq_src = src.pq_code_book();
+  auto vq_src_opt = src.vq_code_book();
+  auto pq_src     = src.pq_code_book();
 
-  auto vq_new = raft::make_device_matrix<NewMathT, uint32_t, raft::row_major>(
-    res, vq_src.extent(0), vq_src.extent(1));
   auto pq_new = raft::make_device_matrix<NewMathT, uint32_t, raft::row_major>(
     res, pq_src.extent(0), pq_src.extent(1));
-
-  raft::linalg::map(
-    res, vq_new.view(), cuvs::spatial::knn::detail::utils::mapping<NewMathT>{}, vq_src);
   raft::linalg::map(
     res, pq_new.view(), cuvs::spatial::knn::detail::utils::mapping<NewMathT>{}, pq_src);
 
+  std::optional<raft::device_matrix<NewMathT, uint32_t, raft::row_major>> vq_new_opt;
+  if (vq_src_opt.has_value()) {
+    auto vq_src = vq_src_opt.value();
+    auto vq_new = raft::make_device_matrix<NewMathT, uint32_t, raft::row_major>(
+      res, vq_src.extent(0), vq_src.extent(1));
+    raft::linalg::map(
+      res, vq_new.view(), cuvs::spatial::knn::detail::utils::mapping<NewMathT>{}, vq_src);
+    vq_new_opt = std::move(vq_new);
+  }
+
   return vpq_codebooks<NewMathT>{
-    std::make_unique<vpq_codebooks_owning<NewMathT>>(std::move(vq_new), std::move(pq_new))};
+    std::make_unique<vpq_codebooks_owning<NewMathT>>(std::move(pq_new), std::move(vq_new_opt))};
 }
 
 template <typename DatasetT, typename MathT, typename IdxT>
@@ -419,8 +428,8 @@ auto vpq_build(const raft::resources& res,
     true);
 
   return vpq_dataset<MathT, IdxT>{
-    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(std::move(vq_code_book),
-                                                                       std::move(pq_code_book))},
+    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(std::move(pq_code_book),
+                                                                       std::move(vq_code_book))},
     std::move(codes)};
 }
 

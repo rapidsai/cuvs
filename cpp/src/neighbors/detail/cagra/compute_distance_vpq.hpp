@@ -50,10 +50,11 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                    cuvs::distance::DistanceType metric,
                    const DistanceT* dataset_norms = nullptr) -> host_type
   {
+    auto vq_view = dataset.vq_code_book();
     return init_(params,
                  dataset.data.data_handle(),
                  dataset.encoded_row_length(),
-                 dataset.vq_code_book().data_handle(),
+                 vq_view.has_value() ? vq_view->data_handle() : nullptr,
                  dataset.pq_code_book().data_handle(),
                  IndexT(dataset.n_rows()),
                  dataset.dim());
