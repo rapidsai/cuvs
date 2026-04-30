@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,14 +8,14 @@ use crate::error::{check_cuvs, Result};
 use std::fmt;
 use std::io::{stderr, Write};
 
-pub struct Params(pub ffi::cuvsKMeansParams_v2_t);
+pub struct Params(pub ffi::cuvsKMeansParams_t);
 
 impl Params {
     /// Returns a new Params
     pub fn new() -> Result<Params> {
         unsafe {
-            let mut params = std::mem::MaybeUninit::<ffi::cuvsKMeansParams_v2_t>::uninit();
-            check_cuvs(ffi::cuvsKMeansParamsCreate_v2(params.as_mut_ptr()))?;
+            let mut params = std::mem::MaybeUninit::<ffi::cuvsKMeansParams_t>::uninit();
+            check_cuvs(ffi::cuvsKMeansParamsCreate(params.as_mut_ptr()))?;
             Ok(Params(params.assume_init()))
         }
     }
@@ -115,13 +115,9 @@ impl fmt::Debug for Params {
 
 impl Drop for Params {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsKMeansParamsDestroy_v2(self.0) }) {
-            write!(
-                stderr(),
-                "failed to call cuvsKMeansParamsDestroy_v2 {:?}",
-                e
-            )
-            .expect("failed to write to stderr");
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsKMeansParamsDestroy(self.0) }) {
+            write!(stderr(), "failed to call cuvsKMeansParamsDestroy {:?}", e)
+                .expect("failed to write to stderr");
         }
     }
 }

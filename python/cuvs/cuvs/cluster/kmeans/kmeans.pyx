@@ -100,13 +100,13 @@ cdef class KMeansParams:
         For hierarchical k-means , defines the number of training iterations
     """
 
-    cdef cuvsKMeansParams_v2* params
+    cdef cuvsKMeansParams* params
 
     def __cinit__(self):
-        cuvsKMeansParamsCreate_v2(&self.params)
+        cuvsKMeansParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsKMeansParamsDestroy_v2(self.params))
+        check_cuvs(cuvsKMeansParamsDestroy(self.params))
 
     def __init__(self, *,
                  metric=None,
@@ -338,7 +338,7 @@ def fit(
             cydlpack.dlpack_c(wrap_array(sample_weights))
 
     with cuda_interruptible():
-        check_cuvs(cuvsKMeansFit_v2(
+        check_cuvs(cuvsKMeansFit(
             res,
             params.params,
             x_dlpack,
@@ -431,7 +431,7 @@ def predict(
     cdef double inertia = 0
 
     with cuda_interruptible():
-        check_cuvs(cuvsKMeansPredict_v2(
+        check_cuvs(cuvsKMeansPredict(
             res,
             params.params,
             x_dlpack,
