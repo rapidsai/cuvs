@@ -718,7 +718,8 @@ The `generate_jit_lto_kernels()` function (defined in `cmake/modules/generate_ji
 - `NAME_FORMAT`: Format string for generated kernel names (using `@variable@` syntax)
 - `MATRIX_JSON_FILE`: Path to the JSON matrix file
 - `KERNEL_INPUT_FILE`: Path to the `.cu.in` template
-- `EMBEDDED_INPUT_FILE`: Path to the `.cpp.in` template
+- `FRAGMENT_TAG_FORMAT`: Format for fragment tag with placeholders from matrix file
+- `FRAGMENT_TAG_HEADER_FILES`: List of header files that provide the fragment tag types (should be enclosed in `<`/`>`)
 - `OUTPUT_DIRECTORY`: Where generated files are placed
 - `KERNEL_LINK_LIBRARIES`: Interface library with compilation settings
 
@@ -738,7 +739,7 @@ The process involves:
 1. Separating device functions into fragment headers
 2. Creating JSON matrices defining parameter combinations
 3. Creating `.cu.in` templates for explicit instantiations
-4. Creating `.cpp.in` templates for fatbin registration
+4. Creating fragment tag types for fatbin registration
 5. Creating a planner to manage fragment dependencies
 6. Integrating the planner into the code path to launch kernels
 7. **Adding CMake integration** to generate and compile all fragment variants
