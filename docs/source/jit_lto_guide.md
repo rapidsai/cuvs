@@ -708,8 +708,6 @@ struct tag_l {};  // int64_t
 
 These tags are used in `registerAlgorithm<>()` to create a hierarchical organization of fragments.
 
-**Why Tags Instead of Real Types?**: Using tags instead of real types (like `float`, `__half`) in the `FRAGMENT_TAG_FORMAT` argument avoids including heavy headers that define those types. This significantly improves compilation times since the generated `.cpp` files don't need to pull in CUDA headers, type definitions, or other dependencies. Tags are lightweight compile-time identifiers that don't require any runtime overhead or additional includes.
-
 ### AlgorithmLauncher
 
 The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
