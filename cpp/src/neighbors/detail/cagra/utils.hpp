@@ -302,7 +302,7 @@ void copy_with_padding(
 }
 
 /**
- * Iterate a 2D mdspan in row-batches with overlapping prefetch/writeback.
+ * Iterate a 2D mdspan in row-batches with overlapping copies and kernel work.
  *
  * The strategy is selected at compile time from
  * `AccessorInputView::is_device_accessible`:
@@ -310,8 +310,22 @@ void copy_with_padding(
  *     No buffering, no arithmetic on `input_view_.data_handle()`.
  *   * copy_device: each batch is staged through an internal device buffer
  *     via `cudaMemcpyAsync`. When `host_writeback` is set, every returned
- *     batch is copied back to `input_view_` on destruction (and earlier
- *     batches incrementally as iteration progresses).
+ *     batch is copied back to `input_view_`; flushing happens lazily during
+ *     subsequent `prefetch_next()` calls and the destructor flushes the tail.
+ *
+ * Concurrency model (copy_device):
+ *   * Two device buffers, ping-ponged across iterations.
+ *   * One non-res_ stream `copy_stream_` carries both D2H writebacks and
+ *     H2D prefetches in FIFO order.
+ *   * `next_view()` drains `copy_stream_` so the caller sees a fully-staged
+ *     slot; it does NOT touch res_'s stream.
+ *   * `prefetch_next()` queues D2H of the previous-iter batch and H2D of the
+ *     next-iter batch on `copy_stream_` (slots different from the running
+ *     kernel's slot), then ends with `sync_stream(res_)`. The host stall on
+ *     that final sync overlaps with both the kernel on `res_` and the copies
+ *     on `copy_stream_` -- so for pageable host the host-bound
+ *     pageable->pinned phase of `cudaMemcpyAsync` also overlaps with the
+ *     kernel.
  *
  * Usage:
  * ```
@@ -319,8 +333,9 @@ void copy_with_padding(
  *   res, input_view, batch_size, host_writeback, initialize);
  * for (;;) {
  *   auto device_view = view.next_view();
- *   if (device_view.extent(0) == 0) { break; }   // sole stop condition
- *   // ... call next_view() exactly once per batch; never in the loop condition
+ *   if (device_view.extent(0) == 0) { break; }                // sole stop condition
+ *   kernel<<<..., raft::resource::get_cuda_stream(res)>>>(device_view);
+ *   view.prefetch_next();   // pair with next_view(); copies overlap with kernel
  * }
  * ```
  *
@@ -330,17 +345,21 @@ void copy_with_padding(
  *     at compile time from the accessor; `batch_load_iterator` takes
  *     `(T const*, n_rows, row_width)` and decides at runtime via
  *     `cudaPointerGetAttributes` (also forces a copy for HMM/ATS sources).
- *   * API: this class exposes a single-pass `next_view()` that returns an
- *     mdspan; `batch_load_iterator` is an STL iterator (begin/end,
- *     operator++/--, random access) that yields a `batch` wrapping a
- *     `T const*`.
+ *   * API shape: both classes split iteration from prefetch -- here it's
+ *     `next_view()` + `prefetch_next()`; in `batch_load_iterator` it's
+ *     `operator*` + `prefetch_next_batch()`. `batch_load_iterator` is also
+ *     an STL iterator with begin/end and random access; this class is
+ *     single-pass and returns mdspans directly.
  *   * Mutability: returned views here are mutable T* and support host
  *     writeback on destruction; `batch_load_iterator` is read-only and never
  *     copies back.
- *   * Pipelining: copy_device uses 2-3 device buffers and dedicated prefetch
- *     and writeback streams for true overlap; `batch_load_iterator` uses
- *     1-2 buffers and exposes a synchronous `prefetch_next_batch()` that the
- *     caller must interleave with kernels on a separate stream.
+ *   * Pipelining: copy_device uses 2 device buffers and a single non-res_
+ *     stream that carries both directions; cross-iter ordering of D2H and
+ *     H2D on the same slot is enforced by FIFO, and overlap with the kernel
+ *     is achieved by issuing copies *before* the trailing `sync_stream(res_)`
+ *     in `prefetch_next()`. `batch_load_iterator` uses 1-2 buffers, never
+ *     writes back, and the caller is responsible for using a separate stream
+ *     for kernels in order to overlap with `prefetch_next_batch()`.
  *
  * @tparam T                 element type
  * @tparam IdxT              index type for the input mdspan extents
@@ -391,9 +410,9 @@ class batched_device_view {
     : res_(res),
       input_view_(input_view),
       batch_size_(batch_size),
-      offset_(0),
-      batch_id_(-2),
-      num_buffers_(2),
+      batch_id_(-1),
+      next_prefetched_(false),
+      last_flushed_batch_id_(-1),
       host_writeback_(host_writeback),
       initialize_(initialize)
   {
@@ -409,7 +428,11 @@ class batched_device_view {
                    input_view.extent(0),
                    input_view.extent(1));
 
-    // device buffers (copy_device only)
+    // device buffers (copy_device only). Two slots suffice: at any iter K
+    // the kernel runs on slot K%nb while prefetch_next() queues a D2H of
+    // slot (K-1)%nb and an H2D into slot (K+1)%nb on the *same* copy_stream_,
+    // so D2H and H2D ordering on one slot is enforced by FIFO -- no third
+    // buffer needed.
     if constexpr (!kPassthrough) {
       try {
         device_mem_[0].emplace(raft::make_device_mdarray<T, IdxT>(
@@ -424,15 +447,6 @@ class batched_device_view {
             raft::make_extents<int64_t>(batch_size, input_view.extent(1))));
           device_ptr[1] = device_mem_[1]->data_handle();
         }
-        if (host_writeback_ && initialize_ &&
-            batch_size * 2 < static_cast<uint64_t>(input_view.extent(0))) {
-          num_buffers_ = 3;
-          device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
-            res,
-            raft::resource::get_workspace_resource_ref(res),
-            raft::make_extents<int64_t>(batch_size, input_view.extent(1))));
-          device_ptr[2] = device_mem_[2]->data_handle();
-        }
       } catch (std::bad_alloc& e) {
         throw std::bad_alloc();
       } catch (raft::logic_error& e) {
@@ -440,137 +454,160 @@ class batched_device_view {
       }
     }
 
-    // ensure a stream pool with one stream per concurrent direction
-    size_t required_streams = host_writeback_ && initialize_ ? 2 : 1;
+    // One non-res_ stream is enough: D2H and H2D for a given iter are queued
+    // back-to-back on this stream and run concurrently with the user's kernel
+    // on res_'s stream.
     if (!res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) ||
-        raft::resource::get_stream_pool_size(res) < required_streams) {
-      raft::resource::set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(2));
+        raft::resource::get_stream_pool_size(res) < 1) {
+      raft::resource::set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(1));
     }
-    prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
-    writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
+    copy_stream_ = raft::resource::get_stream_from_stream_pool(res);
 
-    // prime batch 0
-    prefetch_next_batch();
+    // Prime batch 0 (slot 0 staged on copy_stream_; first next_view() syncs).
+    issue_prefetch_for_next_batch();
   }
 
   ~batched_device_view() noexcept
   {
     raft::resource::sync_stream(res_);
 
-    // Nothing was returned to the caller -> nothing to write back.
+    // Nothing was ever returned (empty input or no next_view() call); streams
+    // may still be default-constructed so bail out early.
     if (batch_id_ < 0) { return; }
 
-    // Passthrough has no internal buffer and writes through input_view_ directly.
     if constexpr (!kPassthrough) {
       if (host_writeback_) {
-        uint32_t writeback_pos_last = batch_id_ % num_buffers_;
-        if (batch_id_ > 0) {
-          uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
-          uint64_t writeback_offset = (batch_id_ - 1) * batch_size_;
-          writeback_from_device_to_host(device_ptr[writeback_pos], writeback_offset, batch_size_);
+        // Each prefetch_next() flushes batch (batch_id_ - 1) lazily; that
+        // leaves the most recent 1 batch (normal exit on empty next_view) or
+        // up to 2 batches (early break without final prefetch_next()) still
+        // pending. Flush whatever's left on copy_stream_ FIFO.
+        for (int32_t i = last_flushed_batch_id_ + 1; i <= batch_id_; ++i) {
+          uint32_t pos = i % 2;
+          uint64_t off = static_cast<uint64_t>(i) * batch_size_;
+          writeback_from_device_to_host(device_ptr[pos], off, actual_batch_size_[pos]);
         }
-        {
-          uint64_t writeback_offset_last = batch_id_ * batch_size_;
-          writeback_from_device_to_host(device_ptr[writeback_pos_last],
-                                        writeback_offset_last,
-                                        actual_batch_size_[writeback_pos_last]);
-        }
-        writeback_stream_.synchronize();
+        copy_stream_.synchronize();
       }
     }
   }
 
   /**
-   * Advance to the next batch and return its view.
+   * Return the view of the batch staged by the constructor or the most recent
+   * `prefetch_next()`. After this call, that batch is the "current" batch; its
+   * slot is owned by the caller until `prefetch_next()` advances the pipeline.
    *
-   * In copy_device mode this also kicks off prefetch of the batch after it
-   * and writeback of the previously returned batch (when host_writeback is
-   * set). In passthrough mode the call is essentially a slice update.
-   *
-   * Return type is `next_view_passthrough_type` or `next_view_copy_type`;
-   * both are 2D mdspans of T with the same element- and extent-API surface.
+   * Return type is `next_view_passthrough_type` or `next_view_copy_type`; both
+   * are 2D mdspans of T with the same element- and extent-API surface.
    * Iteration ends when extent(0) == 0; this is the only legal stop signal.
    *
-   * Must be called exactly once per batch (never in a loop condition).
+   * Pair every non-empty `next_view()` with a `prefetch_next()` call. Skipping
+   * the pairing simply stops iteration at the current batch.
    */
   auto next_view()
   {
-    bool end_of_data = static_cast<uint64_t>((batch_id_ + 1) * batch_size_) >=
-                       static_cast<uint64_t>(input_view_.extent(0));
-
     if constexpr (kPassthrough) {
-      // Slice goes through the accessor; data_handle() is never used.
-      if (end_of_data) {
+      // Passthrough has no buffer; the slice goes through the accessor.
+      if (!next_prefetched_) {
         auto end = static_cast<IdxT>(input_view_.extent(0));
         return cuda::std::submdspan(
           input_view_, cuda::std::tuple{end, end}, cuda::std::full_extent);
       }
+      ++batch_id_;
+      next_prefetched_ = false;
 
-      prefetch_next_batch();
-
-      uint32_t current_pos = batch_id_ % num_buffers_;
+      uint32_t current_pos = batch_id_ % 2;
       auto first           = static_cast<IdxT>(batch_id_ * batch_size_);
       auto last            = static_cast<IdxT>(first + actual_batch_size_[current_pos]);
       return cuda::std::submdspan(
         input_view_, cuda::std::tuple{first, last}, cuda::std::full_extent);
     } else {
       auto cols = static_cast<IdxT>(input_view_.extent(1));
+      if (!next_prefetched_) { return next_view_copy_type{nullptr, IdxT{0}, cols}; }
 
-      if (end_of_data) { return next_view_copy_type{nullptr, IdxT{0}, cols}; }
+      // Drain the copies queued by the previous prefetch_next() / ctor: this
+      // ensures the slot we're about to hand out is fully staged AND that the
+      // writeback for the older batch (if any) has finished before we return
+      // -- which matters for slot recycling on subsequent iterations.
+      copy_stream_.synchronize();
 
-      prefetch_next_batch();
+      ++batch_id_;
+      next_prefetched_ = false;
 
-      uint32_t current_pos = batch_id_ % num_buffers_;
+      uint32_t current_pos = batch_id_ % 2;
       return next_view_copy_type{
         device_ptr[current_pos], static_cast<IdxT>(actual_batch_size_[current_pos]), cols};
     }
   }
 
- private:
   /**
-   * Advance batch_id_ to the next batch and stage I/O around it (copy_device only):
-   *   * prefetch the (batch_id_ + 1)-th batch when initialize_ is set
-   *   * write back the (batch_id_ - 1)-th batch when host_writeback_ is set
-   * In passthrough mode this only updates batch_id_ and offset_ bookkeeping.
+   * Advance the prefetch pipeline -- call once after each non-empty
+   * `next_view()`, AFTER launching the kernel on res_'s stream.
    *
-   * @return true if more input rows remain after this advance.
+   * In copy_device mode this:
+   *   1. Queues D2H of batch (batch_id_ - 1) on copy_stream_ (the slot the
+   *      kernel is NOT on; data is from the previous iter's kernel which has
+   *      already been sync'd on res_). Skipped on the first iteration when no
+   *      previous batch exists.
+   *   2. Queues H2D of batch (batch_id_ + 1) on copy_stream_ (also a different
+   *      slot from the running kernel).
+   *   3. Calls sync_stream(res_) at the *end*.
+   *
+   * Steps 1-2 run on copy_stream_ concurrently with the just-launched kernel
+   * on res_'s stream. The host stall during cudaMemcpyAsync's pageable->pinned
+   * staging (for pageable host sources/destinations) and the host stall on
+   * step 3 both overlap with the kernel: that is what makes the pipeline
+   * actually asynchronous, even for plain pageable host memory.
+   *
+   * In passthrough mode this is pure bookkeeping (no copies, no syncs).
    */
-  bool prefetch_next_batch()
+  void prefetch_next()
   {
-    batch_id_++;
-
-    // wait for the prior round's prefetch / writeback before reusing the slots
-    if (initialize_) { prefetch_stream_.synchronize(); }
-    if (host_writeback_) { writeback_stream_.synchronize(); }
-
-    RAFT_EXPECTS(static_cast<int64_t>(offset_) <= input_view_.extent(0), "Offset out of bounds");
-
-    bool next_batch_exists = offset_ < static_cast<uint64_t>(input_view_.extent(0));
-
-    if (next_batch_exists) {
-      // make sure all kernels touching batch_id_ - 1 (the now-writable slot)
-      // are done before we either overwrite it (initialize) or read it back
-      raft::resource::sync_stream(res_);
-
-      int32_t prefetch_pos             = (batch_id_ + 1) % num_buffers_;
-      actual_batch_size_[prefetch_pos] = min(batch_size_, input_view_.extent(0) - offset_);
-
-      if constexpr (!kPassthrough) {
-        if (host_writeback_ && batch_id_ > 0) {
-          uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
-          uint64_t writeback_offset = (batch_id_ - 1) * batch_size_;
-          writeback_from_device_to_host(device_ptr[writeback_pos], writeback_offset, batch_size_);
-        }
-        if (initialize_) {
-          prefetch_from_host_to_device(
-            device_ptr[prefetch_pos], offset_, actual_batch_size_[prefetch_pos]);
-        }
+    if constexpr (!kPassthrough) {
+      if (host_writeback_ && batch_id_ - 1 > last_flushed_batch_id_) {
+        // Writeback batch (batch_id_ - 1) -- the slot the kernel is *not* on.
+        // The corresponding kernel (kernel-(batch_id_-1)) finished at the end
+        // of the previous prefetch_next() (sync_stream(res_)), so its writes
+        // are globally visible.
+        uint32_t pos = (batch_id_ - 1) % 2;
+        uint64_t off = static_cast<uint64_t>(batch_id_ - 1) * batch_size_;
+        writeback_from_device_to_host(device_ptr[pos], off, actual_batch_size_[pos]);
+        last_flushed_batch_id_ = batch_id_ - 1;
       }
-
-      offset_ += actual_batch_size_[prefetch_pos];
     }
 
-    return next_batch_exists;
+    issue_prefetch_for_next_batch();
+
+    if constexpr (!kPassthrough) {
+      // Wait for the kernel we paired with this prefetch_next() before
+      // returning.
+      if (input_view_.extent(0) == 0) raft::resource::sync_stream(res_);
+    }
+  }
+
+ private:
+  /**
+   * Stage batch (batch_id_ + 1) into slot ((batch_id_ + 1) % 2) on
+   * copy_stream_, after any prior op on the stream (FIFO). Pure bookkeeping
+   * in passthrough or !initialize_ mode. Sets next_prefetched_ accordingly.
+   */
+  void issue_prefetch_for_next_batch()
+  {
+    uint64_t target_offset = static_cast<uint64_t>(batch_id_ + 1) * batch_size_;
+    if (target_offset >= static_cast<uint64_t>(input_view_.extent(0))) {
+      next_prefetched_ = false;
+      return;
+    }
+    int32_t prefetch_pos = (batch_id_ + 1) % 2;
+    actual_batch_size_[prefetch_pos] =
+      static_cast<uint32_t>(min(batch_size_, input_view_.extent(0) - target_offset));
+
+    if constexpr (!kPassthrough) {
+      if (initialize_) {
+        prefetch_from_host_to_device(
+          device_ptr[prefetch_pos], target_offset, actual_batch_size_[prefetch_pos]);
+      }
+    }
+    next_prefetched_ = true;
   }
 
   void prefetch_from_host_to_device(T* dev_ptr, size_t src_row_offset, size_t num_rows)
@@ -583,7 +620,7 @@ class batched_device_view {
                       input_view_.data_handle() + src_row_offset * input_view_.extent(1),
                       n_bytes,
                       cudaMemcpyHostToDevice,
-                      prefetch_stream_));
+                      copy_stream_));
   }
 
   void writeback_from_device_to_host(T* dev_ptr, size_t dst_row_offset, size_t num_rows)
@@ -596,12 +633,12 @@ class batched_device_view {
                       dev_ptr,
                       n_bytes,
                       cudaMemcpyDeviceToHost,
-                      writeback_stream_));
+                      copy_stream_));
   }
 
-  // streams (copy_device only; unused in passthrough)
-  rmm::cuda_stream_view prefetch_stream_;
-  rmm::cuda_stream_view writeback_stream_;
+  // single non-res_ stream that carries both H2D prefetches and D2H writebacks
+  // in FIFO order (copy_device only; unused in passthrough)
+  rmm::cuda_stream_view copy_stream_;
 
   // configuration
   const raft::resources& res_;
@@ -610,16 +647,16 @@ class batched_device_view {
 
   // iteration state
   uint64_t batch_size_;
-  int32_t batch_id_;  // -2 before any prefetch; >= 0 once a batch has been returned
-  uint64_t offset_;   // first row of the upcoming-prefetch batch, in input_view_ rows
+  int32_t batch_id_;               // most-recently-returned batch id; -1 if none returned
+  bool next_prefetched_;           // slot for batch_id_+1 holds staged data
+  int32_t last_flushed_batch_id_;  // highest batch id whose writeback has been issued; -1 if none
 
   input_view_t input_view_;
 
   // device buffers (copy_device only)
-  uint64_t num_buffers_;
-  std::optional<raft::device_matrix<T, IdxT>> device_mem_[3];
-  T* device_ptr[3];
-  uint32_t actual_batch_size_[3];
+  std::optional<raft::device_matrix<T, IdxT>> device_mem_[2];
+  T* device_ptr[2];
+  uint32_t actual_batch_size_[2];
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

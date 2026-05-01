@@ -850,7 +850,7 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
     n_rows * sizeof(uint32_t) + graph_degree * sizeof(uint32_t);  // in_edge_count + hist
 
   // additional memory for combine stage on device (3 batches)
-  size_t combine_dev = 3 * batch_size * graph_degree * index_size;  // d_output_graph(3*batch)
+  size_t combine_dev = 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
   if (mst_optimize) {
     combine_dev += 2 * batch_size * graph_degree * index_size;  // d_mst_graph(2*batch)
     combine_dev += 2 * batch_size * sizeof(uint32_t);           // d_mst_graph_num_edges(2*batch)

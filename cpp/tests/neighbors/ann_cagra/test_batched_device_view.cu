@@ -101,6 +101,11 @@ class BatchedDeviceViewTest : public ::testing::Test {
                              IdxT(17));
         }
         total_processed += dev_view.extent(0);
+
+        // Pair next_view() with prefetch_next(): the next batch's H2D and the
+        // previous batch's D2H run on copy_stream_ concurrently with the
+        // raft::copy / raft::matrix::fill kernels we just queued on res_.
+        batched.prefetch_next();
       }
     }
     raft::resource::sync_stream(res);

@@ -858,6 +858,10 @@ void merge_graph_gpu(
         i_batch,
         guarantee_connectivity,
         d_check_num_protected_edges.data_handle());
+
+    d_output_graph.prefetch_next();
+    d_mst_graph.prefetch_next();
+    d_mst_graph_num_edges.prefetch_next();
   }
 
   bool check_num_protected_edges = true;
@@ -1603,7 +1607,7 @@ void prune_graph_gpu(
         d_invalid_neighbor_list.data_handle(),
         dev_stats.data_handle());
 
-    raft::resource::sync_stream(res);
+    d_output_graph.prefetch_next();
     RAFT_LOG_DEBUG(
       "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
       (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
