@@ -8,8 +8,9 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/rng_state.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::cluster::spectral {
+namespace CUVS_EXPORT cuvs { namespace cluster { namespace spectral {
 
 /**
  * @defgroup spectral_params Spectral Clustering Parameters
@@ -160,4 +161,6 @@ void fit_predict(raft::resources const& handle,
  * @}
  */
 
-}  // namespace cuvs::cluster::spectral
+}  // namespace spectral
+}  // namespace cluster
+}  // namespace cuvs

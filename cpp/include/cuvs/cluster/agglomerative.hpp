@@ -13,8 +13,9 @@
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::cluster::agglomerative {
+namespace CUVS_EXPORT cuvs { namespace cluster { namespace agglomerative {
 
 // constant to indirectly control the number of neighbors. k = sqrt(n) + c. default to 15
 constexpr int DEFAULT_CONST_C = 15;
@@ -257,4 +258,6 @@ void build_dendrogram(raft::resources const& handle,
 /**
  * @}
  */
-};  // end namespace  cuvs::cluster::agglomerative
+}  // namespace agglomerative
+}  // namespace cluster
+}  // namespace cuvs

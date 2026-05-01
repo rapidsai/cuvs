@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <cuvs/core/export.hpp>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

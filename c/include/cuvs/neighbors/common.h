@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#include <cuvs/core/export.hpp>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

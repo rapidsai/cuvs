@@ -21,8 +21,9 @@
 #include <memory>
 #include <type_traits>
 #include <variant>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::hnsw {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace hnsw {
 
 // Re-export graph_build_params into hnsw namespace for convenience
 namespace graph_build_params = cuvs::neighbors::graph_build_params;
@@ -1231,8 +1232,7 @@ void deserialize(raft::resources const& res,
  * @}
  */
 
-}  // namespace cuvs::neighbors::hnsw
-
+}}}  // namespace cuvs::neighbors::hnsw
 #else
 #error "This header is only available if cuVS CMake option `BUILD_CAGRA_HNSWLIB=ON"
 #endif

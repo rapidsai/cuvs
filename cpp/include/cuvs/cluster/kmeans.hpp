@@ -12,8 +12,9 @@
 #include <rapids_logger/logger.hpp>
 
 #include <optional>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::cluster::kmeans {
+namespace CUVS_EXPORT cuvs { namespace cluster { namespace kmeans {
 
 /** Base structure for parameters that are common to all k-means algorithms */
 struct base_params {
@@ -1630,4 +1631,6 @@ void find_k(raft::resources const& handle,
  */
 }  // namespace helpers
 
-}  // namespace  cuvs::cluster::kmeans
+}  // namespace kmeans
+}  // namespace cluster
+}  // namespace cuvs

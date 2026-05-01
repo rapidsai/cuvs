@@ -5,8 +5,9 @@
 #pragma once
 
 #include <raft/core/error.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs {
+namespace CUVS_EXPORT cuvs {
 
 /**
  * @brief Exception thrown when a CUTLASS error is encountered.

@@ -19,8 +19,9 @@
 
 #include <optional>
 #include <variant>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::vamana {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace vamana {
 
 /**
  * @defgroup vamana_cpp_index_params Vamana index build parameters
@@ -615,4 +616,4 @@ auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)
  * @}
  */
 
-}  // namespace cuvs::neighbors::vamana
+}}}  // namespace cuvs::neighbors::vamana

@@ -8,8 +8,9 @@
 
 #include <fstream>
 #include <string>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::util {
+namespace CUVS_EXPORT cuvs { namespace util {
 
 /**
  * @brief Get available host memory from /proc/meminfo
@@ -22,4 +23,5 @@ namespace cuvs::util {
  */
 size_t get_free_host_memory();
 
-}  // namespace cuvs::util
+}  // namespace util
+}  // namespace cuvs

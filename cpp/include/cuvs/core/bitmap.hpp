@@ -6,11 +6,13 @@
 #pragma once
 
 #include <raft/core/bitmap.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::core {
+namespace CUVS_EXPORT cuvs { namespace core {
 /* To use bitmap functions containing CUDA code, include <raft/core/bitmap.cuh> */
 
 template <typename bitmap_t, typename index_t>
 using bitmap_view = raft::core::bitmap_view<bitmap_t, index_t>;
 
-}  // end namespace cuvs::core
+}  // namespace core
+}  // namespace cuvs

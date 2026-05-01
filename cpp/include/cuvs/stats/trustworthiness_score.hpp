@@ -7,8 +7,9 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs {
+namespace CUVS_EXPORT cuvs {
 namespace stats {
 /**
  * @defgroup stats_trustworthiness Trustworthiness

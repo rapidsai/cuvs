@@ -12,8 +12,9 @@
 #include <raft/core/host_mdspan.hpp>
 #include <sstream>
 #include <string>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::ivf_flat {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace ivf_flat {
 /**
  * @defgroup ivf_flat_cpp_index_params IVF-Flat index build parameters
  * @{
@@ -3571,4 +3572,4 @@ __device__ __forceinline__ void compute_dist_udf_impl(AccT& acc, AccT x, AccT y)
 
 }  // namespace experimental::udf
 
-}  // namespace cuvs::neighbors::ivf_flat
+}}}  // namespace cuvs::neighbors::ivf_flat

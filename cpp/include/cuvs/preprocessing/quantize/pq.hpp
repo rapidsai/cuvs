@@ -12,8 +12,9 @@
 #include <raft/core/host_mdspan.hpp>
 
 #include <variant>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::preprocessing::quantize::pq {
+namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace quantize { namespace pq {
 
 /**
  * @defgroup pq Product Quantizer utilities
@@ -241,4 +242,7 @@ void inverse_transform(
 
 /** @} */  // end of group product
 
-}  // namespace cuvs::preprocessing::quantize::pq
+}  // namespace pq
+}  // namespace quantize
+}  // namespace preprocessing
+}  // namespace cuvs

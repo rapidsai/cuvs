@@ -10,6 +10,8 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
+#include <cuvs/core/export.hpp>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,7 +36,7 @@ extern "C" {
  * @param[out] indices device matrix that stores the refined indices [n_queries, k]
  * @param[out] distances device matrix that stores the refined distances [n_queries, k]
  */
-cuvsError_t cuvsRefine(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsRefine(cuvsResources_t res,
                        DLManagedTensor* dataset,
                        DLManagedTensor* queries,
                        DLManagedTensor* candidates,

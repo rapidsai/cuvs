@@ -10,6 +10,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <cuvs/core/export.hpp>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -67,7 +69,7 @@ typedef struct cuvsPcaParams* cuvsPcaParams_t;
  * @param[out] params cuvsPcaParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 
 /**
  * @brief De-allocate PCA params.
@@ -75,7 +77,7 @@ cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
  * @param[in] params cuvsPcaParams_t to de-allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
+CUVS_EXPORT cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 
 /**
  * @brief Perform PCA fit operation.
@@ -125,7 +127,7 @@ cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
  * @param[in] flip_signs_based_on_U whether to determine signs by U (true) or V.T (false)
  * @return cuvsError_t
  */
-cuvsError_t cuvsPcaFit(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsPcaFit(cuvsResources_t res,
                        cuvsPcaParams_t params,
                        DLManagedTensor* input,
                        DLManagedTensor* components,
@@ -154,7 +156,7 @@ cuvsError_t cuvsPcaFit(cuvsResources_t res,
  * @param[in] flip_signs_based_on_U whether to determine signs by U (true) or V.T (false)
  * @return cuvsError_t
  */
-cuvsError_t cuvsPcaFitTransform(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsPcaFitTransform(cuvsResources_t res,
                                 cuvsPcaParams_t params,
                                 DLManagedTensor* input,
                                 DLManagedTensor* trans_input,
@@ -180,7 +182,7 @@ cuvsError_t cuvsPcaFitTransform(cuvsResources_t res,
  * @param[out] trans_input transformed data [n_rows x n_components] (col-major, float32, device)
  * @return cuvsError_t
  */
-cuvsError_t cuvsPcaTransform(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsPcaTransform(cuvsResources_t res,
                              cuvsPcaParams_t params,
                              DLManagedTensor* input,
                              DLManagedTensor* components,
@@ -202,7 +204,7 @@ cuvsError_t cuvsPcaTransform(cuvsResources_t res,
  * @param[out] output reconstructed data [n_rows x n_cols] (col-major, float32, device)
  * @return cuvsError_t
  */
-cuvsError_t cuvsPcaInverseTransform(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsPcaInverseTransform(cuvsResources_t res,
                                     cuvsPcaParams_t params,
                                     DLManagedTensor* trans_input,
                                     DLManagedTensor* components,

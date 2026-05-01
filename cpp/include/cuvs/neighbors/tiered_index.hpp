@@ -10,8 +10,9 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <mutex>
 #include <shared_mutex>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::ivf_pq {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace ivf_pq {
 // The default ivf-pq index doesn't have a 'value_type', since it
 // can accept multiple different types at search time.
 // However, the tiered index code needs a value_type (for the bfknn tier),
@@ -20,9 +21,8 @@ template <typename T, typename IdxT>
 struct typed_index : index<IdxT> {
   using value_type = T;
 };
-}  // namespace cuvs::neighbors::ivf_pq
-
-namespace cuvs::neighbors::tiered_index {
+}}}  // namespace cuvs::neighbors::ivf_pq
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace tiered_index {
 
 // forward reference to tiered_index implementation.
 namespace detail {
@@ -216,4 +216,4 @@ auto merge(raft::resources const& res,
            const std::vector<tiered_index::index<ivf_pq::typed_index<float, int64_t>>*>& indices)
   -> tiered_index::index<ivf_pq::typed_index<float, int64_t>>;
 
-}  // namespace cuvs::neighbors::tiered_index
+}}}  // namespace cuvs::neighbors::tiered_index

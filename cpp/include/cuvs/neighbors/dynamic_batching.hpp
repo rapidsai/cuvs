@@ -6,8 +6,9 @@
 #pragma once
 
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::dynamic_batching {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace dynamic_batching {
 
 namespace detail {
 template <typename T, typename IdxT>
@@ -276,4 +277,4 @@ void search(raft::resources const& res,
 
 /** @} */
 
-}  // namespace cuvs::neighbors::dynamic_batching
+}}}  // namespace cuvs::neighbors::dynamic_batching

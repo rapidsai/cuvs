@@ -13,6 +13,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/distance/pairwise_distance.h>
 #include <cuvs/distance/distance.hpp>
 
 #include "../core/exceptions.hpp"

@@ -22,8 +22,9 @@
 #include <cmath>
 #include <optional>
 #include <variant>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::experimental::scann {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace experimental { namespace scann {
 /**
  * @defgroup scann_cpp_index_params ScaNN index build parameters
  * @{
@@ -321,4 +322,4 @@ void serialize(raft::resources const& handle,
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::scann
+}}}}  // namespace cuvs::neighbors::experimental::scann

@@ -10,8 +10,9 @@
 #include <raft/core/resources.hpp>
 
 #include <optional>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::distance {
+namespace CUVS_EXPORT cuvs { namespace distance {
 
 /**
  * @brief Compute log-density estimates for query points using kernel density estimation.
@@ -78,4 +79,5 @@ extern template void kde<double>(
   cuvs::distance::DistanceType,
   double);
 
-}  // namespace cuvs::distance
+}  // namespace distance
+}  // namespace cuvs

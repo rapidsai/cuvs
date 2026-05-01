@@ -8,8 +8,9 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::epsilon_neighborhood {
+namespace CUVS_EXPORT cuvs { namespace neighbors { namespace epsilon_neighborhood {
 
 /**
  * @defgroup epsilon_neighborhood_cpp_l2 Epsilon Neighborhood L2 Operations
@@ -66,4 +67,4 @@ void compute(raft::resources const& handle,
 
 /** @} */  // end group epsilon_neighborhood_cpp_l2
 
-}  // namespace cuvs::neighbors::epsilon_neighborhood
+}}}  // namespace cuvs::neighbors::epsilon_neighborhood

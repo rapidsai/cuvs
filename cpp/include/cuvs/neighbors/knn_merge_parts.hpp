@@ -9,8 +9,9 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors {
+namespace CUVS_EXPORT cuvs { namespace neighbors {
 /**
  * @brief Merge knn distances and index matrix, which have been partitioned
  * by row, into a single matrix with only the k-nearest neighbors.
@@ -40,4 +41,4 @@ void knn_merge_parts(raft::resources const& res,
                      raft::device_matrix_view<float, int64_t> outK,
                      raft::device_matrix_view<int32_t, int64_t> outV,
                      raft::device_vector_view<int32_t, int64_t> translations);
-}  // namespace cuvs::neighbors
+}}  // namespace cuvs::neighbors

@@ -8,8 +8,9 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/pca_types.hpp>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::preprocessing::pca {
+namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace pca {
 
 using solver = raft::linalg::solver;
 
@@ -182,4 +183,6 @@ void inverse_transform(raft::resources const& handle,
 
 /** @} */  // end group pca
 
-}  // namespace cuvs::preprocessing::pca
+}  // namespace pca
+}  // namespace preprocessing
+}  // namespace cuvs
