@@ -8,6 +8,7 @@ API Reference
    cpp_api.rst
    python_api.rst
    rust_api/index.rst
+   java_api/index.rst
 
 * :ref:`genindex`
 * :ref:`search`

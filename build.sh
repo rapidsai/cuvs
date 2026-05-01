@@ -542,6 +542,19 @@ if hasArg docs; then
     cd "${REPODIR}"/rust
     cargo doc -p cuvs --no-deps
     rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/build/html/_static/rust
+    cd "${REPODIR}"/java/cuvs-java
+    # cuvs-java is a Java module (has src/main/java/module-info.java). The
+    # `javadoc:javadoc` mojo forks a build lifecycle that only runs through
+    # `generate-sources`, so module-info.java is never compiled during the fork
+    # and maven-javadoc-plugin (>=3.10) errors with "named and unnamed modules"
+    # on a fresh checkout. Run `compile` first so module-info.class exists, then
+    # use `javadoc:javadoc-no-fork` to reuse those compiled classes.
+    # -Dspotless.apply.skip avoids the spotless plugin (bound to the validate
+    # phase) from rewriting source license headers during a docs-only build.
+    mvn compile javadoc:javadoc-no-fork \
+        -DexcludePackageNames=com.nvidia.cuvs.internal.panama \
+        -Dspotless.apply.skip=true
+    rsync -av "${JAVA_BUILD_DIR}"/reports/apidocs/ "${SPHINX_BUILD_DIR}"/build/html/_static/java
 fi
 
 ################################################################################

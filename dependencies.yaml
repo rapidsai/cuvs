@@ -79,6 +79,7 @@ files:
       - cuda_version
       - depends_on_cupy
       - docs
+      - java
       - py_version
       - rapids_build
       - rust
