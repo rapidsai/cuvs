@@ -42,4 +42,3 @@
 #include <cuvs/preprocessing/quantize/binary.h>
 #include <cuvs/preprocessing/quantize/pq.h>
 #include <cuvs/preprocessing/quantize/scalar.h>
-#include <cuvs/core/export.hpp>
