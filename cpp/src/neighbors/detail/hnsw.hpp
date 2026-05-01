@@ -13,9 +13,12 @@
 #include <cuvs/neighbors/hnsw.hpp>
 #include <cuvs/util/file_io.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/pinned_mdarray.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
@@ -34,7 +37,7 @@ namespace cuvs::neighbors::hnsw::detail {
 
 // This is needed as hnswlib hardcodes the distance type to float
 // or int32_t in certain places. However, we can solve uint8 or int8
-// natively with the pacth cuVS applies. We could potentially remove
+// natively with the patch cuVS applies. We could potentially remove
 // all the hardcodes and propagate templates throughout hnswlib, but
 // as of now it's not needed.
 template <typename T>
@@ -231,14 +234,13 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
                  static_cast<size_t>(cagra_dataset.extent(1)));
     host_dataset =
       raft::make_host_matrix<T, int64_t>(cagra_dataset.extent(0), cagra_dataset.extent(1));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    cagra_dataset.data_handle(),
-                                    sizeof(T) * cagra_dataset.stride(0),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    cagra_dataset.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(host_dataset.data_handle(),
+                      host_dataset.extent(1),
+                      cagra_dataset.data_handle(),
+                      cagra_dataset.stride(0),
+                      host_dataset.extent(1),
+                      cagra_dataset.extent(0),
+                      raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = host_dataset.view();
   }
@@ -267,10 +269,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     // copy cagra graph to host
     host_graph = raft::make_host_matrix<uint32_t, int64_t>(host_graph_view.extent(0),
                                                            host_graph_view.extent(1));
-    raft::copy(host_graph.data_handle(),
-               host_graph_view.data_handle(),
-               host_graph_view.size(),
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res, host_graph.view(), host_graph_view);
     raft::resource::sync_stream(res);
     host_graph_view = host_graph.view();
   }
@@ -914,10 +913,11 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
         if (next_batch_i < n_batches) {
           auto offset     = next_batch_i * max_batch_size;
           auto batch_size = std::min(max_batch_size, n_rows - offset);
-          raft::copy(bufs[next_batch_i % 2],
-                     source_dataset + offset * source_stride,
-                     batch_size * source_stride,
-                     stream);
+          raft::copy(
+            res,
+            raft::make_host_vector_view(bufs[next_batch_i % 2], batch_size * source_stride),
+            raft::make_device_vector_view(source_dataset + offset * source_stride,
+                                          batch_size * source_stride));
         }
       }
       if (batch_i < 0) { continue; }

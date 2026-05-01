@@ -12,15 +12,21 @@ jobs:
       - check-nightly-ci
       - changed-files
       - checks
+      - check-c-abi
       - conda-cpp-build
       - conda-cpp-tests
       - conda-cpp-checks
       - conda-python-build
       - conda-python-tests
+      - rocky8-clib-standalone-build-matrix
       - rocky8-clib-standalone-build
+      - rocky8-clib-tests-matrix
       - rocky8-clib-tests
+      - conda-java-build-and-tests-matrix
       - conda-java-build-and-tests
+      - rust-build-matrix
       - rust-build
+      - go-build-matrix
       - go-build
       - docs-build
       - wheel-build-libcuvs
@@ -43,16 +49,22 @@ jobs:
         if: ${{ vars.TELEMETRY_ENABLED == 'true' }}
         uses: rapidsai/shared-actions/telemetry-dispatch-stash-base-env-vars@main
   check-nightly-ci:
-    needs: telemetry-setup
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      id-token: write
     env:
-      RAPIDS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Get PR Info
+        id: get-pr-info
+        uses: nv-gha-runners/get-pr-info@main
       - name: Check if nightly CI is passing
         uses: rapidsai/shared-actions/check_nightly_success/dispatch@main
         with:
-          repo: cuvs
-          max_days_without_success: 30
+          repo: ${{ github.repository }}
+          target-branch: ${{ fromJSON(steps.get-pr-info.outputs.pr-info).base.ref }}
+          max-days-without-success: 30
   changed-files:
     needs: telemetry-setup
     secrets: inherit
@@ -61,6 +73,8 @@ jobs:
       files_yaml: |
         build_docs:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -83,6 +97,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_cpp:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -117,6 +133,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_java:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -150,6 +168,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_python_conda:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -187,6 +207,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_python_wheels:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -229,6 +251,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_rust:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -266,6 +290,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_go:
           - '**'
+          - '!**/*/REVIEW_GUIDELINES.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -309,6 +335,9 @@ jobs:
     with:
       enable_check_generated_files: false
       ignored_pr_jobs: "telemetry-summarize"
+  check-c-abi:
+    needs: telemetry-setup
+    uses: ./.github/workflows/check-c-abi.yaml
   conda-cpp-build:
     needs: checks
     secrets: inherit
@@ -317,7 +346,6 @@ jobs:
       build_type: pull-request
       node_type: cpu16
       script: ci/build_cpp.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   conda-cpp-tests:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
@@ -326,7 +354,6 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_cpp.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   conda-cpp-checks:
     needs: conda-cpp-build
     secrets: inherit
@@ -341,6 +368,8 @@ jobs:
     with:
       build_type: pull-request
       script: ci/build_python.sh
+      # Build a conda package for each CUDA x ARCH x minimum supported Python version
+      matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   conda-python-tests:
     needs: [conda-python-build, changed-files]
     secrets: inherit
@@ -349,114 +378,127 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_python.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
+  rocky8-clib-standalone-build-matrix:
+    needs: checks
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
   rocky8-clib-standalone-build:
-    needs: [checks]
+    needs: rocky8-clib-standalone-build-matrix
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - &latest_cuda12 '12.9.1'
-          - &latest_cuda13 '13.1.1'
-        arch:
-          - amd64
-          - arm64
+      matrix: ${{ fromJSON(needs.rocky8-clib-standalone-build-matrix.outputs.matrix) }}
     with:
       build_type: pull-request
       arch: "${{matrix.arch}}"
       date: ${{ inputs.date }}_c
-      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
+      container_image: "rapidsai/ci-wheel:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       node_type: "cpu16"
       requires_license_builder: true
       script: "ci/build_standalone_c.sh --build-tests"
-      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
+      artifact-name: "libcuvs_c_${{ matrix.CUDA_VER }}_${{ matrix.ARCH }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
-  rocky8-clib-tests:
+  rocky8-clib-tests-matrix:
     needs: [rocky8-clib-standalone-build, changed-files]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
+  rocky8-clib-tests:
+    needs: rocky8-clib-tests-matrix
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
-        arch:
-          - amd64
-          - arm64
+      matrix: ${{ fromJSON(needs.rocky8-clib-tests-matrix.outputs.matrix) }}
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
       arch: "${{matrix.arch}}"
       date: ${{ inputs.date }}_c
-      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
-      script: "ci/test_standalone_c.sh libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
+      container_image: "rapidsai/ci-wheel:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
+      script: "ci/test_standalone_c.sh libcuvs_c_${{ matrix.CUDA_VER }}_${{ matrix.ARCH }}.tar.gz"
       sha: ${{ inputs.sha }}
-  conda-java-build-and-tests:
+  conda-java-build-and-tests-matrix:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
+      matrix_filter: map(select(.ARCH == "amd64"))
+  conda-java-build-and-tests:
+    needs: conda-java-build-and-tests-matrix
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
+      matrix: ${{ fromJSON(needs.conda-java-build-and-tests-matrix.outputs.matrix) }}
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
       arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       script: "ci/test_java.sh"
-      artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
+      artifact-name: "cuvs-java-cuda${{ matrix.CUDA_VER }}"
       file_to_upload: "java/cuvs-java/target/"
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
-  rust-build:
+  rust-build-matrix:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
-    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
     with:
       build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
-      script: "ci/build_rust.sh"
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
-  go-build:
-    needs: [conda-cpp-build, changed-files]
+      matrix_name: conda-cpp-build
+      matrix_filter: map(select(.ARCH == "amd64"))
+  rust-build:
+    needs: rust-build-matrix
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_go || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
+      matrix: ${{ fromJSON(needs.rust-build-matrix.outputs.matrix) }}
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
       arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
+      script: "ci/build_rust.sh"
+  go-build-matrix:
+    needs: [conda-cpp-build, changed-files]
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_go || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
+      matrix_filter: map(select(.ARCH == "amd64"))
+  go-build:
+    needs: go-build-matrix
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.go-build-matrix.outputs.matrix) }}
+    with:
+      build_type: pull-request
+      node_type: "gpu-l4-latest-1"
+      arch: "amd64"
+      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       script: "ci/build_go.sh"
   docs-build:
     needs: conda-python-build
@@ -466,7 +508,7 @@ jobs:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
       arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-latest"
+      container_image: "rapidsai/ci-conda:26.06-latest"
       script: "ci/build_docs.sh"
   wheel-build-libcuvs:
     needs: checks
@@ -480,7 +522,6 @@ jobs:
       matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
       package-name: libcuvs
       package-type: cpp
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   wheel-build-cuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
@@ -491,7 +532,8 @@ jobs:
       script: ci/build_wheel_cuvs.sh
       package-name: cuvs
       package-type: python
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
+      # Build a wheel for each CUDA x ARCH x minimum supported Python version
+      matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   wheel-tests-cuvs:
     needs: [wheel-build-cuvs, changed-files]
     secrets: inherit
@@ -500,7 +542,6 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_wheel_cuvs.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   devcontainer:
     secrets: inherit
     needs: telemetry-setup
@@ -509,12 +550,10 @@ jobs:
       arch: '["amd64", "arm64"]'
       cuda: '["13.1"]'
       node_type: "cpu8"
-      rapids-aux-secret-1: GIST_REPO_READ_ORG_GITHUB_TOKEN
       env: |
         SCCACHE_DIST_MAX_RETRIES=inf
         SCCACHE_SERVER_LOG=sccache=debug
         SCCACHE_DIST_FALLBACK_TO_LOCAL_COMPILE=false
-        SCCACHE_DIST_AUTH_TOKEN_VAR=RAPIDS_AUX_SECRET_1
       build_command: |
         sccache --zero-stats;
         build-all -j0 --verbose 2>&1 | tee telemetry-artifacts/build.log;

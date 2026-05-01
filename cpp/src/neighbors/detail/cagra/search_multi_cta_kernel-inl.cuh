@@ -7,12 +7,12 @@
 #include "search_multi_cta_kernel.cuh"
 
 #include "bitonic.hpp"
-#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk if possible
 #include "utils.hpp"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
@@ -26,6 +26,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp
@@ -193,7 +194,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -281,7 +283,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                            local_traversed_hashmap_ptr,
                                            traversed_hash_bitlen,
                                            block_id,
-                                           num_blocks);
+                                           num_blocks,
+                                           graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -589,8 +592,6 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
     THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
   }
 
-  RAFT_CUDA_TRY(
-    cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
   // Initialize hash table
   const uint32_t traversed_hash_size = hashmap::get_size(traversed_hash_bitlen);
   set_value_batch(traversed_hashmap_ptr,
@@ -627,7 +628,8 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        ps.min_iterations,
                                                        ps.max_iterations,
                                                        num_executed_iterations,
-                                                       sample_filter);
+                                                       sample_filter,
+                                                       static_cast<IndexT>(graph.extent(0)));
 }
 
 }  // namespace multi_cta_search

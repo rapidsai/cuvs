@@ -7,13 +7,13 @@
 #include "search_single_cta_kernel.cuh"
 
 #include "bitonic.hpp"
-#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_by_radix.cuh"
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk
 #include "utils.hpp"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -26,6 +26,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -702,7 +703,8 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   using LOAD_T = device::LOAD_128BIT_T;
 
@@ -791,7 +793,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                                            local_visited_hashmap_ptr,
                                            hash_bitlen,
                                            (INDEX_T*)nullptr,
-                                           0);
+                                           0,
+                                           0,
+                                           1,
+                                           graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -1124,7 +1129,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const std::uint32_t hash_bitlen,
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
@@ -1155,7 +1161,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                small_hash_bitlen,
                                small_hash_reset_interval,
                                query_id,
-                               sample_filter);
+                               sample_filter,
+                               graph_size);
 }
 
 // To make sure we avoid false sharing on both CPU and GPU, we enforce cache line size to the
@@ -1804,7 +1811,7 @@ struct alignas(kCacheLineBytes) launcher_t {
   {
     // Don't sleep this many times hoping for smoother run
     constexpr auto kSpinLimit = 3;
-    // It doesn't make much sense to slee less than this
+    // It doesn't make much sense to sleep less than this
     constexpr auto kPauseTimeMin = std::chrono::nanoseconds(1000);
     // Bound sleeping time
     constexpr auto kPauseTimeMax = std::chrono::nanoseconds(50000);
@@ -2289,6 +2296,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             std::cref(dataset_desc),
                             graph,
                             source_indices_ptr,
+                            max_candidates,
                             num_itopk_candidates,
                             block_size,
                             smem_size,
@@ -2298,7 +2306,6 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             ps.num_random_samplings,
                             ps.rand_xor_mask,
                             num_seeds,
-                            max_candidates,
                             max_itopk,
                             ps.itopk_size,
                             ps.search_width,
@@ -2312,8 +2319,6 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
     using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
     auto kernel = search_kernel_config<false, descriptor_base_type, SourceIndexT, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
-    RAFT_CUDA_TRY(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
     dim3 thread_dims(block_size, 1, 1);
     dim3 block_dims(1, num_queries, 1);
     RAFT_LOG_DEBUG(
@@ -2341,7 +2346,8 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                                                            hash_bitlen,
                                                            small_hash_bitlen,
                                                            small_hash_reset_interval,
-                                                           sample_filter);
+                                                           sample_filter,
+                                                           static_cast<IndexT>(graph.extent(0)));
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }

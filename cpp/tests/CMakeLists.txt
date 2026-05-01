@@ -61,8 +61,10 @@ function(ConfigureTest)
                CUDA_STANDARD_REQUIRED ON
   )
   target_compile_options(
-    ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                         "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    ${TEST_NAME}
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(_CUVS_TEST_NOCUDA)
@@ -132,6 +134,13 @@ ConfigureTest(
 )
 
 ConfigureTest(
+  NAME NEIGHBORS_ANN_IVF_FLAT_UDF_TEST
+  PATH neighbors/ann_ivf_flat/test_udf.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_PQ_TEST
   PATH neighbors/ann_ivf_pq/test_float_int64_t.cu neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
        neighbors/ann_ivf_pq/test_uint8_t_int64_t.cu
@@ -155,7 +164,11 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
-  PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu neighbors/ann_cagra/bug_multi_cta_crash.cu
+  PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
+       neighbors/ann_cagra/bug_multi_cta_crash.cu
+       neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
+       neighbors/ann_cagra/bug_iterative_cagra_build.cu
+       neighbors/ann_cagra/bug_issue_93_reproducer.cu
   GPUS 1
   PERCENT 100
 )
@@ -324,6 +337,7 @@ ConfigureTest(
        distance/dist_lp_unexp.cu
        distance/dist_russell_rao.cu
        distance/gram.cu
+       distance/kde.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
        sparse/gram.cu
@@ -334,8 +348,11 @@ ConfigureTest(
 
 ConfigureTest(
   NAME PREPROCESSING_TEST
-  PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu preprocessing/product_quantization.cu
+  PATH preprocessing/scalar_quantization.cu
+       preprocessing/binary_quantization.cu
+       preprocessing/spectral_embedding.cu
+       preprocessing/product_quantization.cu
+       preprocessing/pca.cu
   GPUS 1
   PERCENT 100
 )

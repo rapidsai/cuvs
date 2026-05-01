@@ -5,9 +5,10 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../../vpq_dataset.cuh"
+#include "../../../preprocessing/quantize/vpq_build-ext.cuh"
 #include "graph_core.cuh"
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -109,8 +110,7 @@ void ace_get_partition_labels(
     }
   }
   auto sample_db_dev = raft::make_device_matrix<float, int64_t>(res, n_samples, dataset_dim);
-  raft::update_device(
-    sample_db_dev.data_handle(), sample_db.data_handle(), sample_db.size(), stream);
+  raft::copy(res, sample_db_dev.view(), sample_db.view());
 
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
@@ -145,10 +145,11 @@ void ace_get_partition_labels(
         sub_dataset(i_sub, k) = static_cast<float>(dataset(i, k));
       }
     }
+    auto sub_dataset_dev_view = raft::make_device_matrix_view<float, int64_t>(
+      _sub_dataset_dev.data_handle(), sub_dataset_size, dataset_dim);
+    raft::copy(res, sub_dataset_dev_view, sub_dataset);
     auto sub_dataset_dev = raft::make_device_matrix_view<const float, int64_t>(
       _sub_dataset_dev.data_handle(), sub_dataset_size, dataset_dim);
-    raft::update_device(
-      _sub_dataset_dev.data_handle(), sub_dataset.data_handle(), sub_dataset.size(), stream);
 
     auto sub_distances = raft::make_host_matrix_view<float, int64_t>(
       _sub_distances.data_handle(), sub_dataset_size, n_partitions);
@@ -161,8 +162,7 @@ void ace_get_partition_labels(
                                       sub_distances_dev,
                                       cuvs::distance::DistanceType::L2Expanded);
 
-    raft::update_host(
-      sub_distances.data_handle(), sub_distances_dev.data_handle(), sub_distances.size(), stream);
+    raft::copy(res, sub_distances, sub_distances_dev);
     raft::resource::sync_stream(res, stream);
 
     // Find two closest partitions to each dataset vector
@@ -1382,10 +1382,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
       auto sub_search_graph =
         raft::make_host_matrix<IdxT, int64_t>(core_sub_dataset_size, graph_degree);
       cudaStream_t stream = raft::resource::get_cuda_stream(res);
-      raft::update_host(sub_search_graph.data_handle(),
-                        sub_index.graph().data_handle(),
-                        sub_search_graph.size(),
-                        stream);
+      raft::copy(
+        res,
+        raft::make_host_vector_view(sub_search_graph.data_handle(), sub_search_graph.size()),
+        raft::make_device_vector_view(sub_index.graph().data_handle(), sub_search_graph.size()));
       raft::resource::sync_stream(res, stream);
 
       if (use_disk_mode) {
@@ -1696,8 +1696,8 @@ void build_knn_graph(
 
   // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
   rmm::device_async_resource_ref workspace_mr =
-    use_large_workspace ? raft::resource::get_large_workspace_resource(res)
-                        : raft::resource::get_workspace_resource(res);
+    use_large_workspace ? raft::resource::get_large_workspace_resource_ref(res)
+                        : raft::resource::get_workspace_resource_ref(res);
 
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
@@ -1771,16 +1771,14 @@ void build_knn_graph(
       }
 
       // copy next batch to host
-      raft::copy(neighbors_host.data_handle(),
-                 neighbors.data_handle(),
-                 neighbors_view.size(),
-                 raft::resource::get_cuda_stream(res));
+      raft::copy(res,
+                 raft::make_host_vector_view(neighbors_host.data_handle(), neighbors_view.size()),
+                 raft::make_device_vector_view(neighbors.data_handle(), neighbors_view.size()));
       if (top_k != gpu_top_k) {
         // can be skipped for disabled refinement
-        raft::copy(queries_host.data_handle(),
-                   batch.data(),
-                   queries_view.size(),
-                   raft::resource::get_cuda_stream(res));
+        raft::copy(res,
+                   raft::make_host_vector_view(queries_host.data_handle(), queries_view.size()),
+                   raft::make_device_vector_view(batch.data(), queries_view.size()));
       }
 
       previous_batch_size   = batch.size();
@@ -1822,10 +1820,11 @@ void build_knn_graph(
                               refined_neighbors_view,
                               refined_distances_view,
                               pq.build_params.metric);
-      raft::copy(refined_neighbors_host.data_handle(),
-                 refined_neighbors_view.data_handle(),
-                 refined_neighbors_view.size(),
-                 raft::resource::get_cuda_stream(res));
+      raft::copy(res,
+                 raft::make_host_vector_view(refined_neighbors_host.data_handle(),
+                                             refined_neighbors_view.size()),
+                 raft::make_device_vector_view(refined_neighbors_view.data_handle(),
+                                               refined_neighbors_view.size()));
       raft::resource::sync_stream(res);
 
       auto refined_neighbors_host_view = raft::make_host_matrix_view<int64_t, int64_t>(
@@ -2021,7 +2020,9 @@ auto iterative_build_graph(
 
   // Allocate memory for search results.
   constexpr uint64_t max_chunk_size = 8192;
-  auto topk                         = intermediate_degree;
+  // +1 because the search may return the query node itself as a neighbor;
+  // this is consistent with the per-iteration curr_topk = next_graph_degree + 1
+  auto topk          = intermediate_degree + 1;
   auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, max_chunk_size, topk);
   auto dev_distances = raft::make_device_matrix<float, int64_t>(res, max_chunk_size, topk);
 
@@ -2079,7 +2080,7 @@ auto iterative_build_graph(
       curr_itopk_size = curr_topk + 32;
     }
 
-    RAFT_LOG_INFO(
+    RAFT_LOG_DEBUG(
       "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
       (uint64_t)cagra_graph.extent(0),
       (double)cagra_graph.extent(0) / final_graph_size,
@@ -2115,7 +2116,7 @@ auto iterative_build_graph(
       dev_query_view.extent(1),
       max_chunk_size,
       raft::resource::get_cuda_stream(res),
-      raft::resource::get_workspace_resource(res));
+      raft::resource::get_workspace_resource_ref(res));
     for (const auto& batch : query_batch) {
       auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
         batch.data(), batch.size(), dev_query_view.extent(1));
@@ -2133,10 +2134,7 @@ auto iterative_build_graph(
 
       auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
         neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
-      raft::copy(batch_neighbors_view.data_handle(),
-                 batch_dev_neighbors_view.data_handle(),
-                 batch_neighbors_view.size(),
-                 raft::resource::get_cuda_stream(res));
+      raft::copy(res, batch_neighbors_view, batch_dev_neighbors_view);
     }
 
     // Optimize graph
@@ -2148,7 +2146,7 @@ auto iterative_build_graph(
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    RAFT_LOG_INFO("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
+    RAFT_LOG_DEBUG("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
 
     if (flag_last) { break; }
     flag_last       = (curr_graph_size == final_graph_size);
@@ -2281,8 +2279,7 @@ index<T, IdxT> build(
     idx.update_dataset(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-      cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
-        res, *params.compression, dataset));
+      cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dataset));
 
     return idx;
   }
