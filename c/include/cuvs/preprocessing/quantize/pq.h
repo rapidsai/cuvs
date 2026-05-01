@@ -166,7 +166,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
  * @param[out] vq_labels a device vector containing the VQ labels when VQ is used.
  *   Optional, can be NULL.
  */
- cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
   cuvsProductQuantizer_t quantizer,
   DLManagedTensor* pq_codes,
   DLManagedTensor* out,
