@@ -1327,10 +1327,6 @@ struct alignas(kCacheLineBytes) job_desc_t {
     const data_type* queries_ptr;         // [num_queries, dataset_dim]
     uint32_t top_k;
     uint32_t n_queries;
-    // Make index details job-specific so the persistent kernel singleton can serve multiple indexes
-    const DATASET_DESCRIPTOR_T* dataset_desc_ptr;
-    const index_type* graph_ptr;
-    uint32_t graph_degree;
   };
   using blob_elem_type = uint4;
   constexpr static inline size_t kBlobSize =
@@ -1374,9 +1370,12 @@ template <bool TOPK_BY_BITONIC_SORT,
           class SourceIndexT,
           class SAMPLE_FILTER_T>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
+  const DATASET_DESCRIPTOR_T* dataset_desc,
   worker_handle_t* worker_handles,
   job_desc_t<DATASET_DESCRIPTOR_T>* job_descriptors,
   uint32_t* completion_counters,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T* const knn_graph,  // [dataset_size, graph_degree]
+  const std::uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,
   const unsigned num_distilation,
   const uint64_t rand_xor_mask,
@@ -1435,10 +1434,6 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
     auto top_k                 = job_descriptor.value.top_k;
     auto n_queries             = job_descriptor.value.n_queries;
     auto query_id              = worker_data.value.query_id;
-    // per-job index pointers
-    auto* dataset_desc = job_descriptor.value.dataset_desc_ptr;
-    auto* knn_graph    = job_descriptor.value.graph_ptr;
-    auto  graph_degree = job_descriptor.value.graph_degree;
 
     // work phase
     search_core<TOPK_BY_BITONIC_SORT,
@@ -1525,13 +1520,32 @@ struct search_kernel_config {
                                              unsigned num_itopk_candidates,
                                              unsigned block_size) -> kernel_t
   {
-    switch (select_topk_variant(itopk_size, num_itopk_candidates, block_size)) {
-      case TopkVariant::BITONIC:
-        return dispatch_kernel<Persistent, true, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
-      case TopkVariant::BITONIC_MERGE_MULTI:
-        return dispatch_kernel<Persistent, true, true, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
-      default:
-        return dispatch_kernel<Persistent, false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+    assert(itopk_size <= 512);
+    if (num_itopk_candidates <= 256) {
+      if (itopk_size <= 256) {
+        return dispatch_kernel<Persistent,
+                               true,
+                               false,
+                               DATASET_DESCRIPTOR_T,
+                               SourceIndexT,
+                               SAMPLE_FILTER_T>;
+      } else {
+        assert(block_size >= 64);
+        return dispatch_kernel<Persistent,
+                               true,
+                               true,
+                               DATASET_DESCRIPTOR_T,
+                               SourceIndexT,
+                               SAMPLE_FILTER_T>;
+      }
+    } else {
+      // Radix-based topk is used
+      return dispatch_kernel<Persistent,
+                             false,
+                             false,
+                             DATASET_DESCRIPTOR_T,
+                             SourceIndexT,
+                             SAMPLE_FILTER_T>;
     }
   }
 };
@@ -2014,6 +2028,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
   using job_desc_type = job_desc_t<descriptor_base_type>;
   kernel_type kernel;
   uint32_t block_size;
+  dataset_descriptor_host<DataT, IndexT, DistanceT> dd_host;
   rmm::device_uvector<worker_handle_t> worker_handles;
   rmm::device_uvector<job_desc_type> job_descriptors;
   rmm::device_uvector<uint32_t> completion_counters;
@@ -2025,9 +2040,9 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
    * Calculate the hash of the parameters to detect if they've changed across the calls.
    * NB: this must have the same argument types as the constructor.
    */
-  // NB: dataset_desc and graph are intentionally excluded from the hash — they are now per-job
-  // fields stored in the job descriptor, so the runner is keyed only on fixed kernel parameters.
   static inline auto calculate_parameter_hash(
+    std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
+    raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
     const SourceIndexT* source_indices_ptr,
     uint32_t max_candidates,
     uint32_t num_itopk_candidates,
@@ -2048,13 +2063,16 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     float persistent_lifetime,
     float persistent_device_usage) -> uint64_t
   {
-    return uint64_t(source_indices_ptr) ^ num_itopk_candidates ^ block_size ^ smem_size ^
+    return uint64_t(graph.data_handle()) ^ uint64_t(source_indices_ptr) ^
+           dataset_desc.get().team_size ^ num_itopk_candidates ^ block_size ^ smem_size ^
            hash_bitlen ^ small_hash_reset_interval ^ num_random_samplings ^ rand_xor_mask ^
            num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^
            uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000);
   }
 
   persistent_runner_t(
+    std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
+    raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
     const SourceIndexT* source_indices_ptr,
     uint32_t max_candidates,
     uint32_t num_itopk_candidates,
@@ -2082,7 +2100,10 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
       job_descriptors(kMaxJobsNum, stream, job_descriptor_mr),
       completion_counters(kMaxJobsNum, stream, device_mr),
       hashmap(0, stream, device_mr),
-      param_hash(calculate_parameter_hash(source_indices_ptr,
+      dd_host{dataset_desc.get()},
+      param_hash(calculate_parameter_hash(dd_host,
+                                          graph,
+                                          source_indices_ptr,
                                           max_candidates,
                                           num_itopk_candidates,
                                           block_size,
@@ -2102,7 +2123,8 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                                           persistent_lifetime,
                                           persistent_device_usage))
   {
-    // dataset_desc and graph are now per-job fields; no fixed device descriptor at launch time.
+    // initialize the dataset/distance descriptor
+    auto* dd_dev_ptr = dd_host.dev_ptr(stream);
 
     // set kernel attributes same as in normal kernel
     RAFT_CUDA_TRY(
@@ -2145,14 +2167,18 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     }
 
     // launch the kernel
-    // dataset_desc and graph are per-job (in the job descriptor); not passed as kernel args.
+    auto* graph_ptr                   = graph.data_handle();
+    uint32_t graph_degree             = graph.extent(1);
     uint32_t* num_executed_iterations = nullptr;  // optional arg [num_queries]
     const index_type* dev_seed_ptr    = nullptr;  // optional arg [num_queries, num_seeds]
 
     void* args[] =  // NOLINT
-      {&worker_handles_ptr,
+      {&dd_dev_ptr,
+       &worker_handles_ptr,
        &job_descriptors_ptr,
        &completion_counters_ptr,
+       &graph_ptr,  // [dataset_size, graph_degree]
+       &graph_degree,
        &source_indices_ptr,
        &num_random_samplings,
        &rand_xor_mask,
@@ -2192,14 +2218,11 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     RAFT_LOG_INFO("Destroyed the persistent runner.");
   }
 
-  void launch(uintptr_t result_indices_ptr,              // [num_queries, top_k]
-              distance_type* result_distances_ptr,       // [num_queries, top_k]
-              const data_type* queries_ptr,              // [num_queries, dataset_dim]
+  void launch(uintptr_t result_indices_ptr,         // [num_queries, top_k]
+              distance_type* result_distances_ptr,  // [num_queries, top_k]
+              const data_type* queries_ptr,         // [num_queries, dataset_dim]
               uint32_t num_queries,
-              uint32_t top_k,
-              const descriptor_base_type* dd_dev_ptr,   // device descriptor for this segment
-              const index_type* graph_ptr,              // graph for this segment
-              uint32_t graph_degree)                    // graph degree for this segment
+              uint32_t top_k)
   {
     // submit all queries
     launcher_t launcher{job_queue,
@@ -2212,20 +2235,14 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                          result_distances_ptr,
                          queries_ptr,
                          top_k,
-                         num_queries,
-                         dd_dev_ptr,
-                         graph_ptr,
-                         graph_degree](uint32_t job_ix) {
-                          auto& jd                  = job_descriptors.data()[job_ix].input.value;
-                          auto* cflag               = &job_descriptors.data()[job_ix].completion_flag;
-                          jd.result_indices_ptr     = result_indices_ptr;
-                          jd.result_distances_ptr   = result_distances_ptr;
-                          jd.queries_ptr            = queries_ptr;
-                          jd.top_k                  = top_k;
-                          jd.n_queries              = num_queries;
-                          jd.dataset_desc_ptr       = dd_dev_ptr;
-                          jd.graph_ptr              = graph_ptr;
-                          jd.graph_degree           = graph_degree;
+                         num_queries](uint32_t job_ix) {
+                          auto& jd                = job_descriptors.data()[job_ix].input.value;
+                          auto* cflag             = &job_descriptors.data()[job_ix].completion_flag;
+                          jd.result_indices_ptr   = result_indices_ptr;
+                          jd.result_distances_ptr = result_distances_ptr;
+                          jd.queries_ptr          = queries_ptr;
+                          jd.top_k                = top_k;
+                          jd.n_queries            = num_queries;
                           cflag->store(false, cuda::memory_order_relaxed);
                           cuda::atomic_thread_fence(cuda::memory_order_release,
                                                     cuda::thread_scope_system);
@@ -2423,14 +2440,14 @@ void select_and_run(
   if (ps.persistent) {
     using runner_type = persistent_runner_t<DataT, IndexT, DistanceT, SourceIndexT, SampleFilterT>;
 
-    // Initialize the device descriptor on the caller's stream (lazy, cached after first call).
-    // Synchronize to guarantee the upload completes before the GPU kernel reads the pointer from
-    // the job descriptor.  This sync is cheap on all subsequent calls (stream is empty).
-    auto* dd_dev_ptr = dataset_desc.dev_ptr(stream);
-    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
-
-    // Runner is keyed on fixed kernel parameters only; dataset/graph are now per-job.
-    get_runner<runner_type>(source_indices_ptr,
+    get_runner<runner_type>(/*
+Note, we're passing the descriptor by reference here, and this reference is going to be passed to a
+new spawned thread, which is dangerous. However, the descriptor is copied in that thread before the
+control is returned in this thread (in persistent_runner_t constructor), so we're safe.
+*/
+                            std::cref(dataset_desc),
+                            graph,
+                            source_indices_ptr,
                             max_candidates,
                             num_itopk_candidates,
                             block_size,
@@ -2449,14 +2466,7 @@ void select_and_run(
                             sample_filter,
                             ps.persistent_lifetime,
                             ps.persistent_device_usage)
-      ->launch(topk_indices_ptr,
-               topk_distances_ptr,
-               queries_ptr,
-               num_queries,
-               topk,
-               dd_dev_ptr,
-               graph.data_handle(),
-               static_cast<uint32_t>(graph.extent(1)));
+      ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
   } else {
     using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
     auto kernel = search_kernel_config<false, descriptor_base_type, SourceIndexT, SampleFilterT>::
