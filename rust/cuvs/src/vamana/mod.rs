@@ -8,4 +8,4 @@ mod index;
 mod index_params;
 
 pub use index::Index;
-pub use index_params::IndexParams;
+pub use index_params::{IndexParams, IndexParamsBuilder};
