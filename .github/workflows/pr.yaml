@@ -34,7 +34,7 @@ jobs:
       - wheel-tests-cuvs
       - devcontainer
       - telemetry-setup
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@main
     if: always()
     with:
@@ -67,7 +67,7 @@ jobs:
           max-days-without-success: 30
   changed-files:
     needs: telemetry-setup
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/changed-files.yaml@main
     with:
       files_yaml: |
@@ -330,7 +330,7 @@ jobs:
           - '!thirdparty/LICENSES/**'
   checks:
     needs: telemetry-setup
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/checks.yaml@main
     with:
       enable_check_generated_files: false
@@ -340,7 +340,7 @@ jobs:
     uses: ./.github/workflows/check-c-abi.yaml
   conda-cpp-build:
     needs: checks
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@main
     with:
       build_type: pull-request
@@ -348,7 +348,7 @@ jobs:
       script: ci/build_cpp.sh
   conda-cpp-tests:
     needs: [conda-cpp-build, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     with:
@@ -356,14 +356,14 @@ jobs:
       script: ci/test_cpp.sh
   conda-cpp-checks:
     needs: conda-cpp-build
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@main
     with:
       build_type: pull-request
       symbol_exclusions: (void (thrust::|cub::))
   conda-python-build:
     needs: conda-cpp-build
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@main
     with:
       build_type: pull-request
@@ -372,7 +372,7 @@ jobs:
       matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   conda-python-tests:
     needs: [conda-python-build, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python_conda
     with:
@@ -380,14 +380,14 @@ jobs:
       script: ci/test_python.sh
   rocky8-clib-standalone-build-matrix:
     needs: checks
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     with:
       build_type: pull-request
       matrix_name: conda-cpp-build
   rocky8-clib-standalone-build:
     needs: rocky8-clib-standalone-build-matrix
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     strategy:
       fail-fast: false
@@ -405,7 +405,7 @@ jobs:
       sha: ${{ inputs.sha }}
   rocky8-clib-tests-matrix:
     needs: [rocky8-clib-standalone-build, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     with:
@@ -413,7 +413,7 @@ jobs:
       matrix_name: conda-cpp-build
   rocky8-clib-tests:
     needs: rocky8-clib-tests-matrix
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     strategy:
       fail-fast: false
@@ -428,7 +428,7 @@ jobs:
       sha: ${{ inputs.sha }}
   conda-java-build-and-tests-matrix:
     needs: [conda-cpp-build, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     with:
@@ -437,7 +437,7 @@ jobs:
       matrix_filter: map(select(.ARCH == "amd64"))
   conda-java-build-and-tests:
     needs: conda-java-build-and-tests-matrix
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
@@ -454,7 +454,7 @@ jobs:
       file_to_upload: "java/cuvs-java/target/"
   rust-build-matrix:
     needs: [conda-cpp-build, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     with:
@@ -463,7 +463,7 @@ jobs:
       matrix_filter: map(select(.ARCH == "amd64"))
   rust-build:
     needs: rust-build-matrix
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
@@ -478,7 +478,7 @@ jobs:
       script: "ci/build_rust.sh"
   go-build-matrix:
     needs: [conda-cpp-build, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_go || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     with:
@@ -487,7 +487,7 @@ jobs:
       matrix_filter: map(select(.ARCH == "amd64"))
   go-build:
     needs: go-build-matrix
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
@@ -502,7 +502,7 @@ jobs:
       script: "ci/build_go.sh"
   docs-build:
     needs: conda-python-build
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     with:
       build_type: pull-request
@@ -512,7 +512,7 @@ jobs:
       script: "ci/build_docs.sh"
   wheel-build-libcuvs:
     needs: checks
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
     with:
       build_type: pull-request
@@ -524,7 +524,7 @@ jobs:
       package-type: cpp
   wheel-build-cuvs:
     needs: wheel-build-libcuvs
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
     with:
       build_type: pull-request
@@ -536,14 +536,14 @@ jobs:
       matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   wheel-tests-cuvs:
     needs: [wheel-build-cuvs, changed-files]
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@main
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python_wheels
     with:
       build_type: pull-request
       script: ci/test_wheel_cuvs.sh
   devcontainer:
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     needs: telemetry-setup
     uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@main
     with:
