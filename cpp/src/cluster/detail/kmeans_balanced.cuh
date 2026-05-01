@@ -6,7 +6,9 @@
 #pragma once
 
 #include "kmeans_common.cuh"
+#include "kmeans_predict_cagra.cuh"
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 
 #include "../../core/nvtx.hpp"
 #include "../../distance/distance.cuh"
@@ -646,6 +648,7 @@ void balancing_em_iters(const raft::resources& handle,
 {
   auto stream                = raft::resource::get_cuda_stream(handle);
   uint32_t balancing_counter = balancing_pullback;
+  std::optional<cuvs::neighbors::cagra::index<float, uint32_t>> cagra_index_opt;
   for (uint32_t iter = 0; iter < n_iters; iter++) {
     // Balancing step - move the centers around to equalize cluster sizes
     // (but not on the first iteration)
@@ -681,18 +684,35 @@ void balancing_em_iters(const raft::resources& handle,
       }
       default: break;
     }
-    // E: Expectation step - predict labels
-    predict(handle,
-            params,
-            cluster_centers,
-            n_clusters,
-            dim,
-            dataset,
-            n_rows,
-            cluster_labels,
-            mapping_op,
-            device_memory,
-            dataset_norm);
+    // E: Expectation step - predict labels (optionally via ANN with batched index rebuild)
+    const bool use_ann = params.use_ann_for_fit &&
+                         n_clusters >= cuvs::cluster::kmeans::detail::kMinClustersForAnnFit &&
+                         std::is_same_v<MathT, float> && std::is_same_v<T, float>;
+    if (use_ann) {
+      bool rebuild = (iter % params.ann_rebuild_interval == 0);
+      cuvs::cluster::kmeans::detail::predict_cagra_with_index_reuse<IdxT, LabelT>(handle,
+                                                                                  params,
+                                                                                  cluster_centers,
+                                                                                  n_clusters,
+                                                                                  dim,
+                                                                                  reinterpret_cast<const float*>(dataset),
+                                                                                  n_rows,
+                                                                                  cluster_labels,
+                                                                                  &cagra_index_opt,
+                                                                                  rebuild);
+    } else {
+      predict(handle,
+              params,
+              cluster_centers,
+              n_clusters,
+              dim,
+              dataset,
+              n_rows,
+              cluster_labels,
+              mapping_op,
+              device_memory,
+              dataset_norm);
+    }
     // M: Maximization step - calculate optimal cluster centers
     calc_centers_and_sizes(handle,
                            cluster_centers,
