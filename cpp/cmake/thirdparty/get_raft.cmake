@@ -1,13 +1,13 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 
 # Use RAPIDS_VERSION_MAJOR_MINOR from rapids_config.cmake
 set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
-set(RAFT_FORK "rapidsai")
-set(RAFT_PINNED_TAG "${rapids-cmake-checkout-tag}")
+set(RAFT_FORK "vyasr")
+set(RAFT_PINNED_TAG "fix/symbol_export")
 
 function(find_and_configure_raft)
     set(oneValueArgs VERSION FORK PINNED_TAG BUILD_STATIC_DEPS ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
