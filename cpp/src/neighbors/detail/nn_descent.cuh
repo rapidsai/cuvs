@@ -6,7 +6,7 @@
 #pragma once
 
 #include "ann_utils.cuh"
-#include "cagra/device_common.hpp"
+#include "cagra/jit_lto_kernels/device_intrinsics.hpp"
 #include "nn_descent_gnnd.hpp"
 
 #include "../../core/omp_wrapper.hpp"

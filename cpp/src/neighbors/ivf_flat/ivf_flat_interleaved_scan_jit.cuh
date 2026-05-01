@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../detail/cagra/jit_lto_kernels/sample_filter_data.h"
 #include "../ivf_common.cuh"
 #include "detail/jit_lto_kernels/interleaved_scan_planner.hpp"
 #include "detail/jit_lto_kernels/kernel_def.hpp"
@@ -28,7 +29,6 @@
 #include <rmm/cuda_stream_view.hpp>
 
 namespace cuvs::neighbors::ivf_flat::detail {
-
 static constexpr int kThreadsPerBlock = 128;
 
 using namespace cuvs::spatial::knn::detail;  // NOLINT
@@ -37,10 +37,10 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 template <typename T>
 constexpr auto get_data_type_tag()
 {
-  if constexpr (std::is_same_v<T, float>) { return tag_f{}; }
-  if constexpr (std::is_same_v<T, __half>) { return tag_h{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return tag_i8{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return tag_u8{}; }
+  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::detail::tag_f{}; }
+  if constexpr (std::is_same_v<T, __half>) { return cuvs::neighbors::detail::tag_h{}; }
+  if constexpr (std::is_same_v<T, int8_t>) { return cuvs::neighbors::detail::tag_i8{}; }
+  if constexpr (std::is_same_v<T, uint8_t>) { return cuvs::neighbors::detail::tag_u8{}; }
 }
 
 template <typename AccT>
@@ -202,6 +202,9 @@ void launch_kernel(const index<T, IdxT>& index,
       std::min(kMaxGridY, num_queries), n_probes, smem_size, kernel_launcher->get_kernel());
     return;
   }
+
+  // Pass individual filter parameters like CAGRA does
+  // The kernel will construct filter_data struct internally when needed
 
   for (uint32_t query_offset = 0; query_offset < num_queries; query_offset += kMaxGridY) {
     uint32_t grid_dim_y = std::min<uint32_t>(kMaxGridY, num_queries - query_offset);

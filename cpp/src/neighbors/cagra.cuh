@@ -9,7 +9,7 @@
 #include "detail/cagra/cagra_build.cuh"
 #include "detail/cagra/cagra_merge.cuh"
 #include "detail/cagra/cagra_search.cuh"
-#include "detail/cagra/graph_core.cuh"
+#include "detail/cagra/jit_lto_kernels/graph_core.cuh"
 
 #include "detail/ann_utils.cuh"
 #include <raft/core/device_mdspan.hpp>
