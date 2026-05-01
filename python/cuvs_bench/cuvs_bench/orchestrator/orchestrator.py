@@ -222,43 +222,47 @@ class BenchmarkOrchestrator:
         for config in benchmark_configs:
             # Create backend instance
             backend = self.backend_class(config.backend_config)
+            try:
+                backend.initialize()
 
-            if build:
-                # Pass ALL indexes at once - ONE C++ command builds all
-                build_result = backend.build(
-                    dataset=bench_dataset,
-                    indexes=config.indexes,
-                    force=force,
-                    dry_run=dry_run,
-                )
-                results.append(build_result)
-
-                if not build_result.success:
-                    print(
-                        f"Build failed for {config.index_name}: {build_result.error_message}"
+                if build:
+                    # Pass ALL indexes at once - ONE C++ command builds all
+                    build_result = backend.build(
+                        dataset=bench_dataset,
+                        indexes=config.indexes,
+                        force=force,
+                        dry_run=dry_run,
                     )
-                    continue
+                    results.append(build_result)
 
-            if search:
-                # Pass ALL indexes at once - ONE C++ command searches all
-                # Each index has its own search_params list
-                # Total benchmarks = sum(len(idx.search_params) for idx in indexes)
-                search_result = backend.search(
-                    dataset=bench_dataset,
-                    indexes=config.indexes,
-                    k=count,
-                    batch_size=batch_size,
-                    mode=search_mode,
-                    force=force,
-                    search_threads=search_threads,
-                    dry_run=dry_run,
-                )
-                results.append(search_result)
+                    if not build_result.success:
+                        print(
+                            f"Build failed for {config.index_name}: {build_result.error_message}"
+                        )
+                        continue
 
-                if not search_result.success:
-                    print(
-                        f"Search failed for {config.index_name}: {search_result.error_message}"
+                if search:
+                    # Pass ALL indexes at once - ONE C++ command searches all
+                    # Each index has its own search_params list
+                    # Total benchmarks = sum(len(idx.search_params) for idx in indexes)
+                    search_result = backend.search(
+                        dataset=bench_dataset,
+                        indexes=config.indexes,
+                        k=count,
+                        batch_size=batch_size,
+                        mode=search_mode,
+                        force=force,
+                        search_threads=search_threads,
+                        dry_run=dry_run,
                     )
+                    results.append(search_result)
+
+                    if not search_result.success:
+                        print(
+                            f"Search failed for {config.index_name}: {search_result.error_message}"
+                        )
+            finally:
+                backend.cleanup()
 
         return results
 
@@ -550,32 +554,36 @@ class BenchmarkOrchestrator:
             "append_results": append_results,
         }
         backend = self.backend_class(backend_config)
+        try:
+            backend.initialize()
 
-        result = None
+            result = None
 
-        if build:
-            result = backend.build(
-                dataset=bench_dataset,
-                indexes=config.indexes,
-                force=force,
-                dry_run=dry_run,
-            )
-            if not result.success:
-                return result
+            if build:
+                result = backend.build(
+                    dataset=bench_dataset,
+                    indexes=config.indexes,
+                    force=force,
+                    dry_run=dry_run,
+                )
+                if not result.success:
+                    return result
 
-        if search:
-            result = backend.search(
-                dataset=bench_dataset,
-                indexes=config.indexes,
-                k=count,
-                batch_size=batch_size,
-                mode=search_mode,
-                force=force,
-                search_threads=search_threads,
-                dry_run=dry_run,
-            )
+            if search:
+                result = backend.search(
+                    dataset=bench_dataset,
+                    indexes=config.indexes,
+                    k=count,
+                    batch_size=batch_size,
+                    mode=search_mode,
+                    force=force,
+                    search_threads=search_threads,
+                    dry_run=dry_run,
+                )
 
-        return result
+            return result
+        finally:
+            backend.cleanup()
 
     def _create_dataset(self, dataset_config: DatasetConfig) -> Dataset:
         """

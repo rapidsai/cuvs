@@ -1,0 +1,35 @@
+# OpenSearch k-NN benchmark configuration – faiss HNSW engine
+#
+# Uses OpenSearch's faiss engine with the HNSW method.
+#
+# Build parameters
+# ----------------
+# m                Number of bidirectional graph edges per node.
+# ef_construction  Candidate list size during construction.
+#
+# Search parameters
+# -----------------
+# ef_search        Candidate list size at query time (updated via index settings).
+
+name: opensearch_faiss_hnsw
+groups:
+  base:
+    build:
+      m: [16, 32]
+      ef_construction: [100, 200, 512]
+    search:
+      ef_search: [50, 100, 200, 512]
+
+  large:
+    build:
+      m: [32]
+      ef_construction: [200, 512]
+    search:
+      ef_search: [100, 200, 512, 1024]
+
+  test:
+    build:
+      m: [16]
+      ef_construction: [100]
+    search:
+      ef_search: [50, 100]
