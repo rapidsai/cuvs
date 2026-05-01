@@ -689,6 +689,54 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
   });
 }
 
+extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
+                                                   cuvsCagraSearchParams_t params,
+                                                   uint32_t num_segments,
+                                                   cuvsCagraIndex_t* indices,
+                                                   DLManagedTensor** queries,
+                                                   DLManagedTensor** neighbors,
+                                                   DLManagedTensor** distances)
+{
+  return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(num_segments > 0, "num_segments must be > 0");
+    RAFT_EXPECTS(indices != nullptr && queries != nullptr && neighbors != nullptr &&
+                   distances != nullptr,
+                 "All pointer arrays must be non-null");
+
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    auto search_params = cuvs::neighbors::cagra::search_params();
+    convert_c_search_params(*params, &search_params);
+
+    // Only float32 is supported for multi-segment search.
+    RAFT_EXPECTS(
+      indices[0]->dtype.code == kDLFloat && indices[0]->dtype.bits == 32,
+      "Multi-segment search only supports float32 indices");
+
+    using T        = float;
+    using IdxT     = uint32_t;
+    using OutIdxT  = uint32_t;
+    using DistanceT = float;
+    using IndexT    = cuvs::neighbors::cagra::index<T, IdxT>;
+
+    std::vector<const IndexT*> idx_vec(num_segments);
+    std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>> q_vec(num_segments);
+    std::vector<raft::device_matrix_view<OutIdxT, int64_t, raft::row_major>> n_vec(num_segments);
+    std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>> d_vec(num_segments);
+
+    for (uint32_t i = 0; i < num_segments; i++) {
+      RAFT_EXPECTS(indices[i] != nullptr && indices[i]->addr != 0,
+                   "Index at position %u is null or not built", i);
+      idx_vec[i] = reinterpret_cast<const IndexT*>(indices[i]->addr);
+      q_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(q_vec[i])>>(queries[i]);
+      n_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(n_vec[i])>>(neighbors[i]);
+      d_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(d_vec[i])>>(distances[i]);
+    }
+
+    cuvs::neighbors::cagra::search_multi_segment(
+      *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec);
+  });
+}
+
 extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
                                       cuvsCagraIndexParams_t params,
                                       cuvsCagraIndex_t* indices,

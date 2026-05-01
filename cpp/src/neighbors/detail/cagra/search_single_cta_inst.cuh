@@ -34,4 +34,21 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
     SampleFilterT sample_filter,                                                   \
     cudaStream_t stream);
 
+#define instantiate_kernel_selection_ms(DataT, IndexT, DistanceT, SampleFilterT)               \
+  template void select_and_run_multi_segment<DataT, IndexT, DistanceT, IndexT, SampleFilterT>( \
+    const multi_segment_desc_t<DataT, IndexT, DistanceT>* segment_descs,                       \
+    uint32_t num_segments,                                                                     \
+    uint32_t num_queries,                                                                      \
+    const search_params& ps,                                                                   \
+    uint32_t topk,                                                                             \
+    uint32_t num_itopk_candidates,                                                             \
+    uint32_t block_size,                                                                       \
+    uint32_t smem_size,                                                                        \
+    int64_t hash_bitlen,                                                                       \
+    IndexT* hashmap_ptr,                                                                       \
+    size_t small_hash_bitlen,                                                                  \
+    size_t small_hash_reset_interval,                                                          \
+    SampleFilterT sample_filter,                                                               \
+    cudaStream_t stream);
+
 }  // namespace cuvs::neighbors::cagra::detail::single_cta_search

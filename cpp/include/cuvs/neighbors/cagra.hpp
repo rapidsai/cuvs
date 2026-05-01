@@ -29,6 +29,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace cuvs::neighbors::graph_build_params {
 using iterative_search_params = cuvs::neighbors::search_params;
@@ -1722,6 +1723,87 @@ void search(raft::resources const& res,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
+
+/**
+ * @brief Search multiple CAGRA index segments concurrently in a single kernel launch.
+ *
+ * Launches a single SINGLE_CTA kernel grid that covers all segments, with one CTA per segment.
+ * All per-segment results are written into the caller-supplied device buffers on the stream
+ * associated with @p res; the call returns when all segments have been submitted to the stream
+ * (not necessarily completed).  Use @c cuvsStreamSync to wait for completion.
+ *
+ * Distance values are comparable across segments but are not postprocessed (no kScale correction).
+ *
+ * @param[in]  res        raft resources
+ * @param[in]  params     search parameters
+ * @param[in]  indices    one index per segment
+ * @param[in]  queries    per-segment query matrix [n_queries, dim]
+ * @param[out] neighbors  per-segment result neighbors [n_queries, topk]
+ * @param[out] distances  per-segment result distances [n_queries, topk]
+ */
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const float, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const float, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const half, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const half, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const int8_t, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const int8_t, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
+
+void search_multi_segment(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::search_params const& params,
+  const std::vector<const cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
+  const std::vector<raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>>& queries,
+  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
+  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances);
 
 /**
  * @}

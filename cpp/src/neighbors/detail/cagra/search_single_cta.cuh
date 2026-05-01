@@ -87,6 +87,12 @@ struct search
 
   uint32_t num_itopk_candidates;
 
+  /** Number of elements in a hashmap covering @p n_queries queries across @p n_segments segments. */
+  static size_t hashmap_element_count(size_t n_segments, size_t n_queries, size_t h_bitlen)
+  {
+    return n_segments * n_queries * hashmap::get_size(h_bitlen);
+  }
+
   search(raft::resources const& res,
          search_params params,
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
@@ -197,10 +203,58 @@ struct search
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
     hashmap_size = 0;
     if (small_hash_bitlen == 0 && !this->persistent) {
-      hashmap_size = max_queries * hashmap::get_size(hash_bitlen);
+      hashmap_size = hashmap_element_count(1, max_queries, hash_bitlen);
       hashmap.resize(hashmap_size, raft::resource::get_cuda_stream(res));
     }
     RAFT_LOG_DEBUG("# hashmap_size: %lu", hashmap_size);
+  }
+
+  /**
+   * @brief Search all segments concurrently in a single kernel launch.
+   *
+   * @param res         RAFT resources (stream is extracted from here)
+   * @param segment_descs  device pointer to [num_segments] descriptors
+   * @param num_segments   number of segments (gridDim.z)
+   * @param num_queries    queries per segment (gridDim.y)
+   * @param topk           neighbors to return per (query, segment)
+   */
+  void run_multi_segment(
+    raft::resources const& res,
+    const multi_segment_desc_t<DATA_T, INDEX_T, DISTANCE_T>* segment_descs,
+    uint32_t num_segments,
+    uint32_t num_queries,
+    uint32_t topk)
+  {
+    cudaStream_t stream = raft::resource::get_cuda_stream(res);
+
+    // Allocate global hashmap when small-hash is disabled via the workspace pool
+    // (no cudaMallocAsync/cudaFreeAsync after pool warmup).
+    // Layout: [num_segments][num_queries][hash_size].
+    lightweight_uvector<INDEX_T> ms_hashmap_buf(res);
+    INDEX_T* ms_hashmap_ptr = nullptr;
+    if (small_hash_bitlen == 0) {
+      const size_t ms_hashmap_elems = hashmap_element_count(num_segments, num_queries, hash_bitlen);
+      ms_hashmap_buf.resize(ms_hashmap_elems, stream);
+      ms_hashmap_ptr = ms_hashmap_buf.data();
+    }
+
+    select_and_run_multi_segment<DATA_T, INDEX_T, DISTANCE_T, INDEX_T,
+                                 cuvs::neighbors::filtering::none_sample_filter>(
+      segment_descs,
+      num_segments,
+      num_queries,
+      *this,
+      topk,
+      num_itopk_candidates,
+      static_cast<uint32_t>(thread_block_size),
+      smem_size,
+      hash_bitlen,
+      ms_hashmap_ptr,
+      small_hash_bitlen,
+      small_hash_reset_interval,
+      cuvs::neighbors::filtering::none_sample_filter{},
+      stream);
+    // ms_hashmap_buf destructor returns memory to workspace pool (stream-ordered).
   }
 
   void operator()(
