@@ -9,29 +9,26 @@ mod cmake;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "generate-bindings")]
-fn generate_bindings(
-    include_dir: &Path,
-    include_dirs: &[PathBuf],
-    system_include_dirs: &[PathBuf],
-) {
+fn generate_bindings(include_dir: &Path, include_dirs: &[PathBuf]) {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR not set by Cargo"));
+    let stub_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("bindgen-stubs");
 
     let mut builder = bindgen::Builder::default()
         .header("cuvs_c_wrapper.h")
         .must_use_type("cuvsError_t")
-        .allowlist_function("(cuvs|cudaMemcpyAsync).*")
-        .allowlist_type("(cuvs|DL|cudaError|cudaMemcpyKind).*")
-        .rustified_enum("(cuvs|DL|cudaError).*")
+        .allowlist_function("cuvs.*")
+        .allowlist_type("(cuvs|DL).*")
+        .rustified_enum("(cuvs|DL).*")
+        .blocklist_item("cuda.*")
+        .blocklist_item("CUstream_st")
+        .raw_line("use crate::{cudaDataType_t, cudaStream_t};")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
+    builder = builder.clang_arg(format!("-I{}", stub_dir.display()));
     builder = builder.clang_arg(format!("-I{}", include_dir.display()));
 
     for include_dir in include_dirs {
         builder = builder.clang_arg(format!("-I{}", include_dir.display()));
-    }
-
-    for include_dir in system_include_dirs {
-        builder = builder.clang_arg(format!("-isystem{}", include_dir.display()));
     }
 
     builder
@@ -44,6 +41,7 @@ fn generate_bindings(
 fn main() {
     println!("cargo::rerun-if-changed=cmake.rs");
     println!("cargo::rerun-if-changed=cmake/find_cuvs.cmake");
+    println!("cargo::rerun-if-changed=bindgen-stubs/cuda_runtime.h");
     println!("cargo::rerun-if-env-changed=CMAKE_PREFIX_PATH");
     println!("cargo::rerun-if-env-changed=CONDA_PREFIX");
     println!("cargo::rerun-if-env-changed=LIBCUVS_USE_PYTHON");
@@ -61,19 +59,11 @@ fn main() {
         }
     };
 
-    // The bindings expose cudaMemcpyAsync which lives in libcudart,
-    // not in libcuvs_c, so we must link it explicitly.
-    println!("cargo:rustc-link-lib=dylib=cudart");
-
     // Expose include path to downstream crates via DEP_CUVS_INCLUDE.
     println!("cargo::metadata=include={}", metadata.include_dir.display());
     // Expose the directory containing libcuvs_c.so via DEP_CUVS_LIB.
     println!("cargo::metadata=lib={}", metadata.lib_dir.display());
 
     #[cfg(feature = "generate-bindings")]
-    generate_bindings(
-        &metadata.include_dir,
-        &metadata.bindgen_include_dirs,
-        &metadata.bindgen_system_include_dirs,
-    );
+    generate_bindings(&metadata.include_dir, &metadata.bindgen_include_dirs);
 }

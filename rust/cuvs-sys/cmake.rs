@@ -30,8 +30,6 @@ pub(crate) struct CuvsMetadata {
     pub(crate) include_dir: PathBuf,
     #[cfg(feature = "generate-bindings")]
     pub(crate) bindgen_include_dirs: Vec<PathBuf>,
-    #[cfg(feature = "generate-bindings")]
-    pub(crate) bindgen_system_include_dirs: Vec<PathBuf>,
     pub(crate) lib_dir: PathBuf,
 }
 
@@ -166,19 +164,6 @@ fn find_cuvs_package(cmake_dir: &Path) -> Result<cmake_package::CMakePackage> {
 }
 
 #[cfg(feature = "generate-bindings")]
-fn find_cudatoolkit_package() -> Result<cmake_package::CMakePackage> {
-    find_package("CUDAToolkit").find().map_err(|e| match e {
-        CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
-            cmake_unavailable_error()
-        }
-        _ => anyhow::anyhow!(
-            "Could not find CUDA Toolkit CMake package.\n\n\
-             Install CUDA Toolkit so that `find_package(CUDAToolkit)` succeeds."
-        ),
-    })
-}
-
-#[cfg(feature = "generate-bindings")]
 fn find_dlpack_package() -> Result<cmake_package::CMakePackage> {
     find_package("dlpack").find().map_err(|e| match e {
         CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
@@ -216,7 +201,7 @@ pub(crate) fn try_find_cuvs_package(
         .map(PathBuf::from)
         .context("cuVS CMake target did not export any include directories")?;
 
-    // CUDAToolkit and DLPack include directories are only needed for bindgen.
+    // DLPack include directories are only needed for bindgen.
     #[cfg(feature = "generate-bindings")]
     let bindgen_include_dirs: Vec<_> = {
         let dlpack = find_dlpack_package()?;
@@ -227,18 +212,6 @@ pub(crate) fn try_find_cuvs_package(
             .map(PathBuf::from)
             .filter(|dir| dir.is_dir())
             .filter(|dir| dir != &include_dir)
-            .collect()
-    };
-
-    #[cfg(feature = "generate-bindings")]
-    let bindgen_system_include_dirs: Vec<_> = {
-        let cudatoolkit = find_cudatoolkit_package()?;
-        let cudatoolkit_target = find_target(&cudatoolkit, "CUDA::toolkit")?;
-        cudatoolkit_target
-            .include_directories
-            .iter()
-            .map(PathBuf::from)
-            .filter(|dir| dir.is_dir())
             .collect()
     };
 
@@ -256,8 +229,6 @@ pub(crate) fn try_find_cuvs_package(
         include_dir,
         #[cfg(feature = "generate-bindings")]
         bindgen_include_dirs,
-        #[cfg(feature = "generate-bindings")]
-        bindgen_system_include_dirs,
         lib_dir,
     })
 }

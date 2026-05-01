@@ -8,6 +8,10 @@ homepage.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+doc-only = ["cuvs-sys/doc-only"]
+
 [dependencies]
 cuvs-sys = { workspace = true }
 ndarray = "0.15"
@@ -15,3 +19,6 @@ ndarray = "0.15"
 [dev-dependencies]
 ndarray-rand = "0.14"
 mark-flaky-tests = "1"
+
+[package.metadata.docs.rs]
+features = ["doc-only"]

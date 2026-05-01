@@ -5,7 +5,7 @@
 
 use std::convert::From;
 
-use crate::error::{Result, check_cuda, check_cuvs};
+use crate::error::{Result, check_cuvs};
 use crate::resources::Resources;
 
 /// ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
@@ -32,20 +32,14 @@ impl ManagedTensor {
             // allocate storage, copy over
             check_cuvs(ffi::cuvsRMMAlloc(res.0, &mut device_data as *mut _, bytes))?;
 
-            check_cuda(ffi::cudaMemcpyAsync(
-                device_data,
-                self.0.dl_tensor.data,
-                bytes,
-                ffi::cudaMemcpyKind_cudaMemcpyDefault,
-                res.get_cuda_stream()?,
-            ))?;
+            let mut ret = ManagedTensor(self.0);
+            ret.0.dl_tensor.data = device_data;
+            ret.0.deleter = Some(rmm_free_tensor);
+            ret.0.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCUDA;
 
-            let mut ret = self.0;
-            ret.dl_tensor.data = device_data;
-            ret.deleter = Some(rmm_free_tensor);
-            ret.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCUDA;
+            check_cuvs(ffi::cuvsMatrixCopy(res.0, self.as_ptr(), ret.as_ptr()))?;
 
-            Ok(ManagedTensor(ret))
+            Ok(ret)
         }
     }
 
@@ -60,14 +54,12 @@ impl ManagedTensor {
         arr: &mut ndarray::ArrayBase<S, D>,
     ) -> Result<()> {
         unsafe {
-            let bytes = dl_tensor_bytes(&self.0.dl_tensor);
-            check_cuda(ffi::cudaMemcpyAsync(
-                arr.as_mut_ptr() as *mut std::ffi::c_void,
-                self.0.dl_tensor.data,
-                bytes,
-                ffi::cudaMemcpyKind_cudaMemcpyDefault,
-                res.get_cuda_stream()?,
-            ))?;
+            let mut dst = self.0;
+            dst.dl_tensor.data = arr.as_mut_ptr() as *mut std::ffi::c_void;
+            dst.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCPU;
+            dst.deleter = None;
+
+            check_cuvs(ffi::cuvsMatrixCopy(res.0, self.as_ptr(), &mut dst))?;
             Ok(())
         }
     }
