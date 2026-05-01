@@ -2,7 +2,7 @@ API Reference
 =============
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 5
 
    c_api.rst
    cpp_api.rst

@@ -1,4 +1,4 @@
-All-neighbors
+All-Neighbors
 =============
 
 All-neighbors is a specialized algorithm for building approximate all-neighbors k-NN graphs. Unlike traditional nearest neighbor indexes that are designed for searching, all-neighbors focuses on constructing complete k-NN graphs for entire datasets.

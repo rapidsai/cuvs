@@ -10,3 +10,4 @@ Cluster
    :caption: Contents:
 
    cluster_kmeans.rst
+   cluster_spectral.rst

@@ -2023,9 +2023,9 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
-/// \defgroup mg_cpp_index_build ANN MG index build
+/// \defgroup mg_cpp_ivf_flat_index_build ANN MG IVF-Flat index build
 
-/// \ingroup mg_cpp_index_build
+/// \ingroup mg_cpp_ivf_flat_index_build
 /**
  * @brief Builds a multi-GPU index
  *
@@ -2047,7 +2047,7 @@ auto build(const raft::resources& clique,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg_index<ivf_flat::index<float, int64_t>, float, int64_t>;
 
-/// \ingroup mg_cpp_index_build
+/// \ingroup mg_cpp_ivf_flat_index_build
 /**
  * @brief Builds a multi-GPU index
  *
@@ -2069,7 +2069,7 @@ auto build(const raft::resources& clique,
            raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg_index<ivf_flat::index<half, int64_t>, half, int64_t>;
 
-/// \ingroup mg_cpp_index_build
+/// \ingroup mg_cpp_ivf_flat_index_build
 /**
  * @brief Builds a multi-GPU index
  *
@@ -2091,7 +2091,7 @@ auto build(const raft::resources& clique,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>;
 
-/// \ingroup mg_cpp_index_build
+/// \ingroup mg_cpp_ivf_flat_index_build
 /**
  * @brief Builds a multi-GPU index
  *
@@ -2113,9 +2113,9 @@ auto build(const raft::resources& clique,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg_index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>;
 
-/// \defgroup mg_cpp_index_extend ANN MG index extend
+/// \defgroup mg_cpp_ivf_flat_index_extend ANN MG IVF-Flat index extend
 
-/// \ingroup mg_cpp_index_extend
+/// \ingroup mg_cpp_ivf_flat_index_extend
 /**
  * @brief Extends a multi-GPU index
  *
@@ -2139,7 +2139,7 @@ void extend(const raft::resources& clique,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup mg_cpp_index_extend
+/// \ingroup mg_cpp_ivf_flat_index_extend
 /**
  * @brief Extends a multi-GPU index
  *
@@ -2163,7 +2163,7 @@ void extend(const raft::resources& clique,
             raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup mg_cpp_index_extend
+/// \ingroup mg_cpp_ivf_flat_index_extend
 /**
  * @brief Extends a multi-GPU index
  *
@@ -2187,7 +2187,7 @@ void extend(const raft::resources& clique,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup mg_cpp_index_extend
+/// \ingroup mg_cpp_ivf_flat_index_extend
 /**
  * @brief Extends a multi-GPU index
  *
@@ -2211,9 +2211,9 @@ void extend(const raft::resources& clique,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \defgroup mg_cpp_index_search ANN MG index search
+/// \defgroup mg_cpp_ivf_flat_index_search ANN MG IVF-Flat index search
 
-/// \ingroup mg_cpp_index_search
+/// \ingroup mg_cpp_ivf_flat_index_search
 /**
  * @brief Searches a multi-GPU index
  *
@@ -2242,7 +2242,7 @@ void search(const raft::resources& clique,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
 
-/// \ingroup mg_cpp_index_search
+/// \ingroup mg_cpp_ivf_flat_index_search
 /**
  * @brief Searches a multi-GPU index
  *
@@ -2271,7 +2271,7 @@ void search(const raft::resources& clique,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
 
-/// \ingroup mg_cpp_index_search
+/// \ingroup mg_cpp_ivf_flat_index_search
 /**
  * @brief Searches a multi-GPU index
  *
@@ -2301,7 +2301,7 @@ void search(
   raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
   raft::host_matrix_view<float, int64_t, row_major> distances);
 
-/// \ingroup mg_cpp_index_search
+/// \ingroup mg_cpp_ivf_flat_index_search
 /**
  * @brief Searches a multi-GPU index
  *
@@ -2331,9 +2331,9 @@ void search(
   raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
   raft::host_matrix_view<float, int64_t, row_major> distances);
 
-/// \defgroup mg_cpp_serialize ANN MG index serialization
+/// \defgroup mg_cpp_ivf_flat_serialize ANN MG IVF-Flat index serialization
 
-/// \ingroup mg_cpp_serialize
+/// \ingroup mg_cpp_ivf_flat_serialize
 /**
  * @brief Serializes a multi-GPU index
  *
@@ -2356,7 +2356,7 @@ void serialize(
   const cuvs::neighbors::mg_index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
   const std::string& filename);
 
-/// \ingroup mg_cpp_serialize
+/// \ingroup mg_cpp_ivf_flat_serialize
 /**
  * @brief Serializes a multi-GPU index
  *
@@ -2379,7 +2379,7 @@ void serialize(
   const cuvs::neighbors::mg_index<ivf_flat::index<half, int64_t>, half, int64_t>& index,
   const std::string& filename);
 
-/// \ingroup mg_cpp_serialize
+/// \ingroup mg_cpp_ivf_flat_serialize
 /**
  * @brief Serializes a multi-GPU index
  *
@@ -2402,7 +2402,7 @@ void serialize(
   const cuvs::neighbors::mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
   const std::string& filename);
 
-/// \ingroup mg_cpp_serialize
+/// \ingroup mg_cpp_ivf_flat_serialize
 /**
  * @brief Serializes a multi-GPU index
  *
@@ -2425,7 +2425,9 @@ void serialize(
   const cuvs::neighbors::mg_index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
   const std::string& filename);
 
-/// \ingroup mg_cpp_deserialize
+/// \defgroup mg_cpp_ivf_flat_deserialize ANN MG IVF-Flat index deserialization
+
+/// \ingroup mg_cpp_ivf_flat_deserialize
 /**
  * @brief Deserializes an IVF-Flat multi-GPU index
  *
@@ -2448,9 +2450,9 @@ template <typename T, typename IdxT>
 auto deserialize(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg_index<ivf_flat::index<T, IdxT>, T, IdxT>;
 
-/// \defgroup mg_cpp_distribute ANN MG local index distribution
+/// \defgroup mg_cpp_ivf_flat_distribute ANN MG IVF-Flat local index distribution
 
-/// \ingroup mg_cpp_distribute
+/// \ingroup mg_cpp_ivf_flat_distribute
 /**
  * @brief Replicates a locally built and serialized IVF-Flat index to all GPUs to form a distributed
  * multi-GPU index

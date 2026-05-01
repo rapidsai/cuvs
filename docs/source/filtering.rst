@@ -1,7 +1,7 @@
 .. _filtering:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Filtering vector indexes
+Filtering Vector Indexes
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 cuVS supports different type of filtering depending on the vector index being used. The main method used in all of the vector indexes

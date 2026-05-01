@@ -1,5 +1,5 @@
-Clustering
-==========
+Cluster
+=======
 
 .. role:: py(code)
    :language: c
