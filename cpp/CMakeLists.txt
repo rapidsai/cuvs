@@ -225,6 +225,32 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
+  add_library(
+    ivf_rabitq STATIC
+    src/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_shared_mem_opt.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_quantize_query.cu
+    src/neighbors/ivf_rabitq/utils/searcher_gpu_utils.cu
+  )
+
+  target_link_libraries(ivf_rabitq PRIVATE OpenMP::OpenMP_CXX CUDA::cudart raft::raft rmm)
+
+  target_include_directories(
+    ivf_rabitq PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  )
+
+  target_compile_options(
+    ivf_rabitq
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:Debug>:-G;-g> --extended-lambda
+            --expt-relaxed-constexpr -Xcompiler=-fopenmp > $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+  )
+
+  target_compile_definitions(ivf_rabitq PRIVATE HIGH_ACC_FAST_SCAN)
+
   generate_inst_matrix(
     cagra_search_inst_files
     MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_search_matrix.json"
@@ -897,6 +923,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     ${ivf_pq_search_inst_files}
     ${ivf_pq_transform_inst_files}
+    src/neighbors/ivf_rabitq.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     ${nn_descent_inst_files}
@@ -1040,6 +1067,7 @@ if(NOT BUILD_CPU_ONLY)
               $<COMPILE_ONLY:cuco::cuco>
               CUDA::nvJitLink
               CUDA::nvrtc
+              ivf_rabitq
     )
     set_property(TARGET cuvs PROPERTY NO_CUDART_DEP ON)
 
