@@ -13,6 +13,8 @@ jobs:
   # Extract and store baseline ABI from main branch
   update-baseline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4

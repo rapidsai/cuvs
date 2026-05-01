@@ -22,8 +22,16 @@ on:
         type: string
         default: nightly
 
+permissions: {}
+
 jobs:
   conda-cpp-checks:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@main
     with:
@@ -33,6 +41,12 @@ jobs:
       sha: ${{ inputs.sha }}
       symbol_exclusions: (void (thrust::|cub::))
   conda-cpp-tests:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@main
     with:
@@ -42,6 +56,12 @@ jobs:
       script: ci/test_cpp.sh
       sha: ${{ inputs.sha }}
   conda-python-tests:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@main
     with:
@@ -51,6 +71,12 @@ jobs:
       script: ci/test_python.sh
       sha: ${{ inputs.sha }}
   conda-java-tests:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
@@ -71,6 +97,12 @@ jobs:
       container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/test_java.sh"
   wheel-tests-cuvs:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@main
     with:
