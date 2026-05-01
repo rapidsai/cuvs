@@ -31,6 +31,14 @@
 namespace cuvs::neighbors::cagra {
 
 using IdxT = uint32_t;
+using DeviceAccessor =
+  raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::device>;
+using HostAccessor =
+  raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>;
+using PinnedAccessor =
+  raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::pinned>;
+using ManagedAccessor =
+  raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::managed>;
 
 struct BatchConfig {
   bool initialize;
@@ -43,19 +51,20 @@ struct DimsConfig {
   uint64_t batch_size;
 };
 
-class BatchedDeviceViewFromHostTest : public ::testing::Test {
+class BatchedDeviceViewTest : public ::testing::Test {
  protected:
   void SetUp() override { raft::resource::sync_stream(res); }
 
   /**
-   * Run batched_device_view_from_host over host data, copy device views back,
+   * Run batched_device_view over host data, copy device views back,
    * and verify against the input.
    */
-  template <typename InputMatrixView>
-  void run_and_verify_batched(InputMatrixView input_view,
-                              uint64_t batch_size,
-                              bool host_writeback,
-                              bool initialize)
+  template <typename AccessorInputView>
+  void run_and_verify_batched(
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorInputView> input_view,
+    uint64_t batch_size,
+    bool host_writeback,
+    bool initialize)
   {
     int64_t n_rows = input_view.extent(0);
     int64_t n_cols = input_view.extent(1);
@@ -65,12 +74,8 @@ class BatchedDeviceViewFromHostTest : public ::testing::Test {
     int64_t total_processed = 0;
 
     {
-      cagra::detail::batched_device_view_from_host<IdxT, int64_t> batched(
-        res,
-        raft::make_host_matrix_view<IdxT, int64_t>(input_view.data_handle(), n_rows, n_cols),
-        batch_size,
-        host_writeback,
-        initialize);
+      cagra::detail::batched_device_view<IdxT, int64_t, AccessorInputView> batched(
+        res, input_view, batch_size, host_writeback, initialize);
       while (true) {
         auto dev_view = batched.next_view();
         if (dev_view.extent(0) == 0) break;
@@ -81,7 +86,20 @@ class BatchedDeviceViewFromHostTest : public ::testing::Test {
                      dev_view.extent(0) * dev_view.extent(1),
                      raft::resource::get_cuda_stream(res));
         }
-        if (host_writeback) { raft::matrix::fill(res, dev_view, IdxT(17)); }
+        if (host_writeback) {
+          // Re-wrap as a plain device_matrix_view to strip the (potentially
+          // layout_stride / pinned- or managed-accessor) shape that the
+          // passthrough path would otherwise hand us, so raft::matrix::fill's
+          // device_matrix_view overload accepts the call. dev_view is always
+          // exhaustive (contiguous row range of a row-major matrix), so
+          // (data_handle, extent(0), extent(1)) describes the same memory.
+          // This should eventually be fixed by adding a more generic
+          // overload to raft::matrix::fill.
+          raft::matrix::fill(res,
+                             raft::make_device_matrix_view<IdxT, int64_t>(
+                               dev_view.data_handle(), dev_view.extent(0), dev_view.extent(1)),
+                             IdxT(17));
+        }
         total_processed += dev_view.extent(0);
       }
     }
@@ -107,12 +125,25 @@ class BatchedDeviceViewFromHostTest : public ::testing::Test {
   raft::resources res;
 };
 
-TEST_F(BatchedDeviceViewFromHostTest, EmptyView)
+TEST_F(BatchedDeviceViewTest, EmptyViewFromHost)
 {
   auto host_empty = raft::make_host_matrix<IdxT, int64_t>(0, 8);
   auto host_view  = host_empty.view();
-  cagra::detail::batched_device_view_from_host<IdxT, int64_t> batched(
+  cagra::detail::batched_device_view<IdxT, int64_t, HostAccessor> batched(
     res, host_view, /*batch_size=*/128, /*host_writeback=*/false, /*initialize=*/true);
+
+  auto view = batched.next_view();
+  EXPECT_EQ(view.extent(0), 0);
+  EXPECT_EQ(view.extent(1), 8);
+  EXPECT_EQ(view.data_handle(), nullptr);
+}
+
+TEST_F(BatchedDeviceViewTest, EmptyViewFromDevice)
+{
+  auto device_empty = raft::make_device_matrix<IdxT, int64_t>(res, 0, 8);
+  auto device_view  = device_empty.view();
+  cagra::detail::batched_device_view<IdxT, int64_t, DeviceAccessor> batched(
+    res, device_view, /*batch_size=*/128, /*host_writeback=*/false, /*initialize=*/true);
 
   auto view = batched.next_view();
   EXPECT_EQ(view.extent(0), 0);
@@ -122,11 +153,10 @@ TEST_F(BatchedDeviceViewFromHostTest, EmptyView)
 
 using BatchDimsParam = std::tuple<BatchConfig, DimsConfig>;
 
-class BatchedDeviceViewFromHostParameterizedTest
-  : public BatchedDeviceViewFromHostTest,
-    public ::testing::WithParamInterface<BatchDimsParam> {};
+class BatchedDeviceViewParameterizedTest : public BatchedDeviceViewTest,
+                                           public ::testing::WithParamInterface<BatchDimsParam> {};
 
-TEST_P(BatchedDeviceViewFromHostParameterizedTest, VectorHostData)
+TEST_P(BatchedDeviceViewParameterizedTest, VectorHostData)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
@@ -140,46 +170,81 @@ TEST_P(BatchedDeviceViewFromHostParameterizedTest, VectorHostData)
   run_and_verify_batched(host_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewFromHostParameterizedTest, PinnedMemory)
+TEST_P(BatchedDeviceViewParameterizedTest, PinnedMemory)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
   auto [n_rows, n_cols, batch_size] = dims_config;
 
-  auto host_matrix = raft::make_pinned_matrix<IdxT, int64_t>(res, n_rows, n_cols);
-  auto host_view   = host_matrix.view();
+  auto pinned_matrix = raft::make_pinned_matrix<IdxT, int64_t>(res, n_rows, n_cols);
+  // auto pinned_view   = pinned_matrix.view();
+  auto pinned_view =
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, PinnedAccessor>(
+      pinned_matrix.data_handle(), n_rows, n_cols);
+  std::fill(pinned_view.data_handle(), pinned_view.data_handle() + n_rows * n_cols, IdxT(13));
 
-  std::fill(host_view.data_handle(), host_view.data_handle() + n_rows * n_cols, IdxT(13));
-
-  run_and_verify_batched(host_view, batch_size, host_writeback, initialize);
+  run_and_verify_batched(pinned_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewFromHostParameterizedTest, ManagedMemory)
+TEST_P(BatchedDeviceViewParameterizedTest, PinnedMemoryForcedToHost)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
   auto [n_rows, n_cols, batch_size] = dims_config;
 
-  auto host_matrix = raft::make_managed_matrix<IdxT, int64_t>(res, n_rows, n_cols);
-  auto host_view   = host_matrix.view();
+  auto pinned_matrix = raft::make_pinned_matrix<IdxT, int64_t>(res, n_rows, n_cols);
 
-  std::fill(host_view.data_handle(), host_view.data_handle() + n_rows * n_cols, IdxT(13));
+  auto pinned_view =
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, HostAccessor>(
+      pinned_matrix.data_handle(), n_rows, n_cols);
 
-  run_and_verify_batched(host_view, batch_size, host_writeback, initialize);
+  std::fill(pinned_view.data_handle(), pinned_view.data_handle() + n_rows * n_cols, IdxT(13));
+  run_and_verify_batched(pinned_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewFromHostParameterizedTest, DeviceMemory)
+TEST_P(BatchedDeviceViewParameterizedTest, ManagedMemory)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
   auto [n_rows, n_cols, batch_size] = dims_config;
 
-  auto host_matrix = raft::make_device_matrix<IdxT, int64_t>(res, n_rows, n_cols);
-  auto host_view   = host_matrix.view();
+  auto managed_matrix = raft::make_managed_matrix<IdxT, int64_t>(res, n_rows, n_cols);
+  auto managed_view   = managed_matrix.view();
 
-  raft::matrix::fill(res, host_view, IdxT(13));
+  std::fill(managed_view.data_handle(), managed_view.data_handle() + n_rows * n_cols, IdxT(13));
 
-  run_and_verify_batched(host_view, batch_size, host_writeback, initialize);
+  run_and_verify_batched(managed_view, batch_size, host_writeback, initialize);
+}
+
+TEST_P(BatchedDeviceViewParameterizedTest, ManagedMemoryForcedToHost)
+{
+  auto [batch_config, dims_config]  = GetParam();
+  auto [initialize, host_writeback] = batch_config;
+  auto [n_rows, n_cols, batch_size] = dims_config;
+
+  auto managed_matrix = raft::make_managed_matrix<IdxT, int64_t>(res, n_rows, n_cols);
+
+  auto managed_view =
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, HostAccessor>(
+      managed_matrix.data_handle(), n_rows, n_cols);
+
+  std::fill(managed_view.data_handle(), managed_view.data_handle() + n_rows * n_cols, IdxT(13));
+
+  run_and_verify_batched(managed_view, batch_size, host_writeback, initialize);
+}
+
+TEST_P(BatchedDeviceViewParameterizedTest, DeviceMemory)
+{
+  auto [batch_config, dims_config]  = GetParam();
+  auto [initialize, host_writeback] = batch_config;
+  auto [n_rows, n_cols, batch_size] = dims_config;
+
+  auto device_matrix = raft::make_device_matrix<IdxT, int64_t>(res, n_rows, n_cols);
+  auto device_view   = device_matrix.view();
+
+  raft::matrix::fill(res, device_view, IdxT(13));
+
+  run_and_verify_batched(device_view, batch_size, host_writeback, initialize);
 }
 
 static const std::array<BatchConfig, 3> kBatchConfigs = {{
@@ -198,7 +263,7 @@ static const std::array<DimsConfig, 4> kDimsConfigs = {{
 }};
 
 INSTANTIATE_TEST_SUITE_P(BatchConfigs,
-                         BatchedDeviceViewFromHostParameterizedTest,
+                         BatchedDeviceViewParameterizedTest,
                          ::testing::Combine(::testing::ValuesIn(kBatchConfigs),
                                             ::testing::ValuesIn(kDimsConfigs)));
 

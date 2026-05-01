@@ -194,14 +194,18 @@ __global__ void kern_make_rev_graph_k(
   }
 }
 
-template <class IdxT, uint32_t num_warps>
-__global__ void kern_fused_prune(
-  raft::device_matrix_view<IdxT, int64_t> knn_graph,     // [graph_chunk_size, graph_degree]
-  raft::device_matrix_view<IdxT, int64_t> output_graph,  // [batch_size, output_graph_degree]
-  const uint32_t batch_size,
-  const uint32_t batch_id,
-  uint32_t* const d_invalid_neighbor_list,
-  uint64_t* const stats)
+// KnnGraphView and OutputGraphView are mdspans with element type IdxT and
+// dynamic 2D extents. They may have layout_right (raft::device_matrix_view) or
+// layout_stride (the result of cuda::std::submdspan), and any accessor that is
+// device-accessible (default_accessor, raft::host_device_accessor with a
+// device-accessible memory_type, etc.).
+template <class IdxT, uint32_t num_warps, class KnnGraphView, class OutputGraphView>
+__global__ void kern_fused_prune(KnnGraphView knn_graph,        // [graph_chunk_size, graph_degree]
+                                 OutputGraphView output_graph,  // [batch_size, output_graph_degree]
+                                 const uint32_t batch_size,
+                                 const uint32_t batch_id,
+                                 uint32_t* const d_invalid_neighbor_list,
+                                 uint64_t* const stats)
 {
   // Check assumption we have at least one warp per row of the batch
   assert(blockDim.x == raft::WarpSize * num_warps);
@@ -357,13 +361,20 @@ __device__ void warp_shift_array_one_right(uint32_t lane_id, T* array, uint64_t 
   }
 }
 
-template <typename IdxT, uint32_t num_warps>
+// OutputGraphView, MstGraphView and MstNumEdgesView are 2D mdspans that may
+// have layout_right or layout_stride and any device-accessible accessor; see
+// the comment on kern_fused_prune for details.
+template <typename IdxT,
+          uint32_t num_warps,
+          class OutputGraphView,
+          class MstGraphView,
+          class MstNumEdgesView>
 __global__ void kern_merge_graph(
-  raft::device_matrix_view<IdxT, int64_t> output_graph,         // [batch_size, output_graph_degree]
+  OutputGraphView output_graph,                                 // [batch_size, output_graph_degree]
   raft::device_matrix_view<IdxT, int64_t> rev_graph,            // [graph_size, output_graph_degree]
   raft::device_vector_view<uint32_t, int64_t> rev_graph_count,  // [graph_size]
-  raft::device_matrix_view<IdxT, int64_t> mst_graph,            // [batch_size, output_graph_degree]
-  raft::device_matrix_view<uint32_t, int64_t> mst_graph_num_edges,  // [batch_size, 1]
+  MstGraphView mst_graph,                                       // [batch_size, output_graph_degree]
+  MstNumEdgesView mst_graph_num_edges,                          // [batch_size, 1]
   const uint32_t batch_size,
   const uint32_t batch_id,
   bool guarantee_connectivity,
@@ -777,14 +788,16 @@ void check_duplicates_and_out_of_range(const IdxT* output_graph_ptr,
     num_oor == 0, "%lu out-of-range index node(s) are found in the generated CAGRA graph", num_oor);
 }
 
-template <typename IdxT, typename OutputMatrixView>
-void merge_graph_gpu(raft::resources const& res,
-                     OutputMatrixView output_graph,
-                     raft::device_matrix_view<IdxT, int64_t> d_rev_graph,
-                     raft::device_vector_view<uint32_t, int64_t> d_rev_graph_count,
-                     raft::host_matrix_view<IdxT, int64_t> mst_graph,
-                     raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
-                     bool guarantee_connectivity)
+template <typename IdxT, typename AccessorOutputGraph>
+void merge_graph_gpu(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>
+    output_graph,
+  raft::device_matrix_view<IdxT, int64_t> d_rev_graph,
+  raft::device_vector_view<uint32_t, int64_t> d_rev_graph_count,
+  raft::host_matrix_view<IdxT, int64_t> mst_graph,
+  raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
+  bool guarantee_connectivity)
 {
   const uint64_t graph_size          = output_graph.extent(0);
   const uint64_t output_graph_degree = output_graph.extent(1);
@@ -799,27 +812,32 @@ void merge_graph_gpu(raft::resources const& res,
   uint32_t batch_size      = static_cast<uint32_t>(std::min<uint64_t>(graph_size, 256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
-  batched_device_view_from_host<IdxT, int64_t> d_output_graph(
-    res,
-    raft::make_host_matrix_view<IdxT, int64_t>(
-      output_graph.data_handle(), graph_size, output_graph_degree),
-    /*batch_size*/ batch_size,
-    /*host_writeback*/ true,
-    /*initialize*/ true);
+  batched_device_view<IdxT, int64_t, AccessorOutputGraph> d_output_graph(res,
+                                                                         output_graph,
+                                                                         /*batch_size*/ batch_size,
+                                                                         /*host_writeback*/ true,
+                                                                         /*initialize*/ true);
 
-  batched_device_view_from_host<IdxT, int64_t> d_mst_graph(res,
-                                                           mst_graph,
-                                                           /*batch_size*/ batch_size,
-                                                           /*host_writeback*/ false,
-                                                           /*initialize*/ true);
+  batched_device_view<
+    IdxT,
+    int64_t,
+    raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
+    d_mst_graph(res,
+                mst_graph,
+                /*batch_size*/ batch_size,
+                /*host_writeback*/ false,
+                /*initialize*/ true);
 
-  batched_device_view_from_host<uint32_t, int64_t> d_mst_graph_num_edges(
-    res,
-    raft::make_host_matrix_view<uint32_t, int64_t>(
-      mst_graph_num_edges.data_handle(), mst_graph_num_edges.extent(0), 1),
-    /*batch_size*/ batch_size,
-    /*host_writeback*/ false,
-    /*initialize*/ true);
+  batched_device_view<
+    uint32_t,
+    int64_t,
+    raft::host_device_accessor<cuda::std::default_accessor<uint32_t>, raft::memory_type::host>>
+    d_mst_graph_num_edges(res,
+                          raft::make_host_matrix_view<uint32_t, int64_t>(
+                            mst_graph_num_edges.data_handle(), mst_graph_num_edges.extent(0), 1l),
+                          /*batch_size*/ batch_size,
+                          /*host_writeback*/ false,
+                          /*initialize*/ true);
 
   const uint32_t num_warps = 4;
   const dim3 threads_merge(raft::WarpSize * num_warps, 1, 1);
@@ -858,11 +876,13 @@ void merge_graph_gpu(raft::resources const& res,
                  (merge_graph_end - merge_graph_start) * 1000.0);
 }
 
-template <typename IdxT, typename OutputMatrixView>
-void make_reverse_graph_gpu(raft::resources const& res,
-                            OutputMatrixView output_graph,
-                            raft::device_matrix_view<IdxT, int64_t> d_rev_graph,
-                            raft::device_vector_view<uint32_t, int64_t> d_rev_graph_count)
+template <typename IdxT, typename AccessorOutputGraph>
+void make_reverse_graph_gpu(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>
+    output_graph,
+  raft::device_matrix_view<IdxT, int64_t> d_rev_graph,
+  raft::device_vector_view<uint32_t, int64_t> d_rev_graph_count)
 {
   const uint64_t graph_size          = output_graph.extent(0);
   const uint64_t output_graph_degree = output_graph.extent(1);
@@ -876,9 +896,9 @@ void make_reverse_graph_gpu(raft::resources const& res,
   raft::matrix::fill(res, d_rev_graph, IdxT(-1));
   raft::matrix::fill(res, d_rev_graph_count, uint32_t(0));
 
-  if (is_ptr_host_accessible(output_graph.data_handle())) {
+  if constexpr (!AccessorOutputGraph::is_device_accessible) {
     auto d_dest_nodes = raft::make_device_matrix<IdxT, int64_t>(res, graph_size, 1);
-    auto dest_nodes   = make_host_vector<IdxT, int64_t>(graph_size);
+    auto dest_nodes   = raft::make_host_vector<IdxT, int64_t>(graph_size);
     for (uint64_t k = 0; k < output_graph_degree; k++) {
 #pragma omp parallel for
       for (uint64_t i = 0; i < graph_size; i++) {
@@ -1115,12 +1135,13 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
 //   an approximate MST.
 // * If the input kNN graph is disconnected, random connection is added to the largest cluster.
 //
-template <typename IdxT, typename InputMatrixView>
-void mst_optimization(raft::resources const& res,
-                      InputMatrixView input_graph,
-                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
-                      raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
-                      bool use_gpu = true)
+template <typename IdxT, typename AccessorKnnGraph>
+void mst_optimization(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph> input_graph,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
+  raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
+  bool use_gpu = true)
 {
   if (use_gpu) {
     RAFT_LOG_DEBUG("# MST optimization on GPU");
@@ -1249,7 +1270,7 @@ void mst_optimization(raft::resources const& res,
       }
     } else {
       // Copy rank-k edges from the input knn graph to 'candidate_edges'
-      if (is_ptr_host_accessible(input_graph.data_handle())) {
+      if constexpr (AccessorKnnGraph::is_host_accessible) {
 #pragma omp parallel for
         for (uint64_t i = 0; i < graph_size; i++) {
           candidate_edges_ptr[i] = input_graph(i, k);
@@ -1524,10 +1545,12 @@ void mst_optimization(raft::resources const& res,
 // specified number of edges are picked up for each node, starting with the edge with
 // the lowest number of 2-hop detours.
 //
-template <typename IdxT, typename InputMatrixView, typename OutputMatrixView>
-void prune_graph_gpu(raft::resources const& res,
-                     InputMatrixView knn_graph,
-                     OutputMatrixView output_graph)
+template <typename IdxT, typename AccessorKnnGraph, typename AccessorOutputGraph>
+void prune_graph_gpu(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph> knn_graph,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>
+    output_graph)
 {
   const uint64_t graph_size          = output_graph.extent(0);
   const uint64_t knn_graph_degree    = knn_graph.extent(1);
@@ -1549,22 +1572,18 @@ void prune_graph_gpu(raft::resources const& res,
   auto host_stats                           = raft::make_host_vector<uint64_t>(2);
   raft::matrix::fill(res, dev_stats.view(), uint64_t(0));
 
-  batched_device_view_from_host<IdxT, int64_t> d_input_graph(
-    res,
-    raft::make_host_matrix_view<IdxT, int64_t>(
-      knn_graph.data_handle(), graph_size, knn_graph_degree),
-    /*batch_size*/ graph_size,
-    /*host_writeback*/ false,
-    /*initialize*/ true);
+  batched_device_view<IdxT, int64_t, AccessorKnnGraph> d_input_graph(res,
+                                                                     knn_graph,
+                                                                     /*batch_size*/ graph_size,
+                                                                     /*host_writeback*/ false,
+                                                                     /*initialize*/ true);
   auto input_view = d_input_graph.next_view();
 
-  batched_device_view_from_host<IdxT, int64_t> d_output_graph(
-    res,
-    raft::make_host_matrix_view<IdxT, int64_t>(
-      output_graph.data_handle(), graph_size, output_graph_degree),
-    /*batch_size*/ batch_size,
-    /*host_writeback*/ true,
-    /*initialize*/ false);
+  batched_device_view<IdxT, int64_t, AccessorOutputGraph> d_output_graph(res,
+                                                                         output_graph,
+                                                                         /*batch_size*/ batch_size,
+                                                                         /*host_writeback*/ true,
+                                                                         /*initialize*/ false);
 
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 
@@ -1622,12 +1641,17 @@ void prune_graph_gpu(raft::resources const& res,
 
 }  // namespace
 
-template <typename IdxT = uint32_t, typename InputMatrixView, typename OutputMatrixView>
-void optimize(raft::resources const& res,
-              InputMatrixView knn_graph,
-              OutputMatrixView new_graph,
-              const bool guarantee_connectivity       = true,
-              const bool use_gpu_for_mst_optimization = true)
+template <typename IdxT = uint32_t,
+          typename AccessorKnnGraph =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>,
+          typename AccessorOutputGraph =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
+void optimize(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph> knn_graph,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph> new_graph,
+  const bool guarantee_connectivity       = true,
+  const bool use_gpu_for_mst_optimization = true)
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
@@ -1719,7 +1743,7 @@ void optimize(raft::resources const& res,
 
   raft::resource::sync_stream(res);
 
-  if (is_ptr_host_accessible(new_graph.data_handle())) {
+  if constexpr (AccessorOutputGraph::is_host_accessible) {
     // following checks require host access
     log_incoming_edges_histogram<IdxT>(new_graph.data_handle(), graph_size, output_graph_degree);
 
