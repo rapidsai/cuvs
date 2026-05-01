@@ -46,14 +46,10 @@
      } else {
          auto dataset = raft::make_host_matrix_view<const uint8_t, int64_t>(
                  x, n, dim_ / 8);
-+        auto ace = cuvs::neighbors::cagra::build(
-+                raft_handle, index_params_, dataset);
-+        ace_build_owning_dataset_ = std::move(ace.dataset);
          cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
--                cuvs::neighbors::cagra::build(
--                        raft_handle, index_params_, dataset));
-+                std::move(ace.idx));
+                 cuvs::neighbors::cagra::build(
+                         raft_handle, index_params_, dataset));
      }
  }
 
@@ -86,9 +82,8 @@
  }
 
  void BinaryCuvsCagra::reset() {
-+    device_dataset_for_host_storage_.reset();
-+    ace_build_owning_dataset_.reset();
      cuvs_index.reset();
++    device_dataset_for_host_storage_.reset();
  }
 
 --- a/faiss/gpu/impl/BinaryCuvsCagra.cuh
@@ -114,10 +109,6 @@
 +    /// Device padded copy when `storage_` is host memory (required by cuVS update_dataset).
 +    std::unique_ptr<cuvs::neighbors::device_padded_dataset<uint8_t, int64_t>>
 +            device_dataset_for_host_storage_;
-+
-+    /// Owns optional device dataset from ACE host `build`; must outlive `cuvs_index`.
-+    std::optional<raft::device_matrix<uint8_t, int64_t, raft::row_major>>
-+            ace_build_owning_dataset_;
 +
      /// Instance of trained cuVS CAGRA index
      std::shared_ptr<cuvs::neighbors::cagra::index<uint8_t, uint32_t>>
@@ -170,14 +161,10 @@
      } else {
          auto dataset =
                  raft::make_host_matrix_view<const data_t, int64_t>(x, n, dim_);
-+        auto ace = cuvs::neighbors::cagra::build(
-+                raft_handle, index_params_, dataset);
-+        ace_build_owning_dataset_ = std::move(ace.dataset);
          cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<data_t, uint32_t>>(
--                cuvs::neighbors::cagra::build(
--                        raft_handle, index_params_, dataset));
-+                std::move(ace.idx));
+                 cuvs::neighbors::cagra::build(
+                         raft_handle, index_params_, dataset));
      }
  }
 
@@ -209,9 +196,8 @@
 
  template <typename data_t>
  void CuvsCagra<data_t>::reset() {
-+    device_dataset_for_host_storage_.reset();
-+    ace_build_owning_dataset_.reset();
      cuvs_index.reset();
++    device_dataset_for_host_storage_.reset();
  }
 
 --- a/faiss/gpu/impl/CuvsCagra.cuh
@@ -238,10 +224,6 @@
 +    /// Device padded copy when `storage_` is host memory (required by cuVS update_dataset).
 +    std::unique_ptr<cuvs::neighbors::device_padded_dataset<data_t, int64_t>>
 +            device_dataset_for_host_storage_;
-+
-+    /// Owns optional device dataset from ACE host `build`; must outlive `cuvs_index`.
-+    std::optional<raft::device_matrix<data_t, int64_t, raft::row_major>>
-+            ace_build_owning_dataset_;
 +
      /// Instance of trained cuVS CAGRA index
      std::shared_ptr<cuvs::neighbors::cagra::index<data_t, uint32_t>> cuvs_index{
