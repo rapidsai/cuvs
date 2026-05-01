@@ -147,7 +147,10 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     auto orig_data = raft::make_device_matrix_view<T, int64_t>(dataset_.data_handle(), n_take, dim);
 
     std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels_view = std::nullopt;
-    if (vq_labels) { vq_labels_view = raft::make_const_mdspan(vq_labels.value()); }
+    if (vq_labels) {
+      vq_labels_view = raft::make_device_vector_view<const uint32_t, int64_t>(
+        vq_labels.value().data_handle(), static_cast<int64_t>(n_take));
+    }
     inverse_transform(handle,
                       quantizer,
                       raft::device_matrix_view<const uint8_t, int64_t>(
@@ -242,7 +245,11 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void testViewQuantizer()
   {
-    params config{params_.pq_bits, params_.pq_dim, true, false};
+    params config;
+    config.pq_bits       = params_.pq_bits;
+    config.pq_dim        = params_.pq_dim;
+    config.use_subspaces = true;
+    config.use_vq        = false;
 
     if ((n_samples_ < (1 << params_.pq_bits)) || (n_features_ % params_.pq_dim != 0) ||
         (static_cast<uint32_t>(n_samples_) < params_.n_vq_centers)) {

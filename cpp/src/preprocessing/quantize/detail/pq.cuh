@@ -502,30 +502,6 @@ inline auto make_pq_params_from_vpq(const cuvs::neighbors::vpq_params& in_params
     max_train_points_per_vq_cluster};
 }
 
-inline auto make_pq_params_from_vpq(const cuvs::neighbors::vpq_params& in_params,
-                                    const uint64_t n_rows)
-  -> cuvs::preprocessing::quantize::pq::params
-{
-  const uint32_t pq_n_centers              = 1 << in_params.pq_bits;
-  uint32_t max_train_points_per_vq_cluster = in_params.max_train_points_per_vq_cluster;
-  if (in_params.vq_n_centers > 0) {
-    max_train_points_per_vq_cluster =
-      std::min<uint32_t>(max_train_points_per_vq_cluster,
-                         n_rows * in_params.vq_kmeans_trainset_fraction / in_params.vq_n_centers);
-  }
-  return cuvs::preprocessing::quantize::pq::params{
-    in_params.pq_bits,
-    in_params.pq_dim,
-    true,
-    true,
-    in_params.vq_n_centers,
-    in_params.kmeans_n_iters,
-    in_params.pq_kmeans_type,
-    std::min<uint32_t>(in_params.max_train_points_per_pq_code,
-                       n_rows * in_params.pq_kmeans_trainset_fraction / pq_n_centers),
-    max_train_points_per_vq_cluster};
-}
-
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res,
                const cuvs::neighbors::vpq_params& params,
