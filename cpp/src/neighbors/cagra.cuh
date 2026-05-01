@@ -26,7 +26,35 @@
 
 #include <rmm/cuda_stream_view.hpp>
 
+#include <memory>
+
 namespace cuvs::neighbors::cagra {
+namespace detail {
+
+template <typename T, typename IdxT>
+cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&& r)
+{
+  r.idx.host_build_ace_device_store_ = std::move(r.dataset);
+  r.idx.host_build_padded_owner_.reset();
+  return std::move(r.idx);
+}
+
+template <typename T, typename IdxT>
+cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_padded(
+  build_result<T, IdxT>&& br,
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> own)
+{
+  if (br.vpq) {
+    throw raft::logic_error(
+      "cagra::build: VPQ compression requires cagra::build(res, params, dataset_view) that returns "
+      "cagra::build_result. The host mdspan / host_matrixView build that returns cagra::index does "
+      "not retain VPQ storage in one object.");
+  }
+  br.idx.host_build_padded_owner_ = std::move(own);
+  br.idx.host_build_ace_device_store_.reset();
+  return std::move(br.idx);
+}
+}  // namespace detail
 
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
@@ -307,23 +335,28 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-ace_build_result<T, IdxT> build(
+index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
-  // Check if ACE dispatch is requested via graph_build_params
   if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
-    // ACE expects the dataset to be on host due to the large dataset size
     RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
                  "ACE: Dataset must be on host for ACE build");
     auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
+    return detail::finalize_index_from_ace(
+      cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view));
   }
-  throw raft::logic_error(
-    "Use make_padded_dataset_view() or make_padded_dataset() to obtain a view, "
-    "then call build(res, params, view). ACE build is the only path that accepts a raw mdspan.");
+  RAFT_EXPECTS(
+    raft::get_device_for_address(dataset.data_handle()) == -1,
+    "cagra::build: non-ACE path from an mdspan host overload must use host memory. For "
+    "device data, use cagra::build with raft::device_matrix_view or a device dataset_view.");
+  auto hview = raft::make_host_matrix_view<const T, int64_t, row_major>(
+    dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+  auto own  = cuvs::neighbors::make_padded_dataset(res, hview);
+  auto bres = cuvs::neighbors::cagra::build<T, IdxT>(res, params, own->as_dataset_view());
+  return detail::finalize_index_from_padded<T, IdxT>(std::move(bres), std::move(own));
 }
 
 /**

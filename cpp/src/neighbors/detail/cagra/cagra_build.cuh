@@ -1127,7 +1127,7 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
   bool use_disk          = ace_params.use_disk;
 
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
-    "cagra::build_ace<host>(%zu, %zu, %zu)",
+    "cagra::detail::build_ace<host>(%zu, %zu, %zu)",
     params.intermediate_graph_degree,
     params.graph_degree,
     npartitions);

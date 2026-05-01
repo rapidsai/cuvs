@@ -29,6 +29,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <string>
@@ -372,6 +373,21 @@ struct extend_params {
 
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
+
+template <typename T, typename IdxT>
+struct index;
+template <typename T, typename IdxT>
+struct build_result;
+template <typename T, typename IdxT>
+struct ace_build_result;
+
+namespace detail {
+template <typename T, typename IdxT>
+index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&&);
+template <typename T, typename IdxT>
+index<T, IdxT> finalize_index_from_padded(
+  build_result<T, IdxT>&&, std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>);
+}  // namespace detail
 
 /**
  * @defgroup cagra_cpp_index CAGRA index type
@@ -831,6 +847,12 @@ struct index : cuvs::neighbors::index {
   }
 
  private:
+  template <typename T2, typename I2>
+  friend index<T2, I2> detail::finalize_index_from_ace(ace_build_result<T2, I2>&&);
+  template <typename T2, typename I2>
+  friend index<T2, I2> detail::finalize_index_from_padded(
+    build_result<T2, I2>&&, std::unique_ptr<device_padded_dataset<T2, int64_t>>);
+
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> graph_view_;
@@ -839,6 +861,16 @@ struct index : cuvs::neighbors::index {
   std::optional<raft::device_vector<IdxT, int64_t>> source_indices_;
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
+  /**
+   * Owning storage for the host-`build` (non-ACE) path: `make_padded_dataset` is moved here so the
+   * public API can return only `cagra::index` with a non-owning dataset view.
+   */
+  std::unique_ptr<device_padded_dataset<T, int64_t>> host_build_padded_owner_{};
+  /**
+   * Optional ACE device row storage when `detail::build_ace` materializes a padded copy for
+   * `attach_dataset_on_build` (lives for the same lifetime as the index in the public `build` API).
+   */
+  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> host_build_ace_device_store_{};
 
   // File descriptors for disk-backed index components (ACE disk mode)
   std::optional<cuvs::util::file_descriptor> dataset_fd_;
@@ -976,7 +1008,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<float, uint32_t>;
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1053,7 +1085,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<half, uint32_t>;
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1134,7 +1166,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<int8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1216,6 +1248,37 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+
+/**
+ * @brief ACE host build returning the full `ace_build_result` (index + optional device matrix).
+ *
+ * Requires `graph_build_params` to be `ace_params`. For a single `cagra::index` return with
+ * internal lifetime management, use `cagra::build(res, params, host_view)` (backward
+ * compatible). For the generic padded-`dataset_view` path that returns `build_result`, use
+ * `cagra::build(res, params, make_padded_dataset* / view)`.
+ */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::ace_build_result<float, uint32_t>;
+
+/** @copydoc build_ace */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::ace_build_result<half, uint32_t>;
+
+/** @copydoc build_ace */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::ace_build_result<int8_t, uint32_t>;
+
+/** @copydoc build_ace */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::ace_build_result<uint8_t, uint32_t>;
 
 /**

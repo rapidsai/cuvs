@@ -67,7 +67,7 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
     dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto ace_build_res = cagra::build(dev_resources, index_params, dataset_host_view);
+  auto ace_build_res = cagra::build_ace(dev_resources, index_params, dataset_host_view);
   // In-memory build of ACE provides the index in memory, so we can search it directly using
   // cagra::search
 

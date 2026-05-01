@@ -211,13 +211,11 @@ void _build(cuvsResources_t res,
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
           index_params.graph_build_params)) {
-      auto result = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
-      // ACE disk mode attaches numpy-backed fds only; no in-memory device matrix is returned.
+      auto result = cuvs::neighbors::cagra::build_ace(*res_ptr, index_params, mds);
       auto storage =
         result.dataset.has_value()
           ? std::move(*result.dataset)
-          : raft::make_device_matrix<T, int64_t>(
-              *res_ptr, 0, std::max<int64_t>(static_cast<int64_t>(result.idx.dim()), 1));
+          : raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr);
       auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
         nullptr, nullptr, std::move(storage), std::move(result.idx)};
       output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);

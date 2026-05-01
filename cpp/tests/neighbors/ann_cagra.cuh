@@ -49,9 +49,10 @@ namespace {
  * If \p ace_host_dataset is set, builds from that host mdspan (ACE-only API). Otherwise builds from
  * \p padded and assigns optional VPQ state to \p vpq_keep when \p vpq_keep is non-null.
  *
- * When the ACE build attaches an owning device matrix (\p ace_res.dataset), pass a non-null
- * \p ace_device_keep so the storage outlives the non-owning index view. For VPQ builds, pass a
- * non-null \p vpq_keep whenever \p params.compression is set.
+ * For VPQ builds, pass a non-null \p vpq_keep whenever \p params.compression is set.
+ * ACE host path uses `cagra::build_ace` and may set \p ace_device_keep with the optional device
+ * matrix from the result. For a single `cagra::index` with internal storage, use `cagra::build`
+ * on the host view instead.
  */
 template <typename DataT, typename IdxT>
 void cagra_build_into_index(
@@ -64,7 +65,7 @@ void cagra_build_into_index(
   std::optional<raft::device_matrix<DataT, int64_t, raft::row_major>>* ace_device_keep = nullptr)
 {
   if (ace_host_dataset.has_value()) {
-    auto ace_res = cagra::build(res, params, *ace_host_dataset);
+    auto ace_res = cagra::build_ace(res, params, *ace_host_dataset);
     index        = std::move(ace_res.idx);
     if (ace_res.dataset.has_value()) {
       RAFT_EXPECTS(ace_device_keep != nullptr,

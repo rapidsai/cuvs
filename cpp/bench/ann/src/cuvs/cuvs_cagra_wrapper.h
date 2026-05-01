@@ -190,16 +190,15 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   auto dataset_view_host =
     raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
-  // Host mdspan cagra::build() is only valid for ACE graph (see cagra_build_inst.cu.in).
-  // For NN_DESCENT, IVF-PQ, etc. we must use cagra::build(res, params, dataset_view) with
-  // a padded device dataset (or upload host data first). Used for both single-split
-  // and logical multi-split build paths.
+  // Host mdspan: `cagra::build_ace` is for ACE (returns ace_build_result). Non-ACE from host
+  // uses `cagra::build(res, params, dataset_view)` with a padded device dataset (or upload
+  // host data first). Used for both single-split and logical multi-split build paths.
   bool const use_ace_host =
     dataset_is_on_host && std::holds_alternative<cuvs::neighbors::graph_build_params::ace_params>(
                             params.graph_build_params);
   if (index_params_.num_dataset_splits <= 1) {
     if (use_ace_host) {
-      auto ace_res = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
+      auto ace_res = cuvs::neighbors::cagra::build_ace(handle_, params, dataset_view_host);
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(ace_res.idx));
       if (ace_res.dataset.has_value()) { *dataset_ = std::move(*ace_res.dataset); }
     } else {
@@ -289,7 +288,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (use_ace_host) {
-          auto ace_res = cuvs::neighbors::cagra::build(handle_, params, sub_host);
+          auto ace_res = cuvs::neighbors::cagra::build_ace(handle_, params, sub_host);
           sub_index    = std::move(ace_res.idx);
           if (ace_res.dataset.has_value()) {
             sub_dataset_buffers_->push_back(std::move(*ace_res.dataset));

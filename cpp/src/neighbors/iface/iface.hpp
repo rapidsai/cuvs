@@ -107,8 +107,7 @@ void build(const raft::resources& handle,
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     const auto& cagra_params = *static_cast<const cagra::index_params*>(index_params);
     // Use compile-time routing for raft::host_device_accessor: a runtime `if (host vs device)`
-    // still type-checks both branches; device mdspan + ACE host code then fails (build returns
-    // index, not ace_build_result). Pointer fallback remains for other accessor types.
+    // still type-checks both branches. Pointer fallback remains for other accessor types.
     if constexpr (iface_detail::is_raft_host_device_accessor_v<Accessor>) {
       if constexpr (Accessor::mem_type == raft::memory_type::device) {
         auto idx = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
@@ -117,7 +116,7 @@ void build(const raft::resources& handle,
         // Host mdspan is only accepted on the ACE build path; non-ACE requires dataset_view.
         if (std::holds_alternative<cagra::graph_build_params::ace_params>(
               cagra_params.graph_build_params)) {
-          auto result = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
+          auto result = cuvs::neighbors::cagra::build_ace(handle, cagra_params, index_dataset);
           interface.cagra_build_dataset_ = std::move(result.dataset);
           interface.index_.emplace(std::move(result.idx));
         } else {
@@ -130,7 +129,7 @@ void build(const raft::resources& handle,
       if (dataset_on_host) {
         if (std::holds_alternative<cagra::graph_build_params::ace_params>(
               cagra_params.graph_build_params)) {
-          auto result = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
+          auto result = cuvs::neighbors::cagra::build_ace(handle, cagra_params, index_dataset);
           interface.cagra_build_dataset_ = std::move(result.dataset);
           interface.index_.emplace(std::move(result.idx));
         } else {
