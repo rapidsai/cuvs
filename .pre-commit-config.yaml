@@ -32,7 +32,8 @@ repos:
                 args: ["--config-file=pyproject.toml",
                        "python/cuvs/cuvs",
                        "cpp/cmake/modules",
-                       "cpp/tests/python"]
+                       "cpp/tests/python",
+                       "ci/checks"]
                 pass_filenames: false
       - repo: https://github.com/PyCQA/pydocstyle
         rev: 6.1.1
@@ -42,7 +43,7 @@ repos:
                 additional_dependencies: [toml]
                 args: ["--config=pyproject.toml"]
       - repo: https://github.com/pre-commit/mirrors-clang-format
-        rev: v20.1.4
+        rev: v20.1.8
         hooks:
               - id: clang-format
                 types_or: [c, c++, cuda]
@@ -91,8 +92,20 @@ repos:
                 pass_filenames: false
                 files: rust/.*
                 language: rust
+              - id: clang-format-with-cmake-placeholders
+                name: clang-format-with-cmake-placeholders
+                entry: python3 ci/checks/clang_format_with_cmake_placeholders.py
+                language: python
+                additional_dependencies: [clang_format==20.1.8]
+                files: |
+                  (?x)
+                    [.](cpp|cu|hpp|cuh)[.]in$
+                # clang-format struggles with one of the placeholders in register_fatbin.cpp.in, so exclude it
+                exclude: |
+                  (?x)
+                    ^cpp/cmake/modules/register_fatbin[.]cpp[.]in$
       - repo: https://github.com/codespell-project/codespell
-        rev: v2.2.2
+        rev: v2.4.1
         hooks:
               - id: codespell
                 additional_dependencies: [tomli]
@@ -109,7 +122,7 @@ repos:
             args: [--fix, --spdx]
             files: |
               (?x)
-                [.](cmake|c|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs|java)$|
+                [.](cmake|c|cpp([.]in)?|cu([.]in)?|cuh([.]in)?|h|hpp([.]in)?|sh|pxd|py|pyx|rs|java)$|
                 CMakeLists[.]txt$|
                 CMakeLists_standalone[.]txt$|
                 meta[.]yaml$|

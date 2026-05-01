@@ -20,7 +20,7 @@ void sort_cluster_sizes_descending(uint32_t* input,
                                    uint32_t* output,
                                    uint32_t n_lists,
                                    rmm::cuda_stream_view stream,
-                                   rmm::mr::device_memory_resource* tmp_res);
+                                   rmm::device_async_resource_ref tmp_res);
 
 /**
  * Default value returned by `search` when the `n_probes` is too small and top-k is too large.
@@ -235,6 +235,18 @@ void postprocess_distances(const raft::resources& res,
       }
     } break;
     case distance::DistanceType::BitwiseHamming: break;
+    case distance::DistanceType::L1: {
+      if (scaling_factor != 1.0) {
+        raft::linalg::map(res,
+                          out_view,
+                          raft::compose_op(raft::mul_const_op<ScoreOutT>{scaling_factor},
+                                           raft::cast_op<ScoreOutT>{}),
+                          raft::make_const_mdspan(in_view));
+      } else if (needs_cast || needs_copy) {
+        raft::linalg::map(
+          res, out_view, raft::cast_op<ScoreOutT>{}, raft::make_const_mdspan(in_view));
+      }
+    } break;
     default: RAFT_FAIL("Unexpected metric.");
   }
 }
@@ -244,7 +256,7 @@ template <typename Index>
 void recompute_internal_state(const raft::resources& res, Index& index)
 {
   auto stream  = raft::resource::get_cuda_stream(res);
-  auto tmp_res = raft::resource::get_workspace_resource(res);
+  auto tmp_res = raft::resource::get_workspace_resource_ref(res);
   rmm::device_uvector<uint32_t> sorted_sizes(index.n_lists(), stream, tmp_res);
 
   // Actualize the list pointers

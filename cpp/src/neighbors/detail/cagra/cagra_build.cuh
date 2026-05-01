@@ -5,7 +5,7 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../../vpq_dataset.cuh"
+#include "../../../preprocessing/quantize/vpq_build-ext.cuh"
 #include "graph_core.cuh"
 
 #include <raft/core/copy.cuh>
@@ -1696,8 +1696,8 @@ void build_knn_graph(
 
   // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
   rmm::device_async_resource_ref workspace_mr =
-    use_large_workspace ? raft::resource::get_large_workspace_resource(res)
-                        : raft::resource::get_workspace_resource(res);
+    use_large_workspace ? raft::resource::get_large_workspace_resource_ref(res)
+                        : raft::resource::get_workspace_resource_ref(res);
 
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
@@ -2080,7 +2080,7 @@ auto iterative_build_graph(
       curr_itopk_size = curr_topk + 32;
     }
 
-    RAFT_LOG_INFO(
+    RAFT_LOG_DEBUG(
       "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
       (uint64_t)cagra_graph.extent(0),
       (double)cagra_graph.extent(0) / final_graph_size,
@@ -2116,7 +2116,7 @@ auto iterative_build_graph(
       dev_query_view.extent(1),
       max_chunk_size,
       raft::resource::get_cuda_stream(res),
-      raft::resource::get_workspace_resource(res));
+      raft::resource::get_workspace_resource_ref(res));
     for (const auto& batch : query_batch) {
       auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
         batch.data(), batch.size(), dev_query_view.extent(1));
@@ -2146,7 +2146,7 @@ auto iterative_build_graph(
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    RAFT_LOG_INFO("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
+    RAFT_LOG_DEBUG("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
 
     if (flag_last) { break; }
     flag_last       = (curr_graph_size == final_graph_size);
@@ -2279,8 +2279,7 @@ index<T, IdxT> build(
     idx.update_dataset(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-      cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
-        res, *params.compression, dataset));
+      cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dataset));
 
     return idx;
   }

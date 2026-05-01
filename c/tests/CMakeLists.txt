@@ -87,6 +87,8 @@ ConfigureTest(
   NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
 )
 
+ConfigureTest(NAME PCA_C_TEST PATH preprocessing/pca_c.cu)
+
 if(BUILD_CAGRA_HNSWLIB)
   ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu)
   target_link_libraries(HNSW_C_TEST PRIVATE hnswlib::hnswlib)
@@ -98,7 +100,7 @@ endif()
 
 ConfigureTest(NAME cuvs_c_headers PATH core/headers.c)
 ConfigureTest(NAME cuvs_c_test PATH core/c_api.c)
-target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart)
+target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart_static)
 ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 
 # ##################################################################################################
