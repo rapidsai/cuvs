@@ -18,6 +18,7 @@ Nearest Neighbors
    neighbors_hnsw.rst
    neighbors_ivf_flat.rst
    neighbors_ivf_pq.rst
+   neighbors_ivf_sq.rst
    neighbors_mg.rst
    neighbors_nn_descent.rst
    neighbors_refine.rst

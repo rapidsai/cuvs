@@ -126,6 +126,13 @@ ConfigureTest(
 )
 
 ConfigureTest(
+  NAME NEIGHBORS_ANN_IVF_FLAT_UDF_TEST
+  PATH neighbors/ann_ivf_flat/test_udf.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_FLAT_TEST
   PATH neighbors/ann_ivf_flat/test_float_int64_t.cu neighbors/ann_ivf_flat/test_half_int64_t.cu
        neighbors/ann_ivf_flat/test_int8_t_int64_t.cu neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
@@ -134,8 +141,8 @@ ConfigureTest(
 )
 
 ConfigureTest(
-  NAME NEIGHBORS_ANN_IVF_FLAT_UDF_TEST
-  PATH neighbors/ann_ivf_flat/test_udf.cu
+  NAME NEIGHBORS_ANN_IVF_SQ_TEST
+  PATH neighbors/ann_ivf_sq/test_float_int64_t.cu neighbors/ann_ivf_sq/test_half_int64_t.cu
   GPUS 1
   PERCENT 100
 )
