@@ -205,9 +205,20 @@ struct indirect_dataset_view final : public dataset_view<IdxT> {
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return target_->dim(); }
 };
 
-/** Strided device row layout; independent of owning vs view (no common root with `dataset`). */
+// TODO(removal): Remove strided_dataset, non_owning_dataset, owning_dataset, make_strided_dataset,
+//                make_aligned_dataset, and is_strided_dataset* after one release; internal dispatch
+//                should rely on device_padded_dataset(_view) only.
+
+/**
+ * @brief Strided device row layout; independent of owning vs view (no common root with `dataset`).
+ *
+ * @deprecated Prefer `device_padded_dataset` / `device_padded_dataset_view` with
+ * `make_padded_dataset` / `make_padded_dataset_view` for CAGRA-compatible row layout.
+ */
 template <typename DataT, typename IdxT>
-struct strided_dataset {
+struct [[deprecated(
+  "Prefer device_padded_dataset / device_padded_dataset_view with make_padded_dataset / "
+  "make_padded_dataset_view.")]] strided_dataset {
   using index_type = IdxT;
   using value_type = DataT;
   using view_type  = raft::device_matrix_view<const value_type, index_type, raft::layout_stride>;
@@ -231,8 +242,15 @@ struct strided_dataset {
   [[nodiscard]] virtual auto view() const noexcept -> view_type = 0;
 };
 
+/**
+ * @deprecated Prefer `device_padded_dataset_view` or non-strided `dataset_view` wiring; see
+ *             `device_padded_dataset` / `make_padded_dataset_view`.
+ */
 template <typename DataT, typename IdxT>
-struct non_owning_dataset : public dataset_view<IdxT>, public strided_dataset<DataT, IdxT> {
+struct [[deprecated(
+  "Prefer device_padded_dataset_view / make_padded_dataset_view; see device_padded_dataset.")]]
+non_owning_dataset : public dataset_view<IdxT>,
+                     public strided_dataset<DataT, IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using typename strided_dataset<value_type, index_type>::view_type;
@@ -252,8 +270,13 @@ struct non_owning_dataset : public dataset_view<IdxT>, public strided_dataset<Da
   [[nodiscard]] auto view() const noexcept -> view_type final { return data; };
 };
 
+/**
+ * @deprecated Prefer `device_padded_dataset` with `make_padded_dataset`.
+ */
 template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
-struct owning_dataset : public dataset<IdxT>, public strided_dataset<DataT, IdxT> {
+struct [[deprecated("Prefer device_padded_dataset with make_padded_dataset.")]] owning_dataset
+  : public dataset<IdxT>,
+    public strided_dataset<DataT, IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
   using typename strided_dataset<value_type, index_type>::view_type;
@@ -284,6 +307,11 @@ struct owning_dataset : public dataset<IdxT>, public strided_dataset<DataT, IdxT
   };
 };
 
+/**
+ * @brief True if `DatasetT` is `strided_dataset`, `non_owning_dataset`, or `owning_dataset`.
+ *
+ * @deprecated Prefer `is_padded_dataset` / `is_padded_dataset_v`; see `is_strided_dataset_v`.
+ */
 template <typename DatasetT>
 struct is_strided_dataset : std::false_type {};
 
@@ -298,6 +326,7 @@ struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPol
   : std::true_type {};
 
 template <typename DatasetT>
+[[deprecated("Prefer is_padded_dataset_v where applicable; strided_dataset types are deprecated.")]]
 inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
 
 // =============================================================================
@@ -452,8 +481,11 @@ template <typename T, typename I, typename L>
  * @param[in] src the source mdarray or mdspan
  * @param[in] required_stride the leading dimension (in elements)
  * @return maybe owning current-device-accessible strided matrix
+ *
+ * @deprecated Prefer `make_padded_dataset` / `make_padded_dataset_view` for CAGRA layout.
  */
 template <typename SrcT>
+[[deprecated("Prefer make_padded_dataset / make_padded_dataset_view for CAGRA-compatible layout.")]]
 auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t required_stride)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
@@ -524,8 +556,11 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
  * @param[in] src the source mdarray or mdspan
  * @param[in] required_stride the leading dimension (in elements)
  * @return owning current-device-accessible strided matrix
+ *
+ * @deprecated Prefer `make_padded_dataset` for owning padded row-major layout.
  */
 template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
+[[deprecated("Prefer make_padded_dataset / make_padded_dataset_view for CAGRA-compatible layout.")]]
 auto make_strided_dataset(
   const raft::resources& res,
   raft::mdarray<DataT, raft::matrix_extent<IdxT>, LayoutPolicy, ContainerPolicy>&& src,
@@ -591,8 +626,11 @@ auto make_strided_dataset(
  * @param[in] src the source mdarray or mdspan
  * @param[in] align_bytes the required byte alignment for the dataset rows.
  * @return maybe owning current-device-accessible strided matrix
+ *
+ * @deprecated Prefer `make_padded_dataset` / `make_padded_dataset_view`.
  */
 template <typename SrcT>
+[[deprecated("Prefer make_padded_dataset / make_padded_dataset_view for CAGRA-compatible layout.")]]
 auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {

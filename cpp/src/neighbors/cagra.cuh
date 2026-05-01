@@ -331,6 +331,8 @@ void optimize(
   detail::optimize(res, knn_graph, new_graph, guarantee_connectivity);
 }
 
+// TODO(removal): Deprecated host mdspan build->index (delete with matrix-view build API).
+
 template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =

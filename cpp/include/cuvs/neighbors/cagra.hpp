@@ -965,7 +965,14 @@ struct ace_build_result {
  * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
+ *             not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
+  "make_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
@@ -1004,7 +1011,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
+ *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
+  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
@@ -1043,7 +1057,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
+ *             not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
+  "make_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
@@ -1081,7 +1102,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
+ *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
+  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
@@ -1121,7 +1149,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
+ *             not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
+  "make_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
@@ -1162,7 +1197,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
+ *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
+  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
@@ -1203,7 +1245,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
+ *             not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
+  "make_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
@@ -1244,7 +1293,14 @@ auto build(raft::resources const& res,
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
  *
  * @return the constructed cagra index
+ *
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
+ *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
+[[deprecated(
+  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
+  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
