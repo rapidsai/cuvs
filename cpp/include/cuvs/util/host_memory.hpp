@@ -1,16 +1,17 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include <raft/core/error.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <fstream>
 #include <string>
-#include <cuvs/core/export.hpp>
 
-namespace CUVS_EXPORT cuvs { namespace util {
+namespace CUVS_EXPORT cuvs {
+namespace util {
 
 /**
  * @brief Get available host memory from /proc/meminfo
@@ -24,4 +25,4 @@ namespace CUVS_EXPORT cuvs { namespace util {
 size_t get_free_host_memory();
 
 }  // namespace util
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

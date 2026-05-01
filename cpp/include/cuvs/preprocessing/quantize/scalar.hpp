@@ -14,7 +14,10 @@
 #include <cuda_fp16.h>
 #include <cuvs/core/export.hpp>
 
-namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace quantize { namespace scalar {
+namespace CUVS_EXPORT cuvs {
+namespace preprocessing {
+namespace quantize {
+namespace scalar {
 
 /**
  * @defgroup scalar Scalar quantizer utilities
@@ -475,4 +478,4 @@ void inverse_transform(raft::resources const& res,
 }  // namespace scalar
 }  // namespace quantize
 }  // namespace preprocessing
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

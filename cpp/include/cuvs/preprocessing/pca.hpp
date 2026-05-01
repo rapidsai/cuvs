@@ -5,12 +5,14 @@
 
 #pragma once
 
+#include <cuvs/core/export.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/pca_types.hpp>
-#include <cuvs/core/export.hpp>
 
-namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace pca {
+namespace CUVS_EXPORT cuvs {
+namespace preprocessing {
+namespace pca {
 
 using solver = raft::linalg::solver;
 
@@ -185,4 +187,4 @@ void inverse_transform(raft::resources const& handle,
 
 }  // namespace pca
 }  // namespace preprocessing
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

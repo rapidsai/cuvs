@@ -10,10 +10,12 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-#include <optional>
 #include <cuvs/core/export.hpp>
+#include <optional>
 
-namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace spectral_embedding {
+namespace CUVS_EXPORT cuvs {
+namespace preprocessing {
+namespace spectral_embedding {
 
 /**
  * @brief Parameters for spectral embedding algorithm
@@ -191,9 +193,12 @@ void transform(raft::resources const& handle,
 
 }  // namespace spectral_embedding
 }  // namespace preprocessing
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs
 
-namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace spectral_embedding { namespace helpers {
+namespace CUVS_EXPORT cuvs {
+namespace preprocessing {
+namespace spectral_embedding {
+namespace helpers {
 
 void create_connectivity_graph(raft::resources const& handle,
                                params spectral_embedding_config,
@@ -203,4 +208,4 @@ void create_connectivity_graph(raft::resources const& handle,
 }  // namespace helpers
 }  // namespace spectral_embedding
 }  // namespace preprocessing
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

@@ -14,7 +14,10 @@
 #include <cuda_fp16.h>
 #include <cuvs/core/export.hpp>
 
-namespace CUVS_EXPORT cuvs { namespace preprocessing { namespace quantize { namespace binary {
+namespace CUVS_EXPORT cuvs {
+namespace preprocessing {
+namespace quantize {
+namespace binary {
 
 /**
  * @defgroup binary Binary quantizer utilities
@@ -432,4 +435,4 @@ void transform(raft::resources const& res,
 }  // namespace binary
 }  // namespace quantize
 }  // namespace preprocessing
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

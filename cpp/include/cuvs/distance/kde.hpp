@@ -9,10 +9,11 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-#include <optional>
 #include <cuvs/core/export.hpp>
+#include <optional>
 
-namespace CUVS_EXPORT cuvs { namespace distance {
+namespace CUVS_EXPORT cuvs {
+namespace distance {
 
 /**
  * @brief Compute log-density estimates for query points using kernel density estimation.
@@ -80,4 +81,4 @@ extern template void kde<double>(
   double);
 
 }  // namespace distance
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,10 +11,11 @@
 #include <raft/core/resources.hpp>
 #include <raft/matrix/select_k_types.hpp>
 
-#include <optional>
 #include <cuvs/core/export.hpp>
+#include <optional>
 
-namespace CUVS_EXPORT cuvs { namespace selection {
+namespace CUVS_EXPORT cuvs {
+namespace selection {
 using SelectAlgo = raft::matrix::SelectAlgo;
 
 /**
@@ -199,4 +200,4 @@ void select_k(
 /** @} */  // end of group select_k
 
 }  // namespace selection
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs

@@ -4,8 +4,8 @@
  */
 #pragma once
 
-#include <raft/core/error.hpp>
 #include <cuvs/core/export.hpp>
+#include <raft/core/error.hpp>
 
 namespace CUVS_EXPORT cuvs {
 
@@ -17,4 +17,4 @@ struct cutlass_error : public raft::exception {
   explicit cutlass_error(std::string const& message) : raft::exception(message) {}
 };
 
-}  // namespace cuvs
+}  // namespace CUVS_EXPORT cuvs
