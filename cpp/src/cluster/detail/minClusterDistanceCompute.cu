@@ -8,6 +8,8 @@
 
 #include <raft/matrix/init.cuh>
 
+#include <optional>
+
 namespace cuvs::cluster::kmeans::detail {
 
 // Calculates a <key, value> pair for every sample in input 'X' where key is an
@@ -24,7 +26,8 @@ void minClusterAndDistanceCompute(
   cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
-  rmm::device_uvector<char>& workspace)
+  rmm::device_uvector<char>& workspace,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -154,7 +157,8 @@ void minClusterAndDistanceCompute(
     cuvs::distance::DistanceType metric,                                                       \
     int batch_samples,                                                                         \
     int batch_centroids,                                                                       \
-    rmm::device_uvector<char>& workspace);
+    rmm::device_uvector<char>& workspace,                                                      \
+    std::optional<raft::device_vector_view<const DataT, IndexT>>);
 
 INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(float, int64_t)
 INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int64_t)
@@ -164,16 +168,18 @@ INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int)
 #undef INSTANTIATE_MIN_CLUSTER_AND_DISTANCE
 
 template <typename DataT, typename IndexT>
-void minClusterDistanceCompute(raft::resources const& handle,
-                               raft::device_matrix_view<const DataT, IndexT> X,
-                               raft::device_matrix_view<DataT, IndexT> centroids,
-                               raft::device_vector_view<DataT, IndexT> minClusterDistance,
-                               raft::device_vector_view<DataT, IndexT> L2NormX,
-                               rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-                               cuvs::distance::DistanceType metric,
-                               int batch_samples,
-                               int batch_centroids,
-                               rmm::device_uvector<char>& workspace)
+void minClusterDistanceCompute(
+  raft::resources const& handle,
+  raft::device_matrix_view<const DataT, IndexT> X,
+  raft::device_matrix_view<DataT, IndexT> centroids,
+  raft::device_vector_view<DataT, IndexT> minClusterDistance,
+  raft::device_vector_view<DataT, IndexT> L2NormX,
+  rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
+  cuvs::distance::DistanceType metric,
+  int batch_samples,
+  int batch_centroids,
+  rmm::device_uvector<char>& workspace,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -283,7 +289,8 @@ void minClusterDistanceCompute(raft::resources const& handle,
     cuvs::distance::DistanceType metric,                        \
     int batch_samples,                                          \
     int batch_centroids,                                        \
-    rmm::device_uvector<char>& workspace);
+    rmm::device_uvector<char>& workspace,                       \
+    std::optional<raft::device_vector_view<const DataT, IndexT>>);
 
 INSTANTIATE_MIN_CLUSTER_DISTANCE(float, int64_t)
 INSTANTIATE_MIN_CLUSTER_DISTANCE(double, int64_t)
