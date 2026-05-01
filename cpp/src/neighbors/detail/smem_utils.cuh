@@ -9,117 +9,84 @@
 #include <cuda_runtime.h>
 #include <mutex>
 #include <raft/core/error.hpp>
-#include <unordered_map>
+#include <utility>
 
 namespace cuvs::neighbors::detail {
+
+/** Host-side pointer to @p KernelT (or nullptr for pure JIT) paired with the CUDA module kernel
+ *  handle; used to track which logical kernel last had smem attributes applied. */
+template <typename KernelT>
+using kernel_cuda_pair_t = std::pair<std::add_pointer_t<KernelT>, cudaKernel_t>;
 
 /**
  * @brief (Thread-)Safely invoke a kernel with a maximum dynamic shared memory size.
  *
  * Maintains a monotonically growing high-water mark for
- * `cudaFuncAttributeMaxDynamicSharedMemorySize`. When the kernel function pointer changes, the new
- * kernel is brought up to the current high-water mark; when smem_size exceeds the high-water mark,
- * it is grown for the current kernel. This guarantees every kernel's attribute is always >=
+ * `cudaFuncAttributeMaxDynamicSharedMemorySize`. When the kernel identity changes, the new kernel
+ * is brought up to the current high-water mark; when @p smem_size exceeds the high-water mark, it
+ * is grown for the current kernel. This guarantees every kernel's attribute is always >= @p
  * smem_size at the time of launch.
  *
- * NB: cudaFuncSetAttribute is per kernel function pointer value, not per type. Multiple kernel
- * template instantiations may share the same KernelT type (e.g. function pointers with the same
- * signature), so we track the kernel identity alongside the smem high-water mark.
+ * This is required because the sequence `cudaFuncSetAttribute` + kernel launch is not executed
+ * atomically. Used this way, `cudaFuncAttributeMaxDynamicSharedMemorySize` can only grow and the
+ * kernel remains safe to launch.
  *
- * @tparam KernelT The type of the kernel.
- * @tparam KernelLauncherT The type of the launch function/lambda.
- * @param kernel The kernel function address (for whom the smem-size is specified).
- * @param smem_size The size of the dynamic shared memory to be set.
- * @param launch The kernel launch function/lambda.
+ * NB: cudaFuncSetAttribute is per kernel handle value, not per C++ type. Multiple template
+ * instantiations may share the same @p KernelT (e.g. the same function signature), so we track the
+ * kernel identity alongside the smem high-water mark using @p cuda_kernel (and optional host
+ * function pointer in the pair's first element).
+ *
+ * @tparam KernelT Kernel function type from kernel_def.hpp (keys static state per signature).
+ * @tparam KernelLauncherT Type of the launch callable (e.g. lambda calling launcher->dispatch).
+ * @param smem_size Dynamic shared memory required for this launch.
+ * @param launch Invoked after attributes are set; takes no arguments.
+ * @param cuda_kernel Handle passed to cudaFuncSetAttribute (e.g. launcher->get_kernel()). Pure JIT
+ *                    callers pair this with `nullptr` as the host pointer.
  */
 template <typename KernelT, typename KernelLauncherT>
-void safely_launch_kernel_with_smem_size_impl(KernelT const& kernel,
-                                              uint32_t smem_size,
-                                              KernelLauncherT const& launch,
-                                              std::mutex& mutex,
-                                              std::atomic<uint32_t>& current_smem_size)
+void safely_launch_kernel_with_smem_size(std::uint32_t smem_size,
+                                         KernelLauncherT const& launch,
+                                         cudaKernel_t cuda_kernel)
 {
-  // last_smem_size is a monotonically growing high-water mark across all kernel pointers.
-  // last_kernel tracks which kernel pointer was last used.
-  static std::atomic<uint32_t> last_smem_size{0};
-  static std::atomic<KernelT> last_kernel{KernelT{}};
-  // Fast path: skip the lock when the kernel matches and the smem size is within bounds.
-  // Load order matters: last_smem_size (acquire) before last_kernel (relaxed). Inside the lock
-  // we store in the opposite order: last_kernel (relaxed) then last_smem_size (release).
-  // This way an acquire load of last_smem_size that sees a post-cudaFuncSetAttribute value is
-  // guaranteed to also see the corresponding last_kernel.
-  if (smem_size > last_smem_size.load(std::memory_order_acquire) ||
-      kernel != last_kernel.load(std::memory_order_relaxed)) {
+  // last_smem_size is a monotonically growing high-water mark. last_kernel is a (host fn ptr,
+  // cudaKernel_t) pair tracking which kernel identity was last configured.
+  static std::atomic<std::uint32_t> last_smem_size{0};
+  static std::atomic<kernel_cuda_pair_t<KernelT>> last_kernel{
+    kernel_cuda_pair_t<KernelT>{nullptr, cudaKernel_t{}}};
+  static std::mutex mutex;
+
+  kernel_cuda_pair_t<KernelT> const current{nullptr, cuda_kernel};
+
+  // Fast path: skip the lock when the kernel identity matches and smem is within bounds.
+  // Load order matters: last_smem_size (acquire) before last_kernel (relaxed). Inside the lock we
+  // store in the opposite order: last_kernel (relaxed) then last_smem_size (release). This way an
+  // acquire load of last_smem_size that sees a post-cudaFuncSetAttribute value is guaranteed to
+  // also see the corresponding last_kernel pair.
+  std::uint32_t observed_smem                 = last_smem_size.load(std::memory_order_acquire);
+  kernel_cuda_pair_t<KernelT> observed_kernel = last_kernel.load(std::memory_order_relaxed);
+  if (smem_size > observed_smem || current != observed_kernel) {
     std::lock_guard<std::mutex> guard(mutex);
     // Re-check under the lock: the outside decision can be stale.
-    uint32_t cur_smem_size = last_smem_size.load(std::memory_order_relaxed);
-    bool need_update       = (kernel != last_kernel.load(std::memory_order_relaxed));
+    std::uint32_t cur_smem_size = last_smem_size.load(std::memory_order_relaxed);
+    observed_kernel             = last_kernel.load(std::memory_order_relaxed);
+    bool need_update            = (current != observed_kernel);
     if (smem_size > cur_smem_size) {
       cur_smem_size = smem_size;
       need_update   = true;
     }
     if (need_update) {
-      auto launch_status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, cur_smem_size);
+      auto launch_status = cudaFuncSetAttribute(
+        cuda_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, cur_smem_size);
       RAFT_EXPECTS(launch_status == cudaSuccess,
                    "Failed to set max dynamic shared memory size to %u bytes",
                    cur_smem_size);
-      // Store order matters: last_kernel before last_smem_size (release) so the fast-path
-      // acquire load of last_smem_size also publishes last_kernel.
-      last_kernel.store(kernel, std::memory_order_relaxed);
+      // Store order matters: last_kernel before last_smem_size (release) so the fast-path acquire
+      // load of last_smem_size also publishes last_kernel.
+      last_kernel.store(current, std::memory_order_relaxed);
       last_smem_size.store(cur_smem_size, std::memory_order_release);
     }
   }
-  return launch(kernel);
-}
-
-/**
- * @brief (Thread-)Safely invoke a kernel with a maximum dynamic shared memory size.
- * This is required because the sequence `cudaFuncSetAttribute` + kernel launch is not executed
- * atomically.
- *
- * Used this way, the cudaFuncAttributeMaxDynamicSharedMemorySize can only grow and thus
- * guarantees that the kernel is safe to launch.
- *
- * @tparam KernelT The type of the kernel.
- * @tparam InvocationT The type of the invocation function.
- * @param kernel The kernel function address (for whom the smem-size is specified).
- * @param smem_size The size of the dynamic shared memory to be set.
- * @param launch The kernel launch function/lambda.
- */
-// Specialization for cudaKernel_t (JIT LTO kernels) - track by kernel pointer
-template <typename KernelLauncherT>
-void safely_launch_kernel_with_smem_size(cudaKernel_t kernel,
-                                         uint32_t smem_size,
-                                         KernelLauncherT const& launch)
-{
-  // For JIT kernels, track by kernel pointer since all cudaKernel_t have the same type
-  static std::unordered_map<cudaKernel_t, std::pair<std::mutex, std::atomic<uint32_t>>>
-    jit_smem_sizes;
-  static std::mutex
-    map_mutex;  // protects jit_smem_sizes (insert / lookup) across calls and threads
-
-  std::pair<std::mutex, std::atomic<uint32_t>>* current_smem_size;
-  {
-    std::lock_guard<std::mutex> map_lock{map_mutex};
-    current_smem_size = &jit_smem_sizes[kernel];
-  }
-  safely_launch_kernel_with_smem_size_impl<cudaKernel_t, KernelLauncherT>(
-    kernel, smem_size, launch, current_smem_size->first, current_smem_size->second);
-}
-
-// General template for regular function pointers
-template <typename KernelT, typename KernelLauncherT>
-void safely_launch_kernel_with_smem_size(KernelT const& kernel,
-                                         uint32_t smem_size,
-                                         KernelLauncherT const& launch)
-{
-  // the last smem size is parameterized by the kernel thanks to the template parameter.
-  static std::atomic<uint32_t> current_smem_size{0};
-  static std::mutex mutex;
-
-  safely_launch_kernel_with_smem_size_impl<KernelT, KernelLauncherT>(
-    kernel, smem_size, launch, mutex, current_smem_size);
+  return launch();
 }
 
 }  // namespace cuvs::neighbors::detail

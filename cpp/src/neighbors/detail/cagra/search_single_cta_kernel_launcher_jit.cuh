@@ -827,7 +827,7 @@ void select_and_run(
                    smem_size);
 
     // Dispatch kernel via launcher
-    auto kernel_launcher = [&](auto const& kernel) -> void {
+    auto kernel_launcher = [&]() -> void {
       launcher->dispatch<search_single_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
         stream,
         grid,
@@ -861,8 +861,9 @@ void select_and_run(
         bitset);
     };
 
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-      launcher->get_kernel(), smem_size, kernel_launcher);
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+      search_single_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+      smem_size, kernel_launcher, launcher->get_kernel());
 
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }

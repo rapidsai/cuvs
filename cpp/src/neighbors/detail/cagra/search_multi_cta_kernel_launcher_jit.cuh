@@ -113,7 +113,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
   const uint32_t max_iterations_u32        = static_cast<uint32_t>(ps.max_iterations);
   const unsigned num_random_samplings_u    = static_cast<unsigned>(ps.num_random_samplings);
 
-  auto kernel_launcher = [&](auto const& kernel) -> void {
+  auto kernel_launcher = [&]() -> void {
     launcher->dispatch<
       multi_cta_search::search_multi_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
       stream,
@@ -143,8 +143,9 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
       query_id_offset,
       bf.bitset);
   };
-  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-    launcher->get_kernel(), smem_size, kernel_launcher);
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+    multi_cta_search::search_multi_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(
+    smem_size, kernel_launcher, launcher->get_kernel());
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
