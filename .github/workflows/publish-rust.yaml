@@ -31,7 +31,7 @@ jobs:
           fi
       - name: Setup and publish crates
         if: steps.check_release.outputs.is_release == 'true'
-        run: |
+        run: | # zizmor: ignore[use-trusted-publishing]
           . /opt/conda/etc/profile.d/conda.sh
 
           rapids-dependency-file-generator \
