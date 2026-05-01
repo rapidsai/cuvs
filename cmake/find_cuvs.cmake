@@ -1,11 +1,13 @@
-#=============================================================================
+# =============================================================================
+# cmake-format: off
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
-#=============================================================================
+# cmake-format: on
+# =============================================================================
 
-# This file is copied to a temporary CMakeLists.txt by build.rs. It intentionally
-# performs only the versioned cuVS package discovery step; Rust uses the selected
-# cuvs_DIR with cmake-package for target introspection.
+# This file is copied to a temporary CMakeLists.txt by build.rs. It intentionally performs only the
+# versioned cuVS package discovery step; Rust uses the selected cuvs_DIR with cmake-package for
+# target introspection.
 
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 project(cuvs_package_probe LANGUAGES C CXX)
@@ -24,7 +26,10 @@ endif()
 
 function(json_set_string json_var key value)
   string(JSON _json SET "${${json_var}}" "${key}" "\"${value}\"")
-  set(${json_var} "${_json}" PARENT_SCOPE)
+  set(${json_var}
+      "${_json}"
+      PARENT_SCOPE
+  )
 endfunction()
 
 set(_find_args cuvs ${REQUIRED_VERSION} CONFIG QUIET COMPONENTS ${CUVS_COMPONENT})
