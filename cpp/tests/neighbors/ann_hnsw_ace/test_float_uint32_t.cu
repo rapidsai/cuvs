@@ -23,4 +23,15 @@ INSTANTIATE_TEST_CASE_P(AnnHnswAceMemoryFallbackTest,
                         AnnHnswAceMemoryFallbackTest_float,
                         ::testing::ValuesIn(hnsw_ace_memory_fallback_inputs));
 
+// Test for `hnsw::from_cagra` remap behavior
+typedef AnnHnswAceTest<float, float, uint32_t> AnnHnswAceFromCagraRemapTest_float;
+TEST_P(AnnHnswAceFromCagraRemapTest_float, AnnHnswAceFromCagraRemap)
+{
+  this->testHnswAceFromCagraRemap();
+}
+
+INSTANTIATE_TEST_CASE_P(AnnHnswAceFromCagraRemapTest,
+                        AnnHnswAceFromCagraRemapTest_float,
+                        ::testing::ValuesIn(hnsw_ace_from_cagra_remap_inputs));
+
 }  // namespace cuvs::neighbors::hnsw
