@@ -6,6 +6,7 @@
 #pragma once
 
 #include "common.hpp"
+#include <cuda_fp16.h>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -286,7 +287,8 @@ struct index : cuvs::neighbors::index {
  * to improve graph quality. The index_params struct controls the degree of the final graph.
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded (squared L2)
+ * - L2SqrtExpanded (Euclidean distance)
  *
  * Usage example:
  * @code{.cpp}
@@ -343,6 +345,16 @@ auto build(raft::resources const& res,
            const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::vamana::index<float, uint32_t>;
+
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::vamana::index<half, uint32_t>;
+
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::vamana::index<half, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
@@ -517,6 +529,12 @@ auto build(raft::resources const& res,
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<float, uint32_t>& index,
+               bool include_dataset = true,
+               bool sector_aligned  = false);
+
+void serialize(raft::resources const& handle,
+               const std::string& file_prefix,
+               const cuvs::neighbors::vamana::index<half, uint32_t>& index,
                bool include_dataset = true,
                bool sector_aligned  = false);
 

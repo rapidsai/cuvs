@@ -45,6 +45,7 @@ namespace cuvs::neighbors::vamana {
  *
  * The following distance metrics are supported:
  * - L2Expanded
+ * - L2SqrtExpanded
  *
  * Usage example:
  * @code{.cpp}

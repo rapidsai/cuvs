@@ -8,7 +8,9 @@
 #include <climits>
 #include <cstdint>
 #include <cstdio>
+#include <cuda_fp16.h>
 #include <float.h>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -171,16 +173,102 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
   return partial_sum[0];
 }
 
+/* fp16: accumulate in float; promote operands once for correct fmaf behavior */
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_SEQ_half(Point<__half, SUMTYPE>* src_vec, Point<__half, SUMTYPE>* dst_vec)
+{
+  SUMTYPE partial_sum = 0;
+
+  for (int i = threadIdx.x; i < src_vec->Dim; i += blockDim.x) {
+    float s = __half2float(src_vec[0].coords[i]);
+    float t = __half2float(dst_vec[0].coords[i]);
+    float d = s - t;
+    partial_sum = fmaf(d, d, partial_sum);
+  }
+
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP2_half(Point<__half, SUMTYPE>* src_vec, Point<__half, SUMTYPE>* dst_vec)
+{
+  float partial_sum[2] = {0, 0};
+  for (int i = threadIdx.x; i < src_vec->Dim; i += 2 * blockDim.x) {
+    float t0 = __half2float(dst_vec->coords[i]);
+    float s0 = __half2float(src_vec[0].coords[i]);
+    partial_sum[0] = fmaf(s0 - t0, s0 - t0, partial_sum[0]);
+
+    if (i + 32 < src_vec->Dim) {
+      float t1         = __half2float(dst_vec->coords[i + 32]);
+      float s1         = __half2float(src_vec[0].coords[i + 32]);
+      partial_sum[1] = fmaf(s1 - t1, s1 - t1, partial_sum[1]);
+    }
+  }
+  partial_sum[0] += partial_sum[1];
+
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP4_half(Point<__half, SUMTYPE>* src_vec, Point<__half, SUMTYPE>* dst_vec)
+{
+  float partial_sum[4] = {0, 0, 0, 0};
+  for (int i = threadIdx.x; i < src_vec->Dim; i += 4 * blockDim.x) {
+    float t0 = __half2float(dst_vec->coords[i]);
+    float s0 = __half2float(src_vec[0].coords[i]);
+    partial_sum[0] = fmaf(s0 - t0, s0 - t0, partial_sum[0]);
+
+    if (i + 32 < src_vec->Dim) {
+      float t1 = __half2float(dst_vec->coords[i + 32]);
+      float s1 = __half2float(src_vec[0].coords[i + 32]);
+      partial_sum[1] = fmaf(s1 - t1, s1 - t1, partial_sum[1]);
+    }
+    if (i + 64 < src_vec->Dim) {
+      float t2 = __half2float(dst_vec->coords[i + 64]);
+      float s2 = __half2float(src_vec[0].coords[i + 64]);
+      partial_sum[2] = fmaf(s2 - t2, s2 - t2, partial_sum[2]);
+    }
+    if (i + 96 < src_vec->Dim) {
+      float t3 = __half2float(dst_vec->coords[i + 96]);
+      float s3 = __half2float(src_vec[0].coords[i + 96]);
+      partial_sum[3] = fmaf(s3 - t3, s3 - t3, partial_sum[3]);
+    }
+  }
+  partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
+
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+
+  return partial_sum[0];
+}
+
 /* Selects ILP optimization level based on dimension */
 template <typename T, typename SUMTYPE>
 __forceinline__ __device__ SUMTYPE l2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec)
 {
-  if (src_vec->Dim >= 128) {
-    return l2_ILP4<T, SUMTYPE>(src_vec, dst_vec);
-  } else if (src_vec->Dim >= 64) {
-    return l2_ILP2<T, SUMTYPE>(src_vec, dst_vec);
+  if constexpr (std::is_same_v<std::remove_cv_t<T>, __half>) {
+    if (src_vec->Dim >= 128) {
+      return l2_ILP4_half<SUMTYPE>(src_vec, dst_vec);
+    } else if (src_vec->Dim >= 64) {
+      return l2_ILP2_half<SUMTYPE>(src_vec, dst_vec);
+    } else {
+      return l2_SEQ_half<SUMTYPE>(src_vec, dst_vec);
+    }
   } else {
-    return l2_SEQ<T, SUMTYPE>(src_vec, dst_vec);
+    if (src_vec->Dim >= 128) {
+      return l2_ILP4<T, SUMTYPE>(src_vec, dst_vec);
+    } else if (src_vec->Dim >= 64) {
+      return l2_ILP2<T, SUMTYPE>(src_vec, dst_vec);
+    } else {
+      return l2_SEQ<T, SUMTYPE>(src_vec, dst_vec);
+    }
   }
 }
 
@@ -198,12 +286,15 @@ __host__ __device__ SUMTYPE l2(const T* src, const T* dest, int dim)
   return l2<T, SUMTYPE>(&src_p, &dest_p);
 }
 
-// Currently only L2Expanded is supported
 template <typename T, typename SUMTYPE>
 __host__ __device__ SUMTYPE
 dist(const T* src, const T* dest, int dim, cuvs::distance::DistanceType metric)
 {
-  return l2<T, SUMTYPE>(src, dest, dim);
+  SUMTYPE d = l2<T, SUMTYPE>(src, dest, dim);
+  if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    return static_cast<SUMTYPE>(sqrtf(static_cast<float>(d)));
+  }
+  return d;
 }
 
 /***************************************************************************************

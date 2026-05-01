@@ -562,8 +562,9 @@ index<T, IdxT> build(
 {
   uint32_t graph_degree = params.graph_degree;
 
-  RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
-               "Currently only L2Expanded metric is supported");
+  RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 params.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "Only L2Expanded and L2SqrtExpanded metrics are supported");
 
   const int* deg_size = std::find(std::begin(DEGREE_SIZES), std::end(DEGREE_SIZES), graph_degree);
   RAFT_EXPECTS(deg_size != std::end(DEGREE_SIZES), "Provided graph_degree not currently supported");
@@ -580,10 +581,9 @@ index<T, IdxT> build(
 
   RAFT_LOG_DEBUG("Running Vamana batched insert algorithm");
 
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
   IdxT medoid_id;
   batched_insert_vamana<T, float, IdxT, Accessor>(
-    res, params, dataset, vamana_graph.view(), &medoid_id, metric);
+    res, params, dataset, vamana_graph.view(), &medoid_id, params.metric);
 
   std::optional<raft::device_matrix<uint8_t, int64_t, raft::row_major>> quantized_vectors;
   if (params.codebooks) {
