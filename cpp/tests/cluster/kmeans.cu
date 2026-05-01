@@ -273,15 +273,15 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     int n_iter  = 0;
     auto X_view = raft::make_const_mdspan(X.view());
 
-    cuvs::cluster::kmeans::fit_predict(
+    cuvs::cluster::kmeans::fit(
       handle,
       params,
       X_view,
       d_sw,
       d_centroids_view,
-      raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
       raft::make_host_scalar_view<T>(&inertia),
-      raft::make_host_scalar_view<int>(&n_iter));
+      raft::make_host_scalar_view<int>(&n_iter),
+      std::make_optional(raft::make_device_vector_view<int, int>(d_labels.data(), n_samples)));
 
     raft::resource::sync_stream(handle, stream);
 

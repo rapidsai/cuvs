@@ -23,6 +23,7 @@
 #include <gtest/gtest.h>
 
 #include <optional>
+#include <type_traits>
 #include <vector>
 
 /* This test takes advantage of the fact that make_blobs generates balanced clusters.
@@ -122,8 +123,18 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
       cuvs::cluster::kmeans::predict(
         handle, p.kb_params, X_view, raft::make_const_mdspan(d_centroids_view), d_labels_view);
     } else {
-      cuvs::cluster::kmeans::fit_predict(
-        handle, p.kb_params, X_view, d_centroids_view, d_labels_view);
+      if constexpr (std::is_same_v<LabelT, uint32_t>) {
+        cuvs::cluster::kmeans::fit(handle,
+                                   p.kb_params,
+                                   X_view,
+                                   d_centroids_view,
+                                   std::nullopt,
+                                   std::make_optional(d_labels_view));
+      } else {
+        cuvs::cluster::kmeans::fit(handle, p.kb_params, X_view, d_centroids_view, std::nullopt);
+        cuvs::cluster::kmeans::predict(
+          handle, p.kb_params, X_view, raft::make_const_mdspan(d_centroids_view), d_labels_view);
+      }
     }
 
     raft::resource::sync_stream(handle, stream);

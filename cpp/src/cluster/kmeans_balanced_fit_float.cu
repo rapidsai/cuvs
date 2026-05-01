@@ -15,9 +15,15 @@ void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const float, int64_t> X,
          raft::device_matrix_view<float, int64_t> centroids,
-         std::optional<raft::host_scalar_view<float>> inertia)
+         std::optional<raft::host_scalar_view<float>> inertia,
+         std::optional<raft::device_vector_view<uint32_t, int64_t>> labels)
 {
-  cuvs::cluster::kmeans_balanced::fit(
-    handle, params, X, centroids, cuvs::spatial::knn::detail::utils::mapping<float>{}, inertia);
+  cuvs::cluster::kmeans_balanced::fit(handle,
+                                      params,
+                                      X,
+                                      centroids,
+                                      cuvs::spatial::knn::detail::utils::mapping<float>{},
+                                      inertia,
+                                      labels);
 }
 }  // namespace cuvs::cluster::kmeans

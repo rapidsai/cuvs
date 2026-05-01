@@ -1,10 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
-#include "kmeans.cuh"
+#include "detail/kmeans.cuh"
+#include "kmeans_mg.hpp"
+#include <raft/core/resource/comms.hpp>
 
 namespace cuvs::cluster::kmeans {
 
@@ -29,14 +31,16 @@ void fit(raft::resources const& handle,
          std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
          raft::device_matrix_view<DataT, IndexT> centroids,
          raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
+         raft::host_scalar_view<IndexT> n_iter,
+         std::optional<raft::device_vector_view<IndexT, IndexT>> labels = std::nullopt)
 {
   // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
   if (raft::resource::comms_initialized(handle)) {
-    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
+    cuvs::cluster::kmeans::mg::fit(
+      handle, params, X, sample_weight, centroids, inertia, n_iter, labels);
   } else {
     cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
+      handle, params, X, sample_weight, centroids, inertia, n_iter, labels);
   }
 }
 
@@ -53,5 +57,4 @@ void predict(raft::resources const& handle,
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
-
 }  // namespace cuvs::cluster::kmeans

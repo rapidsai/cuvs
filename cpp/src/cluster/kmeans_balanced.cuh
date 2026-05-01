@@ -63,14 +63,17 @@ namespace cuvs::cluster::kmeans_balanced {
  *                        datatype. If DataT == MathT, this must be the identity.
  * @param[out] inertia    (optional) Sum of squared distances of samples to their
  *                        closest cluster center.
+ * @param[out] labels     (optional) Labels of the clusters [dim = n_samples]
+ *                        [len = n_samples]
  */
 template <typename DataT, typename MathT, typename IndexT, typename MappingOpT = raft::identity_op>
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
-         MappingOpT mapping_op                                = raft::identity_op(),
-         std::optional<raft::host_scalar_view<MathT>> inertia = std::nullopt)
+         MappingOpT mapping_op                                            = raft::identity_op(),
+         std::optional<raft::host_scalar_view<MathT>> inertia             = std::nullopt,
+         std::optional<raft::device_vector_view<uint32_t, IndexT>> labels = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
@@ -81,7 +84,8 @@ void fit(const raft::resources& handle,
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
-  MathT* inertia_ptr = inertia.has_value() ? inertia.value().data_handle() : nullptr;
+  MathT* inertia_ptr   = inertia.has_value() ? inertia.value().data_handle() : nullptr;
+  uint32_t* labels_ptr = labels.has_value() ? labels.value().data_handle() : nullptr;
 
   cuvs::cluster::kmeans::detail::build_hierarchical(handle,
                                                     params,
@@ -91,7 +95,8 @@ void fit(const raft::resources& handle,
                                                     centroids.data_handle(),
                                                     centroids.extent(0),
                                                     mapping_op,
-                                                    inertia_ptr);
+                                                    inertia_ptr,
+                                                    labels_ptr);
 }
 
 /**
