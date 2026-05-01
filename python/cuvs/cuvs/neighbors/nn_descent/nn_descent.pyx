@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -63,22 +63,20 @@ cdef class IndexParams:
         The delta at which nn-descent will terminate its iterations
     return_distances : bool
         Whether to return distances array
-    dist_comp_dtype : str, default = "auto"
-        Dtype to use for distance computation.
-        Supported dtypes are `auto`, `fp32`, and `fp16`
-        `auto` automatically determines the best dtype for distance computation based on the dataset dimensions.
-        `fp32` uses fp32 distance computation for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32.
-        `fp16` uses fp16 distance computation for better performance and memory usage at the cost of precision.
+    compress_to_fp16 : bool, default = False
+        When True and the input data is fp32, distance computation is done in
+        fp16 for better performance and lower memory usage at the cost of
+        precision. Has no effect on non-fp32 input types.
     """
 
-    cdef cuvsNNDescentIndexParams* params
+    cdef cuvsNNDescentIndexParams_v6* params
     cdef object _metric
 
     def __cinit__(self):
-        cuvsNNDescentIndexParamsCreate(&self.params)
+        cuvsNNDescentIndexParamsCreate_v6(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsNNDescentIndexParamsDestroy(self.params))
+        check_cuvs(cuvsNNDescentIndexParamsDestroy_v6(self.params))
 
     def __init__(self, *,
                  metric=None,
@@ -88,7 +86,7 @@ cdef class IndexParams:
                  max_iterations=None,
                  termination_threshold=None,
                  return_distances=None,
-                 dist_comp_dtype="auto"
+                 compress_to_fp16=None
                  ):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -102,15 +100,8 @@ cdef class IndexParams:
             self.params.termination_threshold = termination_threshold
         if return_distances is not None:
             self.params.return_distances = return_distances
-
-        if dist_comp_dtype is "auto":
-            self.params.dist_comp_dtype = cuvsNNDescentDistCompDtype.NND_DIST_COMP_AUTO
-        elif dist_comp_dtype is "fp32":
-            self.params.dist_comp_dtype = cuvsNNDescentDistCompDtype.NND_DIST_COMP_FP32
-        elif dist_comp_dtype is "fp16":
-            self.params.dist_comp_dtype = cuvsNNDescentDistCompDtype.NND_DIST_COMP_FP16
-        else:
-            raise ValueError(f"Invalid dist_comp_dtype: {dist_comp_dtype}. Supported options are 'auto', 'fp32', and 'fp16'.")
+        if compress_to_fp16 is not None:
+            self.params.compress_to_fp16 = compress_to_fp16
 
     @property
     def metric(self):
@@ -245,7 +236,7 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
     cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
-    cdef cuvsNNDescentIndexParams* params = index_params.params
+    cdef cuvsNNDescentIndexParams_v6* params = index_params.params
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
@@ -265,7 +256,7 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
         graph_dlpack = cydlpack.dlpack_c(graph_ai)
 
     with cuda_interruptible():
-        check_cuvs(cuvsNNDescentBuild(
+        check_cuvs(cuvsNNDescentBuild_v6(
             res,
             params,
             dataset_dlpack,

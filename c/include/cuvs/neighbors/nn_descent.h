@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,9 +17,14 @@ extern "C" {
 
 /**
  * @brief Dtype to use for distance computation
- * - `NND_DIST_COMP_AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions.
- * - `NND_DIST_COMP_FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage.
+ * - `NND_DIST_COMP_AUTO`: Automatically determine the best dtype for distance computation based on
+ * the dataset dimensions.
+ * - `NND_DIST_COMP_FP32`: Use fp32 distance computation for better precision at the cost of
+ * performance and memory usage.
  * - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
+ *
+ * @deprecated To be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with compress_to_fp16
+ * instead.
  */
 typedef enum {
   NND_DIST_COMP_AUTO = 0,
@@ -47,7 +52,13 @@ typedef enum {
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * `return_distances`: Boolean to decide whether to return distances array
- * `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision.
+ * `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which
+ * automatically determines the best dtype for distance computation based on the dataset dimensions.
+ * Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This
+ * option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and
+ * memory usage at the cost of precision.
+ *
+ * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentIndexParams_v6.
  */
 struct cuvsNNDescentIndexParams {
   cuvsDistanceType metric;
@@ -63,7 +74,44 @@ struct cuvsNNDescentIndexParams {
 typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;
 
 /**
+ * @brief Parameters used to build an nn-descent index (v6)
+ *
+ * `metric`: The distance metric to use
+ * `metric_arg`: The argument used by distance metrics like Minkowskidistance
+ * `graph_degree`: For an input dataset of dimensions (N, D),
+ * determines the final dimensions of the all-neighbors knn graph
+ * which turns out to be of dimensions (N, graph_degree)
+ * `intermediate_graph_degree`: Internally, nn-descent builds an
+ * all-neighbors knn graph of dimensions (N, intermediate_graph_degree)
+ * before selecting the final `graph_degree` neighbors. It's recommended
+ * that `intermediate_graph_degree` >= 1.5 * graph_degree
+ * `max_iterations`: The number of iterations that nn-descent will refine
+ * the graph for. More iterations produce a better quality graph at cost of performance
+ * `termination_threshold`: The delta at which nn-descent will terminate its iterations
+ * `return_distances`: Boolean to decide whether to return distances array
+ * `compress_to_fp16`: When true and the input data is fp32, distance computation is done in
+ * fp16 for better performance and lower memory usage at the cost of precision. Has no effect on
+ * non-fp32 input types.
+ *
+ * @since 26.06
+ */
+struct cuvsNNDescentIndexParams_v6 {
+  cuvsDistanceType metric;
+  float metric_arg;
+  size_t graph_degree;
+  size_t intermediate_graph_degree;
+  size_t max_iterations;
+  float termination_threshold;
+  bool return_distances;
+  bool compress_to_fp16;
+};
+
+typedef struct cuvsNNDescentIndexParams_v6* cuvsNNDescentIndexParams_v6_t;
+
+/**
  * @brief Allocate NN-Descent Index params, and populate with default values
+ *
+ * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentIndexParamsCreate_v6.
  *
  * @param[in] index_params cuvsNNDescentIndexParams_t to allocate
  * @return cuvsError_t
@@ -71,12 +119,34 @@ typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;
 cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_params);
 
 /**
+ * @brief Allocate NN-Descent Index params (v6), and populate with default values
+ *
+ * @since 26.06
+ *
+ * @param[in] index_params cuvsNNDescentIndexParams_v6_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsNNDescentIndexParamsCreate_v6(cuvsNNDescentIndexParams_v6_t* index_params);
+
+/**
  * @brief De-allocate NN-Descent Index params
+ *
+ * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentIndexParamsDestroy_v6.
  *
  * @param[in] index_params
  * @return cuvsError_t
  */
 cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_params);
+
+/**
+ * @brief De-allocate NN-Descent Index params (v6)
+ *
+ * @since 26.06
+ *
+ * @param[in] index_params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsNNDescentIndexParamsDestroy_v6(cuvsNNDescentIndexParams_v6_t index_params);
 /**
  * @}
  */
@@ -155,6 +225,8 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
+ * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentBuild_v6.
+ *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index_params cuvsNNDescentIndexParams_t used to build NN-Descent index
  * @param[in] dataset DLManagedTensor* training dataset on host or device memory
@@ -167,6 +239,58 @@ cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
                                DLManagedTensor* dataset,
                                DLManagedTensor* graph,
                                cuvsNNDescentIndex_t index);
+
+/**
+ * @brief Build a NN-Descent index (v6) with a `DLManagedTensor` which has underlying
+ *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
+ *        or `kDLCPU`. Also, acceptable underlying types are:
+ *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *        3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *
+ * @code {.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/nn_descent.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // Assume a populated `DLManagedTensor` type here
+ * DLManagedTensor dataset;
+ *
+ * // Create default index params
+ * cuvsNNDescentIndexParams_v6_t index_params;
+ * cuvsError_t params_create_status = cuvsNNDescentIndexParamsCreate_v6(&index_params);
+ *
+ * // Create NN-Descent index
+ * cuvsNNDescentIndex_t index;
+ * cuvsError_t index_create_status = cuvsNNDescentIndexCreate(&index);
+ *
+ * // Build the NN-Descent Index
+ * cuvsError_t build_status = cuvsNNDescentBuild_v6(res, index_params, &dataset, NULL, index);
+ *
+ * // de-allocate `index_params`, `index` and `res`
+ * cuvsError_t params_destroy_status = cuvsNNDescentIndexParamsDestroy_v6(index_params);
+ * cuvsError_t index_destroy_status = cuvsNNDescentIndexDestroy(index);
+ * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+ * @endcode
+ *
+ * @since 26.06
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index_params cuvsNNDescentIndexParams_v6_t used to build NN-Descent index
+ * @param[in] dataset DLManagedTensor* training dataset on host or device memory
+ * @param[inout] graph Optional preallocated graph on host memory to store output
+ * @param[out] index cuvsNNDescentIndex_t Newly built NN-Descent index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsNNDescentBuild_v6(cuvsResources_t res,
+                                  cuvsNNDescentIndexParams_v6_t index_params,
+                                  DLManagedTensor* dataset,
+                                  DLManagedTensor* graph,
+                                  cuvsNNDescentIndex_t index);
 /**
  * @}
  */

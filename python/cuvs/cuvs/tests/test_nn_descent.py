@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -61,9 +61,9 @@ def test_nn_descent(
 
 
 @pytest.mark.parametrize("n_cols", [2, 17, 32])
-@pytest.mark.parametrize("dist_comp_dtype", ["auto", "fp32", "fp16"])
+@pytest.mark.parametrize("compress_to_fp16", [False, True])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_nn_descent_dist_comp_dtype(n_cols, dist_comp_dtype, dtype):
+def test_nn_descent_compress_to_fp16(n_cols, compress_to_fp16, dtype):
     metric = "sqeuclidean"
     graph_degree = 32
     n_rows = 100_000
@@ -77,7 +77,7 @@ def test_nn_descent_dist_comp_dtype(n_cols, dist_comp_dtype, dtype):
         metric=metric,
         graph_degree=graph_degree,
         return_distances=True,
-        dist_comp_dtype=dist_comp_dtype,
+        compress_to_fp16=compress_to_fp16,
     )
 
     index = nn_descent.build(params, X)
@@ -88,8 +88,8 @@ def test_nn_descent_dist_comp_dtype(n_cols, dist_comp_dtype, dtype):
     _, bf_indices = brute_force.search(index, gpu_X, k=graph_degree)
     bf_indices = bf_indices.copy_to_host()
 
-    if n_cols <= 16 and dist_comp_dtype == "fp16" and dtype == np.float32:
-        # for small dim, if data is fp32 but dist_comp_dtype is fp16, the recall will be low
+    if n_cols <= 16 and compress_to_fp16 and dtype == np.float32:
+        # for small dim, if data is fp32 but compress_to_fp16 is True, the recall will be low
         assert calc_recall(nnd_indices, bf_indices) < 0.7
     else:
         assert calc_recall(nnd_indices, bf_indices) > 0.9

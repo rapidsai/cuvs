@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -13,10 +13,11 @@ from cuvs.distance_type cimport cuvsDistanceType
 
 
 cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
-    enum cuvsNNDescentDistCompDtype:
-        NND_DIST_COMP_AUTO = 0,
-        NND_DIST_COMP_FP32 = 1,
-        NND_DIST_COMP_FP16 = 2
+    # Deprecated — to be removed in 26.08 and replaced by cuvsNNDescentIndexParams_v6.
+    ctypedef enum cuvsNNDescentDistCompDtype:
+        NND_DIST_COMP_AUTO
+        NND_DIST_COMP_FP32
+        NND_DIST_COMP_FP16
 
     ctypedef struct cuvsNNDescentIndexParams:
         cuvsDistanceType metric
@@ -30,17 +31,29 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
 
     ctypedef cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t
 
+    ctypedef struct cuvsNNDescentIndexParams_v6:
+        cuvsDistanceType metric
+        float metric_arg
+        size_t graph_degree
+        size_t intermediate_graph_degree
+        size_t max_iterations
+        float termination_threshold
+        bool return_distances
+        bool compress_to_fp16
+
+    ctypedef cuvsNNDescentIndexParams_v6* cuvsNNDescentIndexParams_v6_t
+
     ctypedef struct cuvsNNDescentIndex:
         uintptr_t addr
         DLDataType dtype
 
     ctypedef cuvsNNDescentIndex* cuvsNNDescentIndex_t
 
-    cuvsError_t cuvsNNDescentIndexParamsCreate(
-        cuvsNNDescentIndexParams_t* params)
+    cuvsError_t cuvsNNDescentIndexParamsCreate_v6(
+        cuvsNNDescentIndexParams_v6_t* params)
 
-    cuvsError_t cuvsNNDescentIndexParamsDestroy(
-        cuvsNNDescentIndexParams_t index)
+    cuvsError_t cuvsNNDescentIndexParamsDestroy_v6(
+        cuvsNNDescentIndexParams_v6_t index)
 
     cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index)
 
@@ -54,8 +67,8 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
                                                cuvsNNDescentIndex_t index,
                                                DLManagedTensor * output)
 
-    cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
-                                   cuvsNNDescentIndexParams* params,
-                                   DLManagedTensor* dataset,
-                                   DLManagedTensor* graph,
-                                   cuvsNNDescentIndex_t index) except +
+    cuvsError_t cuvsNNDescentBuild_v6(cuvsResources_t res,
+                                      cuvsNNDescentIndexParams_v6* params,
+                                      DLManagedTensor* dataset,
+                                      DLManagedTensor* graph,
+                                      cuvsNNDescentIndex_t index) except +

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -28,22 +28,12 @@ namespace {
 
 template <typename T, typename IdxT = uint32_t>
 void* _build(cuvsResources_t res,
-             cuvsNNDescentIndexParams params,
+             cuvs::neighbors::nn_descent::index_params build_params,
              DLManagedTensor* dataset_tensor,
              DLManagedTensor* graph_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto dataset = dataset_tensor->dl_tensor;
-
-  auto build_params         = cuvs::neighbors::nn_descent::index_params();
-  build_params.metric       = static_cast<cuvs::distance::DistanceType>((int)params.metric),
-  build_params.metric_arg   = params.metric_arg;
-  build_params.graph_degree = params.graph_degree;
-  build_params.intermediate_graph_degree = params.intermediate_graph_degree;
-  build_params.max_iterations            = params.max_iterations;
-  build_params.termination_threshold     = params.termination_threshold;
-  build_params.return_distances          = params.return_distances;
-  build_params.dist_comp_dtype           = static_cast<cuvs::neighbors::nn_descent::DIST_COMP_DTYPE>(static_cast<int>(params.dist_comp_dtype));
 
   using graph_type = raft::host_matrix_view<IdxT, int64_t, raft::row_major>;
   std::optional<graph_type> graph;
@@ -62,6 +52,35 @@ void* _build(cuvsResources_t res,
   } else {
     RAFT_FAIL("dataset must be accessible on host or device memory");
   }
+}
+
+cuvs::neighbors::nn_descent::index_params convert_params(cuvsNNDescentIndexParams const& params)
+{
+  auto build_params                      = cuvs::neighbors::nn_descent::index_params();
+  build_params.metric                    = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  build_params.metric_arg                = params.metric_arg;
+  build_params.graph_degree              = params.graph_degree;
+  build_params.intermediate_graph_degree = params.intermediate_graph_degree;
+  build_params.max_iterations            = params.max_iterations;
+  build_params.termination_threshold     = params.termination_threshold;
+  build_params.return_distances          = params.return_distances;
+  build_params.compress_to_fp16          = (params.dist_comp_dtype == NND_DIST_COMP_FP16);
+  return build_params;
+}
+
+cuvs::neighbors::nn_descent::index_params convert_params_v6(
+  cuvsNNDescentIndexParams_v6 const& params)
+{
+  auto build_params                      = cuvs::neighbors::nn_descent::index_params();
+  build_params.metric                    = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  build_params.metric_arg                = params.metric_arg;
+  build_params.graph_degree              = params.graph_degree;
+  build_params.intermediate_graph_degree = params.intermediate_graph_degree;
+  build_params.max_iterations            = params.max_iterations;
+  build_params.termination_threshold     = params.termination_threshold;
+  build_params.return_distances          = params.return_distances;
+  build_params.compress_to_fp16          = params.compress_to_fp16;
+  return build_params;
 }
 
 template <typename output_mdspan_type>
@@ -113,6 +132,37 @@ void _get_distances(cuvsResources_t res, cuvsNNDescentIndex_t index, DLManagedTe
     RAFT_FAIL("Unsupported nn-descent index dtype: %d and bits: %d", dtype.code, dtype.bits);
   }
 }
+
+cuvsError_t _nn_descent_build(cuvsResources_t res,
+                              DLManagedTensor* dataset_tensor,
+                              DLManagedTensor* graph_tensor,
+                              cuvsNNDescentIndex_t index,
+                              cuvs::neighbors::nn_descent::index_params build_params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    index->dtype.code = kDLUInt;
+    index->dtype.bits = 32;
+
+    auto dtype = dataset_tensor->dl_tensor.dtype;
+
+    if ((dtype.code == kDLFloat) && (dtype.bits == 32)) {
+      index->addr = reinterpret_cast<uintptr_t>(
+        _build<float, uint32_t>(res, build_params, dataset_tensor, graph_tensor));
+    } else if ((dtype.code == kDLFloat) && (dtype.bits == 16)) {
+      index->addr = reinterpret_cast<uintptr_t>(
+        _build<half, uint32_t>(res, build_params, dataset_tensor, graph_tensor));
+    } else if ((dtype.code == kDLInt) && (dtype.bits == 8)) {
+      index->addr = reinterpret_cast<uintptr_t>(
+        _build<int8_t, uint32_t>(res, build_params, dataset_tensor, graph_tensor));
+    } else if ((dtype.code == kDLUInt) && (dtype.bits == 8)) {
+      index->addr = reinterpret_cast<uintptr_t>(
+        _build<uint8_t, uint32_t>(res, build_params, dataset_tensor, graph_tensor));
+    } else {
+      RAFT_FAIL("Unsupported nn-descent dataset dtype: %d and bits: %d", dtype.code, dtype.bits);
+    }
+  });
+}
+
 }  // namespace
 
 extern "C" cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index)
@@ -141,28 +191,18 @@ extern "C" cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
                                           DLManagedTensor* graph_tensor,
                                           cuvsNNDescentIndex_t index)
 {
-  return cuvs::core::translate_exceptions([=] {
-    index->dtype.code = kDLUInt;
-    index->dtype.bits = 32;
+  auto build_params = convert_params(*params);
+  return _nn_descent_build(res, dataset_tensor, graph_tensor, index, build_params);
+}
 
-    auto dtype = dataset_tensor->dl_tensor.dtype;
-
-    if ((dtype.code == kDLFloat) && (dtype.bits == 32)) {
-      index->addr = reinterpret_cast<uintptr_t>(
-        _build<float, uint32_t>(res, *params, dataset_tensor, graph_tensor));
-    } else if ((dtype.code == kDLFloat) && (dtype.bits == 16)) {
-      index->addr = reinterpret_cast<uintptr_t>(
-        _build<half, uint32_t>(res, *params, dataset_tensor, graph_tensor));
-    } else if ((dtype.code == kDLInt) && (dtype.bits == 8)) {
-      index->addr = reinterpret_cast<uintptr_t>(
-        _build<int8_t, uint32_t>(res, *params, dataset_tensor, graph_tensor));
-    } else if ((dtype.code == kDLUInt) && (dtype.bits == 8)) {
-      index->addr = reinterpret_cast<uintptr_t>(
-        _build<uint8_t, uint32_t>(res, *params, dataset_tensor, graph_tensor));
-    } else {
-      RAFT_FAIL("Unsupported nn-descent dataset dtype: %d and bits: %d", dtype.code, dtype.bits);
-    }
-  });
+extern "C" cuvsError_t cuvsNNDescentBuild_v6(cuvsResources_t res,
+                                             cuvsNNDescentIndexParams_v6_t params,
+                                             DLManagedTensor* dataset_tensor,
+                                             DLManagedTensor* graph_tensor,
+                                             cuvsNNDescentIndex_t index)
+{
+  auto build_params = convert_params_v6(*params);
+  return _nn_descent_build(res, dataset_tensor, graph_tensor, index, build_params);
 }
 
 extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* params)
@@ -179,11 +219,35 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
       .max_iterations            = cpp_params.max_iterations,
       .termination_threshold     = cpp_params.termination_threshold,
       .return_distances          = cpp_params.return_distances,
-      .dist_comp_dtype           = static_cast<cuvsNNDescentDistCompDtype>(static_cast<int>(cpp_params.dist_comp_dtype))};
+      .dist_comp_dtype           = cpp_params.compress_to_fp16 ? NND_DIST_COMP_FP16
+                                                               : NND_DIST_COMP_AUTO};
+  });
+}
+
+extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate_v6(cuvsNNDescentIndexParams_v6_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // get defaults from cpp parameters struct
+    cuvs::neighbors::nn_descent::index_params cpp_params;
+
+    *params = new cuvsNNDescentIndexParams_v6{
+      .metric                    = static_cast<cuvsDistanceType>((int)cpp_params.metric),
+      .metric_arg                = cpp_params.metric_arg,
+      .graph_degree              = cpp_params.graph_degree,
+      .intermediate_graph_degree = cpp_params.intermediate_graph_degree,
+      .max_iterations            = cpp_params.max_iterations,
+      .termination_threshold     = cpp_params.termination_threshold,
+      .return_distances          = cpp_params.return_distances,
+      .compress_to_fp16          = cpp_params.compress_to_fp16};
   });
 }
 
 extern "C" cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsNNDescentIndexParamsDestroy_v6(cuvsNNDescentIndexParams_v6_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
