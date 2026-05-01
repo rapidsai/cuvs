@@ -8,7 +8,7 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 
-#include <cuvs/core/export.hpp>
+#include <cuvs/core/export.h>
 
 #ifdef __cplusplus
 extern "C" {

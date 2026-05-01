@@ -9,7 +9,7 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
-#include <cuvs/core/export.hpp>
+#include <cuvs/core/export.h>
 
 #ifdef __cplusplus
 extern "C" {
