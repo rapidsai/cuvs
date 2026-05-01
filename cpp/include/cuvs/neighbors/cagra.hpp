@@ -658,6 +658,18 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
+   * Replace the dataset by copying a host-resident matrix to a padded device buffer owned by the
+   * index (`host_build_padded_owner_`).
+   */
+  void update_dataset(raft::resources const& res,
+                      raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+  {
+    auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
+    update_dataset(res, own->as_dataset_view());
+    host_build_padded_owner_ = std::move(own);
+  }
+
+  /**
    * Replace the graph with a new graph.
    *
    * Since the new graph is a device array, we store a reference to that, and it is
