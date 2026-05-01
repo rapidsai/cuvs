@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "detail/tiered_index.cuh"
 
+#include <cuvs/core/export.hpp>
 #include <cuvs/neighbors/tiered_index.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
@@ -203,8 +204,8 @@ int64_t index<UpstreamT>::dim() const noexcept
   return state->dim();
 }
 
-template struct index<cagra::index<float, uint32_t>>;
-template struct index<ivf_flat::index<float, int64_t>>;
-template struct index<ivf_pq::typed_index<float, int64_t>>;
+template struct CUVS_EXPORT index<cagra::index<float, uint32_t>>;
+template struct CUVS_EXPORT index<ivf_flat::index<float, int64_t>>;
+template struct CUVS_EXPORT index<ivf_pq::typed_index<float, int64_t>>;
 
 }  // namespace cuvs::neighbors::tiered_index
