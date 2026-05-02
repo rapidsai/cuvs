@@ -6,6 +6,8 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <neighbors/cagra.cuh>
 
+#include <memory>
+
 namespace {
 
 using data_t  = @data_type@;
@@ -23,20 +25,69 @@ void build_knn_graph(raft::resources const& handle,
   cuvs::neighbors::cagra::build_knn_graph<data_t, index_t>(handle, dataset, knn_graph, params);
 }
 
+// TODO(removal): Deprecated build(device_matrix_view)->index (delete with cagra.hpp declarations).
+
 auto build(raft::resources const& handle,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<data_t, index_t>
 {
-  return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
+  // `build` on dataset_view returns build_result; convert to index (RAFT_EXPECTS in build_result
+  // if VPQ is set).
+  auto padded = cuvs::neighbors::make_padded_dataset_view(handle, dataset);
+  cuvs::neighbors::cagra::index<data_t, index_t> out =
+    cuvs::neighbors::cagra::build(handle, params, padded);
+  return out;
 }
+
+// TODO(removal): Deprecated build(host_matrix_view)->index (delete with cagra.hpp declarations).
 
 auto build(raft::resources const& handle,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const data_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<data_t, index_t>
 {
-  return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
+  // Do not call unqualified cagra::build(handle, params, dataset): we are inside namespace
+  // cagra; use fully qualified implementation.
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
+    return ::cuvs::neighbors::cagra::detail::finalize_index_from_ace(
+      ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset));
+  }
+  auto bres = ::cuvs::neighbors::cagra::detail::build_from_host_matrix<data_t, index_t>(
+    handle, params, dataset);
+  if (auto own = std::move(bres.deferred_host_dataset)) {
+    return ::cuvs::neighbors::cagra::detail::finalize_index_from_padded(std::move(bres),
+                                                                        std::move(own));
+  }
+  RAFT_EXPECTS(
+    !bres.vpq.has_value(),
+    "When using VPQ compression or deferred host padded storage, keep the full build_result "
+    "alive and use finalize_index_from_padded when deferred_host_dataset is set.");
+  return std::move(bres.idx);
 }
+
+auto build_ace(raft::resources const& handle,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const data_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::ace_build_result<data_t, index_t>
+{
+  RAFT_EXPECTS(
+    std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params),
+    "cagra::build_ace requires graph_build_params to be ace_params. For cagra::index, use "
+    "cagra::build(res, params, host_view). For build_result, use cagra::build(res, params, view).");
+  RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+               "ACE: Dataset must be on host for ACE build");
+  return ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset);
+}
+
+// Definition lives in cagra.cuh; callers that only include cagra.hpp need this symbol in libcuvs.
+// The device_matrix_view overload above may inline the dataset_view template, so emit it
+// explicitly.
+template build_result<data_t, index_t> build<data_t, index_t>(
+  raft::resources const& res,
+  const index_params& params,
+  cuvs::neighbors::dataset_view<int64_t> const& dataset);
 
 }  // namespace cuvs::neighbors::cagra

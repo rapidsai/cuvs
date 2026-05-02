@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -10,10 +10,12 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 
 #include "../common/ann_types.hpp"
 #include "../diskann/diskann_wrapper.h"
 #include "cuvs_ann_bench_utils.h"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/vamana.hpp>
 #include <utils.h>
 
@@ -165,18 +167,45 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
 
   // try allocating a buffer for the dataset on host
   try {
-    const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
-      dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
-        const_cast<cuvs::neighbors::dataset<int64_t>*>(&cagra_build_.get_index()->data()));
-    if (strided_dataset == nullptr) {
-      RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
+    const auto* ds_view = &cagra_build_.get_index()->data();
+    const auto* strided_dataset =
+      dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(ds_view);
+    const auto* padded_dataset_view =
+      dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(ds_view);
+
+    std::optional<raft::host_matrix<T, int64_t>> h_dataset = std::nullopt;
+    if (strided_dataset != nullptr) {
+      auto n_rows      = strided_dataset->n_rows();
+      auto logical_dim = static_cast<uint32_t>(cagra_build_.get_index()->dim());
+      auto stride      = strided_dataset->stride();
+      h_dataset.emplace(raft::make_host_matrix<T, int64_t>(n_rows, logical_dim));
+      raft::copy_matrix(h_dataset->data_handle(),
+                        logical_dim,
+                        strided_dataset->view().data_handle(),
+                        stride,
+                        logical_dim,
+                        n_rows,
+                        raft::resource::get_cuda_stream(handle_));
+    } else if (padded_dataset_view != nullptr) {
+      auto n_rows = padded_dataset_view->n_rows();
+      auto dim    = padded_dataset_view->dim();
+      auto stride = padded_dataset_view->stride();
+      h_dataset.emplace(raft::make_host_matrix<T, int64_t>(n_rows, dim));
+      RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_dataset->data_handle(),
+                                      sizeof(T) * dim,
+                                      padded_dataset_view->view().data_handle(),
+                                      sizeof(T) * stride,
+                                      sizeof(T) * dim,
+                                      n_rows,
+                                      cudaMemcpyDefault,
+                                      raft::resource::get_cuda_stream(handle_)));
     } else {
-      auto h_dataset =
-        raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
-      raft::copy(h_dataset.data_handle(),
-                 strided_dataset->view().data_handle(),
-                 strided_dataset->n_rows() * strided_dataset->dim(),
-                 raft::resource::get_cuda_stream(handle_));
+      RAFT_LOG_DEBUG(
+        "dataset serialization: neither strided_dataset nor device_padded_dataset_view");
+    }
+
+    if (h_dataset.has_value()) {
+      raft::resource::sync_stream(handle_);
       std::string dataset_base_file = file + ".data";
       std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
       if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
@@ -187,7 +216,7 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
       dataset_of.write((char*)&size, sizeof(int));
       dataset_of.write((char*)&dim, sizeof(int));
       for (int i = 0; i < size; i++) {
-        dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
+        dataset_of.write((char*)(h_dataset->data_handle() + i * h_dataset->extent(1)),
                          dim * sizeof(T));
       }
       dataset_of.close();

@@ -67,7 +67,7 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
     dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(dev_resources, index_params, dataset_host_view);
+  auto ace_build_res = cagra::build_ace(dev_resources, index_params, dataset_host_view);
   // In-memory build of ACE provides the index in memory, so we can search it directly using
   // cagra::search
 
@@ -80,7 +80,7 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
   hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
-  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index);
+  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, ace_build_res.idx);
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
@@ -116,8 +116,12 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   std::cout << "Deserializing HNSW index from disk for search." << std::endl;
 
   hnsw::index<float>* hnsw_index_raw = nullptr;
-  hnsw::deserialize(
-    dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
+  hnsw::deserialize(dev_resources,
+                    hnsw_params,
+                    hnsw_index_path,
+                    ace_build_res.idx.dim(),
+                    ace_build_res.idx.metric(),
+                    &hnsw_index_raw);
 
   std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
 

@@ -28,6 +28,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../cagra_padded_build_helpers.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -40,6 +41,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace cuvs::neighbors::cagra {
@@ -56,7 +58,8 @@ TEST(Issue93Reproducer, ConcurrentSearchDifferentGraphDegrees)
   constexpr int dim              = 64;
   constexpr int top_k            = 10;
 
-  // Build indices on the main thread.
+  // Build indices on the main thread (keep padded builders alive for view-based indexes).
+  std::vector<cuvs::neighbors::test::padded_device_matrix_for_cagra<float>> padded_builders;
   std::vector<cagra::index<float, uint32_t>> indices;
   for (int n_rows : dataset_sizes) {
     auto database = raft::make_device_matrix<float, int64_t>(handle, n_rows, dim);
@@ -70,7 +73,9 @@ TEST(Issue93Reproducer, ConcurrentSearchDifferentGraphDegrees)
     ip.graph_build_params =
       graph_build_params::nn_descent_params(ip.intermediate_graph_degree, ip.metric);
 
-    indices.push_back(cagra::build(handle, ip, raft::make_const_mdspan(database.view())));
+    padded_builders.emplace_back(handle, raft::make_const_mdspan(database.view()));
+    auto cagra_build_res = cagra::build(handle, ip, padded_builders.back().view);
+    indices.push_back(std::move(cagra_build_res.idx));
   }
   raft::resource::sync_stream(handle);
 

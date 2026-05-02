@@ -263,7 +263,10 @@ void serialize_to_hnswlib(
  *
  */
 template <typename T, typename IdxT>
-void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* index_)
+void deserialize(raft::resources const& res,
+                 std::istream& is,
+                 index<T, IdxT>* index_,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
@@ -288,7 +291,13 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
   auto content_map = raft::deserialize_scalar<uint32_t>(res, is);
   bool has_dataset = content_map & 0x1u;
   if (has_dataset) {
-    index_->update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
+    RAFT_EXPECTS(out_dataset != nullptr,
+                 "deserialize: index contains a dataset; pass a non-null out_dataset to own it.");
+    *out_dataset = cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is);
+    auto* own    = dynamic_cast<const cuvs::neighbors::dataset<int64_t>*>(out_dataset->get());
+    RAFT_EXPECTS(own != nullptr,
+                 "deserialize: loaded dataset must be owning storage (dataset<>, not a view)");
+    index_->update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(own));
   }
 
   bool has_source_indices = content_map & 0x2u;
@@ -302,13 +311,16 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
 }
 
 template <typename T, typename IdxT>
-void deserialize(raft::resources const& res, const std::string& filename, index<T, IdxT>* index_)
+void deserialize(raft::resources const& res,
+                 const std::string& filename,
+                 index<T, IdxT>* index_,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  detail::deserialize<T, IdxT>(res, is, index_);
+  detail::deserialize<T, IdxT>(res, is, index_, out_dataset);
 
   is.close();
 }
