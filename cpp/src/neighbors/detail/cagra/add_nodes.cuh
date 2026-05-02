@@ -296,10 +296,9 @@ void add_graph_nodes(
   const std::size_t max_chunk_size_ =
     params.max_chunk_size == 0 ? new_dataset_size : params.max_chunk_size;
 
-  raft::copy(updated_graph_view.data_handle(),
-             index.graph().data_handle(),
-             index.graph().size(),
-             raft::resource::get_cuda_stream(handle));
+  auto updated_graph_prefix = raft::make_host_matrix_view<IdxT, std::int64_t>(
+    updated_graph_view.data_handle(), initial_dataset_size, degree);
+  raft::copy(handle, updated_graph_prefix, raft::make_const_mdspan(index.graph()));
 
   auto empty_data_view = raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim);
   cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(empty_data_view);
