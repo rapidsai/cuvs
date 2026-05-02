@@ -70,8 +70,8 @@ auto cagra_index_dataset_view_dispatcher(const cuvs::neighbors::dataset_view<Idx
  *        `device_padded_dataset_view` for existing graph-build code paths.
  *
  * Does not copy vector data; only builds a padded view over the same device memory. For
- * `attach_dataset_on_build`, `detail::build` still passes the original `dataset_view` to the
- * index constructor.
+ * `attach_dataset_on_build`, `build_from_device_matrix` still passes the original `dataset_view`
+ * to the index constructor.
  */
 template <typename T>
 auto convert_dataset_view_to_padded_for_graph_build(

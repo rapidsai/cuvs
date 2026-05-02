@@ -356,9 +356,15 @@ index<T, IdxT> build(
     "device data, use cagra::build with raft::device_matrix_view or a device dataset_view.");
   auto hview = raft::make_host_matrix_view<const T, int64_t, row_major>(
     dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-  auto own  = cuvs::neighbors::make_padded_dataset(res, hview);
-  auto bres = cuvs::neighbors::cagra::build<T, IdxT>(res, params, own->as_dataset_view());
-  return detail::finalize_index_from_padded<T, IdxT>(std::move(bres), std::move(own));
+  auto bres = detail::build_from_host_matrix<T, IdxT>(res, params, hview);
+  if (auto own = std::move(bres.deferred_host_dataset)) {
+    return detail::finalize_index_from_padded<T, IdxT>(std::move(bres), std::move(own));
+  }
+  RAFT_EXPECTS(
+    !bres.vpq.has_value(),
+    "When using VPQ compression or deferred host padded storage, keep the full build_result "
+    "alive and use finalize_index_from_padded when deferred_host_dataset is set.");
+  return std::move(bres.idx);
 }
 
 /**
@@ -372,7 +378,7 @@ build_result<T, IdxT> build(raft::resources const& res,
                             const index_params& params,
                             cuvs::neighbors::dataset_view<int64_t> const& dataset)
 {
-  return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
+  return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(res, params, dataset);
 }
 
 /**

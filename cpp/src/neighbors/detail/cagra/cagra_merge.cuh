@@ -158,14 +158,14 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
 
       cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
         raft::make_const_mdspan(filtered_dataset.view()), static_cast<uint32_t>(dim));
-      auto build_res = cagra::detail::build<T, IdxT>(handle, params, dv);
+      auto build_res = cagra::detail::build_from_device_matrix<T, IdxT>(handle, params, dv);
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return cagra::merge_result<T, IdxT>{
         std::move(build_res.idx), std::move(filtered_dataset), std::move(build_res.vpq)};
     } else {
       cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
         raft::make_const_mdspan(updated_dataset.view()), static_cast<uint32_t>(dim));
-      auto build_res = cagra::detail::build<T, IdxT>(handle, params, dv);
+      auto build_res = cagra::detail::build_from_device_matrix<T, IdxT>(handle, params, dv);
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return cagra::merge_result<T, IdxT>{
         std::move(build_res.idx), std::move(updated_dataset), std::move(build_res.vpq)};

@@ -55,11 +55,17 @@ auto build(raft::resources const& handle,
     return ::cuvs::neighbors::cagra::detail::finalize_index_from_ace(
       ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset));
   }
-  auto own = cuvs::neighbors::make_padded_dataset(handle, dataset);
-  auto bres =
-    ::cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, own->as_dataset_view());
-  return ::cuvs::neighbors::cagra::detail::finalize_index_from_padded(std::move(bres),
-                                                                      std::move(own));
+  auto bres = ::cuvs::neighbors::cagra::detail::build_from_host_matrix<data_t, index_t>(
+    handle, params, dataset);
+  if (auto own = std::move(bres.deferred_host_dataset)) {
+    return ::cuvs::neighbors::cagra::detail::finalize_index_from_padded(std::move(bres),
+                                                                        std::move(own));
+  }
+  RAFT_EXPECTS(
+    !bres.vpq.has_value(),
+    "When using VPQ compression or deferred host padded storage, keep the full build_result "
+    "alive and use finalize_index_from_padded when deferred_host_dataset is set.");
+  return std::move(bres.idx);
 }
 
 auto build_ace(raft::resources const& handle,

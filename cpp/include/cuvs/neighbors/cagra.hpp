@@ -906,13 +906,19 @@ template <typename T, typename IdxT>
 struct build_result {
   cuvs::neighbors::cagra::index<T, IdxT> idx;
   std::optional<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq;
+  /**
+   * Host-matrix build only: GPU padded dataset kept alive until `finalize_index_from_padded` moves
+   * it for indices that attach raw vectors on build; unset for VPQ-only or graph-only builds.
+   */
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> deferred_host_dataset{};
 
   /** Implicit conversion to index when VPQ is not used (e.g. index idx = build(...)). */
   operator cuvs::neighbors::cagra::index<T, IdxT>() &&
   {
-    RAFT_EXPECTS(!vpq.has_value(),
-                 "When using VPQ compression, use build_result.idx and keep build_result.vpq "
-                 "alive.");
+    RAFT_EXPECTS(
+      !vpq.has_value() && !deferred_host_dataset,
+      "When using VPQ compression or deferred host padded storage, keep the full build_result "
+      "alive and use finalize_index_from_padded when deferred_host_dataset is set.");
     return std::move(idx);
   }
 };
