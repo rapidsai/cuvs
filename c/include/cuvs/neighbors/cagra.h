@@ -464,23 +464,15 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
  */
 
 /**
- * @brief Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
+ * @brief Struct holding the CAGRA index storage address and vector element dtype (DLPack-style)
  *
- * When the index was created with co-owned device storage (merge, build, deserialize, from_args,
- * extend, etc.), \p c_api_lifetime_owner is non-null and must be deleted (by the
- * implementation) when the index is destroyed; \p addr then points at the index inside that
- * allocation. When \p c_api_lifetime_owner is 0, \p addr is a raw index pointer.
+ * Matches the usual cuVS C index pattern (`addr` + `dtype`). \p addr points at implementation-owned
+ * storage (not always a bare `cagra::index*`); free only via \ref cuvsCagraIndexDestroy. \p dtype
+ * describes index vector elements for queries and template dispatch.
  */
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-  /**
-   * Address of an internal lifetime holder (`cuvs_cagra_c_api_lifetime_holder` in the C++ impl)
-   * that owns the cagra::index and any co-owned device storage (VPQ, padded dataset, merged
-   * matrix, etc.). The C API deletes it when the index is destroyed. Zero when \p addr is a
-   * standalone index pointer and no extra storage is co-owned.
-   */
-  uintptr_t c_api_lifetime_owner;
 } cuvsCagraIndex;
 
 typedef cuvsCagraIndex* cuvsCagraIndex_t;
