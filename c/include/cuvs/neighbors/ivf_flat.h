@@ -156,10 +156,22 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
  */
 CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 
-/** Get the number of clusters/inverted lists */
+/**
+ * @brief Get the number of clusters/inverted lists in the index
+ *
+ * @param[in] index cuvsIvfFlatIndex_t Built IVF-Flat index
+ * @param[out] n_lists Pointer to store the number of lists
+ * @return cuvsError_t
+ */
 CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists);
 
-/** Get the dimensionality of the data */
+/**
+ * @brief Get the dimensionality of the indexed data
+ *
+ * @param[in] index cuvsIvfFlatIndex_t Built IVF-Flat index
+ * @param[out] dim Pointer to store the dimensionality
+ * @return cuvsError_t
+ */
 CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
 
 /**
