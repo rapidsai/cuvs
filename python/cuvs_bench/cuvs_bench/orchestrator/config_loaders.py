@@ -338,10 +338,7 @@ class ConfigLoader(ABC):
         algos_conf_fs = [
             os.path.join(config_path, "algos", f)
             for f in algos_conf_fs
-            if ".json" not in f
-            and "constraint" not in f
-            and ".py" not in f
-            and "__pycache__" not in f
+            if f.endswith((".yaml", ".yml"))
         ]
 
         if algorithm_configuration:
@@ -349,7 +346,7 @@ class ConfigLoader(ABC):
                 algos_conf_fs += [
                     os.path.join(algorithm_configuration, f)
                     for f in os.listdir(algorithm_configuration)
-                    if ".json" not in f
+                    if f.endswith((".yaml", ".yml"))
                 ]
             elif os.path.isfile(algorithm_configuration):
                 algos_conf_fs.append(algorithm_configuration)
