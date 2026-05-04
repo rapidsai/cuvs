@@ -5,10 +5,26 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "../compute_distance.hpp"
 #include <cuvs/distance/distance.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
+
+template <typename QUERY_T, typename DISTANCE_T>
+extern __device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename QueryT>
+extern __device__ DistanceT apply_normalization_standard(
+  DistanceT distance,
+  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+  IndexT dataset_index);
 
 template <typename DataT, typename IndexT, typename DistanceT>
 extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_base(

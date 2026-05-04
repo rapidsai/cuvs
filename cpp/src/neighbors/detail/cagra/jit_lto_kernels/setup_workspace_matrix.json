@@ -81,8 +81,7 @@
         "codebook_type": "void",
         "codebook_abbrev": "none"
       }
-    ],
-    "impl_file": "setup_workspace_standard_impl.cuh"
+    ]
   },
   {
     "_data": [
@@ -150,7 +149,6 @@
         "codebook_type": "half",
         "codebook_abbrev": "half"
       }
-    ],
-    "impl_file": "setup_workspace_vpq_impl.cuh"
+    ]
   }
 ]

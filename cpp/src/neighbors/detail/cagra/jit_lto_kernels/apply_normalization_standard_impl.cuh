@@ -6,26 +6,37 @@
 #pragma once
 
 #include "../compute_distance_standard-impl.cuh"
+#include "extern_device_functions.cuh"
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Cosine normalization fragment implementation
-// This provides apply_normalization_standard that normalizes by dataset norm (for CosineExpanded
-// metric)
-// QueryT is needed to match the descriptor template signature, but not used in this function
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
           typename DistanceT,
           typename QueryT>
-__device__ DistanceT
-apply_normalization_standard(DistanceT distance,
-                             const typename cuvs::neighbors::cagra::detail::
-                               dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-                             IndexT dataset_index)
+__device__ DistanceT apply_normalization_standard_noop_impl(
+  DistanceT distance,
+  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+  IndexT dataset_index)
 {
-  // CosineExpanded normalization: divide by dataset norm
+  (void)args;
+  (void)dataset_index;
+  return distance;
+}
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename QueryT>
+__device__ DistanceT apply_normalization_standard_cosine_impl(
+  DistanceT distance,
+  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+  IndexT dataset_index)
+{
   const auto* dataset_norms =
     standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, QueryT>::
       dataset_norms_ptr(args);

@@ -1090,7 +1090,6 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
-            CUDA::nvrtc
   )
 
   target_include_directories(

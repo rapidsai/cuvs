@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <cuda_fp16.h>
 
-#include "../../sample_filter_data.cuh"
 #include "extern_device_functions.cuh"
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
@@ -164,12 +163,10 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
   }
 
   if (bitset.bitset_ptr != nullptr) {
-    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
     const SourceIndexT node_id = source_indices_ptr == nullptr
                                    ? static_cast<SourceIndexT>(parent_index)
                                    : static_cast<SourceIndexT>(source_indices_ptr[parent_index]);
-    if (!sample_filter<SourceIndexT>(query_id, node_id, &filter_data)) {
+    if (!sample_filter<SourceIndexT>(query_id, node_id, &bitset)) {
       parent_candidates_ptr[parent_list_index + (lds * query_id)] = utils::get_max_value<INDEX_T>();
       parent_distance_ptr[parent_list_index + (lds * query_id)] =
         utils::get_max_value<DISTANCE_T>();
@@ -199,17 +196,13 @@ __device__ void apply_filter_kernel_jit(
 
   if (result_indices_ptr[index] != ~index_msb_1_mask) {
     // Use extern sample_filter function with 3 params: query_id, node_id, filter_data
-    // filter_data is a void* pointer to bitset_filter_data_t (or nullptr for none_filter)
+    // Third argument is &bitset (layout matches bitset_filter_data_t) or nullptr for none_filter
     SourceIndexT node_id = source_indices_ptr == nullptr
                              ? static_cast<SourceIndexT>(result_indices_ptr[index])
                              : source_indices_ptr[result_indices_ptr[index]];
 
-    // Construct filter_data struct in registers (bitset data is in global memory)
-    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
-
     if (!sample_filter<SourceIndexT>(
-          query_id_offset + j, node_id, bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
+          query_id_offset + j, node_id, bitset.bitset_ptr != nullptr ? &bitset : nullptr)) {
       result_indices_ptr[index]   = utils::get_max_value<IndexT>();
       result_distances_ptr[index] = utils::get_max_value<DistanceT>();
     }

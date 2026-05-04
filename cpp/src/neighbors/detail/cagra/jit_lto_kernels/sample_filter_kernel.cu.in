@@ -3,20 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Explicit instantiation for the unified 3-arg sample_filter used by CAGRA JIT
-// (extern in extern_device_functions.cuh). Implementations: sample_filter_*_impl.cuh,
+// Explicit specialization for the unified 3-arg sample_filter used by CAGRA JIT
+// (extern in extern_device_functions.cuh). Implementations in sample_filter_impl.cuh,
 // aligned with filtering::{none_sample_filter, bitset_filter} in neighbors/sample_filter.cuh.
 
 #include <cstdint>
 
-#include <neighbors/detail/cagra/jit_lto_kernels/sample_filter_@filter_name@_impl.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/sample_filter_impl.cuh>
 
 namespace cuvs::neighbors::detail {
 
 using SourceIndexT = @source_index_type@;
 
-template __device__ bool sample_filter<SourceIndexT>(uint32_t query_id,
-                                                     SourceIndexT node_id,
-                                                     void* filter_data);
+template <>
+__device__ bool sample_filter<SourceIndexT>(uint32_t query_id,
+                                            SourceIndexT node_id,
+                                            void* filter_data)
+{
+  return sample_filter_@filter_name@_impl<SourceIndexT>(query_id, node_id, filter_data);
+}
 
 }  // namespace cuvs::neighbors::detail

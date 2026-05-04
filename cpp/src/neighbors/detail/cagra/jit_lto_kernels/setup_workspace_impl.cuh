@@ -6,11 +6,59 @@
 #pragma once
 
 #include "../../neighbors_device_intrinsics.cuh"
+#include "../compute_distance_standard-impl.cuh"
+#include "../compute_distance_standard.hpp"
 #include "../compute_distance_vpq-impl.cuh"
 #include "../compute_distance_vpq.hpp"
 #include "device_memory_ops.hpp"
 
 namespace cuvs::neighbors::cagra::detail {
+
+template <typename DescriptorT>
+_RAFT_DEVICE __noinline__ auto setup_workspace_standard(
+  const DescriptorT* that,
+  void* smem_ptr,
+  const typename DescriptorT::DATA_T* queries_ptr,
+  uint32_t query_id) -> const DescriptorT*
+{
+  using DATA_T                    = typename DescriptorT::DATA_T;
+  using LOAD_T                    = typename DescriptorT::LOAD_T;
+  using QUERY_T                   = typename DescriptorT::QUERY_T;
+  using word_type                 = uint32_t;
+  constexpr auto kTeamSize        = DescriptorT::kTeamSize;
+  constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
+  auto* r                         = reinterpret_cast<DescriptorT*>(smem_ptr);
+  auto* buf                       = reinterpret_cast<QUERY_T*>(r + 1);
+  if (r != that) {
+    constexpr uint32_t kCount = sizeof(DescriptorT) / sizeof(word_type);
+    using blob_type           = word_type[kCount];
+    auto& src                 = reinterpret_cast<const blob_type&>(*that);
+    auto& dst                 = reinterpret_cast<blob_type&>(*r);
+    for (uint32_t i = threadIdx.x; i < kCount; i += blockDim.x) {
+      dst[i] = src[i];
+    }
+    const auto smem_ptr_offset =
+      reinterpret_cast<uint8_t*>(&(r->args.smem_ws_ptr)) - reinterpret_cast<uint8_t*>(r);
+    if (threadIdx.x == uint32_t(smem_ptr_offset / sizeof(word_type))) {
+      r->args.smem_ws_ptr = uint32_t(__cvta_generic_to_shared(buf));
+    }
+    __syncthreads();
+  }
+
+  uint32_t dim        = r->args.dim;
+  auto buf_len        = raft::round_up_safe<uint32_t>(dim, kDatasetBlockDim);
+  constexpr auto vlen = device::get_vlen<LOAD_T, DATA_T>();
+  queries_ptr += dim * query_id;
+  for (unsigned i = threadIdx.x; i < buf_len; i += blockDim.x) {
+    unsigned j = device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(i);
+    if (i < dim) {
+      buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(queries_ptr[i]);
+    } else {
+      buf[j] = 0;
+    }
+  }
+  return r;
+}
 
 template <auto Block, auto Stride, typename T>
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto transpose(T x) -> T
@@ -54,14 +102,11 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
     }
     __syncthreads();
 
-    // Copy PQ table
     for (unsigned i = threadIdx.x * 2; i < (1 << PQ_BITS) * PQ_LEN; i += blockDim.x * 2) {
       half2 buf2;
       buf2.x = r->pq_code_book_ptr()[i];
       buf2.y = r->pq_code_book_ptr()[i + 1];
 
-      // Change the order of PQ code book array to reduce the
-      // frequency of bank conflicts.
       constexpr auto num_elements_per_bank  = 4 / utils::size_of<CODE_BOOK_T>();
       constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
       const auto j                          = i / num_elements_per_bank;
@@ -84,7 +129,6 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
     if (i < dim) { buf2.x = mapping(queries_ptr[i]); }
     if (i + 1 < dim) { buf2.y = mapping(queries_ptr[i + 1]); }
     if constexpr ((PQ_BITS == 8) && (PQ_LEN % 2 == 0)) {
-      // Transpose the queries buffer to avoid bank conflicts in compute_distance.
       constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
       constexpr auto kStride  = vlen * PQ_LEN / 2;
       reinterpret_cast<half2*>(smem_query_ptr)[transpose<kDatasetBlockDim / 2, kStride>(i / 2)] =
@@ -97,10 +141,6 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
   return r;
 }
 
-// Unified setup_workspace implementation for VPQ descriptors
-// This is instantiated when PQ_BITS>0, PQ_LEN>0, CodebookT=half
-// Takes const dataset_descriptor_base_t* and reconstructs the derived descriptor inside smem
-// QueryT is always half for VPQ
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -116,24 +156,32 @@ __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_work
   const DataT* queries,
   uint32_t query_id)
 {
-  // For VPQ descriptors, PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
-  static_assert(
-    PQ_BITS > 0 && PQ_LEN > 0 && std::is_same_v<CodebookT, half> && std::is_same_v<QueryT, half>,
-    "VPQ descriptor requires PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half");
+  if constexpr (PQ_BITS == 0 && PQ_LEN == 0 && std::is_same_v<CodebookT, void>) {
+    using desc_t =
+      standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, QueryT>;
+    const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
 
-  using desc_t       = cagra_q_dataset_descriptor_t<TeamSize,
-                                                    DatasetBlockDim,
-                                                    PQ_BITS,
-                                                    PQ_LEN,
-                                                    CodebookT,
-                                                    DataT,
-                                                    IndexT,
-                                                    DistanceT,
-                                                    QueryT>;
-  const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
+    const desc_t* result = setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
+    return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
+  } else if constexpr (PQ_BITS > 0 && PQ_LEN > 0 && std::is_same_v<CodebookT, half> &&
+                       std::is_same_v<QueryT, half>) {
+    using desc_t       = cagra_q_dataset_descriptor_t<TeamSize,
+                                                      DatasetBlockDim,
+                                                      PQ_BITS,
+                                                      PQ_LEN,
+                                                      CodebookT,
+                                                      DataT,
+                                                      IndexT,
+                                                      DistanceT,
+                                                      QueryT>;
+    const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
 
-  const desc_t* result = setup_workspace_vpq<desc_t>(desc, smem, queries, query_id);
-  return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
+    const desc_t* result = setup_workspace_vpq<desc_t>(desc, smem, queries, query_id);
+    return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
+  } else {
+    static_assert(sizeof(DataT) == 0,
+                  "setup_workspace: unsupported PQ_BITS/PQ_LEN/CodebookT/QueryT for CAGRA JIT");
+  }
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

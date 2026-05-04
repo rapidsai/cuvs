@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "extern_device_functions.cuh"
+
 #include "../../sample_filter_data.cuh"
 
 #include <raft/core/bitset.cuh>
@@ -13,11 +15,18 @@
 
 namespace cuvs::neighbors::detail {
 
-// JIT LTO: unified 3-arg device hook. Semantics match filtering::bitset_filter::operator()
-// (query_ix, sample_ix) in sample_filter.cuh — return bitset_view.test(sample_ix); here
-// sample_ix is the dataset node id.
 template <typename SourceIndexT>
-__device__ bool sample_filter(uint32_t /*query_id*/, SourceIndexT node_id, void* filter_data)
+__device__ bool sample_filter_none_impl(uint32_t /*query_id*/,
+                                        SourceIndexT /*node_id*/,
+                                        void* /*filter_data*/)
+{
+  return true;
+}
+
+template <typename SourceIndexT>
+__device__ bool sample_filter_bitset_impl(uint32_t /*query_id*/,
+                                          SourceIndexT node_id,
+                                          void* filter_data)
 {
   if (filter_data == nullptr) { return true; }
 

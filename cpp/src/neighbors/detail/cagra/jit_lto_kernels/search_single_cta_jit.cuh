@@ -29,7 +29,6 @@
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
-#include "../../sample_filter_data.cuh"
 #include "cagra_bitset.cuh"
 #include "extern_device_functions.cuh"
 // Include shared JIT device functions
@@ -305,12 +304,9 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
     for (unsigned p = threadIdx.x; p < search_width; p += blockDim.x) {
       if (parent_list_buffer[p] != invalid_index) {
         const auto parent_id = result_indices_buffer[parent_list_buffer[p]] & ~index_msb_1_mask;
-        // Construct filter_data struct (bitset data is in global memory)
-        cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-          bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
         if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
-                                         bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                         bitset.bitset_ptr != nullptr ? &bitset : nullptr)) {
           result_distances_buffer[parent_list_buffer[p]] = utils::get_max_value<DistanceT>();
           result_indices_buffer[parent_list_buffer[p]]   = invalid_index;
           *filter_flag                                   = 1;
@@ -328,13 +324,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
 
   for (unsigned i = threadIdx.x; i < internal_topk + search_width * graph_degree; i += blockDim.x) {
     const auto node_id = result_indices_buffer[i] & ~index_msb_1_mask;
-    // Construct filter_data struct (bitset data is in global memory)
-    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
     if (node_id != (invalid_index & ~index_msb_1_mask) &&
         !sample_filter<SourceIndexT>(query_id + query_id_offset,
                                      to_source_index(node_id),
-                                     bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                     bitset.bitset_ptr != nullptr ? &bitset : nullptr)) {
       result_distances_buffer[i] = utils::get_max_value<DistanceT>();
       result_indices_buffer[i]   = invalid_index;
     }

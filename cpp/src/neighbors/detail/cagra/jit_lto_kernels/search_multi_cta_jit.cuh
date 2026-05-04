@@ -18,7 +18,6 @@
 #include <cstdio>
 #endif
 
-#include "../../sample_filter_data.cuh"
 #include "cagra_bitset.cuh"
 #include "device_common_jit.cuh"
 #include "extern_device_functions.cuh"
@@ -258,12 +257,9 @@ __device__ void search_kernel_jit(
     for (unsigned p = threadIdx.x; p < 1; p += blockDim.x) {
       if (parent_indices_buffer[p] != invalid_index) {
         const auto parent_id = result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
-        // Construct filter_data struct (bitset data is in global memory)
-        cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-          bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
         if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
-                                         bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                         bitset.bitset_ptr != nullptr ? &bitset : nullptr)) {
           // If the parent must not be in the resulting top-k list, remove from the parent list
           result_distances_buffer[parent_indices_buffer[p]] = utils::get_max_value<DISTANCE_T>();
           result_indices_buffer[parent_indices_buffer[p]]   = invalid_index;
@@ -280,12 +276,9 @@ __device__ void search_kernel_jit(
     INDEX_T index = result_indices_buffer[i];
     if (index == invalid_index) { continue; }
     index &= ~index_msb_1_mask;
-    // Construct filter_data struct (bitset data is in global memory)
-    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
-      bitset.bitset_ptr, bitset.bitset_len, bitset.original_nbits);
     if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                      to_source_index(index),
-                                     bitset.bitset_ptr != nullptr ? &filter_data : nullptr)) {
+                                     bitset.bitset_ptr != nullptr ? &bitset : nullptr)) {
       result_indices_buffer[i]   = invalid_index;
       result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
     }

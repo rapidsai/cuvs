@@ -10,14 +10,19 @@
 
 namespace cuvs::neighbors::detail {
 
-// Passed as void* to the unified JIT sample_filter (see sample_filter.cuh / bitset_filter).
+/// Bitset (and length metadata) for linked @c sample_filter in JIT LTO; passed by value to
+/// @c __global__ entry points. `bitset_ptr == nullptr` means no bitset (none filter, or not a
+/// bitset at runtime on host). Also passed as @c void* to the unified JIT @c sample_filter (see
+/// @c sample_filter.cuh / @c bitset_filter).
 template <typename SourceIndexT>
 struct bitset_filter_data_t {
-  uint32_t* bitset_ptr;
-  SourceIndexT bitset_len;
-  SourceIndexT original_nbits;
+  std::uint32_t* bitset_ptr{nullptr};
+  SourceIndexT bitset_len{};
+  SourceIndexT original_nbits{};
 
-  __device__ bitset_filter_data_t(uint32_t* ptr, SourceIndexT len, SourceIndexT nbits)
+  __host__ __device__ bitset_filter_data_t() = default;
+
+  __host__ __device__ bitset_filter_data_t(std::uint32_t* ptr, SourceIndexT len, SourceIndexT nbits)
     : bitset_ptr(ptr), bitset_len(len), original_nbits(nbits)
   {
   }

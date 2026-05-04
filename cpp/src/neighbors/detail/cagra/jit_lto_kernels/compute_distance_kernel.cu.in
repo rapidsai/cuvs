@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <neighbors/detail/cagra/jit_lto_kernels/compute_distance@pq_prefix@_impl.cuh>
-#include <neighbors/detail/cagra/jit_lto_kernels/extern_device_functions.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/compute_distance_impl.cuh>
 
 namespace {
 

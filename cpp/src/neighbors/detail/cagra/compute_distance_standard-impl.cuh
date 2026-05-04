@@ -82,8 +82,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return sizeof(standard_dataset_descriptor_t) +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
-
- private:
 };
 
 template <cuvs::distance::DistanceType Metric,

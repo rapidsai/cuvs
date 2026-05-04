@@ -5,21 +5,15 @@
 #pragma once
 
 #include "../../../sample_filter.cuh"  // bitset_filter, none_sample_filter
+#include "../../sample_filter_data.cuh"
 
 #include <cstdint>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
 
-/// Bitset (and length metadata) for linked @c sample_filter in JIT LTO; passed by value to
-/// @c __global__ entry points. `bitset_ptr == nullptr` means no bitset (none filter, or not a
-/// bitset at runtime on host).
 template <typename SourceIndexT>
-struct cagra_bitset {
-  std::uint32_t* bitset_ptr{nullptr};
-  SourceIndexT bitset_len{};
-  SourceIndexT original_nbits{};
-};
+using cagra_bitset = cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT>;
 
 /// Host: bitset payload for kernels plus query offset for wrapped CAGRA filters.
 template <typename SourceIndexT>

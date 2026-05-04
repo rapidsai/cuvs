@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <neighbors/detail/cagra/jit_lto_kernels/@impl_file@>
 #include <neighbors/detail/cagra/jit_lto_kernels/extern_device_functions.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_impl.cuh>
 
 namespace {
 
