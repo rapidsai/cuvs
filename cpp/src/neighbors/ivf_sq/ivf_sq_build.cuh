@@ -30,6 +30,7 @@
 #include <raft/random/rng.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/pow2_utils.cuh>
+#include <raft/util/vectorized.cuh>
 
 #include <cub/block/block_reduce.cuh>
 
@@ -58,82 +59,28 @@ struct ColMinMaxOp {
 
 /**
  * Vectorized load helper: reads VecCols contiguous elements of type T as
- * a single aligned wide load and unpacks them into floats.
+ * a single aligned wide load (via raft::TxN_t -> __ldg on the promoted
+ * io_t) and unpacks them into floats.
  *
  * The primary benefit over scalar loads is halving (VecCols=2) or
  * quartering (VecCols=4) the number of LDG instructions issued per warp,
  * which is the dominant cost in the column-strided access pattern of
- * fused_column_minmax_kernel. VecCols=1 is provided as the degenerate
- * scalar fallback for odd `dim`.
+ * fused_column_minmax_kernel. VecCols=1 is the degenerate scalar
+ * fallback for odd `dim`.
  *
- * Requires `p` to be aligned to sizeof(T) * VecCols.
+ * Requires `p` to be aligned to sizeof(raft::IOType<T, VecCols>::Type),
+ * i.e. sizeof(T) * VecCols.
  */
 template <typename T, int VecCols>
-struct vec_loader;
-
-template <>
-struct vec_loader<float, 1> {
-  __device__ __forceinline__ static void load(const float* p, float (&out)[1]) { out[0] = *p; }
-};
-
-template <>
-struct vec_loader<half, 1> {
-  __device__ __forceinline__ static void load(const half* p, float (&out)[1])
-  {
-    out[0] = float(*p);
-  }
-};
-
-template <>
-struct vec_loader<float, 4> {
-  __device__ __forceinline__ static void load(const float* p, float (&out)[4])
-  {
-    float4 v = *reinterpret_cast<const float4*>(p);
-    out[0]   = v.x;
-    out[1]   = v.y;
-    out[2]   = v.z;
-    out[3]   = v.w;
-  }
-};
-
-template <>
-struct vec_loader<float, 2> {
-  __device__ __forceinline__ static void load(const float* p, float (&out)[2])
-  {
-    float2 v = *reinterpret_cast<const float2*>(p);
-    out[0]   = v.x;
-    out[1]   = v.y;
-  }
-};
-
-template <>
-struct vec_loader<half, 4> {
-  __device__ __forceinline__ static void load(const half* p, float (&out)[4])
-  {
-    // Single 8-byte load covering 4 halves; memcpy avoids aliasing issues
-    // and is compiled to a register move in device code.
-    uint2 raw = *reinterpret_cast<const uint2*>(p);
-    half h[4];
-    static_assert(sizeof(h) == sizeof(raw), "unexpected half packing");
-    memcpy(&h[0], &raw, sizeof(raw));
+__device__ __forceinline__ void load_cols_as_float(const T* p, float (&out)[VecCols])
+{
+  raft::TxN_t<T, VecCols> v;
+  v.load(p, 0);
 #pragma unroll
-    for (int k = 0; k < 4; ++k)
-      out[k] = float(h[k]);
+  for (int k = 0; k < VecCols; ++k) {
+    out[k] = static_cast<float>(v.val.data[k]);
   }
-};
-
-template <>
-struct vec_loader<half, 2> {
-  __device__ __forceinline__ static void load(const half* p, float (&out)[2])
-  {
-    uint32_t raw = *reinterpret_cast<const uint32_t*>(p);
-    half h[2];
-    static_assert(sizeof(h) == sizeof(raw), "unexpected half packing");
-    memcpy(&h[0], &raw, sizeof(raw));
-    out[0] = float(h[0]);
-    out[1] = float(h[1]);
-  }
-};
+}
 
 /**
  * Fused per-column min+max in a single pass (2x less DRAM traffic than two
@@ -176,10 +123,10 @@ __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __r
   // the column and row axes.
   for (; row + 3 * stride < n_rows; row += 4 * stride) {
     float r0[VecCols], r1[VecCols], r2[VecCols], r3[VecCols];
-    vec_loader<T, VecCols>::load(data + row * dim + col_base, r0);
-    vec_loader<T, VecCols>::load(data + (row + stride) * dim + col_base, r1);
-    vec_loader<T, VecCols>::load(data + (row + 2 * stride) * dim + col_base, r2);
-    vec_loader<T, VecCols>::load(data + (row + 3 * stride) * dim + col_base, r3);
+    load_cols_as_float<T, VecCols>(data + row * dim + col_base, r0);
+    load_cols_as_float<T, VecCols>(data + (row + stride) * dim + col_base, r1);
+    load_cols_as_float<T, VecCols>(data + (row + 2 * stride) * dim + col_base, r2);
+    load_cols_as_float<T, VecCols>(data + (row + 3 * stride) * dim + col_base, r3);
 #pragma unroll
     for (int k = 0; k < VecCols; ++k) {
       float mn       = fminf(fminf(r0[k], r1[k]), fminf(r2[k], r3[k]));
@@ -190,7 +137,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __r
   }
   for (; row < n_rows; row += stride) {
     float r[VecCols];
-    vec_loader<T, VecCols>::load(data + row * dim + col_base, r);
+    load_cols_as_float<T, VecCols>(data + row * dim + col_base, r);
 #pragma unroll
     for (int k = 0; k < VecCols; ++k) {
       agg[k].min_val = fminf(agg[k].min_val, r[k]);
