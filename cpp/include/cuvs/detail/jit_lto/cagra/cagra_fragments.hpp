@@ -20,6 +20,11 @@ struct tag_metric_l1 {};
 struct tag_norm_noop {};
 struct tag_norm_cosine {};
 
+/// Multi-kernel planners that do not link `sample_filter` into the JIT link (e.g.
+/// `random_pickup`). Real filters use `cuvs::neighbors::detail::tag_filter_*` on
+/// `CagraPlannerBase`.
+struct tag_cagra_jit_sample_filter_link_absent {};
+
 template <typename DataTag,
           typename IndexTag,
           typename DistanceTag,

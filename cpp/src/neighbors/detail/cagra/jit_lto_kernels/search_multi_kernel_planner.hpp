@@ -17,9 +17,10 @@ template <typename DataTag,
           typename DistanceTag,
           typename SourceIndexTag,
           typename QueryTag,
-          typename CodebookTag>
+          typename CodebookTag,
+          typename SampleFilterJitTag = tag_cagra_jit_sample_filter_link_absent>
 struct CagraMultiKernelSearchPlanner
-  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
+  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag> {
   static inline LauncherJitCache launcher_jit_cache{};
 
   CagraMultiKernelSearchPlanner(cuvs::distance::DistanceType /*metric*/,
@@ -29,8 +30,8 @@ struct CagraMultiKernelSearchPlanner
                                 bool /*is_vpq*/,
                                 uint32_t /*pq_bits*/,
                                 uint32_t /*pq_len*/)
-    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(kernel_name,
-                                                                              launcher_jit_cache)
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag>(
+        kernel_name, launcher_jit_cache)
   {
   }
 

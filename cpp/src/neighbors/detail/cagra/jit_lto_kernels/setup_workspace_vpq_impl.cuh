@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "../../neighbors_device_intrinsics.cuh"
 #include "../compute_distance_vpq-impl.cuh"
 #include "../compute_distance_vpq.hpp"
-#include "device_intrinsics.hpp"
 #include "device_memory_ops.hpp"
 
 namespace cuvs::neighbors::cagra::detail {

@@ -73,8 +73,14 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 
   // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
-  const char* lopts[] = {"-lto", archs.c_str(), "-maxrregcount=64"};
-  auto result         = nvJitLinkCreate(&handle, 3, lopts);
+  std::vector<const char*> lopts;
+  lopts.reserve(2 + linktime_extra_options.size());
+  lopts.push_back("-lto");
+  lopts.push_back(archs.c_str());
+  for (auto const& opt : linktime_extra_options) {
+    lopts.push_back(opt.c_str());
+  }
+  auto result = nvJitLinkCreate(&handle, static_cast<unsigned int>(lopts.size()), lopts.data());
   check_nvjitlink_result(handle, result);
 
   for (const auto& frag : this->fragments) {

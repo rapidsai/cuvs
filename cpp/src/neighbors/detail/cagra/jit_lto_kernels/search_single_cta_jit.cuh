@@ -8,7 +8,7 @@
 // Device-only helpers - split out to avoid pulling host launcher code into JIT translation units
 #include "search_single_cta_device_helpers.cuh"
 
-// device_intrinsics / memory_ops come via search_single_cta_device_helpers.cuh
+// neighbors_device_intrinsics / memory_ops come via search_single_cta_device_helpers.cuh
 #include "../utils.hpp"
 #include "hashmap.hpp"
 #include "topk_by_radix.cuh"
@@ -29,9 +29,9 @@
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
+#include "../../sample_filter_data.cuh"
 #include "cagra_bitset.cuh"
 #include "extern_device_functions.cuh"
-#include "sample_filter_data.h"
 // Include shared JIT device functions
 #include "device_common_jit.cuh"
 

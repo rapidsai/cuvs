@@ -6,9 +6,9 @@
 #pragma once
 
 // Device-only includes - no host-side headers
+#include "../../neighbors_device_intrinsics.cuh"
 #include "../utils.hpp"
 #include "bitonic.hpp"
-#include "device_intrinsics.hpp"
 #include "device_memory_ops.hpp"
 #include "hashmap.hpp"
 

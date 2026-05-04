@@ -18,10 +18,10 @@
 #include <cstdio>
 #endif
 
+#include "../../sample_filter_data.cuh"
 #include "cagra_bitset.cuh"
 #include "device_common_jit.cuh"
 #include "extern_device_functions.cuh"
-#include "sample_filter_data.h"
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 

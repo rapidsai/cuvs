@@ -4,8 +4,8 @@
  */
 #pragma once
 
+#include "../neighbors_device_intrinsics.cuh"
 #include "jit_lto_kernels/bitonic.hpp"
-#include "jit_lto_kernels/device_intrinsics.hpp"
 #include "jit_lto_kernels/device_memory_ops.hpp"
 #include "jit_lto_kernels/hashmap.hpp"
 #include "jit_lto_kernels/topk_by_radix.cuh"

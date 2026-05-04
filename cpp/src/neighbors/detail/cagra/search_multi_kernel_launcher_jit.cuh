@@ -13,7 +13,7 @@
 #include "jit_lto_kernels/kernel_def.hpp"
 #include "jit_lto_kernels/search_multi_kernel_planner.hpp"
 #include "search_plan.cuh"          // For search_params
-#include "shared_launcher_jit.hpp"  // cagra_bitset / cagra_sample_filter, get_sample_filter_name, tags
+#include "shared_launcher_jit.hpp"  // cagra_bitset / cagra_sample_filter, sample_filter_jit_tag_t, tags
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -21,7 +21,6 @@
 
 #include <cstddef>
 #include <cuda_runtime.h>
-#include <string>
 #include <type_traits>
 // - The launcher doesn't need the kernel function definitions
 // - The kernel is dispatched via the JIT LTO launcher system
@@ -109,13 +108,10 @@ void compute_distance_to_child_nodes_jit(
   DistanceT* result_distances_ptr,  // [num_queries, ldd]
   std::uint32_t ldd,                // (*) ldd >= search_width * graph_degree
   SAMPLE_FILTER_T sample_filter,
-  cudaStream_t cuda_stream)
+  cudaStream_t cuda_stream,
+  std::shared_ptr<AlgorithmLauncher> const& launcher)
 {
-  const auto bf                 = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  const std::string filter_name = get_sample_filter_name<SAMPLE_FILTER_T>();
-  std::shared_ptr<AlgorithmLauncher> launcher =
-    make_cagra_multi_kernel_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(
-      dataset_desc, "compute_distance_to_child_nodes", filter_name);
+  const auto bf = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
 
   const auto block_size      = 128;
   const auto teams_per_block = block_size / dataset_desc.team_size;
@@ -161,36 +157,12 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                       const std::uint32_t num_queries,
                       const std::uint32_t query_id_offset,
                       SAMPLE_FILTER_T sample_filter,
-                      cudaStream_t cuda_stream)
+                      cudaStream_t cuda_stream,
+                      std::shared_ptr<AlgorithmLauncher> const& launcher)
 {
   // Note: query_id for the linked filter is the function's `query_id_offset` + query index, not
   // the wrapper's offset; we only need bitset pointers (same as other JIT launchers).
   const auto bf = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-
-  // Create planner with tags
-  using DataTag =
-    decltype(get_data_type_tag<float>());  // Not used for apply_filter, but required by planner
-  using IndexTag  = decltype(get_index_type_tag<INDEX_T>());
-  using DistTag   = decltype(get_distance_type_tag<DISTANCE_T>());
-  using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
-
-  // Create planner - apply_filter doesn't use dataset_descriptor, so we use dummy values
-  // The kernel name is "apply_filter_kernel" and build_entrypoint_name will handle it specially
-  using QueryTag    = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
-  using CodebookTag = tag_codebook_none;
-  CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
-    planner(cuvs::distance::DistanceType::L2Expanded,
-            "apply_filter_kernel",
-            8,
-            128,
-            false,
-            0,
-            0);  // Dummy values, not used by apply_filter
-
-  planner.add_sample_filter_device_function(get_sample_filter_name<SAMPLE_FILTER_T>());
-  planner.add_linked_kernel("apply_filter_kernel");
-
-  std::shared_ptr<AlgorithmLauncher> launcher = planner.get_launcher();
 
   const std::uint32_t block_size = 256;
   const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);

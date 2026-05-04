@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include "../../neighbors_device_intrinsics.cuh"
 #include "../utils.hpp"
-#include "device_intrinsics.hpp"
 #include "extern_device_functions.cuh"
 #include "hashmap.hpp"
 
@@ -15,8 +15,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <type_traits>
 
-namespace cuvs::neighbors::cagra::detail {
-namespace device {
+namespace cuvs::neighbors::cagra::detail::device {
 
 // Helper to check if DescriptorT has kPqBits (VPQ descriptor)
 template <typename T>
@@ -180,5 +179,4 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   }
 }
 
-}  // namespace device
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail::device

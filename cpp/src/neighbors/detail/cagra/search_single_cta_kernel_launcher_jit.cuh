@@ -7,9 +7,6 @@
 
 #include "../smem_utils.cuh"
 
-#include <iostream>
-#include <typeinfo>
-
 // Include tags header before any other includes that might open namespaces
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
@@ -48,7 +45,6 @@
 #include <cuda/std/atomic>
 #include <cuda_runtime.h>
 #include <fstream>
-#include <iostream>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -57,7 +53,6 @@
 #include <string>
 #include <thread>
 #include <type_traits>
-#include <typeinfo>
 #include <vector>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
@@ -755,14 +750,16 @@ void select_and_run(
     using runner_type =
       persistent_runner_jit_t<DataT, IndexT, DistanceT, SourceIndexT, SampleFilterT>;
 
-    std::string const filter_name = get_sample_filter_name<SampleFilterT>();
     std::shared_ptr<AlgorithmLauncher> launcher =
-      make_cagra_single_cta_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(
+      make_cagra_single_cta_jit_launcher<DataT,
+                                         IndexT,
+                                         DistanceT,
+                                         SourceIndexT,
+                                         sample_filter_jit_tag_t<SampleFilterT>>(
         dataset_desc,
         topk_by_bitonic_sort,
         bitonic_sort_and_merge_multi_warps,
-        true /* persistent */,
-        filter_name);
+        true /* persistent */);
     if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA persistent search kernel"); }
 
     // Use get_runner pattern similar to non-JIT version
@@ -793,14 +790,16 @@ void select_and_run(
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
     return;
   } else {
-    std::string const filter_name = get_sample_filter_name<SampleFilterT>();
     std::shared_ptr<AlgorithmLauncher> launcher =
-      make_cagra_single_cta_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(
+      make_cagra_single_cta_jit_launcher<DataT,
+                                         IndexT,
+                                         DistanceT,
+                                         SourceIndexT,
+                                         sample_filter_jit_tag_t<SampleFilterT>>(
         dataset_desc,
         topk_by_bitonic_sort,
         bitonic_sort_and_merge_multi_warps,
-        false /* persistent */,
-        filter_name);
+        false /* persistent */);
     if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA search kernel"); }
 
     // Get the device descriptor pointer - dev_ptr() initializes it if needed

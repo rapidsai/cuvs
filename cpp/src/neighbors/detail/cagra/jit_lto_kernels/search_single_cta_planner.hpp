@@ -17,9 +17,10 @@ template <typename DataTag,
           typename DistanceTag,
           typename SourceIndexTag,
           typename QueryTag,
-          typename CodebookTag>
+          typename CodebookTag,
+          typename SampleFilterJitTag>
 struct CagraSingleCtaSearchPlanner
-  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
+  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag> {
   static inline LauncherJitCache launcher_jit_cache{};
 
   CagraSingleCtaSearchPlanner(cuvs::distance::DistanceType /*metric*/,
@@ -31,7 +32,7 @@ struct CagraSingleCtaSearchPlanner
                               uint32_t /*pq_bits*/,
                               uint32_t /*pq_len*/,
                               bool persistent = false)
-    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag>(
         persistent ? "search_single_cta_p" : "search_single_cta", launcher_jit_cache)
   {
   }

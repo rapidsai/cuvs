@@ -13,7 +13,6 @@
 
 #include <cstdint>
 #include <iostream>
-#include <string>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -79,41 +78,57 @@ using query_type_tag_standard_hamming_t =
 using codebook_tag_vpq_t      = cuvs::neighbors::cagra::detail::tag_codebook_half;
 using codebook_tag_standard_t = cuvs::neighbors::cagra::detail::tag_codebook_none;
 
-// Dependent false for static_assert in get_sample_filter_name (CAGRA JIT).
+// Dependent false for static_assert in sample_filter_jit_tag (CAGRA JIT).
 template <typename T>
-inline constexpr bool cagra_jit_get_sample_filter_name_type_always_false = false;
+inline constexpr bool cagra_jit_sample_filter_tag_type_always_false = false;
 
+/// Maps a host sample-filter type to the JIT fragment tag (`cuvs::neighbors::detail::tag_filter_*`)
+/// for `CagraPlannerBase<..., JitTag>` / `add_sample_filter_device_function()`.
 template <class SAMPLE_FILTER_T>
-std::string get_sample_filter_name()
-{
-  using namespace cuvs::neighbors::filtering;
+struct sample_filter_jit_tag {
+ private:
   using DecayedFilter = std::decay_t<SAMPLE_FILTER_T>;
 
-  if constexpr (std::is_same_v<DecayedFilter, none_sample_filter>) {
-    return "filter_none_source_index_ui";
-  } else if constexpr (requires { std::declval<DecayedFilter>().filter; }) {
-    using InnerFilter = decltype(std::declval<DecayedFilter>().filter);
-    if constexpr (is_bitset_filter<InnerFilter>::value ||
-                  std::is_same_v<InnerFilter, bitset_filter<uint32_t, int64_t>> ||
-                  std::is_same_v<InnerFilter, bitset_filter<uint32_t, uint32_t>>) {
-      return "filter_bitset_source_index_ui";
-    } else {
-      static_assert(
-        cagra_jit_get_sample_filter_name_type_always_false<DecayedFilter>,
-        "CAGRA JIT: get_sample_filter_name does not know how to link this filter. "
-        "CagraSampleFilterWithQueryIdOffset<Inner> requires Inner of type bitset_filter<bitset, "
-        "SourceIndexT> (see cagra_bitset.cuh is_bitset_filter and sample_filter_utils.cuh). "
-        "For a new filter kind, add a get_sample_filter_name() branch. "
-        "(SAMPLE_FILTER_T in error = DecayedFilter, check InnerFilter in compiler output.)");
+  struct dispatch {
+    template <typename U>
+    static constexpr auto f()
+    {
+      using namespace cuvs::neighbors::filtering;
+      if constexpr (std::is_same_v<U, none_sample_filter>) {
+        return cuvs::neighbors::detail::tag_filter_none{};
+      } else if constexpr (requires { std::declval<U>().filter; }) {
+        using InnerFilter = decltype(std::declval<U>().filter);
+        if constexpr (is_bitset_filter<InnerFilter>::value ||
+                      std::is_same_v<InnerFilter, bitset_filter<uint32_t, int64_t>> ||
+                      std::is_same_v<InnerFilter, bitset_filter<uint32_t, uint32_t>>) {
+          return cuvs::neighbors::detail::tag_filter_bitset{};
+        } else {
+          static_assert(
+            cagra_jit_sample_filter_tag_type_always_false<U>,
+            "CAGRA JIT: sample_filter_jit_tag does not know how to link this filter. "
+            "CagraSampleFilterWithQueryIdOffset<Inner> requires Inner of type "
+            "bitset_filter<bitset, "
+            "SourceIndexT> (see cagra_bitset.cuh is_bitset_filter and sample_filter_utils.cuh). "
+            "For a new filter kind, add a sample_filter_jit_tag branch. "
+            "(SAMPLE_FILTER_T in error; check InnerFilter in compiler output.)");
+        }
+      } else {
+        static_assert(
+          cagra_jit_sample_filter_tag_type_always_false<U>,
+          "CAGRA JIT: sample_filter_jit_tag: SAMPLE_FILTER_T must be cuvs::neighbors::filtering::"
+          "none_sample_filter, or "
+          "cuvs::neighbors::cagra::detail::CagraSampleFilterWithQueryIdOffset<"
+          "bitset_filter<bitset, SourceIndexT>>. Unknown wrapper type. "
+          "(SAMPLE_FILTER_T in error; add a branch in sample_filter_jit_tag.)");
+      }
     }
-  } else {
-    static_assert(
-      cagra_jit_get_sample_filter_name_type_always_false<DecayedFilter>,
-      "CAGRA JIT: get_sample_filter_name: SAMPLE_FILTER_T must be cuvs::neighbors::filtering::"
-      "none_sample_filter, or cuvs::neighbors::cagra::detail::CagraSampleFilterWithQueryIdOffset<"
-      "bitset_filter<bitset, SourceIndexT>>. Unknown wrapper type. "
-      "(SAMPLE_FILTER_T in error = DecayedFilter; add a branch in get_sample_filter_name().)");
-  }
-}
+  };
+
+ public:
+  using type = decltype(dispatch::template f<DecayedFilter>());
+};
+
+template <class SAMPLE_FILTER_T>
+using sample_filter_jit_tag_t = typename sample_filter_jit_tag<SAMPLE_FILTER_T>::type;
 
 }  // namespace cuvs::neighbors::cagra::detail

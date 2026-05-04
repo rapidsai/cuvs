@@ -12,7 +12,6 @@
 #include <raft/core/logger.hpp>
 
 #include <cstdint>
-#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -22,17 +21,20 @@ template <typename DataTag_,
           typename IndexTag_,
           typename DistanceTag_,
           typename QueryTag_,
-          typename CodebookTag_>
+          typename CodebookTag_,
+          typename SampleFilterJitTag_ = tag_cagra_jit_sample_filter_link_absent>
 struct CagraPlannerBase : AlgorithmPlanner {
-  using DataTag     = DataTag_;
-  using IndexTag    = IndexTag_;
-  using DistanceTag = DistanceTag_;
-  using QueryTag    = QueryTag_;
-  using CodebookTag = CodebookTag_;
+  using DataTag            = DataTag_;
+  using IndexTag           = IndexTag_;
+  using DistanceTag        = DistanceTag_;
+  using QueryTag           = QueryTag_;
+  using CodebookTag        = CodebookTag_;
+  using SampleFilterJitTag = SampleFilterJitTag_;
 
   explicit CagraPlannerBase(std::string entrypoint, LauncherJitCache& jit_cache)
     : AlgorithmPlanner(std::move(entrypoint), jit_cache)
   {
+    linktime_extra_options.push_back("-maxrregcount=64");
   }
 
   void add_setup_workspace_device_function(cuvs::distance::DistanceType metric,
@@ -159,6 +161,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
           RAFT_FAIL(
             "CAGRA JIT BitwiseHamming dist_op is only registered for uint8_t data / tag_u8 query "
             "layout");
+          break;
         case cuvs::distance::DistanceType::L1:
           this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_l1>>();
           break;
@@ -233,20 +236,12 @@ struct CagraPlannerBase : AlgorithmPlanner {
               static_cast<unsigned>(dataset_block_dim));
   }
 
-  void add_sample_filter_device_function(std::string const& filter_name)
+  void add_sample_filter_device_function()
   {
-    if (filter_name == "filter_none_source_index_ui") {
-      this->add_static_fragment<
-        fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
-                                   cuvs::neighbors::detail::tag_index_u32,
-                                   cuvs::neighbors::detail::tag_filter_none>>();
-    } else if (filter_name == "filter_bitset_source_index_ui") {
-      this->add_static_fragment<
-        fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
-                                   cuvs::neighbors::detail::tag_index_u32,
-                                   cuvs::neighbors::detail::tag_filter_bitset>>();
-    } else {
-      RAFT_FAIL("Unknown CAGRA sample filter name for JIT: %s", filter_name.c_str());
+    if constexpr (!std::is_same_v<SampleFilterJitTag_, tag_cagra_jit_sample_filter_link_absent>) {
+      this->add_static_fragment<fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
+                                                           cuvs::neighbors::detail::tag_index_u32,
+                                                           SampleFilterJitTag_>>();
     }
   }
 };

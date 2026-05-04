@@ -6,7 +6,7 @@
 #pragma once
 
 #include "ann_utils.cuh"
-#include "cagra/jit_lto_kernels/device_intrinsics.hpp"
+#include "neighbors_device_intrinsics.cuh"
 #include "nn_descent_gnnd.hpp"
 
 #include "../../core/omp_wrapper.hpp"
@@ -1665,7 +1665,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
         graph_shrink_buffer[i * build_config_.node_degree + j] = id;
       } else {
         graph_shrink_buffer[i * build_config_.node_degree + j] =
-          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+          cuvs::neighbors::detail::device::xorshift64(idx) % nrow_;
       }
     }
   }

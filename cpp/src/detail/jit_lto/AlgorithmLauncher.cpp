@@ -64,9 +64,3 @@ void AlgorithmLauncher::call_cooperative(
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
-
-std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers()
-{
-  static std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>> launchers;
-  return launchers;
-}

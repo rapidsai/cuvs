@@ -2,13 +2,9 @@
  * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
+
 #pragma once
 
-#include "../utils.hpp"
-
-#include <cuvs/distance/distance.hpp>
-
-// TODO: This shouldn't be invoking anything in detail APIs outside of cuvs/neighbors
 #include <raft/core/detail/macros.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/warp_primitives.cuh>
@@ -18,8 +14,7 @@
 #include <cfloat>
 #include <cstdint>
 
-namespace cuvs::neighbors::cagra::detail {
-namespace device {
+namespace cuvs::neighbors::detail::device {
 
 // warpSize for compile time calculation
 constexpr unsigned warp_size = 32;
@@ -31,7 +26,8 @@ using LOAD_64BIT_T  = uint64_t;
 template <class LOAD_T, class DATA_T>
 RAFT_DEVICE_INLINE_FUNCTION constexpr unsigned get_vlen()
 {
-  return utils::size_of<LOAD_T>() / utils::size_of<DATA_T>();
+  static_assert(sizeof(DATA_T) > 0, "get_vlen: DATA_T must have positive size");
+  return static_cast<unsigned>(sizeof(LOAD_T) / sizeof(DATA_T));
 }
 
 /** Xorshift rondem number generator.
@@ -83,5 +79,10 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto swizzling(T x) -> T
   }
 }
 
-}  // namespace device
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::detail::device
+
+// CAGRA JIT kernels extend `cuvs::neighbors::cagra::detail::device` in other headers; re-export
+// the shared helpers there under the historical nested name.
+namespace cuvs::neighbors::cagra::detail::device {
+using namespace cuvs::neighbors::detail::device;
+}  // namespace cuvs::neighbors::cagra::detail::device

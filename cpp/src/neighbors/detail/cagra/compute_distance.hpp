@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include "jit_lto_kernels/device_intrinsics.hpp"
+#include "../neighbors_device_intrinsics.cuh"
 #include "jit_lto_kernels/device_memory_ops.hpp"
 #include "jit_lto_kernels/hashmap.hpp"
 #include "utils.hpp"

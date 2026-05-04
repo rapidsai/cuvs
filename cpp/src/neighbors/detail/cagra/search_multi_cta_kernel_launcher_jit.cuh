@@ -24,7 +24,6 @@
 
 #include <cstddef>
 #include <cuda_runtime.h>
-#include <string>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
@@ -60,10 +59,12 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
   const auto bf                  = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
   const uint32_t query_id_offset = bf.query_id_offset;
 
-  std::string const filter_name = get_sample_filter_name<SampleFilterT>();
   std::shared_ptr<AlgorithmLauncher> launcher =
-    make_cagra_multi_cta_jit_launcher<DataT, IndexT, DistanceT, SourceIndexT>(dataset_desc,
-                                                                              filter_name);
+    make_cagra_multi_cta_jit_launcher<DataT,
+                                      IndexT,
+                                      DistanceT,
+                                      SourceIndexT,
+                                      sample_filter_jit_tag_t<SampleFilterT>>(dataset_desc);
 
   if (!launcher) { RAFT_FAIL("Failed to get JIT launcher"); }
 

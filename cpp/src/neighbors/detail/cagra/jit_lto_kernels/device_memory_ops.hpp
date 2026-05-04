@@ -8,8 +8,7 @@
 
 #include <cuda_fp16.h>
 
-namespace cuvs::neighbors::cagra::detail {
-namespace device {
+namespace cuvs::neighbors::cagra::detail::device {
 
 RAFT_DEVICE_INLINE_FUNCTION void lds(float& x, uint32_t addr)
 {
@@ -152,5 +151,4 @@ RAFT_DEVICE_INLINE_FUNCTION void ldg_ca(half2 (&x)[2], const half* addr)
                : "l"(reinterpret_cast<const uint32_t*>(addr)));
 }
 
-}  // namespace device
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail::device

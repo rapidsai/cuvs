@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "sample_filter_data.h"
+#include "../../sample_filter_data.cuh"
 
 #include <raft/core/bitset.cuh>
 
