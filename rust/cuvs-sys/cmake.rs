@@ -3,13 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result};
-use cmake_package::{Error as CmakeError, Version, find_cmake, find_package};
-use serde::Deserialize;
+use cmake_package::{Error as CmakeError, Version, VersionError, find_package};
 
 const CUVS_COMPONENT: &str = "c_api";
 const CUVS_C_API_TARGET: &str = "cuvs::c_api";
@@ -33,18 +31,6 @@ pub(crate) struct CuvsMetadata {
     pub(crate) lib_dir: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
-struct CuvsProbeResult {
-    cmake_dir: Option<PathBuf>,
-    considered: Vec<CuvsConsideredConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CuvsConsideredConfig {
-    config: String,
-    version: String,
-}
-
 fn cmake_unavailable_error() -> anyhow::Error {
     anyhow::anyhow!(
         "CMake is not installed or does not satisfy this build's requirements. Install the required CMake version and try again."
@@ -63,7 +49,7 @@ fn cuvs_package_not_found_error() -> anyhow::Error {
 
 fn cuvs_incompatible_version_error(
     required_version: &Version,
-    candidates: &[CuvsConsideredConfig],
+    candidates: &[cmake_package::Considered],
 ) -> anyhow::Error {
     let considered = candidates
         .iter()
@@ -78,65 +64,23 @@ fn cuvs_incompatible_version_error(
     )
 }
 
-fn copy_cuvs_probe_project(probe_dir: &Path) -> Result<()> {
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("cmake/find_cuvs.cmake");
-    let destination = probe_dir.join("CMakeLists.txt");
-    fs::copy(&source, &destination).with_context(|| {
-        format!("failed to copy {} to {}", source.display(), destination.display())
-    })?;
-    Ok(())
-}
-
-fn run_cuvs_probe(
-    required_version: &Version,
-    cuvs_cmake_dir: Option<&Path>,
-) -> Result<CuvsProbeResult> {
-    let cmake = find_cmake().map_err(|e| match e {
+fn cmake_package_error(error: CmakeError, required_version: &Version) -> anyhow::Error {
+    match error {
         CmakeError::CMakeNotFound | CmakeError::UnsupportedCMakeVersion => {
             cmake_unavailable_error()
         }
+        CmakeError::PackageNotFound => cuvs_package_not_found_error(),
+        CmakeError::Version(VersionError::VersionIncompatible(candidates)) => {
+            cuvs_incompatible_version_error(required_version, &candidates)
+        }
+        CmakeError::Version(VersionError::InvalidVersion) => anyhow::anyhow!(
+            "{CUVS_CMAKE_INSPECTION_FAILED}\n\nCMake reported an invalid cuVS package version."
+        ),
         CmakeError::IO(error) => {
             anyhow::anyhow!("{CUVS_CMAKE_INSPECTION_FAILED}\n\nUnderlying error: {error}")
         }
-        _ => anyhow::anyhow!("{CUVS_CMAKE_INSPECTION_FAILED}"),
-    })?;
-
-    let out_dir = PathBuf::from(
-        std::env::var("OUT_DIR").expect("OUT_DIR not set by Cargo while probing cuVS"),
-    );
-    let probe_dir = tempfile::Builder::new()
-        .prefix("cuvs-cmake-package-probe")
-        .tempdir_in(out_dir)
-        .context("failed to create cuVS CMake probe directory")?;
-    copy_cuvs_probe_project(probe_dir.path())?;
-
-    let result_file = probe_dir.path().join("cuvs-package.json");
-    let mut command = Command::new(&cmake.path);
-    command
-        .current_dir(probe_dir.path())
-        .arg(".")
-        .arg(format!("-DOUTPUT_FILE={}", result_file.display()))
-        .arg(format!("-DREQUIRED_VERSION={required_version}"))
-        .arg(format!("-DCUVS_COMPONENT={CUVS_COMPONENT}"));
-
-    if let Some(cuvs_cmake_dir) = cuvs_cmake_dir {
-        command.arg(format!("-DCUVS_CMAKE_DIR={}", cuvs_cmake_dir.display()));
+        CmakeError::Internal => anyhow::anyhow!("{CUVS_CMAKE_INSPECTION_FAILED}"),
     }
-
-    let output =
-        command.output().with_context(|| format!("failed to run {}", cmake.path.display()))?;
-
-    if !output.status.success() {
-        anyhow::bail!(
-            "{CUVS_CMAKE_INSPECTION_FAILED}\n\nCMake stdout:\n{}\n\nCMake stderr:\n{}",
-            String::from_utf8_lossy(&output.stdout).trim(),
-            String::from_utf8_lossy(&output.stderr).trim(),
-        );
-    }
-
-    let reader = fs::File::open(&result_file)
-        .with_context(|| format!("CMake did not write {}", result_file.display()))?;
-    serde_json::from_reader(reader).context("failed to parse cuVS CMake probe result")
 }
 
 fn find_target(
@@ -148,19 +92,20 @@ fn find_target(
     })
 }
 
-fn find_cuvs_package(cmake_dir: &Path) -> Result<cmake_package::CMakePackage> {
-    find_package("cuvs")
-        .define("cuvs_DIR", cmake_dir.to_string_lossy().into_owned())
+fn find_cuvs_package(
+    required_version: &Version,
+    python_package_dir: Option<&Path>,
+) -> Result<cmake_package::CMakePackage> {
+    let mut package = find_package("cuvs")
+        .version(*required_version)
         .components([CUVS_COMPONENT.to_owned()])
-        .find()
-        .map_err(|error| {
-            anyhow::anyhow!(
-                "{CUVS_CMAKE_INSPECTION_FAILED}\n\n\
-                 Selected cuVS CMake package: {}\n\
-                 Underlying error: {error:?}",
-                cmake_dir.display()
-            )
-        })
+        .define("CMAKE_FIND_PACKAGE_PREFER_CONFIG", "TRUE");
+
+    if let Some(python_package_dir) = python_package_dir {
+        package = package.prefix_paths(vec![python_package_dir.to_path_buf()]);
+    }
+
+    package.find().map_err(|error| cmake_package_error(error, required_version))
 }
 
 #[cfg(feature = "generate-bindings")]
@@ -181,18 +126,9 @@ fn find_dlpack_package() -> Result<cmake_package::CMakePackage> {
 /// preserving all link libraries, directories, and options from the CMake target.
 pub(crate) fn try_find_cuvs_package(
     required_version: &Version,
-    cuvs_cmake_dir: Option<&Path>,
+    python_package_dir: Option<&Path>,
 ) -> Result<CuvsMetadata> {
-    let probe = run_cuvs_probe(required_version, cuvs_cmake_dir)?;
-
-    let cmake_dir = probe.cmake_dir.ok_or_else(|| {
-        if probe.considered.is_empty() {
-            cuvs_package_not_found_error()
-        } else {
-            cuvs_incompatible_version_error(required_version, &probe.considered)
-        }
-    })?;
-    let package = find_cuvs_package(&cmake_dir)?;
+    let package = find_cuvs_package(required_version, python_package_dir)?;
     let target = find_target(&package, CUVS_C_API_TARGET)?;
 
     let include_dir = target
@@ -233,7 +169,7 @@ pub(crate) fn try_find_cuvs_package(
     })
 }
 
-fn find_python_cuvs_cmake_dir() -> Result<PathBuf> {
+fn find_python_cuvs_package_dir() -> Result<PathBuf> {
     let python =
         Path::new(if std::env::var_os("VIRTUAL_ENV").is_some() { "python" } else { "python3" });
     let output = Command::new(python)
@@ -260,7 +196,7 @@ fn find_python_cuvs_cmake_dir() -> Result<PathBuf> {
         cmake_dir.display(),
     );
 
-    Ok(cmake_dir)
+    Ok(package_dir)
 }
 
 /// Locate cuVS either from standard CMake search paths or, when explicitly
@@ -270,8 +206,9 @@ pub(crate) fn locate_cuvs() -> Result<CuvsMetadata> {
         .try_into()
         .expect("workspace package version must be a valid semantic version");
 
-    let cuvs_cmake_dir =
-        std::env::var_os("LIBCUVS_USE_PYTHON").map(|_| find_python_cuvs_cmake_dir()).transpose()?;
+    let python_package_dir = std::env::var_os("LIBCUVS_USE_PYTHON")
+        .map(|_| find_python_cuvs_package_dir())
+        .transpose()?;
 
-    try_find_cuvs_package(&required_version, cuvs_cmake_dir.as_deref())
+    try_find_cuvs_package(&required_version, python_package_dir.as_deref())
 }

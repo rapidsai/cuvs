@@ -40,7 +40,6 @@ fn generate_bindings(include_dir: &Path, include_dirs: &[PathBuf]) {
 
 fn main() {
     println!("cargo::rerun-if-changed=cmake.rs");
-    println!("cargo::rerun-if-changed=cmake/find_cuvs.cmake");
     println!("cargo::rerun-if-changed=bindgen-stubs/cuda_runtime.h");
     println!("cargo::rerun-if-env-changed=CMAKE_PREFIX_PATH");
     println!("cargo::rerun-if-env-changed=CONDA_PREFIX");
