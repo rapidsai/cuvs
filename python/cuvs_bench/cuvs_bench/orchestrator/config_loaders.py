@@ -10,7 +10,6 @@ This module defines the abstract ConfigLoader interface and backend-specific
 implementations that handle configuration loading and preprocessing.
 """
 
-import itertools
 import os
 import warnings
 from abc import ABC, abstractmethod
@@ -20,6 +19,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
+from ..backends.utils import expand_param_grid
 
 
 @dataclass
@@ -848,40 +849,17 @@ class CppGBenchConfigLoader(ConfigLoader):
         search_params = group_conf.get("search", {})
 
         if tune_mode and tune_build_params is not None:
-            # TUNE MODE: Use exact params from Optuna (single config)
-            param_names = list(tune_build_params.keys())
-            all_build_params = [tuple(tune_build_params.values())]
-            # For search params, use tune_search_params keys/values
-            if tune_search_params:
-                search_param_names = tuple(tune_search_params.keys())
-                search_param_lists = [[v] for v in tune_search_params.values()]
-            else:
-                search_param_names, search_param_lists = [], []
+            all_build_params = [tune_build_params.copy()]
+            all_search_params = [tune_search_params.copy()] if tune_search_params else [{}]
         else:
-            # SWEEP MODE: Cartesian product of all YAML params
-            all_build_params = itertools.product(*build_params.values())
-            search_param_names, search_param_lists = (
-                zip(*search_params.items()) if search_params else ([], [])
-            )
-            param_names = list(build_params.keys())
-        for params in all_build_params:
-            # Build the build_param dict using appropriate keys
-            if tune_mode and tune_build_params is not None:
-                # Tune mode: use exact params from Optuna
-                index = {
-                    "algo": algo,
-                    "build_param": tune_build_params.copy(),
-                }
-            else:
-                # Sweep mode: use YAML param names
-                index = {
-                    "algo": algo,
-                    "build_param": dict(zip(param_names, params)),
-                }
+            all_build_params = expand_param_grid(build_params)
+            all_search_params = expand_param_grid(search_params)
 
-            # Build index name from params
+        for build_param in all_build_params:
+            index = {"algo": algo, "build_param": build_param}
+
             index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
-            for name, val in zip(param_names, params):
+            for name, val in build_param.items():
                 index_name += f".{name}{val}"
 
             # Skip constraint validation in tune mode (Optuna handles bounds)
@@ -890,7 +868,7 @@ class CppGBenchConfigLoader(ConfigLoader):
                     algos_conf,
                     algo,
                     "build",
-                    index["build_param"],
+                    build_param,
                     None,
                     conf_file["dataset"].get("dims"),
                     count,
@@ -908,16 +886,12 @@ class CppGBenchConfigLoader(ConfigLoader):
 
             # Handle search params
             if tune_mode and tune_search_params is not None:
-                # Tune mode: use exact search params from Optuna (as single-item list)
                 index["search_params"] = [tune_search_params.copy()]
             else:
-                # Sweep mode: validate and expand search params
                 index["search_params"] = self.validate_search_params(
-                    itertools.product(*search_param_lists),
-                    search_param_names,
-                    index["build_param"],
+                    all_search_params,
+                    build_param,
                     algo,
-                    group_conf,
                     algos_conf,
                     conf_file,
                     count,
@@ -931,29 +905,26 @@ class CppGBenchConfigLoader(ConfigLoader):
     def validate_search_params(
         self,
         all_search_params,
-        search_param_names,
         build_params,
         algo,
-        group_conf,
         algos_conf,
         conf_file,
         count,
         batch_size,
     ) -> list:
         """
-        Validate and prepare the search parameters for the given algorithm
-        and group.
+        Validate and filter search parameter combinations.
 
         Parameters
         ----------
-        all_search_params : itertools.product
-            The Cartesian product of search parameter values.
-        search_param_names : list
-            The names of the search parameters.
+        all_search_params : List[Dict[str, Any]]
+            List of search parameter dicts (from expand_param_grid).
+        build_params : dict
+            The build parameters for the current index.
         algo : str
             The name of the algorithm.
-        group_conf : dict
-            The configuration for the algorithm group.
+        algos_conf : dict
+            The loaded algorithm configurations.
         conf_file : dict
             The main configuration file.
         count : int
@@ -964,11 +935,10 @@ class CppGBenchConfigLoader(ConfigLoader):
         Returns
         -------
         list
-            A list of validated search parameters.
+            A list of validated search parameter dicts.
         """
         search_params_list = []
-        for search_params in all_search_params:
-            search_dict = dict(zip(search_param_names, search_params))
+        for search_dict in all_search_params:
             if self.validate_constraints(
                 algos_conf,
                 algo,
