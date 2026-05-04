@@ -82,4 +82,9 @@ CUVS_INST_VPQ_BUILD(uint8_t);
 
 #undef CUVS_INST_VPQ_BUILD
 
+template class vpq_codebooks<half>;
+template class vpq_codebooks<float>;
+template class vpq_dataset<half, int64_t>;
+template class vpq_dataset<float, int64_t>;
+
 }  // namespace cuvs::preprocessing::quantize::pq

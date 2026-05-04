@@ -41,7 +41,13 @@ class vpq_codebooks_iface {
   [[nodiscard]] virtual auto dim() const noexcept -> uint32_t
   {
     auto vq = vq_code_book();
-    return vq.has_value() ? vq->extent(1) : 0;
+    if (!vq.has_value()) {
+      RAFT_LOG_WARN(
+        "vpq_codebooks_iface::dim() returns 0 when no VQ codebook is present; "
+        "the original vector dimension cannot be recovered from PQ codebooks alone.");
+      return 0;
+    }
+    return vq->extent(1);
   }
   [[nodiscard]] virtual auto vq_n_centers() const noexcept -> uint32_t
   {
@@ -118,15 +124,7 @@ class vpq_codebooks {
     return impl_->pq_code_book();
   }
 
-  [[nodiscard]] auto dim() const noexcept -> uint32_t
-  {
-    if (!impl_->vq_code_book().has_value()) {
-      RAFT_LOG_WARN(
-        "vpq_codebooks::dim() returns 0 when no VQ codebook is present; "
-        "the original vector dimension cannot be recovered from PQ codebooks alone.");
-    }
-    return impl_->dim();
-  }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t { return impl_->dim(); }
   [[nodiscard]] auto vq_n_centers() const noexcept -> uint32_t { return impl_->vq_n_centers(); }
   [[nodiscard]] auto pq_bits() const noexcept -> uint32_t { return impl_->pq_bits(); }
   [[nodiscard]] auto pq_dim() const noexcept -> uint32_t { return impl_->pq_dim(); }
