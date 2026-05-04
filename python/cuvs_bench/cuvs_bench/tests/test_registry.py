@@ -30,13 +30,15 @@ class DummyBackend(BenchmarkBackend):
         return "dummy_algo"
 
     def build(self, dataset, indexes, force=False, dry_run=False):
-        first = indexes[0] if indexes else None
+        if not indexes:
+            raise ValueError("indexes must not be empty")
+        first = indexes[0]
         return BuildResult(
-            index_path=first.file if first else "",
+            index_path=first.file,
             build_time_seconds=1.0,
             index_size_bytes=1000,
             algorithm=self.algo,
-            build_params=first.build_param if first else {},
+            build_params=first.build_param,
             success=True,
         )
 
@@ -51,10 +53,12 @@ class DummyBackend(BenchmarkBackend):
         search_threads=None,
         dry_run=False,
     ):
+        if not indexes:
+            raise ValueError("indexes must not be empty")
         n_queries = dataset.n_queries
         neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
-        first = indexes[0] if indexes else None
+        first = indexes[0]
 
         return SearchResult(
             neighbors=neighbors,
@@ -63,7 +67,7 @@ class DummyBackend(BenchmarkBackend):
             queries_per_second=n_queries / 0.1,
             recall=0.95,
             algorithm=self.algo,
-            search_params=first.search_params if first else [],
+            search_params=first.search_params,
             success=True,
         )
 
@@ -76,13 +80,15 @@ class AnotherDummyBackend(BenchmarkBackend):
         return "another_dummy_algo"
 
     def build(self, dataset, indexes, force=False, dry_run=False):
-        first = indexes[0] if indexes else None
+        if not indexes:
+            raise ValueError("indexes must not be empty")
+        first = indexes[0]
         return BuildResult(
-            index_path=first.file if first else "",
+            index_path=first.file,
             build_time_seconds=2.0,
             index_size_bytes=2000,
             algorithm=self.algo,
-            build_params=first.build_param if first else {},
+            build_params=first.build_param,
             success=True,
         )
 
@@ -97,10 +103,12 @@ class AnotherDummyBackend(BenchmarkBackend):
         search_threads=None,
         dry_run=False,
     ):
+        if not indexes:
+            raise ValueError("indexes must not be empty")
         n_queries = dataset.n_queries
         neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
-        first = indexes[0] if indexes else None
+        first = indexes[0]
 
         return SearchResult(
             neighbors=neighbors,
@@ -327,7 +335,7 @@ class TestBackendRegistry:
 class TestBackendIntegration:
     """Integration tests for backends."""
 
-    def test_dummy_backend_build(self):
+    def test_dummy_backend_build(self, tmp_path):
         """Test dummy backend build."""
         from cuvs_bench.orchestrator.config_loaders import IndexConfig
 
@@ -345,7 +353,7 @@ class TestBackendIntegration:
                 algo="dummy_algo",
                 build_param={"nlist": 1024},
                 search_params=[{"nprobe": 10}],
-                file="/tmp/test_index",
+                file=str(tmp_path / "test_index"),
             )
         ]
 
@@ -355,7 +363,7 @@ class TestBackendIntegration:
         assert result.algorithm == "dummy_algo"
         assert result.build_params["nlist"] == 1024
 
-    def test_dummy_backend_search(self):
+    def test_dummy_backend_search(self, tmp_path):
         """Test dummy backend search."""
         from cuvs_bench.orchestrator.config_loaders import IndexConfig
 
@@ -373,7 +381,7 @@ class TestBackendIntegration:
                 algo="dummy_algo",
                 build_param={"nlist": 1024},
                 search_params=[{"nprobe": 10}],
-                file="/tmp/test_index",
+                file=str(tmp_path / "test_index"),
             )
         ]
 

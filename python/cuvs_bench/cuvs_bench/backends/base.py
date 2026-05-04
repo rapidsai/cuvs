@@ -101,6 +101,11 @@ class Dataset:
             )
         return self._base_vectors
 
+    @base_vectors.setter
+    def base_vectors(self, value: Optional[np.ndarray]) -> None:
+        """Set base vectors directly."""
+        self._base_vectors = value if value is not None else np.empty((0, 0))
+
     @property
     def query_vectors(self) -> np.ndarray:
         """Query vectors for search.
@@ -111,6 +116,11 @@ class Dataset:
             from .utils import load_vectors
             self._query_vectors = load_vectors(self.query_file)
         return self._query_vectors
+
+    @query_vectors.setter
+    def query_vectors(self, value: Optional[np.ndarray]) -> None:
+        """Set query vectors directly."""
+        self._query_vectors = value if value is not None else np.empty((0, 0))
 
     @property
     def groundtruth_neighbors(self) -> Optional[np.ndarray]:
@@ -125,6 +135,11 @@ class Dataset:
                 self.groundtruth_neighbors_file
             )
         return self._groundtruth_neighbors
+
+    @groundtruth_neighbors.setter
+    def groundtruth_neighbors(self, value: Optional[np.ndarray]) -> None:
+        """Set ground truth neighbors directly."""
+        self._groundtruth_neighbors = value
 
     @property
     def dims(self) -> int:

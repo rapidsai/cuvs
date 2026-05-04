@@ -264,7 +264,16 @@ def main(
         if backend_config:
             with open(backend_config, "r") as f:
                 cfg = yaml.safe_load(f)
-            backend_type = cfg.pop("backend", "cpp_gbench")
+            if not isinstance(cfg, dict):
+                raise ValueError(
+                    f"--backend-config must parse to a mapping, "
+                    f"got {type(cfg).__name__}"
+                )
+            if "backend" not in cfg:
+                raise ValueError(
+                    "--backend-config must include a 'backend' field"
+                )
+            backend_type = cfg.pop("backend")
             backend_kwargs = cfg
 
         orchestrator = BenchmarkOrchestrator(backend_type=backend_type)
@@ -274,8 +283,8 @@ def main(
             n_trials=n_trials,
             dataset=dataset,
             dataset_path=dataset_path,
-            build=build if build else True,
-            search=search if search else True,
+            build=build,
+            search=search,
             force=force,
             dry_run=dry_run,
             count=count,

@@ -260,7 +260,7 @@ class BenchmarkOrchestrator:
                 # empty neighbors, so this is skipped for it.
                 # Note: The recall computation relies on empty neighbors to
                 # distinguish backends that already computed recall.
-                if search_result.neighbors.size > 0:
+                if search_result.success and search_result.neighbors.size > 0:
                     gt = bench_dataset.groundtruth_neighbors
                     if gt is not None:
                         search_result.recall = compute_recall(
@@ -592,7 +592,7 @@ class BenchmarkOrchestrator:
             # Compute recall for backends that return actual neighbors.
             # Note: The recall computation relies on empty neighbors to
             # distinguish backends that already computed recall.
-            if result.neighbors.size > 0:
+            if result.success and result.neighbors.size > 0:
                 gt = bench_dataset.groundtruth_neighbors
                 if gt is not None:
                     result.recall = compute_recall(

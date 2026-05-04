@@ -169,7 +169,19 @@ def compute_recall(
     float
         Recall@k in range [0.0, 1.0]
     """
+    if not isinstance(neighbors, np.ndarray) or not isinstance(groundtruth, np.ndarray):
+        raise ValueError("neighbors and groundtruth must be numpy ndarrays")
+    if neighbors.ndim != 2 or groundtruth.ndim != 2:
+        raise ValueError(
+            f"neighbors and groundtruth must be 2-D arrays, got "
+            f"neighbors.shape={neighbors.shape}, groundtruth.shape={groundtruth.shape}"
+        )
     n_queries = neighbors.shape[0]
+    if groundtruth.shape[0] != n_queries:
+        raise ValueError(
+            f"Row count mismatch: neighbors has {n_queries} rows, "
+            f"groundtruth has {groundtruth.shape[0]} rows"
+        )
     gt_k = min(k, groundtruth.shape[1])
     if gt_k == 0 or n_queries == 0:
         return 0.0
