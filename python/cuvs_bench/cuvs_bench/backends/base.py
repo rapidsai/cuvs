@@ -90,8 +90,10 @@ class Dataset:
 
     @property
     def base_vectors(self) -> np.ndarray:
-        """Base vectors for index building. Loaded lazily from base_file if
-        not provided directly."""
+        """Base vectors for index building.
+
+        Loaded from base_file on first access if not provided directly.
+        """
         if self._base_vectors.size == 0 and self.base_file:
             from .utils import load_vectors
             self._base_vectors = load_vectors(
@@ -101,8 +103,10 @@ class Dataset:
 
     @property
     def query_vectors(self) -> np.ndarray:
-        """Query vectors for search. Loaded lazily from query_file if
-        not provided directly."""
+        """Query vectors for search.
+
+        Loaded from query_file on first access if not provided directly.
+        """
         if self._query_vectors.size == 0 and self.query_file:
             from .utils import load_vectors
             self._query_vectors = load_vectors(self.query_file)
@@ -110,8 +114,11 @@ class Dataset:
 
     @property
     def groundtruth_neighbors(self) -> Optional[np.ndarray]:
-        """Ground truth neighbor IDs. Loaded lazily from
-        groundtruth_neighbors_file if not provided directly."""
+        """Ground truth neighbor IDs.
+
+        Loaded from groundtruth_neighbors_file on first access if not
+        provided directly.
+        """
         if self._groundtruth_neighbors is None and self.groundtruth_neighbors_file:
             from .utils import load_vectors
             self._groundtruth_neighbors = load_vectors(
