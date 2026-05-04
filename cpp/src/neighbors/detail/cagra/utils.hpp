@@ -580,7 +580,7 @@ class batched_device_view {
     if constexpr (!kPassthrough) {
       // Wait for the kernel we paired with this prefetch_next() before
       // returning.
-      if (input_view_.extent(0) == 0) raft::resource::sync_stream(res_);
+      if (input_view_.extent(0) != 0) raft::resource::sync_stream(res_);
     }
   }
 
