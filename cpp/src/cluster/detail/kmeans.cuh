@@ -745,9 +745,6 @@ void kmeans_fit(
                                                               cur_batch_size);
   };
 
-  // Returns the weights view to feed into `process_batch` / `cluster_cost`
-  // for the current batch. On the device path this is a sub-range of the
-  // pre-normalized buffer; on the host path it delegates to `prepare_batch_weights`.
   auto cur_batch_weights = [&](IndexT batch_offset, const DataT* wt_data, IndexT cur_batch_size) {
     if constexpr (data_on_device) {
       const DataT* base = prenormalized_weights.has_value()
