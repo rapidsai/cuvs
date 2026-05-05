@@ -639,10 +639,7 @@ void kmeans_fit(
   auto init_centroids = [&](const cuvs::cluster::kmeans::params& iter_params,
                             raft::device_matrix_view<DataT, IndexT> centroidsRawData) {
     if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
-      raft::copy(
-        handle,
-        raft::make_device_vector_view(centroidsRawData.data_handle(), n_clusters * n_features),
-        raft::make_device_vector_view(centroids.data_handle(), n_clusters * n_features));
+      raft::copy(handle, centroidsRawData.view(), centroids.view());
       return;
     }
 
@@ -680,10 +677,10 @@ void kmeans_fit(
   }
 
   IndexT centroid_buf_size = n_clusters * n_features;
-  rmm::device_uvector<DataT> centroid_buf_A(centroid_buf_size, stream);
-  rmm::device_uvector<DataT> centroid_buf_B(centroid_buf_size, stream);
-  DataT* cur_centroids_ptr = centroid_buf_A.data();
-  DataT* new_centroids_ptr = centroid_buf_B.data();
+  rmm::device_uvector<DataT> cur_centroids_buf(centroid_buf_size, stream);
+  rmm::device_uvector<DataT> new_centroids_buf(centroid_buf_size, stream);
+  DataT* cur_centroids_ptr = cur_centroids_buf.data();
+  DataT* new_centroids_ptr = new_centroids_buf.data();
 
   auto minClusterAndDistance = raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(
     handle, streaming_batch_size);
@@ -803,8 +800,8 @@ void kmeans_fit(
                    n_init,
                    (unsigned long long)iter_params.rng_state.seed);
 
-    cur_centroids_ptr = centroid_buf_A.data();
-    new_centroids_ptr = centroid_buf_B.data();
+    cur_centroids_ptr = cur_centroids_buf.data();
+    new_centroids_ptr = new_centroids_buf.data();
     init_centroids(
       iter_params,
       raft::make_device_matrix_view<DataT, IndexT>(cur_centroids_ptr, n_clusters, n_features));
