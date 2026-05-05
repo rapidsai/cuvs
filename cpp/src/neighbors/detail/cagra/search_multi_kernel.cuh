@@ -7,9 +7,9 @@
 #include "search_multi_kernel_launcher_jit.cuh"
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
-#include "jit_lto_kernels/set_value_batch.cuh"
+#include "set_value_batch.cuh"
 
-#include "jit_lto_kernels/hashmap.hpp"
+#include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_for_cagra/topk.h"  //todo replace with raft kernel
 #include "utils.hpp"

@@ -9,9 +9,9 @@
 #include "search_single_cta_device_helpers.cuh"
 
 // neighbors_device_intrinsics / memory_ops come via search_single_cta_device_helpers.cuh
+#include "../hashmap.hpp"
+#include "../topk_by_radix.cuh"
 #include "../utils.hpp"
-#include "hashmap.hpp"
-#include "topk_by_radix.cuh"
 
 #include <raft/core/operators.hpp>      // For raft::shfl_xor
 #include <raft/util/integer_utils.hpp>  // For raft::round_up_safe

@@ -5,9 +5,9 @@
 #pragma once
 
 #include "../neighbors_device_intrinsics.cuh"
-#include "jit_lto_kernels/bitonic.hpp"
-#include "jit_lto_kernels/device_memory_ops.hpp"
-#include "jit_lto_kernels/hashmap.hpp"
+#include "bitonic.hpp"
+#include "device_memory_ops.hpp"
+#include "hashmap.hpp"
 #include "search_multi_cta_kernel.cuh"
 #include "search_plan.cuh"
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk if possible

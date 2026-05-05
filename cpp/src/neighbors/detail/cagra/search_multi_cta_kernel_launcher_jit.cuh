@@ -13,10 +13,10 @@
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
 #include "jit_lto_kernels/kernel_def.hpp"
-#include "jit_lto_kernels/set_value_batch.cuh"  // For set_value_batch
-#include "sample_filter_utils.cuh"              // For CagraSampleFilterWithQueryIdOffset
-#include "search_plan.cuh"                      // For search_params
-#include "shared_launcher_jit.hpp"              // For shared JIT helper functions
+#include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
+#include "search_plan.cuh"          // For search_params
+#include "set_value_batch.cuh"      // For set_value_batch
+#include "shared_launcher_jit.hpp"  // For shared JIT helper functions
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>

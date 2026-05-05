@@ -6,9 +6,9 @@
 #pragma once
 
 #include "../../neighbors_device_intrinsics.cuh"
+#include "../hashmap.hpp"
 #include "../utils.hpp"
 #include "cagra_bitset.cuh"
-#include "hashmap.hpp"
 
 #include <cstdint>
 #include <cuda_fp16.h>

@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include "../topk_for_cagra/topk_core.cuh"
+#include "topk_for_cagra/topk_core.cuh"
 
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {

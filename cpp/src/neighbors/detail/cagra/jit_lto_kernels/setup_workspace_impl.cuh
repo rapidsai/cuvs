@@ -10,7 +10,7 @@
 #include "../compute_distance_standard.hpp"
 #include "../compute_distance_vpq-impl.cuh"
 #include "../compute_distance_vpq.hpp"
-#include "device_memory_ops.hpp"
+#include "../device_memory_ops.hpp"
 
 #include <type_traits>
 

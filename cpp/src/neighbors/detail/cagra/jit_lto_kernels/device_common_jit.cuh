@@ -6,9 +6,9 @@
 #pragma once
 
 #include "../../neighbors_device_intrinsics.cuh"
+#include "../hashmap.hpp"
 #include "../utils.hpp"
 #include "extern_device_functions.cuh"
-#include "hashmap.hpp"
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/operators.hpp>

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "jit_lto_kernels/hashmap.hpp"
+#include "hashmap.hpp"
 
 #include <cuvs/neighbors/common.hpp>
 #include <neighbors/detail/cagra/compute_distance-ext.cuh>

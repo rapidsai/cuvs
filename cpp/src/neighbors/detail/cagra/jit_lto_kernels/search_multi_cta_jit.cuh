@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include "../hashmap.hpp"
 #include "../utils.hpp"
-#include "hashmap.hpp"
 
 #include <raft/util/integer_utils.hpp>
 

@@ -11,8 +11,8 @@
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
+#include "hashmap.hpp"
 #include "jit_lto_kernels/cagra_jit_launcher_factory.hpp"
-#include "jit_lto_kernels/hashmap.hpp"
 #include "jit_lto_kernels/kernel_def.hpp"
 #include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
 #include "search_plan.cuh"          // For search_params

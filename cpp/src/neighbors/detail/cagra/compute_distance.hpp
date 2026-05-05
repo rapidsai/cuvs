@@ -5,8 +5,8 @@
 #pragma once
 
 #include "../neighbors_device_intrinsics.cuh"
-#include "jit_lto_kernels/device_memory_ops.hpp"
-#include "jit_lto_kernels/hashmap.hpp"
+#include "device_memory_ops.hpp"
+#include "hashmap.hpp"
 #include "utils.hpp"
 
 #include <cuvs/distance/distance.hpp>
