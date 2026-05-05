@@ -716,8 +716,7 @@ void kmeans_fit(
   std::optional<raft::device_vector<DataT, IndexT>> prenormalized_weights;
   if constexpr (data_on_device) {
     if (weight_ptr != nullptr) {
-      prenormalized_weights.emplace(
-        raft::make_device_vector<DataT, IndexT>(handle, n_samples));
+      prenormalized_weights.emplace(raft::make_device_vector<DataT, IndexT>(handle, n_samples));
       const DataT* d_wt_sum_ptr = d_wt_sum.data_handle();
       raft::linalg::map(
         handle,
@@ -775,7 +774,6 @@ void kmeans_fit(
   bool use_norm_cache = need_compute_norms && !data_on_device;
   auto h_norm_cache =
     raft::make_pinned_vector<DataT, IndexT>(handle, use_norm_cache ? n_samples : 0);
-  bool norms_cached = false;
 
   auto compute_batch_norms = [&](const DataT* batch_ptr, IndexT batch_size) {
     auto batch_view =
@@ -785,6 +783,13 @@ void kmeans_fit(
     raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
       handle, batch_view, norm_view);
   };
+
+  // Device path: compute X norms once up front
+  if constexpr (data_on_device) {
+    if (need_compute_norms) {
+      compute_batch_norms(X.data_handle(), static_cast<IndexT>(n_samples));
+    }
+  }
 
   std::mt19937 gen(pams.rng_state.seed);
   inertia[0] = std::numeric_limits<DataT>::max();
@@ -812,12 +817,9 @@ void kmeans_fit(
     auto d_done_flag  = raft::make_device_scalar<int>(handle, 0);
     auto h_done_flag  = raft::make_pinned_scalar<int>(handle, 0);
 
-    cudaEvent_t convergence_event;
-    RAFT_CUDA_TRY(cudaEventCreateWithFlags(&convergence_event, cudaEventDisableTiming));
-
     for (n_current_iter = 1; n_current_iter <= iter_params.max_iter; ++n_current_iter) {
       if (n_current_iter > 1) {
-        RAFT_CUDA_TRY(cudaEventSynchronize(convergence_event));
+        raft::resource::sync_stream(handle);
         if (*h_done_flag.data_handle()) {
           n_current_iter--;
           RAFT_LOG_DEBUG("Threshold triggered after %d iterations. Terminating early.",
@@ -869,19 +871,21 @@ void kmeans_fit(
         auto minCAD_view = raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
           minClusterAndDistance.data_handle(), cur_batch_size);
 
-        if (need_compute_norms) {
-          compute_batch_norms(data_batch.data(), cur_batch_size);
-          if (use_norm_cache) {
-            raft::copy(h_norm_cache.data_handle() + data_batch.offset(),
-                       L2NormBatch.data_handle(),
+        if constexpr (!data_on_device) {
+          if (need_compute_norms) {
+            compute_batch_norms(data_batch.data(), cur_batch_size);
+            if (use_norm_cache) {
+              raft::copy(h_norm_cache.data_handle() + data_batch.offset(),
+                         L2NormBatch.data_handle(),
+                         cur_batch_size,
+                         stream);
+            }
+          } else if (use_norm_cache) {
+            raft::copy(L2NormBatch.data_handle(),
+                       h_norm_cache.data_handle() + data_batch.offset(),
                        cur_batch_size,
                        stream);
           }
-        } else if (use_norm_cache) {
-          raft::copy(L2NormBatch.data_handle(),
-                     h_norm_cache.data_handle() + data_batch.offset(),
-                     cur_batch_size,
-                     stream);
         }
 
         auto l2_const_view = raft::make_device_vector_view<const DataT, IndexT>(
@@ -904,7 +908,6 @@ void kmeans_fit(
                                      batch_workspace,
                                      centroid_norms_opt);
       }
-      if (!norms_cached && use_norm_cache) { norms_cached = true; }
 
       finalize_centroids<DataT, IndexT>(handle,
                                         raft::make_const_mdspan(centroid_sums.view()),
@@ -937,10 +940,7 @@ void kmeans_fit(
       raft::copy(handle,
                  raft::make_pinned_scalar_view(h_done_flag.data_handle()),
                  raft::make_device_scalar_view<const int>(d_done_flag.data_handle()));
-      RAFT_CUDA_TRY(cudaEventRecord(convergence_event, stream));
     }
-
-    RAFT_CUDA_TRY(cudaEventDestroy(convergence_event));
 
     {
       auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
