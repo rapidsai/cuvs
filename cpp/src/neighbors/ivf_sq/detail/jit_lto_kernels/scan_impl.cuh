@@ -43,6 +43,18 @@ using sq_block_sort_t = typename sq_block_sort<Capacity, Ascending>::type;
 
 // IVF-SQ scan kernel body with fused in-kernel top-k.
 //
+// The kernel is metric-agnostic: the four metric-specific pieces are
+// linked in at runtime via JIT-LTO as fragments declared in
+// device_functions.cuh:
+//   - setup_invariant_smem  (Phase 1, once per query)
+//   - setup_per_probe_smem  (Phase 2, once per probe)
+//   - accumulate_distance   (per-element, inner unrolled loop)
+//   - finalize_distance     (per-row, after the dim accumulation)
+//
+// The host launcher (ivf_sq_search.cuh) derives Ascending from the metric
+// (Ascending = !is_ip) and registers the matching metric variant of each
+// fragment with the planner.
+//
 // Grid layout:
 //   kManageLocalTopK (Capacity > 0):
 //     grid (grid_dim_x, n_queries) - each block loops over probes
@@ -67,7 +79,7 @@ using sq_block_sort_t = typename sq_block_sort<Capacity, Ascending>::type;
 //     Reconstructed vector component: s_aux[d] + code*s_sq_scale[d].
 //
 //   After all probes are scanned, the smem is reused for block_sort merge.
-template <int Capacity, typename MetricTag>
+template <int Capacity, bool Ascending>
 __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs,
                                                  const uint32_t* list_sizes,
                                                  const uint32_t* coarse_indices,
@@ -93,10 +105,6 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
 
   constexpr int BlockDim          = kSqScanThreads;
   constexpr bool kManageLocalTopK = (Capacity > 0);
-  constexpr bool kIsL2            = std::is_same_v<MetricTag, tag_metric_l2>;
-  constexpr bool kIsCosine        = std::is_same_v<MetricTag, tag_metric_cosine>;
-  constexpr bool kIsIP            = std::is_same_v<MetricTag, tag_metric_ip>;
-  constexpr bool kAscending       = !kIsIP;
 
   extern __shared__ __align__(256) uint8_t smem_buf[];
   float* smem = reinterpret_cast<float*>(smem_buf);
@@ -108,6 +116,11 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
   const uint32_t query_ix = blockIdx.y;
   const float* query      = queries_float + query_ix * dim;
 
+  // Hoist the per-query scalar load to a uniform value. The cosine fragment of
+  // finalize_distance is the only consumer; for L2/IP, the unused argument is
+  // dead-code-eliminated after JIT-LTO inlining and this load disappears.
+  const float q_norm = (query_norms != nullptr) ? query_norms[query_ix] : 0.0f;
+
   if constexpr (kManageLocalTopK) {
     out_distances += uint64_t(query_ix) * k * gridDim.x + blockIdx.x * k;
     out_indices += uint64_t(query_ix) * k * gridDim.x + blockIdx.x * k;
@@ -116,15 +129,11 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
   // Phase 1: load shared memory that is invariant across probes.
   for (uint32_t d = threadIdx.x; d < dim; d += BlockDim) {
     s_sq_scale[d] = sq_delta[d];
-    if constexpr (kIsL2) {
-      s_aux[d] = query[d] - sq_vmin[d];
-    } else {
-      s_query_term[d] = query[d];
-    }
   }
+  setup_invariant_smem(dim, query, sq_vmin, s_aux, s_query_term);
   __syncthreads();
 
-  using local_topk_t = sq_block_sort_t<Capacity, kAscending>;
+  using local_topk_t = sq_block_sort_t<Capacity, Ascending>;
   local_topk_t queue(k);
 
   const uint32_t* my_coarse = coarse_indices + query_ix * n_probes;
@@ -154,16 +163,7 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
     const uint32_t cluster_id = my_coarse[probe_ix];
     const uint32_t cluster_sz = list_sizes[cluster_id];
 
-    {
-      const float* centroid = centers + cluster_id * dim;
-      for (uint32_t d = threadIdx.x; d < dim; d += BlockDim) {
-        if constexpr (kIsL2) {
-          s_query_term[d] = s_aux[d] - centroid[d];
-        } else {
-          s_aux[d] = centroid[d] + sq_vmin[d];
-        }
-      }
-    }
+    setup_per_probe_smem(dim, centers + cluster_id * dim, sq_vmin, s_aux, s_query_term);
     __syncthreads();  // (b)
 
     if (cluster_sz == 0) {
@@ -198,24 +198,17 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
 #pragma unroll
         for (uint32_t j = 0; j < veclen; j++) {
           if (l + j < dim) {
-            float recon = float(codes_local[j]) * s_sq_scale[l + j];
-
-            if constexpr (kIsL2) {
-              float diff = s_query_term[l + j] - recon;
-              dist += diff * diff;
-            } else {
-              float v_d = s_aux[l + j] + recon;
-              dist += s_query_term[l + j] * v_d;
-              if constexpr (kIsCosine) { v_norm_sq += v_d * v_d; }
-            }
+            accumulate_distance(s_query_term[l + j],
+                                s_aux[l + j],
+                                s_sq_scale[l + j],
+                                codes_local[j],
+                                dist,
+                                v_norm_sq);
           }
         }
       }
 
-      if constexpr (kIsCosine) {
-        float denom = query_norms[query_ix] * sqrtf(v_norm_sq);
-        dist        = (denom > 0.0f) ? 1.0f - dist / denom : 0.0f;
-      }
+      dist = finalize_distance(dist, v_norm_sq, q_norm);
 
       if constexpr (kManageLocalTopK) {
         float val = valid ? dist : local_topk_t::queue_t::kDummy;

@@ -2,7 +2,14 @@
   "capacity": [
     "0", "32", "64", "128", "256"
   ],
-  "metric_name": [
-    "l2", "ip", "cosine"
+  "_ascending": [
+    {
+      "ascending_descending": "ascending",
+      "ascending_value": "true"
+    },
+    {
+      "ascending_descending": "descending",
+      "ascending_value": "false"
+    }
   ]
 }

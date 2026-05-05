@@ -18,10 +18,10 @@ struct IvfSqScanPlanner : AlgorithmPlanner {
 
   IvfSqScanPlanner() : AlgorithmPlanner("ivf_sq_scan", launcher_jit_cache) {}
 
-  template <typename MetricTag, int Capacity>
+  template <int Capacity, bool Ascending>
   void add_entrypoint()
   {
-    this->add_static_fragment<fragment_tag_ivf_sq_scan<MetricTag, Capacity>>();
+    this->add_static_fragment<fragment_tag_ivf_sq_scan<Capacity, Ascending>>();
   }
 
   template <typename FilterTag>
@@ -32,6 +32,30 @@ struct IvfSqScanPlanner : AlgorithmPlanner {
       cuvs::neighbors::detail::fragment_tag_sample_filter<cuvs::neighbors::detail::tag_bitset_u32,
                                                           cuvs::neighbors::detail::tag_index_i64,
                                                           FilterTag>>();
+  }
+
+  template <typename MetricTag>
+  void add_setup_invariant_smem_function()
+  {
+    this->add_static_fragment<fragment_tag_setup_invariant_smem<MetricTag>>();
+  }
+
+  template <typename MetricTag>
+  void add_setup_per_probe_smem_function()
+  {
+    this->add_static_fragment<fragment_tag_setup_per_probe_smem<MetricTag>>();
+  }
+
+  template <typename MetricTag>
+  void add_accumulate_distance_function()
+  {
+    this->add_static_fragment<fragment_tag_accumulate_distance<MetricTag>>();
+  }
+
+  template <typename MetricTag>
+  void add_finalize_distance_function()
+  {
+    this->add_static_fragment<fragment_tag_finalize_distance<MetricTag>>();
   }
 };
 

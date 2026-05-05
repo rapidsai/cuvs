@@ -155,8 +155,18 @@ void launch_kernel(const index<CodeT>& idx,
   constexpr int kThreads          = kSqScanThreads;
   uint32_t dim                    = idx.dim();
 
+  // The scan entrypoint is templated only on (Capacity, Ascending). Metric
+  // specialization is composed in at link time via four device-function
+  // fragments (setup_invariant_smem, setup_per_probe_smem,
+  // accumulate_distance, finalize_distance).
+  constexpr bool kAscending = !std::is_same_v<MetricTag, tag_metric_ip>;
+
   IvfSqScanPlanner kernel_planner;
-  kernel_planner.add_entrypoint<MetricTag, Capacity>();
+  kernel_planner.add_entrypoint<Capacity, kAscending>();
+  kernel_planner.add_setup_invariant_smem_function<MetricTag>();
+  kernel_planner.add_setup_per_probe_smem_function<MetricTag>();
+  kernel_planner.add_accumulate_distance_function<MetricTag>();
+  kernel_planner.add_finalize_distance_function<MetricTag>();
   kernel_planner.add_filter_device_function<IvfSampleFilterTag>();
   auto kernel_launcher = kernel_planner.get_launcher();
 
