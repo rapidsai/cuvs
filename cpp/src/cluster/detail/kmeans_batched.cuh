@@ -229,6 +229,9 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<T> inertia,
          raft::host_scalar_view<IdxT> n_iter)
 {
+  RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 params.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
