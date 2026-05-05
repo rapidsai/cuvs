@@ -365,6 +365,9 @@ void search_impl(raft::resources const& handle,
 
   bool needs_query_norms = index.metric() != cuvs::distance::DistanceType::InnerProduct;
   rmm::device_uvector<float> query_norm_dev(needs_query_norms ? n_queries : 0, stream, search_mr);
+  // Pass nullptr to the kernel for IP, where the empty uvector's data() pointer
+  // is implementation-defined and the kernel's `query_norms` argument is unused.
+  const float* qn_ptr = needs_query_norms ? query_norm_dev.data() : nullptr;
   rmm::device_uvector<float> distance_buffer_dev(n_queries * index.n_lists(), stream, search_mr);
   rmm::device_uvector<float> coarse_distances_dev(n_queries_probes, stream, search_mr);
   rmm::device_uvector<uint32_t> coarse_indices_dev(n_queries_probes, stream, search_mr);
@@ -491,7 +494,7 @@ void search_impl(raft::resources const& handle,
     ivf_sq_scan(handle,
                 index,
                 converted_queries_ptr,
-                query_norm_dev.data(),
+                qn_ptr,
                 n_queries,
                 n_probes,
                 k,
@@ -513,15 +516,10 @@ void search_impl(raft::resources const& handle,
     }
   }
 
-  // Prepare uint32 neighbors buffer for postprocessing
-  rmm::device_uvector<uint32_t> neighbors_uint32(0, stream, search_mr);
-  uint32_t* neighbors_uint32_ptr = nullptr;
-  if constexpr (sizeof(int64_t) == sizeof(uint32_t)) {
-    neighbors_uint32_ptr = reinterpret_cast<uint32_t*>(neighbors);
-  } else {
-    neighbors_uint32.resize(std::size_t(n_queries) * k, stream);
-    neighbors_uint32_ptr = neighbors_uint32.data();
-  }
+  // The scan kernel writes sample-local uint32 indices; postprocess_neighbors
+  // lifts them to int64_t database indices via inds_ptrs.
+  rmm::device_uvector<uint32_t> neighbors_uint32(std::size_t(n_queries) * k, stream, search_mr);
+  uint32_t* neighbors_uint32_ptr = neighbors_uint32.data();
 
   if (manage_local_topk) {
     // --- Fused top-k path ---
@@ -545,7 +543,7 @@ void search_impl(raft::resources const& handle,
     ivf_sq_scan(handle,
                 index,
                 converted_queries_ptr,
-                query_norm_dev.data(),
+                qn_ptr,
                 n_queries,
                 n_probes,
                 k,
@@ -596,7 +594,7 @@ void search_impl(raft::resources const& handle,
     ivf_sq_scan(handle,
                 index,
                 converted_queries_ptr,
-                query_norm_dev.data(),
+                qn_ptr,
                 n_queries,
                 n_probes,
                 k,
@@ -674,32 +672,42 @@ inline void search_with_filtering(raft::resources const& handle,
 
   bool manage_local_topk = is_local_topk_feasible(k);
 
-  uint32_t max_samples = 0;
-  if (!manage_local_topk) {
-    int64_t ms = std::max<int64_t>(index.accum_sorted_sizes()(n_probes), k);
-    RAFT_EXPECTS(ms <= int64_t(std::numeric_limits<uint32_t>::max()),
-                 "The maximum sample size is too big.");
-    max_samples = static_cast<uint32_t>(ms);
-  }
+  // Always compute max_samples: even on the fused path, search_impl may fall
+  // back to the materialize-all branch when the scan kernel reports zero
+  // occupancy, in which case the workspace must already be sized for the
+  // (much larger) materialize-path requirement.
+  int64_t ms = std::max<int64_t>(index.accum_sorted_sizes()(n_probes), k);
+  RAFT_EXPECTS(ms <= int64_t(std::numeric_limits<uint32_t>::max()),
+               "The maximum sample size is too big.");
+  uint32_t max_samples = static_cast<uint32_t>(ms);
 
   constexpr uint64_t kExpectedWsSize = 1024ull * 1024 * 1024;
   uint64_t max_ws_size =
     std::min<uint64_t>(raft::resource::get_workspace_free_bytes(handle), kExpectedWsSize);
 
   uint64_t converted_query_floats = std::is_same_v<T, float> ? 0 : index.dim();
+
+  // Materialize-path estimate: used directly for the non-fused path, and as
+  // a conservative upper bound for the fused path so the fallback branch in
+  // search_impl never overshoots the workspace.
+  uint64_t ws_materialize = sizeof(float) * (uint64_t(index.n_lists()) + n_probes + 1 +
+                                             max_samples + converted_query_floats) +
+                            sizeof(uint32_t) * (uint64_t(n_probes) * 2 + 1 + max_samples + k);
+
   uint64_t ws_per_query;
   if (manage_local_topk) {
-    // Fused path: only small per-query buffers for coarse search + chunk indices
-    // (The scan output is at most grid_dim_x * k per query, which is small)
-    // Conservatively assume grid_dim_x <= n_probes for the workspace estimate
+    // Fused path: only small per-query buffers for coarse search + chunk indices.
+    // The scan output is at most grid_dim_x * k per query (we conservatively
+    // assume grid_dim_x <= n_probes for the workspace estimate).
     uint64_t fused_out = uint64_t(n_probes) * k;
-    ws_per_query       = sizeof(float) * (uint64_t(index.n_lists()) + n_probes + 1 + fused_out +
-                                    converted_query_floats) +
-                   sizeof(uint32_t) * (uint64_t(n_probes) * 2 + 1 + fused_out + k);
+    uint64_t ws_fused  = sizeof(float) * (uint64_t(index.n_lists()) + n_probes + 1 + fused_out +
+                                         converted_query_floats) +
+                        sizeof(uint32_t) * (uint64_t(n_probes) * 2 + 1 + fused_out + k);
+    // Take the conservative max so search_impl can safely fall back to the
+    // materialize path if the fused-path occupancy probe returns zero.
+    ws_per_query = std::max(ws_fused, ws_materialize);
   } else {
-    ws_per_query = sizeof(float) * (uint64_t(index.n_lists()) + n_probes + 1 + max_samples +
-                                    converted_query_floats) +
-                   sizeof(uint32_t) * (uint64_t(n_probes) * 2 + 1 + max_samples + k);
+    ws_per_query = ws_materialize;
   }
 
   const uint32_t max_queries =
