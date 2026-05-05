@@ -35,8 +35,7 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     "IPython.sphinxext.ipython_directive",
     "breathe",
-    "recommonmark",
-    "sphinx_markdown_tables",
+    "myst_parser",
     "sphinx_copybutton",
 ]
 
@@ -55,8 +54,10 @@ templates_path = ["_templates"]
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
+# source_suffix = [".md"]
+source_suffix = {".md": "markdown"}
+myst_enable_extensions = ["dollarmath"]
+myst_heading_anchors = 6
 
 # The master toctree document.
 master_doc = "index"

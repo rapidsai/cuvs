@@ -146,7 +146,7 @@ elif [[ "${RUN_CONTEXT}" == "release" ]]; then
 fi
 
 # Update cuvs-bench Docker image references (version-only, not branch-related)
-sed_runner "s|rapidsai/cuvs-bench:[0-9][0-9].[0-9][0-9]|rapidsai/cuvs-bench:${NEXT_SHORT_TAG}|g" docs/source/cuvs_bench/index.rst
+sed_runner "s|rapidsai/cuvs-bench:[0-9][0-9].[0-9][0-9]|rapidsai/cuvs-bench:${NEXT_SHORT_TAG}|g" docs/source/cuvs_bench/index.md
 
 # Version references (not branch-related)
 sed_runner "s|=[0-9][0-9].[0-9][0-9]|=${NEXT_SHORT_TAG}|g" README.md

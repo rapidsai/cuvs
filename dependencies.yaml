@@ -450,11 +450,10 @@ dependencies:
           - doxygen>=1.8.20
           - graphviz
           - ipython
+          - myst-parser
           - numpydoc
-          - recommonmark
           - sphinx>=8.0.0
           - sphinx-copybutton
-          - sphinx-markdown-tables
           - pip:
               - nvidia-sphinx-theme
   rust:
