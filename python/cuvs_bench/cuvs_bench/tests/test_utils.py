@@ -57,7 +57,9 @@ class TestDtypeFromFilename:
 
     def test_full_path(self):
         """Test that full paths are handled correctly."""
-        assert dtype_from_filename("/data/datasets/sift/base.fbin") == np.float32
+        assert (
+            dtype_from_filename("/data/datasets/sift/base.fbin") == np.float32
+        )
 
 
 class TestLoadVectors:
@@ -125,7 +127,9 @@ class TestLoadVectors:
         path = str(tmp_path / "test.fbin")
         _write_test_bin(path, data)
 
-        with pytest.raises(ValueError, match="subset_size must be a positive integer"):
+        with pytest.raises(
+            ValueError, match="subset_size must be a positive integer"
+        ):
             load_vectors(path, subset_size=-1)
 
     def test_zero_subset_size(self, tmp_path):
@@ -134,7 +138,9 @@ class TestLoadVectors:
         path = str(tmp_path / "test.fbin")
         _write_test_bin(path, data)
 
-        with pytest.raises(ValueError, match="subset_size must be a positive integer"):
+        with pytest.raises(
+            ValueError, match="subset_size must be a positive integer"
+        ):
             load_vectors(path, subset_size=0)
 
     def test_unsupported_extension(self, tmp_path):
@@ -152,7 +158,9 @@ class TestLoadVectors:
         with open(path, "wb") as f:
             f.write(b"\x00\x00")
 
-        with pytest.raises(ValueError, match="File too small to contain a valid header"):
+        with pytest.raises(
+            ValueError, match="File too small to contain a valid header"
+        ):
             load_vectors(path)
 
     def test_truncated_data(self, tmp_path):
@@ -318,7 +326,9 @@ class TestConfigLoaderMethods:
         loader = CppGBenchConfigLoader()
         datasets = [{"name": "sift-128"}]
 
-        with pytest.raises(ValueError, match="Could not find a dataset configuration"):
+        with pytest.raises(
+            ValueError, match="Could not find a dataset configuration"
+        ):
             loader.get_dataset_configuration("nonexistent", datasets)
 
 

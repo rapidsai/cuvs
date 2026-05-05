@@ -120,7 +120,9 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
     return data.reshape(n_rows, n_cols)
 
 
-def expand_param_grid(param_spec: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
+def expand_param_grid(
+    param_spec: Dict[str, List[Any]],
+) -> List[Dict[str, Any]]:
     """
     Expand a parameter specification into all combinations via Cartesian product.
 
@@ -143,7 +145,10 @@ def expand_param_grid(param_spec: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
     if not param_spec:
         return [{}]
     keys = list(param_spec.keys())
-    return [dict(zip(keys, vals)) for vals in itertools.product(*param_spec.values())]
+    return [
+        dict(zip(keys, vals))
+        for vals in itertools.product(*param_spec.values())
+    ]
 
 
 def compute_recall(
@@ -169,7 +174,9 @@ def compute_recall(
     float
         Recall@k in range [0.0, 1.0]
     """
-    if not isinstance(neighbors, np.ndarray) or not isinstance(groundtruth, np.ndarray):
+    if not isinstance(neighbors, np.ndarray) or not isinstance(
+        groundtruth, np.ndarray
+    ):
         raise ValueError("neighbors and groundtruth must be numpy ndarrays")
     if neighbors.ndim != 2 or groundtruth.ndim != 2:
         raise ValueError(
@@ -186,7 +193,10 @@ def compute_recall(
     if gt_k == 0 or n_queries == 0:
         return 0.0
     n_correct = sum(
-        len(set(neighbors[i, :k].tolist()) & set(groundtruth[i, :gt_k].tolist()))
+        len(
+            set(neighbors[i, :k].tolist())
+            & set(groundtruth[i, :gt_k].tolist())
+        )
         for i in range(n_queries)
     )
     return n_correct / (n_queries * gt_k)

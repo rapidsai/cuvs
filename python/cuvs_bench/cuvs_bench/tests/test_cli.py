@@ -531,17 +531,28 @@ def test_run_with_mode_sweep(temp_datasets_dir):
     from cuvs_bench.run.__main__ import main as run_main
 
     runner = CliRunner()
-    result = runner.invoke(run_main, [
-        "--dataset", "test-data",
-        "--dataset-path", str(temp_datasets_dir),
-        "--algorithms", "cuvs_cagra",
-        "--batch-size", "10",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency",
-        "--mode", "sweep",
-        "--dry-run",
-    ])
+    result = runner.invoke(
+        run_main,
+        [
+            "--dataset",
+            "test-data",
+            "--dataset-path",
+            str(temp_datasets_dir),
+            "--algorithms",
+            "cuvs_cagra",
+            "--batch-size",
+            "10",
+            "-k",
+            "10",
+            "--groups",
+            "test",
+            "-m",
+            "latency",
+            "--mode",
+            "sweep",
+            "--dry-run",
+        ],
+    )
     assert result.exit_code == 0, (
         f"--mode sweep failed with output:\n{result.output}"
     )
@@ -554,17 +565,28 @@ def test_run_with_backend_config(temp_datasets_dir, tmp_path):
     config_file = tmp_path / "backend.yaml"
     config_file.write_text("backend: cpp_gbench\n")
     runner = CliRunner()
-    result = runner.invoke(run_main, [
-        "--dataset", "test-data",
-        "--dataset-path", str(temp_datasets_dir),
-        "--algorithms", "cuvs_cagra",
-        "--batch-size", "10",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency",
-        "--backend-config", str(config_file),
-        "--dry-run",
-    ])
+    result = runner.invoke(
+        run_main,
+        [
+            "--dataset",
+            "test-data",
+            "--dataset-path",
+            str(temp_datasets_dir),
+            "--algorithms",
+            "cuvs_cagra",
+            "--batch-size",
+            "10",
+            "-k",
+            "10",
+            "--groups",
+            "test",
+            "-m",
+            "latency",
+            "--backend-config",
+            str(config_file),
+            "--dry-run",
+        ],
+    )
     assert result.exit_code == 0, (
         f"--backend-config failed with output:\n{result.output}"
     )
@@ -575,16 +597,27 @@ def test_run_with_invalid_backend_config(tmp_path):
     from cuvs_bench.run.__main__ import main as run_main
 
     runner = CliRunner()
-    result = runner.invoke(run_main, [
-        "--dataset", "test-data",
-        "--dataset-path", str(tmp_path),
-        "--algorithms", "cuvs_cagra",
-        "--batch-size", "10",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency",
-        "--backend-config", "/nonexistent/config.yaml",
-    ])
+    result = runner.invoke(
+        run_main,
+        [
+            "--dataset",
+            "test-data",
+            "--dataset-path",
+            str(tmp_path),
+            "--algorithms",
+            "cuvs_cagra",
+            "--batch-size",
+            "10",
+            "-k",
+            "10",
+            "--groups",
+            "test",
+            "-m",
+            "latency",
+            "--backend-config",
+            "/nonexistent/config.yaml",
+        ],
+    )
     assert result.exit_code != 0
 
 
@@ -593,17 +626,28 @@ def test_run_with_n_trials_flag(temp_datasets_dir):
     from cuvs_bench.run.__main__ import main as run_main
 
     runner = CliRunner()
-    result = runner.invoke(run_main, [
-        "--dataset", "test-data",
-        "--dataset-path", str(temp_datasets_dir),
-        "--algorithms", "cuvs_cagra",
-        "--batch-size", "10",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency",
-        "--n-trials", "50",
-        "--dry-run",
-    ])
+    result = runner.invoke(
+        run_main,
+        [
+            "--dataset",
+            "test-data",
+            "--dataset-path",
+            str(temp_datasets_dir),
+            "--algorithms",
+            "cuvs_cagra",
+            "--batch-size",
+            "10",
+            "-k",
+            "10",
+            "--groups",
+            "test",
+            "-m",
+            "latency",
+            "--n-trials",
+            "50",
+            "--dry-run",
+        ],
+    )
     assert result.exit_code == 0, (
         f"--n-trials failed with output:\n{result.output}"
     )
@@ -614,17 +658,28 @@ def test_run_with_constraints_flag(temp_datasets_dir):
     from cuvs_bench.run.__main__ import main as run_main
 
     runner = CliRunner()
-    result = runner.invoke(run_main, [
-        "--dataset", "test-data",
-        "--dataset-path", str(temp_datasets_dir),
-        "--algorithms", "cuvs_cagra",
-        "--batch-size", "10",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency",
-        "--constraints", '{"recall": "maximize", "latency": {"max": 10}}',
-        "--dry-run",
-    ])
+    result = runner.invoke(
+        run_main,
+        [
+            "--dataset",
+            "test-data",
+            "--dataset-path",
+            str(temp_datasets_dir),
+            "--algorithms",
+            "cuvs_cagra",
+            "--batch-size",
+            "10",
+            "-k",
+            "10",
+            "--groups",
+            "test",
+            "-m",
+            "latency",
+            "--constraints",
+            '{"recall": "maximize", "latency": {"max": 10}}',
+            "--dry-run",
+        ],
+    )
     assert result.exit_code == 0, (
         f"--constraints failed with output:\n{result.output}"
     )

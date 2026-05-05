@@ -253,6 +253,7 @@ class ConfigLoader(ABC):
         -------
         DatasetConfig
         """
+
         def _resolve(rel):
             if rel and dataset_path and not os.path.isabs(rel):
                 return os.path.join(dataset_path, rel)
@@ -540,8 +541,12 @@ class CppGBenchConfigLoader(ConfigLoader):
                 try:
                     executable, executable_path, file_name = (
                         self.find_executable(
-                            algos_yaml, algo, group, count, batch_size,
-                            executable_dir
+                            algos_yaml,
+                            algo,
+                            group,
+                            count,
+                            batch_size,
+                            executable_dir,
                         )
                     )
                 except FileNotFoundError:
@@ -850,7 +855,9 @@ class CppGBenchConfigLoader(ConfigLoader):
 
         if tune_mode and tune_build_params is not None:
             all_build_params = [tune_build_params.copy()]
-            all_search_params = [tune_search_params.copy()] if tune_search_params else [{}]
+            all_search_params = (
+                [tune_search_params.copy()] if tune_search_params else [{}]
+            )
         else:
             all_build_params = expand_param_grid(build_params)
             all_search_params = expand_param_grid(search_params)

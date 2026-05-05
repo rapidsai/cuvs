@@ -8,7 +8,6 @@ Unit tests for the backend registry system.
 
 import pytest
 import numpy as np
-from pathlib import Path
 
 from cuvs_bench.backends import (
     Dataset,

@@ -595,9 +595,7 @@ class BenchmarkOrchestrator:
             if result.success and result.neighbors.size > 0:
                 gt = bench_dataset.groundtruth_neighbors
                 if gt is not None:
-                    result.recall = compute_recall(
-                        result.neighbors, gt, count
-                    )
+                    result.recall = compute_recall(result.neighbors, gt, count)
 
         return result
 

@@ -78,8 +78,12 @@ class Dataset:
         # loading logic invisible to backends: they just access
         # dataset.base_vectors and get a numpy array regardless of whether
         # it was passed in or loaded from disk.
-        self._base_vectors = base_vectors if base_vectors is not None else np.empty((0, 0))
-        self._query_vectors = query_vectors if query_vectors is not None else np.empty((0, 0))
+        self._base_vectors = (
+            base_vectors if base_vectors is not None else np.empty((0, 0))
+        )
+        self._query_vectors = (
+            query_vectors if query_vectors is not None else np.empty((0, 0))
+        )
         self._groundtruth_neighbors = groundtruth_neighbors
         self.groundtruth_distances = groundtruth_distances
         self.distance_metric = distance_metric
@@ -96,6 +100,7 @@ class Dataset:
         """
         if self._base_vectors.size == 0 and self.base_file:
             from .utils import load_vectors
+
             self._base_vectors = load_vectors(
                 self.base_file, self.metadata.get("subset_size")
             )
@@ -114,6 +119,7 @@ class Dataset:
         """
         if self._query_vectors.size == 0 and self.query_file:
             from .utils import load_vectors
+
             self._query_vectors = load_vectors(self.query_file)
         return self._query_vectors
 
@@ -129,8 +135,12 @@ class Dataset:
         Loaded from groundtruth_neighbors_file on first access if not
         provided directly.
         """
-        if self._groundtruth_neighbors is None and self.groundtruth_neighbors_file:
+        if (
+            self._groundtruth_neighbors is None
+            and self.groundtruth_neighbors_file
+        ):
             from .utils import load_vectors
+
             self._groundtruth_neighbors = load_vectors(
                 self.groundtruth_neighbors_file
             )
