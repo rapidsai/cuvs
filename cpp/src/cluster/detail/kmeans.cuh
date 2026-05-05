@@ -639,7 +639,7 @@ void kmeans_fit(
   auto init_centroids = [&](const cuvs::cluster::kmeans::params& iter_params,
                             raft::device_matrix_view<DataT, IndexT> centroidsRawData) {
     if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
-      raft::copy(handle, centroidsRawData.view(), centroids.view());
+      raft::copy(handle, centroidsRawData, centroids);
       return;
     }
 
