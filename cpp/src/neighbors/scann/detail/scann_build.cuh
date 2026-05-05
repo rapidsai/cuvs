@@ -87,7 +87,7 @@ index<T, IdxT> build(
   raft::device_vector_view<uint32_t, int64_t> labels_view = idx.labels();
 
   // setup batching for kmeans prediction + quantization
-  auto* device_memory = raft::resource::get_workspace_resource(res);
+  auto device_memory = raft::resource::get_workspace_resource_ref(res);
 
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size = std::min<size_t>(dataset.extent(0), kReasonableMaxBatchSize);
@@ -160,14 +160,16 @@ index<T, IdxT> build(
   int dim_per_subspace = params.pq_dim;
   int num_clusters     = 1 << params.pq_bits;
 
-  cuvs::preprocessing::quantize::pq::params pq_build_params;
-  pq_build_params.pq_bits                      = params.pq_bits;
-  pq_build_params.pq_dim                       = num_subspaces;
-  pq_build_params.use_subspaces                = true;
-  pq_build_params.use_vq                       = false;  // We already computed residuals
-  pq_build_params.kmeans_n_iters               = params.pq_train_iters;
-  pq_build_params.max_train_points_per_pq_code = pq_n_rows_train / num_clusters;
-  pq_build_params.pq_kmeans_type               = cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+  cuvs::preprocessing::quantize::pq::params pq_build_params(
+    params.pq_bits,
+    num_subspaces,
+    true,
+    false,
+    0,
+    params.pq_train_iters,
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+    pq_n_rows_train / num_clusters,
+    1024);
 
   auto pq_quantizer = cuvs::preprocessing::quantize::pq::build(
     res, pq_build_params, raft::make_const_mdspan(trainset_residuals.view()));

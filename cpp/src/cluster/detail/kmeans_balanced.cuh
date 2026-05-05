@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include "../../distance/fused_distance_nn.cuh"
-#include "../../distance/unfused_distance_nn.cuh"
 #include "kmeans_common.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -54,27 +52,6 @@ namespace cuvs::cluster::kmeans::detail {
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
 /**
- * @brief Returns true is fused implementation should used.
- */
-template <typename MathT, typename IdxT, typename LabelT>
-bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
-{
-  cudaDeviceProp prop;
-  prop = raft::resource::get_device_properties(handle);
-  if (prop.major <= 8) {
-    // Use fused for Ampere or before
-    return true;
-  } else if (prop.major == 9 && (m >= 4096 || n >= 4096)) {
-    // On Hopper if m, n are bigger than 4096, use fused
-    return true;
-  } else if (prop.major >= 10) {
-    // On Blackwell onwards, use unfused
-    return false;
-  }
-  return false;
-}
-
-/**
  * @brief Predict labels for the dataset; floating-point types only.
  *
  * NB: no minibatch splitting is done here, it may require large amount of temporary memory (n_rows
@@ -108,107 +85,35 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   LabelT* labels,
   rmm::device_async_resource_ref mr)
 {
-  auto stream           = raft::resource::get_cuda_stream(handle);
-  bool should_use_fused = use_fused<MathT, IdxT, LabelT>(handle, n_rows, n_clusters, dim);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
-    case cuvs::distance::DistanceType::L2SqrtExpanded: {
-      size_t workspace_size =
-        should_use_fused ? sizeof(IdxT) * n_rows : sizeof(MathT) * n_rows * n_clusters;
-      auto workspace =
-        raft::make_device_mdarray<char, IdxT>(handle, mr, raft::make_extents<IdxT>(workspace_size));
-      auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        handle, mr, raft::make_extents<IdxT>(n_rows));
-      raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
-
-      auto centroidsNorm =
-        raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(centers, n_clusters, dim),
-        centroidsNorm.view());
-
-      if (should_use_fused) {
-        cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-          minClusterAndDistance.data_handle(),
-          dataset,
-          centers,
-          dataset_norm,
-          centroidsNorm.data_handle(),
-          n_rows,
-          n_clusters,
-          dim,
-          (void*)workspace.data_handle(),
-          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
-          false,
-          true,
-          params.metric,
-          0.0f,
-          stream);
-      } else {
-        cuvs::distance::
-          unfusedDistanceNNMinReduce<MathT, MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-            handle,
-            minClusterAndDistance.data_handle(),
-            dataset,
-            centers,
-            dataset_norm,
-            centroidsNorm.data_handle(),
-            n_rows,
-            n_clusters,
-            dim,
-            (void*)workspace.data_handle(),
-            (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
-            false,
-            true,
-            params.metric,
-            0.0f,
-            stream);
-      }
-
-      // todo(lsugy): use KVP + iterator in caller.
-      // Copy keys to output labels
-      raft::linalg::map(handle,
-                        raft::make_const_mdspan(minClusterAndDistance.view()),
-                        raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows),
-                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
-      break;
-    }
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::CosineExpanded: {
-      auto workspace = raft::make_device_mdarray<char, IdxT>(
-        handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
+      rmm::device_uvector<MathT> L2NormBuf_OR_DistBuf(0, stream, mr);
+      rmm::device_uvector<char> workspace(0, stream, mr);
+
+      auto X_view = raft::make_device_matrix_view<const MathT, IdxT>(dataset, n_rows, dim);
+      auto centroids_view =
+        raft::make_device_matrix_view<const MathT, IdxT>(centers, n_clusters, dim);
+      auto X_norm_view = raft::make_device_vector_view<const MathT, IdxT>(dataset_norm, n_rows);
 
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
-      raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
 
-      auto centroidsNorm =
-        raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<MathT, IdxT>(
         handle,
-        raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(centers, n_clusters, dim),
-        centroidsNorm.view(),
-        raft::sqrt_op{});
-
-      cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        minClusterAndDistance.data_handle(),
-        dataset,
-        centers,
-        dataset_norm,
-        centroidsNorm.data_handle(),
-        n_rows,
-        n_clusters,
-        dim,
-        (void*)workspace.data_handle(),
-        false,
-        false,
-        true,
+        X_view,
+        centroids_view,
+        minClusterAndDistance.view(),
+        X_norm_view,
+        L2NormBuf_OR_DistBuf,
         params.metric,
-        0.0f,
-        stream);
+        0,  // batch_samples (unused for fused reduction)
+        0,  // batch_centroids (unused for fused reduction)
+        workspace);
+
       // Copy keys to output labels
       raft::linalg::map(handle,
                         raft::make_const_mdspan(minClusterAndDistance.view()),
@@ -411,7 +316,7 @@ void compute_norm(const raft::resources& handle,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("compute_norm");
   auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<MathT> mapped_dataset(
-    0, stream, mr.value_or(raft::resource::get_workspace_resource(handle)));
+    0, stream, mr.value_or(raft::resource::get_workspace_resource_ref(handle)));
 
   const MathT* dataset_ptr = nullptr;
 
@@ -473,7 +378,7 @@ void predict(const raft::resources& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "predict(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
-  auto mem_res = mr.value_or(raft::resource::get_workspace_resource(handle));
+  auto mem_res = mr.value_or(raft::resource::get_workspace_resource_ref(handle));
   auto [max_minibatch_size, _mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
   rmm::device_uvector<MathT> cur_dataset(
@@ -1085,7 +990,7 @@ void build_hierarchical(const raft::resources& handle,
 
   // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
   rmm::mr::managed_memory_resource managed_memory;
-  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource_ref(handle);
   auto [max_minibatch_size, mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
 
@@ -1126,8 +1031,8 @@ void build_hierarchical(const raft::resources& handle,
     CounterT;
 
   // build coarse clusters (mesoclusters)
-  rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, &managed_memory);
-  rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, &managed_memory);
+  rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, managed_memory);
+  rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, managed_memory);
   {
     rmm::device_uvector<MathT> mesocluster_centers_buf(n_mesoclusters * dim, stream, device_memory);
     build_clusters(handle,
@@ -1183,7 +1088,7 @@ void build_hierarchical(const raft::resources& handle,
                                              fine_clusters_nums_max,
                                              cluster_centers,
                                              mapping_op,
-                                             &managed_memory,
+                                             managed_memory,
                                              device_memory);
   RAFT_EXPECTS(n_clusters_done == n_clusters, "Didn't process all clusters.");
 
