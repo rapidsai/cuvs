@@ -249,7 +249,10 @@ __global__ void computeInnerProductsWithBitwiseOptNoEX(
   }
 }
 
-__global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
+// Unified template replacing the four separate BlockSort kernels.
+// NumBits=4 or 8; WithEx=true adds warp-level IP2 refinement with long codes.
+template <int NumBits, bool WithEx>
+__global__ void computeInnerProductsWithBitwiseBlockSort(
   const ComputeInnerProductsKernelParams params)
 {
   const int block_id = blockIdx.x;
@@ -264,26 +267,20 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
   size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
   size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
 
-  // Shared memory layout
   extern __shared__ __align__(256) char shared_mem_raw_2[];
-
-  // Load packed query bit planes into shared memory
   uint32_t* shared_packed_query = reinterpret_cast<uint32_t*>(shared_mem_raw_2);
 
   const int tid         = threadIdx.x;
   const int num_threads = blockDim.x;
 
-  // Load this query's packed bit planes
   const uint32_t* query_packed_ptr =
     params.d_packed_queries + query_idx * params.num_bits * params.num_words;
   for (uint32_t i = tid; i < params.num_bits * params.num_words; i += num_threads) {
     shared_packed_query[i] = query_packed_ptr[i];
   }
 
-  // Load query width
   float query_width = params.d_widths[query_idx];
 
-  // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
   float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
   float q_k1xsumq = params.d_G_k1xSumq[query_idx];
@@ -293,7 +290,6 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
   if (tid == 0) { num_candidates = 0; }
   __syncthreads();
 
-  // Allocate shared memory for candidates
   size_t packed_query_bytes   = max(params.num_bits * params.num_words * sizeof(uint32_t),
                                   params.max_candidates_per_pair * sizeof(float));
   float* shared_candidate_ips = reinterpret_cast<float*>(shared_mem_raw_2 + packed_query_bytes);
@@ -301,11 +297,9 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
     reinterpret_cast<int*>(shared_candidate_ips + params.max_candidates_per_pair);
   float* shared_query = (float*)(shared_candidate_indices + params.max_candidates_per_pair);
   const size_t short_code_length = params.D / 32;
-  // Step 2 Part 1: Compute bitwise inner products
-  const int vectors_per_iteration = num_threads;
 
-  // Optimized first-round IP computation - accumulate on the fly
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
+  // Phase 1: Bitwise inner product filter
+  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
     size_t vec_idx = vec_base + tid;
 
     bool is_candidate        = false;
@@ -318,26 +312,21 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
       float f_rescale      = factors.y;
       float f_error        = factors.z;
 
-      int32_t accumulator = 0;  // Single accumulator, no array needed
-
-      // Load data once, accumulate directly
+      int32_t accumulator = 0;
       for (int word = 0; word < params.num_words; ++word) {
         size_t data_offset =
           cluster_start_index * params.num_words + word * num_vectors_in_cluster + vec_idx;
         uint32_t data_word = params.d_short_data[data_offset];
 
-        // Fully unrolled bit processing for better ILP
-        accumulator += __popc(shared_packed_query[0 * params.num_words + word] & data_word) << 0;
-        accumulator += __popc(shared_packed_query[1 * params.num_words + word] & data_word) << 1;
-        accumulator += __popc(shared_packed_query[2 * params.num_words + word] & data_word) << 2;
-        accumulator += __popc(shared_packed_query[3 * params.num_words + word] & data_word) << 3;
-        accumulator += __popc(shared_packed_query[4 * params.num_words + word] & data_word) << 4;
-        accumulator += __popc(shared_packed_query[5 * params.num_words + word] & data_word) << 5;
-        accumulator += __popc(shared_packed_query[6 * params.num_words + word] & data_word) << 6;
-        accumulator -= __popc(shared_packed_query[7 * params.num_words + word] & data_word) << 7;
+#pragma unroll
+        for (int b = 0; b < NumBits - 1; b++) {
+          accumulator += __popc(shared_packed_query[b * params.num_words + word] & data_word) << b;
+        }
+        accumulator -=
+          __popc(shared_packed_query[(NumBits - 1) * params.num_words + word] & data_word)
+          << (NumBits - 1);
       }
 
-      // Restore scale and compute estimated distance
       float ip       = (float)accumulator * query_width;
       float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
       float low_dist = est_dist - f_error * q_g_error;
@@ -367,966 +356,169 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
     }
     __syncthreads();
 
-    //    --------------
-    // Step 2 （optional): Load float query and compute exact IPs for candidates
-    // Now we can overwrite the packed query with the float query
-
-    // Compute exact float inner products for all candidates
     const int candidates_per_thread = (num_candidates + num_threads - 1) / num_threads;
+    __shared__ int probe_slot;
 
-    for (int c = 0; c < candidates_per_thread; ++c) {
-      int cand_idx = tid + c * num_threads;
+    if constexpr (WithEx) {
+      // Phase 2 (WithEx): Compute exact 1-bit IPs and store for IP2 refinement
+      for (int c = 0; c < candidates_per_thread; ++c) {
+        int cand_idx = tid + c * num_threads;
+        if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
+          int vec_idx    = shared_candidate_indices[cand_idx];
+          float exact_ip = 0.0f;
 
-      if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
-        int vec_idx = shared_candidate_indices[cand_idx];
-
-        // Compute exact inner product with float query
-        float exact_ip = 0.0f;
-
-        // Process each uint32_t of the short code
-        for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-          // Access short code in transposed layout
-          size_t short_code_offset =
-            cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-          uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-          // Process each bit in the uint32_t
-          // Note: bit 31 is lowest dimension, bit 0 is highest
+          for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
+            size_t short_code_offset = cluster_start_index * short_code_length +
+                                       uint32_idx * num_vectors_in_cluster + vec_idx;
+            uint32_t short_code_chunk = params.d_short_data[short_code_offset];
 #pragma unroll 8
-          for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-            size_t dim = uint32_idx * 32 + bit_idx;
-            if (dim < params.D) {
-              // Extract bit from MSB to LSB
-              int bit_position = 31 - bit_idx;
-              bool bit_value   = (short_code_chunk >> bit_position) & 0x1;
-
-              // If bit is 1, add the query value
-              if (bit_value) { exact_ip += shared_query[dim]; }
+            for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
+              size_t dim = uint32_idx * 32 + bit_idx;
+              if (dim < params.D) {
+                if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
+              }
             }
           }
+          shared_candidate_ips[cand_idx] = exact_ip;
         }
-
-        // Store the exact inner product
-        shared_candidate_ips[cand_idx] = exact_ip;
       }
-    }
+      __syncthreads();
 
-    __syncthreads();
-    //    ------------------
+      // Phase 3 (WithEx): Warp-level IP2 computation + block-sort queue
+      {
+        using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
+          flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
+        block_sort_t queue(params.topk);
 
-    __shared__ int probe_slot;
-    {
+        float q_kbxsumq               = params.d_G_kbxSumq[query_idx];
+        const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
+        float* shared_ip2_results     = reinterpret_cast<float*>(shared_mem_raw_2);
+
+        const int warp_id   = tid / raft::WarpSize;
+        const int lane_id   = tid % raft::WarpSize;
+        const int num_warps = num_threads / raft::WarpSize;
+
+        for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
+          size_t global_vec_idx        = cluster_start_index + shared_candidate_indices[cand_idx];
+          const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
+
+          float ip2 = 0.0f;
+          for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
+            ip2 += shared_query[d] * (float)extract_code(vec_long_code, d, params.ex_bits);
+          }
+#pragma unroll
+          for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
+            ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
+          }
+          if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
+        }
+        __syncthreads();
+
+        for (int round = 0; round < candidates_per_thread; round++) {
+          int cand_idx = tid + round * num_threads;
+
+          float ex_dist;
+          uint32_t pid;
+          if (cand_idx < num_candidates) {
+            float ip              = shared_candidate_ips[cand_idx];
+            float ip2             = shared_ip2_results[cand_idx];
+            int local_vec_idx     = shared_candidate_indices[cand_idx];
+            size_t global_vec_idx = cluster_start_index + local_vec_idx;
+
+            float2 ex_factors = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
+            float f_ex_add    = ex_factors.x;
+            float f_ex_rescale = ex_factors.y;
+
+            ex_dist =
+              f_ex_add + q_g_add +
+              f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
+            pid = (uint32_t)params.d_pids[global_vec_idx];
+          } else {
+            ex_dist = INFINITY;
+            pid     = 0;
+          }
+          queue.add(ex_dist, pid);
+        }
+        __syncthreads();
+
+        queue.done((uint8_t*)shared_mem_raw_2);
+        if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
+        __syncthreads();
+
+        if (probe_slot >= params.nprobe) { return; }
+
+        uint32_t output_offset =
+          query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
+        queue.store(params.d_topk_dists + output_offset,
+                    (uint32_t*)(params.d_topk_pids + output_offset));
+      }
+    } else {
+      // Phase 2+3 (NoEx): Compute exact 1-bit IPs and add directly to queue
       using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
         flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
       block_sort_t queue(params.topk);
 
-      float q_kbxsumq = params.d_G_kbxSumq[query_idx];
+      float final_dist;
+      PID final_pid;
+      for (int c = 0; c < candidates_per_thread; ++c) {
+        int cand_idx = tid + c * num_threads;
+        if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
+          int vec_idx          = shared_candidate_indices[cand_idx];
+          size_t factor_offset = cluster_start_index + vec_idx;
+          float3 factors  = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
+          float f_add     = factors.x;
+          float f_rescale = factors.y;
+          size_t global_vec_idx = cluster_start_index + vec_idx;
 
-      // Calculate long code parameters
-      const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-
-      // Step 3 Part 1: Warp-level IP2 computation for better memory coalescing
-
-      // Reuse shared_candidate_dists to store IP2 results
-      float* shared_ip2_results = reinterpret_cast<float*>(shared_mem_raw_2);
-
-      const int warp_id   = tid / raft::WarpSize;
-      const int lane_id   = tid % raft::WarpSize;
-      const int num_warps = num_threads / raft::WarpSize;
-
-      // Each warp processes different candidates
-      for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
-        size_t global_vec_idx = cluster_start_index + shared_candidate_indices[cand_idx];
-
-        // Pointer to this vector's long code
-        const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-
-        // Warp-level IP2 computation
-        float ip2 = 0.0f;
-
-        // Each thread in warp processes different dimensions
-        for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
-          // Extract ex_bits value for this dimension
-          uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
-          float ex_val      = (float)code_val;
-          ip2 += shared_query[d] * ex_val;
-        }
-
-        // Warp-level reduction for ip2
-#pragma unroll
-        for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-          ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
-        }
-
-        // Lane 0 stores the result
-        if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-      }
-
-      __syncthreads();
-
-      // Step 3 Part 2: Each thread computes final distance and adds to queue
-      // Step 3 Part 2: FIXED - Ensure all threads call queue.add() the same number of times
-
-      // Calculate how many rounds we need (all threads must do the same number of adds)
-      const int adds_per_thread = (num_candidates + num_threads - 1) / num_threads;
-
-      for (int round = 0; round < adds_per_thread; round++) {
-        int cand_idx = tid + round * num_threads;
-
-        float ex_dist;
-        uint32_t pid;
-
-        if (cand_idx < num_candidates) {
-          // Get pre-computed values
-          float ip              = shared_candidate_ips[cand_idx];
-          float ip2             = shared_ip2_results[cand_idx];
-          int local_vec_idx     = shared_candidate_indices[cand_idx];
-          size_t global_vec_idx = cluster_start_index + local_vec_idx;
-
-          // vec load version
-          float2 ex_factors  = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-          float f_ex_add     = ex_factors.x;
-          float f_ex_rescale = ex_factors.y;
-
-          // Compute final distance using pre-computed ip2
-          ex_dist = f_ex_add + q_g_add +
-                    f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
-          //
-          // Get PID
-          pid = (uint32_t)params.d_pids[global_vec_idx];
-
+          float exact_ip = 0.0f;
+          for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
+            size_t short_code_offset = cluster_start_index * short_code_length +
+                                       uint32_idx * num_vectors_in_cluster + vec_idx;
+            uint32_t short_code_chunk = params.d_short_data[short_code_offset];
+#pragma unroll 8
+            for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
+              size_t dim = uint32_idx * 32 + bit_idx;
+              if (dim < params.D) {
+                if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
+              }
+            }
+          }
+          final_dist = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
+          final_pid  = (uint32_t)params.d_pids[global_vec_idx];
         } else {
-          // Thread has no valid candidate for this round - use dummy values
-          ex_dist = INFINITY;
-          pid     = 0;
+          final_dist = INFINITY;
+          final_pid  = 0;
         }
-        // ALL threads call queue.add() exactly once per round
-        queue.add(ex_dist, pid);
+        queue.add(final_dist, final_pid);
       }
-
       __syncthreads();
 
-      // Step 3 Part 3: Merge results and write back top-k
       queue.done((uint8_t*)shared_mem_raw_2);
-
-      // Atomically get write position
       if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
       __syncthreads();
 
-      if (probe_slot >= params.nprobe) { return; }
-
-      // Calculate output offset and store results
       uint32_t output_offset = query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
       queue.store(params.d_topk_dists + output_offset,
                   (uint32_t*)(params.d_topk_pids + output_offset));
     }
 
-    // Step 4: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
+    // Update threshold atomically
     if (num_candidates >= params.topk) {
       float max_topk_dist;
 
       if (tid == 0) {
         max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
         uint32_t output_offset =
-          query_idx * (params.topk * params.nprobe) +
-          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
-
+          query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
           if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
-
       __syncthreads();
 
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
       if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
-      }
-    }
-  }
-}
-
-__global__ void computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort(
-  const ComputeInnerProductsKernelParams params)
-{
-  const int block_id = blockIdx.x;
-  if (block_id >= params.num_pairs) return;
-
-  ClusterQueryPair pair = params.d_sorted_pairs[block_id];
-  int cluster_idx       = pair.cluster_idx;
-  int query_idx         = pair.query_idx;
-
-  if (cluster_idx >= params.num_centroids || query_idx >= params.num_queries) return;
-
-  size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
-  size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
-
-  // Shared memory layout
-  extern __shared__ __align__(256) char shared_mem_raw_2[];
-
-  // Load packed query bit planes into shared memory
-  uint32_t* shared_packed_query = reinterpret_cast<uint32_t*>(shared_mem_raw_2);
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Load this query's packed bit planes
-  const uint32_t* query_packed_ptr =
-    params.d_packed_queries + query_idx * params.num_bits * params.num_words;
-  for (uint32_t i = tid; i < params.num_bits * params.num_words; i += num_threads) {
-    shared_packed_query[i] = query_packed_ptr[i];
-  }
-
-  // Load query width
-  float query_width = params.d_widths[query_idx];
-
-  // Shared values for this <cluster, query> pair
-  __shared__ int num_candidates;
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
-  float q_g_error = sqrtf(q_g_add);
-  float threshold = params.d_threshold[query_idx];
-
-  if (tid == 0) { num_candidates = 0; }
-  __syncthreads();
-
-  // Allocate shared memory for candidates
-  size_t packed_query_bytes   = max(params.num_bits * params.num_words * sizeof(uint32_t),
-                                  params.max_candidates_per_pair * sizeof(float));
-  float* shared_candidate_ips = reinterpret_cast<float*>(shared_mem_raw_2 + packed_query_bytes);
-  int* shared_candidate_indices =
-    reinterpret_cast<int*>(shared_candidate_ips + params.max_candidates_per_pair);
-  float* shared_query = (float*)(shared_candidate_indices + params.max_candidates_per_pair);
-  const size_t short_code_length = params.D / 32;
-  // Step 2 Part 1: Compute bitwise inner products
-  const int vectors_per_iteration = num_threads;
-
-  // Ori version --------------------------------------
-  // Optimized first-round IP computation - accumulate on the fly
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
-    size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
-    if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
-
-      int32_t accumulator = 0;  // Single accumulator, no array needed
-
-      // Load data once, accumulate directly
-      for (int word = 0; word < params.num_words; ++word) {
-        size_t data_offset =
-          cluster_start_index * params.num_words + word * num_vectors_in_cluster + vec_idx;
-        uint32_t data_word = params.d_short_data[data_offset];
-
-        accumulator += __popc(shared_packed_query[0 * params.num_words + word] & data_word) << 0;
-        accumulator += __popc(shared_packed_query[1 * params.num_words + word] & data_word) << 1;
-        accumulator += __popc(shared_packed_query[2 * params.num_words + word] & data_word) << 2;
-        accumulator += __popc(shared_packed_query[3 * params.num_words + word] & data_word) << 3;
-        accumulator += __popc(shared_packed_query[4 * params.num_words + word] & data_word) << 4;
-        accumulator += __popc(shared_packed_query[5 * params.num_words + word] & data_word) << 5;
-        accumulator += __popc(shared_packed_query[6 * params.num_words + word] & data_word) << 6;
-        accumulator -= __popc(shared_packed_query[7 * params.num_words + word] & data_word)
-                       << 7;  // Sign bit
-      }
-
-      // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
-
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
-      int candidate_slot = atomicAdd(&num_candidates, 1);
-      if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
-        shared_candidate_indices[candidate_slot] = vec_idx;
-      }
-    }
-  }
-  // -----------------
-
-  __syncthreads();
-
-  if (num_candidates > 0) {
-    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-      flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
-    block_sort_t queue(params.topk);
-
-    for (size_t i = tid; i < params.D; i += num_threads) {
-      shared_query[i] = params.d_query[query_idx * params.D + i];
-    }
-    __syncthreads();
-
-    //    --------------
-    // Step 2 （optional): Load float query and compute exact IPs for candidates
-    // Now we can overwrite the packed query with the float query
-
-    // Compute exact float inner products for all candidates
-    const int candidates_per_thread = (num_candidates + num_threads - 1) / num_threads;
-    float final_1bit_dist;
-    PID final_1bit_pid;
-
-    for (int c = 0; c < candidates_per_thread; ++c) {
-      int cand_idx = tid + c * num_threads;
-
-      if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
-        int vec_idx          = shared_candidate_indices[cand_idx];
-        size_t factor_offset = cluster_start_index + vec_idx;
-        float3 factors  = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-        float f_add     = factors.x;
-        float f_rescale = factors.y;
-        size_t global_vec_idx = cluster_start_index + vec_idx;
-
-        // Compute exact inner product with float query
-        float exact_ip = 0.0f;
-
-        // Process each uint32_t of the short code
-        for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-          // Access short code in transposed layout
-          size_t short_code_offset =
-            cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-          uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-          // Process each bit in the uint32_t
-          // Note: bit 31 is lowest dimension, bit 0 is highest
-#pragma unroll 8
-          for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-            size_t dim = uint32_idx * 32 + bit_idx;
-            if (dim < params.D) {
-              // Extract bit from MSB to LSB
-              int bit_position = 31 - bit_idx;
-              bool bit_value   = (short_code_chunk >> bit_position) & 0x1;
-
-              // If bit is 1, add the query value
-              if (bit_value) { exact_ip += shared_query[dim]; }
-            }
-          }
-        }
-
-        // get final results and push to queue
-        final_1bit_dist = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
-        final_1bit_pid  = (uint32_t)params.d_pids[global_vec_idx];
-
-      } else {
-        final_1bit_dist = INFINITY;
-        final_1bit_pid  = 0;
-      };
-      queue.add(final_1bit_dist, final_1bit_pid);
-    }
-
-    __syncthreads();
-    //    ------------------
-    __shared__ int probe_slot;
-    queue.done((uint8_t*)shared_mem_raw_2);
-
-    // Atomically get write position
-    if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
-    __syncthreads();
-
-    // Calculate output offset and store results
-    uint32_t output_offset = query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
-    queue.store(params.d_topk_dists + output_offset,
-                (uint32_t*)(params.d_topk_pids + output_offset));
-
-    // Step 3: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        uint32_t output_offset =
-          query_idx * (params.topk * params.nprobe) +
-          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
-
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
-      }
-    }
-  }
-}
-
-__global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
-  const ComputeInnerProductsKernelParams params)
-{
-  const int block_id = blockIdx.x;
-  if (block_id >= params.num_pairs) return;
-
-  ClusterQueryPair pair = params.d_sorted_pairs[block_id];
-  int cluster_idx       = pair.cluster_idx;
-  int query_idx         = pair.query_idx;
-
-  if (cluster_idx >= params.num_centroids || query_idx >= params.num_queries) return;
-
-  size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
-  size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
-
-  // Shared memory layout
-  extern __shared__ __align__(256) char shared_mem_raw_2[];
-
-  // Load packed query bit planes into shared memory
-  uint32_t* shared_packed_query = reinterpret_cast<uint32_t*>(shared_mem_raw_2);
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Load this query's packed bit planes
-  const uint32_t* query_packed_ptr =
-    params.d_packed_queries + query_idx * params.num_bits * params.num_words;
-  for (uint32_t i = tid; i < params.num_bits * params.num_words; i += num_threads) {
-    shared_packed_query[i] = query_packed_ptr[i];
-  }
-
-  // Load query width
-  float query_width = params.d_widths[query_idx];
-
-  // Shared values for this <cluster, query> pair
-  __shared__ int num_candidates;
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
-  float q_g_error = sqrtf(q_g_add);
-  float threshold = params.d_threshold[query_idx];
-
-  if (tid == 0) { num_candidates = 0; }
-  __syncthreads();
-
-  // Allocate shared memory for candidates
-  size_t packed_query_bytes   = max(params.num_bits * params.num_words * sizeof(uint32_t),
-                                  params.max_candidates_per_pair * sizeof(float));
-  float* shared_candidate_ips = reinterpret_cast<float*>(shared_mem_raw_2 + packed_query_bytes);
-  int* shared_candidate_indices =
-    reinterpret_cast<int*>(shared_candidate_ips + params.max_candidates_per_pair);
-  float* shared_query = (float*)(shared_candidate_indices + params.max_candidates_per_pair);
-  const size_t short_code_length = params.D / 32;
-  // Step 2 Part 1: Compute bitwise inner products
-  const int vectors_per_iteration = num_threads;
-
-  // Ori version --------------------------------------
-  // Optimized first-round IP computation - accumulate on the fly
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
-    size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
-    if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
-
-      int32_t accumulator = 0;  // Single accumulator, no array needed
-
-      // Load data once, accumulate directly
-      int32_t accumulator2 = 0;
-      for (int word = 0; word < params.num_words; ++word) {
-        size_t data_offset =
-          cluster_start_index * params.num_words + word * num_vectors_in_cluster + vec_idx;
-        uint32_t data_word = params.d_short_data[data_offset];
-        accumulator2 += __popc(data_word);
-
-        accumulator += __popc(shared_packed_query[0 * params.num_words + word] & data_word) << 0;
-        accumulator += __popc(shared_packed_query[1 * params.num_words + word] & data_word) << 1;
-        accumulator += __popc(shared_packed_query[2 * params.num_words + word] & data_word) << 2;
-        accumulator -= __popc(shared_packed_query[3 * params.num_words + word] & data_word)
-                       << 3;  // Sign bit
-      }
-
-      // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
-
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
-      int candidate_slot = atomicAdd(&num_candidates, 1);
-      if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
-        shared_candidate_indices[candidate_slot] = vec_idx;
-      }
-    }
-  }
-  // -----------------
-
-  __syncthreads();
-
-  if (num_candidates > 0) {
-    for (size_t i = tid; i < params.D; i += num_threads) {
-      shared_query[i] = params.d_query[query_idx * params.D + i];
-    }
-    __syncthreads();
-
-    //    --------------
-    // Step 2 （optional): Load float query and compute exact IPs for candidates
-    // Now we can overwrite the packed query with the float query
-
-    // Compute exact float inner products for all candidates
-    const int candidates_per_thread = (num_candidates + num_threads - 1) / num_threads;
-
-    for (int c = 0; c < candidates_per_thread; ++c) {
-      int cand_idx = tid + c * num_threads;
-
-      if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
-        int vec_idx = shared_candidate_indices[cand_idx];
-
-        // Compute exact inner product with float query
-        float exact_ip = 0.0f;
-
-        // Process each uint32_t of the short code
-        for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-          // Access short code in transposed layout
-          size_t short_code_offset =
-            cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-          uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-          // Process each bit in the uint32_t
-          // Note: bit 31 is lowest dimension, bit 0 is highest
-#pragma unroll 8
-          for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-            size_t dim = uint32_idx * 32 + bit_idx;
-            if (dim < params.D) {
-              // Extract bit from MSB to LSB
-              int bit_position = 31 - bit_idx;
-              bool bit_value   = (short_code_chunk >> bit_position) & 0x1;
-
-              // If bit is 1, add the query value
-              if (bit_value) { exact_ip += shared_query[dim]; }
-            }
-          }
-        }
-
-        // Store the exact inner product
-        shared_candidate_ips[cand_idx] = exact_ip;
-      }
-    }
-
-    __syncthreads();
-    //    ------------------
-
-    __shared__ int probe_slot;
-    {
-      using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-        flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
-      block_sort_t queue(params.topk);
-
-      // Additional shared values needed for Step 3
-      float q_kbxsumq = params.d_G_kbxSumq[query_idx];
-
-      // Calculate long code parameters
-      const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-
-      // Step 3 Part 1: Warp-level IP2 computation for better memory coalescing
-
-      // Reuse shared_candidate_dists to store IP2 results
-      float* shared_ip2_results = reinterpret_cast<float*>(shared_mem_raw_2);
-
-      const int warp_id   = tid / raft::WarpSize;
-      const int lane_id   = tid % raft::WarpSize;
-      const int num_warps = num_threads / raft::WarpSize;
-
-      // Each warp processes different candidates
-      for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
-        size_t global_vec_idx = cluster_start_index + shared_candidate_indices[cand_idx];
-
-        // Pointer to this vector's long code
-        const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-
-        // Warp-level IP2 computation
-        float ip2 = 0.0f;
-
-        // Each thread in warp processes different dimensions
-        for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
-          // Extract ex_bits value for this dimension
-          uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
-          float ex_val      = (float)code_val;
-          ip2 += shared_query[d] * ex_val;
-        }
-
-        // Warp-level reduction for ip2
-#pragma unroll
-        for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-          ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
-        }
-
-        // Lane 0 stores the result
-        if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-      }
-
-      __syncthreads();
-
-      // Step 3 Part 2: Each thread computes final distance and adds to queue
-      // Step 3 Part 2: FIXED - Ensure all threads call queue.add() the same number of times
-
-      // Calculate how many rounds we need (all threads must do the same number of adds)
-      const int adds_per_thread = (num_candidates + num_threads - 1) / num_threads;
-
-      for (int round = 0; round < adds_per_thread; round++) {
-        int cand_idx = tid + round * num_threads;
-
-        float ex_dist;
-        uint32_t pid;
-
-        if (cand_idx < num_candidates) {
-          // Get pre-computed values
-          float ip              = shared_candidate_ips[cand_idx];
-          float ip2             = shared_ip2_results[cand_idx];
-          int local_vec_idx     = shared_candidate_indices[cand_idx];
-          size_t global_vec_idx = cluster_start_index + local_vec_idx;
-
-          // vec load version
-          float2 ex_factors  = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-          float f_ex_add     = ex_factors.x;
-          float f_ex_rescale = ex_factors.y;
-
-          // Compute final distance using pre-computed ip2
-          ex_dist = f_ex_add + q_g_add +
-                    f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
-
-          // Get PID
-          pid = (uint32_t)params.d_pids[global_vec_idx];
-
-        } else {
-          // Thread has no valid candidate for this round - use dummy values
-          ex_dist = INFINITY;
-          pid     = 0;
-        }
-        // ALL threads call queue.add() exactly once per round
-        queue.add(ex_dist, pid);
-      }
-
-      __syncthreads();
-
-      // Step 3 Part 3: Merge results and write back top-k
-      queue.done((uint8_t*)shared_mem_raw_2);
-
-      // Atomically get write position
-      if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
-      __syncthreads();
-
-      if (probe_slot >= params.nprobe) { return; }
-
-      // Calculate output offset and store results
-      uint32_t output_offset = query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
-      queue.store(params.d_topk_dists + output_offset,
-                  (uint32_t*)(params.d_topk_pids + output_offset));
-    }
-
-    // Step 4: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        uint32_t output_offset =
-          query_idx * (params.topk * params.nprobe) +
-          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
-
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
-      }
-    }
-  }
-}
-
-__global__ void computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort(
-  const ComputeInnerProductsKernelParams params)
-{
-  const int block_id = blockIdx.x;
-  if (block_id >= params.num_pairs) return;
-
-  ClusterQueryPair pair = params.d_sorted_pairs[block_id];
-  int cluster_idx       = pair.cluster_idx;
-  int query_idx         = pair.query_idx;
-
-  if (cluster_idx >= params.num_centroids || query_idx >= params.num_queries) return;
-
-  size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
-  size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
-
-  // Shared memory layout
-  extern __shared__ __align__(256) char shared_mem_raw_2[];
-
-  // Load packed query bit planes into shared memory
-  uint32_t* shared_packed_query = reinterpret_cast<uint32_t*>(shared_mem_raw_2);
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Load this query's packed bit planes
-  const uint32_t* query_packed_ptr =
-    params.d_packed_queries + query_idx * params.num_bits * params.num_words;
-  for (uint32_t i = tid; i < params.num_bits * params.num_words; i += num_threads) {
-    shared_packed_query[i] = query_packed_ptr[i];
-  }
-
-  // Load query width
-  float query_width = params.d_widths[query_idx];
-
-  // Shared values for this <cluster, query> pair
-  __shared__ int num_candidates;
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
-  float q_g_error = sqrtf(q_g_add);
-  float threshold = params.d_threshold[query_idx];
-
-  if (tid == 0) { num_candidates = 0; }
-  __syncthreads();
-
-  // Allocate shared memory for candidates
-  size_t packed_query_bytes   = max(params.num_bits * params.num_words * sizeof(uint32_t),
-                                  params.max_candidates_per_pair * sizeof(float));
-  float* shared_candidate_ips = reinterpret_cast<float*>(shared_mem_raw_2 + packed_query_bytes);
-  int* shared_candidate_indices =
-    reinterpret_cast<int*>(shared_candidate_ips + params.max_candidates_per_pair);
-  float* shared_query = (float*)(shared_candidate_indices + params.max_candidates_per_pair);
-  const size_t short_code_length = params.D / 32;
-  // Step 2 Part 1: Compute bitwise inner products
-  const int vectors_per_iteration = num_threads;
-
-  // Ori version --------------------------------------
-  // Optimized first-round IP computation - accumulate on the fly
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
-    size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
-    if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
-
-      int32_t accumulator = 0;  // Single accumulator, no array needed
-
-      // Load data once, accumulate directly
-      for (int word = 0; word < params.num_words; ++word) {
-        size_t data_offset =
-          cluster_start_index * params.num_words + word * num_vectors_in_cluster + vec_idx;
-        uint32_t data_word = params.d_short_data[data_offset];
-
-        accumulator += __popc(shared_packed_query[0 * params.num_words + word] & data_word) << 0;
-        accumulator += __popc(shared_packed_query[1 * params.num_words + word] & data_word) << 1;
-        accumulator += __popc(shared_packed_query[2 * params.num_words + word] & data_word) << 2;
-        accumulator -= __popc(shared_packed_query[3 * params.num_words + word] & data_word)
-                       << 3;  // Sign bit
-      }
-
-      // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
-
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
-      int candidate_slot = atomicAdd(&num_candidates, 1);
-      if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
-        shared_candidate_indices[candidate_slot] = vec_idx;
-      }
-    }
-  }
-  // -----------------
-
-  __syncthreads();
-
-  if (num_candidates > 0) {
-    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-      flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
-    block_sort_t queue(params.topk);
-
-    for (size_t i = tid; i < params.D; i += num_threads) {
-      shared_query[i] = params.d_query[query_idx * params.D + i];
-    }
-    __syncthreads();
-
-    //    --------------
-    // Step 2 （optional): Load float query and compute exact IPs for candidates
-    // Now we can overwrite the packed query with the float query
-
-    // Compute exact float inner products for all candidates
-    const int candidates_per_thread = (num_candidates + num_threads - 1) / num_threads;
-    float final_1bit_dist;
-    PID final_1bit_pid;
-
-    for (int c = 0; c < candidates_per_thread; ++c) {
-      int cand_idx = tid + c * num_threads;
-
-      if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
-        int vec_idx          = shared_candidate_indices[cand_idx];
-        size_t factor_offset = cluster_start_index + vec_idx;
-        float3 factors  = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-        float f_add     = factors.x;
-        float f_rescale = factors.y;
-        size_t global_vec_idx = cluster_start_index + vec_idx;
-
-        // Compute exact inner product with float query
-        float exact_ip = 0.0f;
-
-        // Process each uint32_t of the short code
-        for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-          // Access short code in transposed layout
-          size_t short_code_offset =
-            cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-          uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-          // Process each bit in the uint32_t
-          // Note: bit 31 is lowest dimension, bit 0 is highest
-#pragma unroll 8
-          for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-            size_t dim = uint32_idx * 32 + bit_idx;
-            if (dim < params.D) {
-              // Extract bit from MSB to LSB
-              int bit_position = 31 - bit_idx;
-              bool bit_value   = (short_code_chunk >> bit_position) & 0x1;
-
-              // If bit is 1, add the query value
-              if (bit_value) { exact_ip += shared_query[dim]; }
-            }
-          }
-        }
-
-        // get final results and push to queue
-        final_1bit_dist = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
-        final_1bit_pid  = (uint32_t)params.d_pids[global_vec_idx];
-
-      } else {
-        final_1bit_dist = INFINITY;
-        final_1bit_pid  = 0;
-      };
-      queue.add(final_1bit_dist, final_1bit_pid);
-    }
-
-    __syncthreads();
-    //    ------------------
-    __shared__ int probe_slot;
-    queue.done((uint8_t*)shared_mem_raw_2);
-
-    // Atomically get write position
-    if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
-    __syncthreads();
-
-    // Calculate output offset and store results
-    uint32_t output_offset = query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
-    queue.store(params.d_topk_dists + output_offset,
-                (uint32_t*)(params.d_topk_pids + output_offset));
-
-    // Step 3: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        uint32_t output_offset =
-          query_idx * (params.topk * params.nprobe) +
-          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
-
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
+        atomicMin((int*)(params.d_threshold + query_idx), __float_as_int(max_topk_dist));
       }
     }
   }
@@ -1858,15 +1050,15 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   if (!use_4bit) {
     if (cur_ivf.get_ex_bits() != 0) {
-      auto kernel                 = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitBlockSort
-                                                   : computeInnerProductsWithBitwiseOpt;
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, true>
+                                   : computeInnerProductsWithBitwiseOpt;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
       cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
         kernel, shared_mem_size, kernel_launcher);
     } else {
-      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, false>
                                    : computeInnerProductsWithBitwiseOptNoEX;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
@@ -1877,15 +1069,15 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
-      auto kernel                 = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitBlockSort
-                                                   : computeInnerProductsWithBitwiseOpt;
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<4, true>
+                                   : computeInnerProductsWithBitwiseOpt;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
       cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
         kernel, shared_mem_size, kernel_launcher);
     } else {
-      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<4, false>
                                    : computeInnerProductsWithBitwiseOptNoEX;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
