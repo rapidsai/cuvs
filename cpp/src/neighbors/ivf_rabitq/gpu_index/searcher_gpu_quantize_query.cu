@@ -27,7 +27,11 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-__global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKernelParams params)
+// Unified kernel template without BlockSort.
+// WithEx=true precomputes warp-level IP2 for all cluster vectors; WithEx=false uses only 1-bit
+// short codes.
+template <bool WithEx>
+__global__ void computeInnerProductsWithBitwise(const ComputeInnerProductsKernelParams params)
 {
   const int block_id = blockIdx.x;
   if (block_id >= params.num_pairs) return;
@@ -41,215 +45,119 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
   size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
   size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
 
-  // Shared memory layout
-  extern __shared__ __align__(256) char shared_mem_raw_2[];
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Allocate shared memory for candidates
-  float* shared_query       = reinterpret_cast<float*>(shared_mem_raw_2);
-  float* shared_ip2_results = shared_query + params.D;
-
-  for (size_t i = tid; i < params.D; i += num_threads) {
-    shared_query[i] = params.d_query[query_idx * params.D + i];
-  }
-  __syncthreads();
-
-  // Step 1: Warp-level IP2 computation for better memory coalescing
-  const int warp_id   = tid / raft::WarpSize;
-  const int lane_id   = tid % raft::WarpSize;
-  const int num_warps = num_threads / raft::WarpSize;
-
-  // Calculate long code parameters
-  const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-
-  // Each warp processes different candidates
-  for (int cand_idx = warp_id; cand_idx < num_vectors_in_cluster; cand_idx += num_warps) {
-    size_t global_vec_idx = cluster_start_index + cand_idx;
-
-    // Pointer to this vector's long code
-    const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-
-    // Warp-level IP2 computation
-    float ip2 = 0.0f;
-
-    // Each thread in warp processes different dimensions
-    for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
-      // Extract ex_bits value for this dimension
-      uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
-      float ex_val      = (float)code_val;
-      ip2 += shared_query[d] * ex_val;
-    }
-
-    // Warp-level reduction for ip2
-#pragma unroll
-    for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-      ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
-    }
-
-    // Lane 0 stores the result
-    if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-  }
-
-  __syncthreads();
-
-  // Step 2: Load float query and compute exact IPs for candidates
-
-  const size_t short_code_length = params.D / 32;
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-  float q_kbxsumq = params.d_G_kbxSumq[query_idx];
-
-  // Atomically get write position
-  __shared__ int probe_slot;
-  if (tid == 0) {
-    probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
-  }
-  __syncthreads();
-  // Calculate output offset
-  uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
-
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-    size_t vec_idx = vec_base + tid;
-    if (vec_idx >= num_vectors_in_cluster) break;
-
-    // Compute exact inner product with float query
-    float exact_ip = 0.0f;
-
-    // Process each uint32_t of the short code
-    for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-      // Access short code in transposed layout
-      size_t short_code_offset =
-        cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-      uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-      // Process each bit in the uint32_t
-      // Note: bit 31 is lowest dimension, bit 0 is highest
-#pragma unroll 8
-      for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-        size_t dim = uint32_idx * 32 + bit_idx;
-        if (dim < params.D) {
-          // Extract bit from MSB to LSB
-          int bit_position = 31 - bit_idx;
-          bool bit_value   = (short_code_chunk >> bit_position) & 0x1;
-
-          // If bit is 1, add the query value
-          if (bit_value) { exact_ip += shared_query[dim]; }
-        }
-      }
-    }
-
-    // Get pre-computed values
-    float ip2             = shared_ip2_results[vec_idx];
-    size_t global_vec_idx = cluster_start_index + vec_idx;
-
-    // vec load version
-    float2 ex_factors  = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-    float f_ex_add     = ex_factors.x;
-    float f_ex_rescale = ex_factors.y;
-
-    // Compute final distance using pre-computed ip2
-    float ex_dist =
-      f_ex_add + q_g_add +
-      f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * exact_ip + ip2 + q_kbxsumq);
-
-    // Write to global memory
-    params.d_topk_dists[output_offset + vec_idx] = ex_dist;
-    params.d_topk_pids[output_offset + vec_idx]  = params.d_pids[global_vec_idx];
-  }
-}
-
-__global__ void computeInnerProductsWithBitwiseOptNoEX(
-  const ComputeInnerProductsKernelParams params)
-{
-  const int block_id = blockIdx.x;
-  if (block_id >= params.num_pairs) return;
-
-  ClusterQueryPair pair = params.d_sorted_pairs[block_id];
-  int cluster_idx       = pair.cluster_idx;
-  int query_idx         = pair.query_idx;
-
-  if (cluster_idx >= params.num_centroids || query_idx >= params.num_queries) return;
-
-  size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
-  size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Shared memory layout
   extern __shared__ __align__(256) char shared_mem_raw[];
+  const int tid         = threadIdx.x;
+  const int num_threads = blockDim.x;
 
-  // Allocate shared memory for candidates
-  float* shared_query            = reinterpret_cast<float*>(shared_mem_raw);
-  const size_t short_code_length = params.D / 32;
-
+  float* shared_query = reinterpret_cast<float*>(shared_mem_raw);
   for (size_t i = tid; i < params.D; i += num_threads) {
     shared_query[i] = params.d_query[query_idx * params.D + i];
   }
   __syncthreads();
 
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+  if constexpr (WithEx) {
+    // Precompute warp-level IP2 for every vector, stored in shared memory
+    float* shared_ip2_results     = shared_query + params.D;
+    const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
+    const int warp_id             = tid / raft::WarpSize;
+    const int lane_id             = tid % raft::WarpSize;
+    const int num_warps           = num_threads / raft::WarpSize;
 
-  // Step 2: Load float query and compute exact IPs for candidates
+    for (int cand_idx = warp_id; cand_idx < num_vectors_in_cluster; cand_idx += num_warps) {
+      size_t global_vec_idx        = cluster_start_index + cand_idx;
+      const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
+      float ip2                    = 0.0f;
+      for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
+        ip2 += shared_query[d] * (float)extract_code(vec_long_code, d, params.ex_bits);
+      }
+#pragma unroll
+      for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
+        ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
+      }
+      if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
+    }
+    __syncthreads();
+  }
 
-  // Compute exact float inner products for all candidates
-  // Atomically get write position
+  const size_t short_code_length = params.D / 32;
+  float q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+
   __shared__ int probe_slot;
   if (tid == 0) {
     probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
   }
   __syncthreads();
-  // Calculate output offset
+
   uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
 
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-    size_t vec_idx = vec_base + tid;
-    if (vec_idx >= num_vectors_in_cluster) break;
+  if constexpr (WithEx) {
+    float* shared_ip2_results = shared_query + params.D;
+    float q_kbxsumq           = params.d_G_kbxSumq[query_idx];
 
-    size_t factor_offset  = cluster_start_index + vec_idx;
-    float3 factors        = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-    float f_add           = factors.x;
-    float f_rescale       = factors.y;
-    size_t global_vec_idx = cluster_start_index + vec_idx;
+    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
+      size_t vec_idx = vec_base + tid;
+      if (vec_idx >= num_vectors_in_cluster) break;
 
-    // Compute exact inner product with float query
-    float exact_ip = 0.0f;
-
-    // Process each uint32_t of the short code
-    for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-      // Access short code in transposed layout
-      size_t short_code_offset =
-        cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-      uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-      // Process each bit in the uint32_t
-      // Note: bit 31 is lowest dimension, bit 0 is highest
+      float exact_ip = 0.0f;
+      for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
+        size_t short_code_offset =
+          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
+        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
 #pragma unroll 8
-      for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-        size_t dim = uint32_idx * 32 + bit_idx;
-        if (dim < params.D) {
-          // Extract bit from MSB to LSB
-          int bit_position = 31 - bit_idx;
-          bool bit_value   = (short_code_chunk >> bit_position) & 0x1;
-
-          // If bit is 1, add the query value
-          if (bit_value) { exact_ip += shared_query[dim]; }
+        for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
+          size_t dim = uint32_idx * 32 + bit_idx;
+          if (dim < params.D) {
+            if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
+          }
         }
       }
-    }
 
-    // get final results
-    float final_1bit_dist = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
-    PID final_1bit_pid    = (uint32_t)params.d_pids[global_vec_idx];
-    // Write to global memory
-    params.d_topk_dists[output_offset + vec_idx] = final_1bit_dist;
-    params.d_topk_pids[output_offset + vec_idx]  = final_1bit_pid;
+      float ip2             = shared_ip2_results[vec_idx];
+      size_t global_vec_idx = cluster_start_index + vec_idx;
+      float2 ex_factors     = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
+      float f_ex_add        = ex_factors.x;
+      float f_ex_rescale    = ex_factors.y;
+
+      params.d_topk_dists[output_offset + vec_idx] =
+        f_ex_add + q_g_add +
+        f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * exact_ip + ip2 + q_kbxsumq);
+      params.d_topk_pids[output_offset + vec_idx] = params.d_pids[global_vec_idx];
+    }
+  } else {
+    float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+
+    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
+      size_t vec_idx = vec_base + tid;
+      if (vec_idx >= num_vectors_in_cluster) break;
+
+      size_t factor_offset = cluster_start_index + vec_idx;
+      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
+      float f_add          = factors.x;
+      float f_rescale      = factors.y;
+      size_t global_vec_idx = cluster_start_index + vec_idx;
+
+      float exact_ip = 0.0f;
+      for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
+        size_t short_code_offset =
+          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
+        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
+#pragma unroll 8
+        for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
+          size_t dim = uint32_idx * 32 + bit_idx;
+          if (dim < params.D) {
+            if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
+          }
+        }
+      }
+
+      params.d_topk_dists[output_offset + vec_idx] =
+        f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
+      params.d_topk_pids[output_offset + vec_idx] = params.d_pids[global_vec_idx];
+    }
   }
 }
 
-// Unified template replacing the four separate BlockSort kernels.
+// Unified kernel template using BlockSort.
 // NumBits=4 or 8; WithEx=true adds warp-level IP2 refinement with long codes.
 template <int NumBits, bool WithEx>
 __global__ void computeInnerProductsWithBitwiseBlockSort(
@@ -1051,7 +959,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   if (!use_4bit) {
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, true>
-                                   : computeInnerProductsWithBitwiseOpt;
+                                   : computeInnerProductsWithBitwise<true>;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
@@ -1059,7 +967,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
         kernel, shared_mem_size, kernel_launcher);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, false>
-                                   : computeInnerProductsWithBitwiseOptNoEX;
+                                   : computeInnerProductsWithBitwise<false>;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
@@ -1070,7 +978,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<4, true>
-                                   : computeInnerProductsWithBitwiseOpt;
+                                   : computeInnerProductsWithBitwise<true>;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
@@ -1078,7 +986,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
         kernel, shared_mem_size, kernel_launcher);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<4, false>
-                                   : computeInnerProductsWithBitwiseOptNoEX;
+                                   : computeInnerProductsWithBitwise<false>;
       auto const& kernel_launcher = [&](auto const& kernel) -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
