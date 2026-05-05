@@ -576,7 +576,7 @@
 - Vendor RAPIDS.cmake ([#816](https://github.com/rapidsai/cuvs/pull/816)) [@bdice](https://github.com/bdice)
 - Update libcuvs libraft ver to 25.06 in conda env ([#808](https://github.com/rapidsai/cuvs/pull/808)) [@jinsolp](https://github.com/jinsolp)
 - Moving NN Descent class and struct declarations to `nn_descent_gnnd.hpp` ([#803](https://github.com/rapidsai/cuvs/pull/803)) [@jinsolp](https://github.com/jinsolp)
-- Remove `[@rapidsai/cuvs-build-codeowners` ([#783](https://github.com/rapidsai/cuvs/pull/783)) @KyleFromNVIDIA](https://github.com/rapidsai/cuvs-build-codeowners` ([#783](https://github.com/rapidsai/cuvs/pull/783)) @KyleFromNVIDIA)
+- Remove @rapidsai/cuvs-build-codeowners ([#783](https://github.com/rapidsai/cuvs/pull/783)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
 - Moving wheel builds to specified location and uploading build artifacts to Github ([#777](https://github.com/rapidsai/cuvs/pull/777)) [@VenkateshJaya](https://github.com/VenkateshJaya)
 - Remove unused raft cagra header in add_nodes.cuh ([#741](https://github.com/rapidsai/cuvs/pull/741)) [@jiangyinzuo](https://github.com/jiangyinzuo)
 - Expose kmeans to python ([#729](https://github.com/rapidsai/cuvs/pull/729)) [@benfred](https://github.com/benfred)

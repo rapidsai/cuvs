@@ -1,6 +1,6 @@
 # Vector search indexes vs vector databases
 
-This guide provides information on the differences between vector search indexes and fully-fledged vector databases. For more information on selecting and configuring vector search indexes, please refer to our {doc}`guide on choosing and configuring indexes <choosing_and_configuring_indexes>`
+This guide provides information on the differences between vector search indexes and fully-fledged vector databases. For more information on selecting and configuring vector search indexes, please refer to our [guide on choosing and configuring indexes](choosing_and_configuring_indexes.md)
 
 One of the primary differences between vector database indexes and traditional database indexes is that vector search often uses approximations to trade-off accuracy of the results for speed. Because of this, while many mature databases offer mechanisms to tune their indexes and achieve better performance, vector database indexes can return completely garbage results if they aren’t tuned for a reasonable level of search quality in addition to performance tuning. This is because vector database indexes are more closely related to machine learning models than they are to traditional database indexes.
 
@@ -47,4 +47,4 @@ Unfortunately, for large datasets, doing a hyper-parameter optimization on the w
 
 Full hyper-parameter optimization may also not always be necessary- for example, once you have built a ground truth dataset on a subset, many times you can start by building an index with the default build parameters and then playing around with different search parameters until you get the desired quality and search performance.  For massive indexes that might be multiple terabytes, you could also take this subsampling of, say, 10M vectors, train an index and then tune the search parameters from there. While there might be a small margin of error, the chosen build/search parameters should generalize fairly well for the databases that build locally partitioned indexes.
 
-Refer to our {doc}`tuning guide <tuning_guide>` for more information and examples on how to efficiently and automatically tune your vector search indexes based on your needs.
+Refer to our [tuning guide](tuning_guide.md) for more information and examples on how to efficiently and automatically tune your vector search indexes based on your needs.

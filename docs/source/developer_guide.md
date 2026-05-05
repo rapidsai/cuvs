@@ -181,7 +181,7 @@ You can skip these checks with `git commit --no-verify` or with the short versio
 The following section describes some of the core pre-commit hooks used by the repository.
 See `.pre-commit-config.yaml` for a full list.
 
-C++/CUDA is formatted with [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html).
+C++/CUDA is formatted with [clang-format](https://clang.llvm.org/docs/ClangFormat.html).
 
 RAFT relies on `clang-format` to enforce code style across all C++ and CUDA source code. The coding style is based on the [Google style guide](https://google.github.io/styleguide/cppguide.html#Formatting). The only digressions from this style are the following.
 1. Do not split empty functions/records/namespaces.
@@ -189,7 +189,7 @@ RAFT relies on `clang-format` to enforce code style across all C++ and CUDA sour
 3. Disable reflowing of comments.
    The reasons behind these deviations from the Google style guide are given in comments [here](https://github.com/rapidsai/cuvs/blob/main/cpp/.clang-format).
 
-[`doxygen`](https://doxygen.nl/) is used as documentation generator and also as a documentation linter.
+[doxygen](https://doxygen.nl/) is used as documentation generator and also as a documentation linter.
 In order to run doxygen as a linter on C++/CUDA code, run
 
 ```bash

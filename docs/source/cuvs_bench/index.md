@@ -24,9 +24,9 @@ This tool offers several benefits, including
 
 - [Running the benchmarks](#running-the-benchmarks)
 
-  * `End-to-end: smaller-scale benchmarks (<1M to 10M)`_
+  * [End-to-end: smaller-scale benchmarks (<1M to 10M)](#end-to-end-smaller-scale-benchmarks-1m-to-10m)
 
-  * `End-to-end: large-scale benchmarks (>10M vectors)`_
+  * [End-to-end: large-scale benchmarks (>10M vectors)](#end-to-end-large-scale-benchmarks-10m-vectors)
 
   * [Running with Docker containers](#running-with-docker-containers)
 
@@ -68,7 +68,7 @@ conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
 
 The channel `rapidsai` can easily be substituted with `rapidsai-nightly` if nightly benchmarks are desired. The CPU package currently allows to run the HNSW benchmarks.
 
-Please see the {doc}`build instructions <build>` to build the benchmarks from source.
+Please see the [build instructions](build.md) to build the benchmarks from source.
 
 ### Docker
 
@@ -188,7 +188,7 @@ All other python commands mentioned below work as intended once the billion-scal
 
 To download billion-scale datasets, visit [big-ann-benchmarks](http://big-ann-benchmarks.com/neurips21.html)
 
-We also provide a new dataset called `wiki-all` containing 88 million 768-dimensional vectors. This dataset is meant for benchmarking a realistic retrieval-augmented generation (RAG)/LLM embedding size at scale. It also contains 1M and 10M vector subsets for smaller-scale experiments. See our {doc}`Wiki-all Dataset Guide <wiki_all_dataset>` for more information and to download the dataset.
+We also provide a new dataset called `wiki-all` containing 88 million 768-dimensional vectors. This dataset is meant for benchmarking a realistic retrieval-augmented generation (RAG)/LLM embedding size at scale. It also contains 1M and 10M vector subsets for smaller-scale experiments. See our [Wiki-all Dataset Guide](wiki_all_dataset.md) for more information and to download the dataset.
 
 
 The steps below demonstrate how to download, install, and run benchmarks on a subset of 100M vectors from the Yandex Deep-1B dataset. Please note that datasets of this scale are recommended for GPUs with larger amounts of memory, such as the A100 or H100.
@@ -468,7 +468,7 @@ The config above has 3 fields:
 2. `constraints` - Optional. Python import paths to functions that validate build and search parameter combinations (e.g. `cuvs_bench.config.algos.constraints.cuvs_cagra_build`). Each function returns `True` if the parameters are valid, `False` otherwise; invalid combinations are skipped and not benchmarked.
 3. `groups` - Run groups, each with a set of parameters. Each group defines a cross-product of all hyper-parameter fields for `build` and `search`.
 
-The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The {doc}`ANN Algorithm Parameter Tuning Guide <param_tuning>` contains detailed instructions on choosing build and search parameters for each supported algorithm.
+The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The [ANN Algorithm Parameter Tuning Guide](param_tuning.md) contains detailed instructions on choosing build and search parameters for each supported algorithm.
 
 ```{list-table}
 * - Library

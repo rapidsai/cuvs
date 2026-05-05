@@ -4,7 +4,7 @@
 
 CUDA 12 and a GPU with Volta architecture or later are required to run the benchmarks.
 
-Please refer to the  {doc}`installation docs <../build>` for the base requirements to build cuVS.
+Please refer to the  [installation docs](../build.md) for the base requirements to build cuVS.
 
 In addition to the base requirements for building cuVS, additional dependencies needed to build the ANN benchmarks include:
 

@@ -1,6 +1,6 @@
 # cuVS Bench Parameter Tuning Guide
 
-This guide outlines the various parameter settings that can be specified in {doc}`cuVS Benchmarks <index>` yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
+This guide outlines the various parameter settings that can be specified in [cuVS Benchmarks](index.md) yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
 
 ## Benchmark modes
 
@@ -8,7 +8,7 @@ When you run benchmarks with `BenchmarkOrchestrator.run_benchmark()`, you can ch
 
 **Sweep mode (default)**
 
-Pass `mode="sweep"` or omit `mode`. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see {doc}`Creating and customizing dataset configurations <index>`). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
+Pass `mode="sweep"` or omit `mode`. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see [Creating and customizing dataset configurations](index.md)). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
 
 **Tune mode**
 
@@ -148,7 +148,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
   - N
   - [`cluster`, `subspace`]
   - `subspace`
-  - Type of codebook. See {doc}`IVF-PQ index overview <../neighbors/ivfpq>` for more detail
+  - Type of codebook. See [IVF-PQ index overview](../neighbors/ivfpq.md) for more detail
 
 * - `dataset_memory_type`
   - `build`
@@ -363,7 +363,7 @@ To fine tune CAGRA index building we can customize IVF-PQ index builder options 
   - N
   - [`cluster`, `subspace`]
   - `subspace`
-  - Type of codebook. See {doc}`IVF-PQ index overview <../neighbors/ivfpq>` for more detail
+  - Type of codebook. See [IVF-PQ index overview](../neighbors/ivfpq.md) for more detail
 
 * - `ivf_pq_build_nprobe`
   - `search`

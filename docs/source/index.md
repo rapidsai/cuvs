@@ -1,6 +1,6 @@
 # cuVS: Vector Search and Clustering on the GPU
 
-Welcome to cuVS, the premier library for GPU-accelerated vector search and clustering! cuVS provides several core building blocks for constructing new algorithms, as well as end-to-end vector search and clustering algorithms for use either standalone or through a growing list of {doc}`integrations <integrations>`.
+Welcome to cuVS, the premier library for GPU-accelerated vector search and clustering! cuVS provides several core building blocks for constructing new algorithms, as well as end-to-end vector search and clustering algorithms for use either standalone or through a growing list of [integrations](integrations.md).
 
 ## Useful Resources
 

@@ -9,5 +9,5 @@ python_api.md
 rust_api/index.md
 ```
 
-* {ref}`genindex`
-* {ref}`search`
+* [Index](genindex.html)
+* [Search](search.html)

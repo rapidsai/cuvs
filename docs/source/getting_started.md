@@ -2,31 +2,31 @@
 
 - [New to vector search?](#new-to-vector-search)
 
-  * {doc}`Primer on vector search <choosing_and_configuring_indexes>`
+  * [Primer on vector search](choosing_and_configuring_indexes.md)
 
-  * {doc}`Vector search indexes vs vector databases <vector_databases_vs_vector_search>`
+  * [Vector search indexes vs vector databases](vector_databases_vs_vector_search.md)
 
-  * {doc}`Index tuning guide <tuning_guide>`
+  * [Index tuning guide](tuning_guide.md)
 
-  * {doc}`Comparing vector search index performance <comparing_indexes>`
+  * [Comparing vector search index performance](comparing_indexes.md)
 
 - [Supported indexes](#supported-indexes)
 
-  * {doc}`Vector search index guide <neighbors/neighbors>`
+  * [Vector search index guide](neighbors/neighbors.md)
 
 - [Using cuVS APIs](#using-cuvs-apis)
 
-  * {doc}`C API Docs <c_api>`
+  * [C API Docs](c_api.md)
 
-  * {doc}`C++ API Docs <cpp_api>`
+  * [C++ API Docs](cpp_api.md)
 
-  * {doc}`Python API Docs <python_api>`
+  * [Python API Docs](python_api.md)
 
-  * {doc}`Rust API Docs <rust_api/index>`
+  * [Rust API Docs](rust_api/index.md)
 
-  * {doc}`API basics <api_basics>`
+  * [API basics](api_basics.md)
 
-  * {doc}`API interoperability <api_interoperability>`
+  * [API interoperability](api_interoperability.md)
 
 - [Where to next?](#where-to-next)
 
@@ -40,9 +40,9 @@
 
 ## New to vector search?
 
-If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then {doc}`this primer on vector search guide <choosing_and_configuring_indexes>` should provide some good insight. Another good resource for the uninitiated is our {doc}`vector databases vs vector search <vector_databases_vs_vector_search>` guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results if not tuned correctly.
+If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then [this primer on vector search guide](choosing_and_configuring_indexes.md) should provide some good insight. Another good resource for the uninitiated is our [vector databases vs vector search](vector_databases_vs_vector_search.md) guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results if not tuned correctly.
 
-Fortunately, this opens up the whole world of hyperparameter optimization to improve vector search performance and quality. Please see our {doc}`index tuning guide <tuning_guide>` for more information.
+Fortunately, this opens up the whole world of hyperparameter optimization to improve vector search performance and quality. Please see our [index tuning guide](tuning_guide.md) for more information.
 
 When comparing the performance of vector search indexes, it is important that considerations are made with respect to three main dimensions:
 
@@ -50,20 +50,20 @@ When comparing the performance of vector search indexes, it is important that co
 1. Search quality
 1. Search performance
 
-Please see the {doc}`primer on comparing vector search index performance <comparing_indexes>` for more information on methodologies and how to make a fair apples-to-apples comparison during your evaluations.
+Please see the [primer on comparing vector search index performance](comparing_indexes.md) for more information on methodologies and how to make a fair apples-to-apples comparison during your evaluations.
 
 ## Supported indexes
 
-cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our {doc}`vector search index guide <neighbors/neighbors>` to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
+cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our [vector search index guide](neighbors/neighbors.md) to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
 
 The primary goal of cuVS is to enable speed, scale, and flexibility (in that order)- and one of the important value propositions is to enhance existing software deployments with extensible GPU capabilities to improve pain points while not interrupting parts of the system that work well today with CPU.
 
 
 ## Using cuVS APIs
 
-cuVS is a C++ library at its core, which is wrapped with a C library and exposed further through various different languages. cuVS currently provides APIs and documentation for {doc}`C <c_api>`, {doc}`C++ <cpp_api>`, {doc}`Python <python_api>`, and {doc}`Rust <rust_api/index>` with more languages in the works. our {doc}`API basics <api_basics>` provides some background and context about the important paradigms and vocabulary types you'll encounter when working with cuVS types.
+cuVS is a C++ library at its core, which is wrapped with a C library and exposed further through various different languages. cuVS currently provides APIs and documentation for [C](c_api.md), [C++](cpp_api.md), [Python](python_api.md), and [Rust](rust_api/index.md) with more languages in the works. our [API basics](api_basics.md) provides some background and context about the important paradigms and vocabulary types you'll encounter when working with cuVS types.
 
-Please refer to the {doc}`guide on API interoperability <api_interoperability>` for more information on how cuVS can work seamlessly with other libraries like numpy, cupy, tensorflow, and pytorch, even without having to copy device memory.
+Please refer to the [guide on API interoperability](api_interoperability.md) for more information on how cuVS can work seamlessly with other libraries like numpy, cupy, tensorflow, and pytorch, even without having to copy device memory.
 
 
 ## Where to next?

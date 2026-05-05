@@ -40,7 +40,7 @@ The orchestrator calls the config loader's **load()** method with the same argum
 
 - **List[BenchmarkConfig]** – Each **BenchmarkConfig** has:
   - **indexes**: a list of **IndexConfig**. Each **IndexConfig** has `name` (e.g. `"my_algo.param1value"`), `algo` (algorithm name), `build_param` (dict of build parameters), `search_params` (list of dicts, one per search parameter combination to benchmark), and `file` (path or identifier where the index is stored).
-  - **backend_config**: a dict passed to the backend constructor (e.g. `executable_path` for C++, or `host`, `port`, `index_name` for a network backend). The backend receives this as its `config` in `__init__`.
+  - **backend_config**: a dict passed to the backend constructor (e.g. `executable_path` for C++, or `host`, `port`, `index_name` for a network backend). The backend receives this as its `config[in](#in)_init__`.
 
 The following shows how to construct a minimal `DatasetConfig` and one `BenchmarkConfig` (one index, one search param set) so the backend runs a single build and search configuration:
 
@@ -213,7 +213,7 @@ register_config_loader("elasticsearch", ElasticsearchConfigLoader)
 get_registry().register("elasticsearch", ElasticsearchBackend)
 ```
 
-The built-in **CppGoogleBenchmarkBackend** (`backend_type="cpp_gbench"`) is one such pair: **CppGBenchConfigLoader** reads the YAML under `config/datasets` and `config/algos`, expands the Cartesian product, and validates with the constraint functions; the backend runs the C++ benchmark executables and merges results. Adding a new C++ algorithm (see {doc}`index`) only adds another executable and config for this backend; it does not add a new backend.
+The built-in **CppGoogleBenchmarkBackend** (`backend_type="cpp_gbench"`) is one such pair: **CppGBenchConfigLoader** reads the YAML under `config/datasets` and `config/algos`, expands the Cartesian product, and validates with the constraint functions; the backend runs the C++ benchmark executables and merges results. Adding a new C++ algorithm (see [index](index.md)) only adds another executable and config for this backend; it does not add a new backend.
 
 ## Components at a glance
 

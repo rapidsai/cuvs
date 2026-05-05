@@ -1,20 +1,20 @@
 # Vamana
 
-VAMANA is the underlying graph construction algorithm used to construct indexes for the DiskANN vector search solution. DiskANN and the Vamana algorithm are described in detail in the `published paper <https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf>`, and a highly optimized `open-source repository <https://github.com/microsoft/DiskANN>`  includes many features for index construction and search. In cuVS, we provide a version of the Vamana algorithm optimized for GPU architectures to accelreate graph construction to build DiskANN idnexes. At a high level, the Vamana algorithm operates as follows:
+VAMANA is the underlying graph construction algorithm used to construct indexes for the DiskANN vector search solution. DiskANN and the Vamana algorithm are described in detail in the [published paper](https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf), and a highly optimized [open-source repository](https://github.com/microsoft/DiskANN) includes many features for index construction and search. In cuVS, we provide a version of the Vamana algorithm optimized for GPU architectures to accelreate graph construction to build DiskANN idnexes. At a high level, the Vamana algorithm operates as follows:
 
 * 1. Starting with an empty graph, select a medoid vector from the D-dimension vector dataset and insert it into the graph.
 * 2. Iteratively insert batches of dataset vectors into the graph, connecting each inserted vector to neighbors based on a graph traversal.
 * 3. For each batch, create reverse edges and prune unnecessary edges.
 
-There are many algorithmic details that are outlined in the `paper <https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf>`, and many GPU-specific optimizations are included in this implementation.
+There are many algorithmic details that are outlined in the [paper](https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf), and many GPU-specific optimizations are included in this implementation.
 
-The current implementation of DiskANN in cuVS only includes the 'in-memory' graph construction and a serialization step that writes the index to a file. This index file can be then used by the `open-source DiskANN <https://github.com/microsoft/DiskANN>` library to perform efficient search. Additional DiskANN functionality, including GPU-accelerated search and 'ssd' index build are planned for future cuVS releases.
+The current implementation of DiskANN in cuVS only includes the 'in-memory' graph construction and a serialization step that writes the index to a file. This index file can be then used by the [open-source DiskANN](https://github.com/microsoft/DiskANN) library to perform efficient search. Additional DiskANN functionality, including GPU-accelerated search and 'ssd' index build are planned for future cuVS releases.
 
-[ {doc}`C++ API <../cpp_api/neighbors_vamana>` ]
+[C++ API](../cpp_api/neighbors_vamana.md)
 
 ## Interoperability with CPU DiskANN
 
-The 'vamana::serialize' API calls writes the index to a file with a format that is compatible with the `open-source DiskANN repositoriy <https://github.com/microsoft/DiskANN>`. This allows cuVS to be used to accelerate index construction while leveraging the efficient CPU-based search currently available.
+The 'vamana::serialize' API calls writes the index to a file with a format that is compatible with the [open-source DiskANN repositoriy](https://github.com/microsoft/DiskANN). This allows cuVS to be used to accelerate index construction while leveraging the efficient CPU-based search currently available.
 
 ## Configuration parameters
 

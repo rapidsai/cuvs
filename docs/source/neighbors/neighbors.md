@@ -14,6 +14,6 @@ all_neighbors.md
 
 # Indices and tables
 
-* {ref}`genindex`
-* {ref}`modindex`
-* {ref}`search`
+* [Index](genindex.html)
+* [Module Index](py-modindex.html)
+* [Search](search.html)

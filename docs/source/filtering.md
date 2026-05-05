@@ -11,13 +11,13 @@ some computation from calculating distances.
 A bitset is an array of bits where each bit can have two possible values: `0` and `1`, which signify in the context of filtering whether
 a sample should be filtered or not. `0` means that the corresponding vector will be filtered, and will therefore not be present in the results of the search.
 This mechanism is optimized to take as little memory space as possible, and is available through the RAFT library
-(check out RAFT's `bitset API documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitset/>`). When calling a search function of an ANN index, the
+(check out RAFT's [bitset API documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitset/)). When calling a search function of an ANN index, the
 bitset length should match the number of vectors present in the database.
 
 ## Bitmap
 
 A bitmap is based on the same principle as a bitset, but in two dimensions. This allows users to provide a different bitset for each query
-being searched. Check out RAFT's `bitmap API documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitmap/>`.
+being searched. Check out RAFT's [bitmap API documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitmap/).
 
 ## Examples
 
@@ -106,4 +106,3 @@ brute_force::search(res,
                     distances.view(),
                     bitmap_filter);
 ```
-

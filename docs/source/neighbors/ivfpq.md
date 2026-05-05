@@ -8,7 +8,7 @@ Often a strategy called refinement reranking is employed to make up for the lost
 `k` than desired and performing a reordering and reduction to `k` based on the distances from the unquantized vectors. Unfortunately,
 this does mean that the unquantized raw vectors need to be available and often this can be done efficiently using multiple CPU threads.
 
-[ {doc}`C API <../c_api/neighbors_ivf_pq_c>` | {doc}`C++ API <../cpp_api/neighbors_ivf_pq>` | {doc}`Python API <../python_api/neighbors_ivf_pq>` | {doc}`Rust API <../rust_api/index>` ]
+[C API](../c_api/neighbors_ivf_pq_c.md) | [C++ API](../cpp_api/neighbors_ivf_pq.md) | [Python API](../python_api/neighbors_ivf_pq.md) | [Rust API](../rust_api/index.md)
 
 
 ## Configuration parameters

@@ -13,7 +13,7 @@ IVF-Flat tends to be a great choice when
 in the index, and
 2. exact recall is not needed. as with the other index types, the tuning parameters are used to trade-off recall for search latency / throughput.
 
-[ {doc}`C API <../c_api/neighbors_ivf_flat_c>` | {doc}`C++ API <../cpp_api/neighbors_ivf_flat>` | {doc}`Python API <../python_api/neighbors_ivf_flat>` | {doc}`Rust API <../rust_api/index>` ]
+[C API](../c_api/neighbors_ivf_flat_c.md) | [C++ API](../cpp_api/neighbors_ivf_flat.md) | [Python API](../python_api/neighbors_ivf_flat.md) | [Rust API](../rust_api/index.md)
 
 ## Filtering considerations
 

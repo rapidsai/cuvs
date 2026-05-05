@@ -2,7 +2,7 @@
 
 # Comparing performance of vector indexes
 
-This document provides a brief overview methodology for comparing vector search indexes and models. For guidance on how to choose and configure an index type, please refer to {doc}`this <vector_databases_vs_vector_search>` guide.
+This document provides a brief overview methodology for comparing vector search indexes and models. For guidance on how to choose and configure an index type, please refer to [this](vector_databases_vs_vector_search.md) guide.
 
 Unlike traditional database indexes, which will generally return correct results even without performance tuning, vector search indexes are more closely related to ML models and they can return absolutely garbage results if they have not been tuned.
 
@@ -52,4 +52,4 @@ It turns out that most vector databases, like Milvus for example, make many smal
 
 Please note, however, that there are often caps on the size of each of these smaller indexes, and that needs to be taken into consideration when choosing the size of the sub sample to tune.
 
-Please see {doc}`this guide <tuning_guide>` for more information on the steps one would take to do this subsampling and tuning process.
+Please see [this guide](tuning_guide.md) for more information on the steps one would take to do this subsampling and tuning process.
