@@ -5,14 +5,15 @@
 
 #pragma once
 
+#include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/core/logger.hpp>
 
 #include <stdint.h>
 #include <sys/stat.h>
 
 #include <cassert>
 #include <fstream>
-#include <iostream>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
@@ -37,10 +38,7 @@ bool file_exits(const char* filename)
 template <typename T, class M>
 void load_vecs(const char* filename, M& Mat)
 {
-  if (!file_exits(filename)) {
-    std::cerr << "File " << filename << " not exists\n";
-    abort();
-  }
+  RAFT_EXPECTS(file_exits(filename), "File %s not exists", filename);
 
   static_assert(std::is_same_v<T, typename M::element_type>, "T must match M::element_type");
 
@@ -61,8 +59,8 @@ void load_vecs(const char* filename, M& Mat)
     input.read((char*)&Mat(i, 0), sizeof(T) * cols);
   }
 
-  std::cout << "File " << filename << " loaded\n";
-  std::cout << "Rows " << rows << " Cols " << cols << '\n' << std::flush;
+  RAFT_LOG_DEBUG("File %s loaded", filename);
+  RAFT_LOG_DEBUG("Rows %zu Cols %zu", rows, cols);
   input.close();
 }
 
@@ -71,10 +69,7 @@ template <typename T, class M>
 void load_vecs_k(const char* filename, M& Mat, size_t k)
 {
   static_assert(std::is_same_v<T, typename M::element_type>, "T must match M::element_type");
-  if (!file_exits(filename)) {
-    std::cerr << "File " << filename << " not exists\n";
-    std::abort();
-  }
+  RAFT_EXPECTS(file_exits(filename), "File %s not exists", filename);
 
   uint32_t tmp;
   size_t file_size = get_filesize(filename);
@@ -106,8 +101,8 @@ void load_vecs_k(const char* filename, M& Mat, size_t k)
     }
   }
 
-  std::cout << "File " << filename << " loaded\n";
-  std::cout << "Rows " << rows * k << " Cols " << cols << '\n' << std::flush;
+  RAFT_LOG_DEBUG("File %s loaded", filename);
+  RAFT_LOG_DEBUG("Rows %zu Cols %zu", rows * k, cols);
   input.close();
 }
 

@@ -57,9 +57,9 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
   __syncthreads();
 
   // Step 1: Warp-level IP2 computation for better memory coalescing
-  const int warp_id   = tid / WARP_SIZE;
-  const int lane_id   = tid % WARP_SIZE;
-  const int num_warps = num_threads / WARP_SIZE;
+  const int warp_id   = tid / raft::WarpSize;
+  const int lane_id   = tid % raft::WarpSize;
+  const int num_warps = num_threads / raft::WarpSize;
 
   // Calculate long code parameters
   const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
@@ -75,7 +75,7 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
     float ip2 = 0.0f;
 
     // Each thread in warp processes different dimensions
-    for (uint32_t d = lane_id; d < params.D; d += WARP_SIZE) {
+    for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
       // Extract ex_bits value for this dimension
       uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
       float ex_val      = (float)code_val;
@@ -84,7 +84,7 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
 
     // Warp-level reduction for ip2
 #pragma unroll
-    for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
+    for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
       ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
     }
 
@@ -417,7 +417,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
     __shared__ int probe_slot;
     {
       using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-        flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+        flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
       block_sort_t queue(params.topk);
 
       float q_kbxsumq = params.d_G_kbxSumq[query_idx];
@@ -430,9 +430,9 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
       // Reuse shared_candidate_dists to store IP2 results
       float* shared_ip2_results = reinterpret_cast<float*>(shared_mem_raw_2);
 
-      const int warp_id   = tid / WARP_SIZE;
-      const int lane_id   = tid % WARP_SIZE;
-      const int num_warps = num_threads / WARP_SIZE;
+      const int warp_id   = tid / raft::WarpSize;
+      const int lane_id   = tid % raft::WarpSize;
+      const int num_warps = num_threads / raft::WarpSize;
 
       // Each warp processes different candidates
       for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
@@ -445,7 +445,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
         float ip2 = 0.0f;
 
         // Each thread in warp processes different dimensions
-        for (uint32_t d = lane_id; d < params.D; d += WARP_SIZE) {
+        for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
           // Extract ex_bits value for this dimension
           uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
           float ex_val      = (float)code_val;
@@ -454,7 +454,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
 
         // Warp-level reduction for ip2
 #pragma unroll
-        for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
+        for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
           ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
         }
 
@@ -675,7 +675,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort(
 
   if (num_candidates > 0) {
     using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+      flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
     block_sort_t queue(params.topk);
 
     for (size_t i = tid; i < params.D; i += num_threads) {
@@ -960,7 +960,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
     __shared__ int probe_slot;
     {
       using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-        flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+        flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
       block_sort_t queue(params.topk);
 
       // Additional shared values needed for Step 3
@@ -974,9 +974,9 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
       // Reuse shared_candidate_dists to store IP2 results
       float* shared_ip2_results = reinterpret_cast<float*>(shared_mem_raw_2);
 
-      const int warp_id   = tid / WARP_SIZE;
-      const int lane_id   = tid % WARP_SIZE;
-      const int num_warps = num_threads / WARP_SIZE;
+      const int warp_id   = tid / raft::WarpSize;
+      const int lane_id   = tid % raft::WarpSize;
+      const int num_warps = num_threads / raft::WarpSize;
 
       // Each warp processes different candidates
       for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
@@ -989,7 +989,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
         float ip2 = 0.0f;
 
         // Each thread in warp processes different dimensions
-        for (uint32_t d = lane_id; d < params.D; d += WARP_SIZE) {
+        for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
           // Extract ex_bits value for this dimension
           uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
           float ex_val      = (float)code_val;
@@ -998,7 +998,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
 
         // Warp-level reduction for ip2
 #pragma unroll
-        for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
+        for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
           ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
         }
 
@@ -1215,7 +1215,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort(
 
   if (num_candidates > 0) {
     using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+      flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
     block_sort_t queue(params.topk);
 
     for (size_t i = tid; i < params.D; i += num_threads) {
@@ -1666,7 +1666,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 {
   // check if the inner products kernel should use block sort to keep a top-k priority queue vs.
   // outputting distances from all vectors in probed clusters
-  const bool use_block_sort{topk <= MAX_TOP_K_BLOCK_SORT};
+  const bool use_block_sort{topk <= kMaxTopKBlockSort};
 
   // query quantize
   const int num_bits  = use_4bit ? 4 : 8;  // Choose bit width
@@ -1814,7 +1814,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   size_t query_storage = D * sizeof(float);  // For shared query vector
   const int queue_buffer_smem_bytes =
     use_block_sort ? raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(
-                       blockDim / WARP_SIZE, MAX_TOP_K_BLOCK_SORT)
+                       blockDim / raft::WarpSize, kMaxTopKBlockSort)
                    : 0;
 
   // Now we need: packed query bits, candidate storage, and query vector

@@ -7,9 +7,9 @@
 // Created by Stardust on 2/23/25.
 //
 
-#include "../utils/tools.hpp"
 #include "ivf_gpu.cuh"
 #include "searcher_gpu.cuh"
+#include <raft/util/integer_utils.hpp>
 
 #include <raft/core/cublas_macros.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -36,7 +36,7 @@ IVFGPU::IVFGPU(raft::resources const& handle, size_t n, size_t dim, size_t k, si
   : handle_(handle),
     num_vectors(n),
     num_dimensions(dim),
-    num_padded_dim(rd_up_to_multiple_of(dim, 64)),
+    num_padded_dim(raft::round_up_safe<size_t>(dim, 64)),
     num_centroids(k),
     ex_bits(bits_per_dim - 1),
     initializer(nullptr),
@@ -98,7 +98,7 @@ void IVFGPU::load_transposed(const char* filename)
   input.read(reinterpret_cast<char*>(&this->num_vectors), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->num_dimensions), sizeof(size_t));
   // Compute padded dimension.
-  this->num_padded_dim = rd_up_to_multiple_of(this->num_dimensions, 64);
+  this->num_padded_dim = raft::round_up_safe<size_t>(this->num_dimensions, 64);
   input.read(reinterpret_cast<char*>(&this->num_centroids), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->ex_bits), sizeof(size_t));
 

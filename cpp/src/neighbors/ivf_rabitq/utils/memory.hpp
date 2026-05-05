@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "tools.hpp"
+#include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
@@ -22,7 +22,7 @@ namespace memory {
 template <size_t alignment, class T, bool HUGE_PAGE = false>
 inline T* align_mm(size_t nbytes)
 {
-  size_t size = rd_up_to_multiple_of(nbytes, alignment);
+  size_t size = raft::round_up_safe<size_t>(nbytes, alignment);
   void* p     = std::aligned_alloc(alignment, size);
   if (HUGE_PAGE) { madvise(p, nbytes, MADV_HUGEPAGE); }
   std::memset(p, 0, size);

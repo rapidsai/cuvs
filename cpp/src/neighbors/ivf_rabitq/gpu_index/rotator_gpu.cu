@@ -16,18 +16,14 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
+#include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim) : handle_(handle)
 {
-  // keep track of cuda stream
-  // Compute padded dimension
-  // A padding function that rounds up to a multiple of 64.
-  auto rd_up_to_multiple_of = [](uint32_t dim, uint32_t mult) -> size_t {
-    return ((dim + mult - 1) / mult) * mult;
-  };
-  D = rd_up_to_multiple_of(dim, 64);
+  // Compute padded dimension (round up to multiple of 64)
+  D = raft::round_up_safe<uint32_t>(dim, 64u);
   // Create a random matrix (size D x D)
   rotation_matrix_ = raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, D, D);
   raft::random::RngState rng(7ULL);
@@ -77,7 +73,6 @@ void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const
       const_cast<float*>(rotation_matrix_.data_handle()), D, D),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_A), D, N),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(d_RAND_A, D, N));
-  raft::resource::sync_stream(handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

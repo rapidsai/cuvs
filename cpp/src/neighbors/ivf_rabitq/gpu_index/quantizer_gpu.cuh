@@ -10,8 +10,8 @@
 #pragma once
 
 #include "../defines.hpp"
-#include "../utils/tools.hpp"
 #include "rotator_gpu.cuh"
+#include <raft/util/integer_utils.hpp>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
@@ -49,7 +49,7 @@ class DataQuantizerGPU {
   // Constructor: initialize from dimension and bit count.
   explicit DataQuantizerGPU(raft::resources const& handle, size_t dim, size_t b)
     : DIM(dim),
-      D(rd_up_to_multiple_of(dim, 64)),
+      D(raft::round_up_safe<size_t>(dim, 64)),
       EX_BITS(b),
       SHORT_CODE_LENGTH((D + 31) / 32),
       LONG_CODE_LENGTH(D * EX_BITS / 8)  // Simplified for now.
@@ -74,7 +74,7 @@ class DataQuantizerGPU {
     // 3 factors for batch: f_add, f_rescale and f_error are stored separately
     return SHORT_CODE_LENGTH * sizeof(uint32_t);
   }
-  size_t num_blocks(size_t num) const { return div_rd_up(num, FAST_SIZE); }
+  size_t num_blocks(size_t num) const { return raft::div_rounding_up_safe<size_t>(num, FAST_SIZE); }
   static constexpr size_t num_short_factors() { return NUM_SHORT_FACTORS; }
   const FastQuantizeFactors* get_query_scaling_factor() const { return &fast_quantize_factors; }
   FastQuantizeFactors* get_query_scaling_factor() { return &fast_quantize_factors; }

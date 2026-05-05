@@ -9,6 +9,8 @@
 
 #include "searcher_gpu.cuh"
 
+#include <raft/util/cuda_dev_essentials.cuh>
+
 #include <cstdint>
 #include <cuda_runtime.h>
 
@@ -17,7 +19,6 @@ namespace {
 
 static constexpr int BITS_PER_CHUNK = 4;
 static constexpr int LUT_SIZE       = (1 << BITS_PER_CHUNK);  // 16
-static constexpr int WARP_SIZE      = 32;
 
 // --- Tunables ---
 using T    = float;

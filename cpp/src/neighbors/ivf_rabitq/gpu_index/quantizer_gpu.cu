@@ -7,6 +7,7 @@
 // Created by Stardust on 3/10/25.
 //
 
+#include "../../detail/smem_utils.cuh"
 #include "quantizer_gpu.cuh"
 
 #include <curand_kernel.h>
@@ -29,8 +30,6 @@
 #include <thread>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
-
-#define MAX_D 2048
 
 namespace {
 
@@ -378,7 +377,6 @@ __global__ void exrabitq_fused_kernel_batch(
   for (int j = tid; j < D; j += BlockSize) {
     s_xp_norm[j] = d_XP_norm[row * D + j];
   }
-  __syncthreads();
 
   //=========================================================================
   // Part A: ExRaBitQ Code Generation
@@ -394,13 +392,11 @@ __global__ void exrabitq_fused_kernel_batch(
     s_tmp_code[j] = static_cast<uint8_t>(code_val);
     thread_ipnorm_sum += (code_val + 0.5f) * val;
   }
-  __syncthreads();
 
   // Parallel bit-flipping
   for (int j = tid; j < D; j += BlockSize) {
     if (d_bin_XP[row * D + j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
   }
-  __syncthreads();
 
   // Finish ip_norm reduction
   float total_ipnorm = blockReduceSumdup(thread_ipnorm_sum);
@@ -1172,8 +1168,6 @@ __global__ void exrabitq_fused_kernel_batch_ori(
                                   (s_xp_norm + D),  // Reused as workspace
                                   BlockSize);
 
-  __syncthreads();
-
   //=========================================================================
   // Part A: ExRaBitQ Code Generation
   //=========================================================================
@@ -1188,13 +1182,11 @@ __global__ void exrabitq_fused_kernel_batch_ori(
     s_tmp_code[j] = static_cast<uint8_t>(code_val);
     thread_ipnorm_sum += (code_val + 0.5f) * val;
   }
-  __syncthreads();
 
   // Parallel bit-flipping
   for (int j = tid; j < D; j += BlockSize) {
     if (d_bin_XP[row * D + j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
   }
-  __syncthreads();
 
   // Finish ip_norm reduction
   float total_ipnorm = blockReduceSumdup(thread_ipnorm_sum);
@@ -1420,13 +1412,14 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
                             ) *
                            sizeof(float);
 
-  RAFT_CUDA_TRY(cudaFuncSetAttribute(
-    fully_fused_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
-
-  unsigned long long seed = time(nullptr);
-  // Launch fully fused kernel
-  fully_fused_kernel<<<kConstNum, block_size, shared_mem_size, stream_>>>(
-    d_factors.data(), kConstNum, dim, ex_bits, seed);
+  unsigned long long seed     = time(nullptr);
+  auto kernel_fn              = fully_fused_kernel;  // decay to function pointer for std::atomic
+  auto const& kernel_launcher = [&](auto const& kernel) {
+    kernel<<<kConstNum, block_size, shared_mem_size, stream_>>>(
+      d_factors.data(), kConstNum, dim, ex_bits, seed);
+  };
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+    kernel_fn, static_cast<uint32_t>(shared_mem_size), kernel_launcher);
   RAFT_CUDA_TRY(cudaGetLastError());
 
   // Use CUB for reduction - handles any size optimally
