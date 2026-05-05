@@ -38,16 +38,22 @@ void minClusterAndDistanceCompute(
                   metric == cuvs::distance::DistanceType::CosineExpanded;
 
   if (is_fused) {
-    L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-    auto centroidsNorm =
-      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
-
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, centroids, centroidsNorm, raft::sqrt_op{});
+    const DataT* centroidsNorm_ptr = nullptr;
+    if (precomputed_centroid_norms.has_value()) {
+      centroidsNorm_ptr = precomputed_centroid_norms->data_handle();
     } else {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, centroids, centroidsNorm);
+      L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
+      auto centroidsNorm =
+        raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
+
+      if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centroids, centroidsNorm, raft::sqrt_op{});
+      } else {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centroids, centroidsNorm);
+      }
+      centroidsNorm_ptr = centroidsNorm.data_handle();
     }
 
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
@@ -60,7 +66,7 @@ void minClusterAndDistanceCompute(
       X.data_handle(),
       centroids.data_handle(),
       L2NormX.data_handle(),
-      centroidsNorm.data_handle(),
+      centroidsNorm_ptr,
       n_samples,
       n_clusters,
       n_features,
@@ -193,23 +199,29 @@ void minClusterDistanceCompute(
   raft::matrix::fill(handle, minClusterDistance, std::numeric_limits<DataT>::max());
 
   if (is_fused) {
-    L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-    auto centroidsNorm =
-      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
-
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        raft::make_device_matrix_view<const DataT, IndexT>(
-          centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
-        centroidsNorm,
-        raft::sqrt_op{});
+    const DataT* centroidsNorm_ptr = nullptr;
+    if (precomputed_centroid_norms.has_value()) {
+      centroidsNorm_ptr = precomputed_centroid_norms->data_handle();
     } else {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        raft::make_device_matrix_view<const DataT, IndexT>(
-          centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
-        centroidsNorm);
+      L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
+      auto centroidsNorm =
+        raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
+
+      if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const DataT, IndexT>(
+            centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+          centroidsNorm,
+          raft::sqrt_op{});
+      } else {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const DataT, IndexT>(
+            centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+          centroidsNorm);
+      }
+      centroidsNorm_ptr = centroidsNorm.data_handle();
     }
 
     workspace.resize(sizeof(int) * n_samples, stream);
@@ -219,7 +231,7 @@ void minClusterDistanceCompute(
       X.data_handle(),
       centroids.data_handle(),
       L2NormX.data_handle(),
-      centroidsNorm.data_handle(),
+      centroidsNorm_ptr,
       n_samples,
       n_clusters,
       n_features,

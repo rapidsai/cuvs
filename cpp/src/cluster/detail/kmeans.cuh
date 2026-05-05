@@ -700,13 +700,33 @@ void kmeans_fit(
 
   cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> data_batches(
     X.data_handle(), n_samples, n_features, streaming_batch_size, stream);
-  // Only materialize weight batches when weights are provided; otherwise we
-  // never touch this iterator (and never dereference a null-pointer batch).
+  // Host-path weight batches: only materialized when weights are provided and
+  // the data resides on host
   std::optional<cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT>> weight_batches;
-  if (weight_ptr != nullptr) {
-    weight_batches.emplace(weight_ptr, n_samples, 1, streaming_batch_size, stream);
-  } else {
+  if constexpr (!data_on_device) {
+    if (weight_ptr != nullptr) {
+      weight_batches.emplace(weight_ptr, n_samples, 1, streaming_batch_size, stream);
+    } else {
+      raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1});
+    }
+  } else if (weight_ptr == nullptr) {
     raft::matrix::fill(handle, batch_weights_buf.view(), DataT{1});
+  }
+
+  std::optional<raft::device_vector<DataT, IndexT>> prenormalized_weights;
+  if constexpr (data_on_device) {
+    if (weight_ptr != nullptr) {
+      prenormalized_weights.emplace(
+        raft::make_device_vector<DataT, IndexT>(handle, n_samples));
+      const DataT* d_wt_sum_ptr = d_wt_sum.data_handle();
+      raft::linalg::map(
+        handle,
+        prenormalized_weights->view(),
+        [n_samples, d_wt_sum_ptr] __device__(DataT w) {
+          return w * static_cast<DataT>(n_samples) / *d_wt_sum_ptr;
+        },
+        sample_weight.value());
+    }
   }
 
   // Copies and rescales `wt_data` into `batch_weights_buf` so that weights
@@ -727,6 +747,20 @@ void kmeans_fit(
     }
     return raft::make_device_vector_view<const DataT, IndexT>(batch_weights_buf.data_handle(),
                                                               cur_batch_size);
+  };
+
+  // Returns the weights view to feed into `process_batch` / `cluster_cost`
+  // for the current batch. On the device path this is a sub-range of the
+  // pre-normalized buffer; on the host path it delegates to `prepare_batch_weights`.
+  auto cur_batch_weights = [&](IndexT batch_offset, const DataT* wt_data, IndexT cur_batch_size) {
+    if constexpr (data_on_device) {
+      const DataT* base = prenormalized_weights.has_value()
+                            ? prenormalized_weights->data_handle() + batch_offset
+                            : batch_weights_buf.data_handle();
+      return raft::make_device_vector_view<const DataT, IndexT>(base, cur_batch_size);
+    } else {
+      return prepare_batch_weights(wt_data, cur_batch_size);
+    }
   };
 
   RAFT_LOG_DEBUG(
@@ -829,7 +863,8 @@ void kmeans_fit(
 
         auto batch_data_view = raft::make_device_matrix_view<const DataT, IndexT>(
           data_batch.data(), cur_batch_size, n_features);
-        auto batch_weights_view = prepare_batch_weights(wt_data, cur_batch_size);
+        auto batch_weights_view =
+          cur_batch_weights(static_cast<IndexT>(data_batch.offset()), wt_data, cur_batch_size);
 
         auto minCAD_view = raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
           minClusterAndDistance.data_handle(), cur_batch_size);
@@ -931,7 +966,10 @@ void kmeans_fit(
           data_batch.data(), cur_batch_size, n_features);
 
         std::optional<raft::device_vector_view<const DataT, IndexT>> batch_sw = std::nullopt;
-        if (weight_ptr != nullptr) { batch_sw = prepare_batch_weights(wt_data, cur_batch_size); }
+        if (weight_ptr != nullptr) {
+          batch_sw =
+            cur_batch_weights(static_cast<IndexT>(data_batch.offset()), wt_data, cur_batch_size);
+        }
 
         DataT batch_cost = DataT{0};
         cuvs::cluster::kmeans::cluster_cost(handle,
