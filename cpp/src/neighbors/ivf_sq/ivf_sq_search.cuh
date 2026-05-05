@@ -155,14 +155,12 @@ void launch_kernel(const index<CodeT>& idx,
   constexpr int kThreads          = kSqScanThreads;
   uint32_t dim                    = idx.dim();
 
-  // The scan entrypoint is templated only on (Capacity, Ascending). Metric
-  // specialization is composed in at link time via four device-function
-  // fragments (setup_invariant_smem, setup_per_probe_smem,
-  // accumulate_distance, finalize_distance).
-  constexpr bool kAscending = !std::is_same_v<MetricTag, tag_metric_ip>;
-
+  // The scan entrypoint is templated only on Capacity. The warpsort runs
+  // ascending for all metrics; metric specialization is composed in at link
+  // time via four device-function fragments (setup_invariant_smem,
+  // setup_per_probe_smem, accumulate_distance, finalize_distance).
   IvfSqScanPlanner kernel_planner;
-  kernel_planner.add_entrypoint<Capacity, kAscending>();
+  kernel_planner.add_entrypoint<Capacity>();
   kernel_planner.add_setup_invariant_smem_function<MetricTag>();
   kernel_planner.add_setup_per_probe_smem_function<MetricTag>();
   kernel_planner.add_accumulate_distance_function<MetricTag>();
@@ -348,7 +346,6 @@ void search_impl(raft::resources const& handle,
                  uint32_t n_queries,
                  uint32_t k,
                  uint32_t n_probes,
-                 bool select_min,
                  int64_t* neighbors,
                  float* distances,
                  rmm::device_async_resource_ref search_mr,
@@ -356,6 +353,13 @@ void search_impl(raft::resources const& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
   auto dim    = index.dim();
+
+  // The scan kernel emits min-close distances for every metric (IP scores are
+  // negated by finalize_distance and undone by postprocess_distances below),
+  // so all scan-related top-k selections use select_min = true. Only the
+  // coarse search, which runs on the raw GEMM output, follows the metric's
+  // native direction.
+  const bool coarse_select_min = cuvs::distance::is_min_close(index.metric());
 
   std::size_t n_queries_probes = std::size_t(n_queries) * std::size_t(n_probes);
 
@@ -467,7 +471,7 @@ void search_impl(raft::resources const& handle,
     raft::make_device_matrix_view<float, int64_t>(coarse_distances_dev.data(), n_queries, n_probes),
     raft::make_device_matrix_view<uint32_t, int64_t>(
       coarse_indices_dev.data(), n_queries, n_probes),
-    select_min);
+    coarse_select_min);
 
   rmm::device_uvector<uint32_t> num_samples(n_queries, stream, search_mr);
   rmm::device_uvector<uint32_t> chunk_index(n_queries_probes, stream, search_mr);
@@ -563,7 +567,7 @@ void search_impl(raft::resources const& handle,
         raft::make_device_matrix_view<const uint32_t, int64_t>(indices_tmp.data(), n_queries, cols),
         raft::make_device_matrix_view<float, int64_t>(distances, n_queries, k),
         raft::make_device_matrix_view<uint32_t, int64_t>(neighbors_uint32_ptr, n_queries, k),
-        select_min);
+        /*select_min=*/true);
     }
   } else {
     // --- Fallback: materialize all distances ---
@@ -577,12 +581,10 @@ void search_impl(raft::resources const& handle,
     rmm::device_uvector<uint32_t> all_indices(
       std::size_t(n_queries) * max_samples, stream, search_mr);
 
-    float init_val =
-      select_min ? std::numeric_limits<float>::max() : std::numeric_limits<float>::lowest();
     thrust::fill_n(raft::resource::get_thrust_policy(handle),
                    all_distances.data(),
                    std::size_t(n_queries) * max_samples,
-                   init_val);
+                   std::numeric_limits<float>::max());
     thrust::fill_n(raft::resource::get_thrust_policy(handle),
                    all_indices.data(),
                    std::size_t(n_queries) * max_samples,
@@ -618,14 +620,19 @@ void search_impl(raft::resources const& handle,
         all_indices.data(), n_queries, max_samples),
       raft::make_device_matrix_view<float, int64_t>(distances, n_queries, k),
       raft::make_device_matrix_view<uint32_t, int64_t>(neighbors_uint32_ptr, n_queries, k),
-      select_min,
+      /*select_min=*/true,
       false,
       cuvs::selection::SelectAlgo::kAuto,
       num_samples_view);
   }
 
+  // For IP, the kernel returned negated scores so the warpsort could run
+  // ascending; postprocess_distances multiplies by -1 to restore the public
+  // contract (positive inner products). Cosine distance is already min-close
+  // so it must not be flipped (account_for_max_close = false for cosine).
+  const bool account_for_max_close = index.metric() != cuvs::distance::DistanceType::CosineExpanded;
   ivf::detail::postprocess_distances(
-    handle, distances, distances, index.metric(), n_queries, k, 1.0, false);
+    handle, distances, distances, index.metric(), n_queries, k, 1.0, account_for_max_close);
 
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32_ptr,
@@ -707,7 +714,6 @@ inline void search_with_filtering(raft::resources const& handle,
                                             queries_batch,
                                             k,
                                             n_probes,
-                                            cuvs::distance::is_min_close(index.metric()),
                                             neighbors + std::size_t(offset_q) * k,
                                             distances + std::size_t(offset_q) * k,
                                             raft::resource::get_workspace_resource_ref(handle),

@@ -8,8 +8,7 @@
 
 namespace {
 
-constexpr int capacity   = @capacity@;
-constexpr bool ascending = @ascending_value@;
+constexpr int capacity = @capacity@;
 
 }  // namespace
 
@@ -36,25 +35,25 @@ extern "C" __global__ __launch_bounds__(kSqScanThreads) void ivf_sq_scan(
   int64_t bitset_len,
   int64_t original_nbits)
 {
-  ivf_sq_scan_impl<capacity, ascending>(data_ptrs,
-                                        list_sizes,
-                                        coarse_indices,
-                                        queries_float,
-                                        centers,
-                                        sq_vmin,
-                                        sq_delta,
-                                        query_norms,
-                                        n_probes,
-                                        dim,
-                                        k,
-                                        max_samples,
-                                        chunk_indices,
-                                        out_distances,
-                                        out_indices,
-                                        inds_ptrs,
-                                        bitset_ptr,
-                                        bitset_len,
-                                        original_nbits);
+  ivf_sq_scan_impl<capacity>(data_ptrs,
+                             list_sizes,
+                             coarse_indices,
+                             queries_float,
+                             centers,
+                             sq_vmin,
+                             sq_delta,
+                             query_norms,
+                             n_probes,
+                             dim,
+                             k,
+                             max_samples,
+                             chunk_indices,
+                             out_distances,
+                             out_indices,
+                             inds_ptrs,
+                             bitset_ptr,
+                             bitset_len,
+                             original_nbits);
 }
 
 static_assert(std::is_same_v<decltype(ivf_sq_scan), ivf_sq_scan_func_t<int64_t>>);

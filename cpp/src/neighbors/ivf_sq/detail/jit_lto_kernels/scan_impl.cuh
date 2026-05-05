@@ -23,23 +23,27 @@ namespace cuvs::neighbors::ivf_sq::detail {
 // block_sort type selection: dispatch the dummy block sort when Capacity == 0
 // so the same impl body works for both the fused top-k path (Capacity > 0) and
 // the materialize-all path (Capacity == 0).
-template <int Capacity, bool Ascending>
+//
+// All metrics are min-close after finalize_distance (IP is negated; cosine
+// returns 1 - cos_sim; L2 is squared L2), so the warpsort is hardcoded to
+// ascending.
+template <int Capacity>
 struct sq_block_sort {
   using type = raft::matrix::detail::select::warpsort::block_sort<
     raft::matrix::detail::select::warpsort::warp_sort_filtered,
     Capacity,
-    Ascending,
+    /*Ascending=*/true,
     float,
     uint32_t>;
 };
 
-template <bool Ascending>
-struct sq_block_sort<0, Ascending> {
-  using type = ivf::detail::dummy_block_sort_t<float, uint32_t, Ascending>;
+template <>
+struct sq_block_sort<0> {
+  using type = ivf::detail::dummy_block_sort_t<float, uint32_t, /*Ascending=*/true>;
 };
 
-template <int Capacity, bool Ascending>
-using sq_block_sort_t = typename sq_block_sort<Capacity, Ascending>::type;
+template <int Capacity>
+using sq_block_sort_t = typename sq_block_sort<Capacity>::type;
 
 // IVF-SQ scan kernel body with fused in-kernel top-k.
 //
@@ -49,11 +53,14 @@ using sq_block_sort_t = typename sq_block_sort<Capacity, Ascending>::type;
 //   - setup_invariant_smem  (Phase 1, once per query)
 //   - setup_per_probe_smem  (Phase 2, once per probe)
 //   - accumulate_distance   (per-element, inner unrolled loop)
-//   - finalize_distance     (per-row, after the dim accumulation)
+//   - finalize_distance     (per-row, after the dim accumulation; ensures
+//                            all metrics are min-close so the warpsort
+//                            epilogue and the host select_k can be
+//                            hardcoded to ascending / select-min)
 //
-// The host launcher (ivf_sq_search.cuh) derives Ascending from the metric
-// (Ascending = !is_ip) and registers the matching metric variant of each
-// fragment with the planner.
+// The host launcher (ivf_sq_search.cuh) registers the matching metric
+// variant of each fragment with the planner. IP scores are negated by
+// finalize_distance and undone by postprocess_distances.
 //
 // Grid layout:
 //   kManageLocalTopK (Capacity > 0):
@@ -79,7 +86,7 @@ using sq_block_sort_t = typename sq_block_sort<Capacity, Ascending>::type;
 //     Reconstructed vector component: s_aux[d] + code*s_sq_scale[d].
 //
 //   After all probes are scanned, the smem is reused for block_sort merge.
-template <int Capacity, bool Ascending>
+template <int Capacity>
 __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs,
                                                  const uint32_t* list_sizes,
                                                  const uint32_t* coarse_indices,
@@ -133,7 +140,7 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
   setup_invariant_smem(dim, query, sq_vmin, s_aux, s_query_term);
   __syncthreads();
 
-  using local_topk_t = sq_block_sort_t<Capacity, Ascending>;
+  using local_topk_t = sq_block_sort_t<Capacity>;
   local_topk_t queue(k);
 
   const uint32_t* my_coarse = coarse_indices + query_ix * n_probes;

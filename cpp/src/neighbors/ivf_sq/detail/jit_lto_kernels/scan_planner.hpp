@@ -18,10 +18,10 @@ struct IvfSqScanPlanner : AlgorithmPlanner {
 
   IvfSqScanPlanner() : AlgorithmPlanner("ivf_sq_scan", launcher_jit_cache) {}
 
-  template <int Capacity, bool Ascending>
+  template <int Capacity>
   void add_entrypoint()
   {
-    this->add_static_fragment<fragment_tag_ivf_sq_scan<Capacity, Ascending>>();
+    this->add_static_fragment<fragment_tag_ivf_sq_scan<Capacity>>();
   }
 
   template <typename FilterTag>

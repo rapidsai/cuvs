@@ -11,9 +11,11 @@ struct tag_metric_l2 {};
 struct tag_metric_ip {};
 struct tag_metric_cosine {};
 
-// Scan entrypoint fragment. Templated only on (Capacity, Ascending). The
-// metric specialization lives in the four device-function fragments below.
-template <int Capacity, bool Ascending>
+// Scan entrypoint fragment. Templated only on Capacity. The warpsort runs
+// ascending for all metrics; metric specialization lives in the four
+// device-function fragments below (finalize_distance is responsible for
+// returning a min-close value).
+template <int Capacity>
 struct fragment_tag_ivf_sq_scan {};
 
 template <typename FilterTag>
