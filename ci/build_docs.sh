@@ -30,7 +30,4 @@ rapids-logger "Install Fern CLI"
 npm install -g fern-api
 
 rapids-logger "Validate Fern docs"
-pushd fern
-fern check --warnings --strict-broken-links
-fern docs md check
-popd
+fern/build_docs.sh check

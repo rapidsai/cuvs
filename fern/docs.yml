@@ -11,6 +11,9 @@ colors:
   accent-primary:
     light: "#76B900"
     dark: "#A4E600"
+check:
+  rules:
+    broken-links: "error"
 layout:
   content-width: "760px"
 navbar-links:

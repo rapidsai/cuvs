@@ -29,7 +29,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    rust             - build the cuvs Rust bindings
    go               - build the cuvs Go bindings
    java             - build the cuvs Java bindings
-   docs             - validate the Fern documentation
+   docs             - run the Fern documentation build script
    tests            - build the tests
    bench-ann        - build end-to-end ann benchmarks
    examples         - build the examples
@@ -62,6 +62,8 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
                                  to speedup the build process.
    --time                      - Enable nvcc compilation time logging into cpp/build/nvcc_compile_log.csv.
                                  Results can be interpreted with cpp/scripts/analyze_nvcc_log.py
+   FERN_DOCS_MODE=<mode>       - mode passed to fern/build_docs.sh for the docs target
+                                 (check, preview, publish, or dev; defaults to check)
    -h                          - print this text
 
  default action (no args) is to build libcuvs, tests and cuvs targets
@@ -534,13 +536,7 @@ export RAPIDS_VERSION_MAJOR_MINOR
 
 if hasArg docs; then
     set -x
-    cd "${FERN_DOCS_DIR}"
-    if ! command -v fern >/dev/null 2>&1; then
-        echo "The Fern CLI is required. Install it with: npm install -g fern-api"
-        exit 1
-    fi
-    fern check --warnings --strict-broken-links
-    fern docs md check
+    "${FERN_DOCS_DIR}/build_docs.sh" "${FERN_DOCS_MODE:-check}"
 fi
 
 ################################################################################

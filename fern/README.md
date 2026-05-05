@@ -4,11 +4,10 @@ The cuVS documentation lives in this Fern project. Pages are in `fern/pages`, an
 
 ## Preview locally
 
-Install the Fern CLI and start the docs server:
+Start the local preview server from the repository root:
 
 ```bash
-npm install -g fern-api
-fern docs dev
+fern/build_docs.sh dev
 ```
 
 Fern serves the local preview at `http://localhost:3000` by default.
@@ -18,14 +17,19 @@ Fern serves the local preview at `http://localhost:3000` by default.
 Run Fern's checks before publishing changes:
 
 ```bash
-fern check --warnings --strict-broken-links
-fern docs md check
+fern/build_docs.sh check
 ```
 
 ## Publish
 
+Create a Fern preview deployment:
+
+```bash
+fern/build_docs.sh preview
+```
+
 Publish to the instance configured in `fern/docs.yml` with:
 
 ```bash
-fern generate --docs
+fern/build_docs.sh publish
 ```
