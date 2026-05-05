@@ -73,9 +73,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
         }
       }
 
-      const auto norm2 =
-        cuvs::neighbors::cagra::detail::compute_distance_base<DataT, IndexT, DistanceT>(
-          args_load, seed_index, valid_i, team_size_bits);
+      const auto norm2 = cuvs::neighbors::cagra::detail::compute_distance<DataT, IndexT, DistanceT>(
+        args_load, seed_index, valid_i, team_size_bits);
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;
@@ -168,8 +167,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
 
     const auto per_thread =
       (child_id != invalid_index)
-        ? cuvs::neighbors::cagra::detail::
-            compute_distance_per_thread_base<DataT, IndexT, DistanceT>(args, child_id)
+        ? cuvs::neighbors::cagra::detail::compute_distance_per_thread<DataT, IndexT, DistanceT>(
+            args, child_id)
         : (lead_lane ? raft::upper_bound<DistanceT>() : 0);
     const DistanceT child_dist = device::team_sum(per_thread, team_size_bits);
     __syncwarp();

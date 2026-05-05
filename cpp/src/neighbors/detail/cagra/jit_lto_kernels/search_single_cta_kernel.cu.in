@@ -8,6 +8,9 @@
 
 namespace {
 
+constexpr bool k_topk_by_bitonic_sort               = @topk_by_bitonic_sort@;
+constexpr bool k_bitonic_sort_and_merge_multi_warps = @bitonic_sort_and_merge_multi_warps@;
+
 using data_t         = @data_type@;
 using index_t        = @index_type@;
 using distance_t     = @distance_type@;
@@ -48,34 +51,37 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_single_cta(
   const index_t graph_size,
   cagra_bitset_t bitset)
 {
-  single_cta_search::
-    search_kernel_jit<@topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@, data_t, index_t, distance_t, source_index_t>(
-      topk_indices_ptr,
-      topk_distances_ptr,
-      topk,
-      queries_ptr,
-      knn_graph,
-      graph_degree,
-      source_indices_ptr,
-      num_distilation,
-      rand_xor_mask,
-      seed_ptr,
-      num_seeds,
-      visited_hashmap_ptr,
-      max_candidates,
-      max_itopk,
-      internal_topk,
-      search_width,
-      min_iteration,
-      max_iteration,
-      num_executed_iterations,
-      hash_bitlen,
-      small_hash_bitlen,
-      small_hash_reset_interval,
-      query_id_offset,
-      dataset_desc,
-      graph_size,
-      bitset);
+  single_cta_search::search_kernel_jit<k_topk_by_bitonic_sort,
+                                       k_bitonic_sort_and_merge_multi_warps,
+                                       data_t,
+                                       index_t,
+                                       distance_t,
+                                       source_index_t>(topk_indices_ptr,
+                                                       topk_distances_ptr,
+                                                       topk,
+                                                       queries_ptr,
+                                                       knn_graph,
+                                                       graph_degree,
+                                                       source_indices_ptr,
+                                                       num_distilation,
+                                                       rand_xor_mask,
+                                                       seed_ptr,
+                                                       num_seeds,
+                                                       visited_hashmap_ptr,
+                                                       max_candidates,
+                                                       max_itopk,
+                                                       internal_topk,
+                                                       search_width,
+                                                       min_iteration,
+                                                       max_iteration,
+                                                       num_executed_iterations,
+                                                       hash_bitlen,
+                                                       small_hash_bitlen,
+                                                       small_hash_reset_interval,
+                                                       query_id_offset,
+                                                       dataset_desc,
+                                                       graph_size,
+                                                       bitset);
 }
 
 static_assert(

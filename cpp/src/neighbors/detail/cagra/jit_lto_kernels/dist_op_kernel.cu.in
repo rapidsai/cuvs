@@ -7,10 +7,14 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/dist_op_impl.cuh>
 
-namespace cuvs::neighbors::cagra::detail {
+namespace {
 
 using query_t    = @query_type@;
 using distance_t = @distance_type@;
+
+}  // namespace
+
+namespace cuvs::neighbors::cagra::detail {
 
 template <>
 __device__ distance_t dist_op<query_t, distance_t>(query_t a, query_t b)

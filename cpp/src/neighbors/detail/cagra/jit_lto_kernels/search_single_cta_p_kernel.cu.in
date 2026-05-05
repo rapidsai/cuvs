@@ -10,6 +10,9 @@ namespace scta_jit = cuvs::neighbors::cagra::detail::single_cta_search;
 
 namespace {
 
+constexpr bool k_topk_by_bitonic_sort               = @topk_by_bitonic_sort@;
+constexpr bool k_bitonic_sort_and_merge_multi_warps = @bitonic_sort_and_merge_multi_warps@;
+
 using data_t         = @data_type@;
 using index_t        = @index_type@;
 using distance_t     = @distance_type@;
@@ -50,31 +53,35 @@ extern "C" __global__ __launch_bounds__(1024, 1) void search_single_cta_p(
   const dataset_desc_base* dataset_desc,
   cagra_bitset_t bitset)
 {
-  search_single_cta_p_impl<@topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@, data_t, index_t, distance_t, source_index_t>(
-    worker_handles,
-    job_descriptors,
-    completion_counters,
-    knn_graph,
-    graph_degree,
-    source_indices_ptr,
-    num_distilation,
-    rand_xor_mask,
-    seed_ptr,
-    num_seeds,
-    visited_hashmap_ptr,
-    max_candidates,
-    max_itopk,
-    internal_topk,
-    search_width,
-    min_iteration,
-    max_iteration,
-    num_executed_iterations,
-    hash_bitlen,
-    small_hash_bitlen,
-    small_hash_reset_interval,
-    query_id_offset,
-    dataset_desc,
-    bitset);
+  search_single_cta_p_impl<k_topk_by_bitonic_sort,
+                           k_bitonic_sort_and_merge_multi_warps,
+                           data_t,
+                           index_t,
+                           distance_t,
+                           source_index_t>(worker_handles,
+                                           job_descriptors,
+                                           completion_counters,
+                                           knn_graph,
+                                           graph_degree,
+                                           source_indices_ptr,
+                                           num_distilation,
+                                           rand_xor_mask,
+                                           seed_ptr,
+                                           num_seeds,
+                                           visited_hashmap_ptr,
+                                           max_candidates,
+                                           max_itopk,
+                                           internal_topk,
+                                           search_width,
+                                           min_iteration,
+                                           max_iteration,
+                                           num_executed_iterations,
+                                           hash_bitlen,
+                                           small_hash_bitlen,
+                                           small_hash_reset_interval,
+                                           query_id_offset,
+                                           dataset_desc,
+                                           bitset);
 }
 
 static_assert(

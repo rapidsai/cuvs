@@ -47,7 +47,7 @@ __device__ void random_pickup_kernel_jit(
   extern __shared__ uint8_t smem[];
 
   auto smem_desc =
-    setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+    setup_workspace<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
   __syncthreads();
 
   IndexT dataset_size            = smem_desc->size;
@@ -66,7 +66,7 @@ __device__ void random_pickup_kernel_jit(
     }
 
     const auto norm2 =
-      compute_distance_base<DataT, IndexT, DistanceT>(args_load, seed_index, true, team_size_bits);
+      compute_distance<DataT, IndexT, DistanceT>(args_load, seed_index, true, team_size_bits);
 
     if (norm2 < best_norm2_team_local) {
       best_norm2_team_local = norm2;
@@ -121,7 +121,7 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
 
   extern __shared__ uint8_t smem[];
   auto smem_desc =
-    setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, query_ptr, query_id);
+    setup_workspace<DataT, IndexT, DistanceT>(dataset_desc, smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -148,7 +148,7 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
     team_size, visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
 
   const auto args  = smem_desc->args.load();
-  DISTANCE_T norm2 = compute_distance_base<DataT, IndexT, DistanceT>(
+  DISTANCE_T norm2 = compute_distance<DataT, IndexT, DistanceT>(
     args, static_cast<INDEX_T>(child_id), compute_distance_flag, team_size_bits);
 
   if (compute_distance_flag) {

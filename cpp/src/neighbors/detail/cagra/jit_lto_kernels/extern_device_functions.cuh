@@ -27,18 +27,18 @@ extern __device__ DistanceT apply_normalization_standard(
   IndexT dataset_index);
 
 template <typename DataT, typename IndexT, typename DistanceT>
-extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_base(
+extern __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*, void*, const DataT*, uint32_t);
 
 template <typename DataT, typename IndexT, typename DistanceT>
-extern __device__ DistanceT compute_distance_base(
-  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-  IndexT dataset_index,
-  bool valid,
-  uint32_t team_size_bits);
+extern __device__ DistanceT
+compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+                 IndexT dataset_index,
+                 bool valid,
+                 uint32_t team_size_bits);
 
 template <typename DataT, typename IndexT, typename DistanceT>
-extern __device__ DistanceT compute_distance_per_thread_base(
+extern __device__ DistanceT compute_distance_per_thread(
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t, IndexT);
 }  // namespace cuvs::neighbors::cagra::detail
 

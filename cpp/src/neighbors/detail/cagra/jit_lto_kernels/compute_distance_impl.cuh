@@ -15,11 +15,12 @@
 #include "device_memory_ops.hpp"
 
 #include <raft/util/integer_utils.hpp>
+#include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DescriptorT>
-RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
+RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker_impl(
   const typename DescriptorT::DATA_T* __restrict__ dataset_ptr,
   uint32_t dim,
   uint32_t query_smem_ptr) -> typename DescriptorT::DISTANCE_T
@@ -65,11 +66,11 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
 }
 
 template <typename DescriptorT>
-_RAFT_DEVICE __noinline__ auto compute_distance_standard(
+_RAFT_DEVICE __noinline__ auto compute_distance_standard_impl(
   const typename DescriptorT::args_t args, const typename DescriptorT::INDEX_T dataset_index) ->
   typename DescriptorT::DISTANCE_T
 {
-  auto distance = compute_distance_standard_worker<DescriptorT>(
+  auto distance = compute_distance_standard_worker_impl<DescriptorT>(
     DescriptorT::ptr(args) + (static_cast<std::uint64_t>(DescriptorT::ld(args)) * dataset_index),
     args.dim,
     args.smem_ws_ptr);
@@ -86,7 +87,7 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
 }
 
 template <typename DescriptorT>
-_RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
+_RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
   const uint8_t* __restrict__ dataset_ptr,
   const typename DescriptorT::CODE_BOOK_T* __restrict__ vq_code_book_ptr,
   uint32_t dim,
@@ -194,7 +195,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
 }
 
 template <typename DescriptorT>
-_RAFT_DEVICE __noinline__ auto compute_distance_vpq(
+_RAFT_DEVICE __noinline__ auto compute_distance_vpq_impl(
   const typename DescriptorT::args_t args, const typename DescriptorT::INDEX_T dataset_index) ->
   typename DescriptorT::DISTANCE_T
 {
@@ -203,7 +204,7 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
     (static_cast<std::uint64_t>(DescriptorT::encoded_dataset_dim(args)) * dataset_index);
   uint32_t vq_code;
   device::ldg_cg(vq_code, reinterpret_cast<const std::uint32_t*>(dataset_ptr));
-  return compute_distance_vpq_worker<DescriptorT>(
+  return compute_distance_vpq_worker_impl<DescriptorT>(
     dataset_ptr,
     DescriptorT::vq_code_book_ptr(args) + args.dim * vq_code,
     args.dim,
@@ -219,14 +220,14 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT>
-__device__ DistanceT
-compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-                 IndexT dataset_index)
+__device__ DistanceT compute_distance_impl(
+  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+  IndexT dataset_index)
 {
   if constexpr (PQ_BITS == 0 && PQ_LEN == 0 && std::is_same_v<CodebookT, void>) {
     using desc_t =
       standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, QueryT>;
-    return compute_distance_standard<desc_t>(args, dataset_index);
+    return compute_distance_standard_impl<desc_t>(args, dataset_index);
   } else if constexpr (PQ_BITS > 0 && PQ_LEN > 0 && std::is_same_v<CodebookT, half> &&
                        std::is_same_v<QueryT, half>) {
     using desc_t = cagra_q_dataset_descriptor_t<TeamSize,
@@ -238,11 +239,12 @@ compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, Distanc
                                                 IndexT,
                                                 DistanceT,
                                                 QueryT>;
-    return compute_distance_vpq<desc_t>(args, dataset_index);
+    return compute_distance_vpq_impl<desc_t>(args, dataset_index);
   } else {
-    static_assert(
-      sizeof(TeamSize) == 0,
-      "compute_distance: unsupported PQ_BITS/PQ_LEN/CodebookT/QueryT for CAGRA JIT descriptor");
+    static_assert(sizeof(TeamSize) == 0,
+                  "compute_distance_impl: unsupported PQ_BITS/PQ_LEN/CodebookT/QueryT for CAGRA "
+                  "JIT descriptor");
+    return DistanceT{};
   }
 }
 

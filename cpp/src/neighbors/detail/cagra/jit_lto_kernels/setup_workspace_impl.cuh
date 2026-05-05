@@ -12,10 +12,12 @@
 #include "../compute_distance_vpq.hpp"
 #include "device_memory_ops.hpp"
 
+#include <type_traits>
+
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DescriptorT>
-_RAFT_DEVICE __noinline__ auto setup_workspace_standard(
+_RAFT_DEVICE __noinline__ auto setup_workspace_standard_impl(
   const DescriptorT* that,
   void* smem_ptr,
   const typename DescriptorT::DATA_T* queries_ptr,
@@ -71,10 +73,11 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto transpose(T x) -> T
 }
 
 template <typename DescriptorT>
-_RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
-                                                   void* smem_ptr,
-                                                   const typename DescriptorT::DATA_T* queries_ptr,
-                                                   uint32_t query_id) -> const DescriptorT*
+_RAFT_DEVICE __noinline__ auto setup_workspace_vpq_impl(
+  const DescriptorT* that,
+  void* smem_ptr,
+  const typename DescriptorT::DATA_T* queries_ptr,
+  uint32_t query_id) -> const DescriptorT*
 {
   using QUERY_T                   = typename DescriptorT::QUERY_T;
   using CODE_BOOK_T               = typename DescriptorT::CODE_BOOK_T;
@@ -150,7 +153,7 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT>
-__device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
+__device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_impl(
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
   void* smem,
   const DataT* queries,
@@ -161,7 +164,7 @@ __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_work
       standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, QueryT>;
     const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
 
-    const desc_t* result = setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
+    const desc_t* result = setup_workspace_standard_impl<desc_t>(desc, smem, queries, query_id);
     return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
   } else if constexpr (PQ_BITS > 0 && PQ_LEN > 0 && std::is_same_v<CodebookT, half> &&
                        std::is_same_v<QueryT, half>) {
@@ -176,11 +179,13 @@ __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_work
                                                       QueryT>;
     const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
 
-    const desc_t* result = setup_workspace_vpq<desc_t>(desc, smem, queries, query_id);
+    const desc_t* result = setup_workspace_vpq_impl<desc_t>(desc, smem, queries, query_id);
     return static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result);
   } else {
-    static_assert(sizeof(DataT) == 0,
-                  "setup_workspace: unsupported PQ_BITS/PQ_LEN/CodebookT/QueryT for CAGRA JIT");
+    static_assert(
+      sizeof(DataT) == 0,
+      "setup_workspace_impl: unsupported PQ_BITS/PQ_LEN/CodebookT/QueryT for CAGRA JIT");
+    return nullptr;
   }
 }
 

@@ -11,16 +11,20 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/sample_filter_impl.cuh>
 
+namespace {
+
+using source_index_t = @source_index_type@;
+
+}  // namespace
+
 namespace cuvs::neighbors::detail {
 
-using SourceIndexT = @source_index_type@;
-
 template <>
-__device__ bool sample_filter<SourceIndexT>(uint32_t query_id,
-                                            SourceIndexT node_id,
-                                            void* filter_data)
+__device__ bool sample_filter<source_index_t>(uint32_t query_id,
+                                              source_index_t node_id,
+                                              void* filter_data)
 {
-  return sample_filter_@filter_name@_impl<SourceIndexT>(query_id, node_id, filter_data);
+  return sample_filter_@filter_name@_impl<source_index_t>(query_id, node_id, filter_data);
 }
 
 }  // namespace cuvs::neighbors::detail
