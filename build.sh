@@ -29,7 +29,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    rust             - build the cuvs Rust bindings
    go               - build the cuvs Go bindings
    java             - build the cuvs Java bindings
-   docs             - build the documentation
+   docs             - validate the Fern documentation
    tests            - build the tests
    bench-ann        - build end-to-end ann benchmarks
    examples         - build the examples
@@ -67,8 +67,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
  default action (no args) is to build libcuvs, tests and cuvs targets
 "
 LIBCUVS_BUILD_DIR=${LIBCUVS_BUILD_DIR:=${REPODIR}/cpp/build}
-SPHINX_BUILD_DIR=${REPODIR}/docs
-DOXYGEN_BUILD_DIR=${REPODIR}/cpp/doxygen
+FERN_DOCS_DIR=${REPODIR}/fern
 PYTHON_BUILD_DIR=${REPODIR}/python/cuvs/_skbuild
 RUST_BUILD_DIR=${REPODIR}/rust/target
 JAVA_BUILD_DIR=${REPODIR}/java/cuvs-java/target
@@ -371,7 +370,7 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
     COMPILE_LIBRARY=ON
     if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
         CMAKE_TARGET+=("cuvs")
@@ -535,13 +534,13 @@ export RAPIDS_VERSION_MAJOR_MINOR
 
 if hasArg docs; then
     set -x
-    cd "${DOXYGEN_BUILD_DIR}"
-    doxygen Doxyfile
-    cd "${SPHINX_BUILD_DIR}"
-    make html
-    cd "${REPODIR}"/rust
-    cargo doc -p cuvs --no-deps
-    rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/build/html/_static/rust
+    cd "${FERN_DOCS_DIR}"
+    if ! command -v fern >/dev/null 2>&1; then
+        echo "The Fern CLI is required. Install it with: npm install -g fern-api"
+        exit 1
+    fi
+    fern check --warnings --strict-broken-links
+    fern docs md check
 fi
 
 ################################################################################

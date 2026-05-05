@@ -1,0 +1,59 @@
+# IVF-PQ
+
+The IVF-PQ method is an ANN algorithm. Like IVF-Flat, IVF-PQ splits the points into a number of clusters (also specified by a parameter called n_lists) and searches the closest clusters to compute the nearest neighbors (also specified by a parameter called n_probes), but it shrinks the sizes of the vectors using a technique called product quantization.
+
+`#include <cuvs/neighbors/ivf_pq.hpp>`
+
+namespace *cuvs::neighbors::ivf_pq*
+
+## Index build parameters
+
+> **Generated API group:** `ivf_pq_cpp_index_params`
+>
+> project:  cuvs; members; content-only.
+
+## Index search parameters
+
+> **Generated API group:** `ivf_pq_cpp_search_params`
+>
+> project:  cuvs; members; content-only.
+
+## Index
+
+> **Generated API group:** `ivf_pq_cpp_index`
+>
+> project:  cuvs; members; content-only.
+
+## Index build
+
+> **Generated API group:** `ivf_pq_cpp_index_build`
+>
+> project:  cuvs; members; content-only.
+
+## Index extend
+
+> **Generated API group:** `ivf_pq_cpp_index_extend`
+>
+> project:  cuvs; members; content-only.
+
+## Index search
+
+> **Generated API group:** `ivf_pq_cpp_index_search`
+>
+> project:  cuvs; members; content-only.
+
+## Index serialize
+
+> **Generated API group:** `ivf_pq_cpp_serialize`
+>
+> project:  cuvs; members; content-only.
+
+## Helper Methods
+
+Additional helper functions for manipulating the underlying data of an IVF-PQ index, unpacking records, and writing PQ codes into an existing IVF list.
+
+namespace *cuvs::neighbors::ivf_pq::helpers*
+
+> **Generated API group:** `ivf_pq_cpp_helpers`
+>
+> project:  cuvs; members; content-only.
