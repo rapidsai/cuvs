@@ -765,9 +765,9 @@ void kmeans_fit(
 
   bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
                             metric == cuvs::distance::DistanceType::L2SqrtExpanded;
-  bool use_norm_cache = need_compute_norms && !data_on_device;
-  auto h_norm_cache =
-    raft::make_pinned_vector<DataT, IndexT>(handle, use_norm_cache ? n_samples : 0);
+  auto h_norm_cache = raft::make_pinned_vector<DataT, IndexT>(
+    handle, (need_compute_norms && !data_on_device) ? n_samples : 0);
+  bool norms_cached = false;
 
   auto compute_batch_norms = [&](const DataT* batch_ptr, IndexT batch_size) {
     auto batch_view =
@@ -867,18 +867,18 @@ void kmeans_fit(
 
         if constexpr (!data_on_device) {
           if (need_compute_norms) {
-            compute_batch_norms(data_batch.data(), cur_batch_size);
-            if (use_norm_cache) {
+            if (!norms_cached) {
+              compute_batch_norms(data_batch.data(), cur_batch_size);
               raft::copy(h_norm_cache.data_handle() + data_batch.offset(),
                          L2NormBatch.data_handle(),
                          cur_batch_size,
                          stream);
+            } else {
+              raft::copy(L2NormBatch.data_handle(),
+                         h_norm_cache.data_handle() + data_batch.offset(),
+                         cur_batch_size,
+                         stream);
             }
-          } else if (use_norm_cache) {
-            raft::copy(L2NormBatch.data_handle(),
-                       h_norm_cache.data_handle() + data_batch.offset(),
-                       cur_batch_size,
-                       stream);
           }
         }
 
@@ -902,6 +902,7 @@ void kmeans_fit(
                                      batch_workspace,
                                      centroid_norms_opt);
       }
+      if (need_compute_norms) { norms_cached = true; }
 
       finalize_centroids<DataT, IndexT>(handle,
                                         raft::make_const_mdspan(centroid_sums.view()),
