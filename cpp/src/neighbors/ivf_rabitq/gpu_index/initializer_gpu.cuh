@@ -12,6 +12,7 @@
 #include "../defines.hpp"
 
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/error.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
@@ -33,6 +34,8 @@ class InitializerGPU {
   explicit InitializerGPU(raft::resources const& handle, size_t d, size_t k)
     : D(d), K(k), handle_(handle)
   {
+    RAFT_EXPECTS(d > 0, "InitializerGPU: d must be > 0");
+    RAFT_EXPECTS(k > 0, "InitializerGPU: k must be > 0");
   }
 
   virtual ~InitializerGPU() = default;

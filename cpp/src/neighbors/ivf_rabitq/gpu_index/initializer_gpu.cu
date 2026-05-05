@@ -9,6 +9,7 @@
 
 #include "initializer_gpu.cuh"
 
+#include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
@@ -26,6 +27,7 @@ __host__ __device__ float* FlatInitializerGPU::GetCentroid(PID id) const
 
 void FlatInitializerGPU::AddVectors(const float* cent)
 {
+  RAFT_EXPECTS(cent != nullptr, "FlatInitializerGPU::AddVectors: cent is null");
   raft::copy(centroids_.data_handle(), cent, data_elements(), stream_);
 }
 
@@ -38,6 +40,9 @@ void FlatInitializerGPU::LoadCentroids(std::ifstream& input, const char* filenam
   auto host_buf = raft::make_host_vector<float, int64_t>(K * D);
   // Read the raw data from the file.
   input.read(reinterpret_cast<char*>(host_buf.data_handle()), data_bytes());
+  RAFT_EXPECTS(input && input.gcount() == static_cast<std::streamsize>(data_bytes()),
+               "Failed to read centroids from file: %s",
+               filename);
   // Copy the data from host to device.
   raft::copy(centroids_.data_handle(), host_buf.data_handle(), data_elements(), stream_);
   raft::resource::sync_stream(handle_);
@@ -55,6 +60,7 @@ void FlatInitializerGPU::SaveCentroids(std::ofstream& output, const char* filena
   raft::resource::sync_stream(handle_);
   // Write the raw data to the file.
   output.write(reinterpret_cast<char*>(host_buf.data_handle()), data_bytes());
+  RAFT_EXPECTS(static_cast<bool>(output), "Failed to write centroids to file: %s", filename);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

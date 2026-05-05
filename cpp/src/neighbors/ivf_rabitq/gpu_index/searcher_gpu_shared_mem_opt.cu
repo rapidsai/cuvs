@@ -50,7 +50,7 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
   // Shared memory for IP2
   extern __shared__ __align__(256) float shared_ip2_results[];
   // Shared memory for LUT (first used for query storage which is assumed to be smaller)
-  lut_dtype* shared_lut_bf16 =
+  lut_dtype* shared_lut_fp16 =
     reinterpret_cast<lut_dtype*>(shared_ip2_results + params.max_candidates_per_pair);
 
   // Thread index within the block
@@ -62,7 +62,7 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
 
   // Load query vector to shared memory (to be reused later for LUT; assumed to require less storage
   // than LUT)
-  float* shared_query = reinterpret_cast<float*>(shared_lut_bf16);
+  float* shared_query = reinterpret_cast<float*>(shared_lut_fp16);
   for (uint32_t i = tid; i < params.D; i += num_threads) {
     shared_query[i] = params.d_query[query_idx * params.D + i];
   }
@@ -117,7 +117,7 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
   // Load LUT into shared memory
   // Direct copy of BF16 values
   for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-    shared_lut_bf16[i] = query_lut[i];
+    shared_lut_fp16[i] = query_lut[i];
   }
 
   // Calculate short code parameters
@@ -166,7 +166,7 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
         uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
 
         // Accumulate inner product
-        ip += __half2float(shared_lut_bf16[lut_offset]);
+        ip += __half2float(shared_lut_fp16[lut_offset]);
       }
     }
 
@@ -216,7 +216,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
 
   // Shared memory for LUT
   extern __shared__ __align__(256) char shared_mem_raw[];
-  lut_dtype* shared_lut_bf16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
+  lut_dtype* shared_lut_fp16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
   // Calculate offset for other shared arrays after BF16 LUT
   uint32_t lut_bytes = num_chunks * LUT_SIZE * sizeof(lut_dtype);
 
@@ -230,7 +230,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
   // Then Load LUT into shared memory
   // Direct copy of BF16 values
   for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-    shared_lut_bf16[i] = query_lut[i];
+    shared_lut_fp16[i] = query_lut[i];
   }
 
   __syncthreads();
@@ -310,7 +310,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
           uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
 
           // Accumulate inner product
-          ip += __half2float(shared_lut_bf16[lut_offset]);
+          ip += __half2float(shared_lut_fp16[lut_offset]);
         }
       }
 
@@ -368,7 +368,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
       // Step 3 Part 1: Warp-level IP2 computation for better memory coalescing
 
       // Reuse shared_candidate_dists to store IP2 results
-      float* shared_ip2_results = reinterpret_cast<float*>(shared_lut_bf16);
+      float* shared_ip2_results = reinterpret_cast<float*>(shared_lut_fp16);
 
       const int warp_id   = tid / raft::WarpSize;
       const int lane_id   = tid % raft::WarpSize;
@@ -446,7 +446,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
       __syncthreads();
 
       // Step 3 Part 3: Merge results and write back top-k
-      queue.done((uint8_t*)shared_lut_bf16);
+      queue.done((uint8_t*)shared_lut_fp16);
 
       // Atomically get write position
       if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -519,7 +519,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEX(const ComputeInnerProductsK
 
   // Shared memory for LUT
   extern __shared__ __align__(256) char shared_mem_raw[];
-  lut_dtype* shared_lut_bf16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
+  lut_dtype* shared_lut_fp16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
 
   // Thread index within the block
   const int tid         = threadIdx.x;
@@ -531,7 +531,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEX(const ComputeInnerProductsK
   // Then Load LUT into shared memory
   // Direct copy of BF16 values
   for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-    shared_lut_bf16[i] = query_lut[i];
+    shared_lut_fp16[i] = query_lut[i];
   }
 
   __syncthreads();
@@ -593,7 +593,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEX(const ComputeInnerProductsK
         uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
 
         // Accumulate inner product
-        ip += __half2float(shared_lut_bf16[lut_offset]);
+        ip += __half2float(shared_lut_fp16[lut_offset]);
       }
     }
 
@@ -629,7 +629,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
 
   // Shared memory for LUT
   extern __shared__ __align__(256) char shared_mem_raw[];
-  lut_dtype* shared_lut_bf16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
+  lut_dtype* shared_lut_fp16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
   // Calculate offset for other shared arrays after BF16 LUT
   uint32_t lut_bytes = num_chunks * LUT_SIZE * sizeof(lut_dtype);
 
@@ -643,7 +643,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
   // Then Load LUT into shared memory
   // Direct copy of BF16 values
   for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-    shared_lut_bf16[i] = query_lut[i];
+    shared_lut_fp16[i] = query_lut[i];
   }
 
   __syncthreads();
@@ -716,7 +716,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
           uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
 
           // Accumulate inner product
-          ip += __half2float(shared_lut_bf16[lut_offset]);
+          ip += __half2float(shared_lut_fp16[lut_offset]);
         }
       }
 
@@ -774,7 +774,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
       __syncthreads();
 
       // Step 3: Merge results and write back top-k
-      queue.done((uint8_t*)shared_lut_bf16);
+      queue.done((uint8_t*)shared_lut_fp16);
 
       // Atomically get write position
       if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -827,7 +827,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
 }
 
 // Simpler non-optimized version with BF16
-__global__ void precomputeAllLUTs_bf16_simple(const float* d_query,
+__global__ void precomputeAllLUTs_fp16_simple(const float* d_query,
                                               lut_dtype* d_lut_for_queries,
                                               size_t num_queries,
                                               size_t D)
@@ -863,7 +863,7 @@ __global__ void precomputeAllLUTs_bf16_simple(const float* d_query,
   }
 }
 
-__global__ void precomputeAllLUTs_bf16_optimized(const float* d_query,
+__global__ void precomputeAllLUTs_fp16_optimized(const float* d_query,
                                                  lut_dtype* d_lut_for_queries,  // Output in BF16
                                                  size_t num_queries,
                                                  size_t D)
@@ -919,7 +919,7 @@ __global__ void precomputeAllLUTs_bf16_optimized(const float* d_query,
 }
 
 // Optimized version with BF16
-void launchPrecomputeLUTs_bf16(const float* d_query,
+void launchPrecomputeLUTs_fp16(const float* d_query,
                                lut_dtype* d_lut_for_queries,
                                size_t num_queries,
                                size_t D,
@@ -931,11 +931,11 @@ void launchPrecomputeLUTs_bf16(const float* d_query,
 
   if (use_optimized) {
     size_t shared_mem_size = (BITS_PER_CHUNK + LUT_SIZE) * sizeof(float);
-    precomputeAllLUTs_bf16_optimized<<<gridDim, blockDim, shared_mem_size, stream>>>(
+    precomputeAllLUTs_fp16_optimized<<<gridDim, blockDim, shared_mem_size, stream>>>(
       d_query, d_lut_for_queries, num_queries, D);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
-    precomputeAllLUTs_bf16_simple<<<gridDim, blockDim, 0, stream>>>(
+    precomputeAllLUTs_fp16_simple<<<gridDim, blockDim, 0, stream>>>(
       d_query, d_lut_for_queries, num_queries, D);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
@@ -962,15 +962,15 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
 
   rmm::device_uvector<lut_dtype> d_lut_for_queries(lut_elements, stream_);
 
-  // Initialize with -infinity (convert to BF16)
-  lut_dtype neg_inf_bf16 = __float2half(-std::numeric_limits<float>::infinity());
+  // Initialize with -infinity (convert to FP16)
+  lut_dtype neg_inf_fp16 = __float2half(-std::numeric_limits<float>::infinity());
   thrust::fill(thrust::cuda::par.on(stream_),
                d_lut_for_queries.data(),
                d_lut_for_queries.data() + lut_elements,
-               neg_inf_bf16);
+               neg_inf_fp16);
 
   // Precompute LUTs
-  launchPrecomputeLUTs_bf16(
+  launchPrecomputeLUTs_fp16(
     d_query, d_lut_for_queries.data(), num_queries, cur_ivf.get_num_padded_dim(), stream_);
 
   // check if the inner products kernel should use block sort to keep a top-k priority queue vs.

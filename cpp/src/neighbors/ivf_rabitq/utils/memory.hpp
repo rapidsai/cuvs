@@ -10,6 +10,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <new>
 
 #include <raft/util/integer_utils.hpp>
 
@@ -22,9 +23,14 @@ namespace memory {
 template <size_t alignment, class T, bool HUGE_PAGE = false>
 inline T* align_mm(size_t nbytes)
 {
+  static_assert(alignment != 0 && (alignment & (alignment - 1)) == 0);
+  static_assert(alignment % alignof(void*) == 0);
+
   size_t size = raft::round_up_safe<size_t>(nbytes, alignment);
-  void* p     = std::aligned_alloc(alignment, size);
-  if (HUGE_PAGE) { madvise(p, nbytes, MADV_HUGEPAGE); }
+  if (size == 0) { size = alignment; }
+  void* p = std::aligned_alloc(alignment, size);
+  if (p == nullptr) { throw std::bad_alloc{}; }
+  if constexpr (HUGE_PAGE) { madvise(p, size, MADV_HUGEPAGE); }
   std::memset(p, 0, size);
   return static_cast<T*>(p);
 }
