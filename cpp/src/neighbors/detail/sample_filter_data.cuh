@@ -19,13 +19,6 @@ struct bitset_filter_data_t {
   std::uint32_t* bitset_ptr{nullptr};
   SourceIndexT bitset_len{};
   SourceIndexT original_nbits{};
-
-  __host__ __device__ bitset_filter_data_t() = default;
-
-  __host__ __device__ bitset_filter_data_t(std::uint32_t* ptr, SourceIndexT len, SourceIndexT nbits)
-    : bitset_ptr(ptr), bitset_len(len), original_nbits(nbits)
-  {
-  }
 };
 
 }  // namespace cuvs::neighbors::detail
