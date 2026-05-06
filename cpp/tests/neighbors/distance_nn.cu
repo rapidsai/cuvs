@@ -183,6 +183,8 @@ const std::vector<NNInputs<IdxT>> input_fp32 = {
   {16384, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
   {4096, 4096, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
   {4096, 16384, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
+  {4096, 16384, 128, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   {8192, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   // Fused implementation for cosine distance ignores the sqrt paramter, therefore
@@ -215,6 +217,8 @@ template <typename IdxT>
 const std::vector<NNInputs<IdxT>> input_fp16 = {
   {4096, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
   {4096, 16384, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
+  {4096, 16384, 128, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   {4096, 16384, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
@@ -234,6 +238,8 @@ template <typename IdxT>
 const std::vector<NNInputs<IdxT>> input_int8 = {
   {4096, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
   {4096, 16384, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
+  {4096, 16384, 128, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   {4096, 16384, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
