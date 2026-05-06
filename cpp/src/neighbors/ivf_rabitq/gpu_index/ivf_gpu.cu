@@ -261,6 +261,7 @@ void IVFGPU::init_clusters(const std::vector<size_t>& cluster_sizes)
   // Copy the host cluster metadata to device memory.
   // cluster_meta_ must have been allocated with size: num_centroids * sizeof(GPUClusterMeta)
   raft::copy(cluster_meta_.data_handle(), cluster_meta_host_.data_handle(), num_centroids, stream_);
+  raft::resource::sync_stream(handle_);
 }
 
 // for debug use
@@ -315,27 +316,25 @@ void print_first_vector(uint8_t* ex_data_, float* ex_factors_, size_t dim, int e
 
 void IVFGPU::save(const char* filename) const
 {
-  if (num_centroids == 0) {
-    std::cerr << "IVF not constructed\n";
-    return;
-  }
+  RAFT_EXPECTS(num_centroids > 0, "IVF index has not been constructed");
 
   std::ofstream output(filename, std::ios::binary);
-  if (!output.is_open()) {
-    std::cerr << "Failed to open file for saving\n";
-    return;
-  }
+  RAFT_EXPECTS(output.is_open(), "failed to open file for saving: %s", filename);
+
+  auto write_exact = [&](const void* ptr, size_t n_bytes) {
+    output.write(reinterpret_cast<const char*>(ptr), n_bytes);
+    RAFT_EXPECTS(static_cast<bool>(output), "write failed to: %s", filename);
+  };
 
   // Save meta data.
-  output.write(reinterpret_cast<const char*>(&num_vectors), sizeof(size_t));
-  output.write(reinterpret_cast<const char*>(&num_dimensions), sizeof(size_t));
-  output.write(reinterpret_cast<const char*>(&num_centroids), sizeof(size_t));
-  output.write(reinterpret_cast<const char*>(&ex_bits), sizeof(size_t));
+  write_exact(&num_vectors, sizeof(size_t));
+  write_exact(&num_dimensions, sizeof(size_t));
+  write_exact(&num_centroids, sizeof(size_t));
+  write_exact(&ex_bits, sizeof(size_t));
   // Write legacy batch_flag=true for backward compatibility
   bool legacy_batch_flag = true;
-  output.write(reinterpret_cast<const char*>(&legacy_batch_flag), sizeof(bool));
-  output.write(reinterpret_cast<const char*>(DQ->get_query_scaling_factor()),
-               sizeof(DataQuantizerGPU::FastQuantizeFactors));
+  write_exact(&legacy_batch_flag, sizeof(bool));
+  write_exact(DQ->get_query_scaling_factor(), sizeof(DataQuantizerGPU::FastQuantizeFactors));
 
   // Save number of vectors of each cluster.
   std::vector<GPUClusterMeta> h_cluster_meta(num_centroids);
@@ -345,7 +344,7 @@ void IVFGPU::save(const char* filename) const
   for (int i = 0; i < num_centroids; i++) {
     cluster_sizes[i] = h_cluster_meta[i].num;
   }
-  output.write(reinterpret_cast<const char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);
+  write_exact(cluster_sizes.data(), sizeof(size_t) * num_centroids);
 
   // Save rotator.
   this->rotator().save(output);
@@ -387,12 +386,11 @@ void IVFGPU::save(const char* filename) const
   raft::resource::sync_stream(handle_);
 
   // Write raw arrays to file.
-  output.write(reinterpret_cast<const char*>(h_short_data_buf.data_handle()), short_data_size);
-  output.write(reinterpret_cast<const char*>(h_short_factors_batch_buf.data_handle()),
-               short_factors_size);
-  output.write(reinterpret_cast<const char*>(h_long_code_buf.data_handle()), long_code_size);
-  output.write(reinterpret_cast<const char*>(h_ex_factor_buf.data_handle()), ex_factor_size);
-  output.write(reinterpret_cast<const char*>(h_ids_buf.data_handle()), ids_size);
+  write_exact(h_short_data_buf.data_handle(), short_data_size);
+  write_exact(h_short_factors_batch_buf.data_handle(), short_factors_size);
+  write_exact(h_long_code_buf.data_handle(), long_code_size);
+  write_exact(h_ex_factor_buf.data_handle(), ex_factor_size);
+  write_exact(h_ids_buf.data_handle(), ids_size);
 
   output.close();
 }
@@ -872,10 +870,7 @@ void IVFGPU::construct(const float* host_data,
   std::vector<size_t> counts(num_centroids, 0);
   for (size_t i = 0; i < num_vectors; ++i) {
     PID cid = host_cluster_ids[i];
-    if (cid >= num_centroids) {
-      std::cerr << "Bad cluster id\n";
-      abort();
-    }
+    RAFT_EXPECTS(cid < num_centroids, "cluster id %u out of range [0, %zu)", cid, num_centroids);
     counts[cid]++;
   }
 

@@ -176,7 +176,23 @@ void search(raft::resources const& handle,
   size_t NQ = queries.extent(0);
   size_t k  = neighbors.extent(1);
   if (NQ == 0 || k == 0 || params.n_probes == 0) return;
-  size_t dim           = queries.extent(1);
+  size_t dim = queries.extent(1);
+
+  RAFT_EXPECTS(neighbors.extent(0) == static_cast<IdxT>(NQ),
+               "neighbors rows must equal queries rows");
+  RAFT_EXPECTS(distances.extent(0) == static_cast<IdxT>(NQ),
+               "distances rows must equal queries rows");
+  RAFT_EXPECTS(distances.extent(1) == static_cast<IdxT>(k),
+               "distances cols must equal neighbors cols");
+  RAFT_EXPECTS(dim == static_cast<size_t>(idx.dim()),
+               "query dimensionality (%zu) must match index dimensionality (%u)",
+               dim,
+               idx.dim());
+  RAFT_EXPECTS(params.n_probes <= idx.rabitq_index().get_num_centroids(),
+               "n_probes (%zu) cannot exceed number of IVF lists (%zu)",
+               params.n_probes,
+               idx.rabitq_index().get_num_centroids());
+
   auto padded_dim      = idx.rabitq_index().get_num_padded_dim();
   auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
   if (padded_dim == dim) {
@@ -297,9 +313,9 @@ index<IdxT>::index(raft::resources const& handle,
                    uint32_t dim,
                    uint32_t n_lists,
                    uint32_t bits_per_dim)
-  : rabitq_index_(std::make_unique<detail::IVFGPU>(handle, n_rows, dim, n_lists, bits_per_dim))
 {
   RAFT_EXPECTS(bits_per_dim >= 1 && bits_per_dim <= 9, "Unsupported bits_per_dim");
+  rabitq_index_ = std::make_unique<detail::IVFGPU>(handle, n_rows, dim, n_lists, bits_per_dim);
 }
 
 template <typename IdxT>
