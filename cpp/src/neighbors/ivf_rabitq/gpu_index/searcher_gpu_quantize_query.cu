@@ -271,7 +271,7 @@ __global__ void computeInnerProductsWithBitwiseBlockSort(
       // Phase 2 (WithEx): Compute exact 1-bit IPs and store for IP2 refinement
       for (int c = 0; c < candidates_per_thread; ++c) {
         int cand_idx = tid + c * num_threads;
-        if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
+        if (cand_idx < num_candidates) {
           int vec_idx    = shared_candidate_indices[cand_idx];
           float exact_ip = 0.0f;
 
@@ -370,7 +370,7 @@ __global__ void computeInnerProductsWithBitwiseBlockSort(
       PID final_pid;
       for (int c = 0; c < candidates_per_thread; ++c) {
         int cand_idx = tid + c * num_threads;
-        if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
+        if (cand_idx < num_candidates) {
           int vec_idx          = shared_candidate_indices[cand_idx];
           size_t factor_offset = cluster_start_index + vec_idx;
           float3 factors  = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
@@ -549,9 +549,14 @@ __global__ void exrabitq_quantize_query(
 
   // Thread 0 computes and writes the final factors
   if (tid == 0) {
-    float norm_quan      = sqrtf(fmaxf(xu_sq, 0.f));
-    float cos_similarity = ip_resi_xucb / (norm * norm_quan);
-    float delta          = norm / norm_quan * cos_similarity;
+    float norm_quan = sqrtf(fmaxf(xu_sq, 0.f));
+    float delta;
+    if (norm > 1e-6f && norm_quan > 1e-6f) {
+      float cos_similarity = ip_resi_xucb / (norm * norm_quan);
+      delta                = norm / norm_quan * cos_similarity;
+    } else {
+      delta = 0.f;
+    }
 
     size_t base   = row;
     d_delta[base] = delta;

@@ -382,7 +382,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
           int cand_idx = tid + c * num_threads;
           float dist;
           uint32_t pid;
-          if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
+          if (cand_idx < num_candidates) {
             dist = shared_candidate_ips[cand_idx];
             pid  = (uint32_t)shared_candidate_indices[cand_idx];
           } else {
@@ -464,7 +464,7 @@ __global__ void precomputeAllLUTs_fp16_simple(const float* d_query,
 }
 
 __global__ void precomputeAllLUTs_fp16_optimized(const float* d_query,
-                                                 lut_dtype* d_lut_for_queries,  // Output in BF16
+                                                 lut_dtype* d_lut_for_queries,  // Output in FP16
                                                  size_t num_queries,
                                                  size_t D)
 {

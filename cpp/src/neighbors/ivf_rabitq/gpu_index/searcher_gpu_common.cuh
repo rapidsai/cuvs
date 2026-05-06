@@ -24,7 +24,7 @@ static constexpr int LUT_SIZE       = (1 << BITS_PER_CHUNK);  // 16
 using T    = float;
 using IdxT = uint32_t;
 
-using lut_dtype = __half;  // FP16 alternative
+using lut_dtype = __half;  // FP16
 
 // POD struct consolidating parameters for all computeInnerProducts* kernels
 struct ComputeInnerProductsKernelParams {

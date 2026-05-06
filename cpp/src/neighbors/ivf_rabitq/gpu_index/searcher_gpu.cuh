@@ -27,6 +27,10 @@ static constexpr int kMaxTopKBlockSort = 64;
 
 class SearcherGPU {
  public:
+  /**
+   * @param d vector dimension; must be divisible by 32 and by BITS_PER_CHUNK. Pass the padded
+   *          dimension (e.g. IVFGPU::get_num_padded_dim()), not the raw dataset dimension.
+   */
   explicit SearcherGPU(raft::resources const& handle,
                        const float* q,
                        size_t d,

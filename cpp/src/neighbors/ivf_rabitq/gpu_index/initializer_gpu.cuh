@@ -49,10 +49,13 @@ class InitializerGPU {
   virtual __host__ __device__ float* GetCentroid(PID id) const = 0;
 
   /**
-   * @brief Copies centroids from a host pointer to the device memory assuming that 'cent' points to
-   * a host array of size K * D.
+   * @brief Copies centroids from cent into device memory (K * D floats).
    *
-   * @param cent pointer to centroids
+   * The copy is issued asynchronously on the internal CUDA stream. The caller must keep cent
+   * valid until that stream has been synchronized (or until any subsequent work on the stream
+   * consuming the centroids has been submitted).
+   *
+   * @param cent pointer to centroids (host or device)
    */
   virtual void AddVectors(const float* cent) = 0;
 

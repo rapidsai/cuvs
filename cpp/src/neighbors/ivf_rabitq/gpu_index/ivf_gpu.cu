@@ -138,11 +138,13 @@ void IVFGPU::load_transposed(const char* filename)
     auto before = input.tellg();
     input.read(reinterpret_cast<char*>(h_buf.data()), n_bytes);
     auto got = static_cast<size_t>(input.gcount());
-    if (got != n_bytes) {
-      std::ostringstream oss;
-      oss << "unexpected EOF: wanted " << n_bytes << " bytes at offset " << before << ", got "
-          << got << (input.eof() ? " (hit EOF)" : "") << (input.bad() ? " (I/O error)" : "");
-    }
+    RAFT_EXPECTS(got == n_bytes,
+                 "unexpected EOF: wanted %zu bytes at offset %ld, got %zu%s%s",
+                 n_bytes,
+                 static_cast<long>(before),
+                 got,
+                 input.eof() ? " (hit EOF)" : "",
+                 input.bad() ? " (I/O error)" : "");
 
     raft::copy(static_cast<uint8_t*>(d_ptr), h_buf.data(), n_bytes, stream_);
     raft::resource::sync_stream(handle_);
@@ -713,6 +715,11 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
   for (size_t i = 0; i < num_centroids; ++i) {
     max_cluster_length = std::max(max_cluster_length, h_cluster_meta[i].num);
   }
+  RAFT_EXPECTS(max_cluster_length <= batch_size_vectors,
+               "max cluster size (%zu) exceeds batch_size_vectors (%zu); "
+               "increase batch_size_vectors so every cluster fits in one batch",
+               max_cluster_length,
+               batch_size_vectors);
   DQ->alloc_buffers(max_cluster_length);
 
   // -------------------------
@@ -747,12 +754,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
     while (cluster_idx < num_centroids &&
            batch_vectors + h_cluster_meta[cluster_idx].num <= batch_size_vectors) {
       batch_vectors += h_cluster_meta[cluster_idx].num;
-      cluster_idx++;
-    }
-
-    // Handle case where single cluster exceeds batch size
-    if (batch_vectors == 0 && cluster_idx < num_centroids) {
-      batch_vectors = h_cluster_meta[cluster_idx].num;
       cluster_idx++;
     }
 

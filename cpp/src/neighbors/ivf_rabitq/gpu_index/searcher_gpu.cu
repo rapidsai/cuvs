@@ -39,16 +39,19 @@ SearcherGPU::SearcherGPU(raft::resources const& handle,
                          bool rabitq_quantize_flag)
   : D(d), query_(q), rabitq_quantize_flag_(rabitq_quantize_flag), mode_(mode), handle_(handle)
 {
+  RAFT_EXPECTS(D % 32 == 0, "D (%zu) must be divisible by 32", D);
+  RAFT_EXPECTS(
+    D % BITS_PER_CHUNK == 0, "D (%zu) must be divisible by BITS_PER_CHUNK (%d)", D, BITS_PER_CHUNK);
   set_unit_q(memory::align_mm<64, float>(D * sizeof(float)));
   set_quant_query(memory::align_mm<64, int16_t>(D * sizeof(int16_t)));
-  if (mode_ == "quant4" && fast_quantize_factors != nullptr) {
-    best_rescaling_factor =
-      fast_quantize_factors->const_scaling_factor_4bit;  // suppose that always quantize query to 4
-                                                         // bits (1 + 3) per dim
-  } else if (mode_ == "quant8" && fast_quantize_factors != nullptr) {
-    best_rescaling_factor = fast_quantize_factors->const_scaling_factor_8bit;
-  } else if (!fast_quantize_factors && (mode_ == "quant4" || mode_ == "quant8")) {
-    std::cerr << "ERROR: fast_quantize_factors must be set for quant4/quant8 mode" << std::endl;
+  if (mode_ == "quant4" || mode_ == "quant8") {
+    RAFT_EXPECTS(fast_quantize_factors != nullptr,
+                 "fast_quantize_factors must be set for quant4/quant8 mode");
+    if (mode_ == "quant4") {
+      best_rescaling_factor = fast_quantize_factors->const_scaling_factor_4bit;
+    } else if (mode_ == "quant8") {
+      best_rescaling_factor = fast_quantize_factors->const_scaling_factor_8bit;
+    }
   }
   raft::resource::sync_stream(handle);
 }
@@ -554,8 +557,6 @@ __global__ void computeInnerProductsWithLUTBlockSort(const ComputeInnerProductsK
       }
     }
     __syncthreads();
-
-    __syncthreads();
     if (num_candidates > 0) {
       __shared__ int probe_slot;
       {
@@ -568,7 +569,7 @@ __global__ void computeInnerProductsWithLUTBlockSort(const ComputeInnerProductsK
         for (int c = 0; c < candidates_per_thread; ++c) {
           int cand_idx = tid + c * num_threads;
 
-          if (cand_idx < num_candidates && cand_idx < params.max_candidates_per_pair) {
+          if (cand_idx < num_candidates) {
             final_1bit_dist = shared_candidate_ips[cand_idx];
             final_1bit_pid  = shared_candidate_pids[cand_idx];
           } else {
@@ -628,10 +629,7 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                                           PID* d_final_pids)
 {
   // First allocate space for LUT
-  size_t lut_size =
-    num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
-  // each line's space is (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE *
-  // sizeof(float);
+  size_t lut_size = num_queries * (D / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
   rmm::device_uvector<float> d_lut_for_queries(lut_size / sizeof(float), stream_);
   thrust::fill(thrust::cuda::par.on(stream_),
                d_lut_for_queries.data(),

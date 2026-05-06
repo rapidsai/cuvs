@@ -173,7 +173,8 @@ void search(raft::resources const& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle).value();
 
-  size_t NQ            = queries.extent(0);
+  size_t NQ = queries.extent(0);
+  if (NQ == 0) return;  // no queries: nothing to do
   size_t dim           = queries.extent(1);
   auto padded_dim      = idx.rabitq_index().get_num_padded_dim();
   auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
