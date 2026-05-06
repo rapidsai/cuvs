@@ -66,7 +66,9 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
     raft::random::RngState rng{params_.rng_seed};
     if constexpr (std::is_same_v<DataT, int8_t>) {
       fill_int8<<<1000, 256, 0, stream>>>(x.data_handle(), m * k, 0);
+      RAFT_CUDA_TRY(cudaGetLastError());
       fill_int8<<<1000, 256, 0, stream>>>(y.data_handle(), n * k, m * k);
+      RAFT_CUDA_TRY(cudaGetLastError());
     } else {
       raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
       raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));

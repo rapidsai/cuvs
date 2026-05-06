@@ -151,6 +151,7 @@ void reduce_min(OutT* out,
   int blocks = m;
   reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB, metric>
     <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt, initOutBuffer);
+    RAFT_CUDA_TRY(cudaGetLastError());
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>

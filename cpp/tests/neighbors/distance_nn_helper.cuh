@@ -119,6 +119,8 @@ void ref_nn(OutT* out,
 {
   ref_nn_kernel<DataT, AccT, OutT, IdxT>
     <<<(m + 127) / 128, 128, 0, stream>>>(out, A, B, m, n, k, sqrt, metric);
+
+  RAFT_CUDA_TRY(cudaGetLastError());
   return;
 }
 
