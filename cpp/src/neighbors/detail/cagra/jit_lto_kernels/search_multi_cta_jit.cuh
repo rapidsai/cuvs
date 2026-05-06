@@ -8,6 +8,8 @@
 #include "../hashmap.hpp"
 #include "../utils.hpp"
 
+#include <neighbors/detail/cagra/search_multi_cta_helpers.cuh>
+
 #include <raft/util/integer_utils.hpp>
 
 #include <cstdint>

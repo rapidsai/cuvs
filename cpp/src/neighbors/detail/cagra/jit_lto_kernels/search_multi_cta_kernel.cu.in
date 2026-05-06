@@ -5,7 +5,6 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/kernel_def.hpp>
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_jit.cuh>
-#include <neighbors/detail/cagra/search_multi_cta_helpers.cuh>
 
 namespace {
 
