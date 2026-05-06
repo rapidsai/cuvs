@@ -86,7 +86,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   rmm::device_async_resource_ref mr)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
-
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded:
