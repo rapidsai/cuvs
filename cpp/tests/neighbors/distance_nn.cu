@@ -32,11 +32,11 @@ __global__ void fill_int8(int8_t* buff, int len)
 {
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   // Fill the buffer with pseudo-random int8_t values using a simple LCG
-  for (int i = tid; i < len; i += blockIdx.x * gridDim.x) {
+  for (int i = tid; i < len; i += blockDim.x * gridDim.x) {
     // Simple LCG: x_n+1 = (a * x_n + c) % m
-    // Use tid as seed, constants chosen for decent distribution
-    int seed  = tid * 1103515245 + 12345;
-    buff[tid] = static_cast<int8_t>((seed >> 16) & 0xFF);
+    // Use i as seed, constants chosen for decent distribution
+    int seed = i * 1103515245 + 12345;
+    buff[i]  = static_cast<int8_t>((seed >> 16) & 0xFF);
   }
 }
 
