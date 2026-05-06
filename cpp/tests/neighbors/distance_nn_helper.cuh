@@ -180,8 +180,8 @@ void vector_compare(
   auto b_h = raft::make_host_vector<OutT, IdxT>(n);
 
   raft::copy(a_h.data_handle(), a, n, raft::resource::get_cuda_stream(handle));
-
   raft::copy(b_h.data_handle(), b, n, raft::resource::get_cuda_stream(handle));
+  raft::resource::sync_stream(handle, raft::resource::get_cuda_stream(handle));
 
   summary.init();
 
