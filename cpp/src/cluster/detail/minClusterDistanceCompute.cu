@@ -8,8 +8,6 @@
 
 #include <raft/matrix/init.cuh>
 
-#include <optional>
-
 namespace cuvs::cluster::kmeans::detail {
 
 // Calculates a <key, value> pair for every sample in input 'X' where key is an
@@ -26,8 +24,7 @@ void minClusterAndDistanceCompute(
   cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
-  rmm::device_uvector<char>& workspace,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms)
+  rmm::device_uvector<char>& workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -38,22 +35,16 @@ void minClusterAndDistanceCompute(
                   metric == cuvs::distance::DistanceType::CosineExpanded;
 
   if (is_fused) {
-    const DataT* centroidsNorm_ptr = nullptr;
-    if (precomputed_centroid_norms.has_value()) {
-      centroidsNorm_ptr = precomputed_centroid_norms->data_handle();
-    } else {
-      L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-      auto centroidsNorm =
-        raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
+    L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
+    auto centroidsNorm =
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
-      if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-          handle, centroids, centroidsNorm, raft::sqrt_op{});
-      } else {
-        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-          handle, centroids, centroidsNorm);
-      }
-      centroidsNorm_ptr = centroidsNorm.data_handle();
+    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle, centroids, centroidsNorm, raft::sqrt_op{});
+    } else {
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle, centroids, centroidsNorm);
     }
 
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
@@ -66,7 +57,7 @@ void minClusterAndDistanceCompute(
       X.data_handle(),
       centroids.data_handle(),
       L2NormX.data_handle(),
-      centroidsNorm_ptr,
+      centroidsNorm.data_handle(),
       n_samples,
       n_clusters,
       n_features,
@@ -163,8 +154,7 @@ void minClusterAndDistanceCompute(
     cuvs::distance::DistanceType metric,                                                       \
     int batch_samples,                                                                         \
     int batch_centroids,                                                                       \
-    rmm::device_uvector<char>& workspace,                                                      \
-    std::optional<raft::device_vector_view<const DataT, IndexT>>);
+    rmm::device_uvector<char>& workspace);
 
 INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(float, int64_t)
 INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int64_t)
@@ -174,18 +164,16 @@ INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int)
 #undef INSTANTIATE_MIN_CLUSTER_AND_DISTANCE
 
 template <typename DataT, typename IndexT>
-void minClusterDistanceCompute(
-  raft::resources const& handle,
-  raft::device_matrix_view<const DataT, IndexT> X,
-  raft::device_matrix_view<DataT, IndexT> centroids,
-  raft::device_vector_view<DataT, IndexT> minClusterDistance,
-  raft::device_vector_view<DataT, IndexT> L2NormX,
-  rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms)
+void minClusterDistanceCompute(raft::resources const& handle,
+                               raft::device_matrix_view<const DataT, IndexT> X,
+                               raft::device_matrix_view<DataT, IndexT> centroids,
+                               raft::device_vector_view<DataT, IndexT> minClusterDistance,
+                               raft::device_vector_view<DataT, IndexT> L2NormX,
+                               rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
+                               cuvs::distance::DistanceType metric,
+                               int batch_samples,
+                               int batch_centroids,
+                               rmm::device_uvector<char>& workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -199,29 +187,23 @@ void minClusterDistanceCompute(
   raft::matrix::fill(handle, minClusterDistance, std::numeric_limits<DataT>::max());
 
   if (is_fused) {
-    const DataT* centroidsNorm_ptr = nullptr;
-    if (precomputed_centroid_norms.has_value()) {
-      centroidsNorm_ptr = precomputed_centroid_norms->data_handle();
-    } else {
-      L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-      auto centroidsNorm =
-        raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
+    L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
+    auto centroidsNorm =
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
-      if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-          handle,
-          raft::make_device_matrix_view<const DataT, IndexT>(
-            centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
-          centroidsNorm,
-          raft::sqrt_op{});
-      } else {
-        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-          handle,
-          raft::make_device_matrix_view<const DataT, IndexT>(
-            centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
-          centroidsNorm);
-      }
-      centroidsNorm_ptr = centroidsNorm.data_handle();
+    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle,
+        raft::make_device_matrix_view<const DataT, IndexT>(
+          centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+        centroidsNorm,
+        raft::sqrt_op{});
+    } else {
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle,
+        raft::make_device_matrix_view<const DataT, IndexT>(
+          centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+        centroidsNorm);
     }
 
     workspace.resize(sizeof(int) * n_samples, stream);
@@ -231,7 +213,7 @@ void minClusterDistanceCompute(
       X.data_handle(),
       centroids.data_handle(),
       L2NormX.data_handle(),
-      centroidsNorm_ptr,
+      centroidsNorm.data_handle(),
       n_samples,
       n_clusters,
       n_features,
@@ -301,8 +283,7 @@ void minClusterDistanceCompute(
     cuvs::distance::DistanceType metric,                        \
     int batch_samples,                                          \
     int batch_centroids,                                        \
-    rmm::device_uvector<char>& workspace,                       \
-    std::optional<raft::device_vector_view<const DataT, IndexT>>);
+    rmm::device_uvector<char>& workspace);
 
 INSTANTIATE_MIN_CLUSTER_DISTANCE(float, int64_t)
 INSTANTIATE_MIN_CLUSTER_DISTANCE(double, int64_t)

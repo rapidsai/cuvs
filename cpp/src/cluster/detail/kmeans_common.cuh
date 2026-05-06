@@ -358,9 +358,7 @@ void minClusterAndDistanceCompute(
   cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
-  rmm::device_uvector<char>& workspace,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms =
-    std::nullopt);
+  rmm::device_uvector<char>& workspace);
 
 #define EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(DataT, IndexT)                                \
   extern template void minClusterAndDistanceCompute<DataT, IndexT>(                            \
@@ -373,8 +371,7 @@ void minClusterAndDistanceCompute(
     cuvs::distance::DistanceType metric,                                                       \
     int batch_samples,                                                                         \
     int batch_centroids,                                                                       \
-    rmm::device_uvector<char>& workspace,                                                      \
-    std::optional<raft::device_vector_view<const DataT, IndexT>>);
+    rmm::device_uvector<char>& workspace);
 
 EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(float, int64_t)
 EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(float, int)
@@ -393,9 +390,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
                                cuvs::distance::DistanceType metric,
                                int batch_samples,
                                int batch_centroids,
-                               rmm::device_uvector<char>& workspace,
-                               std::optional<raft::device_vector_view<const DataT, IndexT>>
-                                 precomputed_centroid_norms = std::nullopt);
+                               rmm::device_uvector<char>& workspace);
 
 #define EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(DataT, IndexT)      \
   extern template void minClusterDistanceCompute<DataT, IndexT>( \
@@ -408,8 +403,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
     cuvs::distance::DistanceType metric,                         \
     int batch_samples,                                           \
     int batch_centroids,                                         \
-    rmm::device_uvector<char>& workspace,                        \
-    std::optional<raft::device_vector_view<const DataT, IndexT>>);
+    rmm::device_uvector<char>& workspace);
 
 EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(float, int64_t)
 EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(double, int64_t)
@@ -655,8 +649,6 @@ __device__ void check_convergence(raft::device_scalar_view<const DataT> clusteri
  * @param[inout]  centroid_sums        Running weighted sums [n_clusters x n_features] (added into)
  * @param[inout]  weight_per_cluster   Running weight counts [n_clusters] (added into)
  * @param[inout]  clustering_cost      Running cost scalar (device) (added into)
- * @param[in]     centroid_norms       Optional precomputed centroid norms [n_clusters].
- *                                     When provided, skips internal centroid norm computation.
  */
 template <typename DataT, typename IndexT>
 void process_batch(
@@ -674,8 +666,7 @@ void process_batch(
   raft::device_matrix_view<DataT, IndexT> centroid_sums,
   raft::device_vector_view<DataT, IndexT> weight_per_cluster,
   raft::device_scalar_view<DataT> clustering_cost,
-  rmm::device_uvector<char>& batch_workspace,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> centroid_norms = std::nullopt)
+  rmm::device_uvector<char>& batch_workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -688,8 +679,7 @@ void process_batch(
                                               metric,
                                               batch_samples_param,
                                               batch_centroids_param,
-                                              workspace,
-                                              centroid_norms);
+                                              workspace);
 
   KeyValueIndexOp<IndexT, DataT> conversion_op;
   thrust::transform_iterator<KeyValueIndexOp<IndexT, DataT>,
