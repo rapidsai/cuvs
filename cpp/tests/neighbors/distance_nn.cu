@@ -28,15 +28,13 @@ struct NNInputs {
   double tol;
 };
 
-__global__ void fill_int8(int8_t* buff, int len)
+__global__ void fill_int8(int8_t* buff, int len, int seed_offset)
 {
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   // Fill the buffer with pseudo-random int8_t values using a simple LCG
   for (int i = tid; i < len; i += blockDim.x * gridDim.x) {
-    // Simple LCG: x_n+1 = (a * x_n + c) % m
-    // Use i as seed, constants chosen for decent distribution
-    int seed = i * 1103515245 + 12345;
-    buff[i]  = static_cast<int8_t>((seed >> 16) & 0xFF);
+    int hash = (i + seed_offset) * 1103515245 + 12345;
+    buff[i]  = static_cast<int8_t>((hash >> 16) & 0xFF);
   }
 }
 
@@ -66,8 +64,8 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
   {
     raft::random::RngState rng{params_.rng_seed};
     if constexpr (std::is_same_v<DataT, int8_t>) {
-      fill_int8<<<1000, 256, 0, stream>>>(x.data_handle(), m * k);
-      fill_int8<<<1000, 256, 0, stream>>>(y.data_handle(), n * k);
+      fill_int8<<<1000, 256, 0, stream>>>(x.data_handle(), m * k, 0);
+      fill_int8<<<1000, 256, 0, stream>>>(y.data_handle(), n * k, m * k);
     } else {
       raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
       raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
