@@ -285,6 +285,8 @@ void unfusedDistanceNNMinReduce(raft::resources const& handle,
                                 cudaStream_t stream)
 {
   ASSERT(isRowMajor, "unfusedDistanceNN only supports row major inputs");
+
+  ASSERT(m > 0 && n > 0 && k > 0, "unfusedDistanceNN requires non-zero m, n, and k");
   pairwise_distance_gemm<DataT, AccT, OutT, IdxT>(
     handle, (AccT*)workspace, x, y, m, n, k, xn, yn, stream);
 
