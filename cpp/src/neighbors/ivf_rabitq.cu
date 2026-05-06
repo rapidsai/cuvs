@@ -174,7 +174,8 @@ void search(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle).value();
 
   size_t NQ = queries.extent(0);
-  if (NQ == 0) return;  // no queries: nothing to do
+  size_t k  = neighbors.extent(1);
+  if (NQ == 0 || k == 0 || params.n_probes == 0) return;
   size_t dim           = queries.extent(1);
   auto padded_dim      = idx.rabitq_index().get_num_padded_dim();
   auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
@@ -215,8 +216,6 @@ void search(raft::resources const& handle,
                                idx.rabitq_index().quantizer().get_query_scaling_factor(),
                                /* rabitq_quantize_flag = */ true);
   searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
-
-  auto k = neighbors.extent(1);
 
   auto final_ids = raft::make_device_vector<uint32_t, int64_t>(handle, NQ * k);
 

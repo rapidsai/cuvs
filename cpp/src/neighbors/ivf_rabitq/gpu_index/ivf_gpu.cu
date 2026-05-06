@@ -92,29 +92,38 @@ void IVFGPU::AllocateHostMemory()
 void IVFGPU::load_transposed(const char* filename)
 {
   std::ifstream input(filename, std::ios::binary);
-  assert(input.is_open());
+  RAFT_EXPECTS(input.is_open(), "failed to open file: %s", filename);
+
+  auto read_exact = [&](void* ptr, size_t n_bytes) {
+    input.read(reinterpret_cast<char*>(ptr), n_bytes);
+    RAFT_EXPECTS(input.gcount() == static_cast<std::streamsize>(n_bytes),
+                 "unexpected EOF reading header from: %s",
+                 filename);
+  };
 
   // Load metadata.
-  input.read(reinterpret_cast<char*>(&this->num_vectors), sizeof(size_t));
-  input.read(reinterpret_cast<char*>(&this->num_dimensions), sizeof(size_t));
+  read_exact(&this->num_vectors, sizeof(size_t));
+  read_exact(&this->num_dimensions, sizeof(size_t));
   // Compute padded dimension.
   this->num_padded_dim = raft::round_up_safe<size_t>(this->num_dimensions, 64);
-  input.read(reinterpret_cast<char*>(&this->num_centroids), sizeof(size_t));
-  input.read(reinterpret_cast<char*>(&this->ex_bits), sizeof(size_t));
+  read_exact(&this->num_centroids, sizeof(size_t));
+  read_exact(&this->ex_bits, sizeof(size_t));
 
   // Skip legacy batch_flag field for backward compatibility
   bool legacy_batch_flag;
-  input.read(reinterpret_cast<char*>(&legacy_batch_flag), sizeof(bool));
+  read_exact(&legacy_batch_flag, sizeof(bool));
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
   this->DQ = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits);
-  input.read(reinterpret_cast<char*>(this->DQ->get_query_scaling_factor()),
-             sizeof(DataQuantizerGPU::FastQuantizeFactors));
+  read_exact(this->DQ->get_query_scaling_factor(), sizeof(DataQuantizerGPU::FastQuantizeFactors));
   this->Rota = std::make_unique<RotatorGPU>(handle_, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
-  input.read(reinterpret_cast<char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);
-  assert(std::accumulate(cluster_sizes.begin(), cluster_sizes.end(), size_t(0)) == num_vectors);
+  read_exact(cluster_sizes.data(), sizeof(size_t) * num_centroids);
+  RAFT_EXPECTS(
+    std::accumulate(cluster_sizes.begin(), cluster_sizes.end(), size_t(0)) == num_vectors,
+    "cluster sizes do not sum to num_vectors in: %s",
+    filename);
 
   // Load rotator from file.
   this->rotator().load(input);
@@ -475,27 +484,27 @@ void IVFGPU::construct_on_gpu(const float* device_data,
 
   // Determine temporary device storage requirements
   size_t temp_storage_bytes = 0;
-  cub::DeviceHistogram::HistogramEven(nullptr,
-                                      temp_storage_bytes,
-                                      device_cluster_ids,
-                                      d_histogram.data(),
-                                      num_levels,
-                                      lower_level,
-                                      upper_level,
-                                      num_vectors,
-                                      stream_);
+  RAFT_CUDA_TRY(cub::DeviceHistogram::HistogramEven(nullptr,
+                                                    temp_storage_bytes,
+                                                    device_cluster_ids,
+                                                    d_histogram.data(),
+                                                    num_levels,
+                                                    lower_level,
+                                                    upper_level,
+                                                    num_vectors,
+                                                    stream_));
 
   {
     rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
-    cub::DeviceHistogram::HistogramEven(d_temp_storage.data(),
-                                        temp_storage_bytes,
-                                        device_cluster_ids,
-                                        d_histogram.data(),
-                                        num_levels,
-                                        lower_level,
-                                        upper_level,
-                                        num_vectors,
-                                        stream_);
+    RAFT_CUDA_TRY(cub::DeviceHistogram::HistogramEven(d_temp_storage.data(),
+                                                      temp_storage_bytes,
+                                                      device_cluster_ids,
+                                                      d_histogram.data(),
+                                                      num_levels,
+                                                      lower_level,
+                                                      upper_level,
+                                                      num_vectors,
+                                                      stream_));
   }
 
   // -------------------------
@@ -504,17 +513,17 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   rmm::device_uvector<size_t> d_offsets(num_centroids + 1, stream_);
 
   temp_storage_bytes = 0;
-  cub::DeviceScan::ExclusiveSum(
-    nullptr, temp_storage_bytes, d_histogram.data(), d_offsets.data(), num_centroids, stream_);
+  RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(
+    nullptr, temp_storage_bytes, d_histogram.data(), d_offsets.data(), num_centroids, stream_));
 
   {
     rmm::device_buffer d_temp_storage(temp_storage_bytes, stream_);
-    cub::DeviceScan::ExclusiveSum(d_temp_storage.data(),
-                                  temp_storage_bytes,
-                                  d_histogram.data(),
-                                  d_offsets.data(),
-                                  num_centroids,
-                                  stream_);
+    RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(d_temp_storage.data(),
+                                                temp_storage_bytes,
+                                                d_histogram.data(),
+                                                d_offsets.data(),
+                                                num_centroids,
+                                                stream_));
   }
 
   // Set the last offset element
@@ -528,6 +537,7 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   num_blocks = (num_centroids + block_size - 1) / block_size;
   build_cluster_meta_kernel<<<num_blocks, block_size, 0, stream_>>>(
     d_cluster_meta_temp, d_histogram.data(), d_offsets.data(), num_centroids);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // -------------------------
   // 6. Scatter PIDs to flat array on GPU
@@ -541,6 +551,7 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   num_blocks = (num_vectors + block_size - 1) / block_size;
   scatter_pids_kernel<<<num_blocks, block_size, 0, stream_>>>(
     d_flat_pids, device_cluster_ids, d_offsets.data(), d_atomic_counters.data(), num_vectors);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // -------------------------
   // 7. Copy cluster metadata back to host
@@ -625,28 +636,28 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
 
   void* d_temp_storage      = nullptr;
   size_t temp_storage_bytes = 0;
-  cub::DeviceHistogram::HistogramEven(d_temp_storage,
-                                      temp_storage_bytes,
-                                      device_cluster_ids,
-                                      d_histogram.data_handle(),
-                                      num_levels,
-                                      lower_level,
-                                      upper_level,
-                                      num_vectors,
-                                      stream_);
+  RAFT_CUDA_TRY(cub::DeviceHistogram::HistogramEven(d_temp_storage,
+                                                    temp_storage_bytes,
+                                                    device_cluster_ids,
+                                                    d_histogram.data_handle(),
+                                                    num_levels,
+                                                    lower_level,
+                                                    upper_level,
+                                                    num_vectors,
+                                                    stream_));
 
   auto d_temp_storage_vec = raft::make_device_vector<uint8_t, int64_t>(handle_, temp_storage_bytes);
   d_temp_storage          = d_temp_storage_vec.data_handle();
 
-  cub::DeviceHistogram::HistogramEven(d_temp_storage,
-                                      temp_storage_bytes,
-                                      device_cluster_ids,
-                                      d_histogram.data_handle(),
-                                      num_levels,
-                                      lower_level,
-                                      upper_level,
-                                      num_vectors,
-                                      stream_);
+  RAFT_CUDA_TRY(cub::DeviceHistogram::HistogramEven(d_temp_storage,
+                                                    temp_storage_bytes,
+                                                    device_cluster_ids,
+                                                    d_histogram.data_handle(),
+                                                    num_levels,
+                                                    lower_level,
+                                                    upper_level,
+                                                    num_vectors,
+                                                    stream_));
 
   // -------------------------
   // 4. Compute prefix sum (offsets) on GPU using CUB
@@ -655,22 +666,22 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
 
   d_temp_storage     = nullptr;
   temp_storage_bytes = 0;
-  cub::DeviceScan::ExclusiveSum(d_temp_storage,
-                                temp_storage_bytes,
-                                d_histogram.data_handle(),
-                                d_offsets.data_handle(),
-                                num_centroids,
-                                stream_);
+  RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(d_temp_storage,
+                                              temp_storage_bytes,
+                                              d_histogram.data_handle(),
+                                              d_offsets.data_handle(),
+                                              num_centroids,
+                                              stream_));
 
   d_temp_storage_vec = raft::make_device_vector<uint8_t, int64_t>(handle_, temp_storage_bytes);
   d_temp_storage     = d_temp_storage_vec.data_handle();
 
-  cub::DeviceScan::ExclusiveSum(d_temp_storage,
-                                temp_storage_bytes,
-                                d_histogram.data_handle(),
-                                d_offsets.data_handle(),
-                                num_centroids,
-                                stream_);
+  RAFT_CUDA_TRY(cub::DeviceScan::ExclusiveSum(d_temp_storage,
+                                              temp_storage_bytes,
+                                              d_histogram.data_handle(),
+                                              d_offsets.data_handle(),
+                                              num_centroids,
+                                              stream_));
 
   // Set the last offset element
   raft::copy(d_offsets.data_handle() + num_centroids, &num_vectors, 1, stream_);
@@ -684,6 +695,7 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
   int num_blocks = (num_centroids + block_size - 1) / block_size;
   build_cluster_meta_kernel<<<num_blocks, block_size, 0, stream_>>>(
     d_cluster_meta_temp, d_histogram.data_handle(), d_offsets.data_handle(), num_centroids);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // -------------------------
   // 6. Scatter PIDs to flat array on GPU
@@ -700,6 +712,7 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
                                                               d_offsets.data_handle(),
                                                               d_atomic_counters.data_handle(),
                                                               num_vectors);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // -------------------------
   // 7. Copy cluster metadata back to host for batching
