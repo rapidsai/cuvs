@@ -78,8 +78,13 @@ __global__ void reduce_min_kernel(OutT* out,
 
     if constexpr (metric == DistanceType::L2SqrtExpanded || metric == DistanceType::L2Expanded) {
       dist = x_norm_row + y_norm[col] - AccT(2) * z[row * n + col];
+      // GEMM round-off can produce slightly negative expanded distances; clamp to zero.
+      dist = (dist > AccT(0)) ? dist : AccT(0);
     } else if constexpr (metric == DistanceType::CosineExpanded) {
-      dist = AccT(1.0) - (z[row * n + col] / (x_norm_row * y_norm[col]));
+      // Guard against zero-norm vectors to avoid inf/NaN from division by zero.
+      AccT denom = x_norm_row * y_norm[col];
+      denom      = (denom > AccT(0)) ? denom : AccT(1);
+      dist       = AccT(1.0) - (z[row * n + col] / denom);
     }
     if (dist < thread_min.value) {
       thread_min.value = dist;
@@ -92,7 +97,9 @@ __global__ void reduce_min_kernel(OutT* out,
   auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<AccT, IdxT>{});
 
   if (threadIdx.x == 0) {
-    if (is_sqrt) { block_result.value = raft::sqrt(block_result.value); }
+    if (is_sqrt) {
+      block_result.value = raft::sqrt(block_result.value > AccT(0) ? block_result.value : AccT(0));
+    }
     if constexpr (std::is_same_v<OutT, KVType>) {
       if (initOutBuffer == true) {
         out[row] = block_result;
