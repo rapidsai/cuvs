@@ -191,14 +191,13 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
       auto dim    = padded_dataset_view->dim();
       auto stride = padded_dataset_view->stride();
       h_dataset.emplace(raft::make_host_matrix<T, int64_t>(n_rows, dim));
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_dataset->data_handle(),
-                                      sizeof(T) * dim,
-                                      padded_dataset_view->view().data_handle(),
-                                      sizeof(T) * stride,
-                                      sizeof(T) * dim,
-                                      n_rows,
-                                      cudaMemcpyDefault,
-                                      raft::resource::get_cuda_stream(handle_)));
+      raft::copy_matrix(h_dataset->data_handle(),
+                        dim,
+                        padded_dataset_view->view().data_handle(),
+                        stride,
+                        dim,
+                        n_rows,
+                        raft::resource::get_cuda_stream(handle_));
     } else {
       RAFT_LOG_DEBUG(
         "dataset serialization: neither strided_dataset nor device_padded_dataset_view");
