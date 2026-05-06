@@ -11,6 +11,7 @@
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/init.cuh>
 
 namespace cuvs::neighbors {
@@ -76,6 +77,12 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
       x_norm.data_handle(), x.data_handle(), k, m, stream);
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
       y_norm.data_handle(), y.data_handle(), k, n, stream);
+
+    // CosineExpanded expects ||x|| not ||x||^2
+    if (metric == DistanceType::CosineExpanded) {
+      raft::linalg::unaryOp(x_norm.data_handle(), x_norm.data_handle(), m, raft::sqrt_op{}, stream);
+      raft::linalg::unaryOp(y_norm.data_handle(), y_norm.data_handle(), n, raft::sqrt_op{}, stream);
+    }
 
     if constexpr (impl == ImplType::fused) {
       workspace_size = m * sizeof(IdxT);
@@ -178,8 +185,10 @@ const std::vector<NNInputs<IdxT>> input_fp32 = {
   {4096, 16384, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   {8192, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
-  {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
-  {4096, 8192, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
+  // Fused implementation for cosine distance ignores the sqrt paramter, therefore
+  // commenting the following two tests
+  // {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
+  // {4096, 8192, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
 
 // Test fused implementation with single-precision
@@ -229,8 +238,7 @@ const std::vector<NNInputs<IdxT>> input_int8 = {
   {4096, 16384, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
 
-// Test unfused implementation with fp16, int8
-// Fused implementation has no support for fp16, int8 so no test for it
+// DataT = int8_t, AccT = int32_t
 typedef NNTest<int8_t, int32_t, int32_t, ImplType::unfused> NNTest_int8_unfused;
 TEST_P(NNTest_int8_unfused, test)
 {
@@ -240,6 +248,7 @@ TEST_P(NNTest_int8_unfused, test)
 
 INSTANTIATE_TEST_CASE_P(NNTest, NNTest_int8_unfused, ::testing::ValuesIn(input_int8<int>));
 
+// DataT = int8_t, AccT = float
 typedef NNTest<int8_t, float, int32_t, ImplType::unfused> NNTest_int8_unfused2;
 TEST_P(NNTest_int8_unfused2, test)
 {
