@@ -27,165 +27,170 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-// compute distances and write to output
+// Unified non-BlockSort half-precision LUT kernel.
+// WithEx=true: IP2 precomputed with long codes for all cluster vectors before the distance loop.
+// WithEx=false: direct 1-bit LUT distance, no IP2 step.
+template <bool WithEx>
 __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKernelParams params)
 {
-  // Each block handles one <cluster, query> pair
-  const int block_id = blockIdx.x;  // simply use 1-D block
-
+  const int block_id = blockIdx.x;
   if (block_id >= params.num_pairs) return;
 
-  // Get the cluster-query pair for this block
   ClusterQueryPair pair = params.d_sorted_pairs[block_id];
   int cluster_idx       = pair.cluster_idx;
   int query_idx         = pair.query_idx;
 
-  // Check bounds
   if (cluster_idx >= params.num_centroids || query_idx >= params.num_queries) return;
 
-  // Get cluster metadata
   size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
   size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
 
-  // Shared memory for IP2
-  extern __shared__ __align__(256) float shared_ip2_results[];
-  // Shared memory for LUT (first used for query storage which is assumed to be smaller)
-  lut_dtype* shared_lut_fp16 =
-    reinterpret_cast<lut_dtype*>(shared_ip2_results + params.max_candidates_per_pair);
-
-  // Thread index within the block
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Calculate long code parameters
-  const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-
-  // Load query vector to shared memory (to be reused later for LUT; assumed to require less storage
-  // than LUT)
-  float* shared_query = reinterpret_cast<float*>(shared_lut_fp16);
-  for (uint32_t i = tid; i < params.D; i += num_threads) {
-    shared_query[i] = params.d_query[query_idx * params.D + i];
-  }
-  __syncthreads();
-
-  // Step 1: Warp-level IP2 computation for better memory coalescing
-
-  const int warp_id   = tid / raft::WarpSize;
-  const int lane_id   = tid % raft::WarpSize;
-  const int num_warps = num_threads / raft::WarpSize;
-
-  // Each warp processes different candidates
-  for (int cand_idx = warp_id; cand_idx < num_vectors_in_cluster; cand_idx += num_warps) {
-    size_t global_vec_idx = cluster_start_index + cand_idx;
-
-    // Pointer to this vector's long code
-    const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-
-    // Warp-level IP2 computation
-    float ip2 = 0.0f;
-
-    // Each thread in warp processes different dimensions
-    for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
-      // Extract ex_bits value for this dimension
-      uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
-      float ex_val      = (float)code_val;
-      ip2 += shared_query[d] * ex_val;
-    }
-
-    // Warp-level reduction for ip2
-#pragma unroll
-    for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-      ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
-    }
-
-    // Lane 0 stores the result
-    if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-  }
-
-  __syncthreads();
-
-  // Step 2: Each thread computes distances using LUT, then computes final distance and writes to
-  // output
-
-  // Calculate LUT parameters
   const uint32_t num_chunks         = params.D / BITS_PER_CHUNK;
   const uint32_t lut_per_query_size = num_chunks * LUT_SIZE;
 
-  // Pointer to this query's LUT in global memory
-  lut_dtype* query_lut = params.d_lut_for_queries_half + query_idx * lut_per_query_size;
+  extern __shared__ __align__(256) char shared_mem_raw[];
 
-  // Load LUT into shared memory
-  // Direct copy of BF16 values
-  for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-    shared_lut_fp16[i] = query_lut[i];
-  }
+  const int tid         = threadIdx.x;
+  const int num_threads = blockDim.x;
 
-  // Calculate short code parameters
-  const uint32_t short_code_length = params.D / 32;        // number of uint32_t per vector
-  const uint32_t chunks_per_uint32 = 32 / BITS_PER_CHUNK;  // 8 chunks per uint32_t
+  if constexpr (WithEx) {
+    // Shared memory layout: [ip2_results (max_candidates_per_pair floats)][lut_fp16 / query]
+    float* shared_ip2_results = reinterpret_cast<float*>(shared_mem_raw);
+    lut_dtype* shared_lut_fp16 =
+      reinterpret_cast<lut_dtype*>(shared_ip2_results + params.max_candidates_per_pair);
 
-  // Atomically get write position
-  __shared__ int probe_slot;
-  if (tid == 0) {
-    probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
-  }
-  __syncthreads();
-  // Calculate output offset
-  uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
+    const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
 
-  // Common values for this <cluster, query> pair
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids +
-                                              cluster_idx];  // squared distance to centroid
-  float q_kbxsumq = params.d_G_kbxSumq[query_idx];
+    // Load query into LUT region (reused; D floats always fit in lut_per_query_size lut_dtype
+    // slots)
+    float* shared_query = reinterpret_cast<float*>(shared_lut_fp16);
+    for (uint32_t i = tid; i < params.D; i += num_threads) {
+      shared_query[i] = params.d_query[query_idx * params.D + i];
+    }
+    __syncthreads();
 
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-    size_t vec_idx = vec_base + tid;
-    if (vec_idx >= num_vectors_in_cluster) break;
+    const int warp_id   = tid / raft::WarpSize;
+    const int lane_id   = tid % raft::WarpSize;
+    const int num_warps = num_threads / raft::WarpSize;
 
-    // Compute inner product using LUT
-    float ip = 0.0f;
+    for (int cand_idx = warp_id; cand_idx < num_vectors_in_cluster; cand_idx += num_warps) {
+      size_t global_vec_idx        = cluster_start_index + cand_idx;
+      const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
 
-    // Process each uint32_t of the short code
-    for (uint32_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-      // Access short code in transposed layout
-      // For transposed layout: vec1[dim0-31], vec2[dim0-31], ..., vecn[dim0-31]
-      size_t short_code_offset =
-        cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-      uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-      // Process 8 4-bit chunks from this uint32_t
-      for (int chunk_in_uint32 = 0; chunk_in_uint32 < chunks_per_uint32; chunk_in_uint32++) {
-        // Extract 4-bit pattern
-        // Note: in uint32_t, lowest dim is at bit 31 (MSB)
-        // So we extract from high bits to low bits
-        int shift   = 28 - (chunk_in_uint32 * BITS_PER_CHUNK);  // 28, 24, 20, 16, 12, 8, 4, 0
-        int pattern = (short_code_chunk >> shift) & 0xF;        // Extract 4 bits
-
-        // Look up in LUT
-        uint32_t lut_chunk_idx = uint32_idx * chunks_per_uint32 + chunk_in_uint32;
-        uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
-
-        // Accumulate inner product
-        ip += __half2float(shared_lut_fp16[lut_offset]);
+      float ip2 = 0.0f;
+      for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
+        uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
+        float ex_val      = (float)code_val;
+        ip2 += shared_query[d] * ex_val;
       }
+
+#pragma unroll
+      for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
+        ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
+      }
+
+      if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
+    }
+    __syncthreads();
+
+    // Load LUT (overwrites query)
+    lut_dtype* query_lut = params.d_lut_for_queries_half + query_idx * lut_per_query_size;
+    for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
+      shared_lut_fp16[i] = query_lut[i];
     }
 
-    // Get pre-computed values
-    float ip2 = shared_ip2_results[vec_idx];
+    const uint32_t short_code_length = params.D / 32;
+    const uint32_t chunks_per_uint32 = 32 / BITS_PER_CHUNK;
 
-    size_t global_vec_idx = cluster_start_index + vec_idx;
-    // vec load version
-    float2 ex_factors  = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-    float f_ex_add     = ex_factors.x;
-    float f_ex_rescale = ex_factors.y;
+    __shared__ int probe_slot;
+    if (tid == 0) {
+      probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
+    }
+    __syncthreads();
+    uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
 
-    // Compute final distance using pre-computed ip2
-    float ex_dist = f_ex_add + q_g_add +
-                    f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
+    float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+    float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
-    // Write to global memory
-    params.d_topk_dists[output_offset + vec_idx] = ex_dist;
-    params.d_topk_pids[output_offset + vec_idx]  = params.d_pids[global_vec_idx];
+    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
+      size_t vec_idx = vec_base + tid;
+      if (vec_idx >= num_vectors_in_cluster) break;
+
+      float ip = 0.0f;
+      for (uint32_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
+        size_t short_code_offset =
+          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
+        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
+        for (int chunk_in_uint32 = 0; chunk_in_uint32 < chunks_per_uint32; chunk_in_uint32++) {
+          int shift              = 28 - (chunk_in_uint32 * BITS_PER_CHUNK);
+          int pattern            = (short_code_chunk >> shift) & 0xF;
+          uint32_t lut_chunk_idx = uint32_idx * chunks_per_uint32 + chunk_in_uint32;
+          uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
+          ip += __half2float(shared_lut_fp16[lut_offset]);
+        }
+      }
+
+      float ip2             = shared_ip2_results[vec_idx];
+      size_t global_vec_idx = cluster_start_index + vec_idx;
+
+      float2 ex_factors  = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
+      float f_ex_add     = ex_factors.x;
+      float f_ex_rescale = ex_factors.y;
+
+      params.d_topk_dists[output_offset + vec_idx] =
+        f_ex_add + q_g_add +
+        f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
+      params.d_topk_pids[output_offset + vec_idx] = params.d_pids[global_vec_idx];
+    }
+  } else {
+    // Shared memory layout: [lut_fp16 (lut_per_query_size lut_dtype elements)]
+    lut_dtype* shared_lut_fp16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
+
+    lut_dtype* query_lut = params.d_lut_for_queries_half + query_idx * lut_per_query_size;
+    for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
+      shared_lut_fp16[i] = query_lut[i];
+    }
+    __syncthreads();
+
+    float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+    float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+
+    const uint32_t short_code_length = params.D / 32;
+    const uint32_t chunks_per_uint32 = 32 / BITS_PER_CHUNK;
+
+    __shared__ int probe_slot;
+    if (tid == 0) {
+      probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
+    }
+    __syncthreads();
+    uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
+
+    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
+      size_t vec_idx = vec_base + tid;
+      if (vec_idx >= num_vectors_in_cluster) break;
+
+      size_t factor_offset = cluster_start_index + vec_idx;
+      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
+      float f_add          = factors.x;
+      float f_rescale      = factors.y;
+
+      float ip = 0.0f;
+      for (uint32_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
+        size_t short_code_offset =
+          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
+        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
+        for (int chunk_in_uint32 = 0; chunk_in_uint32 < chunks_per_uint32; chunk_in_uint32++) {
+          int shift              = 28 - (chunk_in_uint32 * BITS_PER_CHUNK);
+          int pattern            = (short_code_chunk >> shift) & 0xF;
+          uint32_t lut_chunk_idx = uint32_idx * chunks_per_uint32 + chunk_in_uint32;
+          uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
+          ip += __half2float(shared_lut_fp16[lut_offset]);
+        }
+      }
+
+      params.d_topk_dists[output_offset + vec_idx] = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
+      params.d_topk_pids[output_offset + vec_idx]  = params.d_pids[cluster_start_index + vec_idx];
+    }
   }
 }
 
@@ -491,115 +496,6 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
         // because IEEE 754 float format preserves ordering for positive values
       }
     }
-  }
-}
-
-__global__ void computeInnerProductsWithLUT16OptNoEX(const ComputeInnerProductsKernelParams params)
-{
-  // Each block handles one <cluster, query> pair
-  const int block_id = blockIdx.x;  // simply use 1-D block
-
-  if (block_id >= params.num_pairs) return;
-
-  // Get the cluster-query pair for this block
-  ClusterQueryPair pair = params.d_sorted_pairs[block_id];
-  int cluster_idx       = pair.cluster_idx;
-  int query_idx         = pair.query_idx;
-
-  // Check bounds
-  if (cluster_idx >= params.num_centroids || query_idx >= params.num_queries) return;
-
-  // Get cluster metadata
-  size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
-  size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
-
-  // Calculate LUT parameters
-  const uint32_t num_chunks         = params.D / BITS_PER_CHUNK;
-  const uint32_t lut_per_query_size = num_chunks * LUT_SIZE;
-
-  // Shared memory for LUT
-  extern __shared__ __align__(256) char shared_mem_raw[];
-  lut_dtype* shared_lut_fp16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
-
-  // Thread index within the block
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Pointer to this query's LUT in global memory
-  lut_dtype* query_lut = params.d_lut_for_queries_half + query_idx * lut_per_query_size;
-
-  // Then Load LUT into shared memory
-  // Direct copy of BF16 values
-  for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-    shared_lut_fp16[i] = query_lut[i];
-  }
-
-  __syncthreads();
-
-  // Step 2 Part 1: Compute distances using LUT
-
-  // Values for this <cluster, query> pair
-  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids +
-                                              cluster_idx];  // squared distance to centroid
-  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
-  ;  // query factor
-
-  // Calculate short code parameters
-  const uint32_t short_code_length = params.D / 32;        // number of uint32_t per vector
-  const uint32_t chunks_per_uint32 = 32 / BITS_PER_CHUNK;  // 8 chunks per uint32_t
-
-  // Atomically get write position
-  __shared__ int probe_slot;
-  if (tid == 0) {
-    probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
-  }
-  __syncthreads();
-  // Calculate output offset
-  uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
-
-  // Each thread processes one or more vectors
-  // We'll use a grid-stride loop to handle all vectors in the cluster
-  for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-    size_t vec_idx = vec_base + tid;
-    if (vec_idx >= num_vectors_in_cluster) break;
-
-    // vec load for short factors
-    size_t factor_offset = cluster_start_index + vec_idx;
-    float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-    float f_add          = factors.x;
-    float f_rescale      = factors.y;
-
-    // Compute inner product using LUT
-    float ip = 0.0f;
-
-    // Process each uint32_t of the short code
-    for (uint32_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-      // Access short code in transposed layout
-      // For transposed layout: vec1[dim0-31], vec2[dim0-31], ..., vecn[dim0-31]
-      size_t short_code_offset =
-        cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-      uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-
-      // Process 8 4-bit chunks from this uint32_t
-      for (int chunk_in_uint32 = 0; chunk_in_uint32 < chunks_per_uint32; chunk_in_uint32++) {
-        // Extract 4-bit pattern
-        // Note: in uint32_t, lowest dim is at bit 31 (MSB)
-        // So we extract from high bits to low bits
-        int shift   = 28 - (chunk_in_uint32 * BITS_PER_CHUNK);  // 28, 24, 20, 16, 12, 8, 4, 0
-        int pattern = (short_code_chunk >> shift) & 0xF;        // Extract 4 bits
-
-        // Look up in LUT
-        uint32_t lut_chunk_idx = uint32_idx * chunks_per_uint32 + chunk_in_uint32;
-        uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
-
-        // Accumulate inner product
-        ip += __half2float(shared_lut_fp16[lut_offset]);
-      }
-    }
-
-    // Compute estimated distance and write to output
-    params.d_topk_dists[output_offset + vec_idx] = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-    params.d_topk_pids[output_offset + vec_idx]  = params.d_pids[cluster_start_index + vec_idx];
   }
 }
 
@@ -1074,8 +970,8 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
     size_t shared_mem_size =
       max(first_part_shared_mem + second_part_shared_mem + third_part_shared_mem,
           (size_t)queue_buffer_smem_bytes);
-    auto kernel =
-      use_block_sort ? computeInnerProductsWithLUT16OptBlockSort : computeInnerProductsWithLUT16Opt;
+    auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort
+                                                 : computeInnerProductsWithLUT16Opt<true>;
     auto const& kernel_launcher = [&](auto const& kernel) -> void {
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     };
@@ -1089,7 +985,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
     size_t shared_mem_size =
       max(first_part_shared_mem + second_part_shared_mem, (size_t)queue_buffer_smem_bytes);
     auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptNoEXBlockSort
-                                                 : computeInnerProductsWithLUT16OptNoEX;
+                                                 : computeInnerProductsWithLUT16Opt<false>;
     auto const& kernel_launcher = [&](auto const& kernel) -> void {
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     };
