@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -15,19 +15,17 @@ function(cuvs_c_add_header_check project_root binding_header COMPONENT_PLACEHOLD
     "${project_root}/include/*.h"
   )
 
-  set(CUVS_C_HEADER_CHECK_PROJECT_ROOT "${project_root}")
-
   set(template_contents
       [=[
   set(all_headers_to_match @all_headers_to_match@)
   set(binding_header_name @binding_header@)
   set(binary_dir @CMAKE_CURRENT_BINARY_DIR@)
-  set(c_api_project_root @CUVS_C_HEADER_CHECK_PROJECT_ROOT@)
+  set(src_dir @CMAKE_SOURCE_DIR@)
 
   function(check_binding_header mode header_list_var)
 
     if(mode STREQUAL BUILD)
-      set(path "${c_api_project_root}/include/${binding_header_name}")
+      set(path "${src_dir}/include/${binding_header_name}")
     else()
       # Walk up the binary dir till we
       set(path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/include/${binding_header_name}")
