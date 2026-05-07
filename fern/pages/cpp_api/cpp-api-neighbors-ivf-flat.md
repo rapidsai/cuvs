@@ -1847,17 +1847,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2018`_
 
 ## Helper functions for IVF Flat
 
-<a id="namespace-codepacker"></a>
-### namespace codepacker \{
-
-Helper functions for IVF Flat
-
-```cpp
-namespace codepacker {
-```
-
-_Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2484`_
-
 <a id="cuvs-neighbors-ivf-flat-helpers-codepacker-pack"></a>
 ### cuvs::neighbors::ivf_flat::helpers::codepacker::pack
 

@@ -1963,17 +1963,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2106`_
 
 ## IVF-PQ helper methods
 
-<a id="namespace-codepacker"></a>
-### namespace codepacker \{
-
-IVF-PQ helper methods
-
-```cpp
-namespace codepacker {
-```
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2561`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack
 

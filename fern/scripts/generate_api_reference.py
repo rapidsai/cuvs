@@ -281,6 +281,8 @@ class DoxygenHeaderIndex:
                     entry = parse_doxygen_entry(
                         comment, declaration, rel_path, decl_line
                     )
+                    if is_namespace_entry(entry):
+                        continue
                     if entry.kind == "member" and not is_type_alias_signature(
                         entry.signature
                     ):
@@ -311,6 +313,8 @@ class DoxygenHeaderIndex:
                         entry = parse_doxygen_entry(
                             comment, declaration, rel_path, decl_line
                         )
+                        if is_namespace_entry(entry):
+                            continue
                         self._qualify_function(entry, text[: match.start()])
                         if not entry.summary and self.groups[group_name].title:
                             entry.summary = self.groups[group_name].title
@@ -478,6 +482,7 @@ def collect_native_pages(
             for entry in group.entries
             if entry.source.startswith(prefix)
             and not is_detail_namespace_entry(entry)
+            and not is_namespace_entry(entry)
         ]
         if not entries:
             continue
@@ -554,6 +559,10 @@ def short_symbol_name(name: str) -> str:
 
 def is_detail_namespace_entry(entry: DoxygenEntry) -> bool:
     return "detail" in entry.name.split("::")
+
+
+def is_namespace_entry(entry: DoxygenEntry) -> bool:
+    return bool(re.match(r"^\s*(?:inline\s+)?namespace\b", entry.signature))
 
 
 def render_native_group(
