@@ -22,14 +22,14 @@ struct cuvsProductQuantizerParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. |
-| `use_subspaces` | `bool` | Whether to use subspaces for product quantization (PQ). |
-| `use_vq` | `bool` | Whether to use Vector Quantization (KMeans) before product quantization (PQ). |
-| `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: within [4, 16]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `use_subspaces` | `bool` | Whether to use subspaces for product quantization (PQ). When true, one PQ codebook is used for each subspace. Otherwise, a single PQ codebook is used. |
+| `use_vq` | `bool` | Whether to use Vector Quantization (KMeans) before product quantization (PQ). When true, VQ is used before PQ. When false, only product quantization is used. |
+| `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. When one, only product quantization is used. |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
 | `pq_kmeans_type` | `cuvsKMeansType` | The type of kmeans algorithm to use for PQ training. |
-| `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data |
+| `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. We will use `pq_n_centers * max_train_points_per_pq_code` training points to train each PQ codebook. |
 | `max_train_points_per_vq_cluster` | `uint32_t` | The max number of data points to use per VQ cluster. |
 
 _Source: `c/include/cuvs/preprocessing/quantize/pq.h:24`_

@@ -570,13 +570,6 @@ Sparse Brute Force index search
 struct sparse_search_params { ... } ;
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `batch_size_index` | `int` |  |
-| `batch_size_query` | `int` |  |
-
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:668`_
 
 ## Bruteforce index serialize functions

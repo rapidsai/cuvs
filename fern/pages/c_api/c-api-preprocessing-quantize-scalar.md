@@ -18,12 +18,6 @@ Scalar quantizer parameters.
 struct cuvsScalarQuantizerParams { ... } ;
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `quantile` | `float` |  |
-
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:23`_
 
 ### cuvsScalarQuantizerParamsCreate

@@ -22,7 +22,7 @@ struct params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `quantile` | `float` | Specifies how many outliers at top & bottom will be ignored. |
+| `quantile` | `float` | Specifies how many outliers at top & bottom will be ignored. Needs to be within range of (0, 1]. |
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:26`_
 

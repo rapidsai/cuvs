@@ -72,10 +72,10 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_probes` | `uint32_t` | The number of clusters to search. |
-| `lut_dtype` | `cudaDataType_t` | Data type of look up table to be created dynamically at search time. |
-| `internal_distance_dtype` | `cudaDataType_t` | Storage data type for distance/similarity computed at search time. |
-| `preferred_shmem_carveout` | `double` | Preferred fraction of SM's unified memory / L1 cache to be used as shared memory. |
-| `coarse_search_dtype` | `cudaDataType_t` | [Experimental] The data type to use as the GEMM element type when searching the clusters to |
+| `lut_dtype` | `cudaDataType_t` | Data type of look up table to be created dynamically at search time. Possible values: [CUDA_R_32F, CUDA_R_16F, CUDA_R_8U] The use of low-precision types reduces the amount of shared memory required at search time, so fast shared memory kernels can be used even for datasets with large dimansionality. Note that the recall is slightly degraded when low-precision type is selected. |
+| `internal_distance_dtype` | `cudaDataType_t` | Storage data type for distance/similarity computed at search time. Possible values: [CUDA_R_16F, CUDA_R_32F] If the performance limiter at search time is device memory access, selecting FP16 will improve performance slightly. |
+| `preferred_shmem_carveout` | `double` | Preferred fraction of SM's unified memory / L1 cache to be used as shared memory. Possible values: [0.0 - 1.0] as a fraction of the `sharedMemPerMultiprocessor`. One wants to increase the carveout to make sure a good GPU occupancy for the main search kernel, but not to keep it too high to leave some memory to be used as L1 cache. Note, this value is interpreted only as a hint. Moreover, a GPU usually allows only a fixed set of cache configurations, so the provided value is rounded up to the nearest configuration. Refer to the NVIDIA tuning guide for the target GPU architecture. Note, this is a low-level tuning parameter that can have drastic negative effects on the search performance if tweaked incorrectly. |
+| `coarse_search_dtype` | `cudaDataType_t` | [Experimental] The data type to use as the GEMM element type when searching the clusters to probe. Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].<br />- Legacy default: CUDA_R_32F (float)<br />- Recommended for performance: CUDA_R_16F (half)<br />- Experimental/low-precision: CUDA_R_8I (int8_t) (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional) |
 | `max_internal_batch_size` | `uint32_t` | Set the internal batch size to improve GPU utilization at the cost of larger memory footprint. |
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:157`_

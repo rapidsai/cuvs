@@ -40,8 +40,8 @@ struct cuvsPcaParams { ... } ;
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_components` | `int` | Number of principal components to keep. |
-| `copy` | `bool` | If false, data passed to fit are overwritten and running fit(X).transform(X) will |
-| `whiten` | `bool` | When true the component vectors are multiplied by the square root of n_samples and then |
+| `copy` | `bool` | If false, data passed to fit are overwritten and running fit(X).transform(X) will not yield the expected results; use fit_transform(X) instead. |
+| `whiten` | `bool` | When true the component vectors are multiplied by the square root of n_samples and then divided by the singular values to ensure uncorrelated outputs with unit component-wise variances. |
 | `algorithm` | `enum cuvsPcaSolver` | Solver algorithm to use. |
 | `tol` | `float` | Tolerance for singular values (used by Jacobi solver). |
 | `n_iterations` | `int` | Number of iterations for the power method (Jacobi solver). |

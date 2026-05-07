@@ -36,9 +36,9 @@ struct all_neighbors_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `graph_build_params` | `GraphBuildParams` | Parameters for knn graph building algorithm |
-| `overlap_factor` | `size_t` | Number of nearest clusters each data point will be assigned to in the batching algorithm. |
-| `n_clusters` | `size_t` | Number of total clusters (aka batches) to split the data into. If set to 1, algorithm creates |
+| `graph_build_params` | `GraphBuildParams` | Parameters for knn graph building algorithm Approximate nearest neighbors methods or a brute force approach are supported to build the knn graph. Currently supported options are 'IVF-PQ', 'NN Descent', or 'Brute Force'. IVF-PQ is more accurate, but slower compared to NN Descent. Note that 'Brute Force' can also be approximate if n_clusters &gt; 1. Set ivf_pq_params, nn_descent_params, or brute_force_params to select the graph build algorithm and control their parameters. |
+| `overlap_factor` | `size_t` | Number of nearest clusters each data point will be assigned to in the batching algorithm. Start with `overlap_factor = 2` and gradually increase (2-&gt;3-&gt;4 ...) for better accuracy at the cost of device memory usage. |
+| `n_clusters` | `size_t` | Number of total clusters (aka batches) to split the data into. If set to 1, algorithm creates an all-neighbors graph without batching. Start with `n_clusters = 4` and increase (4 → 8 → 16...) for less device memory usage at the cost of accuracy. This is independent from `overlap_factor` as long as `overlap_factor` &lt; `n_clusters`. The ratio of `overlap_factor / n_clusters` determines device memory usage. Approximately `(overlap_factor / n_clusters) * num_rows_in_entire_data` number of rows will be put on device memory at once. E.g. between `(overlap_factor / n_clusters)` = 2/10 and 2/20, the latter will use less device memory. Larger `overlap_factor` results in better accuracy of the final all-neighbors knn graph. E.g. While using similar device memory, `(overlap_factor / n_clusters)` = 4/20 will have better accuracy than 2/10 at the cost of performance. |
 | `metric` | `cuvs::distance::DistanceType` | Metric used. |
 
 _Source: `cpp/include/cuvs/neighbors/all_neighbors.hpp:37`_

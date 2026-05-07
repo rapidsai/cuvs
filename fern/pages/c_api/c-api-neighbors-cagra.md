@@ -53,12 +53,12 @@ struct cuvsCagraCompressionParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. |
-| `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: [4, 5, 6, 7, 8]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
-| `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). |
-| `pq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (PQ phase). |
+| `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). When zero, an optimal value is selected using a heuristic. |
+| `pq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (PQ phase). When zero, an optimal value is selected using a heuristic. |
 
 _Source: `c/include/cuvs/neighbors/cagra.h:82`_
 
@@ -80,12 +80,12 @@ struct cuvsAceParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build. |
-| `ef_construction` | `size_t` | The index quality for the ACE build. |
-| `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). |
-| `use_disk` | `bool` | Whether to use disk-based storage for ACE build. |
-| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. |
-| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. |
+| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build. When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests). If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
+| `ef_construction` | `size_t` | The index quality for the ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
+| `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
+| `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
+| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
 
 _Source: `c/include/cuvs/neighbors/cagra.h:136`_
 
@@ -106,8 +106,8 @@ struct cuvsCagraIndexParams { ... } ;
 | `graph_degree` | `size_t` | Degree of output graph. |
 | `build_algo` | `enum cuvsCagraGraphBuildAlgo` | ANN algorithm to build knn graph. |
 | `nn_descent_niter` | `size_t` | Number of Iterations to run if building with NN_DESCENT |
-| `compression` | `cuvsCagraCompressionParams_t` | Optional: specify compression parameters if compression is desired. |
-| `graph_build_params` | `void*` | Optional: specify graph build params based on build_algo |
+| `compression` | `cuvsCagraCompressionParams_t` | Optional: specify compression parameters if compression is desired. NOTE: this is experimental new API, consider it unsafe. |
+| `graph_build_params` | `void*` | Optional: specify graph build params based on build_algo<br />- IVF_PQ: cuvsIvfPqParams_t<br />- ACE: cuvsAceParams_t<br />- Others: nullptr |
 
 _Source: `c/include/cuvs/neighbors/cagra.h:201`_
 
@@ -295,7 +295,7 @@ struct cuvsCagraExtendParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `max_chunk_size` | `uint32_t` | The additional dataset is divided into chunks and added to the graph. This is the knob to |
+| `max_chunk_size` | `uint32_t` | The additional dataset is divided into chunks and added to the graph. This is the knob to adjust the tradeoff between the recall and operation throughput. Large chunk sizes can result in high throughput, but use more working memory (O(max_chunk_size*degree^2)). This can also degrade recall because no edges are added between the nodes in the same chunk. Auto select when 0. |
 
 _Source: `c/include/cuvs/neighbors/cagra.h:312`_
 
@@ -432,11 +432,11 @@ struct cuvsCagraSearchParams { ... } ;
 | Name | Type | Description |
 | --- | --- | --- |
 | `max_queries` | `size_t` | Maximum number of queries to search at the same time (batch size). Auto select when 0. |
-| `itopk_size` | `size_t` | Number of intermediate search results retained during the search. |
+| `itopk_size` | `size_t` | Number of intermediate search results retained during the search. This is the main knob to adjust trade off between accuracy and search speed. Higher values improve the search accuracy. |
 | `max_iterations` | `size_t` | Upper limit of search iterations. Auto select when 0. |
 | `algo` | `enum cuvsCagraSearchAlgo` | Which search implementation to use. |
 | `team_size` | `size_t` | Number of threads used to calculate a single distance. 4, 8, 16, or 32. |
-| `search_width` | `size_t` | Number of graph nodes to select as the starting point for the search in each iteration. aka |
+| `search_width` | `size_t` | Number of graph nodes to select as the starting point for the search in each iteration. aka search width? |
 | `min_iterations` | `size_t` | Lower limit of search iterations. |
 | `thread_block_size` | `size_t` | Thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when 0. |
 | `hashmap_mode` | `enum cuvsCagraHashMode` | Hashmap type. Auto selection when AUTO. |
@@ -446,7 +446,7 @@ struct cuvsCagraSearchParams { ... } ;
 | `rand_xor_mask` | `uint64_t` | Bit mask used for initial random seed node selection. |
 | `persistent` | `bool` | Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) |
 | `persistent_lifetime` | `float` | Persistent kernel: time in seconds before the kernel stops if no requests received. |
-| `persistent_device_usage` | `float` | Set the fraction of maximum grid size used by persistent kernel. |
+| `persistent_device_usage` | `float` | Set the fraction of maximum grid size used by persistent kernel. Value 1.0 means the kernel grid size is maximum possible for the selected device. The value must be greater than 0.0 and not greater than 1.0. One may need to run other kernels alongside this persistent kernel. This parameter can be used to reduce the grid size of the persistent kernel to leave a few SMs idle. Note: running any other work on GPU alongside with the persistent kernel makes the setup fragile.<br />- Running another kernel in another thread usually works, but no progress guaranteed<br />- Any CUDA allocations block the context (this issue may be obscured by using pools)<br />- Memory copies to not-pinned host memory may block the context Even when we know there are no other kernels working at the same time, setting kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care. If you suspect this is an issue, you can reduce this number to ~0.9 without a significant impact on the throughput. |
 
 _Source: `c/include/cuvs/neighbors/cagra.h:371`_
 

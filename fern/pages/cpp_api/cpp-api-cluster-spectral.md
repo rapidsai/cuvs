@@ -27,7 +27,7 @@ struct params { ... } ;
 | `n_init` | `int` | Number of k-means runs with different centroid seeds |
 | `n_neighbors` | `int` | Number of nearest neighbors for constructing the connectivity graph |
 | `tolerance` | `float` | Tolerance for the eigenvalue solver |
-| `raft::random::RngState rng_state{0}` | `raft::random::RngState rng_state{0}` | Random number generator state for reproducibility |
+| `rng_state` | `raft::random::RngState` | Random number generator state for reproducibility |
 
 _Source: `cpp/include/cuvs/cluster/spectral.hpp:22`_
 

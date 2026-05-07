@@ -24,11 +24,11 @@ struct index_params : cuvs::neighbors::index_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `graph_degree` | `uint32_t` | Maximum degree of output graph corresponds to the R parameter in the original Vamana |
-| `visited_size` | `uint32_t` | Maximum number of visited nodes per search corresponds to the L parameter in the Vamana |
+| `graph_degree` | `uint32_t` | Maximum degree of output graph corresponds to the R parameter in the original Vamana literature. |
+| `visited_size` | `uint32_t` | Maximum number of visited nodes per search corresponds to the L parameter in the Vamana literature * |
 | `vamana_iters` | `float` | Number of Vamana vector insertion iterations (each iteration inserts all vectors). |
 | `alpha` | `float` | Alpha for pruning parameter |
-| `max_fraction` | `float` | Maximum fraction of dataset inserted per batch.              * |
+| `max_fraction` | `float` | Maximum fraction of dataset inserted per batch.              * Larger max batch decreases graph quality, but improves speed |
 | `batch_base` | `float` | Base of growth rate of batch sizes * |
 | `queue_size` | `uint32_t` | Size of candidate queue structure - should be (2^x)-1 |
 | `reverse_batchsize` | `uint32_t` | Max batchsize of reverse edge processing (reduces memory footprint) |

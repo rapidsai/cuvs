@@ -162,7 +162,7 @@ struct extend_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `num_threads` | `int` | Number of host threads to use to add additional vectors to the index. |
+| `num_threads` | `int` | Number of host threads to use to add additional vectors to the index. Value of 0 automatically maximizes parallelism. |
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:186`_
 
@@ -586,8 +586,8 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `ef` | `int` | size of the candidate list |
-| `num_threads` | `int` | number of host threads to use for concurrent searches. Value of 0 |
+| `ef` | `int` |  |
+| `num_threads` | `int` |  |
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:740`_
 

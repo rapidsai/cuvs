@@ -14,34 +14,23 @@ _Doxygen group: `nn_descent_cpp_index_params`_
 
 Dtype to use for distance computation
 
-- `AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions.
-- `FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage.
-- `FP16`: Use fp16 distance computation.
-
 ```cpp
 enum class DIST_COMP_DTYPE { ... } ;
 ```
 
 **Values**
 
-| Name | Value |
-| --- | --- |
-| `AUTO` | `0` |
-| `FP32` | `1` |
-| `FP16` | `2` |
+| Name | Value | Description |
+| --- | --- | --- |
+| `AUTO` | `0` | Automatically determine the best dtype for distance computation based on the dataset dimensions. |
+| `FP32` | `1` | Use fp32 distance computation for better precision at the cost of performance and memory usage. |
+| `FP16` | `2` | Use fp16 distance computation. |
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:35`_
 
 ### cuvs::neighbors::nn_descent::index_params
 
 Parameters used to build an nn-descent index
-
-- `graph_degree`: For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree)
-- `intermediate_graph_degree`: Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree
-- `max_iterations`: The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance
-- `termination_threshold`: The delta at which nn-descent will terminate its iterations
-- `return_distances`: Boolean to decide whether to return distances array
-- `dist_comp_dtype`: dtype to use for distance computation. Defaults to `AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `FP16` for better performance and memory usage at the cost of precision.
 
 ```cpp
 struct index_params : cuvs::neighbors::index_params { ... } ;
@@ -51,13 +40,12 @@ struct index_params : cuvs::neighbors::index_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `index_params` | `index_params(size_t` | Construct NN descent parameters for a specific kNN graph degree |
-| `graph_degree` | `size_t` |  |
-| `intermediate_graph_degree` | `size_t` |  |
-| `max_iterations` | `size_t` |  |
-| `termination_threshold` | `float` |  |
-| `return_distances` | `bool` |  |
-| `dist_comp_dtype` | `DIST_COMP_DTYPE` |  |
+| `graph_degree` | `size_t` | For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree) |
+| `intermediate_graph_degree` | `size_t` | Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree |
+| `max_iterations` | `size_t` | The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance |
+| `termination_threshold` | `float` | The delta at which nn-descent will terminate its iterations |
+| `return_distances` | `bool` | Boolean to decide whether to return distances array |
+| `dist_comp_dtype` | `DIST_COMP_DTYPE` | dtype to use for distance computation. Defaults to `AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `FP16` for better performance and memory usage at the cost of precision. |
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:56`_
 

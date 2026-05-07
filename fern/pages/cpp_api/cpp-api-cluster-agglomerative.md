@@ -80,8 +80,8 @@ struct distance_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `c` | `int` | a constant used when constructing linkage from knn graph. Allows the indirect control of k. |
-| `dist_type` | `cuvs::cluster::agglomerative::Linkage` | strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller |
+| `c` | `int` | a constant used when constructing linkage from knn graph. Allows the indirect control of k. The algorithm will set `k = log(n) + c` |
+| `dist_type` | `cuvs::cluster::agglomerative::Linkage` | strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller datasets. KNN_GRAPH allows the memory usage to be controlled (using parameter c) |
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:118`_
 
@@ -98,8 +98,8 @@ struct mutual_reachability_params { ... } ;
 | Name | Type | Description |
 | --- | --- | --- |
 | `min_samples` | `int` | this neighborhood will be selected for core distances. |
-| `alpha` | `float` | weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables |
-| `cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params::brute_force_params{}}` | `cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params::brute_force_params{}}` | Parameters for building the mutual reachability graph using an underlying KNN algorithm. |
+| `alpha` | `float` | weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables the weighting) |
+| `brute_force_params` | `cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params::` | Parameters for building the mutual reachability graph using an underlying KNN algorithm. The all-neighbors graph construction algorithm enables building the mutual reachability graph on datasets larger than device memory by:<br />1. Partitioning the dataset into overlapping clusters,<br />2. Computing local KNN graphs within each cluster, and<br />3. Merging the local graphs into a single global graph. Key fields:<br />- graph_build_params: Selects the KNN construction method (Brute Force or NN Descent) and controls algorithm-specific parameters.<br />- n_clusters: Number of partitions (batches) to split the data into. Larger `n_clusters` reduces memory usage but may reduce accuracy if `overlap_factor` is too low. Recommended starting value: `n_clusters = 4`. Increase progressively (4 → 8 → 16 ...) to reduce memory usage at the cost of some accuracy. This is independent of `overlap_factor` as long as `overlap_factor &lt; n_clusters`.<br />- overlap_factor: Number of nearest clusters each data point is assigned to. Higher `overlap_factor` improves accuracy at the cost of memory and performance. Recommended starting value: `overlap_factor = 2`. Increase gradually (2 → 3 → 4 ...) for better accuracy with higher device memory usage.<br />- metric: Distance metric to use when computing nearest neighbors. |
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:130`_
 

@@ -42,8 +42,8 @@ struct cuvsBinaryQuantizerParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `threshold` | `enum` |  |
-| `sampling_ratio` | `float` |  |
+| `threshold` | `/* * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform */ enum` |  |
+| `sampling_ratio` | `/* * specifies the sampling ratio */` |  |
 
 _Source: `c/include/cuvs/preprocessing/quantize/binary.h:35`_
 

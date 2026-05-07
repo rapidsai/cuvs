@@ -22,21 +22,18 @@ struct params : base_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `KMeansPlusPlus,` | `KMeansPlusPlus,` | Sample the centroids using the kmeans++ strategy |
-| `Random,` | `Random,` | Sample the centroids uniformly at random |
-| `Array` | `Array` | User provides the array of initial centroids |
 | `n_clusters` | `int` | The number of clusters to form as well as the number of centroids to generate (default:8). |
-| `init` | `InitMethod` | Method for initialization, defaults to k-means++: |
+| `init` | `InitMethod` | Method for initialization, defaults to k-means++:<br />- InitMethod::KMeansPlusPlus (k-means++): Use scalable k-means++ algorithm to select the initial cluster centers.<br />- InitMethod::Random (random): Choose 'n_clusters' observations (rows) at random from the input data for the initial centroids.<br />- InitMethod::Array (ndarray): Use 'centroids' as initial cluster centers. |
 | `max_iter` | `int` | Maximum number of iterations of the k-means algorithm for a single run. |
 | `tol` | `double` | Relative tolerance with regards to inertia to declare convergence. |
 | `verbosity` | `rapids_logger::level_enum` | verbosity level. |
-| `raft::random::RngState rng_state{0}` | `raft::random::RngState rng_state{0}` | Seed to the random number generator. |
+| `rng_state` | `raft::random::RngState` | Seed to the random number generator. |
 | `n_init` | `int` | Number of instance k-means algorithm will be run with different seeds. |
 | `oversampling_factor` | `double` | Oversampling factor for use in the k-means\|\| algorithm |
-| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is |
+| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids NB: These parameters are unrelated to streaming_batch_size, which controls how many samples to transfer from host to device per batch when processing out-of-core data. |
 | `batch_centroids` | `int` | if 0 then batch_centroids = n_clusters |
 | `inertia_check` | `bool` | If true, check inertia during iterations for early convergence. |
-| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. |
+| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. When set to 0, defaults to n_samples (process all at once). Only used by the batched (host-data) code path and ignored by device-data overloads. Default: 0 (process all data at once). |
 
 _Source: `cpp/include/cuvs/cluster/kmeans.hpp:34`_
 

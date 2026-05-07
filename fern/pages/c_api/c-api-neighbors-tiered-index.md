@@ -70,8 +70,8 @@ struct cuvsTieredIndexParams { ... } ;
 | --- | --- | --- |
 | `metric` | `cuvsDistanceType` | Distance type. |
 | `algo` | `cuvsTieredIndexANNAlgo` | The type of ANN algorithm we are using |
-| `min_ann_rows` | `int64_t` | The minimum number of rows necessary in the index to create an |
-| `create_ann_index_on_extend` | `bool` | Whether or not to create a new ann index on extend, if the number |
+| `min_ann_rows` | `int64_t` | The minimum number of rows necessary in the index to create an ann index |
+| `create_ann_index_on_extend` | `bool` | Whether or not to create a new ann index on extend, if the number of rows in the incremental (bfknn) portion is above min_ann_rows |
 | `cagra_params` | `cuvsCagraIndexParams_t` | Optional parameters for building a cagra index |
 | `ivf_flat_params` | `cuvsIvfFlatIndexParams_t` | Optional parameters for building a ivf_flat index |
 | `ivf_pq_params` | `cuvsIvfPqIndexParams_t` | Optional parameters for building a ivf-pq index |

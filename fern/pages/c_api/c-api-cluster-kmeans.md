@@ -41,17 +41,17 @@ struct cuvsKMeansParams { ... } ;
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_clusters` | `int` | The number of clusters to form as well as the number of centroids to generate (default:8). |
-| `init` | `cuvsKMeansInitMethod` | Method for initialization, defaults to k-means++: |
+| `init` | `cuvsKMeansInitMethod` | Method for initialization, defaults to k-means++:<br />- cuvsKMeansInitMethod::KMeansPlusPlus (k-means++): Use scalable k-means++ algorithm to select the initial cluster centers.<br />- cuvsKMeansInitMethod::Random (random): Choose 'n_clusters' observations (rows) at random from the input data for the initial centroids.<br />- cuvsKMeansInitMethod::Array (ndarray): Use 'centroids' as initial cluster centers. |
 | `max_iter` | `int` | Maximum number of iterations of the k-means algorithm for a single run. |
 | `tol` | `double` | Relative tolerance with regards to inertia to declare convergence. |
 | `n_init` | `int` | Number of instance k-means algorithm will be run with different seeds. |
 | `oversampling_factor` | `double` | Oversampling factor for use in the k-means\|\| algorithm |
-| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is |
+| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids |
 | `batch_centroids` | `int` | if 0 then batch_centroids = n_clusters |
 | `inertia_check` | `bool` | Check inertia during iterations for early convergence. |
 | `hierarchical` | `bool` | Whether to use hierarchical (balanced) kmeans or not |
 | `hierarchical_n_iters` | `int` | For hierarchical k-means , defines the number of training iterations |
-| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch for the batched (host-data) API. |
+| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch for the batched (host-data) API. When set to 0, defaults to n_samples (process all at once). |
 | `metric` | `cuvsDistanceType` |  |
 
 _Source: `c/include/cuvs/cluster/kmeans.h:43`_

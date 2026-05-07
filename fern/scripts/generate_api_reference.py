@@ -73,6 +73,9 @@ API_NAV_SECTIONS = [
 COMMENT_RE = re.compile(r"/\*\*.*?\*/|(?:///[^\n]*(?:\n|$))+", re.DOTALL)
 DOXYGEN_COMMAND_RE = re.compile(r"[@\\](\w+)\b")
 DOXYGEN_LIST_ITEM_RE = re.compile(r"^(?:-\s+|\d+\.\s+)")
+DOXYGEN_FIELD_LIST_ITEM_RE = re.compile(
+    r"^-\s+`?(?P<name>[A-Za-z_]\w*)`?\s*:\s*(?P<description>.*)"
+)
 PUBLIC_JAVA_TYPE_RE = re.compile(
     r"\bpublic\s+(?:abstract\s+|final\s+|sealed\s+|non-sealed\s+)?"
     r"(?P<kind>class|interface|enum|record)\s+(?P<name>[A-Za-z_]\w*)"
@@ -538,8 +541,24 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
     lines = [f"### {heading_text(entry.name)}", ""]
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
-    if entry.details:
-        lines.extend(render_doxygen_details(entry.details))
+
+    members: list[DoxygenEntry] = []
+    values: list[dict[str, str]] = []
+    field_descriptions: dict[str, str] = {}
+    details = entry.details
+    if entry.kind == "enum":
+        values = parse_enum_values(entry.signature)
+        field_descriptions, details = extract_field_descriptions(
+            entry.details, {value["name"] for value in values}
+        )
+    else:
+        members = parse_struct_members(entry)
+        field_descriptions, details = extract_field_descriptions(
+            entry.details, {member.name for member in members}
+        )
+
+    if details:
+        lines.extend(render_doxygen_details(details))
         lines.append("")
     lines.extend(
         [
@@ -551,18 +570,34 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
     )
 
     if entry.kind == "enum":
-        values = parse_enum_values(entry.signature)
         if values:
-            lines.extend(
-                ["**Values**", "", "| Name | Value |", "| --- | --- |"]
-            )
-            for value in values:
-                lines.append(
-                    f"| `{escape_code(value['name'])}` | `{escape_code(value.get('value', ''))}` |"
+            if field_descriptions:
+                lines.extend(
+                    [
+                        "**Values**",
+                        "",
+                        "| Name | Value | Description |",
+                        "| --- | --- | --- |",
+                    ]
                 )
+            else:
+                lines.extend(
+                    ["**Values**", "", "| Name | Value |", "| --- | --- |"]
+                )
+            for value in values:
+                name = escape_code(value["name"])
+                enum_value = escape_code(value.get("value", ""))
+                if field_descriptions:
+                    description = render_table_description(
+                        field_descriptions.get(value["name"], "")
+                    )
+                    lines.append(
+                        f"| `{name}` | `{enum_value}` | {description} |"
+                    )
+                else:
+                    lines.append(f"| `{name}` | `{enum_value}` |")
             lines.append("")
     else:
-        members = parse_struct_members(entry)
         if members:
             lines.extend(["**Fields**", ""])
             rows = []
@@ -571,7 +606,9 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
                     {
                         "name": member.name,
                         "type": member_c_type(member),
-                        "description": member.summary,
+                        "description": field_descriptions.get(
+                            member.name, member_description(member)
+                        ),
                     }
                 )
             lines.extend(render_param_table(rows, include_direction=False))
@@ -1322,7 +1359,7 @@ def parse_entry_name(declaration: str) -> str:
 
 
 def parse_member_name(declaration: str) -> str:
-    declaration = declaration.strip().rstrip(";").split("=", 1)[0].strip()
+    declaration = strip_member_initializer(declaration)
     _, name = split_param_name(declaration)
     return name or declaration
 
@@ -1478,6 +1515,8 @@ def parse_return_type(signature: str) -> str:
 def parse_struct_members(entry: DoxygenEntry) -> list[DoxygenEntry]:
     members: list[DoxygenEntry] = []
     for match in COMMENT_RE.finditer(entry.signature):
+        if not is_top_level_compound_comment(entry.signature, match.start()):
+            continue
         comment = clean_doxygen_comment(match.group(0))
         declaration, line = read_declaration_after(
             entry.signature, match.end()
@@ -1485,6 +1524,8 @@ def parse_struct_members(entry: DoxygenEntry) -> list[DoxygenEntry]:
         if not declaration or declaration.startswith(
             ("public:", "private:", "protected:")
         ):
+            continue
+        if parse_doxygen_kind(declaration) != "member":
             continue
         member = parse_doxygen_entry(
             comment, declaration, entry.source, entry.line + line - 1
@@ -1504,35 +1545,20 @@ def parse_plain_struct_members(
     if not body:
         return []
     members: list[DoxygenEntry] = []
-    pending_declaration = ""
-    pending_comment = ""
-    for raw_line in body.splitlines():
-        stripped = raw_line.strip()
-        if not stripped or stripped in {"public:", "private:", "protected:"}:
-            continue
-        if stripped.startswith("//"):
-            continue
-        if stripped.startswith(("*", "/*", "*/")):
-            continue
-        declaration, inline_comment = split_inline_comment(raw_line)
-        declaration = re.sub(r"/\*.*?\*/", "", declaration).strip()
-        if not declaration and not pending_declaration:
-            continue
-        pending_declaration = f"{pending_declaration} {declaration}".strip()
-        pending_comment = append_sentence(
-            pending_comment, clean_doxygen_text(inline_comment)
-        )
-        if ";" not in pending_declaration:
-            continue
-        declaration = pending_declaration.split(";", 1)[0].rstrip(",").strip()
-        inline_comment = pending_comment
-        pending_declaration = ""
-        pending_comment = ""
+    for declaration in top_level_member_declarations(body):
+        declaration = strip_member_initializer(declaration)
         if not declaration or "(" in declaration:
             continue
-        declaration = declaration.split("=", 1)[0].strip()
         if not declaration or declaration.startswith(
-            ("using ", "typedef ", "static_assert")
+            (
+                "enum ",
+                "friend ",
+                "static_assert",
+                "struct ",
+                "template ",
+                "typedef ",
+                "using ",
+            )
         ):
             continue
         c_type, name = split_param_name(declaration)
@@ -1542,7 +1568,7 @@ def parse_plain_struct_members(
             kind="member",
             name=name,
             signature=c_type or declaration,
-            summary=clean_doxygen_text(inline_comment),
+            summary="",
             source=entry.source,
             line=entry.line,
         )
@@ -1551,12 +1577,93 @@ def parse_plain_struct_members(
     return members
 
 
+def is_top_level_compound_comment(signature: str, offset: int) -> bool:
+    bounds = compound_body_bounds(signature)
+    if bounds is None:
+        return False
+    body_start, body_end = bounds
+    if offset < body_start or offset >= body_end:
+        return False
+    depth = 0
+    for char in signature[body_start:offset]:
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth = max(depth - 1, 0)
+    return depth == 0
+
+
+def top_level_member_declarations(body: str) -> list[str]:
+    text = COMMENT_RE.sub("", body)
+    text = re.sub(r"//.*", "", text)
+    declarations: list[str] = []
+    current: list[str] = []
+    depth = {"(": 0, "[": 0, "{": 0, "<": 0}
+    for char in text:
+        current.append(char)
+        update_depth(depth, char)
+        if char == ";" and not any(depth.values()):
+            declaration = "".join(current).strip().rstrip(";").strip()
+            if declaration:
+                declarations.append(" ".join(declaration.split()))
+            current = []
+    return declarations
+
+
+def extract_field_descriptions(
+    details: list[str], field_names: set[str]
+) -> tuple[dict[str, str], list[str]]:
+    descriptions: dict[str, str] = {}
+    remaining: list[str] = []
+    idx = 0
+    while idx < len(details):
+        line = details[idx]
+        match = DOXYGEN_FIELD_LIST_ITEM_RE.match(line.strip())
+        if match and match.group("name") in field_names:
+            name = match.group("name")
+            description = [match.group("description").strip()]
+            idx += 1
+            while idx < len(details):
+                next_line = details[idx]
+                next_stripped = next_line.strip()
+                if not next_stripped or DOXYGEN_LIST_ITEM_RE.match(
+                    next_stripped
+                ):
+                    break
+                description.append(next_stripped)
+                idx += 1
+            descriptions[name] = " ".join(part for part in description if part)
+            continue
+        remaining.append(line)
+        idx += 1
+    return descriptions, trim_blank_lines(remaining)
+
+
 def compound_body(signature: str) -> str:
+    bounds = compound_body_bounds(signature)
+    if bounds is None:
+        return ""
+    start, end = bounds
+    return signature[start:end]
+
+
+def compound_body_bounds(signature: str) -> tuple[int, int] | None:
     start = signature.find("{")
     end = signature.rfind("}")
     if start == -1 or end == -1 or end <= start:
-        return ""
-    return signature[start + 1 : end]
+        return None
+    return start + 1, end
+
+
+def strip_member_initializer(declaration: str) -> str:
+    declaration = declaration.strip().rstrip(";")
+    declaration, _ = split_default(declaration)
+    declaration = declaration.strip()
+    if declaration.endswith("}") and "{" in declaration:
+        before_brace = declaration.rsplit("{", 1)[0].strip()
+        if re.search(r"\b[A-Za-z_]\w*$", before_brace):
+            return before_brace
+    return declaration
 
 
 def split_inline_comment(line: str) -> tuple[str, str]:
@@ -1567,9 +1674,17 @@ def split_inline_comment(line: str) -> tuple[str, str]:
 
 
 def member_c_type(member: DoxygenEntry) -> str:
-    declaration = member.signature.rstrip(";").split("=", 1)[0].strip()
+    declaration = strip_member_initializer(member.signature)
     c_type, _ = split_param_name(declaration)
     return c_type or declaration
+
+
+def member_description(member: DoxygenEntry) -> str:
+    lines = []
+    if member.summary:
+        lines.append(member.summary)
+    lines.extend(member.details)
+    return "\n".join(line for line in lines if line.strip())
 
 
 def parse_enum_values(signature: str) -> list[dict[str, str]]:

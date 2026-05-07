@@ -32,7 +32,7 @@ struct index_params : cuvs::neighbors::index_params { ... } ;
 | `pq_n_rows_train` | `int64_t` | the number of rows for PQ training (internally capped to 100k) * |
 | `pq_train_iters` | `uint32_t` | the max number of iterations for PQ training * |
 | `reordering_bf16` | `bool` | whether to apply bf16 quantization of dataset vectors * |
-| `reordering_noise_shaping_threshold` | `float` | Threshold T for computing AVQ eta = (dim - 1) ( T^2 / \|\| x \|\|^2) / ( 1 - T^2 / \|\| x \|\|^2) |
+| `reordering_noise_shaping_threshold` | `float` | Threshold T for computing AVQ eta = (dim - 1) ( T^2 / \|\| x \|\|^2) / ( 1 - T^2 / \|\| x \|\|^2) When quantizing a vector x to x_q, AVQ minimizes the loss function L(x, x_q) = eta * \|\| r_para \|\|^2 + \|\| r_perp \|\|^2, where r = x - x_q, r_para = &lt;r, x&gt; * x / \|\| x \|\|^2, r_perp = r - r_para Compared to L2 loss, This produces an x_q which better approximates the dot product of a query vector with x If the threshold is NAN, AVQ is not performed during bfloat16 quant |
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:36`_
 
