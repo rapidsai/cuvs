@@ -31,6 +31,8 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
+class SearcherGPU;
+
 // Structure for cluster-query pairs
 struct ClusterQueryPair {
   int cluster_idx;
@@ -295,6 +297,14 @@ class IVFGPU {
                                        int query_bits);
 
  private:
+  void PrepareClusterSearchInputs(const float* d_query,
+                                  size_t batch_size,
+                                  size_t nprobe,
+                                  SearcherGPU* searcher_batch,
+                                  raft::device_vector<ClusterQueryPair, int64_t>& d_sorted_pairs,
+                                  raft::device_vector<float, int64_t>& d_G_k1xSumq,
+                                  raft::device_vector<float, int64_t>& d_G_kbxSumq);
+
   /**
    * @brief function to allocate memory based on the cluster
    *

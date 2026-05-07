@@ -1213,18 +1213,15 @@ void computeQueryFactors(const T* d_query,
 }
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
-void IVFGPU::BatchClusterSearch(const float* d_query,
-                                size_t k,
-                                size_t nprobe,
-                                void* searcher,
-                                size_t batch_size,
-                                float* d_final_dists,
-                                PID* d_final_pids)
+void IVFGPU::PrepareClusterSearchInputs(
+  const float* d_query,
+  size_t batch_size,
+  size_t nprobe,
+  SearcherGPU* searcher_batch,
+  raft::device_vector<ClusterQueryPair, int64_t>& d_sorted_pairs,
+  raft::device_vector<float, int64_t>& d_G_k1xSumq,
+  raft::device_vector<float, int64_t>& d_G_kbxSumq)
 {
-  SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
-  // batch_size = num_queries
-  // First compute distances from query to centroids on CPU and select TOPK for each
-
   // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
   const float alpha = -2.f, beta = 0.f;
   raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
@@ -1243,7 +1240,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
     searcher_batch->get_centroid_distances(),
     num_centroids);
 
-  // Step2: fused kernel to compute q and c norms
+  // Step 2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
   const int norm_block_size = 256;
   size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
@@ -1258,7 +1255,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
     searcher_batch->get_c_norms());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-  // Step3: add all norms together
+  // Step 3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
   add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
@@ -1269,35 +1266,29 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
     num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-  // Step4: select topk and copy back
-  // Use raft library
-  // RAFT select_k outputs
+  // Step 4: select top-nprobe clusters per query
   auto d_raft_vals = raft::make_device_matrix<float, int64_t>(handle_, batch_size, nprobe);
   auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(handle_, batch_size, nprobe);
-
-  // Then TOPK is copied back to CPU side
-  auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+  auto in_view     = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->get_centroid_distances(), batch_size, num_centroids);
-
-  // max-k, sorted within k (nprobe)
   raft::matrix::select_k<float, int>(handle_,
                                      in_view,
-                                     std::nullopt,  // carry column IDs automatically
+                                     std::nullopt,
                                      d_raft_vals.view(),
                                      d_raft_idx.view(),
                                      /*select_min=*/true,
                                      /*sorted=*/true,
                                      raft::matrix::SelectAlgo::kAuto);
 
-  // Sortpairs
-  int total_pairs     = batch_size * nprobe;
-  auto d_sorted_pairs = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, total_pairs);
+  // Step 5: sort (cluster, query) pairs
+  d_sorted_pairs =
+    raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, batch_size * nprobe);
   sort_cluster_query_pairs(
     handle_, d_raft_idx.data_handle(), d_sorted_pairs.data_handle(), batch_size, nprobe);
 
-  // Compute query factors
-  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
-  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  // Step 6: compute query factors
+  d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
   computeQueryFactors<float>(d_query,
                              d_G_k1xSumq.data_handle(),
                              d_G_kbxSumq.data_handle(),
@@ -1305,8 +1296,22 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                              num_padded_dim,
                              ex_bits,
                              stream_);
-  // Then launch the search function
+}
 
+void IVFGPU::BatchClusterSearch(const float* d_query,
+                                size_t k,
+                                size_t nprobe,
+                                void* searcher,
+                                size_t batch_size,
+                                float* d_final_dists,
+                                PID* d_final_pids)
+{
+  SearcherGPU* searcher_batch = (SearcherGPU*)searcher;
+  auto d_sorted_pairs         = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, 0);
+  auto d_G_k1xSumq            = raft::make_device_vector<float, int64_t>(handle_, 0);
+  auto d_G_kbxSumq            = raft::make_device_vector<float, int64_t>(handle_, 0);
+  PrepareClusterSearchInputs(
+    d_query, batch_size, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
   searcher_batch->SearchClusterQueryPairs(*this,
                                           cluster_meta_.data_handle(),
                                           d_sorted_pairs.data_handle(),
@@ -1320,7 +1325,6 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                           d_final_pids);
 }
 
-// normal way to first sort (cluster, query) pairs, then use a CTA to do the search
 void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                      size_t k,
                                      size_t nprobe,
@@ -1329,92 +1333,12 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                      float* d_final_dists,
                                      PID* d_final_pids)
 {
-  SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
-  // batch_size = num_queries
-  // First compute distances from query to centroids on CPU and select TOPK for each
-
-  // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
-  const float alpha = -2.f, beta = 0.f;
-  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
-    handle_,
-    /* trans_a = */ true,
-    /* trans_b = */ false,
-    num_centroids,
-    batch_size,
-    num_padded_dim,
-    &alpha,
-    initializer->GetCentroid(0),
-    num_padded_dim,
-    d_query,
-    num_padded_dim,
-    &beta,
-    searcher_batch->get_centroid_distances(),
-    num_centroids);
-
-  // Step2: fused kernel to compute q and c norms
-  int grid                  = num_centroids + batch_size;
-  const int norm_block_size = 256;
-  size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, stream_>>>(
-    d_query,
-    batch_size,
-    num_padded_dim,
-    initializer->GetCentroid(0),
-    num_centroids,
-    num_padded_dim,
-    searcher_batch->get_q_norms(),
-    searcher_batch->get_c_norms());
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Step3: add all norms together
-  int add_threads = 256;
-  int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
-    searcher_batch->get_centroid_distances(),
-    searcher_batch->get_q_norms(),
-    searcher_batch->get_c_norms(),
-    batch_size,
-    num_centroids);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Step4: select topk and copy back
-  // Use raft library
-  // RAFT select_k outputs
-  auto d_raft_vals = raft::make_device_matrix<float, int64_t>(handle_, batch_size, nprobe);
-  auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(handle_, batch_size, nprobe);
-
-  // Then TOPK is copied back to CPU side
-  auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
-
-  // max-k, sorted within k (nprobe)
-  raft::matrix::select_k<float, int>(handle_,
-                                     in_view,
-                                     std::nullopt,  // carry column IDs automatically
-                                     d_raft_vals.view(),
-                                     d_raft_idx.view(),
-                                     /*select_min=*/true,
-                                     /*sorted=*/true,
-                                     raft::matrix::SelectAlgo::kAuto);
-
-  // Sortpairs
-  int total_pairs     = batch_size * nprobe;
-  auto d_sorted_pairs = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, total_pairs);
-  sort_cluster_query_pairs(
-    handle_, d_raft_idx.data_handle(), d_sorted_pairs.data_handle(), batch_size, nprobe);
-
-  // Compute query factors
-  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
-  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
-  computeQueryFactors<float>(d_query,
-                             d_G_k1xSumq.data_handle(),
-                             d_G_kbxSumq.data_handle(),
-                             batch_size,
-                             num_padded_dim,
-                             ex_bits,
-                             stream_);
-  // Then launch the search function
-
+  SearcherGPU* searcher_batch = (SearcherGPU*)searcher;
+  auto d_sorted_pairs         = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, 0);
+  auto d_G_k1xSumq            = raft::make_device_vector<float, int64_t>(handle_, 0);
+  auto d_G_kbxSumq            = raft::make_device_vector<float, int64_t>(handle_, 0);
+  PrepareClusterSearchInputs(
+    d_query, batch_size, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
   searcher_batch->SearchClusterQueryPairsSharedMemOpt(*this,
                                                       cluster_meta_.data_handle(),
                                                       d_sorted_pairs.data_handle(),
@@ -1428,7 +1352,6 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                                       d_final_pids);
 }
 
-// normal way to first sort (cluster, query) pairs, then use a CTA to do the search
 void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                              size_t k,
                                              size_t nprobe,
@@ -1438,92 +1361,12 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                              PID* d_final_pids,
                                              int query_bits)
 {
-  SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
-  // batch_size = num_queries
-  // First compute distances from query to centroids on CPU and select TOPK for each
-
-  // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
-  const float alpha = -2.f, beta = 0.f;
-  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
-    handle_,
-    /* trans_a = */ true,
-    /* trans_b = */ false,
-    num_centroids,
-    batch_size,
-    num_padded_dim,
-    &alpha,
-    initializer->GetCentroid(0),
-    num_padded_dim,
-    d_query,
-    num_padded_dim,
-    &beta,
-    searcher_batch->get_centroid_distances(),
-    num_centroids);
-
-  // Step2: fused kernel to compute q and c norms
-  int grid                  = num_centroids + batch_size;
-  const int norm_block_size = 256;
-  size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, stream_>>>(
-    d_query,
-    batch_size,
-    num_padded_dim,
-    initializer->GetCentroid(0),
-    num_centroids,
-    num_padded_dim,
-    searcher_batch->get_q_norms(),
-    searcher_batch->get_c_norms());
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Step3: add all norms together
-  int add_threads = 256;
-  int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
-    searcher_batch->get_centroid_distances(),
-    searcher_batch->get_q_norms(),
-    searcher_batch->get_c_norms(),
-    batch_size,
-    num_centroids);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Step4: select topk and copy back
-  // Use raft library
-  // RAFT select_k outputs
-  auto d_raft_vals = raft::make_device_matrix<float, int64_t>(handle_, batch_size, nprobe);
-  auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(handle_, batch_size, nprobe);
-
-  // Then TOPK is copied back to CPU side
-  auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
-
-  // max-k, sorted within k (nprobe)
-  raft::matrix::select_k<float, int>(handle_,
-                                     in_view,
-                                     std::nullopt,  // carry column IDs automatically
-                                     d_raft_vals.view(),
-                                     d_raft_idx.view(),
-                                     /*select_min=*/true,
-                                     /*sorted=*/true,
-                                     raft::matrix::SelectAlgo::kAuto);
-
-  // Sortpairs
-  int total_pairs     = batch_size * nprobe;
-  auto d_sorted_pairs = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, total_pairs);
-  sort_cluster_query_pairs(
-    handle_, d_raft_idx.data_handle(), d_sorted_pairs.data_handle(), batch_size, nprobe);
-
-  // Compute query factors
-  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
-  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
-  computeQueryFactors<float>(d_query,
-                             d_G_k1xSumq.data_handle(),
-                             d_G_kbxSumq.data_handle(),
-                             batch_size,
-                             num_padded_dim,
-                             ex_bits,
-                             stream_);
-  // Then launch the search function
-
+  SearcherGPU* searcher_batch = (SearcherGPU*)searcher;
+  auto d_sorted_pairs         = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, 0);
+  auto d_G_k1xSumq            = raft::make_device_vector<float, int64_t>(handle_, 0);
+  auto d_G_kbxSumq            = raft::make_device_vector<float, int64_t>(handle_, 0);
+  PrepareClusterSearchInputs(
+    d_query, batch_size, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
   searcher_batch->SearchClusterQueryPairsQuantizeQuery(*this,
                                                        cluster_meta_.data_handle(),
                                                        d_sorted_pairs.data_handle(),
