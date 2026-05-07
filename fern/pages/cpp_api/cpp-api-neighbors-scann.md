@@ -1,0 +1,168 @@
+---
+slug: api-reference/cpp-api-neighbors-scann
+---
+
+# Scann
+
+_Source header: `cpp/include/cuvs/neighbors/scann.hpp`_
+
+## ScaNN index build parameters
+
+_Doxygen group: `scann_cpp_index_params`_
+
+### cuvs::neighbors::experimental::scann::index_params
+
+ANN parameters used by ScaNN to build index
+
+```cpp
+struct index_params : cuvs::neighbors::index_params { ... } ;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `n_leaves` | `uint32_t` | the number of leaves in the tree * |
+| `kmeans_n_rows_train` | `int64_t` | the number of rows for training the tree structures * |
+| `kmeans_n_iters` | `uint32_t` | the max number of iterations for training the tree structure * |
+| `partitioning_eta` | `float` | the value of eta for AVQ adjustment during partitioning * |
+| `soar_lambda` | `float` | the value of lambda for SOAR spilling * |
+| `pq_dim` | `uint32_t` | the dimension of pq subspaces (must divide dataset dimension)* |
+| `pq_bits` | `uint32_t` | the number of bits for pq codes (must be 4 or 8, for 16 and 256 codes respectively) * |
+| `pq_n_rows_train` | `int64_t` | the number of rows for PQ training (internally capped to 100k) * |
+| `pq_train_iters` | `uint32_t` | the max number of iterations for PQ training * |
+| `reordering_bf16` | `bool` | whether to apply bf16 quantization of dataset vectors * |
+| `reordering_noise_shaping_threshold` | `float` | Threshold T for computing AVQ eta = (dim - 1) ( T^2 / \|\| x \|\|^2) / ( 1 - T^2 / \|\| x \|\|^2) |
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:36`_
+
+## ScaNN index type
+
+_Doxygen group: `scann_cpp_index`_
+
+### cuvs::neighbors::experimental::scann::metric
+
+Distance metric used for clustering.
+
+```cpp
+[[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType;
+```
+
+**Returns**
+
+`cuvs::distance::DistanceType`
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:110`_
+
+### cuvs::neighbors::experimental::scann::size
+
+Total length of the index (number of vectors).
+
+```cpp
+IdxT size() const noexcept;
+```
+
+**Returns**
+
+`IdxT`
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:116`_
+
+### cuvs::neighbors::experimental::scann::dim
+
+Dimensionality of the data.
+
+```cpp
+[[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t;
+```
+
+**Returns**
+
+`uint32_t`
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:119`_
+
+## ScaNN index build functions
+
+_Doxygen group: `scann_cpp_index_build`_
+
+### cuvs::neighbors::experimental::scann::build
+
+Build the index from the dataset for efficient search.
+
+```cpp
+auto build(raft::resources const& handle,
+const cuvs::neighbors::experimental::scann::index_params& params,
+raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+-> cuvs::neighbors::experimental::scann::index<float, int64_t>;
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | `const cuvs::neighbors::experimental::scann::index_params&` |  |
+| `dataset` |  | `raft::device_matrix_view<const float, int64_t, raft::row_major>` |  |
+
+**Returns**
+
+`cuvs::neighbors::experimental::scann::index<float, int64_t>`
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:291`_
+
+### cuvs::neighbors::experimental::scann::serialize
+
+Save the index to files in a directory
+
+```cpp
+void serialize(raft::resources const& handle,
+const std::string& file_prefix,
+const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
+```
+
+This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `file_prefix` |  | `const std::string&` |  |
+| `index` |  | `const cuvs::neighbors::experimental::scann::index<float, int64_t>&` |  |
+
+**Returns**
+
+`void`
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:316`_
+
+## ScaNN serialize functions
+
+_Doxygen group: `scann_cpp_serialize`_
+
+### cuvs::neighbors::experimental::scann::serialize
+
+Save the index to files in a directory
+
+```cpp
+void serialize(raft::resources const& handle,
+const std::string& file_prefix,
+const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
+```
+
+This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `file_prefix` |  | `const std::string&` |  |
+| `index` |  | `const cuvs::neighbors::experimental::scann::index<float, int64_t>&` |  |
+
+**Returns**
+
+`void`
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:316`_

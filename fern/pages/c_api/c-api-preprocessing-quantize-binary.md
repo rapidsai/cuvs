@@ -1,0 +1,216 @@
+---
+slug: api-reference/c-api-preprocessing-quantize-binary
+---
+
+# Binary
+
+_Source header: `c/include/cuvs/preprocessing/quantize/binary.h`_
+
+## C API for Binary Quantizer
+
+_Doxygen group: `preprocessing_c_binary`_
+
+### cuvsBinaryQuantizerThreshold
+
+In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in
+
+the dataset vector is greater than the corresponding element in the threshold vector. The mean and sampling_median thresholds are calculated separately for each dimension.
+
+```c
+enum cuvsBinaryQuantizerThreshold { ... } ;
+```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `ZERO` | `0` |
+| `MEAN` | `1` |
+| `SAMPLING_MEDIAN` | `2` |
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:26`_
+
+### cuvsBinaryQuantizerParams
+
+Binary quantizer parameters.
+
+```c
+struct cuvsBinaryQuantizerParams { ... } ;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `threshold` | `enum` |  |
+| `sampling_ratio` | `float` |  |
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:35`_
+
+### cuvsBinaryQuantizerParamsCreate
+
+Allocate Binary Quantizer params, and populate with default values
+
+```c
+cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `params` | in | `cuvsBinaryQuantizerParams_t*` | cuvsBinaryQuantizerParams_t to allocate |
+
+**Returns**
+
+`cuvsError_t`
+
+cuvsError_t
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:55`_
+
+### cuvsBinaryQuantizerParamsDestroy
+
+De-allocate Binary Quantizer params
+
+```c
+cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `params` | in | `cuvsBinaryQuantizerParams_t` |  |
+
+**Returns**
+
+`cuvsError_t`
+
+cuvsError_t
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:63`_
+
+### cuvsBinaryQuantizerCreate
+
+Allocate Binary Quantizer and populate with default values
+
+```c
+cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `quantizer` | in | `cuvsBinaryQuantizer_t*` | cuvsBinaryQuantizer_t to allocate |
+
+**Returns**
+
+`cuvsError_t`
+
+cuvsError_t
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:84`_
+
+### cuvsBinaryQuantizerDestroy
+
+De-allocate Binary Quantizer
+
+```c
+cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `quantizer` | in | `cuvsBinaryQuantizer_t` |  |
+
+**Returns**
+
+`cuvsError_t`
+
+cuvsError_t
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:92`_
+
+### cuvsBinaryQuantizerTrain
+
+Trains a binary quantizer to be used later for quantizing the dataset.
+
+```c
+cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
+cuvsBinaryQuantizerParams_t params,
+DLManagedTensor* dataset,
+cuvsBinaryQuantizer_t quantizer);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `res` | in | `cuvsResources_t` | raft resource |
+| `params` | in | `cuvsBinaryQuantizerParams_t` | configure binary quantizer, e.g. threshold |
+| `dataset` | in | `DLManagedTensor*` | a row-major host or device matrix |
+| `quantizer` | out | `cuvsBinaryQuantizer_t` | trained binary quantizer |
+
+**Returns**
+
+`cuvsError_t`
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:102`_
+
+### cuvsBinaryQuantizerTransform
+
+Applies binary quantization transform to the given dataset
+
+```c
+cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
+DLManagedTensor* dataset,
+DLManagedTensor* out);
+```
+
+This applies binary quantization to a dataset, changing any positive values to a bitwise 1. This is useful for searching with the BitwiseHamming distance type.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `res` | in | `cuvsResources_t` | raft resource |
+| `dataset` | in | `DLManagedTensor*` | a row-major host or device matrix to transform |
+| `out` | out | `DLManagedTensor*` | a row-major host or device matrix to store transformed data |
+
+**Returns**
+
+`cuvsError_t`
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:118`_
+
+### cuvsBinaryQuantizerTransformWithParams
+
+Applies binary quantization transform to the given dataset
+
+```c
+cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
+cuvsBinaryQuantizer_t quantizer,
+DLManagedTensor* dataset,
+DLManagedTensor* out);
+```
+
+This applies binary quantization to a dataset, changing any values that are larger than the threshold specified in the param to a bitwise 1. This is useful for searching with the BitwiseHamming distance type.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `res` | in | `cuvsResources_t` | raft resource |
+| `quantizer` | in | `cuvsBinaryQuantizer_t` | binary quantizer |
+| `dataset` | in | `DLManagedTensor*` | a row-major host or device matrix to transform |
+| `out` | out | `DLManagedTensor*` | a row-major host or device matrix to store transformed data |
+
+**Returns**
+
+`cuvsError_t`
+
+_Source: `c/include/cuvs/preprocessing/quantize/binary.h:134`_

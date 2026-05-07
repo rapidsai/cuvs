@@ -1,14 +1,33 @@
 # Building Documentation
-## Building locally:
 
-#### [Build and install cuVS](source/build.md)
+The cuVS documentation is a Fern project in [../fern](../fern).
 
-#### Generate the docs
-```shell script
-bash build.sh docs
+## Preview locally
+
+```bash
+fern/build_docs.sh dev
 ```
 
-#### Once the process finishes, documentation can be found in build/html
-```shell script
-xdg-open build/html/index.html`
+Fern serves the preview at [http://localhost:3000](http://localhost:3000) by default.
+
+## Validate
+
+```bash
+fern/build_docs.sh check
+```
+
+The Fern build refreshes the C, C++, Python, Java, Rust, and Go API reference pages from the source tree before validating.
+
+## Publish
+
+Create a Fern preview deployment:
+
+```bash
+fern/build_docs.sh preview
+```
+
+Publish the production docs site:
+
+```bash
+fern/build_docs.sh publish
 ```
