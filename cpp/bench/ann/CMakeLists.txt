@@ -22,6 +22,9 @@ option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algori
        ON
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ
+       "Include faiss' cpu ivf rabitq algorithm in benchmark" OFF
+)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ "Include cuVS ivf pq algorithm in benchmark" ON)
@@ -45,6 +48,7 @@ option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
 option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ "Include cuVS ivf RaBitQ algorithm in benchmark" ON)
 
 # ##################################################################################################
 # * Process options ----------------------------------------------------------
@@ -244,6 +248,13 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
+  ConfigureAnnBench(
+    NAME CUVS_IVF_RABITQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_rabitq.cu LINKS cuvs
+    ivf_rabitq
+  )
+endif()
+
 if(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE)
   ConfigureAnnBench(NAME CUVS_BRUTE_FORCE PATH src/cuvs/cuvs_benchmark.cu LINKS cuvs)
 endif()
@@ -306,6 +317,13 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ)
   ConfigureAnnBench(
     NAME FAISS_CPU_IVF_PQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ)
+  ConfigureAnnBench(
+    NAME FAISS_CPU_IVF_RABITQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
+    cuvs ivf_rabitq
   )
 endif()
 
