@@ -5,6 +5,7 @@
 #pragma once
 
 #include "kmeans.cuh"
+#include "kmeans_mg.hpp"
 
 namespace cuvs::cluster::kmeans {
 
@@ -66,8 +67,12 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  cuvs::cluster::kmeans::detail::fit<DataT, IndexT>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  if (raft::resource::comms_initialized(handle)) {
+    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
+  } else {
+    cuvs::cluster::kmeans::detail::fit<DataT, IndexT>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  }
 }
 
 }  // namespace cuvs::cluster::kmeans

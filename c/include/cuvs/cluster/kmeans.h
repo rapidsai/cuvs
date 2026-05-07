@@ -200,9 +200,13 @@ struct cuvsKMeansParams {
 };
 
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;
+typedef struct cuvsKMeansParams_v2* cuvsKMeansParams_v2_t;
 
 /**
  * @brief Allocate KMeans params, and populate with default values
+ *
+ * @note In cuVS 26.08 (next ABI major version) this signature will be
+ * replaced by cuvsKMeansParamsCreate_v2.
  *
  * @param[in] params cuvsKMeansParams_t to allocate
  * @return cuvsError_t
@@ -212,10 +216,32 @@ cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 /**
  * @brief De-allocate KMeans params
  *
+ * @note In cuVS 26.08 (next ABI major version) this signature will be
+ * replaced by cuvsKMeansParamsDestroy_v2.
+ *
  * @param[in] params
  * @return cuvsError_t
  */
 cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
+
+/**
+ * @brief Allocate KMeans params
+ *
+ * Mirrors cuvsKMeansParamsCreate but operates on cuvsKMeansParams_v2.
+ * Will become the unsuffixed cuvsKMeansParamsCreate in cuVS 26.08.
+ *
+ * @param[in] params cuvsKMeansParams_v2_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsKMeansParamsCreate_v2(cuvsKMeansParams_v2_t* params);
+
+/**
+ * @brief De-allocate KMeans params allocated by cuvsKMeansParamsCreate_v2.
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params);
 
 /**
  * @brief Type of k-means algorithm.
@@ -241,6 +267,9 @@ typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
  *   X may reside on either host (CPU) or device (GPU) memory.
  *   When X is on the host the data is streamed to the GPU in
  *   batches controlled by params->streaming_batch_size.
+ *
+ * @note In cuVS 26.08 (next ABI major version) this signature will be
+ * replaced by cuvsKMeansFit_v2.
  *
  * @param[in]     res           opaque C handle
  * @param[in]     params        Parameters for KMeans model.
@@ -270,7 +299,43 @@ cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                           int* n_iter);
 
 /**
+ * @brief Find clusters with k-means algorithm (v2 params layout).
+ *
+ * Mirrors cuvsKMeansFit but takes cuvsKMeansParams_v2_t. Will become the
+ * unsuffixed cuvsKMeansFit in cuVS 26.08.
+ *
+ * @param[in]     res           opaque C handle
+ * @param[in]     params        Parameters for KMeans model (v2 layout).
+ * @param[in]     X             Training instances to cluster. The data must
+ *                              be in row-major format. May be on host or
+ *                              device memory.
+ *                              [dim = n_samples x n_features]
+ * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              Must be on the same memory space as X.
+ *                              [len = n_samples]
+ * @param[inout]  centroids     [in] When init is InitMethod::Array, use
+ *                              centroids as the initial cluster centers.
+ *                              [out] The generated centroids from the
+ *                              kmeans algorithm are stored at the address
+ *                              pointed by 'centroids'. Must be on device.
+ *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
+ * @param[out]    n_iter        Number of iterations run.
+ */
+cuvsError_t cuvsKMeansFit_v2(cuvsResources_t res,
+                             cuvsKMeansParams_v2_t params,
+                             DLManagedTensor* X,
+                             DLManagedTensor* sample_weight,
+                             DLManagedTensor* centroids,
+                             double* inertia,
+                             int* n_iter);
+
+/**
  * @brief Predict the closest cluster each sample in X belongs to.
+ *
+ * @note In cuVS 26.08 (next ABI major version) this signature will be
+ * replaced by cuvsKMeansPredict_v2.
  *
  * @param[in]     res              opaque C handle
  * @param[in]     params           Parameters for KMeans model.
@@ -296,6 +361,37 @@ cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
                               DLManagedTensor* labels,
                               bool normalize_weight,
                               double* inertia);
+
+/**
+ * @brief Predict the closest cluster each sample in X belongs to (v2 params layout).
+ *
+ * Mirrors cuvsKMeansPredict but takes cuvsKMeansParams_v2_t. Will become the
+ * unsuffixed cuvsKMeansPredict in cuVS 26.08.
+ *
+ * @param[in]     res              opaque C handle
+ * @param[in]     params           Parameters for KMeans model (v2 layout).
+ * @param[in]     X                New data to predict.
+ *                                 [dim = n_samples x n_features]
+ * @param[in]     sample_weight    Optional weights for each observation in X.
+ *                                 [len = n_samples]
+ * @param[in]     centroids        Cluster centroids. The data must be in
+ *                                 row-major format.
+ *                                 [dim = n_clusters x n_features]
+ * @param[in]     normalize_weight True if the weights should be normalized
+ * @param[out]    labels           Index of the cluster each sample in X
+ *                                 belongs to.
+ *                                 [len = n_samples]
+ * @param[out]    inertia          Sum of squared distances of samples to
+ *                                 their closest cluster center.
+ */
+cuvsError_t cuvsKMeansPredict_v2(cuvsResources_t res,
+                                 cuvsKMeansParams_v2_t params,
+                                 DLManagedTensor* X,
+                                 DLManagedTensor* sample_weight,
+                                 DLManagedTensor* centroids,
+                                 DLManagedTensor* labels,
+                                 bool normalize_weight,
+                                 double* inertia);
 
 /**
  * @brief Compute cluster cost
