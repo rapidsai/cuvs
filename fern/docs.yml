@@ -28,12 +28,10 @@ navigation:
     path: "./pages/index.md"
   - page: "Installation"
     path: "./pages/build.md"
-  - section: "Getting Started"
+  - section: "User Guide"
     contents:
       - page: "Overview"
         path: "./pages/getting_started.md"
-  - section: "User Guide"
-    contents:
       - section: "Working with ANN Indexes"
         path: "./pages/working_with_ann_indexes.md"
         contents:
