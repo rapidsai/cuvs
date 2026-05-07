@@ -26,10 +26,6 @@ Tiered Index object.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:159`_
-
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:143`_
-
 ## IndexParams
 
 ```python
@@ -70,15 +66,11 @@ def __init__(self, *, metric="sqeuclidean", algo="cagra", upstream_params=None, 
 def metric(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:124`_
-
 ### algo
 
 ```python
 def algo(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:128`_
 
 ### min_ann_rows
 
@@ -86,25 +78,17 @@ _Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:128`_
 def min_ann_rows(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:132`_
-
 ### create_ann_index_on_extend
 
 ```python
 def create_ann_index_on_extend(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:136`_
-
 ### upstream_params
 
 ```python
 def upstream_params(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:140`_
-
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:48`_
 
 ## build
 
@@ -150,8 +134,6 @@ Build the Tiered index from the dataset for efficient search.
 >>> neighbors = cp.asarray(neighbors)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:164`_
-
 ## extend
 
 `@auto_sync_resources`
@@ -195,8 +177,6 @@ array interface compliant matrix in host memory.
 ...                                     dtype=cp.float32)
 >>> index = tiered_index.extend(index, more_data)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:326`_
 
 ## search
 
@@ -245,5 +225,3 @@ Find the k nearest neighbors for each query.
 >>> distances, neighbors = tiered_index.search(search_params, index,
 ...                                            queries, k)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:223`_

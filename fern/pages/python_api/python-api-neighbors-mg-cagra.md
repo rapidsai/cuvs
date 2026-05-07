@@ -28,10 +28,6 @@ multiple GPUs.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:126`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:106`_
-
 ## IndexParams
 
 ```python
@@ -71,17 +67,11 @@ def __init__(self, *, distribution_mode="sharded", **kwargs)
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:97`_
-
 ### distribution_mode
 
 ```python
 def distribution_mode(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:101`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:53`_
 
 ## SearchParams
 
@@ -115,8 +105,6 @@ def __init__(self, *, search_mode="load_balancer", merge_mode="merge_on_root_ran
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:222`_
-
 ### search_mode
 
 ```python
@@ -124,8 +112,6 @@ def search_mode(self)
 ```
 
 Get the search mode for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:226`_
 
 ### search_mode
 
@@ -135,8 +121,6 @@ def search_mode(self, value)
 
 Set the search mode for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:232`_
-
 ### merge_mode
 
 ```python
@@ -144,8 +128,6 @@ def merge_mode(self)
 ```
 
 Get the merge mode for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:243`_
 
 ### merge_mode
 
@@ -155,8 +137,6 @@ def merge_mode(self, value)
 
 Set the merge mode for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:249`_
-
 ### n_rows_per_batch
 
 ```python
@@ -165,8 +145,6 @@ def n_rows_per_batch(self)
 
 Get the number of rows per batch for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:260`_
-
 ### n_rows_per_batch
 
 ```python
@@ -174,10 +152,6 @@ def n_rows_per_batch(self, value)
 ```
 
 Set the number of rows per batch for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:265`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:191`_
 
 ## build
 
@@ -222,8 +196,6 @@ Build the multi-GPU CAGRA index from the dataset for efficient search.
 >>> # Results are already in host memory (NumPy arrays)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:131`_
-
 ## extend
 
 `@auto_sync_multi_gpu_resources`
@@ -262,8 +234,6 @@ Extend the multi-GPU CAGRA index with new vectors.
 >>> index = cagra.build(build_params, dataset)
 >>> cagra.extend(index, new_vectors, new_indices)  # doctest: +SKIP
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:385`_
 
 ## search
 
@@ -316,8 +286,6 @@ Search the multi-GPU CAGRA index for the k-nearest neighbors of each query.
 >>> # Results are already in host memory (NumPy arrays)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:274`_
-
 ## save
 
 `@auto_sync_multi_gpu_resources`
@@ -351,8 +319,6 @@ Serialize the multi-GPU CAGRA index to a file.
 >>> cagra.save(index, "index.bin")
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:458`_
-
 ## load
 
 `@auto_sync_multi_gpu_resources`
@@ -383,8 +349,6 @@ Deserialize the multi-GPU CAGRA index from a file.
 >>> index = cagra.load("index.bin")  # doctest: +SKIP
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:496`_
-
 ## distribute
 
 `@auto_sync_multi_gpu_resources`
@@ -414,5 +378,3 @@ Distribute a single-GPU CAGRA index across multiple GPUs from a file.
 >>> from cuvs.neighbors.mg import cagra
 >>> index = cagra.distribute("single_gpu_index.bin")  # doctest: +SKIP
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:530`_

@@ -48,15 +48,11 @@ def __init__(self, *, n_components=None, copy=None, whiten=None, algorithm=None,
 def n_components(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:82`_
-
 ### copy
 
 ```python
 def copy(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:86`_
 
 ### whiten
 
@@ -64,15 +60,11 @@ _Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:86`_
 def whiten(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:90`_
-
 ### algorithm
 
 ```python
 def algorithm(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:94`_
 
 ### tol
 
@@ -80,17 +72,11 @@ _Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:94`_
 def tol(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:98`_
-
 ### n_iterations
 
 ```python
 def n_iterations(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:102`_
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:31`_
 
 ## fit
 
@@ -132,8 +118,6 @@ Named tuple with fields: ``components``, ``explained_var``,
 (8, 32)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:127`_
-
 ## fit_transform
 
 `@auto_sync_resources`
@@ -170,8 +154,6 @@ Named tuple with fields: ``trans_input``, ``components``,
 >>> result.trans_input.shape
 (500, 8)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:200`_
 
 ## inverse_transform
 
@@ -214,8 +196,6 @@ Transform data from the PCA eigenspace back to the original space.
 ...     params, result.trans_input, result.components,
 ...     result.singular_vals, result.mu)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:353`_
 
 ## transform
 
@@ -260,5 +240,3 @@ fit_transform.
 >>> transformed = pca.transform(params, X, result.components,
 ...                             result.singular_vals, result.mu)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/pca/pca.pyx:275`_

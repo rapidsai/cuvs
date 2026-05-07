@@ -12,8 +12,6 @@ _Python module: `cuvs.distance`_
 DISTANCE_NAMES = {v: k for k, v in DISTANCE_TYPES.items()}
 ```
 
-_Source: `python/cuvs/cuvs/distance/distance.pyx:41`_
-
 ## DISTANCE_TYPES
 
 ```python
@@ -41,8 +39,6 @@ DISTANCE_TYPES = {
 "bitwise_hamming": cuvsDistanceType.BitwiseHamming
 }
 ```
-
-_Source: `python/cuvs/cuvs/distance/distance.pyx:17`_
 
 ## pairwise_distance
 
@@ -85,5 +81,3 @@ Valid values for metric:
 ...                               dtype=cp.float32)
 >>> output = pairwise_distance(in1, in2, metric="euclidean")
 ```
-
-_Source: `python/cuvs/cuvs/distance/distance.pyx:51`_

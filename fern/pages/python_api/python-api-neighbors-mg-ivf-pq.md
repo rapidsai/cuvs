@@ -28,10 +28,6 @@ across multiple GPUs.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:125`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:105`_
-
 ## IndexParams
 
 ```python
@@ -67,17 +63,11 @@ def __init__(self, *, distribution_mode="sharded", **kwargs)
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:96`_
-
 ### distribution_mode
 
 ```python
 def distribution_mode(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:100`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:56`_
 
 ## SearchParams
 
@@ -111,8 +101,6 @@ def __init__(self, *, n_probes=20, search_mode="load_balancer", merge_mode="merg
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:224`_
-
 ### search_mode
 
 ```python
@@ -120,8 +108,6 @@ def search_mode(self)
 ```
 
 Get the search mode for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:228`_
 
 ### search_mode
 
@@ -131,8 +117,6 @@ def search_mode(self, value)
 
 Set the search mode for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:234`_
-
 ### merge_mode
 
 ```python
@@ -140,8 +124,6 @@ def merge_mode(self)
 ```
 
 Get the merge mode for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:245`_
 
 ### merge_mode
 
@@ -151,8 +133,6 @@ def merge_mode(self, value)
 
 Set the merge mode for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:251`_
-
 ### n_rows_per_batch
 
 ```python
@@ -161,8 +141,6 @@ def n_rows_per_batch(self)
 
 Get the number of rows per batch for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:262`_
-
 ### n_rows_per_batch
 
 ```python
@@ -170,10 +148,6 @@ def n_rows_per_batch(self, value)
 ```
 
 Set the number of rows per batch for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:267`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:193`_
 
 ## build
 
@@ -219,8 +193,6 @@ Build the multi-GPU IVF-PQ index from the dataset for efficient search.
 >>> # Results are already in host memory (NumPy arrays)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:130`_
-
 ## extend
 
 `@auto_sync_multi_gpu_resources`
@@ -258,8 +230,6 @@ Extend the multi-GPU IVF-PQ index with new vectors.
 >>> index = ivf_pq.build(build_params, dataset)
 >>> ivf_pq.extend(index, new_vectors, new_indices)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:386`_
 
 ## search
 
@@ -313,8 +283,6 @@ of each query.
 >>> # Results are already in host memory (NumPy arrays)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:276`_
-
 ## save
 
 `@auto_sync_multi_gpu_resources`
@@ -348,8 +316,6 @@ Serialize the multi-GPU IVF-PQ index to a file.
 >>> ivf_pq.save(index, "index.bin")
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:459`_
-
 ## load
 
 `@auto_sync_multi_gpu_resources`
@@ -380,8 +346,6 @@ Deserialize the multi-GPU IVF-PQ index from a file.
 >>> index = ivf_pq.load("index.bin")  # doctest: +SKIP
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:497`_
-
 ## distribute
 
 `@auto_sync_multi_gpu_resources`
@@ -411,5 +375,3 @@ Distribute a single-GPU IVF-PQ index across multiple GPUs from a file.
 >>> from cuvs.neighbors.mg import ivf_pq
 >>> index = ivf_pq.distribute("single_gpu_index.bin")  # doctest: +SKIP
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_pq/ivf_pq.pyx:531`_

@@ -1025,7 +1025,6 @@ def render_python_symbol(symbol: PythonSymbol) -> list[str]:
     lines = [f"## {heading_text(symbol.name)}", ""]
     if symbol.kind == "constant":
         lines.extend(["```python", symbol.value or symbol.name, "```", ""])
-        lines.extend([f"_Source: `{symbol.source}:{symbol.line}`_", ""])
         return trim_blank_lines(lines)
 
     for decorator in symbol.decorators:
@@ -1082,9 +1081,7 @@ def render_python_symbol(symbol: PythonSymbol) -> list[str]:
             if member.doc:
                 lines.extend(render_doc_text(member.doc))
                 lines.append("")
-            lines.extend([f"_Source: `{member.source}:{member.line}`_", ""])
 
-    lines.extend([f"_Source: `{symbol.source}:{symbol.line}`_", ""])
     return trim_blank_lines(lines)
 
 

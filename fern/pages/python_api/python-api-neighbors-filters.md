@@ -14,8 +14,6 @@ def no_filter()
 
 Create a default pre-filter which filters nothing.
 
-_Source: `python/cuvs/cuvs/neighbors/filters/filters.pyx:29`_
-
 ## from_bitmap
 
 ```python
@@ -51,8 +49,6 @@ Create a pre-filter from an array with type of uint32.
 >>> bitmap = cp.random.randint(1, 100, size=(n_bitmap,), dtype=cp.uint32)
 >>> prefilter = filters.from_bitmap(bitmap)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/filters/filters.pyx:39`_
 
 ## from_bitset
 
@@ -90,8 +86,6 @@ Create a pre-filter from an array with type of uint32.
 >>> prefilter = filters.from_bitset(bitset)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/filters/filters.pyx:89`_
-
 ## Prefilter
 
 ```python
@@ -103,5 +97,3 @@ cdef class Prefilter
 ```python
 def __init__(self, cuvsFilter prefilter, parent=None)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/filters/filters.pyx:19`_

@@ -53,15 +53,11 @@ def __init__(self, *, npartitions=0, ef_construction=120, build_dir="/tmp/ace_bu
 def npartitions(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:211`_
-
 ### ef_construction
 
 ```python
 def ef_construction(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:215`_
 
 ### build_dir
 
@@ -69,15 +65,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:215`_
 def build_dir(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:219`_
-
 ### use_disk
 
 ```python
 def use_disk(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:226`_
 
 ### max_host_memory_gb
 
@@ -85,25 +77,17 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:226`_
 def max_host_memory_gb(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:230`_
-
 ### max_gpu_memory_gb
 
 ```python
 def max_gpu_memory_gb(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:234`_
-
 ### get_handle
 
 ```python
 def get_handle(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:237`_
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:127`_
 
 ## CompressionParams
 
@@ -148,15 +132,11 @@ def __init__(self, *, pq_bits=8, pq_dim=0, vq_n_centers=0, kmeans_n_iters=25, vq
 def pq_bits(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:100`_
-
 ### pq_dim
 
 ```python
 def pq_dim(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:104`_
 
 ### vq_n_centers
 
@@ -164,15 +144,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:104`_
 def vq_n_centers(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:108`_
-
 ### kmeans_n_iters
 
 ```python
 def kmeans_n_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:112`_
 
 ### vq_kmeans_trainset_fraction
 
@@ -180,25 +156,17 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:112`_
 def vq_kmeans_trainset_fraction(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:116`_
-
 ### pq_kmeans_trainset_fraction
 
 ```python
 def pq_kmeans_trainset_fraction(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:120`_
-
 ### get_handle
 
 ```python
 def get_handle(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:123`_
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:50`_
 
 ## ExtendParams
 
@@ -232,10 +200,6 @@ def __init__(self, *, max_chunk_size=None)
 def max_chunk_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:1060`_
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:1032`_
-
 ## Index
 
 ```python
@@ -259,15 +223,11 @@ cdef class Index
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:436`_
-
 ### dim
 
 ```python
 def dim(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:440`_
 
 ### graph_degree
 
@@ -275,15 +235,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:440`_
 def graph_degree(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:446`_
-
 ### dtype
 
 ```python
 def dtype(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:457`_
 
 ### dataset
 
@@ -291,17 +247,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:457`_
 def dataset(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:461`_
-
 ### graph
 
 ```python
 def graph(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:479`_
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:425`_
 
 ## IndexParams
 
@@ -349,15 +299,11 @@ def __init__(self, *, metric="sqeuclidean", intermediate_graph_degree=128, graph
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:389`_
-
 ### metric
 
 ```python
 def metric(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:393`_
 
 ### intermediate_graph_degree
 
@@ -365,15 +311,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:393`_
 def intermediate_graph_degree(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:397`_
-
 ### graph_degree
 
 ```python
 def graph_degree(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:401`_
 
 ### build_algo
 
@@ -381,25 +323,17 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:401`_
 def build_algo(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:405`_
-
 ### nn_descent_niter
 
 ```python
 def nn_descent_niter(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:409`_
-
 ### refinement_rate
 
 ```python
 def refinement_rate(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:413`_
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:241`_
 
 ## SearchParams
 
@@ -461,15 +395,11 @@ def __init__(self, *, max_queries=0, itopk_size=64, max_iterations=0, algo="auto
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:737`_
-
 ### max_queries
 
 ```python
 def max_queries(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:741`_
 
 ### itopk_size
 
@@ -477,15 +407,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:741`_
 def itopk_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:745`_
-
 ### max_iterations
 
 ```python
 def max_iterations(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:749`_
 
 ### algo
 
@@ -493,15 +419,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:749`_
 def algo(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:753`_
-
 ### team_size
 
 ```python
 def team_size(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:757`_
 
 ### search_width
 
@@ -509,15 +431,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:757`_
 def search_width(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:761`_
-
 ### min_iterations
 
 ```python
 def min_iterations(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:765`_
 
 ### thread_block_size
 
@@ -525,15 +443,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:765`_
 def thread_block_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:769`_
-
 ### hashmap_mode
 
 ```python
 def hashmap_mode(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:773`_
 
 ### hashmap_min_bitlen
 
@@ -541,15 +455,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:773`_
 def hashmap_min_bitlen(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:777`_
-
 ### hashmap_max_fill_rate
 
 ```python
 def hashmap_max_fill_rate(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:781`_
 
 ### num_random_samplings
 
@@ -557,17 +467,11 @@ _Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:781`_
 def num_random_samplings(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:785`_
-
 ### rand_xor_mask
 
 ```python
 def rand_xor_mask(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:789`_
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:601`_
 
 ## build
 
@@ -631,8 +535,6 @@ The following distance metrics are supported:
 >>> neighbors = cp.asarray(neighbors)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:497`_
-
 ## extend
 
 `@auto_sync_resources`
@@ -651,8 +553,6 @@ Extend a CAGRA index with additional vectors
 | `index` | `Index` | Existing cagra index to extend |
 | `additional_dataset` | `CUDA array interface compliant matrix shape` | Supported dtype [float, half, int8, uint8] |
 | `resources` | `cuvs.common.Resources, optional` |  |
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:1065`_
 
 ## from_graph
 
@@ -678,8 +578,6 @@ Construct a cagra index from an existing graph and dataset
 | Name | Type | Description |
 | --- | --- | --- |
 | `index` | `cuvs.cagra.Index` |  |
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:987`_
 
 ## load
 
@@ -707,8 +605,6 @@ version of cuvs is not guaranteed to work.
 | Name | Type | Description |
 | --- | --- | --- |
 | `index` | `Index` |  |
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:954`_
 
 ## save
 
@@ -747,8 +643,6 @@ subject to change.
 >>> cagra.save("my_index.bin", index)
 >>> index_loaded = cagra.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:910`_
 
 ## search
 
@@ -802,5 +696,3 @@ Find the k nearest neighbors for each query.
 >>> neighbors = cp.asarray(neighbors)
 >>> distances = cp.asarray(distances)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:795`_

@@ -30,8 +30,6 @@ which can be used to perform nearest neighbors searches.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:170`_
-
 ### n_lists
 
 ```python
@@ -39,8 +37,6 @@ def n_lists(self)
 ```
 
 The number of inverted lists (clusters)
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:177`_
 
 ### dim
 
@@ -50,8 +46,6 @@ def dim(self)
 
 dimensionality of the cluster centers
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:184`_
-
 ### centers
 
 ```python
@@ -60,10 +54,6 @@ def centers(self)
 
 Get the cluster centers corresponding to the lists in the
 original space
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:191`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:153`_
 
 ## IndexParams
 
@@ -110,15 +100,11 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:117`_
-
 ### metric
 
 ```python
 def metric(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:121`_
 
 ### metric_arg
 
@@ -126,15 +112,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:121`_
 def metric_arg(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:125`_
-
 ### add_data_on_build
 
 ```python
 def add_data_on_build(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:129`_
 
 ### n_lists
 
@@ -142,15 +124,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:129`_
 def n_lists(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:133`_
-
 ### kmeans_n_iters
 
 ```python
 def kmeans_n_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:137`_
 
 ### kmeans_trainset_fraction
 
@@ -158,25 +136,17 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:137`_
 def kmeans_trainset_fraction(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:141`_
-
 ### adaptive_centers
 
 ```python
 def adaptive_centers(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:145`_
-
 ### conservative_memory_allocation
 
 ```python
 def conservative_memory_allocation(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:149`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:41`_
 
 ## SearchParams
 
@@ -211,17 +181,11 @@ def __init__(self, *, n_probes=20)
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:285`_
-
 ### n_probes
 
 ```python
 def n_probes(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:289`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:265`_
 
 ## build
 
@@ -266,8 +230,6 @@ Build the IvfFlat index from the dataset for efficient search.
 >>> distances = cp.asarray(distances)
 >>> neighbors = cp.asarray(neighbors)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:207`_
 
 ## extend
 
@@ -321,8 +283,6 @@ array interface compliant matrix in host memory.
 ...                                      k=10)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:467`_
-
 ## load
 
 `@auto_sync_resources`
@@ -349,8 +309,6 @@ version of cuvs is not guaranteed to work.
 | Name | Type | Description |
 | --- | --- | --- |
 | `index` | `Index` |  |
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:434`_
 
 ## save
 
@@ -388,8 +346,6 @@ subject to change.
 >>> ivf_flat.save("my_index.bin", index)
 >>> index_loaded = ivf_flat.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:397`_
 
 ## search
 
@@ -437,5 +393,3 @@ Find the k nearest neighbors for each query.
 >>> distances, neighbors = ivf_flat.search(search_params, index, queries,
 ...                                     k)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:295`_

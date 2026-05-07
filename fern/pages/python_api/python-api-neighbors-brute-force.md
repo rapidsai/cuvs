@@ -27,10 +27,6 @@ which can be used to perform nearest neighbors searches.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:52`_
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:34`_
-
 ## build
 
 `@auto_sync_resources`
@@ -72,8 +68,6 @@ Build the Brute Force index from the dataset for efficient search.
 >>> distances = cp.asarray(distances)
 >>> neighbors = cp.asarray(neighbors)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:60`_
 
 ## search
 
@@ -160,8 +154,6 @@ Find the k nearest neighbors for each query.
 >>> distances = cp.asarray(distances)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:120`_
-
 ## save
 
 `@auto_sync_resources`
@@ -199,8 +191,6 @@ to work.
 >>> brute_force.save("my_index.bin", index)
 >>> index_loaded = brute_force.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:266`_
 
 ## load
 
@@ -244,5 +234,3 @@ to work.
 >>> brute_force.save("my_index.bin", index)
 >>> index_loaded = brute_force.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:304`_

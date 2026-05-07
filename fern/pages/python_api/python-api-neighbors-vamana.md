@@ -27,10 +27,6 @@ which can be used to perform nearest neighbors searches.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:49`_
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:34`_
-
 ## IndexParams
 
 ```python
@@ -79,15 +75,11 @@ def __init__(self, *, metric="sqeuclidean", graph_degree=32, visited_size=64, va
 def metric(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:122`_
-
 ### graph_degree
 
 ```python
 def graph_degree(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:126`_
 
 ### visited_size
 
@@ -95,15 +87,11 @@ _Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:126`_
 def visited_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:130`_
-
 ### vamana_iters
 
 ```python
 def vamana_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:134`_
 
 ### alpha
 
@@ -111,15 +99,11 @@ _Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:134`_
 def alpha(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:138`_
-
 ### max_fraction
 
 ```python
 def max_fraction(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:142`_
 
 ### batch_base
 
@@ -127,25 +111,17 @@ _Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:142`_
 def batch_base(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:146`_
-
 ### queue_size
 
 ```python
 def queue_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:150`_
-
 ### reverse_batchsize
 
 ```python
 def reverse_batchsize(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:154`_
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:58`_
 
 ## build
 
@@ -197,8 +173,6 @@ The following distance metrics are supported:
 >>> vamana.save("my_index.bin", index)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:159`_
-
 ## save
 
 `@auto_sync_resources`
@@ -235,5 +209,3 @@ allowing cross-compatibility.
 >>> # Serialize and save the vamana index
 >>> vamana.save("my_index.bin", index)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:228`_

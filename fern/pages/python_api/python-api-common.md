@@ -21,8 +21,6 @@ call sync on that resources when the function exits.
 
 This will also insert the appropriate docstring for the resources parameter
 
-_Source: `python/cuvs/cuvs/common/resources.pyx:83`_
-
 ## Resources
 
 ```python
@@ -77,8 +75,6 @@ Using a cuPy stream with cuVS Resources:
 def sync(self)
 ```
 
-_Source: `python/cuvs/cuvs/common/resources.pyx:60`_
-
 ### get_c_obj
 
 ```python
@@ -86,10 +82,6 @@ def get_c_obj(self)
 ```
 
 Return the pointer to the underlying c_obj as a size_t
-
-_Source: `python/cuvs/cuvs/common/resources.pyx:63`_
-
-_Source: `python/cuvs/cuvs/common/resources.pyx:22`_
 
 ## MultiGpuResources
 
@@ -158,8 +150,6 @@ Using specific device IDs:
 def sync(self)
 ```
 
-_Source: `python/cuvs/cuvs/common/mg_resources.pyx:90`_
-
 ### set_memory_pool
 
 ```python
@@ -182,8 +172,6 @@ Set a memory pool on all devices managed by these resources.
 >>> handle.set_memory_pool(80)  # Use 80% of free memory
 ```
 
-_Source: `python/cuvs/cuvs/common/mg_resources.pyx:93`_
-
 ### get_c_obj
 
 ```python
@@ -191,10 +179,6 @@ def get_c_obj(self)
 ```
 
 Return the pointer to the underlying c_obj as a size_t
-
-_Source: `python/cuvs/cuvs/common/mg_resources.pyx:111`_
-
-_Source: `python/cuvs/cuvs/common/mg_resources.pyx:26`_
 
 ## auto_sync_multi_gpu_resources
 
@@ -211,5 +195,3 @@ and call sync on that resources when the function exits.
 
 This will also insert the appropriate docstring for the resources
 parameter
-
-_Source: `python/cuvs/cuvs/common/mg_resources.pyx:132`_

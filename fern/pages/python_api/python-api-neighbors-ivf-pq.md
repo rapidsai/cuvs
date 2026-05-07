@@ -41,8 +41,6 @@ which can be used to perform nearest neighbors searches.
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:256`_
-
 ### n_lists
 
 ```python
@@ -50,8 +48,6 @@ def n_lists(self)
 ```
 
 The number of inverted lists (clusters)
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:263`_
 
 ### dim
 
@@ -61,8 +57,6 @@ def dim(self)
 
 dimensionality of the cluster centers
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:270`_
-
 ### pq_dim
 
 ```python
@@ -70,8 +64,6 @@ def pq_dim(self)
 ```
 
 The dimensionality of an encoded vector after compression by PQ
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:277`_
 
 ### pq_len
 
@@ -82,8 +74,6 @@ def pq_len(self)
 The dimensionality of a subspace, i.e. the number of vector
 components mapped to a subspace
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:284`_
-
 ### pq_bits
 
 ```python
@@ -93,8 +83,6 @@ def pq_bits(self)
 The bit length of an encoded vector element after
 compression by PQ.
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:292`_
-
 ### centers
 
 ```python
@@ -103,8 +91,6 @@ def centers(self)
 
 Get the cluster centers corresponding to the lists in the
 original space
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:305`_
 
 ### centers_padded
 
@@ -116,8 +102,6 @@ Get the padded cluster centers [n_lists, dim_ext]
 where dim_ext = round_up(dim + 1, 8).
 This returns contiguous data suitable for build_precomputed.
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:319`_
-
 ### pq_centers
 
 ```python
@@ -125,8 +109,6 @@ def pq_centers(self)
 ```
 
 Get the PQ cluster centers
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:335`_
 
 ### centers_rot
 
@@ -137,8 +119,6 @@ def centers_rot(self)
 Get the rotated cluster centers [n_lists, rot_dim]
 where rot_dim = pq_len * pq_dim
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:349`_
-
 ### rotation_matrix
 
 ```python
@@ -148,8 +128,6 @@ def rotation_matrix(self)
 Get the rotation matrix [rot_dim, dim]
 Transform matrix (original space -&gt; rotated padded space)
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:364`_
-
 ### list_sizes
 
 ```python
@@ -157,8 +135,6 @@ def list_sizes(self)
 ```
 
 Get the sizes of each list
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:379`_
 
 ### lists
 
@@ -178,8 +154,6 @@ entire list
 | --- | --- | --- |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:392`_
-
 ### list_data
 
 ```python
@@ -197,8 +171,6 @@ Gets unpacked list data for a single list (cluster)
 | `offset`, `int` |  | The row to start getting data at out_codes, CAI Optional buffer to hold memory. Will be created if None |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:411`_
-
 ### list_indices
 
 ```python
@@ -212,10 +184,6 @@ Gets indices for a single cluster (list)
 | Name | Type | Description |
 | --- | --- | --- |
 | `label`, `int` |  | The cluster to get data for n_rows, int, optional Number of rows in the list |
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:451`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:239`_
 
 ## IndexParams
 
@@ -275,15 +243,11 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:174`_
-
 ### metric
 
 ```python
 def metric(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:178`_
 
 ### metric_arg
 
@@ -291,15 +255,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:178`_
 def metric_arg(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:182`_
-
 ### add_data_on_build
 
 ```python
 def add_data_on_build(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:186`_
 
 ### n_lists
 
@@ -307,15 +267,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:186`_
 def n_lists(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:190`_
-
 ### kmeans_n_iters
 
 ```python
 def kmeans_n_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:194`_
 
 ### kmeans_trainset_fraction
 
@@ -323,15 +279,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:194`_
 def kmeans_trainset_fraction(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:198`_
-
 ### pq_bits
 
 ```python
 def pq_bits(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:202`_
 
 ### pq_dim
 
@@ -339,15 +291,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:202`_
 def pq_dim(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:206`_
-
 ### codebook_kind
 
 ```python
 def codebook_kind(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:210`_
 
 ### force_random_rotation
 
@@ -355,15 +303,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:210`_
 def force_random_rotation(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:214`_
-
 ### add_data_on_build
 
 ```python
 def add_data_on_build(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:218`_
 
 ### conservative_memory_allocation
 
@@ -371,15 +315,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:218`_
 def conservative_memory_allocation(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:222`_
-
 ### max_train_points_per_pq_code
 
 ```python
 def max_train_points_per_pq_code(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:226`_
 
 ### codes_layout
 
@@ -387,17 +327,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:226`_
 def codes_layout(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:230`_
-
 ### get_handle
 
 ```python
 def get_handle(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:236`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:40`_
 
 ## SearchParams
 
@@ -441,15 +375,11 @@ def __init__(self, *, n_probes=20, lut_dtype=np.float32, internal_distance_dtype
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:716`_
-
 ### n_probes
 
 ```python
 def n_probes(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:720`_
 
 ### lut_dtype
 
@@ -457,15 +387,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:720`_
 def lut_dtype(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:724`_
-
 ### internal_distance_dtype
 
 ```python
 def internal_distance_dtype(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:728`_
 
 ### coarse_search_dtype
 
@@ -473,25 +399,17 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:728`_
 def coarse_search_dtype(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:732`_
-
 ### max_internal_batch_size
 
 ```python
 def max_internal_batch_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:736`_
-
 ### get_handle
 
 ```python
 def get_handle(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:739`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:667`_
 
 ## build
 
@@ -539,8 +457,6 @@ or an array interface compliant matrix in host memory.
 >>> distances = cp.asarray(distances)
 >>> neighbors = cp.asarray(neighbors)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:477`_
 
 ## build_precomputed
 
@@ -608,8 +524,6 @@ The index_params must be consistent with the provided matrices. Specifically:
 ...                                   centers, centers_rot, rotation_matrix)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:543`_
-
 ## extend
 
 `@auto_sync_resources`
@@ -662,8 +576,6 @@ array interface compliant matrix in host memory.
 ...                                      k=10)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:913`_
-
 ## load
 
 `@auto_sync_resources`
@@ -690,8 +602,6 @@ version of cuvs is not guaranteed to work.
 | Name | Type | Description |
 | --- | --- | --- |
 | `index` | `Index` |  |
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:880`_
 
 ## save
 
@@ -729,8 +639,6 @@ subject to change.
 >>> ivf_pq.save("my_index.bin", index)
 >>> index_loaded = ivf_pq.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:843`_
 
 ## search
 
@@ -778,8 +686,6 @@ Find the k nearest neighbors for each query.
 ...                                     k)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:745`_
-
 ## transform
 
 `@auto_sync_resources`
@@ -805,5 +711,3 @@ Transform a dataset by applying pq-encoding to the vectors.
 | Name | Type | Description |
 | --- | --- | --- |
 | `output_labels`, `output_dataset` |  | The cluster that each point in the dataset belongs to, and the transformed dataset |
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:987`_

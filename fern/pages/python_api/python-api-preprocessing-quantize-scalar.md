@@ -30,17 +30,11 @@ float data type to the full range of the quantized int type.
 def min(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:63`_
-
 ### max
 
 ```python
 def max(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:67`_
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:47`_
 
 ## QuantizerParams
 
@@ -74,10 +68,6 @@ def __init__(self, *, quantile=None)
 def quantile(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:43`_
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:19`_
-
 ## inverse_transform
 
 `@auto_sync_resources`
@@ -106,8 +96,6 @@ is not lossless.
 | Name | Type | Description |
 | --- | --- | --- |
 | `output` | `transformed dataset with scalar quantization reversed` |  |
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:186`_
 
 ## train
 
@@ -146,8 +134,6 @@ Initializes a scalar quantizer to be used later for quantizing the dataset.
 >>> quantizer = scalar.train(params, dataset)
 >>> transformed = scalar.transform(quantizer, dataset)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:75`_
 
 ## transform
 
@@ -188,5 +174,3 @@ Applies quantization transform to given dataset
 >>> quantizer = scalar.train(params, dataset)
 >>> transformed = scalar.transform(quantizer, dataset)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:125`_

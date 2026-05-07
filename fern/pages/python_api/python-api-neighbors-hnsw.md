@@ -50,15 +50,11 @@ def __init__(self, *, npartitions=0, build_dir="/tmp/hnsw_ace_build", use_disk=F
 def npartitions(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:98`_
-
 ### build_dir
 
 ```python
 def build_dir(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:102`_
 
 ### use_disk
 
@@ -66,25 +62,17 @@ _Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:102`_
 def use_disk(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:108`_
-
 ### max_host_memory_gb
 
 ```python
 def max_host_memory_gb(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:112`_
-
 ### max_gpu_memory_gb
 
 ```python
 def max_gpu_memory_gb(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:116`_
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:31`_
 
 ## IndexParams
 
@@ -127,15 +115,11 @@ def __init__(self, *, hierarchy="gpu", ef_construction=200, num_threads=0, M=32,
 def hierarchy(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:193`_
-
 ### ef_construction
 
 ```python
 def ef_construction(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:202`_
 
 ### num_threads
 
@@ -143,25 +127,17 @@ _Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:202`_
 def num_threads(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:206`_
-
 ### m
 
 ```python
 def m(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:210`_
-
 ### ace_params
 
 ```python
 def ace_params(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:214`_
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:120`_
 
 ## Index
 
@@ -183,10 +159,6 @@ which can be used to perform nearest neighbors searches.
 ```python
 def trained(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:236`_
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:218`_
 
 ## ExtendParams
 
@@ -219,10 +191,6 @@ def __init__(self, *, num_threads=0)
 ```python
 def num_threads(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:269`_
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:245`_
 
 ## build
 
@@ -295,8 +263,6 @@ an instance of AceParams.
 ... )
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:472`_
-
 ## extend
 
 `@auto_sync_resources`
@@ -335,8 +301,6 @@ Extends the HNSW index with new data.
 >>> hnsw.extend(hnsw.ExtendParams(), hnsw_index, new_data)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:561`_
-
 ## SearchParams
 
 ```python
@@ -371,17 +335,11 @@ def __init__(self, *, ef=200, num_threads=0)
 def ef(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:638`_
-
 ### num_threads
 
 ```python
 def num_threads(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:642`_
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:609`_
 
 ## load
 
@@ -438,8 +396,6 @@ version of cuVS is not guaranteed to work.
 ...                   "sqeuclidean")
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:317`_
-
 ## save
 
 `@auto_sync_resources`
@@ -482,8 +438,6 @@ subject to change.
 >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(), cagra_index)
 >>> hnsw.save("my_index.bin", hnsw_index)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:274`_
 
 ## search
 
@@ -539,8 +493,6 @@ Find the k nearest neighbors for each query.
 >>> distances = cp.asarray(distances)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:648`_
-
 ## from_cagra
 
 `@auto_sync_resources`
@@ -589,5 +541,3 @@ subject to change.
 >>> # Serialize the CAGRA index to hnswlib base layer only index format
 >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(), index)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:410`_

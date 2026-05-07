@@ -62,15 +62,11 @@ def __init__(self, *, metric=None, n_clusters=None, init_method=None, max_iter=N
 def metric(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:150`_
-
 ### n_clusters
 
 ```python
 def n_clusters(self)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:154`_
 
 ### init_method
 
@@ -78,15 +74,11 @@ _Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:154`_
 def init_method(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:158`_
-
 ### max_iter
 
 ```python
 def max_iter(self)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:162`_
 
 ### tol
 
@@ -94,15 +86,11 @@ _Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:162`_
 def tol(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:166`_
-
 ### n_init
 
 ```python
 def n_init(self)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:170`_
 
 ### oversampling_factor
 
@@ -110,15 +98,11 @@ _Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:170`_
 def oversampling_factor(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:174`_
-
 ### batch_samples
 
 ```python
 def batch_samples(self)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:178`_
 
 ### batch_centroids
 
@@ -126,15 +110,11 @@ _Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:178`_
 def batch_centroids(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:182`_
-
 ### inertia_check
 
 ```python
 def inertia_check(self)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:186`_
 
 ### streaming_batch_size
 
@@ -142,25 +122,17 @@ _Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:186`_
 def streaming_batch_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:190`_
-
 ### hierarchical
 
 ```python
 def hierarchical(self)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:194`_
-
 ### hierarchical_n_iters
 
 ```python
 def hierarchical_n_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:198`_
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:47`_
 
 ## cluster_cost
 
@@ -210,8 +182,6 @@ Compute cluster cost given an input matrix and existing centroids
 ```python
 >>> inertia = cluster_cost(X, centroids)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:435`_
 
 ## fit
 
@@ -277,8 +247,6 @@ Host-data (batched) example:
 >>> centroids, inertia, n_iter = fit(params, X_host)
 ```
 
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:207`_
-
 ## predict
 
 `@auto_sync_resources`
@@ -330,5 +298,3 @@ Predict clusters with the k-means algorithm
 >>>
 >>> labels, inertia = predict(params, X, centroids)
 ```
-
-_Source: `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:344`_
