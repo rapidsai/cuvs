@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/cluster/spectral.hpp`_
 
 ## Spectral Clustering Parameters
 
-_Doxygen group: `spectral_params`_
-
 <a id="cuvs-cluster-spectral-params"></a>
 ### cuvs::cluster::spectral::params
 
@@ -33,8 +31,6 @@ struct params { ... } ;
 _Source: `cpp/include/cuvs/cluster/spectral.hpp:22`_
 
 ## Spectral Clustering
-
-_Doxygen group: `spectral`_
 
 <a id="cuvs-cluster-spectral-fit-predict"></a>
 ### cuvs::cluster::spectral::fit_predict

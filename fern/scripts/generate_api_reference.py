@@ -556,8 +556,6 @@ def render_native_group(
     symbol_links: dict[str, str] | None = None,
 ) -> list[str]:
     lines = [f"## {heading_text(group.title or group.name)}", ""]
-    if group.name and not is_synthetic_native_group(group.name):
-        lines.extend([f"_Doxygen group: `{group.name}`_", ""])
 
     if page_headings is None:
         page_headings = set()

@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/mg_ivf_flat.h`_
 
 ## Multi-GPU IVF-Flat index build parameters
 
-_Doxygen group: `mg_ivf_flat_c_index_params`_
-
 <a id="cuvsmultigpuivfflatindexparams"></a>
 ### cuvsMultiGpuIvfFlatIndexParams
 
@@ -77,8 +75,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:51`_
 
 ## Multi-GPU IVF-Flat index search parameters
-
-_Doxygen group: `mg_ivf_flat_c_search_params`_
 
 <a id="cuvsmultigpuivfflatsearchparams"></a>
 ### cuvsMultiGpuIvfFlatSearchParams
@@ -150,8 +146,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:94`_
 
 ## Multi-GPU IVF-Flat index
 
-_Doxygen group: `mg_ivf_flat_c_index`_
-
 <a id="cuvsmultigpuivfflatindex"></a>
 ### cuvsMultiGpuIvfFlatIndex
 
@@ -220,8 +214,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:130`_
 
 ## Multi-GPU IVF-Flat index build
 
-_Doxygen group: `mg_ivf_flat_c_index_build`_
-
 <a id="cuvsmultigpuivfflatbuild"></a>
 ### cuvsMultiGpuIvfFlatBuild
 
@@ -252,8 +244,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:150`_
 
 ## Multi-GPU IVF-Flat index search
-
-_Doxygen group: `mg_ivf_flat_c_index_search`_
 
 <a id="cuvsmultigpuivfflatsearch"></a>
 ### cuvsMultiGpuIvfFlatSearch
@@ -290,8 +280,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:175`_
 
 ## Multi-GPU IVF-Flat index extend
 
-_Doxygen group: `mg_ivf_flat_c_index_extend`_
-
 <a id="cuvsmultigpuivfflatextend"></a>
 ### cuvsMultiGpuIvfFlatExtend
 
@@ -323,8 +311,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:200`_
 
 ## Multi-GPU IVF-Flat index serialize
 
-_Doxygen group: `mg_ivf_flat_c_index_serialize`_
-
 <a id="cuvsmultigpuivfflatserialize"></a>
 ### cuvsMultiGpuIvfFlatSerialize
 
@@ -354,8 +340,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:222`_
 
 ## Multi-GPU IVF-Flat index deserialize
 
-_Doxygen group: `mg_ivf_flat_c_index_deserialize`_
-
 <a id="cuvsmultigpuivfflatdeserialize"></a>
 ### cuvsMultiGpuIvfFlatDeserialize
 
@@ -384,8 +368,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:243`_
 
 ## Multi-GPU IVF-Flat index distribute
-
-_Doxygen group: `mg_ivf_flat_c_index_distribute`_
 
 <a id="cuvsmultigpuivfflatdistribute"></a>
 ### cuvsMultiGpuIvfFlatDistribute

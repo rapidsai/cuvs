@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/vamana.h`_
 
 ## C API for Vamana index build
 
-_Doxygen group: `vamana_c_index_params`_
-
 <a id="cuvsvamanaindexparams"></a>
 ### cuvsVamanaIndexParams
 
@@ -84,8 +82,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/vamana.h:77`_
 
 ## Vamana index
-
-_Doxygen group: `vamana_c_index`_
 
 <a id="cuvsvamanaindex"></a>
 ### cuvsVamanaIndex
@@ -177,8 +173,6 @@ _Source: `c/include/cuvs/neighbors/vamana.h:123`_
 
 ## Vamana index build
 
-_Doxygen group: `vamana_c_index_build`_
-
 <a id="cuvsvamanabuild"></a>
 ### cuvsVamanaBuild
 
@@ -219,8 +213,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/vamana.h:169`_
 
 ## Vamana index serialize
-
-_Doxygen group: `vamana_c_index_serialize`_
 
 <a id="cuvsvamanaserialize"></a>
 ### cuvsVamanaSerialize

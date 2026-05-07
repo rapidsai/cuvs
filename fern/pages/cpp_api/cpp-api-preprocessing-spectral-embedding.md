@@ -34,8 +34,6 @@ _Source: `cpp/include/cuvs/preprocessing/spectral_embedding.hpp:25`_
 
 ## Spectral Embedding
 
-_Doxygen group: `spectral_embedding`_
-
 <a id="cuvs-preprocessing-spectral-embedding-transform"></a>
 ### cuvs::preprocessing::spectral_embedding::transform
 

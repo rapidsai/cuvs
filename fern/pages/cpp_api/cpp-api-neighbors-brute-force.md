@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/brute_force.hpp`_
 
 ## Bruteforce index
 
-_Doxygen group: `bruteforce_cpp_index`_
-
 <a id="cuvs-neighbors-brute-force-index"></a>
 ### cuvs::neighbors::brute_force::index
 
@@ -337,8 +335,6 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:156`_
 
 ## Bruteforce index build
 
-_Doxygen group: `bruteforce_cpp_index_build`_
-
 <a id="cuvs-neighbors-brute-force-build"></a>
 ### cuvs::neighbors::brute_force::build
 
@@ -512,8 +508,6 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:298`_
 
 ## Sparse Brute Force index
 
-_Doxygen group: `sparse_bruteforce_cpp_index`_
-
 <a id="cuvs-neighbors-brute-force-sparse-index"></a>
 ### cuvs::neighbors::brute_force::sparse_index
 
@@ -571,8 +565,6 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:618`_
 
 ## Sparse Brute Force index search
 
-_Doxygen group: `sparse_bruteforce_cpp_index_search`_
-
 <a id="cuvs-neighbors-brute-force-sparse-search-params"></a>
 ### cuvs::neighbors::brute_force::sparse_search_params
 
@@ -585,8 +577,6 @@ struct sparse_search_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:668`_
 
 ## Bruteforce index serialize functions
-
-_Doxygen group: `bruteforce_cpp_index_serialize`_
 
 <a id="cuvs-neighbors-brute-force-serialize"></a>
 ### cuvs::neighbors::brute_force::serialize

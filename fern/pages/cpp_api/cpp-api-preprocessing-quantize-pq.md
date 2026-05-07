@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/preprocessing/quantize/pq.hpp`_
 
 ## Product Quantizer utilities
 
-_Doxygen group: `pq`_
-
 <a id="kmeans-params-variant"></a>
 ### kmeans_params_variant
 

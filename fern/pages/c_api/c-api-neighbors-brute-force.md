@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/brute_force.h`_
 
 ## Bruteforce index
 
-_Doxygen group: `bruteforce_c_index`_
-
 <a id="cuvsbruteforceindex"></a>
 ### cuvsBruteForceIndex
 
@@ -74,8 +72,6 @@ _Source: `c/include/cuvs/neighbors/brute_force.h:46`_
 
 ## Bruteforce index build
 
-_Doxygen group: `bruteforce_c_index_build`_
-
 <a id="cuvsbruteforcebuild"></a>
 ### cuvsBruteForceBuild
 
@@ -113,8 +109,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/brute_force.h:92`_
 
 ## Bruteforce index search
-
-_Doxygen group: `bruteforce_c_index_search`_
 
 <a id="cuvsbruteforcesearch"></a>
 ### cuvsBruteForceSearch
@@ -154,8 +148,6 @@ cuvsFilter prefilter);
 _Source: `c/include/cuvs/neighbors/brute_force.h:148`_
 
 ## BRUTEFORCE C-API serialize functions
-
-_Doxygen group: `bruteforce_c_index_serialize`_
 
 <a id="cuvsbruteforceserialize"></a>
 ### cuvsBruteForceSerialize

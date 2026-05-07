@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/cluster/agglomerative.hpp`_
 
 ## agglomerative clustering hyperparameters
 
-_Doxygen group: `agglomerative_params`_
-
 <a id="cuvs-cluster-agglomerative-linkage"></a>
 ### cuvs::cluster::agglomerative::Linkage
 
@@ -29,8 +27,6 @@ enum Linkage { ... } ;
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:30`_
 
 ## single-linkage clustering APIs
-
-_Doxygen group: `single_linkage`_
 
 <a id="cuvs-cluster-agglomerative-single-linkage"></a>
 ### cuvs::cluster::agglomerative::single_linkage

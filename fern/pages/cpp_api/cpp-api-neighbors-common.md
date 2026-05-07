@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/common.hpp`_
 
 ## Approximate Nearest Neighbors Types
 
-_Doxygen group: `neighbors_index`_
-
 <a id="cuvs-neighbors-index"></a>
 ### cuvs::neighbors::index
 
@@ -60,8 +58,6 @@ enum class MergeStrategy { ... } ;
 _Source: `cpp/include/cuvs/neighbors/common.hpp:125`_
 
 ## Filtering for ANN Types
-
-_Doxygen group: `neighbors_filtering`_
 
 <a id="filtering-filtertype"></a>
 ### filtering::FilterType
@@ -197,8 +193,6 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:608`_
 
 ## ANN MG index build parameters
 
-_Doxygen group: `mg_cpp_index_params`_
-
 <a id="ivf-distribution-mode"></a>
 ### ivf::distribution_mode
 
@@ -209,8 +203,6 @@ enum distribution_mode { ... } ;
 _Source: `cpp/include/cuvs/neighbors/common.hpp:904`_
 
 ## ANN MG search parameters
-
-_Doxygen group: `mg_cpp_search_params`_
 
 <a id="ivf-replicated-search-mode"></a>
 ### ivf::replicated_search_mode

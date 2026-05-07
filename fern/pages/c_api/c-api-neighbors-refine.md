@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/refine.h`_
 
 ## Approximate Nearest Neighbors Refinement C-API
 
-_Doxygen group: `ann_refine_c`_
-
 <a id="cuvsrefine"></a>
 ### cuvsRefine
 

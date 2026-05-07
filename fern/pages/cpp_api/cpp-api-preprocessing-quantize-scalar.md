@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp`_
 
 ## Scalar quantizer utilities
 
-_Doxygen group: `scalar`_
-
 <a id="cuvs-preprocessing-quantize-scalar-params"></a>
 ### cuvs::preprocessing::quantize::scalar::params
 

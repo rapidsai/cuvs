@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/epsilon_neighborhood.hpp`_
 
 ## Epsilon Neighborhood L2 Operations
 
-_Doxygen group: `epsilon_neighborhood_cpp_l2`_
-
 <a id="cuvs-neighbors-epsilon-neighborhood-compute"></a>
 ### cuvs::neighbors::epsilon_neighborhood::compute
 

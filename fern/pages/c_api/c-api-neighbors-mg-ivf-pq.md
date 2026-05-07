@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/mg_ivf_pq.h`_
 
 ## Multi-GPU IVF-PQ index build parameters
 
-_Doxygen group: `mg_ivf_pq_c_index_params`_
-
 <a id="cuvsmultigpuivfpqindexparams"></a>
 ### cuvsMultiGpuIvfPqIndexParams
 
@@ -77,8 +75,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:51`_
 
 ## Multi-GPU IVF-PQ index search parameters
-
-_Doxygen group: `mg_ivf_pq_c_search_params`_
 
 <a id="cuvsmultigpuivfpqsearchparams"></a>
 ### cuvsMultiGpuIvfPqSearchParams
@@ -150,8 +146,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:94`_
 
 ## Multi-GPU IVF-PQ index
 
-_Doxygen group: `mg_ivf_pq_c_index`_
-
 <a id="cuvsmultigpuivfpqindex"></a>
 ### cuvsMultiGpuIvfPqIndex
 
@@ -220,8 +214,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:130`_
 
 ## Multi-GPU IVF-PQ index build
 
-_Doxygen group: `mg_ivf_pq_c_index_build`_
-
 <a id="cuvsmultigpuivfpqbuild"></a>
 ### cuvsMultiGpuIvfPqBuild
 
@@ -252,8 +244,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:150`_
 
 ## Multi-GPU IVF-PQ index search
-
-_Doxygen group: `mg_ivf_pq_c_index_search`_
 
 <a id="cuvsmultigpuivfpqsearch"></a>
 ### cuvsMultiGpuIvfPqSearch
@@ -290,8 +280,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:175`_
 
 ## Multi-GPU IVF-PQ index extend
 
-_Doxygen group: `mg_ivf_pq_c_index_extend`_
-
 <a id="cuvsmultigpuivfpqextend"></a>
 ### cuvsMultiGpuIvfPqExtend
 
@@ -323,8 +311,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:200`_
 
 ## Multi-GPU IVF-PQ index serialize
 
-_Doxygen group: `mg_ivf_pq_c_index_serialize`_
-
 <a id="cuvsmultigpuivfpqserialize"></a>
 ### cuvsMultiGpuIvfPqSerialize
 
@@ -354,8 +340,6 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:222`_
 
 ## Multi-GPU IVF-PQ index deserialize
 
-_Doxygen group: `mg_ivf_pq_c_index_deserialize`_
-
 <a id="cuvsmultigpuivfpqdeserialize"></a>
 ### cuvsMultiGpuIvfPqDeserialize
 
@@ -384,8 +368,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:243`_
 
 ## Multi-GPU IVF-PQ index distribute
-
-_Doxygen group: `mg_ivf_pq_c_index_distribute`_
 
 <a id="cuvsmultigpuivfpqdistribute"></a>
 ### cuvsMultiGpuIvfPqDistribute

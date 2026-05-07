@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/mg_common.h`_
 
 ## Multi-GPU common types and enums
 
-_Doxygen group: `mg_c_common_types`_
-
 <a id="cuvsmultigpudistributionmode"></a>
 ### cuvsMultiGpuDistributionMode
 

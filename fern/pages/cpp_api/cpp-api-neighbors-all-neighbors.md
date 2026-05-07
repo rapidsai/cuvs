@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/all_neighbors.hpp`_
 
 ## The all-neighbors algorithm parameters.
 
-_Doxygen group: `all_neighbors_cpp_params`_
-
 <a id="graphbuildparams"></a>
 ### GraphBuildParams
 
@@ -46,8 +44,6 @@ struct all_neighbors_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/all_neighbors.hpp:37`_
 
 ## The all-neighbors knn graph build
-
-_Doxygen group: `all_neighbors_cpp_build`_
 
 <a id="cuvs-neighbors-all-neighbors-build"></a>
 ### cuvs::neighbors::all_neighbors::build

@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/ivf_pq.hpp`_
 
 ## IVF-PQ index build parameters
 
-_Doxygen group: `ivf_pq_cpp_index_params`_
-
 <a id="cuvs-neighbors-ivf-pq-codebook-gen"></a>
 ### cuvs::neighbors::ivf_pq::codebook_gen
 
@@ -59,8 +57,6 @@ Usage example:
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:145`_
 
 ## IVF-PQ index search parameters
-
-_Doxygen group: `ivf_pq_cpp_search_params`_
 
 <a id="cuvs-neighbors-ivf-pq-search-params"></a>
 ### cuvs::neighbors::ivf_pq::search_params
@@ -118,8 +114,6 @@ struct ivf_pq_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3364`_
 
 ## IVF-PQ index
-
-_Doxygen group: `ivf_pq_cpp_index`_
 
 <a id="cuvs-neighbors-ivf-pq-index"></a>
 ### cuvs::neighbors::ivf_pq::index
@@ -597,8 +591,6 @@ This constructor is used internally by build/extend/deserialize functions.
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:663`_
 
 ## IVF-PQ index build
-
-_Doxygen group: `ivf_pq_cpp_index_build`_
 
 <a id="cuvs-neighbors-ivf-pq-build"></a>
 ### cuvs::neighbors::ivf_pq::build
@@ -1285,8 +1277,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1253`_
 
 ## IVF-PQ index extend
 
-_Doxygen group: `ivf_pq_cpp_index_extend`_
-
 <a id="cuvs-neighbors-ivf-pq-extend"></a>
 ### cuvs::neighbors::ivf_pq::extend
 
@@ -1762,8 +1752,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1770`_
 
 ## IVF-PQ index transform
 
-_Doxygen group: `ivf_pq_cpp_transform`_
-
 <a id="cuvs-neighbors-ivf-pq-transform"></a>
 ### cuvs::neighbors::ivf_pq::transform
 
@@ -1875,8 +1863,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1999`_
 
 ## IVF-PQ index serialize
 
-_Doxygen group: `ivf_pq_cpp_serialize`_
-
 <a id="cuvs-neighbors-ivf-pq-serialize"></a>
 ### cuvs::neighbors::ivf_pq::serialize
 
@@ -1976,8 +1962,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2106`_
 
 ## IVF-PQ helper methods
-
-_Doxygen group: `ivf_pq_cpp_helpers`_
 
 <a id="namespace-codepacker"></a>
 ### namespace codepacker \{

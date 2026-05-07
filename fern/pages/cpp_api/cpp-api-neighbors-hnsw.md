@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/hnsw.hpp`_
 
 ## hnswlib index wrapper params
 
-_Doxygen group: `hnsw_cpp_index_params`_
-
 <a id="cuvs-neighbors-hnsw-hnswhierarchy"></a>
 ### cuvs::neighbors::hnsw::HnswHierarchy
 
@@ -62,8 +60,6 @@ Usage example:
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:114`_
 
 ## hnswlib index wrapper
-
-_Doxygen group: `hnsw_cpp_index`_
 
 <a id="template-typename-t"></a>
 ### template &lt;typename T&gt;
@@ -155,8 +151,6 @@ _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:169`_
 
 ## HNSW index extend parameters
 
-_Doxygen group: `hnsw_cpp_extend_params`_
-
 <a id="cuvs-neighbors-hnsw-extend-params"></a>
 ### cuvs::neighbors::hnsw::extend_params
 
@@ -175,8 +169,6 @@ struct extend_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:186`_
 
 ## Build HNSW index on the GPU
-
-_Doxygen group: `hnsw_cpp_index_build`_
 
 <a id="cuvs-neighbors-hnsw-build"></a>
 ### cuvs::neighbors::hnsw::build
@@ -312,8 +304,6 @@ Usage example:
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:428`_
 
 ## Load CAGRA index as hnswlib index
-
-_Doxygen group: `hnsw_cpp_index_load`_
 
 <a id="cuvs-neighbors-hnsw-from-cagra"></a>
 ### cuvs::neighbors::hnsw::from_cagra
@@ -458,8 +448,6 @@ _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:579`_
 
 ## Extend HNSW index with additional vectors
 
-_Doxygen group: `hnsw_cpp_index_extend`_
-
 <a id="cuvs-neighbors-hnsw-extend"></a>
 ### cuvs::neighbors::hnsw::extend
 
@@ -583,8 +571,6 @@ _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:726`_
 
 ## Build CAGRA index and search with hnswlib
 
-_Doxygen group: `hnsw_cpp_search_params`_
-
 <a id="cuvs-neighbors-hnsw-search-params"></a>
 ### cuvs::neighbors::hnsw::search_params
 
@@ -604,8 +590,6 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:740`_
 
 ## Search hnswlib index
-
-_Doxygen group: `hnsw_cpp_index_search`_
 
 <a id="cuvs-neighbors-hnsw-search"></a>
 ### cuvs::neighbors::hnsw::search
@@ -753,8 +737,6 @@ Usage example:
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:926`_
 
 ## Deserialize CAGRA index as hnswlib index
-
-_Doxygen group: `hnsw_cpp_index_serialize`_
 
 <a id="cuvs-neighbors-hnsw-serialize"></a>
 ### cuvs::neighbors::hnsw::serialize

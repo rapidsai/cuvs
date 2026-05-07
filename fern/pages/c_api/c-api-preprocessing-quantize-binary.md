@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/preprocessing/quantize/binary.h`_
 
 ## C API for Binary Quantizer
 
-_Doxygen group: `preprocessing_c_binary`_
-
 <a id="cuvsbinaryquantizerthreshold"></a>
 ### cuvsBinaryQuantizerThreshold
 

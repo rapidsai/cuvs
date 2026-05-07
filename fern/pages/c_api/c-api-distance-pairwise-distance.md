@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/distance/pairwise_distance.h`_
 
 ## C pairwise distance
 
-_Doxygen group: `pairwise_distance_c`_
-
 <a id="cuvspairwisedistance"></a>
 ### cuvsPairwiseDistance
 

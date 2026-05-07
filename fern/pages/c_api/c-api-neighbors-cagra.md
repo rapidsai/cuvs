@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/cagra.h`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
-_Doxygen group: `cagra_c_index_params`_
-
 <a id="cuvscagragraphbuildalgo"></a>
 ### cuvsCagraGraphBuildAlgo
 
@@ -293,8 +291,6 @@ _Source: `c/include/cuvs/neighbors/cagra.h:292`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
-_Doxygen group: `cagra_c_extend_params`_
-
 <a id="cuvscagraextendparams"></a>
 ### cuvsCagraExtendParams
 
@@ -395,8 +391,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/cagra.h:644`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
-
-_Doxygen group: `cagra_c_search_params`_
 
 <a id="cuvscagrasearchalgo"></a>
 ### cuvsCagraSearchAlgo
@@ -516,8 +510,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/cagra.h:455`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
-
-_Doxygen group: `cagra_c_index`_
 
 <a id="cuvscagraindex"></a>
 ### cuvsCagraIndex
@@ -711,8 +703,6 @@ _Source: `c/include/cuvs/neighbors/cagra.h:560`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
-_Doxygen group: `cagra_c_index_build`_
-
 <a id="cuvscagrabuild"></a>
 ### cuvsCagraBuild
 
@@ -750,8 +740,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/cagra.h:615`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
-
-_Doxygen group: `cagra_c_index_search`_
 
 <a id="cuvscagrasearch"></a>
 ### cuvsCagraSearch
@@ -793,8 +781,6 @@ cuvsFilter filter);
 _Source: `c/include/cuvs/neighbors/cagra.h:707`_
 
 ## CAGRA C-API serialize functions
-
-_Doxygen group: `cagra_c_index_serialize`_
 
 <a id="cuvscagraserialize"></a>
 ### cuvsCagraSerialize
@@ -909,8 +895,6 @@ cuvsCagraIndex_t index);
 _Source: `c/include/cuvs/neighbors/cagra.h:824`_
 
 ## CAGRA C-API merge functions
-
-_Doxygen group: `cagra_c_index_merge`_
 
 <a id="cuvscagramerge"></a>
 ### cuvsCagraMerge

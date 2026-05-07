@@ -98,8 +98,6 @@ _Source: `cpp/include/cuvs/distance/distance.hpp:111`_
 
 ## Pairwise Distances API
 
-_Doxygen group: `pairwise_distance`_
-
 <a id="kernels-pairwise-distance"></a>
 ### kernels::pairwise_distance
 

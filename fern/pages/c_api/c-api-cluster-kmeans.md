@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/cluster/kmeans.h`_
 
 ## k-means hyperparameters
 
-_Doxygen group: `kmeans_c_params`_
-
 <a id="cuvskmeansinitmethod"></a>
 ### cuvsKMeansInitMethod
 
@@ -123,8 +121,6 @@ typedef enum { ... } cuvsKMeansType;
 _Source: `c/include/cuvs/cluster/kmeans.h:135`_
 
 ## k-means clustering APIs
-
-_Doxygen group: `kmeans_c`_
 
 <a id="cuvskmeansfit"></a>
 ### cuvsKMeansFit

@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/refine.hpp`_
 
 ## Approximate Nearest Neighbors Refinement
 
-_Doxygen group: `ann_refine`_
-
 <a id="cuvs-neighbors-refine"></a>
 ### cuvs::neighbors::refine
 

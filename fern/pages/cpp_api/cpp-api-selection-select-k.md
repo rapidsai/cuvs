@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/selection/select_k.hpp`_
 
 ## Batched-select k smallest or largest key/values
 
-_Doxygen group: `select_k`_
-
 <a id="cuvs-selection-select-k"></a>
 ### cuvs::selection::select_k
 

@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/stats/trustworthiness_score.hpp`_
 
 ## Trustworthiness
 
-_Doxygen group: `stats_trustworthiness`_
-
 <a id="stats-trustworthiness-score"></a>
 ### stats::trustworthiness_score
 

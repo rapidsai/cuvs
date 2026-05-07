@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/mg_cagra.h`_
 
 ## Multi-GPU CAGRA index build parameters
 
-_Doxygen group: `mg_cagra_c_index_params`_
-
 <a id="cuvsmultigpucagraindexparams"></a>
 ### cuvsMultiGpuCagraIndexParams
 
@@ -77,8 +75,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_cagra.h:51`_
 
 ## Multi-GPU CAGRA index search parameters
-
-_Doxygen group: `mg_cagra_c_search_params`_
 
 <a id="cuvsmultigpucagrasearchparams"></a>
 ### cuvsMultiGpuCagraSearchParams
@@ -150,8 +146,6 @@ _Source: `c/include/cuvs/neighbors/mg_cagra.h:94`_
 
 ## Multi-GPU CAGRA index
 
-_Doxygen group: `mg_cagra_c_index`_
-
 <a id="cuvsmultigpucagraindex"></a>
 ### cuvsMultiGpuCagraIndex
 
@@ -220,8 +214,6 @@ _Source: `c/include/cuvs/neighbors/mg_cagra.h:130`_
 
 ## Multi-GPU CAGRA index build
 
-_Doxygen group: `mg_cagra_c_index_build`_
-
 <a id="cuvsmultigpucagrabuild"></a>
 ### cuvsMultiGpuCagraBuild
 
@@ -252,8 +244,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_cagra.h:150`_
 
 ## Multi-GPU CAGRA index search
-
-_Doxygen group: `mg_cagra_c_index_search`_
 
 <a id="cuvsmultigpucagrasearch"></a>
 ### cuvsMultiGpuCagraSearch
@@ -290,8 +280,6 @@ _Source: `c/include/cuvs/neighbors/mg_cagra.h:175`_
 
 ## Multi-GPU CAGRA index extend
 
-_Doxygen group: `mg_cagra_c_index_extend`_
-
 <a id="cuvsmultigpucagraextend"></a>
 ### cuvsMultiGpuCagraExtend
 
@@ -323,8 +311,6 @@ _Source: `c/include/cuvs/neighbors/mg_cagra.h:200`_
 
 ## Multi-GPU CAGRA index serialize
 
-_Doxygen group: `mg_cagra_c_index_serialize`_
-
 <a id="cuvsmultigpucagraserialize"></a>
 ### cuvsMultiGpuCagraSerialize
 
@@ -354,8 +340,6 @@ _Source: `c/include/cuvs/neighbors/mg_cagra.h:222`_
 
 ## Multi-GPU CAGRA index deserialize
 
-_Doxygen group: `mg_cagra_c_index_deserialize`_
-
 <a id="cuvsmultigpucagradeserialize"></a>
 ### cuvsMultiGpuCagraDeserialize
 
@@ -384,8 +368,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/mg_cagra.h:243`_
 
 ## Multi-GPU CAGRA index distribute
-
-_Doxygen group: `mg_cagra_c_index_distribute`_
 
 <a id="cuvsmultigpucagradistribute"></a>
 ### cuvsMultiGpuCagraDistribute

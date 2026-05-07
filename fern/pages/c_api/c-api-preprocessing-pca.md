@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/preprocessing/pca.h`_
 
 ## C API for PCA (Principal Component Analysis)
 
-_Doxygen group: `preprocessing_c_pca`_
-
 <a id="cuvspcasolver"></a>
 ### cuvsPcaSolver
 

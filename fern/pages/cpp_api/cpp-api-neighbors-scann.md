@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/scann.hpp`_
 
 ## ScaNN index build parameters
 
-_Doxygen group: `scann_cpp_index_params`_
-
 <a id="cuvs-neighbors-experimental-scann-index-params"></a>
 ### cuvs::neighbors::experimental::scann::index_params
 
@@ -38,8 +36,6 @@ struct index_params : cuvs::neighbors::index_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:36`_
 
 ## ScaNN index type
-
-_Doxygen group: `scann_cpp_index`_
 
 <a id="cuvs-neighbors-experimental-scann-metric"></a>
 ### cuvs::neighbors::experimental::scann::metric
@@ -87,8 +83,6 @@ Dimensionality of the data.
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:119`_
 
 ## ScaNN index build functions
-
-_Doxygen group: `scann_cpp_index_build`_
 
 <a id="cuvs-neighbors-experimental-scann-build"></a>
 ### cuvs::neighbors::experimental::scann::build
@@ -146,8 +140,6 @@ NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:316`_
 
 ## ScaNN serialize functions
-
-_Doxygen group: `scann_cpp_serialize`_
 
 **Additional overload:** `cuvs::neighbors::experimental::scann::serialize`
 

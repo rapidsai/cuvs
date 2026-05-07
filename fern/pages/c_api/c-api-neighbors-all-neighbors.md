@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/all_neighbors.h`_
 
 ## All-neighbors C-API build parameters
 
-_Doxygen group: `all_neighbors_c_params`_
-
 <a id="cuvsallneighborsalgo"></a>
 ### cuvsAllNeighborsAlgo
 
@@ -98,8 +96,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/all_neighbors.h:79`_
 
 ## All-neighbors C-API build
-
-_Doxygen group: `all_neighbors_c_build`_
 
 <a id="cuvsallneighborsbuild"></a>
 ### cuvsAllNeighborsBuild

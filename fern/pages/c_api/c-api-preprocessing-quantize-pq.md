@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/preprocessing/quantize/pq.h`_
 
 ## C API for Product Quantizer
 
-_Doxygen group: `preprocessing_c_pq`_
-
 <a id="cuvsproductquantizerparams"></a>
 ### cuvsProductQuantizerParams
 

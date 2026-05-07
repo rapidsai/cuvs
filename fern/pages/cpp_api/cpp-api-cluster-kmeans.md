@@ -27,8 +27,6 @@ _Source: `cpp/include/cuvs/cluster/kmeans.hpp:19`_
 
 ## k-means hyperparameters
 
-_Doxygen group: `kmeans_params`_
-
 <a id="cuvs-cluster-kmeans-params"></a>
 ### cuvs::cluster::kmeans::params
 
@@ -100,8 +98,6 @@ enum class kmeans_type { ... } ;
 _Source: `cpp/include/cuvs/cluster/kmeans.hpp:149`_
 
 ## k-means clustering APIs
-
-_Doxygen group: `kmeans`_
 
 <a id="cuvs-cluster-kmeans-fit"></a>
 ### cuvs::cluster::kmeans::fit
@@ -1139,8 +1135,6 @@ std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = s
 _Source: `cpp/include/cuvs/cluster/kmeans.hpp:1566`_
 
 ## k-means API helpers
-
-_Doxygen group: `kmeans_helpers`_
 
 <a id="helpers-find-k"></a>
 ### helpers::find_k

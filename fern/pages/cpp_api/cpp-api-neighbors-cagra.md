@@ -32,8 +32,6 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:37`_
 
 ## CAGRA index build parameters
 
-_Doxygen group: `cagra_cpp_index_params`_
-
 <a id="cuvs-neighbors-vpq-params"></a>
 ### cuvs::neighbors::vpq_params
 
@@ -112,8 +110,6 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:245`_
 
 ## CAGRA index search parameters
 
-_Doxygen group: `cagra_cpp_search_params`_
-
 <a id="cuvs-neighbors-cagra-search-algo"></a>
 ### cuvs::neighbors::cagra::search_algo
 
@@ -136,8 +132,6 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:262`_
 
 ## CAGRA index extend parameters
 
-_Doxygen group: `cagra_cpp_extend_params`_
-
 <a id="cuvs-neighbors-cagra-extend-params"></a>
 ### cuvs::neighbors::cagra::extend_params
 
@@ -156,8 +150,6 @@ struct extend_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:357`_
 
 ## CAGRA index type
-
-_Doxygen group: `cagra_cpp_index`_
 
 <a id="cuvs-neighbors-cagra-metric"></a>
 ### cuvs::neighbors::cagra::metric
@@ -686,8 +678,6 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:834`_
 
 ## CAGRA index build functions
 
-_Doxygen group: `cagra_cpp_index_build`_
-
 <a id="cuvs-neighbors-cagra-build"></a>
 ### cuvs::neighbors::cagra::build
 
@@ -997,8 +987,6 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1202`_
 
 ## CAGRA extend functions
 
-_Doxygen group: `cagra_cpp_index_extend`_
-
 <a id="cuvs-neighbors-cagra-extend"></a>
 ### cuvs::neighbors::cagra::extend
 
@@ -1290,8 +1278,6 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1510`_
 
 ## CAGRA search functions
 
-_Doxygen group: `cagra_cpp_index_search`_
-
 <a id="none-sample-filter"></a>
 ### none_sample_filter
 
@@ -1311,8 +1297,6 @@ cuvs::neighbors::filtering::none_sample_filter{}
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1541`_
 
 ## CAGRA serialize functions
-
-_Doxygen group: `cagra_cpp_serialize`_
 
 <a id="cuvs-neighbors-cagra-serialize"></a>
 ### cuvs::neighbors::cagra::serialize

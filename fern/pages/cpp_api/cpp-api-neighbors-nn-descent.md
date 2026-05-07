@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/nn_descent.hpp`_
 
 ## The nn-descent algorithm parameters.
 
-_Doxygen group: `nn_descent_cpp_index_params`_
-
 <a id="cuvs-neighbors-nn-descent-dist-comp-dtype"></a>
 ### cuvs::neighbors::nn_descent::DIST_COMP_DTYPE
 
@@ -74,8 +72,6 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:69`_
 
 ## nn-descent index
-
-_Doxygen group: `nn_descent_cpp_index`_
 
 <a id="cuvs-neighbors-nn-descent-index"></a>
 ### cuvs::neighbors::nn_descent::index
@@ -219,8 +215,6 @@ neighborhood graph distances [size, graph-degree]
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:182`_
 
 ## nn-descent index build
-
-_Doxygen group: `nn_descent_cpp_index_build`_
 
 <a id="cuvs-neighbors-nn-descent-build"></a>
 ### cuvs::neighbors::nn_descent::build

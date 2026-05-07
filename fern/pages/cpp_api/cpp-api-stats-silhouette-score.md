@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/stats/silhouette_score.hpp`_
 
 ## Silhouette Score
 
-_Doxygen group: `stats_silhouette_score`_
-
 <a id="stats-silhouette-score"></a>
 ### stats::silhouette_score
 

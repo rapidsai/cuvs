@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/vamana.hpp`_
 
 ## Vamana index build parameters
 
-_Doxygen group: `vamana_cpp_index_params`_
-
 <a id="cuvs-neighbors-vamana-index-params"></a>
 ### cuvs::neighbors::vamana::index_params
 
@@ -38,8 +36,6 @@ struct index_params : cuvs::neighbors::index_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:56`_
 
 ## Vamana index type
-
-_Doxygen group: `vamana_cpp_index`_
 
 <a id="cuvs-neighbors-vamana-metric"></a>
 ### cuvs::neighbors::vamana::metric
@@ -313,8 +309,6 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:240`_
 
 ## Vamana index build functions
 
-_Doxygen group: `vamana_cpp_index_build`_
-
 <a id="cuvs-neighbors-vamana-build"></a>
 ### cuvs::neighbors::vamana::build
 
@@ -528,8 +522,6 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:475`_
 
 ## Vamana serialize functions
 
-_Doxygen group: `vamana_cpp_serialize`_
-
 <a id="cuvs-neighbors-vamana-serialize"></a>
 ### cuvs::neighbors::vamana::serialize
 
@@ -622,8 +614,6 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:574`_
 
 ## Vamana codebook functions
-
-_Doxygen group: `vamana_cpp_codebook`_
 
 <a id="cuvs-neighbors-vamana-deserialize-codebooks"></a>
 ### cuvs::neighbors::vamana::deserialize_codebooks

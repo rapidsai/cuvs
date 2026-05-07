@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/ivf_flat.hpp`_
 
 ## IVF-Flat index search parameters
 
-_Doxygen group: `ivf_flat_cpp_search_params`_
-
 <a id="cuvs-neighbors-ivf-flat-search-params"></a>
 ### cuvs::neighbors::ivf_flat::search_params
 
@@ -50,8 +48,6 @@ constexpr auto make_list_extents(SizeT n_rows) const -> list_extents;
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:108`_
 
 ## IVF-Flat index
-
-_Doxygen group: `ivf_flat_cpp_index`_
 
 <a id="cuvs-neighbors-ivf-flat-index"></a>
 ### cuvs::neighbors::ivf_flat::index
@@ -336,8 +332,6 @@ std::vector<std::shared_ptr<list_data<T, IdxT>>>& lists() noexcept;
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:257`_
 
 ## IVF-Flat index build
-
-_Doxygen group: `ivf_flat_cpp_index_build`_
 
 <a id="cuvs-neighbors-ivf-flat-build"></a>
 ### cuvs::neighbors::ivf_flat::build
@@ -926,8 +920,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:824`_
 
 ## IVF-Flat index extend
 
-_Doxygen group: `ivf_flat_cpp_index_extend`_
-
 <a id="cuvs-neighbors-ivf-flat-extend"></a>
 ### cuvs::neighbors::ivf_flat::extend
 
@@ -1435,8 +1427,6 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1393`_
 
 ## IVF-Flat index serialize
 
-_Doxygen group: `ivf_flat_cpp_serialize`_
-
 <a id="cuvs-neighbors-ivf-flat-serialize"></a>
 ### cuvs::neighbors::ivf_flat::serialize
 
@@ -1856,8 +1846,6 @@ Experimental, both the API and the serialization format are subject to change.
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2018`_
 
 ## Helper functions for IVF Flat
-
-_Doxygen group: `ivf_flat_helpers`_
 
 <a id="namespace-codepacker"></a>
 ### namespace codepacker \{

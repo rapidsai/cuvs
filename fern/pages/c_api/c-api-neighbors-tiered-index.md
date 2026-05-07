@@ -29,8 +29,6 @@ _Source: `c/include/cuvs/neighbors/tiered_index.h:24`_
 
 ## Tiered Index
 
-_Doxygen group: `tiered_index_c_index`_
-
 <a id="cuvstieredindex"></a>
 ### cuvsTieredIndex
 
@@ -97,8 +95,6 @@ cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
 _Source: `c/include/cuvs/neighbors/tiered_index.h:60`_
 
 ## Tiered Index build parameters
-
-_Doxygen group: `tiered_c_index_params`_
 
 <a id="cuvstieredindexparams"></a>
 ### cuvsTieredIndexParams
@@ -171,8 +167,6 @@ _Source: `c/include/cuvs/neighbors/tiered_index.h:113`_
 
 ## Tiered index build
 
-_Doxygen group: `tieredindex_c_index_build`_
-
 <a id="cuvstieredindexbuild"></a>
 ### cuvsTieredIndexBuild
 
@@ -208,8 +202,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/tiered_index.h:162`_
 
 ## Tiered index search
-
-_Doxygen group: `tieredindex_c_index_search`_
 
 <a id="cuvstieredindexsearch"></a>
 ### cuvsTieredIndexSearch
@@ -248,8 +240,6 @@ _Source: `c/include/cuvs/neighbors/tiered_index.h:212`_
 
 ## Tiered index extend
 
-_Doxygen group: `tiered_c_index_extend`_
-
 <a id="cuvstieredindexextend"></a>
 ### cuvsTieredIndexExtend
 
@@ -278,8 +268,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/tiered_index.h:235`_
 
 ## Tiered index merge
-
-_Doxygen group: `tiered_c_index_merge`_
 
 <a id="cuvstieredindexmerge"></a>
 ### cuvsTieredIndexMerge

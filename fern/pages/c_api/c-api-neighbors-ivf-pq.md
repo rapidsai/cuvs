@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/ivf_pq.h`_
 
 ## IVF-PQ index build parameters
 
-_Doxygen group: `ivf_pq_c_index_params`_
-
 <a id="cuvsivfpqcodebookgen"></a>
 ### cuvsIvfPqCodebookGen
 
@@ -123,8 +121,6 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:152`_
 
 ## IVF-PQ index search parameters
 
-_Doxygen group: `ivf_pq_c_search_params`_
-
 <a id="cuvsivfpqsearchparams"></a>
 ### cuvsIvfPqSearchParams
 
@@ -194,8 +190,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:235`_
 
 ## IVF-PQ index
-
-_Doxygen group: `ivf_pq_c_index`_
 
 <a id="cuvsivfpqindex"></a>
 ### cuvsIvfPqIndex
@@ -611,8 +605,6 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:386`_
 
 ## IVF-PQ index build
 
-_Doxygen group: `ivf_pq_c_index_build`_
-
 <a id="cuvsivfpqbuild"></a>
 ### cuvsIvfPqBuild
 
@@ -698,8 +690,6 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:474`_
 
 ## IVF-PQ index search
 
-_Doxygen group: `ivf_pq_c_index_search`_
-
 <a id="cuvsivfpqsearch"></a>
 ### cuvsIvfPqSearch
 
@@ -738,8 +728,6 @@ DLManagedTensor* distances);
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:534`_
 
 ## IVF-PQ C-API serialize functions
-
-_Doxygen group: `ivf_pq_c_index_serialize`_
 
 <a id="cuvsivfpqserialize"></a>
 ### cuvsIvfPqSerialize
@@ -793,8 +781,6 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:579`_
 
 ## IVF-PQ index extend
 
-_Doxygen group: `ivf_pq_c_index_extend`_
-
 <a id="cuvsivfpqextend"></a>
 ### cuvsIvfPqExtend
 
@@ -825,8 +811,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:597`_
 
 ## IVF-PQ index transform
-
-_Doxygen group: `ivf_pq_c_index_transform`_
 
 <a id="cuvsivfpqtransform"></a>
 ### cuvsIvfPqTransform

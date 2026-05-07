@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/core/c_api.h`_
 
 ## cuVS Error Messages
 
-_Doxygen group: `error_c`_
-
 <a id="cuvserror-t"></a>
 ### cuvsError_t
 
@@ -69,8 +67,6 @@ clears any previously seen error message.
 _Source: `c/include/cuvs/core/c_api.h:36`_
 
 ## cuVS Logging
-
-_Doxygen group: `log_c`_
 
 <a id="cuvsloglevel-t"></a>
 ### cuvsLogLevel_t
@@ -132,8 +128,6 @@ void cuvsSetLogLevel(cuvsLogLevel_t);
 _Source: `c/include/cuvs/core/c_api.h:65`_
 
 ## cuVS Resources Handle
-
-_Doxygen group: `resources_c`_
 
 <a id="cuvsresources-t"></a>
 ### cuvsResources_t
@@ -389,8 +383,6 @@ cuvsError_t
 _Source: `c/include/cuvs/core/c_api.h:167`_
 
 ## cuVS Memory Allocation
-
-_Doxygen group: `memory_c`_
 
 <a id="cuvsrmmalloc"></a>
 ### cuvsRMMAlloc

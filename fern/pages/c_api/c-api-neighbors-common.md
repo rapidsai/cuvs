@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/common.h`_
 
 ## Filters APIs
 
-_Doxygen group: `filters`_
-
 <a id="cuvsfiltertype"></a>
 ### cuvsFilterType
 
@@ -47,8 +45,6 @@ typedef struct { ... } cuvsFilter;
 _Source: `c/include/cuvs/neighbors/common.h:36`_
 
 ## Index Merge
-
-_Doxygen group: `index_merge`_
 
 <a id="cuvsmergestrategy"></a>
 ### cuvsMergeStrategy

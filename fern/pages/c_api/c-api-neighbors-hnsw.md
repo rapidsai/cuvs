@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/hnsw.h`_
 
 ## C API for HNSW index params
 
-_Doxygen group: `hnsw_c_index_params`_
-
 <a id="cuvshnswhierarchy"></a>
 ### cuvsHnswHierarchy
 
@@ -151,8 +149,6 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:149`_
 
 ## C API for hnswlib wrapper index
 
-_Doxygen group: `hnsw_c_index`_
-
 <a id="cuvshnswindex"></a>
 ### cuvsHnswIndex
 
@@ -216,8 +212,6 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 _Source: `c/include/cuvs/neighbors/hnsw.h:185`_
 
 ## Parameters for extending HNSW index
-
-_Doxygen group: `hnsw_c_extend_params`_
 
 <a id="cuvshnswextendparams"></a>
 ### cuvsHnswExtendParams
@@ -284,8 +278,6 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:218`_
 
 ## Load CAGRA index as hnswlib index
 
-_Doxygen group: `hnsw_c_index_load`_
-
 <a id="cuvshnswfromcagra"></a>
 ### cuvsHnswFromCagra
 
@@ -321,8 +313,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/hnsw.h:270`_
 
 ## Build HNSW index using ACE algorithm
-
-_Doxygen group: `hnsw_c_index_build`_
 
 <a id="cuvshnswbuild"></a>
 ### cuvsHnswBuild
@@ -363,8 +353,6 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:347`_
 
 ## Extend HNSW index with additional vectors
 
-_Doxygen group: `hnsw_c_index_extend`_
-
 <a id="cuvshnswextend"></a>
 ### cuvsHnswExtend
 
@@ -397,8 +385,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/hnsw.h:405`_
 
 ## C API for hnswlib wrapper search params
-
-_Doxygen group: `hnsw_c_search_params`_
 
 <a id="cuvshnswsearchparams"></a>
 ### cuvsHnswSearchParams
@@ -466,8 +452,6 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:440`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
-_Doxygen group: `hnsw_c_index_search`_
-
 <a id="cuvshnswsearch"></a>
 ### cuvsHnswSearch
 
@@ -506,8 +490,6 @@ DLManagedTensor* distances);
 _Source: `c/include/cuvs/neighbors/hnsw.h:499`_
 
 ## HNSW C-API serialize functions
-
-_Doxygen group: `hnsw_c_index_serialize`_
 
 <a id="cuvshnswserialize"></a>
 ### cuvsHnswSerialize

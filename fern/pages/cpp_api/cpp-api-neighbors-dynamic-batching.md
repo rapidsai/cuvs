@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/dynamic_batching.hpp`_
 
 ## Dynamic Batching index parameters
 
-_Doxygen group: `dynamic_batching_cpp_index_params`_
-
 <a id="detail-index-params"></a>
 ### detail::index_params
 
@@ -32,8 +30,6 @@ _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:21`_
 
 ## Dynamic Batching search parameters
 
-_Doxygen group: `dynamic_batching_cpp_search_params`_
-
 <a id="detail-search-params"></a>
 ### detail::search_params
 
@@ -52,8 +48,6 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:60`_
 
 ## Dynamic Batching index type
-
-_Doxygen group: `dynamic_batching_cpp_index`_
 
 <a id="detail-index"></a>
 ### detail::index
@@ -92,8 +86,6 @@ const cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:174`_
 
 ## Dynamic Batching search
-
-_Doxygen group: `dynamic_batching_cpp_search`_
 
 <a id="detail-search"></a>
 ### detail::search

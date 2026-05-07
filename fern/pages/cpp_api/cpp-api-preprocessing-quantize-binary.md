@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/preprocessing/quantize/binary.hpp`_
 
 ## Binary quantizer utilities
 
-_Doxygen group: `binary`_
-
 <a id="cuvs-preprocessing-quantize-binary-bit-threshold"></a>
 ### cuvs::preprocessing::quantize::binary::bit_threshold
 

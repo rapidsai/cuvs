@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/preprocessing/quantize/scalar.h`_
 
 ## C API for Scalar Quantizer
 
-_Doxygen group: `preprocessing_c_scalar`_
-
 <a id="cuvsscalarquantizerparams"></a>
 ### cuvsScalarQuantizerParams
 

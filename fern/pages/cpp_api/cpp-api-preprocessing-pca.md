@@ -34,8 +34,6 @@ _Source: `cpp/include/cuvs/preprocessing/pca.hpp:20`_
 
 ## PCA (Principal Component Analysis)
 
-_Doxygen group: `pca`_
-
 <a id="cuvs-preprocessing-pca-fit"></a>
 ### cuvs::preprocessing::pca::fit
 

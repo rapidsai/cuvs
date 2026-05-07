@@ -8,8 +8,6 @@ _Source header: `cpp/include/cuvs/neighbors/ball_cover.hpp`_
 
 ## Random Ball Cover algorithm
 
-_Doxygen group: `random_ball_cover`_
-
 <a id="cuvs-neighbors-ball-cover-build"></a>
 ### cuvs::neighbors::ball_cover::build
 

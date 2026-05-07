@@ -29,8 +29,6 @@ _Source: `c/include/cuvs/neighbors/nn_descent.h:24`_
 
 ## The nn-descent algorithm parameters.
 
-_Doxygen group: `nn_descent_c_index_params`_
-
 <a id="cuvsnndescentindexparams"></a>
 ### cuvsNNDescentIndexParams
 
@@ -105,8 +103,6 @@ _Source: `c/include/cuvs/neighbors/nn_descent.h:79`_
 
 ## NN-Descent index
 
-_Doxygen group: `nn_descent_c_index`_
-
 <a id="cuvsnndescentindex"></a>
 ### cuvsNNDescentIndex
 
@@ -170,8 +166,6 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 _Source: `c/include/cuvs/neighbors/nn_descent.h:112`_
 
 ## NN-Descent index build
-
-_Doxygen group: `nn_descent_c_index_build`_
 
 <a id="cuvsnndescentbuild"></a>
 ### cuvsNNDescentBuild

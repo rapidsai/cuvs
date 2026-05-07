@@ -8,8 +8,6 @@ _Source header: `c/include/cuvs/neighbors/ivf_flat.h`_
 
 ## IVF-Flat index build parameters
 
-_Doxygen group: `ivf_flat_c_index_params`_
-
 <a id="cuvsivfflatindexparams"></a>
 ### cuvsIvfFlatIndexParams
 
@@ -82,8 +80,6 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:88`_
 
 ## IVF-Flat index search parameters
 
-_Doxygen group: `ivf_flat_c_search_params`_
-
 <a id="cuvsivfflatsearchparams"></a>
 ### cuvsIvfFlatSearchParams
 
@@ -148,8 +144,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:122`_
 
 ## IVF-Flat index
-
-_Doxygen group: `ivf_flat_c_index`_
 
 <a id="cuvsivfflatindex"></a>
 ### cuvsIvfFlatIndex
@@ -283,8 +277,6 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:170`_
 
 ## IVF-Flat index build
 
-_Doxygen group: `ivf_flat_c_index_build`_
-
 <a id="cuvsivfflatbuild"></a>
 ### cuvsIvfFlatBuild
 
@@ -321,8 +313,6 @@ cuvsError_t
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:222`_
 
 ## IVF-Flat index search
-
-_Doxygen group: `ivf_flat_c_index_search`_
 
 <a id="cuvsivfflatsearch"></a>
 ### cuvsIvfFlatSearch
@@ -364,8 +354,6 @@ cuvsFilter filter);
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:279`_
 
 ## IVF-Flat C-API serialize functions
-
-_Doxygen group: `ivf_flat_c_index_serialize`_
 
 <a id="cuvsivfflatserialize"></a>
 ### cuvsIvfFlatSerialize
@@ -422,8 +410,6 @@ Experimental, both the API and the serialization format are subject to change.
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:328`_
 
 ## IVF-Flat index extend
-
-_Doxygen group: `ivf_flat_c_index_extend`_
 
 <a id="cuvsivfflatextend"></a>
 ### cuvsIvfFlatExtend
