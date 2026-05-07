@@ -29,7 +29,7 @@ Parameters used to build an all-neighbors graph (find nearest neighbors for all 
 training vectors). For scalability, the all-neighbors graph construction algorithm partitions a set of training vectors into overlapping clusters, computes a local knn graph on each cluster, and merges the local graphs into a single global graph. Device memory usage and accuracy can be configured by changing the `overlap_factor` and `n_clusters`. The algorithm used to build each local graph is also configurable.
 
 ```cpp
-struct all_neighbors_params { ... } ;
+struct all_neighbors_params { ... };
 ```
 
 **Fields**

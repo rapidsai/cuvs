@@ -16,7 +16,7 @@ Multi-GPU parameters to build CAGRA Index
 This structure extends the base CAGRA index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuCagraIndexParams { ... } ;
+struct cuvsMultiGpuCagraIndexParams { ... };
 ```
 
 **Fields**
@@ -84,7 +84,7 @@ Multi-GPU parameters to search CAGRA index
 This structure extends the base CAGRA search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuCagraSearchParams { ... } ;
+struct cuvsMultiGpuCagraSearchParams { ... };
 ```
 
 **Fields**

@@ -37,7 +37,7 @@ Parameters used to build an nn-descent index
 `metric`: The distance metric to use `metric_arg`: The argument used by distance metrics like Minkowskidistance `graph_degree`: For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree) `intermediate_graph_degree`: Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree `max_iterations`: The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance `termination_threshold`: The delta at which nn-descent will terminate its iterations `return_distances`: Boolean to decide whether to return distances array `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision.
 
 ```c
-struct cuvsNNDescentIndexParams { ... } ;
+struct cuvsNNDescentIndexParams { ... };
 ```
 
 **Fields**

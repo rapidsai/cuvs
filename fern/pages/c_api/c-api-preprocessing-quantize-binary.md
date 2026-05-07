@@ -16,7 +16,7 @@ In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding 
 the dataset vector is greater than the corresponding element in the threshold vector. The mean and sampling_median thresholds are calculated separately for each dimension.
 
 ```c
-enum cuvsBinaryQuantizerThreshold { ... } ;
+enum cuvsBinaryQuantizerThreshold { ... };
 ```
 
 **Values**
@@ -35,15 +35,15 @@ _Source: `c/include/cuvs/preprocessing/quantize/binary.h:26`_
 Binary quantizer parameters.
 
 ```c
-struct cuvsBinaryQuantizerParams { ... } ;
+struct cuvsBinaryQuantizerParams { ... };
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `threshold` | `/* * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform */ enum` |  |
-| `sampling_ratio` | `/* * specifies the sampling ratio */` |  |
+| `threshold` | [`/* * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform */ enum cuvsBinaryQuantizerThreshold`](/api-reference/c-api-preprocessing-quantize-binary#cuvsbinaryquantizerthreshold) |  |
+| `sampling_ratio` | `/* * specifies the sampling ratio */ float` |  |
 
 _Source: `c/include/cuvs/preprocessing/quantize/binary.h:35`_
 

@@ -102,7 +102,7 @@ _Source: `c/include/cuvs/neighbors/tiered_index.h:60`_
 Supplemental parameters to build a TieredIndex
 
 ```c
-struct cuvsTieredIndexParams { ... } ;
+struct cuvsTieredIndexParams { ... };
 ```
 
 **Fields**

@@ -16,7 +16,7 @@ Hierarchy for HNSW index when converting from CAGRA index
 NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
 
 ```c
-enum cuvsHnswHierarchy { ... } ;
+enum cuvsHnswHierarchy { ... };
 ```
 
 **Values**
@@ -40,7 +40,7 @@ ACE enables building indexes for datasets too large to fit in GPU memory by:
 3. Concatenating sub-graphs into a final unified index
 
 ```c
-struct cuvsHnswAceParams { ... } ;
+struct cuvsHnswAceParams { ... };
 ```
 
 **Fields**
@@ -219,7 +219,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:185`_
 Parameters for extending HNSW index
 
 ```c
-struct cuvsHnswExtendParams { ... } ;
+struct cuvsHnswExtendParams { ... };
 ```
 
 **Fields**
@@ -392,7 +392,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:405`_
 C API for hnswlib wrapper search params
 
 ```c
-struct cuvsHnswSearchParams { ... } ;
+struct cuvsHnswSearchParams { ... };
 ```
 
 **Fields**

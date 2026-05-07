@@ -16,7 +16,7 @@ Supplemental parameters to build Vamana Index
 `graph_degree`: Maximum degree of graph; corresponds to the R parameter of Vamana algorithm in the literature. `visited_size`: Maximum number of visited nodes per search during Vamana algorithm. Loosely corresponds to the L parameter in the literature. `vamana_iters`: The number of times all vectors are inserted into the graph. If &gt; 1, all vectors are re-inserted to improve graph quality. `max_fraction`: The maximum batch size is this fraction of the total dataset size. Larger gives faster build but lower graph quality. `alpha`: Used to determine how aggressive the pruning will be.
 
 ```c
-struct cuvsVamanaIndexParams { ... } ;
+struct cuvsVamanaIndexParams { ... };
 ```
 
 **Fields**

@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/cluster/agglomerative.hpp`_
 Determines the method for computing the minimum spanning tree (MST)
 
 ```cpp
-enum Linkage { ... } ;
+enum Linkage { ... };
 ```
 
 **Values**
@@ -25,6 +25,22 @@ enum Linkage { ... } ;
 | `KNN_GRAPH` | `1` |
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:30`_
+
+## Types
+
+<a id="cuvs-cluster-agglomerative-single-linkage-output"></a>
+### cuvs::cluster::agglomerative::single_linkage_output
+
+Simple container object for consolidating linkage results. This closely
+
+mirrors the trained instance variables populated in Scikit-learn's AgglomerativeClustering estimator.
+
+```cpp
+template <typename idx_t>
+class single_linkage_output { ... };
+```
+
+_Source: `cpp/include/cuvs/cluster/agglomerative.hpp:56`_
 
 ## single-linkage clustering APIs
 
@@ -72,7 +88,7 @@ _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:104`_
 Specialized parameters to build the KNN graph with regular distances
 
 ```cpp
-struct distance_params { ... } ;
+struct distance_params { ... };
 ```
 
 **Fields**
@@ -90,7 +106,7 @@ _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:118`_
 Specialized parameters to build the Mutual Reachability graph
 
 ```cpp
-struct mutual_reachability_params { ... } ;
+struct mutual_reachability_params { ... };
 ```
 
 **Fields**

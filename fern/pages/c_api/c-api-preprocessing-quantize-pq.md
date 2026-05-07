@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/preprocessing/quantize/pq.h`_
 Product quantizer parameters.
 
 ```c
-struct cuvsProductQuantizerParams { ... } ;
+struct cuvsProductQuantizerParams { ... };
 ```
 
 **Fields**

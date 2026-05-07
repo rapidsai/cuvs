@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/neighbors/ivf_flat.hpp`_
 IVF-Flat index search parameters
 
 ```cpp
-struct search_params : cuvs::neighbors::search_params { ... } ;
+struct search_params : cuvs::neighbors::search_params { ... };
 ```
 
 **Fields**
@@ -26,8 +26,8 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:73`_
 
-<a id="cuvs-neighbors-ivf-flat-make-list-extents"></a>
-### cuvs::neighbors::ivf_flat::make_list_extents
+<a id="cuvs-neighbors-ivf-flat-list-spec-make-list-extents"></a>
+### cuvs::neighbors::ivf_flat::list_spec::make_list_extents
 
 Determine the extents of an array enough to hold a given amount of data.
 
@@ -52,6 +52,34 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:108`_
 <a id="cuvs-neighbors-ivf-flat-index"></a>
 ### cuvs::neighbors::ivf_flat::index
 
+IVF-flat index.
+
+```cpp
+template <typename T, typename IdxT>
+struct index : cuvs::neighbors::index { ... };
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `veclen_` | `uint32_t` | TODO: in theory, we can lift this to the template parameter and keep it at hardware maximum possible value by padding the `dim` of the data https://github.com/rapidsai/raft/issues/711 |
+| `metric_` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
+| `adaptive_centers_` | `bool` |  |
+| `conservative_memory_allocation_` | `bool` |  |
+| `lists_` | `std::vector<std::shared_ptr<list_data<T, IdxT>>>` |  |
+| `list_sizes_` | `raft::device_vector<uint32_t, uint32_t>` |  |
+| `centers_` | `raft::device_matrix<float, uint32_t, raft::row_major>` |  |
+| `center_norms_` | `std::optional<raft::device_vector<float, uint32_t>>` |  |
+| `data_ptrs_` | `raft::device_vector<T*, uint32_t>` |  |
+| `inds_ptrs_` | `raft::device_vector<IdxT*, uint32_t>` |  |
+| `accum_sorted_sizes_` | `raft::host_vector<IdxT, uint32_t>` |  |
+
+_Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:132`_
+
+<a id="cuvs-neighbors-ivf-flat-index-index"></a>
+### cuvs::neighbors::ivf_flat::index::index
+
 Construct an empty index.
 
 ```cpp
@@ -72,7 +100,7 @@ Constructs an empty index. This index will either need to be trained with `build
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:154`_
 
-**Additional overload:** `cuvs::neighbors::ivf_flat::index`
+**Additional overload:** `cuvs::neighbors::ivf_flat::index::index`
 
 Construct an empty index. It needs to be trained and then populated.
 
@@ -94,7 +122,7 @@ index(raft::resources const& res, const index_params& params, uint32_t dim);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:157`_
 
-**Additional overload:** `cuvs::neighbors::ivf_flat::index`
+**Additional overload:** `cuvs::neighbors::ivf_flat::index::index`
 
 Construct an empty index. It needs to be trained and then populated.
 
@@ -124,8 +152,8 @@ uint32_t dim);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:159`_
 
-<a id="cuvs-neighbors-ivf-flat-veclen"></a>
-### cuvs::neighbors::ivf_flat::veclen
+<a id="cuvs-neighbors-ivf-flat-index-veclen"></a>
+### cuvs::neighbors::ivf_flat::index::veclen
 
 Vectorized load/store size in elements, determines the size of interleaved data chunks.
 
@@ -139,8 +167,8 @@ uint32_t veclen() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:169`_
 
-<a id="cuvs-neighbors-ivf-flat-metric"></a>
-### cuvs::neighbors::ivf_flat::metric
+<a id="cuvs-neighbors-ivf-flat-index-metric"></a>
+### cuvs::neighbors::ivf_flat::index::metric
 
 Distance metric used for clustering.
 
@@ -154,8 +182,8 @@ cuvs::distance::DistanceType metric() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:172`_
 
-<a id="cuvs-neighbors-ivf-flat-adaptive-centers"></a>
-### cuvs::neighbors::ivf_flat::adaptive_centers
+<a id="cuvs-neighbors-ivf-flat-index-adaptive-centers"></a>
+### cuvs::neighbors::ivf_flat::index::adaptive_centers
 
 Whether `centers()` change upon extending the index (ivf_flat::extend).
 
@@ -169,8 +197,8 @@ bool adaptive_centers() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:175`_
 
-<a id="cuvs-neighbors-ivf-flat-list-sizes"></a>
-### cuvs::neighbors::ivf_flat::list_sizes
+<a id="cuvs-neighbors-ivf-flat-index-list-sizes"></a>
+### cuvs::neighbors::ivf_flat::index::list_sizes
 
 Sizes of the lists (clusters) [n_lists]
 
@@ -186,8 +214,8 @@ NB: This may differ from the actual list size if the shared lists have been exte
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:204`_
 
-<a id="cuvs-neighbors-ivf-flat-centers"></a>
-### cuvs::neighbors::ivf_flat::centers
+<a id="cuvs-neighbors-ivf-flat-index-centers"></a>
+### cuvs::neighbors::ivf_flat::index::centers
 
 k-means cluster centers corresponding to the lists [n_lists, dim]
 
@@ -201,8 +229,8 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:208`_
 
-<a id="cuvs-neighbors-ivf-flat-center-norms"></a>
-### cuvs::neighbors::ivf_flat::center_norms
+<a id="cuvs-neighbors-ivf-flat-index-center-norms"></a>
+### cuvs::neighbors::ivf_flat::index::center_norms
 
 (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
 
@@ -218,8 +246,8 @@ NB: this may be empty if the index is empty or if the metric does not require th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:217`_
 
-<a id="cuvs-neighbors-ivf-flat-accum-sorted-sizes"></a>
-### cuvs::neighbors::ivf_flat::accum_sorted_sizes
+<a id="cuvs-neighbors-ivf-flat-index-accum-sorted-sizes"></a>
+### cuvs::neighbors::ivf_flat::index::accum_sorted_sizes
 
 Accumulated list sizes, sorted in descending order [n_lists + 1].
 
@@ -239,8 +267,8 @@ This span is used during search to estimate the maximum size of the workspace.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:229`_
 
-<a id="cuvs-neighbors-ivf-flat-size"></a>
-### cuvs::neighbors::ivf_flat::size
+<a id="cuvs-neighbors-ivf-flat-index-size"></a>
+### cuvs::neighbors::ivf_flat::index::size
 
 Total length of the index.
 
@@ -254,8 +282,8 @@ IdxT size() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:234`_
 
-<a id="cuvs-neighbors-ivf-flat-dim"></a>
-### cuvs::neighbors::ivf_flat::dim
+<a id="cuvs-neighbors-ivf-flat-index-dim"></a>
+### cuvs::neighbors::ivf_flat::index::dim
 
 Dimensionality of the data.
 
@@ -269,8 +297,8 @@ uint32_t dim() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:237`_
 
-<a id="cuvs-neighbors-ivf-flat-n-lists"></a>
-### cuvs::neighbors::ivf_flat::n_lists
+<a id="cuvs-neighbors-ivf-flat-index-n-lists"></a>
+### cuvs::neighbors::ivf_flat::index::n_lists
 
 Number of clusters/inverted lists.
 
@@ -284,8 +312,8 @@ uint32_t n_lists() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:240`_
 
-<a id="cuvs-neighbors-ivf-flat-inds-ptrs"></a>
-### cuvs::neighbors::ivf_flat::inds_ptrs
+<a id="cuvs-neighbors-ivf-flat-index-inds-ptrs"></a>
+### cuvs::neighbors::ivf_flat::index::inds_ptrs
 
 Pointers to the inverted lists (clusters) indices  [n_lists].
 
@@ -299,8 +327,8 @@ raft::device_vector_view<IdxT*, uint32_t> inds_ptrs() noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:245`_
 
-<a id="cuvs-neighbors-ivf-flat-conservative-memory-allocation"></a>
-### cuvs::neighbors::ivf_flat::conservative_memory_allocation
+<a id="cuvs-neighbors-ivf-flat-index-conservative-memory-allocation"></a>
+### cuvs::neighbors::ivf_flat::index::conservative_memory_allocation
 
 Whether to use conservative memory allocation when extending the list (cluster) data
 
@@ -316,8 +344,8 @@ bool conservative_memory_allocation() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:252`_
 
-<a id="cuvs-neighbors-ivf-flat-lists"></a>
-### cuvs::neighbors::ivf_flat::lists
+<a id="cuvs-neighbors-ivf-flat-index-lists"></a>
+### cuvs::neighbors::ivf_flat::index::lists
 
 Lists' data and indices.
 
@@ -364,7 +392,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<float, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -397,7 +425,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<float, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -435,7 +463,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<half, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -468,7 +496,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<half, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -506,7 +534,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -539,7 +567,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -577,7 +605,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -610,7 +638,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -650,7 +678,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<float, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -685,7 +713,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<float, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -725,7 +753,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<half, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -760,7 +788,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<half, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -800,7 +828,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -835,7 +863,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -875,7 +903,7 @@ Usage example:
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed ivf-flat index
 
@@ -910,7 +938,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_flat::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | `cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&` | reference to ivf_flat::index |
+| `idx` | out | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | reference to ivf_flat::index |
 
 **Returns**
 
@@ -944,11 +972,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<float, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<float, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -974,7 +1002,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<float, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1005,11 +1033,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<half, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<half, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1035,7 +1063,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<half, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1066,11 +1094,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1096,7 +1124,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1127,11 +1155,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1157,7 +1185,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1190,11 +1218,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<float, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<float, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1222,7 +1250,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<float, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1255,11 +1283,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<half, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<half, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1287,7 +1315,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<half, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1320,11 +1348,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1352,7 +1380,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1385,11 +1413,11 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | in | `const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&` | original index |
+| `idx` | in | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | original index |
 
 **Returns**
 
-`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
 the constructed extended ivf-flat index
 
@@ -1417,7 +1445,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | `cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*` | pointer to index, to be overwritten in-place |
+| `idx` | inout | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
 
@@ -1446,7 +1474,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<float, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1473,7 +1501,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the name of the file that stores the index |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<float, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1499,7 +1527,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<float, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1525,7 +1553,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `is` | in | `std::istream&` | input stream |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<float, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1551,7 +1579,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<half, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1577,7 +1605,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the name of the file that stores the index |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<half, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1603,7 +1631,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<half, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1629,7 +1657,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `is` | in | `std::istream&` | input stream |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<half, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1655,7 +1683,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1681,7 +1709,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the name of the file that stores the index |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1707,7 +1735,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1733,7 +1761,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `is` | in | `std::istream&` | input stream |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1759,7 +1787,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1785,7 +1813,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the name of the file that stores the index |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1811,7 +1839,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
-| `index` | in | `const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&` | IVF-Flat index |
+| `index` | in | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -1837,7 +1865,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `is` | in | `std::istream&` | input stream |
-| `index` | in | `cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*` | IVF-Flat index |
+| `index` | in | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | IVF-Flat index |
 
 **Returns**
 
@@ -2360,7 +2388,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<float, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2385,7 +2413,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<half, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2410,7 +2438,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<int8_t, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2435,7 +2463,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<uint8_t, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2461,7 +2489,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<float, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2486,7 +2514,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<half, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2511,7 +2539,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<int8_t, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
@@ -2536,10 +2564,45 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | `index<uint8_t, int64_t>*` | pointer to IVF-Flat index |
+| `index` | inout | [`index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index) | pointer to IVF-Flat index |
 
 **Returns**
 
 `void`
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:3048`_
+
+## Types
+
+<a id="cuvs-neighbors-ivf-flat-experimental-udf-point"></a>
+### cuvs::neighbors::ivf_flat::experimental::udf::point
+
+Wrapper for vector elements that provides both packed and unpacked access.
+
+For float: trivial wrapper around scalar values For int8/uint8 with Veclen &gt; 1: wraps packed bytes in a 32-bit word
+
+```cpp
+template <typename T, typename AccT, int Veclen>
+struct point { ... };
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `veclen` | `static constexpr int` |  |
+| `data_` | `storage_type` |  |
+
+_Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:3073`_
+
+<a id="cuvs-neighbors-ivf-flat-experimental-udf-metric-interface"></a>
+### cuvs::neighbors::ivf_flat::experimental::udf::metric_interface
+
+Base interface for custom distance metrics.
+
+```cpp
+template <typename T, typename AccT, int Veclen = 1>
+struct metric_interface { ... };
+```
+
+_Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:3130`_

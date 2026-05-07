@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/neighbors/scann.hpp`_
 ANN parameters used by ScaNN to build index
 
 ```cpp
-struct index_params : cuvs::neighbors::index_params { ... } ;
+struct index_params : cuvs::neighbors::index_params { ... };
 ```
 
 **Fields**
@@ -37,8 +37,22 @@ _Source: `cpp/include/cuvs/neighbors/scann.hpp:36`_
 
 ## ScaNN index type
 
-<a id="cuvs-neighbors-experimental-scann-metric"></a>
-### cuvs::neighbors::experimental::scann::metric
+<a id="cuvs-neighbors-experimental-scann-index"></a>
+### cuvs::neighbors::experimental::scann::index
+
+ScaNN index.
+
+The index stores the dataset and the ScaNN graph in device memory.
+
+```cpp
+template <typename T, typename IdxT>
+struct index : cuvs::neighbors::index { ... };
+```
+
+_Source: `cpp/include/cuvs/neighbors/scann.hpp:103`_
+
+<a id="cuvs-neighbors-experimental-scann-index-metric"></a>
+### cuvs::neighbors::experimental::scann::index::metric
 
 Distance metric used for clustering.
 
@@ -52,8 +66,8 @@ Distance metric used for clustering.
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:110`_
 
-<a id="cuvs-neighbors-experimental-scann-size"></a>
-### cuvs::neighbors::experimental::scann::size
+<a id="cuvs-neighbors-experimental-scann-index-size"></a>
+### cuvs::neighbors::experimental::scann::index::size
 
 Total length of the index (number of vectors).
 
@@ -67,8 +81,8 @@ IdxT size() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:116`_
 
-<a id="cuvs-neighbors-experimental-scann-dim"></a>
-### cuvs::neighbors::experimental::scann::dim
+<a id="cuvs-neighbors-experimental-scann-index-dim"></a>
+### cuvs::neighbors::experimental::scann::index::dim
 
 Dimensionality of the data.
 
@@ -106,7 +120,7 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 
 **Returns**
 
-`cuvs::neighbors::experimental::scann::index<float, int64_t>`
+[`cuvs::neighbors::experimental::scann::index<float, int64_t>`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index)
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:291`_
 
@@ -131,7 +145,7 @@ NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not 
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `file_prefix` |  | `const std::string&` |  |
-| `index` |  | `const cuvs::neighbors::experimental::scann::index<float, int64_t>&` |  |
+| `index` |  | [`const cuvs::neighbors::experimental::scann::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index) |  |
 
 **Returns**
 
@@ -161,7 +175,7 @@ NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not 
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `file_prefix` |  | `const std::string&` |  |
-| `index` |  | `const cuvs::neighbors::experimental::scann::index<float, int64_t>&` |  |
+| `index` |  | [`const cuvs::neighbors::experimental::scann::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index) |  |
 
 **Returns**
 

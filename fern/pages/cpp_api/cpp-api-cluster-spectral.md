@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/cluster/spectral.hpp`_
 Parameters for spectral clustering
 
 ```cpp
-struct params { ... } ;
+struct params { ... };
 ```
 
 **Fields**

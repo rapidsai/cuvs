@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/neighbors/common.h`_
 Enum to denote filter type.
 
 ```c
-enum cuvsFilterType { ... } ;
+enum cuvsFilterType { ... };
 ```
 
 **Values**

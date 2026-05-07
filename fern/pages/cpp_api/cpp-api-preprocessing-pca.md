@@ -16,7 +16,7 @@ Parameters for PCA decomposition. Ref:
 http://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
 
 ```cpp
-struct params { ... } ;
+struct params { ... };
 ```
 
 **Fields**

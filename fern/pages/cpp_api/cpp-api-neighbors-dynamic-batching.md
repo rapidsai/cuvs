@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/neighbors/dynamic_batching.hpp`_
 Dynamic Batching index parameters
 
 ```cpp
-struct index_params : cuvs::neighbors::index_params { ... } ;
+struct index_params : cuvs::neighbors::index_params { ... };
 ```
 
 **Fields**
@@ -36,7 +36,7 @@ _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:21`_
 Dynamic Batching search parameters
 
 ```cpp
-struct search_params : cuvs::neighbors::search_params { ... } ;
+struct search_params : cuvs::neighbors::search_params { ... };
 ```
 
 **Fields**
@@ -51,6 +51,34 @@ _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:60`_
 
 <a id="cuvs-neighbors-dynamic-batching-index"></a>
 ### cuvs::neighbors::dynamic_batching::index
+
+Lightweight dynamic batching index wrapper
+
+One lightweight dynamic batching index manages a single index and a single search parameter set. This structure should be shared among multiple users via copy semantics: access to the underlying implementation is managed via a shared pointer, and concurrent search among the participants is thread-safe.
+
+__Usage example__
+
+__Priority queues__
+
+The dynamic batching index has a limited support for prioritizing individual requests. There's only one pool of queues in the batcher and no functionality to prioritize one bach over the other. The `search_params::dispatch_timeout_ms` parameters passed in each request are aggregated internally and the batch is dispatched no later than any of the timeouts is exceeded. In this logic, a high-priority request can never be processed earlier than any lower-priority requests submitted earlier.
+
+However, dynamic batching indexes are lightweight and do not contain any global or static state. This means it's easy to combine multiple batchers. As an example, you can construct one batching index per priority class:
+
+```cpp
+template <typename T, typename IdxT>
+struct index : cuvs::neighbors::index { ... };
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `runner` | `std::shared_ptr<detail::batch_runner<T, IdxT>>` |  |
+
+_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:155`_
+
+<a id="cuvs-neighbors-dynamic-batching-index-index"></a>
+### cuvs::neighbors::dynamic_batching::index::index
 
 Construct a dynamic batching index by wrapping the upstream index.
 
@@ -113,7 +141,7 @@ Dynamic batching search is thread-safe: call the search function with copies of 
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
 | `params` | in | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) | query-specific batching parameters, such as the maximum waiting time |
-| `index` | in | `dynamic_batching::index<float, uint32_t> const&` | a dynamic batching index |
+| `index` | in | [`dynamic_batching::index<float, uint32_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) | a dynamic batching index |
 | `queries` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_queries, dim] |
 | `neighbors` | out | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` | a device matrix view to the indices of the neighbors in the source dataset [n_queries, k] |
 | `distances` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | a device matrix view to the distances to the selected neighbors [n_queries, k] |
@@ -141,7 +169,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<half, uint32_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<half, uint32_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const half, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |
@@ -169,7 +197,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<int8_t, uint32_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<int8_t, uint32_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |
@@ -197,7 +225,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<uint8_t, uint32_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<uint8_t, uint32_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |
@@ -225,7 +253,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<float, int64_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<float, int64_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const float, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |
@@ -253,7 +281,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<half, int64_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<half, int64_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const half, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |
@@ -281,7 +309,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<int8_t, int64_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<int8_t, int64_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |
@@ -309,7 +337,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `params` |  | [`cuvs::neighbors::dynamic_batching::search_params const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-search-params) |  |
-| `index` |  | `dynamic_batching::index<uint8_t, int64_t> const&` |  |
+| `index` |  | [`dynamic_batching::index<uint8_t, int64_t> const&`](/api-reference/cpp-api-neighbors-dynamic-batching#cuvs-neighbors-dynamic-batching-index) |  |
 | `queries` |  | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` |  |
 | `neighbors` |  | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` |  |
 | `distances` |  | `raft::device_matrix_view<float, int64_t, raft::row_major>` |  |

@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/neighbors/ivf_flat.h`_
 Supplemental parameters to build IVF-Flat Index
 
 ```c
-struct cuvsIvfFlatIndexParams { ... } ;
+struct cuvsIvfFlatIndexParams { ... };
 ```
 
 **Fields**
@@ -86,7 +86,7 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:88`_
 Supplemental parameters to search IVF-Flat index
 
 ```c
-struct cuvsIvfFlatSearchParams { ... } ;
+struct cuvsIvfFlatSearchParams { ... };
 ```
 
 **Fields**

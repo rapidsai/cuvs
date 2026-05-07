@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/util/cutlass_utils.hpp`_
 Exception thrown when a CUTLASS error is encountered.
 
 ```cpp
-struct cutlass_error : public raft::exception { ... } ;
+struct cutlass_error : public raft::exception { ... };
 ```
 
 _Source: `cpp/include/cuvs/util/cutlass_utils.hpp:14`_

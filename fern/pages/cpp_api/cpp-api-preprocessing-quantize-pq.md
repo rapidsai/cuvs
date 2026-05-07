@@ -26,7 +26,7 @@ _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:24`_
 Product Quantizer parameters.
 
 ```cpp
-struct params { ... } ;
+struct params { ... };
 ```
 
 **Fields**
@@ -44,7 +44,8 @@ struct params { ... } ;
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:30`_
 
-**Additional overload:** `cuvs::preprocessing::quantize::pq::params`
+<a id="cuvs-preprocessing-quantize-pq-params-params"></a>
+### cuvs::preprocessing::quantize::pq::params::params
 
 Simplified constructor that will build an appropriate kmeans params object.
 
@@ -82,6 +83,25 @@ uint32_t max_train_points_per_vq_cluster = 1024)
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:34`_
 
+<a id="cuvs-preprocessing-quantize-pq-quantizer"></a>
+### cuvs::preprocessing::quantize::pq::quantizer
+
+Defines and stores VPQ codebooks upon training
+
+```cpp
+template <typename T>
+struct quantizer { ... };
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `params_quantizer` | [`params`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-params) | Parameters used to build this quantizer. |
+| `vpq_codebooks` | [`cuvs::neighbors::vpq_dataset<T, int64_t>`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-vpq-dataset) | VPQ codebooks produced during training. |
+
+_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:141`_
+
 <a id="cuvs-preprocessing-quantize-pq-build"></a>
 ### cuvs::preprocessing::quantize::pq::build
 
@@ -107,7 +127,7 @@ Usage example:
 
 **Returns**
 
-`quantizer<float>`
+[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer)
 
 quantizer
 
@@ -131,7 +151,7 @@ raft::host_matrix_view<const float, int64_t> dataset);
 
 **Returns**
 
-`quantizer<float>`
+[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer)
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:174`_
 
@@ -157,7 +177,7 @@ used, optional
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quant` | in | `const quantizer<float>&` | a product quantizer |
+| `quant` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer) | a product quantizer |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device or host |
 | `codes_out` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a row-major matrix view on device containing the PQ codes |
 | `vq_labels` | out | `std::optional<raft::device_vector_view<uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is Default: `std::nullopt`. |
@@ -183,7 +203,7 @@ std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::null
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `quant` |  | `const quantizer<float>&` |  |
+| `quant` |  | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer) |  |
 | `dataset` |  | `raft::host_matrix_view<const float, int64_t>` |  |
 | `codes_out` |  | `raft::device_matrix_view<uint8_t, int64_t>` |  |
 | `vq_labels` |  | `std::optional<raft::device_vector_view<uint32_t, int64_t>>` | Default: `std::nullopt`. |
@@ -236,7 +256,7 @@ std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quant` | in | `const quantizer<float>&` | a product quantizer |
+| `quant` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer) | a product quantizer |
 | `pq_codes` | in | `raft::device_matrix_view<const uint8_t, int64_t>` | a row-major matrix view on device containing the PQ codes |
 | `out` | out | `raft::device_matrix_view<float, int64_t>` | a row-major matrix view on device |
 | `vq_labels` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is used, optional Default: `std::nullopt`. |

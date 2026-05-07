@@ -33,7 +33,7 @@ _Source: `c/include/cuvs/neighbors/all_neighbors.h:38`_
 Parameters controlling SNMG all-neighbors build.
 
 ```c
-struct cuvsAllNeighborsIndexParams { ... } ;
+struct cuvsAllNeighborsIndexParams { ... };
 ```
 
 **Fields**

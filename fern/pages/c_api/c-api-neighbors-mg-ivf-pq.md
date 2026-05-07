@@ -16,7 +16,7 @@ Multi-GPU parameters to build IVF-PQ Index
 This structure extends the base IVF-PQ index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfPqIndexParams { ... } ;
+struct cuvsMultiGpuIvfPqIndexParams { ... };
 ```
 
 **Fields**
@@ -84,7 +84,7 @@ Multi-GPU parameters to search IVF-PQ index
 This structure extends the base IVF-PQ search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfPqSearchParams { ... } ;
+struct cuvsMultiGpuIvfPqSearchParams { ... };
 ```
 
 **Fields**

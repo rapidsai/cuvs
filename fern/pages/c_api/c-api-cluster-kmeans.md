@@ -33,7 +33,7 @@ _Source: `c/include/cuvs/cluster/kmeans.h:22`_
 Hyper-parameters for the kmeans algorithm
 
 ```c
-struct cuvsKMeansParams { ... } ;
+struct cuvsKMeansParams { ... };
 ```
 
 **Fields**

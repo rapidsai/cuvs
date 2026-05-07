@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/neighbors/cagra.h`_
 Enum to denote which ANN algorithm is used to build CAGRA graph
 
 ```c
-enum cuvsCagraGraphBuildAlgo { ... } ;
+enum cuvsCagraGraphBuildAlgo { ... };
 ```
 
 **Values**
@@ -36,7 +36,7 @@ parameters.
 Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
 
 ```c
-enum cuvsCagraHnswHeuristicType { ... } ;
+enum cuvsCagraHnswHeuristicType { ... };
 ```
 
 _Source: `c/include/cuvs/neighbors/cagra.h:54`_
@@ -47,7 +47,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:54`_
 Parameters for VPQ compression.
 
 ```c
-struct cuvsCagraCompressionParams { ... } ;
+struct cuvsCagraCompressionParams { ... };
 ```
 
 **Fields**
@@ -75,7 +75,7 @@ ACE enables building indexes for datasets too large to fit in GPU memory by:
 3. Concatenating sub-graphs into a final unified index
 
 ```c
-struct cuvsAceParams { ... } ;
+struct cuvsAceParams { ... };
 ```
 
 **Fields**
@@ -97,7 +97,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:136`_
 Supplemental parameters to build CAGRA Index
 
 ```c
-struct cuvsCagraIndexParams { ... } ;
+struct cuvsCagraIndexParams { ... };
 ```
 
 **Fields**
@@ -297,7 +297,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:292`_
 Supplemental parameters to extend CAGRA Index
 
 ```c
-struct cuvsCagraExtendParams { ... } ;
+struct cuvsCagraExtendParams { ... };
 ```
 
 **Fields**
@@ -398,7 +398,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:644`_
 Enum to denote algorithm used to search CAGRA Index
 
 ```c
-enum cuvsCagraSearchAlgo { ... } ;
+enum cuvsCagraSearchAlgo { ... };
 ```
 
 **Values**
@@ -418,7 +418,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:352`_
 Enum to denote Hash Mode used while searching CAGRA index
 
 ```c
-enum cuvsCagraHashMode { ... } ;
+enum cuvsCagraHashMode { ... };
 ```
 
 **Values**
@@ -437,7 +437,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:365`_
 Supplemental parameters to search CAGRA index
 
 ```c
-struct cuvsCagraSearchParams { ... } ;
+struct cuvsCagraSearchParams { ... };
 ```
 
 **Fields**

@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/cluster/kmeans.hpp`_
 Base structure for parameters that are common to all k-means algorithms
 
 ```cpp
-struct base_params { ... } ;
+struct base_params { ... };
 ```
 
 **Fields**
@@ -33,7 +33,7 @@ _Source: `cpp/include/cuvs/cluster/kmeans.hpp:19`_
 Simple object to specify hyper-parameters to the kmeans algorithm.
 
 ```cpp
-struct params : base_params { ... } ;
+struct params : base_params { ... };
 ```
 
 **Fields**
@@ -68,7 +68,7 @@ The following metrics are currently supported in k-means balanced:
 - L2SqrtExpanded
 
 ```cpp
-struct balanced_params : base_params { ... } ;
+struct balanced_params : base_params { ... };
 ```
 
 **Fields**
@@ -85,7 +85,7 @@ _Source: `cpp/include/cuvs/cluster/kmeans.hpp:139`_
 Type of k-means algorithm.
 
 ```cpp
-enum class kmeans_type { ... } ;
+enum class kmeans_type { ... };
 ```
 
 **Values**

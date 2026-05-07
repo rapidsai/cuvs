@@ -14,7 +14,7 @@ _Source header: `cpp/include/cuvs/distance/distance.hpp`_
 enum to tell how to compute distance
 
 ```cpp
-enum class DistanceType : int { ... } ;
+enum class DistanceType : int { ... };
 ```
 
 **Values**
@@ -53,7 +53,7 @@ Density kernel type for Kernel Density Estimation.
 These are the smoothing kernels used in KDE — distinct from the dot-product kernels (RBF, Polynomial, etc.) in cuvs::distance::kernels used by SVMs.
 
 ```cpp
-enum class DensityKernelType : int { ... } ;
+enum class DensityKernelType : int { ... };
 ```
 
 **Values**
@@ -82,7 +82,7 @@ The following kernels are implemented:
 - TANH $K(x_1, x_2) = \tanh(\gamma \langle x_1,x_2 \rangle + \mathrm{coef0})$
 
 ```cpp
-struct KernelParams { ... } ;
+struct KernelParams { ... };
 ```
 
 **Fields**

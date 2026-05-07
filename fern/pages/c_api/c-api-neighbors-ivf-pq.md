@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/neighbors/ivf_pq.h`_
 A type for specifying how PQ codebooks are created
 
 ```c
-enum cuvsIvfPqCodebookGen { ... } ;
+enum cuvsIvfPqCodebookGen { ... };
 ```
 
 **Values**
@@ -32,7 +32,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:26`_
 A type for specifying the memory layout of IVF-PQ list data
 
 ```c
-enum cuvsIvfPqListLayout { ... } ;
+enum cuvsIvfPqListLayout { ... };
 ```
 
 **Values**
@@ -50,7 +50,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:35`_
 Supplemental parameters to build IVF-PQ Index
 
 ```c
-struct cuvsIvfPqIndexParams { ... } ;
+struct cuvsIvfPqIndexParams { ... };
 ```
 
 **Fields**
@@ -127,7 +127,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:152`_
 Supplemental parameters to search IVF-PQ index
 
 ```c
-struct cuvsIvfPqSearchParams { ... } ;
+struct cuvsIvfPqSearchParams { ... };
 ```
 
 **Fields**

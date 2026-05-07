@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/preprocessing/pca.h`_
 Solver algorithm for PCA eigen decomposition.
 
 ```c
-enum cuvsPcaSolver { ... } ;
+enum cuvsPcaSolver { ... };
 ```
 
 **Values**
@@ -32,7 +32,7 @@ _Source: `c/include/cuvs/preprocessing/pca.h:25`_
 Parameters for PCA decomposition.
 
 ```c
-struct cuvsPcaParams { ... } ;
+struct cuvsPcaParams { ... };
 ```
 
 **Fields**

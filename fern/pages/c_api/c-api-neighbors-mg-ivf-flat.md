@@ -16,7 +16,7 @@ Multi-GPU parameters to build IVF-Flat Index
 This structure extends the base IVF-Flat index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfFlatIndexParams { ... } ;
+struct cuvsMultiGpuIvfFlatIndexParams { ... };
 ```
 
 **Fields**
@@ -84,7 +84,7 @@ Multi-GPU parameters to search IVF-Flat index
 This structure extends the base IVF-Flat search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfFlatSearchParams { ... } ;
+struct cuvsMultiGpuIvfFlatSearchParams { ... };
 ```
 
 **Fields**

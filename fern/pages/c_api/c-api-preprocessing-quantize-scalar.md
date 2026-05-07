@@ -14,7 +14,7 @@ _Source header: `c/include/cuvs/preprocessing/quantize/scalar.h`_
 Scalar quantizer parameters.
 
 ```c
-struct cuvsScalarQuantizerParams { ... } ;
+struct cuvsScalarQuantizerParams { ... };
 ```
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:23`_

@@ -84,6 +84,9 @@ SPHINX_ROLE_RE = re.compile(
     r"(?<!\w):?(?:(?:[A-Za-z][\w-]*):)?[A-Za-z][\w-]*:`(?P<target>[^`]+)`"
 )
 MATH_PLACEHOLDER_RE = re.compile(r"@@FERN_MATH_([0-9a-f]+)@@")
+CPP_COMPOUND_RE = re.compile(
+    r"^\s*(?:typedef\s+)?(?:struct|class|enum(?:\s+class)?)\b"
+)
 
 
 @dataclass
@@ -330,12 +333,12 @@ class DoxygenHeaderIndex:
             and "{" not in entry.signature
         ):
             return
-        namespace = infer_namespace(prefix)
+        namespace, class_scope = infer_cpp_scope(prefix)
+        qualifiers = [namespace] if namespace else []
+        qualifiers.extend(class_scope)
         struct_name = parse_struct_name(entry.signature)
         if struct_name:
-            fq_name = (
-                f"{namespace}::{struct_name}" if namespace else struct_name
-            )
+            fq_name = "::".join([*qualifiers, struct_name])
             entry.kind = "struct"
             entry.name = fq_name
             self.structs[fq_name] = entry
@@ -344,8 +347,8 @@ class DoxygenHeaderIndex:
         enum_name = parse_enum_name(entry.signature)
         if enum_name:
             fq_name = enum_name
-            if namespace and "::" not in enum_name:
-                fq_name = f"{namespace}::{enum_name}"
+            if qualifiers and "::" not in enum_name:
+                fq_name = "::".join([*qualifiers, enum_name])
             entry.kind = "enum"
             entry.name = fq_name
             self.enums[fq_name] = entry
@@ -354,9 +357,11 @@ class DoxygenHeaderIndex:
     def _qualify_function(self, entry: DoxygenEntry, prefix: str) -> None:
         if entry.kind != "function" or "::" in entry.name:
             return
-        namespace = infer_namespace(prefix)
-        if namespace:
-            entry.name = f"{namespace}::{entry.name}"
+        namespace, class_scope = infer_cpp_scope(prefix)
+        qualifiers = [namespace] if namespace else []
+        qualifiers.extend(class_scope)
+        if qualifiers:
+            entry.name = "::".join([*qualifiers, entry.name])
 
 
 def main() -> int:
@@ -1258,16 +1263,8 @@ def read_declaration_after(text: str, offset: int) -> tuple[str, int]:
     declaration_start = idx
     depth = {"(": 0, "[": 0, "{": 0, "<": 0}
     saw_brace = False
-    next_newline = text.find("\n", declaration_start)
-    if next_newline == -1:
-        next_newline = len(text)
-    first_declaration_line = text[declaration_start:next_newline].strip()
-    is_compound = bool(
-        re.match(
-            r"(?:template\s*<[^>]+>\s*)?(?:typedef\s+)?(?:struct|class|enum)\b",
-            first_declaration_line,
-        )
-    )
+    declaration_probe = text[declaration_start : declaration_start + 1000]
+    is_compound = is_compound_declaration(declaration_probe)
     while idx < len(text):
         if text.startswith("//", idx):
             next_line = text.find("\n", idx)
@@ -1290,7 +1287,12 @@ def read_declaration_after(text: str, offset: int) -> tuple[str, int]:
         if char == ";" and structural_depth_is_zero(depth):
             idx += 1
             break
-        if char == "," and not any(depth.values()) and not saw_brace:
+        if (
+            char == ","
+            and not any(depth.values())
+            and not saw_brace
+            and not is_compound
+        ):
             idx += 1
             break
         idx += 1
@@ -1317,6 +1319,8 @@ def next_non_whitespace_is_comment(text: str, offset: int) -> bool:
 
 
 def is_simple_member_declaration(declaration: str) -> bool:
+    if is_compound_declaration(declaration):
+        return False
     first_line = declaration.splitlines()[0].strip() if declaration else ""
     if not first_line or re.search(r"\b(?:struct|class|enum)\b", first_line):
         return False
@@ -1534,12 +1538,13 @@ def append_doxygen_line(existing: str, addition: str) -> str:
 
 
 def parse_doxygen_kind(declaration: str) -> str:
-    if re.search(r"^\s*(?:typedef\s+)?(?:struct|class)\b", declaration) and (
-        "{" in declaration or not declaration.lstrip().startswith("typedef")
+    untemplated = strip_leading_cpp_templates(declaration)
+    if re.search(r"^\s*(?:typedef\s+)?(?:struct|class)\b", untemplated) and (
+        "{" in declaration or not untemplated.lstrip().startswith("typedef")
     ):
         return "struct"
     if (
-        re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", declaration)
+        re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", untemplated)
         and "{" in declaration
     ):
         return "enum"
@@ -1599,21 +1604,26 @@ def parse_member_name(declaration: str) -> str:
 
 
 def parse_struct_name(declaration: str) -> str | None:
+    declaration = strip_leading_cpp_templates(declaration)
     match = re.search(
-        r"^\s*(?:typedef\s+)?(?:struct|class)\s+([A-Za-z_]\w*)", declaration
+        r"^\s*(?:typedef\s+)?(?:struct|class)\s+([A-Za-z_]\w*)",
+        declaration,
     )
     return match.group(1) if match else None
 
 
 def is_class_signature(signature: str) -> bool:
+    signature = strip_leading_cpp_templates(signature)
     return bool(
         re.match(
-            r"^\s*(?:template\s*<[^>]+>\s*)?(?:typedef\s+)?class\b", signature
+            r"^\s*(?:typedef\s+)?class\b",
+            signature,
         )
     )
 
 
 def parse_enum_name(declaration: str) -> str | None:
+    declaration = strip_leading_cpp_templates(declaration)
     if not re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", declaration):
         return None
     match = re.search(
@@ -1628,27 +1638,66 @@ def parse_enum_name(declaration: str) -> str | None:
 
 
 def infer_namespace(prefix: str) -> str:
+    return infer_cpp_scope(prefix)[0]
+
+
+def strip_leading_cpp_templates(declaration: str) -> str:
+    text = declaration.lstrip()
+    while True:
+        match = re.match(r"template\s*<", text)
+        if not match:
+            return text
+        idx = match.end()
+        depth = 1
+        while idx < len(text) and depth:
+            char = text[idx]
+            if char == "<":
+                depth += 1
+            elif char == ">":
+                depth -= 1
+            idx += 1
+        if depth:
+            return text
+        text = text[idx:].lstrip()
+
+
+def is_compound_declaration(declaration: str) -> bool:
+    return bool(
+        CPP_COMPOUND_RE.match(strip_leading_cpp_templates(declaration))
+    )
+
+
+def infer_cpp_scope(prefix: str) -> tuple[str, list[str]]:
     text = COMMENT_RE.sub("", prefix)
     text = re.sub(r"//.*", "", text)
-    namespace_stack: list[tuple[str, int]] = []
+    scope_stack: list[tuple[str, str, int]] = []
     depth = 0
     token_re = re.compile(
-        r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;{}]+)?\s*{|[{}]"
+        r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;{}]+)?\s*{"
+        r"|\b(?:class|struct)\s+([A-Za-z_]\w*)[^;{}]*{"
+        r"|[{}]"
     )
     for match in token_re.finditer(text):
         namespace_name = match.group(1)
         if namespace_name:
             depth += 1
-            namespace_stack.append((namespace_name, depth))
+            scope_stack.append(("namespace", namespace_name, depth))
+            continue
+        class_name = match.group(2)
+        if class_name:
+            depth += 1
+            scope_stack.append(("class", class_name, depth))
             continue
         token = match.group(0)
         if token == "{":
             depth += 1
         elif token == "}":
             depth = max(depth - 1, 0)
-            while namespace_stack and namespace_stack[-1][1] > depth:
-                namespace_stack.pop()
-    return "::".join(name for name, _ in namespace_stack)
+            while scope_stack and scope_stack[-1][2] > depth:
+                scope_stack.pop()
+    namespaces = [name for kind, name, _ in scope_stack if kind == "namespace"]
+    classes = [name for kind, name, _ in scope_stack if kind == "class"]
+    return "::".join(namespaces), classes
 
 
 def normalize_entry_signature(declaration: str, kind: str) -> str:
@@ -1668,19 +1717,17 @@ def normalize_signature(declaration: str) -> str:
 
 
 def compact_compound_signature(signature: str) -> str:
-    first_line = signature.splitlines()[0]
-    if "{" in first_line:
-        prefix = signature.split("{", 1)[0].strip()
-        suffix = (
-            signature.rsplit("}", 1)[1].strip() if "}" in signature else ""
-        )
-        if suffix:
-            return f"{prefix} {{ ... }} {suffix}".strip()
-        return f"{prefix} {{ ... }};"
-    for line in signature.splitlines():
-        if "{" in line:
-            return f"{first_line} {{ ... }};"
-    return first_line
+    signature = signature.strip()
+    if "{" not in signature:
+        return signature.splitlines()[0] if signature else ""
+    prefix = "\n".join(
+        line.rstrip() for line in signature.split("{", 1)[0].splitlines()
+    ).strip()
+    suffix = signature.rsplit("}", 1)[1].strip() if "}" in signature else ""
+    if suffix:
+        separator = "" if suffix.startswith(";") else " "
+        return f"{prefix} {{ ... }}{separator}{suffix}".strip()
+    return f"{prefix} {{ ... }};"
 
 
 def parse_function_params(signature: str) -> list[FunctionParam]:
@@ -1778,9 +1825,12 @@ def parse_struct_members(entry: DoxygenEntry) -> list[DoxygenEntry]:
         declaration, line = read_declaration_after(
             entry.signature, match.end()
         )
+        declaration = declaration.strip()
         if not declaration or declaration.startswith(
             ("public:", "private:", "protected:")
         ):
+            continue
+        if declaration in {"}", "};"}:
             continue
         if parse_doxygen_kind(declaration) != "member":
             continue
@@ -1934,7 +1984,9 @@ def split_inline_comment(line: str) -> tuple[str, str]:
 
 def member_c_type(member: DoxygenEntry) -> str:
     declaration = strip_member_initializer(member.signature)
-    c_type, _ = split_param_name(declaration)
+    c_type, name = split_param_name(declaration)
+    if name and name != member.name:
+        return declaration
     return c_type or declaration
 
 
