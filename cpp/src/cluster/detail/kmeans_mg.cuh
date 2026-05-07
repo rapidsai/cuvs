@@ -47,6 +47,7 @@
 #include <optional>
 #include <random>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
@@ -965,8 +966,16 @@ void checkWeights(const raft::resources& handle,
 }
 
 // =========================================================================
-// Host-partitioned MNMG fit implementation
+// Partitioned MNMG fit implementation
 // =========================================================================
+
+template <typename DataT, typename IndexT, typename Accessor>
+using matrix_parts_t =
+  std::vector<raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>;
+
+template <typename DataT, typename IndexT, typename Accessor>
+using weight_parts_t =
+  std::vector<raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor>>;
 
 template <typename DataT, typename IndexT>
 using host_matrix_parts_t = std::vector<raft::host_matrix_view<const DataT, IndexT>>;
@@ -975,17 +984,30 @@ template <typename DataT, typename IndexT>
 using host_weight_parts_t = std::vector<raft::host_vector_view<const DataT, IndexT>>;
 
 template <typename DataT, typename IndexT>
-void sample_host_partitions(const raft::resources& handle,
-                            const host_matrix_parts_t<DataT, IndexT>& X_parts,
-                            IndexT n_local,
-                            raft::device_matrix_view<DataT, IndexT> sample,
-                            uint64_t seed)
+using device_matrix_parts_t = std::vector<raft::device_matrix_view<const DataT, IndexT>>;
+
+template <typename DataT, typename IndexT>
+using device_weight_parts_t = std::vector<raft::device_vector_view<const DataT, IndexT>>;
+
+template <typename DataT, typename IndexT, typename Accessor>
+void sample_partitions(const raft::resources& handle,
+                       const matrix_parts_t<DataT, IndexT, Accessor>& X_parts,
+                       IndexT n_local,
+                       raft::device_matrix_view<DataT, IndexT> sample,
+                       uint64_t seed)
 {
+  using matrix_view_t =
+    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>;
+  constexpr bool data_on_host   = raft::is_host_mdspan_v<matrix_view_t>;
+  constexpr bool data_on_device = raft::is_device_mdspan_v<matrix_view_t>;
+  static_assert(data_on_host || data_on_device,
+                "partition views must be host- or device-accessible raft mdspans");
+
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_rows         = static_cast<IndexT>(sample.extent(0));
   auto n_features     = static_cast<IndexT>(sample.extent(1));
 
-  RAFT_EXPECTS(n_local > 0, "cannot sample centroids from empty local host partitions");
+  RAFT_EXPECTS(n_local > 0, "cannot sample centroids from empty local partitions");
 
   std::vector<IndexT> offsets;
   offsets.reserve(X_parts.size() + 1);
@@ -994,35 +1016,99 @@ void sample_host_partitions(const raft::resources& handle,
     offsets.push_back(offsets.back() + static_cast<IndexT>(X.extent(0)));
   }
 
-  std::vector<DataT> h_sample(static_cast<size_t>(n_rows) * n_features);
   std::mt19937_64 gen(seed);
   std::uniform_int_distribution<IndexT> dist(IndexT{0}, n_local - 1);
 
-  for (IndexT row = 0; row < n_rows; ++row) {
+  auto choose_row = [&]() {
     IndexT global_row = dist(gen);
     auto upper        = std::upper_bound(offsets.begin(), offsets.end(), global_row);
     size_t part_idx   = static_cast<size_t>(std::distance(offsets.begin(), upper) - 1);
     IndexT local_row  = global_row - offsets[part_idx];
+    return std::pair<size_t, IndexT>{part_idx, local_row};
+  };
 
-    auto const* src = X_parts[part_idx].data_handle() + local_row * n_features;
-    auto* dst       = h_sample.data() + row * n_features;
-    std::copy_n(src, n_features, dst);
+  if constexpr (data_on_host) {
+    std::vector<DataT> h_sample(static_cast<size_t>(n_rows) * n_features);
+    for (IndexT row = 0; row < n_rows; ++row) {
+      auto [part_idx, local_row] = choose_row();
+      auto const* src            = X_parts[part_idx].data_handle() + local_row * n_features;
+      auto* dst                  = h_sample.data() + row * n_features;
+      std::copy_n(src, n_features, dst);
+    }
+
+    raft::update_device(sample.data_handle(), h_sample.data(), h_sample.size(), stream);
+  } else {
+    for (IndexT row = 0; row < n_rows; ++row) {
+      auto [part_idx, local_row] = choose_row();
+      auto const* src            = X_parts[part_idx].data_handle() + local_row * n_features;
+      auto* dst                  = sample.data_handle() + row * n_features;
+      raft::copy(dst, src, n_features, stream);
+    }
   }
-
-  raft::update_device(sample.data_handle(), h_sample.data(), h_sample.size(), stream);
 }
 
-template <typename DataT, typename IndexT, typename ReduceOp>
-void fit_host_partitions_impl(
+template <typename DataT, typename IndexT, typename Accessor>
+DataT local_weight_sum(const raft::resources& handle,
+                       const weight_parts_t<DataT, IndexT, Accessor>& sample_weight_parts)
+{
+  using weight_view_t =
+    raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor>;
+  constexpr bool weights_on_host   = raft::is_host_mdspan_v<weight_view_t>;
+  constexpr bool weights_on_device = raft::is_device_mdspan_v<weight_view_t>;
+  static_assert(weights_on_host || weights_on_device,
+                "weight views must be host- or device-accessible raft mdspans");
+
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  if constexpr (weights_on_host) {
+    DataT local_wt_sum = DataT{0};
+    for (auto const& weights : sample_weight_parts) {
+      auto n_weights = static_cast<IndexT>(weights.extent(0));
+      for (IndexT i = 0; i < n_weights; ++i) {
+        local_wt_sum += weights.data_handle()[i];
+      }
+    }
+    return local_wt_sum;
+  } else {
+    auto d_local_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});
+    for (auto const& weights : sample_weight_parts) {
+      auto n_weights = static_cast<IndexT>(weights.extent(0));
+      if (n_weights == 0) { continue; }
+
+      auto d_part_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});
+      raft::linalg::mapThenSumReduce(
+        d_part_wt_sum.data_handle(), n_weights, raft::identity_op{}, stream, weights.data_handle());
+      raft::linalg::add(d_local_wt_sum.data_handle(),
+                        d_local_wt_sum.data_handle(),
+                        d_part_wt_sum.data_handle(),
+                        1,
+                        stream);
+    }
+
+    DataT local_wt_sum = DataT{0};
+    raft::copy(&local_wt_sum, d_local_wt_sum.data_handle(), 1, stream);
+    raft::resource::sync_stream(handle, stream);
+    return local_wt_sum;
+  }
+}
+
+template <typename DataT, typename IndexT, typename Accessor, typename ReduceOp>
+void fit_partitions_impl(
   const raft::resources& handle,
   const cuvs::cluster::kmeans::params& params,
   const ReduceOp& reduce_op,
-  const host_matrix_parts_t<DataT, IndexT>& X_parts,
-  const std::optional<host_weight_parts_t<DataT, IndexT>>& sample_weight_parts,
+  const matrix_parts_t<DataT, IndexT, Accessor>& X_parts,
+  const std::optional<weight_parts_t<DataT, IndexT, Accessor>>& sample_weight_parts,
   raft::device_matrix_view<DataT, IndexT> centroids,
   raft::host_scalar_view<DataT> inertia,
   raft::host_scalar_view<IndexT> n_iter)
 {
+  using matrix_view_t =
+    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>;
+  constexpr bool data_on_host   = raft::is_host_mdspan_v<matrix_view_t>;
+  constexpr bool data_on_device = raft::is_device_mdspan_v<matrix_view_t>;
+  static_assert(data_on_host || data_on_device,
+                "partition views must be host- or device-accessible raft mdspans");
+
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   int rank            = reduce_op.get_rank();
 
@@ -1035,16 +1121,19 @@ void fit_host_partitions_impl(
                "centroids.extent(0) must equal n_clusters");
   RAFT_EXPECTS(n_features > 0, "centroids.extent(1) must be positive");
 
-  IndexT n_local = 0;
+  IndexT n_local       = 0;
+  IndexT max_part_rows = 0;
   for (auto const& X : X_parts) {
     RAFT_EXPECTS(static_cast<IndexT>(X.extent(1)) == n_features,
-                 "all host partitions must have the same feature count as centroids");
-    n_local += static_cast<IndexT>(X.extent(0));
+                 "all partitions must have the same feature count as centroids");
+    auto rows = static_cast<IndexT>(X.extent(0));
+    n_local += rows;
+    max_part_rows = std::max(max_part_rows, rows);
   }
 
   if (sample_weight_parts.has_value()) {
     RAFT_EXPECTS(sample_weight_parts->size() == X_parts.size(),
-                 "sample_weight_parts must have one entry per host partition");
+                 "sample_weight_parts must have one entry per data partition");
     for (size_t i = 0; i < X_parts.size(); ++i) {
       RAFT_EXPECTS(static_cast<IndexT>((*sample_weight_parts)[i].extent(0)) ==
                      static_cast<IndexT>(X_parts[i].extent(0)),
@@ -1060,24 +1149,17 @@ void fit_host_partitions_impl(
   raft::resource::sync_stream(handle, stream);
   RAFT_EXPECTS(global_n > 0, "at least one sample is required across all ranks");
 
-  IndexT streaming_batch_size = static_cast<IndexT>(params.streaming_batch_size);
-  if (streaming_batch_size <= 0 || streaming_batch_size > n_local) {
-    streaming_batch_size = std::max(n_local, IndexT{1});
+  IndexT partition_batch_size = static_cast<IndexT>(params.streaming_batch_size);
+  if (partition_batch_size <= 0 || partition_batch_size > max_part_rows) {
+    partition_batch_size = std::max(max_part_rows, IndexT{1});
   }
 
   bool has_data = n_local > 0;
 
   DataT weight_scale = DataT{1};
   if (sample_weight_parts.has_value()) {
-    DataT local_wt_sum = DataT{0};
-    for (auto const& weights : *sample_weight_parts) {
-      auto n_weights = static_cast<IndexT>(weights.extent(0));
-      for (IndexT i = 0; i < n_weights; ++i) {
-        local_wt_sum += weights.data_handle()[i];
-      }
-    }
-
-    auto d_wt = raft::make_device_scalar<DataT>(handle, local_wt_sum);
+    auto local_wt_sum = local_weight_sum<DataT, IndexT, Accessor>(handle, *sample_weight_parts);
+    auto d_wt         = raft::make_device_scalar<DataT>(handle, local_wt_sum);
     reduce_op.allreduce(d_wt.data_handle(), d_wt.data_handle(), size_t{1}, stream);
     raft::resource::sync_stream(handle, stream);
     DataT global_wt = DataT{0};
@@ -1091,7 +1173,7 @@ void fit_host_partitions_impl(
     if (std::abs(global_wt - target) > tol) { weight_scale = target / global_wt; }
   }
 
-  IndexT alloc_batch_size = has_data ? streaming_batch_size : IndexT{1};
+  IndexT alloc_batch_size = has_data ? partition_batch_size : IndexT{1};
   auto rank_centroids     = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto new_centroids      = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
   auto centroid_sums      = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
@@ -1112,15 +1194,19 @@ void fit_host_partitions_impl(
   } else {
     if (rank == KMEANS_COMM_ROOT) {
       RAFT_EXPECTS(n_local > 0,
-                   "rank 0 must own at least one sample for host-partitioned initialization");
+                   "rank 0 must own at least one sample for partitioned initialization");
       if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-        sample_host_partitions<DataT, IndexT>(
+        sample_partitions<DataT, IndexT, Accessor>(
           handle, X_parts, n_local, rank_centroids.view(), params.rng_state.seed);
       } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-        IndexT init_sample_size = std::max(n_clusters, std::min(IndexT{3} * n_clusters, n_local));
+        IndexT default_init_size   = std::min(static_cast<IndexT>(IndexT{3} * n_clusters), n_local);
+        IndexT requested_init_size = params.init_size > 0
+                                       ? std::min(static_cast<IndexT>(params.init_size), n_local)
+                                       : default_init_size;
+        IndexT init_sample_size    = std::max(n_clusters, requested_init_size);
         auto init_sample =
           raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
-        sample_host_partitions<DataT, IndexT>(
+        sample_partitions<DataT, IndexT, Accessor>(
           handle, X_parts, n_local, init_sample.view(), params.rng_state.seed);
 
         auto init_const = raft::make_device_matrix_view<const DataT, IndexT>(
@@ -1180,7 +1266,7 @@ void fit_host_partitions_impl(
           X_part.data_handle(),
           static_cast<size_t>(part_rows),
           static_cast<size_t>(n_features),
-          static_cast<size_t>(streaming_batch_size),
+          static_cast<size_t>(partition_batch_size),
           stream,
           rmm::mr::get_current_device_resource_ref(),
           true);
@@ -1324,7 +1410,7 @@ void fit_host_partitions_impl(
         X_part.data_handle(),
         static_cast<size_t>(part_rows),
         static_cast<size_t>(n_features),
-        static_cast<size_t>(streaming_batch_size),
+        static_cast<size_t>(partition_batch_size),
         stream,
         rmm::mr::get_current_device_resource_ref(),
         true);
@@ -1411,6 +1497,26 @@ void fit(const raft::resources& handle,
 }
 
 /**
+ * @brief MNMG kmeans fit with multiple local device data partitions.
+ *
+ * Each rank may provide zero or more local device-resident partitions. The
+ * implementation iterates over partitions without concatenating them.
+ */
+template <typename DataT, typename IndexT>
+void fit(const raft::resources& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const device_matrix_parts_t<DataT, IndexT>& X_parts,
+         const std::optional<device_weight_parts_t<DataT, IndexT>>& sample_weight_parts,
+         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::host_scalar_view<DataT> inertia,
+         raft::host_scalar_view<IndexT> n_iter)
+{
+  raft_comms_reduce_op reduce_op(handle);
+  fit_partitions_impl(
+    handle, params, reduce_op, X_parts, sample_weight_parts, centroids, inertia, n_iter);
+}
+
+/**
  * @brief MNMG kmeans fit with multiple local host data partitions.
  *
  * Each rank may provide zero or more local host-resident partitions. Every
@@ -1428,7 +1534,7 @@ void fit(const raft::resources& handle,
          raft::host_scalar_view<IndexT> n_iter)
 {
   raft_comms_reduce_op reduce_op(handle);
-  fit_host_partitions_impl(
+  fit_partitions_impl(
     handle, params, reduce_op, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
