@@ -1107,30 +1107,30 @@ void sort_cluster_query_pairs(raft::resources const& handle,
   // ---- sort by cluster id
   size_t temp_storage_bytes = 0;
 
-  cub::DeviceRadixSort::SortPairs(nullptr,
-                                  temp_storage_bytes,
-                                  d_cluster_keys.data_handle(),
-                                  d_sorted_clusters.data_handle(),
-                                  d_query_values.data_handle(),
-                                  d_sorted_queries.data_handle(),
-                                  total_pairs,
-                                  0,
-                                  sizeof(int) * 8,
-                                  stream);
+  RAFT_CUDA_TRY(cub::DeviceRadixSort::SortPairs(nullptr,
+                                                temp_storage_bytes,
+                                                d_cluster_keys.data_handle(),
+                                                d_sorted_clusters.data_handle(),
+                                                d_query_values.data_handle(),
+                                                d_sorted_queries.data_handle(),
+                                                total_pairs,
+                                                0,
+                                                sizeof(int) * 8,
+                                                stream));
 
   rmm::device_buffer d_temp_storage(temp_storage_bytes, stream);
 
   // Perform radix sort
-  cub::DeviceRadixSort::SortPairs(d_temp_storage.data(),
-                                  temp_storage_bytes,
-                                  d_cluster_keys.data_handle(),
-                                  d_sorted_clusters.data_handle(),
-                                  d_query_values.data_handle(),
-                                  d_sorted_queries.data_handle(),
-                                  total_pairs,
-                                  0,
-                                  sizeof(int) * 8,
-                                  stream);
+  RAFT_CUDA_TRY(cub::DeviceRadixSort::SortPairs(d_temp_storage.data(),
+                                                temp_storage_bytes,
+                                                d_cluster_keys.data_handle(),
+                                                d_sorted_clusters.data_handle(),
+                                                d_query_values.data_handle(),
+                                                d_sorted_queries.data_handle(),
+                                                total_pairs,
+                                                0,
+                                                sizeof(int) * 8,
+                                                stream));
 
   // Combine sorted results into pairs
   combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(
