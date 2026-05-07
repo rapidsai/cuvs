@@ -83,6 +83,7 @@ PUBLIC_JAVA_TYPE_RE = re.compile(
 SPHINX_ROLE_RE = re.compile(
     r"(?<!\w):?(?:(?:[A-Za-z][\w-]*):)?[A-Za-z][\w-]*:`(?P<target>[^`]+)`"
 )
+MATH_PLACEHOLDER_RE = re.compile(r"@@FERN_MATH_([0-9a-f]+)@@")
 
 
 @dataclass
@@ -1458,8 +1459,55 @@ def clean_doxygen_text(text: str) -> str:
         lambda match: match.group(2) or f"`{match.group(1)}`",
         text,
     )
+    text = normalize_doxygen_math(text)
     text = text.replace("@copydoc", "")
     return text.strip()
+
+
+def normalize_doxygen_math(text: str) -> str:
+    text = re.sub(
+        r"\\f\[(.*?)\\f\]",
+        lambda match: math_placeholder(
+            f"${clean_latex_math(match.group(1))}$"
+        ),
+        text,
+    )
+    text = re.sub(
+        r"\\f\$(.*?)\\f\$",
+        lambda match: math_placeholder(
+            f"${clean_latex_math(match.group(1))}$"
+        ),
+        text,
+    )
+    return text
+
+
+def clean_latex_math(math: str) -> str:
+    math = math.strip()
+    math = re.sub(
+        r"<\s*([^<>]*?)\s*>",
+        lambda match: rf"\langle {match.group(1).strip()} \rangle",
+        math,
+    )
+    math = re.sub(
+        r"\|\s*([^|]*?)\s*\|",
+        lambda match: rf"\lVert {match.group(1).strip()} \rVert",
+        math,
+    )
+    math = re.sub(
+        r"(\\(?:mathrm|operatorname|text)\{)([^{}]*)(\})",
+        lambda match: (
+            f"{match.group(1)}"
+            f"{re.sub(r'(?<!\\\\)_', r'\\\\_', match.group(2))}"
+            f"{match.group(3)}"
+        ),
+        math,
+    )
+    return math
+
+
+def math_placeholder(math: str) -> str:
+    return f"@@FERN_MATH_{math.encode('utf-8').hex()}@@"
 
 
 def append_sentence(existing: str, addition: str) -> str:
@@ -3603,7 +3651,7 @@ def escape_code(value: str) -> str:
 
 
 def escape_text(value: str) -> str:
-    return (
+    escaped = (
         str(value)
         .replace("|", "\\|")
         .replace("<", "&lt;")
@@ -3611,6 +3659,14 @@ def escape_text(value: str) -> str:
         .replace("{", "\\{")
         .replace("}", "\\}")
         .replace("\n", " ")
+    )
+    return restore_math_placeholders(escaped)
+
+
+def restore_math_placeholders(value: str) -> str:
+    return MATH_PLACEHOLDER_RE.sub(
+        lambda match: bytes.fromhex(match.group(1)).decode("utf-8"),
+        value,
     )
 
 

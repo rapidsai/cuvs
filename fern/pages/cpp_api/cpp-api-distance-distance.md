@@ -76,10 +76,10 @@ Parameters for kernel matrices.
 
 The following kernels are implemented:
 
-- LINEAR \f[ K(x_1,x_2) = &lt;x_1,x_2&gt;, \f] where \f$&lt; , &gt;\f$ is the dot product
-- POLYNOMIAL \f[ K(x_1, x_2) = (\gamma &lt;x_1,x_2&gt; + \mathrm\{coef0\})^\mathrm\{degree\} \f]
-- RBF \f[ K(x_1, x_2) = \exp(- \gamma \|x_1-x_2\|^2) \f]
-- TANH \f[ K(x_1, x_2) = \tanh(\gamma &lt;x_1,x_2&gt; + \mathrm\{coef0\}) \f]
+- LINEAR $K(x_1,x_2) = \langle x_1,x_2 \rangle,$ where $\langle , \rangle$ is the dot product
+- POLYNOMIAL $K(x_1, x_2) = (\gamma \langle x_1,x_2 \rangle + \mathrm{coef0})^\mathrm{degree}$
+- RBF $K(x_1, x_2) = \exp(- \gamma \lVert x_1-x_2 \rVert^2)$
+- TANH $K(x_1, x_2) = \tanh(\gamma \langle x_1,x_2 \rangle + \mathrm{coef0})$
 
 ```cpp
 struct KernelParams { ... } ;
