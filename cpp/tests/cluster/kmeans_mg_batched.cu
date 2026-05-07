@@ -37,7 +37,6 @@ struct KmeansSNMGInputs {
   int streaming_batch_size;
   int n_init;
   cuvs::cluster::kmeans::params::InitMethod init = cuvs::cluster::kmeans::params::Array;
-  bool inertia_check                             = true;
   int max_iter                                   = 20;
 };
 
@@ -139,7 +138,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     snmg_params.n_init               = testparams_.n_init;
     snmg_params.rng_state.seed       = 42;
     snmg_params.init                 = testparams_.init;
-    snmg_params.inertia_check        = testparams_.inertia_check;
     snmg_params.streaming_batch_size = testparams_.streaming_batch_size;
 
     T snmg_inertia      = T{0};
@@ -346,11 +344,8 @@ const std::vector<KmeansSNMGInputs<float>> snmg_inputsf = {
   {1000, 32, 5, 0.0001f, 0, 5000, 1},
   // n_init > 1 with KMeansPlusPlus: best-of-n seed management across ranks
   {1000, 32, 5, 0.0001f, 0, 1000, 3, cuvs::cluster::kmeans::params::KMeansPlusPlus},
-  // inertia_check=false: convergence only via centroid shift
-  {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, false},
-  {1000, 32, 5, 0.0001f, 0, 128, 1, cuvs::cluster::kmeans::params::Array, false},
   // max_iter saturation: algorithm should stop at max_iter without convergence
-  {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, true, 2},
+  {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, 2},
 };
 
 // ============================================================================
@@ -368,8 +363,7 @@ const std::vector<KmeansSNMGInputs<double>> snmg_inputsd = {
   {1000, 16, 1, 0.0001, 0, 1000, 1},
   {1000, 32, 5, 0.0001, 0, 5000, 1},
   {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::KMeansPlusPlus},
-  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, false},
-  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, true, 2},
+  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, 2},
 };
 
 // ============================================================================

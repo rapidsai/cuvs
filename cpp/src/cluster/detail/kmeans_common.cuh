@@ -5,7 +5,6 @@
 #pragma once
 
 #include "../../distance/distance.cuh"
-#include "../../distance/fused_distance_nn.cuh"
 #include <cstdint>
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
@@ -134,35 +133,30 @@ void countLabels(raft::resources const& handle,
 }
 
 /**
- * @brief Compute the sum of sample weights.
+ * @brief Compute the sum of sample weights into a device scalar.
  *
- * Device-accessible mdspans are reduced on device via mapThenSumReduce;
- * host mdspans are summed on the host.
- *
- * @return Sum of weights.
+ * Device-accessible mdspans are reduced on device. Host mdspans are summed on the host.
  */
 template <typename DataT, typename IndexT, typename Accessor>
-DataT weightSum(
+void weightSum(
   raft::resources const& handle,
-  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor> weight)
+  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_right, Accessor> weight,
+  raft::device_scalar_view<DataT> d_wt_sum)
 {
   auto n_samples = weight.extent(0);
+  auto stream    = raft::resource::get_cuda_stream(handle);
 
-  DataT wt_sum = DataT{0};
   if constexpr (raft::is_device_mdspan_v<decltype(weight)>) {
-    auto stream   = raft::resource::get_cuda_stream(handle);
-    auto d_wt_sum = raft::make_device_scalar<DataT>(handle, DataT{0});
     raft::linalg::mapThenSumReduce(
       d_wt_sum.data_handle(), n_samples, raft::identity_op{}, stream, weight.data_handle());
-    raft::copy(&wt_sum, d_wt_sum.data_handle(), 1, stream);
-    raft::resource::sync_stream(handle);
   } else {
+    DataT wt_sum = DataT{0};
     for (IndexT i = 0; i < n_samples; ++i) {
       wt_sum += weight(i);
     }
+    RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
+    raft::copy(d_wt_sum.data_handle(), &wt_sum, 1, stream);
   }
-  RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
-  return wt_sum;
 }
 
 template <typename IndexT>
@@ -364,9 +358,7 @@ void minClusterAndDistanceCompute(
   cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
-  rmm::device_uvector<char>& workspace,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> precomputed_centroid_norms =
-    std::nullopt);
+  rmm::device_uvector<char>& workspace);
 
 #define EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(DataT, IndexT)                                \
   extern template void minClusterAndDistanceCompute<DataT, IndexT>(                            \
@@ -379,8 +371,7 @@ void minClusterAndDistanceCompute(
     cuvs::distance::DistanceType metric,                                                       \
     int batch_samples,                                                                         \
     int batch_centroids,                                                                       \
-    rmm::device_uvector<char>& workspace,                                                      \
-    std::optional<raft::device_vector_view<const DataT, IndexT>>);
+    rmm::device_uvector<char>& workspace);
 
 EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(float, int64_t)
 EXTERN_TEMPLATE_MIN_CLUSTER_AND_DISTANCE(float, int)
@@ -399,9 +390,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
                                cuvs::distance::DistanceType metric,
                                int batch_samples,
                                int batch_centroids,
-                               rmm::device_uvector<char>& workspace,
-                               std::optional<raft::device_vector_view<const DataT, IndexT>>
-                                 precomputed_centroid_norms = std::nullopt);
+                               rmm::device_uvector<char>& workspace);
 
 #define EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(DataT, IndexT)      \
   extern template void minClusterDistanceCompute<DataT, IndexT>( \
@@ -414,8 +403,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
     cuvs::distance::DistanceType metric,                         \
     int batch_samples,                                           \
     int batch_centroids,                                         \
-    rmm::device_uvector<char>& workspace,                        \
-    std::optional<raft::device_vector_view<const DataT, IndexT>>);
+    rmm::device_uvector<char>& workspace);
 
 EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(float, int64_t)
 EXTERN_TEMPLATE_MIN_CLUSTER_DISTANCE(double, int64_t)
@@ -586,26 +574,51 @@ void finalize_centroids(raft::resources const& handle,
 /**
  * @brief Compute the squared norm difference between two centroid sets.
  *
- * Returns sum((old_centroids - new_centroids)^2).
- * Used for convergence checking.
+ * Writes sum((old_centroids - new_centroids)^2) into @p sqrd_norm_out.
+ * Used for convergence checking. Fully asynchronous — no stream sync.
  */
 template <typename DataT, typename IndexT>
-DataT compute_centroid_shift(raft::resources const& handle,
-                             raft::device_matrix_view<const DataT, IndexT> old_centroids,
-                             raft::device_matrix_view<const DataT, IndexT> new_centroids)
+void compute_centroid_shift(raft::resources const& handle,
+                            raft::device_matrix_view<const DataT, IndexT> old_centroids,
+                            raft::device_matrix_view<const DataT, IndexT> new_centroids,
+                            raft::device_scalar_view<DataT> sqrd_norm_out)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto sqrdNorm       = raft::make_device_scalar<DataT>(handle, DataT{0});
-  raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
+  raft::linalg::mapThenSumReduce(sqrd_norm_out.data_handle(),
                                  old_centroids.size(),
                                  raft::sqdiff_op{},
                                  stream,
                                  old_centroids.data_handle(),
                                  new_centroids.data_handle());
-  DataT result = 0;
-  raft::copy(&result, sqrdNorm.data_handle(), 1, stream);
-  raft::resource::sync_stream(handle);
-  return result;
+}
+
+/**
+ * @brief Evaluate convergence criteria entirely on device.
+ *
+ * Checks the cost-ratio and centroid-shift stopping conditions and writes
+ * a boolean result (0 or 1) into @p done_flag.  Also advances
+ * @p prior_clustering_cost to the current cost for the next iteration.
+ */
+template <typename DataT>
+__device__ void check_convergence(raft::device_scalar_view<const DataT> clustering_cost,
+                                  raft::device_scalar_view<DataT> prior_clustering_cost,
+                                  raft::device_scalar_view<const DataT> sqrd_norm_error,
+                                  DataT tol,
+                                  int n_iter,
+                                  raft::device_scalar_view<int> done_flag)
+{
+  DataT cur_cost = *clustering_cost.data_handle();
+  DataT norm_err = *sqrd_norm_error.data_handle();
+  int done       = 0;
+
+  if (cur_cost != DataT{0} && n_iter > 1) {
+    DataT delta = cur_cost / *prior_clustering_cost.data_handle();
+    if (delta > DataT{1} - tol) done = 1;
+  }
+  if (norm_err < tol) done = 1;
+
+  *prior_clustering_cost.data_handle() = cur_cost;
+  *done_flag.data_handle()             = done;
 }
 
 /**
@@ -636,8 +649,6 @@ DataT compute_centroid_shift(raft::resources const& handle,
  * @param[inout]  centroid_sums        Running weighted sums [n_clusters x n_features] (added into)
  * @param[inout]  weight_per_cluster   Running weight counts [n_clusters] (added into)
  * @param[inout]  clustering_cost      Running cost scalar (device) (added into)
- * @param[in]     centroid_norms       Optional precomputed centroid norms [n_clusters].
- *                                     When provided, skips internal centroid norm computation.
  */
 template <typename DataT, typename IndexT>
 void process_batch(
@@ -655,8 +666,7 @@ void process_batch(
   raft::device_matrix_view<DataT, IndexT> centroid_sums,
   raft::device_vector_view<DataT, IndexT> weight_per_cluster,
   raft::device_scalar_view<DataT> clustering_cost,
-  rmm::device_uvector<char>& batch_workspace,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> centroid_norms = std::nullopt)
+  rmm::device_uvector<char>& batch_workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -669,8 +679,7 @@ void process_batch(
                                               metric,
                                               batch_samples_param,
                                               batch_centroids_param,
-                                              workspace,
-                                              centroid_norms);
+                                              workspace);
 
   KeyValueIndexOp<IndexT, DataT> conversion_op;
   thrust::transform_iterator<KeyValueIndexOp<IndexT, DataT>,

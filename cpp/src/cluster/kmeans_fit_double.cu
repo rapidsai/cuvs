@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "detail/kmeans_batched.cuh"
 #include "kmeans.cuh"
 #include "kmeans_impl.cuh"
 #include <raft/core/resources.hpp>
@@ -86,7 +85,8 @@ void fit(raft::resources const& handle,
   } else
 #endif
   {
-    detail::fit<double, int64_t>(handle, params, X, sample_weight, centroids, inertia, n_iter);
+    cuvs::cluster::kmeans::detail::fit<double, int64_t>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
   }
 }
 
