@@ -163,24 +163,6 @@ template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `template <typename DatasetT>` | `template <typename DatasetT>` | Replace the dataset with a new dataset. It is expected that the same set of vectors are used for update_dataset and index build. Note: This will clear any precomputed dataset norms. |
-| `template <typename Accessor>` | `template <typename Accessor>` | Copy the provided source indices into the index. |
-| `graph_` | `raft::device_matrix<graph_index_type, int64_t, raft::row_major>` |  |
-| `graph_view_` | `raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major>` |  |
-| `dataset_` | `std::unique_ptr<neighbors::dataset<dataset_index_type>>` |  |
-| `source_indices_` | `std::optional<raft::device_vector<IdxT, int64_t>>` |  |
-| `dataset_norms_` | `std::optional<raft::device_vector<float, int64_t>>` |  |
-| `dataset_fd_` | [`std::optional<cuvs::util::file_descriptor>`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor) |  |
-| `graph_fd_` | [`std::optional<cuvs::util::file_descriptor>`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor) |  |
-| `mapping_fd_` | [`std::optional<cuvs::util::file_descriptor>`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor) |  |
-| `n_rows_` | `size_t` |  |
-| `dim_` | `size_t` |  |
-| `graph_degree_` | `size_t` |  |
-
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:387`_
 
 <a id="cuvs-neighbors-cagra-index-metric"></a>

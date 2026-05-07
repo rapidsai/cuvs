@@ -24,19 +24,12 @@ struct index : cuvs::neighbors::index { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
+| `handle` | `raft::resources const&` |  |
 | `m` | `int64_t` |  |
 | `n` | `int64_t` |  |
 | `n_landmarks` | `int64_t` |  |
 | `X` | `raft::device_matrix_view<const float, idx_t, raft::row_major>` |  |
 | `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
-| `R_indptr` | `private: raft::device_vector<idx_t, int64_t>` |  |
-| `R_1nn_cols` | `raft::device_vector<idx_t, int64_t>` |  |
-| `R_1nn_dists` | `raft::device_vector<float, int64_t>` |  |
-| `R_closest_landmark_dists` | `raft::device_vector<float, int64_t>` |  |
-| `R_radius` | `raft::device_vector<float, int64_t>` |  |
-| `R` | `raft::device_matrix<float, int64_t, raft::row_major>` |  |
-| `X_reordered` | `raft::device_matrix<float, int64_t, raft::row_major>` |  |
-| `index_trained` | `protected: bool` |  |
 
 _Source: `cpp/include/cuvs/neighbors/ball_cover.hpp:35`_
 

@@ -59,22 +59,6 @@ template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `veclen_` | `uint32_t` | TODO: in theory, we can lift this to the template parameter and keep it at hardware maximum possible value by padding the `dim` of the data https://github.com/rapidsai/raft/issues/711 |
-| `metric_` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
-| `adaptive_centers_` | `bool` |  |
-| `conservative_memory_allocation_` | `bool` |  |
-| `lists_` | `std::vector<std::shared_ptr<list_data<T, IdxT>>>` |  |
-| `list_sizes_` | `raft::device_vector<uint32_t, uint32_t>` |  |
-| `centers_` | `raft::device_matrix<float, uint32_t, raft::row_major>` |  |
-| `center_norms_` | `std::optional<raft::device_vector<float, uint32_t>>` |  |
-| `data_ptrs_` | `raft::device_vector<T*, uint32_t>` |  |
-| `inds_ptrs_` | `raft::device_vector<IdxT*, uint32_t>` |  |
-| `accum_sorted_sizes_` | `raft::host_vector<IdxT, uint32_t>` |  |
-
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:132`_
 
 <a id="cuvs-neighbors-ivf-flat-index-index"></a>

@@ -88,18 +88,6 @@ template <typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `res_` | `private: raft::resources const&` |  |
-| `metric_` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
-| `graph_` | `raft::host_matrix<IdxT, int64_t, raft::row_major>` |  |
-| `distances_` | `std::optional<raft::device_matrix<float, int64_t, row_major>>` |  |
-| `graph_view_` | `raft::host_matrix_view<IdxT, int64_t, raft::row_major>` |  |
-| `distances_view_` | `std::optional<raft::device_matrix_view<float, int64_t, row_major>>` |  |
-| `return_distances_` | `bool` |  |
-
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:94`_
 
 <a id="cuvs-neighbors-nn-descent-index-index"></a>

@@ -71,13 +71,6 @@ template <typename T>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `metric_` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
-| `hierarchy_` | [`HnswHierarchy`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-hnswhierarchy) |  |
-
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:130`_
 
 <a id="cuvs-neighbors-hnsw-index-index"></a>

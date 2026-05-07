@@ -285,6 +285,8 @@ class DoxygenHeaderIndex:
                     entry = parse_doxygen_entry(
                         comment, declaration, rel_path, decl_line
                     )
+                    if not is_public_cpp_member_context(text[: match.start()]):
+                        continue
                     if is_namespace_entry(entry):
                         continue
                     if entry.kind == "member" and not is_type_alias_signature(
@@ -317,6 +319,10 @@ class DoxygenHeaderIndex:
                         entry = parse_doxygen_entry(
                             comment, declaration, rel_path, decl_line
                         )
+                        if not is_public_cpp_member_context(
+                            text[: match.start()]
+                        ):
+                            continue
                         if is_namespace_entry(entry):
                             continue
                         self._qualify_function(entry, text[: match.start()])
@@ -1317,6 +1323,8 @@ def is_simple_member_declaration(declaration: str) -> bool:
     if is_compound_declaration(declaration):
         return False
     first_line = declaration.splitlines()[0].strip() if declaration else ""
+    if first_line.startswith("template "):
+        return False
     if not first_line or re.search(r"\b(?:struct|class|enum)\b", first_line):
         return False
     if "(" in first_line:
@@ -1663,25 +1671,41 @@ def is_compound_declaration(declaration: str) -> bool:
 
 
 def infer_cpp_scope(prefix: str) -> tuple[str, list[str]]:
+    namespace, class_scope, _ = infer_cpp_context(prefix)
+    return namespace, class_scope
+
+
+def infer_cpp_context(prefix: str) -> tuple[str, list[str], str | None]:
     text = COMMENT_RE.sub("", prefix)
     text = re.sub(r"//.*", "", text)
-    scope_stack: list[tuple[str, str, int]] = []
+    scope_stack: list[tuple[str, str, int, str | None]] = []
     depth = 0
     token_re = re.compile(
         r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;{}]+)?\s*{"
-        r"|\b(?:class|struct)\s+([A-Za-z_]\w*)[^;{}]*{"
+        r"|\b(class|struct)\s+([A-Za-z_]\w*)[^;{}]*{"
+        r"|\b(public|private|protected)\s*:"
         r"|[{}]"
     )
     for match in token_re.finditer(text):
         namespace_name = match.group(1)
         if namespace_name:
             depth += 1
-            scope_stack.append(("namespace", namespace_name, depth))
+            scope_stack.append(("namespace", namespace_name, depth, None))
             continue
-        class_name = match.group(2)
+        compound_kind = match.group(2)
+        class_name = match.group(3)
         if class_name:
             depth += 1
-            scope_stack.append(("class", class_name, depth))
+            default_access = (
+                "private" if compound_kind == "class" else "public"
+            )
+            scope_stack.append(("compound", class_name, depth, default_access))
+            continue
+        access = match.group(4)
+        if access and scope_stack:
+            kind, name, scope_depth, _ = scope_stack[-1]
+            if kind == "compound" and scope_depth == depth:
+                scope_stack[-1] = (kind, name, scope_depth, access)
             continue
         token = match.group(0)
         if token == "{":
@@ -1690,9 +1714,24 @@ def infer_cpp_scope(prefix: str) -> tuple[str, list[str]]:
             depth = max(depth - 1, 0)
             while scope_stack and scope_stack[-1][2] > depth:
                 scope_stack.pop()
-    namespaces = [name for kind, name, _ in scope_stack if kind == "namespace"]
-    classes = [name for kind, name, _ in scope_stack if kind == "class"]
-    return "::".join(namespaces), classes
+    namespaces = [
+        name for kind, name, _, _ in scope_stack if kind == "namespace"
+    ]
+    classes = [name for kind, name, _, _ in scope_stack if kind == "compound"]
+    current_access = next(
+        (
+            access
+            for kind, _, _, access in reversed(scope_stack)
+            if kind == "compound"
+        ),
+        None,
+    )
+    return "::".join(namespaces), classes, current_access
+
+
+def is_public_cpp_member_context(prefix: str) -> bool:
+    _, _, access = infer_cpp_context(prefix)
+    return access in {None, "public"}
 
 
 def normalize_entry_signature(declaration: str, kind: str) -> str:
@@ -1816,6 +1855,8 @@ def parse_struct_members(entry: DoxygenEntry) -> list[DoxygenEntry]:
     for match in COMMENT_RE.finditer(entry.signature):
         if not is_top_level_compound_comment(entry.signature, match.start()):
             continue
+        if not is_public_cpp_member_context(entry.signature[: match.start()]):
+            continue
         comment = clean_doxygen_comment(match.group(0))
         declaration, line = read_declaration_after(
             entry.signature, match.end()
@@ -1847,7 +1888,8 @@ def parse_plain_struct_members(
     if not body:
         return []
     members: list[DoxygenEntry] = []
-    for declaration in top_level_member_declarations(body):
+    default_access = compound_default_access(entry.signature)
+    for declaration in top_level_member_declarations(body, default_access):
         if "(" in declaration:
             continue
         declaration = strip_member_initializer(declaration)
@@ -1897,18 +1939,38 @@ def is_top_level_compound_comment(signature: str, offset: int) -> bool:
     return depth == 0
 
 
-def top_level_member_declarations(body: str) -> list[str]:
+def compound_default_access(signature: str) -> str:
+    return "private" if is_class_signature(signature) else "public"
+
+
+def top_level_member_declarations(
+    body: str, default_access: str = "public"
+) -> list[str]:
     text = COMMENT_RE.sub("", body)
     text = re.sub(r"//.*", "", text)
     declarations: list[str] = []
     current: list[str] = []
+    access = default_access
     depth = {"(": 0, "[": 0, "{": 0, "<": 0}
     for char in text:
         current.append(char)
         update_depth(depth, char)
+        if char == ":" and not any(depth.values()):
+            access_label = "".join(current).strip()
+            if access_label in {"public:", "private:", "protected:"}:
+                access = access_label.rstrip(":")
+                current = []
+                continue
+        if (
+            char == "}"
+            and structural_depth_is_zero(depth)
+            and "(" in "".join(current)
+        ):
+            current = []
+            continue
         if char == ";" and not any(depth.values()):
             declaration = "".join(current).strip().rstrip(";").strip()
-            if declaration:
+            if declaration and access == "public":
                 declarations.append(" ".join(declaration.split()))
             current = []
     return declarations

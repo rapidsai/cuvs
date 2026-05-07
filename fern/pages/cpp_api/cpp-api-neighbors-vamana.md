@@ -70,16 +70,6 @@ template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `graph_` | `raft::device_matrix<IdxT, int64_t, raft::row_major>` |  |
-| `graph_view_` | `raft::device_matrix_view<const IdxT, int64_t, raft::row_major>` |  |
-| `dataset_` | `std::unique_ptr<neighbors::dataset<int64_t>>` |  |
-| `quantized_dataset_` | `raft::device_matrix<uint8_t, int64_t, raft::row_major>` |  |
-| `medoid_id_` | `IdxT` |  |
-
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:101`_
 
 <a id="cuvs-neighbors-vamana-index-metric"></a>

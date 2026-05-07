@@ -20,16 +20,6 @@ template <typename T, typename DistT = T>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `dataset_` | `raft::device_matrix<T, int64_t, raft::row_major>` |  |
-| `norms_` | `std::optional<raft::device_vector<DistT, int64_t>>` |  |
-| `norms_view_` | `std::optional<raft::device_vector_view<const DistT, int64_t>>` |  |
-| `dataset_view_` | `raft::device_matrix_view<const T, int64_t, raft::row_major>` |  |
-| `metric_arg_` | `DistT` |  |
-
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:34`_
 
 <a id="cuvs-neighbors-brute-force-index-index"></a>
@@ -541,13 +531,6 @@ Sparse Brute Force index.
 template <typename T, typename IdxT>
 struct sparse_index { ... };
 ```
-
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `metric_` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
-| `metric_arg_` | `T` |  |
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:599`_
 
