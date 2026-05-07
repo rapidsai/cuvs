@@ -332,7 +332,13 @@ void mnmg_fit(const raft::resources& handle,
 
   std::mt19937 gen(params.rng_state.seed);
 
-  auto d_done = raft::make_device_scalar<int64_t>(dev_res, 0);
+  // On-device convergence state, mirroring single-GPU `detail::fit`.
+  // The flag is `int64_t` for NCCL allreduce compatibility; SUM>0 means
+  // any rank converged, which guards against FP non-determinism in
+  // compute_centroid_shift diverging ranks.
+  auto d_prior_cost = raft::make_device_scalar<T>(dev_res, T{0});
+  auto d_done_flag  = raft::make_device_scalar<int64_t>(dev_res, 0);
+  auto h_done_flag  = raft::make_pinned_scalar<int64_t>(dev_res, 0);
 
   std::optional<cuvs::spatial::knn::detail::utils::batch_load_iterator<T>> data_batches_opt;
   if (has_data) {
@@ -367,9 +373,23 @@ void mnmg_fit(const raft::resources& handle,
       raft::matrix::fill(dev_res, batch_weights.view(), T{1});
     }
 
-    T prior_cluster_cost = T{0};
+    // Reset per-pass convergence state to avoid leaking it across n_init.
+    raft::matrix::fill(dev_res, d_prior_cost.view(), T{0});
+    *h_done_flag.data_handle() = 0;
 
     for (local_n_iter = 1; local_n_iter <= iter_params.max_iter; ++local_n_iter) {
+      // Consume the previous iteration's allreduced flag from pinned host.
+      if (local_n_iter > 1) {
+        raft::resource::sync_stream(dev_res);
+        if (*h_done_flag.data_handle()) {
+          --local_n_iter;
+          RAFT_LOG_DEBUG("SNMG KMeans: threshold triggered after %d iterations on rank %d",
+                         static_cast<int>(local_n_iter),
+                         rank);
+          break;
+        }
+      }
+
       RAFT_LOG_DEBUG("SNMG KMeans: iteration %d on rank %d", local_n_iter, rank);
 
       raft::matrix::fill(dev_res, centroid_sums.view(), T{0});
@@ -454,48 +474,39 @@ void mnmg_fit(const raft::resources& handle,
                                                                  rank_centroids_const,
                                                                  new_centroids.view());
 
-      // Phase 4: convergence check (synchronized across ranks)
+      // Phase 4: device-side convergence evaluation. Compute shift,
+      // run `check_convergence` via `map_offset`, allreduce the flag,
+      // shadow into pinned host. Consumed at top of next iteration.
       cuvs::cluster::kmeans::detail::compute_centroid_shift<T, IdxT>(
         dev_res,
         raft::make_const_mdspan(rank_centroids.view()),
         raft::make_const_mdspan(new_centroids.view()),
         sqrd_norm_error_dev.view());
-      T sqrdNormError = T{0};
-      raft::copy(&sqrdNormError, sqrd_norm_error_dev.data_handle(), 1, stream);
-      raft::resource::sync_stream(dev_res);
 
       raft::copy(
         rank_centroids.data_handle(), new_centroids.data_handle(), n_clusters * n_features, stream);
 
-      bool done = false;
+      auto d_cost_view  = raft::make_device_scalar_view<const T>(clustering_cost.data_handle());
+      auto d_prior_view = d_prior_cost.view();
+      auto d_norm_view  = raft::make_device_scalar_view<const T>(sqrd_norm_error_dev.data_handle());
+      auto d_done_view  = d_done_flag.view();
+      T tol             = static_cast<T>(params.tol);
+      int iter          = static_cast<int>(local_n_iter);
 
-      raft::copy(&local_inertia, clustering_cost.data_handle(), 1, stream);
-      raft::resource::sync_stream(dev_res);
+      raft::linalg::map_offset(
+        dev_res,
+        raft::make_device_vector_view<int64_t, int>(d_done_flag.data_handle(), 1),
+        [=] __device__(int) {
+          cuvs::cluster::kmeans::detail::check_convergence(
+            d_cost_view, d_prior_view, d_norm_view, tol, iter, d_done_view);
+          return *d_done_view.data_handle();
+        });
 
-      if (local_inertia == T{0}) {
-        RAFT_LOG_WARN("Zero clustering cost detected: all points coincide with their centroids.");
-      } else if (local_n_iter > 1 && prior_cluster_cost > T{0}) {
-        T delta = local_inertia / prior_cluster_cost;
-        if (delta > 1 - params.tol) { done = true; }
-      }
-      prior_cluster_cost = local_inertia;
+      SNMG_ALLREDUCE(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
 
-      if (sqrdNormError < params.tol) { done = true; }
-
-      // Allreduce the convergence flag so all ranks agree (FP non-determinism
-      // in compute_centroid_shift could otherwise diverge ranks and deadlock)
-      int64_t done_val = done ? 1 : 0;
-      raft::copy(d_done.data_handle(), &done_val, 1, stream);
-      SNMG_ALLREDUCE(d_done.data_handle(), d_done.data_handle(), 1);
-      raft::copy(&done_val, d_done.data_handle(), 1, stream);
-      raft::resource::sync_stream(dev_res);
-      done = (done_val > 0);
-
-      if (done) {
-        RAFT_LOG_DEBUG(
-          "SNMG KMeans: threshold triggered after %d iterations on rank %d", local_n_iter, rank);
-        break;
-      }
+      raft::copy(dev_res,
+                 raft::make_pinned_scalar_view(h_done_flag.data_handle()),
+                 raft::make_device_scalar_view<const int64_t>(d_done_flag.data_handle()));
     }
 
     // Recompute inertia against the converged centroids
