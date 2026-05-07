@@ -1,7 +1,9 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
+
+#include "../util/serialize_validation.hpp"
 
 #include <cuvs/neighbors/brute_force.hpp>
 #include <raft/core/copy.cuh>
@@ -87,14 +89,31 @@ auto deserialize(raft::resources const& handle, std::istream& is)
   if (ver != serialization_version) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
-  std::int64_t rows = raft::deserialize_scalar<size_t>(handle, is);
-  std::int64_t dim  = raft::deserialize_scalar<size_t>(handle, is);
-  auto metric       = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
-  auto metric_arg   = raft::deserialize_scalar<DistT>(handle, is);
+  constexpr std::size_t kMax = static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max());
+  auto rows_raw              = raft::deserialize_scalar<size_t>(handle, is);
+  auto dim_raw               = raft::deserialize_scalar<size_t>(handle, is);
+  RAFT_EXPECTS(
+    rows_raw <= kMax, "brute_force::deserialize: rows=%zu does not fit in int64_t", rows_raw);
+  RAFT_EXPECTS(
+    dim_raw <= kMax, "brute_force::deserialize: dim=%zu does not fit in int64_t", dim_raw);
+  auto rows   = static_cast<std::int64_t>(rows_raw);
+  auto dim    = static_cast<std::int64_t>(dim_raw);
+  auto metric = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
+  RAFT_EXPECTS(cuvs::util::is_valid_distance_type(metric),
+               "brute_force::deserialize: invalid metric value %d",
+               static_cast<int>(metric));
+  auto metric_arg = raft::deserialize_scalar<DistT>(handle, is);
 
   auto dataset_storage = raft::make_host_matrix<T>(std::int64_t{}, std::int64_t{});
   auto include_dataset = raft::deserialize_scalar<bool>(handle, is);
   if (include_dataset) {
+    RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(
+                   static_cast<std::size_t>(rows), static_cast<std::size_t>(dim), sizeof(T)),
+                 "brute_force::deserialize: integer overflow in rows*dim*sizeof(T) "
+                 "(rows=%lld, dim=%lld, sizeof(T)=%zu)",
+                 static_cast<long long>(rows),
+                 static_cast<long long>(dim),
+                 sizeof(T));
     dataset_storage = raft::make_host_matrix<T>(rows, dim);
     raft::deserialize_mdspan(handle, is, dataset_storage.view());
   }
