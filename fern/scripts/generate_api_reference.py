@@ -33,11 +33,41 @@ JAVA_SOURCE_DIRS = [
 ]
 API_NAV_SECTIONS = [
     ("C API Documentation", "c_api", "c-api-documentation", "C API", "c-api"),
-    ("Cpp API Documentation", "cpp_api", "cpp-api-documentation", "C++ API", "cpp-api"),
-    ("Python API Documentation", "python_api", "python-api-documentation", "Python API", "python-api"),
-    ("Java API Documentation", "java_api", "java-api-documentation", "Java API", "java-api"),
-    ("Rust API Documentation", "rust_api", "rust-api-documentation", "Rust API", "rust-api"),
-    ("Go API Documentation", "go_api", "go-api-documentation", "Go API", "go-api"),
+    (
+        "Cpp API Documentation",
+        "cpp_api",
+        "cpp-api-documentation",
+        "C++ API",
+        "cpp-api",
+    ),
+    (
+        "Python API Documentation",
+        "python_api",
+        "python-api-documentation",
+        "Python API",
+        "python-api",
+    ),
+    (
+        "Java API Documentation",
+        "java_api",
+        "java-api-documentation",
+        "Java API",
+        "java-api",
+    ),
+    (
+        "Rust API Documentation",
+        "rust_api",
+        "rust-api-documentation",
+        "Rust API",
+        "rust-api",
+    ),
+    (
+        "Go API Documentation",
+        "go_api",
+        "go-api-documentation",
+        "Go API",
+        "go-api",
+    ),
 ]
 
 COMMENT_RE = re.compile(r"/\*\*.*?\*/|(?:///[^\n]*(?:\n|$))+", re.DOTALL)
@@ -226,32 +256,46 @@ class DoxygenHeaderIndex:
             group_name = ""
             if group_command:
                 group_name, group_title = split_command_payload(group_command)
-                group = self.groups.setdefault(group_name, DoxygenGroup(group_name))
+                group = self.groups.setdefault(
+                    group_name, DoxygenGroup(group_name)
+                )
                 if group_kind == "defgroup" and group_title:
                     group.title = group_title
 
             closes_group = bool(re.search(r"(^|\s)[@\\]}", comment))
             opens_group = bool(re.search(r"(^|\s)[@\\]{", comment))
             explicit_groups = re.findall(r"[@\\]ingroup\s+([\w:.-]+)", comment)
-            candidate_groups = list(dict.fromkeys([*explicit_groups, *current_groups]))
+            candidate_groups = list(
+                dict.fromkeys([*explicit_groups, *current_groups])
+            )
 
             if not group_command and not closes_group:
-                declaration, decl_line = read_declaration_after(text, match.end())
+                declaration, decl_line = read_declaration_after(
+                    text, match.end()
+                )
                 if declaration:
-                    entry = parse_doxygen_entry(comment, declaration, rel_path, decl_line)
+                    entry = parse_doxygen_entry(
+                        comment, declaration, rel_path, decl_line
+                    )
                     if entry.kind == "member":
                         continue
                     self._qualify_function(entry, text[: match.start()])
                     for candidate in candidate_groups:
-                        self.groups.setdefault(candidate, DoxygenGroup(candidate)).entries.append(entry)
+                        self.groups.setdefault(
+                            candidate, DoxygenGroup(candidate)
+                        ).entries.append(entry)
                     self._index_compound(entry, text[: match.start()])
 
             if group_command and opens_group and group_name:
                 current_groups.append(group_name)
                 if not next_non_whitespace_is_comment(text, match.end()):
-                    declaration, decl_line = read_declaration_after(text, match.end())
+                    declaration, decl_line = read_declaration_after(
+                        text, match.end()
+                    )
                     if declaration:
-                        entry = parse_doxygen_entry(comment, declaration, rel_path, decl_line)
+                        entry = parse_doxygen_entry(
+                            comment, declaration, rel_path, decl_line
+                        )
                         self._qualify_function(entry, text[: match.start()])
                         if not entry.summary and self.groups[group_name].title:
                             entry.summary = self.groups[group_name].title
@@ -264,7 +308,9 @@ class DoxygenHeaderIndex:
         namespace = infer_namespace(prefix)
         struct_name = parse_struct_name(entry.signature)
         if struct_name:
-            fq_name = f"{namespace}::{struct_name}" if namespace else struct_name
+            fq_name = (
+                f"{namespace}::{struct_name}" if namespace else struct_name
+            )
             entry.kind = "struct"
             entry.name = fq_name
             self.structs[fq_name] = entry
@@ -337,7 +383,9 @@ def generate_native_api_pages(index: DoxygenHeaderIndex, api: str) -> None:
         "",
     ]
     for page in pages:
-        index_lines.append(f"- [{page.title}]({api_doc_url(directory, page.slug)})")
+        index_lines.append(
+            f"- [{page.title}]({api_doc_url(directory, page.slug)})"
+        )
     write_page(out_dir / "index.md", index_lines)
 
     language = "c" if api == "c" else "cpp"
@@ -352,26 +400,44 @@ def generate_native_api_pages(index: DoxygenHeaderIndex, api: str) -> None:
         for group in page.groups:
             lines.extend(render_native_group(group, language))
             lines.append("")
-        write_page(out_dir / f"{api_page_route(directory, page.slug)}.md", lines)
+        write_page(
+            out_dir / f"{api_page_route(directory, page.slug)}.md", lines
+        )
 
 
-def collect_native_pages(index: DoxygenHeaderIndex, api: str) -> list[NativePage]:
+def collect_native_pages(
+    index: DoxygenHeaderIndex, api: str
+) -> list[NativePage]:
     prefix = "c/include/" if api == "c" else "cpp/include/"
     pages: dict[str, NativePage] = {}
 
     for group in index.groups.values():
-        entries = [entry for entry in group.entries if entry.source.startswith(prefix)]
+        entries = [
+            entry for entry in group.entries if entry.source.startswith(prefix)
+        ]
         if not entries:
             continue
         source = sorted({entry.source for entry in entries})[0]
         slug = native_page_slug(source)
-        page = pages.setdefault(slug, NativePage(slug, native_page_title(source), source))
-        copied = DoxygenGroup(group.name, group.title, sorted(entries, key=lambda entry: entry.line))
+        page = pages.setdefault(
+            slug, NativePage(slug, native_page_title(source), source)
+        )
+        copied = DoxygenGroup(
+            group.name,
+            group.title,
+            sorted(entries, key=lambda entry: entry.line),
+        )
         page.groups.append(copied)
 
-    ordered = sorted(pages.values(), key=lambda page: (page.source, page.title))
+    ordered = sorted(
+        pages.values(), key=lambda page: (page.source, page.title)
+    )
     for page in ordered:
-        page.groups.sort(key=lambda group: min((entry.line for entry in group.entries), default=0))
+        page.groups.sort(
+            key=lambda group: min(
+                (entry.line for entry in group.entries), default=0
+            )
+        )
     return ordered
 
 
@@ -399,14 +465,30 @@ def render_native_function(entry: DoxygenEntry, language: str) -> list[str]:
     lines.extend([f"```{language}", signature, "```", ""])
 
     if entry.details:
-        lines.extend([escape_text(" ".join(line for line in entry.details if line.strip())), ""])
+        lines.extend(
+            [
+                escape_text(
+                    " ".join(line for line in entry.details if line.strip())
+                ),
+                "",
+            ]
+        )
 
     if entry.tparams:
         lines.extend(["**Template Parameters**", ""])
-        lines.extend(render_param_table(
-            [{"name": param.name, "type": "", "description": param.description} for param in entry.tparams],
-            include_direction=False,
-        ))
+        lines.extend(
+            render_param_table(
+                [
+                    {
+                        "name": param.name,
+                        "type": "",
+                        "description": param.description,
+                    }
+                    for param in entry.tparams
+                ],
+                include_direction=False,
+            )
+        )
         lines.append("")
 
     params = parse_function_params(signature)
@@ -444,13 +526,29 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
     if entry.details:
-        lines.extend([escape_text(" ".join(line for line in entry.details if line.strip())), ""])
-    lines.extend([f"```{language}", compact_compound_signature(entry.signature), "```", ""])
+        lines.extend(
+            [
+                escape_text(
+                    " ".join(line for line in entry.details if line.strip())
+                ),
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            f"```{language}",
+            compact_compound_signature(entry.signature),
+            "```",
+            "",
+        ]
+    )
 
     if entry.kind == "enum":
         values = parse_enum_values(entry.signature)
         if values:
-            lines.extend(["**Values**", "", "| Name | Value |", "| --- | --- |"])
+            lines.extend(
+                ["**Values**", "", "| Name | Value |", "| --- | --- |"]
+            )
             for value in values:
                 lines.append(
                     f"| `{escape_code(value['name'])}` | `{escape_code(value.get('value', ''))}` |"
@@ -480,7 +578,9 @@ def render_native_member(entry: DoxygenEntry, language: str) -> list[str]:
     lines = [f"### {heading_text(entry.name)}", ""]
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
-    lines.extend([f"```{language}", normalize_signature(entry.signature), "```", ""])
+    lines.extend(
+        [f"```{language}", normalize_signature(entry.signature), "```", ""]
+    )
     lines.extend([source_line(entry), ""])
     return trim_blank_lines(lines)
 
@@ -500,7 +600,9 @@ def generate_python_api_pages() -> None:
     for group, group_pages in group_python_pages(pages).items():
         index_lines.extend([f"## {group}", ""])
         for page in group_pages:
-            index_lines.append(f"- [{page.title}]({api_doc_url('python_api', page.slug)})")
+            index_lines.append(
+                f"- [{page.title}]({api_doc_url('python_api', page.slug)})"
+            )
         index_lines.append("")
     write_page(out_dir / "index.md", index_lines)
 
@@ -515,7 +617,9 @@ def generate_python_api_pages() -> None:
         for symbol in page.symbols:
             lines.extend(render_python_symbol(symbol))
             lines.append("")
-        write_page(out_dir / f"{api_page_route('python_api', page.slug)}.md", lines)
+        write_page(
+            out_dir / f"{api_page_route('python_api', page.slug)}.md", lines
+        )
 
 
 def build_python_symbol_index() -> dict[str, dict[str, PythonSymbol]]:
@@ -531,7 +635,9 @@ def build_python_symbol_index() -> dict[str, dict[str, PythonSymbol]]:
     return index
 
 
-def collect_python_pages(symbol_index: dict[str, dict[str, PythonSymbol]]) -> list[PythonPage]:
+def collect_python_pages(
+    symbol_index: dict[str, dict[str, PythonSymbol]],
+) -> list[PythonPage]:
     pages: list[PythonPage] = []
     for init_path in sorted(PYTHON_DIR.rglob("__init__.py")):
         module = python_module_name(init_path)
@@ -545,7 +651,11 @@ def collect_python_pages(symbol_index: dict[str, dict[str, PythonSymbol]]) -> li
                 symbols.append(symbol)
         if not symbols:
             continue
-        pages.append(PythonPage(module, python_title(module), python_slug(module), symbols))
+        pages.append(
+            PythonPage(
+                module, python_title(module), python_slug(module), symbols
+            )
+        )
 
     pages.sort(key=lambda page: (python_group(page.module), page.title))
     return pages
@@ -556,7 +666,11 @@ def find_python_symbol(
     name: str,
     symbol_index: dict[str, dict[str, PythonSymbol]],
 ) -> PythonSymbol | None:
-    candidates = [candidate for candidate in symbol_index if candidate == module or candidate.startswith(f"{module}.")]
+    candidates = [
+        candidate
+        for candidate in symbol_index
+        if candidate == module or candidate.startswith(f"{module}.")
+    ]
     candidates.sort(key=lambda candidate: (candidate.count("."), candidate))
     for candidate in candidates:
         if name in symbol_index[candidate]:
@@ -583,7 +697,9 @@ def parse_python_source(path: Path) -> list[PythonSymbol]:
         if indent == 0 and class_match:
             signature, end_idx = collect_python_signature(lines, idx)
             doc, _ = collect_python_docstring(lines, end_idx + 1)
-            members = collect_python_class_members(lines, end_idx + 1, indent, path)
+            members = collect_python_class_members(
+                lines, end_idx + 1, indent, path
+            )
             symbols.append(
                 PythonSymbol(
                     name=class_match.group(1),
@@ -656,7 +772,11 @@ def collect_python_class_members(
         raw_line = lines[idx]
         stripped = raw_line.strip()
         indent = indentation(raw_line)
-        if stripped and indent <= class_indent and not stripped.startswith("@"):
+        if (
+            stripped
+            and indent <= class_indent
+            and not stripped.startswith("@")
+        ):
             break
         if indent > class_indent and stripped.startswith("@"):
             decorators.append(stripped)
@@ -705,20 +825,50 @@ def render_python_symbol(symbol: PythonSymbol) -> list[str]:
         lines.extend(render_doc_text(symbol.doc))
         lines.append("")
 
-    init_member = next((member for member in symbol.members if member.name == "__init__"), None)
+    init_member = next(
+        (member for member in symbol.members if member.name == "__init__"),
+        None,
+    )
     if init_member is not None:
-        lines.extend(["**Constructor**", "", "```python", init_member.signature, "```", ""])
+        lines.extend(
+            [
+                "**Constructor**",
+                "",
+                "```python",
+                init_member.signature,
+                "```",
+                "",
+            ]
+        )
 
-    visible_members = [member for member in symbol.members if member.name != "__init__"]
+    visible_members = [
+        member for member in symbol.members if member.name != "__init__"
+    ]
     if visible_members:
-        lines.extend(["**Members**", "", "| Name | Kind | Source |", "| --- | --- | --- |"])
+        lines.extend(
+            [
+                "**Members**",
+                "",
+                "| Name | Kind | Source |",
+                "| --- | --- | --- |",
+            ]
+        )
         for member in visible_members:
             lines.append(
                 f"| `{escape_code(member.name)}` | {member.kind} | `{escape_code(f'{member.source}:{member.line}')}` |"
             )
         lines.append("")
         for member in visible_members:
-            lines.extend([f"### {heading_text(member.name)}", "", "```python", member.signature, "```", ""])
+            lines.extend(
+                [
+                    f"### {heading_text(member.name)}",
+                    "",
+                    "```python",
+                    member.signature,
+                    "```",
+                    "",
+                ]
+            )
             if member.doc:
                 lines.extend(render_doc_text(member.doc))
                 lines.append("")
@@ -745,7 +895,9 @@ def generate_java_api_pages() -> None:
     for package in sorted(by_package):
         index_lines.extend([f"## `{package}`", ""])
         for klass in sorted(by_package[package], key=lambda item: item.name):
-            index_lines.append(f"- [{klass.name}]({api_doc_url('java_api', java_slug(klass))})")
+            index_lines.append(
+                f"- [{klass.name}]({api_doc_url('java_api', java_slug(klass))})"
+            )
         index_lines.append("")
     write_page(out_dir / "index.md", index_lines)
 
@@ -767,20 +919,39 @@ def generate_java_api_pages() -> None:
         if klass.members:
             lines.extend(["## Public Members", ""])
             for member in klass.members:
-                lines.extend([f"### {heading_text(member.name)}", "", "```java", member.signature, "```", ""])
+                lines.extend(
+                    [
+                        f"### {heading_text(member.name)}",
+                        "",
+                        "```java",
+                        member.signature,
+                        "```",
+                        "",
+                    ]
+                )
                 lines.extend(render_javadoc(member.doc))
-                if member.doc.summary or member.doc.params or member.doc.returns:
+                if (
+                    member.doc.summary
+                    or member.doc.params
+                    or member.doc.returns
+                ):
                     lines.append("")
                 lines.extend([f"_Source: `{klass.source}:{member.line}`_", ""])
         lines.extend([f"_Source: `{klass.source}:{klass.line}`_", ""])
-        write_page(out_dir / f"{api_page_route('java_api', java_slug(klass))}.md", lines)
+        write_page(
+            out_dir / f"{api_page_route('java_api', java_slug(klass))}.md",
+            lines,
+        )
 
 
 def collect_java_classes() -> list[JavaClass]:
     classes: list[JavaClass] = []
     for root in JAVA_SOURCE_DIRS:
         for path in sorted(root.rglob("*.java")):
-            if "internal" in path.relative_to(root).parts or path.name == "module-info.java":
+            if (
+                "internal" in path.relative_to(root).parts
+                or path.name == "module-info.java"
+            ):
                 continue
             klass = parse_java_class(path)
             if klass is not None:
@@ -826,7 +997,9 @@ def parse_java_members(text: str, class_name: str) -> list[JavaMember]:
             continue
         name = name_match.group(1)
         doc = parse_javadoc(match.group(0))
-        members.append(JavaMember(name=name, signature=signature, doc=doc, line=line))
+        members.append(
+            JavaMember(name=name, signature=signature, doc=doc, line=line)
+        )
     return members
 
 
@@ -865,7 +1038,8 @@ def read_declaration_after(text: str, offset: int) -> tuple[str, int]:
         if (
             not stripped
             or stripped.startswith("#")
-            or stripped in {"extern \"C\" {", "{", "}", "public:", "private:", "protected:"}
+            or stripped
+            in {'extern "C" {', "{", "}", "public:", "private:", "protected:"}
         ):
             idx = line_end + 1
             line_no += 1
@@ -882,7 +1056,10 @@ def read_declaration_after(text: str, offset: int) -> tuple[str, int]:
         next_newline = len(text)
     first_declaration_line = text[declaration_start:next_newline].strip()
     is_compound = bool(
-        re.match(r"(?:template\s*<[^>]+>\s*)?(?:typedef\s+)?(?:struct|class|enum)\b", first_declaration_line)
+        re.match(
+            r"(?:template\s*<[^>]+>\s*)?(?:typedef\s+)?(?:struct|class|enum)\b",
+            first_declaration_line,
+        )
     )
     while idx < len(text):
         if text.startswith("//", idx):
@@ -913,7 +1090,9 @@ def read_declaration_after(text: str, offset: int) -> tuple[str, int]:
 
     declaration = text[declaration_start:idx].strip()
     declaration = re.sub(r"///<.*", "", declaration)
-    declaration = "\n".join(line.rstrip() for line in declaration.splitlines()).strip()
+    declaration = "\n".join(
+        line.rstrip() for line in declaration.splitlines()
+    ).strip()
     if is_simple_member_declaration(declaration):
         declaration = declaration.splitlines()[0].rstrip(",")
     return declaration, line_no
@@ -939,7 +1118,9 @@ def is_simple_member_declaration(declaration: str) -> bool:
     return "\n" in declaration and "\n}" in declaration
 
 
-def parse_doxygen_entry(comment: str, declaration: str, source: str, line: int) -> DoxygenEntry:
+def parse_doxygen_entry(
+    comment: str, declaration: str, source: str, line: int
+) -> DoxygenEntry:
     summary = ""
     details: list[str] = []
     params: list[DoxygenParam] = []
@@ -965,7 +1146,9 @@ def parse_doxygen_entry(comment: str, declaration: str, source: str, line: int) 
             active_param = None
             continue
 
-        if re.match(r"[@\\](?:defgroup|ingroup|addtogroup)\b", line_text) or line_text in {
+        if re.match(
+            r"[@\\](?:defgroup|ingroup|addtogroup)\b", line_text
+        ) or line_text in {
             "@{",
             "\\{",
             "@}",
@@ -996,12 +1179,15 @@ def parse_doxygen_entry(comment: str, declaration: str, source: str, line: int) 
         tparam_match = re.match(r"[@\\]tparam\s+(\w+)\s*(.*)", line_text)
         if tparam_match:
             active_param = DoxygenParam(
-                tparam_match.group(1), clean_doxygen_text(tparam_match.group(2))
+                tparam_match.group(1),
+                clean_doxygen_text(tparam_match.group(2)),
             )
             tparams.append(active_param)
             continue
 
-        return_text = consume_command(line_text, "return") or consume_command(line_text, "returns")
+        return_text = consume_command(line_text, "return") or consume_command(
+            line_text, "returns"
+        )
         if return_text is not None:
             returns = append_sentence(returns, clean_doxygen_text(return_text))
             active_param = None
@@ -1011,7 +1197,9 @@ def parse_doxygen_entry(comment: str, declaration: str, source: str, line: int) 
             active_param = None
             continue
 
-        if active_param is not None and (raw_line.startswith((" ", "\t")) or not line_text):
+        if active_param is not None and (
+            raw_line.startswith((" ", "\t")) or not line_text
+        ):
             active_param.description = append_sentence(
                 active_param.description, clean_doxygen_text(line_text)
             )
@@ -1028,7 +1216,11 @@ def parse_doxygen_entry(comment: str, declaration: str, source: str, line: int) 
         summary = details.pop(0).strip()
 
     kind = parse_doxygen_kind(declaration)
-    name = parse_member_name(declaration) if kind == "member" else parse_entry_name(declaration)
+    name = (
+        parse_member_name(declaration)
+        if kind == "member"
+        else parse_entry_name(declaration)
+    )
     return DoxygenEntry(
         kind=kind,
         name=name,
@@ -1071,11 +1263,14 @@ def append_sentence(existing: str, addition: str) -> str:
 
 
 def parse_doxygen_kind(declaration: str) -> str:
-    if re.search(r"^\s*(?:typedef\s+)?(?:struct|class)\s+\w+", declaration) and (
-        "{" in declaration or declaration.lstrip().startswith("typedef")
-    ):
+    if re.search(
+        r"^\s*(?:typedef\s+)?(?:struct|class)\s+\w+", declaration
+    ) and ("{" in declaration or declaration.lstrip().startswith("typedef")):
         return "struct"
-    if re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", declaration) and "{" in declaration:
+    if (
+        re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", declaration)
+        and "{" in declaration
+    ):
         return "enum"
     if "(" in declaration and ")" in declaration:
         return "function"
@@ -1092,10 +1287,16 @@ def parse_entry_name(declaration: str) -> str:
     before_paren = declaration.split("(", 1)[0].strip()
     if "(" in declaration and before_paren:
         return before_paren.split()[-1].split("::")[-1].strip("*&")
-    declaration_lines = [line.strip() for line in declaration.splitlines() if line.strip()]
+    declaration_lines = [
+        line.strip() for line in declaration.splitlines() if line.strip()
+    ]
     first_line = declaration_lines[0] if declaration_lines else ""
-    name_line = declaration_lines[-1] if len(declaration_lines) > 1 else first_line
-    token_match = re.match(r"\s*(?:[\w:<>,]+\s+)*([A-Za-z_]\w*)\s*(?:=|;|,|$)", name_line)
+    name_line = (
+        declaration_lines[-1] if len(declaration_lines) > 1 else first_line
+    )
+    token_match = re.match(
+        r"\s*(?:[\w:<>,]+\s+)*([A-Za-z_]\w*)\s*(?:=|;|,|$)", name_line
+    )
     return token_match.group(1) if token_match else first_line.strip()
 
 
@@ -1106,20 +1307,30 @@ def parse_member_name(declaration: str) -> str:
 
 
 def parse_struct_name(declaration: str) -> str | None:
-    match = re.search(r"^\s*(?:typedef\s+)?(?:struct|class)\s+([A-Za-z_]\w*)", declaration)
+    match = re.search(
+        r"^\s*(?:typedef\s+)?(?:struct|class)\s+([A-Za-z_]\w*)", declaration
+    )
     return match.group(1) if match else None
 
 
 def parse_enum_name(declaration: str) -> str | None:
-    match = re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\s+([A-Za-z_]\w*)", declaration)
+    match = re.search(
+        r"^\s*(?:typedef\s+)?enum(?:\s+class)?\s+([A-Za-z_]\w*)", declaration
+    )
     if match:
         return match.group(1)
-    typedef_match = re.search(r"}\s*([A-Za-z_]\w*)\s*;", declaration, re.DOTALL)
+    typedef_match = re.search(
+        r"}\s*([A-Za-z_]\w*)\s*;", declaration, re.DOTALL
+    )
     return typedef_match.group(1) if typedef_match else None
 
 
 def infer_namespace(prefix: str) -> str:
-    matches = list(re.finditer(r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;]+)?\s*{", prefix))
+    matches = list(
+        re.finditer(
+            r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;]+)?\s*{", prefix
+        )
+    )
     if not matches:
         return ""
     return matches[-1].group(1)
@@ -1136,14 +1347,18 @@ def normalize_entry_signature(declaration: str, kind: str) -> str:
 
 def normalize_signature(declaration: str) -> str:
     declaration = re.sub(r"\n\s+", "\n", declaration.strip())
-    return "\n".join(line.rstrip() for line in declaration.splitlines()).strip()
+    return "\n".join(
+        line.rstrip() for line in declaration.splitlines()
+    ).strip()
 
 
 def compact_compound_signature(signature: str) -> str:
     first_line = signature.splitlines()[0]
     if "{" in first_line:
         prefix = signature.split("{", 1)[0].strip()
-        suffix = signature.rsplit("}", 1)[1].strip() if "}" in signature else ""
+        suffix = (
+            signature.rsplit("}", 1)[1].strip() if "}" in signature else ""
+        )
         if suffix:
             return f"{prefix} {{ ... }} {suffix}".strip()
         return f"{prefix} {{ ... }};"
@@ -1158,7 +1373,9 @@ def parse_function_params(signature: str) -> list[FunctionParam]:
     if not params_text or params_text.strip() == "void":
         return []
     params: list[FunctionParam] = []
-    for idx, raw_param in enumerate(split_top_level(params_text, ","), start=1):
+    for idx, raw_param in enumerate(
+        split_top_level(params_text, ","), start=1
+    ):
         param = raw_param.strip()
         if not param:
             continue
@@ -1168,7 +1385,13 @@ def parse_function_params(signature: str) -> list[FunctionParam]:
             param = left.strip()
             default = default.strip()
         c_type, name = split_param_name(param)
-        params.append(FunctionParam(name=name or f"arg{idx}", c_type=c_type or param, default=default))
+        params.append(
+            FunctionParam(
+                name=name or f"arg{idx}",
+                c_type=c_type or param,
+                default=default,
+            )
+        )
     return params
 
 
@@ -1219,7 +1442,9 @@ def parse_return_type(signature: str) -> str:
         tail = signature.split(")", 1)[1]
         return tail.split("->", 1)[1].strip().rstrip(";")
     before_paren = signature.split("(", 1)[0]
-    before_paren = re.sub(r"template\s*<[^>]+>", "", before_paren, flags=re.DOTALL)
+    before_paren = re.sub(
+        r"template\s*<[^>]+>", "", before_paren, flags=re.DOTALL
+    )
     before_paren = " ".join(before_paren.split())
     if not before_paren:
         return "void"
@@ -1233,22 +1458,31 @@ def parse_struct_members(entry: DoxygenEntry) -> list[DoxygenEntry]:
     members: list[DoxygenEntry] = []
     for match in COMMENT_RE.finditer(entry.signature):
         comment = clean_doxygen_comment(match.group(0))
-        declaration, line = read_declaration_after(entry.signature, match.end())
-        if not declaration or declaration.startswith(("public:", "private:", "protected:")):
+        declaration, line = read_declaration_after(
+            entry.signature, match.end()
+        )
+        if not declaration or declaration.startswith(
+            ("public:", "private:", "protected:")
+        ):
             continue
-        member = parse_doxygen_entry(comment, declaration, entry.source, entry.line + line - 1)
+        member = parse_doxygen_entry(
+            comment, declaration, entry.source, entry.line + line - 1
+        )
         member.kind = "member"
         members.append(member)
-    members.extend(parse_plain_struct_members(entry, {member.name for member in members}))
+    members.extend(
+        parse_plain_struct_members(entry, {member.name for member in members})
+    )
     return members
 
 
-def parse_plain_struct_members(entry: DoxygenEntry, existing_names: set[str]) -> list[DoxygenEntry]:
+def parse_plain_struct_members(
+    entry: DoxygenEntry, existing_names: set[str]
+) -> list[DoxygenEntry]:
     body = compound_body(entry.signature)
     if not body:
         return []
     members: list[DoxygenEntry] = []
-    last_member: DoxygenEntry | None = None
     pending_declaration = ""
     pending_comment = ""
     for raw_line in body.splitlines():
@@ -1264,7 +1498,9 @@ def parse_plain_struct_members(entry: DoxygenEntry, existing_names: set[str]) ->
         if not declaration and not pending_declaration:
             continue
         pending_declaration = f"{pending_declaration} {declaration}".strip()
-        pending_comment = append_sentence(pending_comment, clean_doxygen_text(inline_comment))
+        pending_comment = append_sentence(
+            pending_comment, clean_doxygen_text(inline_comment)
+        )
         if ";" not in pending_declaration:
             continue
         declaration = pending_declaration.split(";", 1)[0].rstrip(",").strip()
@@ -1274,7 +1510,9 @@ def parse_plain_struct_members(entry: DoxygenEntry, existing_names: set[str]) ->
         if not declaration or "(" in declaration:
             continue
         declaration = declaration.split("=", 1)[0].strip()
-        if not declaration or declaration.startswith(("using ", "typedef ", "static_assert")):
+        if not declaration or declaration.startswith(
+            ("using ", "typedef ", "static_assert")
+        ):
             continue
         c_type, name = split_param_name(declaration)
         if not name or name in existing_names:
@@ -1289,7 +1527,6 @@ def parse_plain_struct_members(entry: DoxygenEntry, existing_names: set[str]) ->
         )
         members.append(member)
         existing_names.add(name)
-        last_member = member
     return members
 
 
@@ -1320,7 +1557,9 @@ def parse_enum_values(signature: str) -> list[dict[str, str]]:
         return []
     values: list[dict[str, str]] = []
     for raw_value in split_top_level(body_match.group("body"), ","):
-        cleaned = re.sub(r"/\*.*?\*/|//.*", "", raw_value, flags=re.DOTALL).strip()
+        cleaned = re.sub(
+            r"/\*.*?\*/|//.*", "", raw_value, flags=re.DOTALL
+        ).strip()
         if not cleaned:
             continue
         name, _, value = cleaned.partition("=")
@@ -1340,8 +1579,12 @@ def collect_python_signature(lines: list[str], start: int) -> tuple[str, int]:
     while idx < len(lines):
         stripped = lines[idx].strip()
         chunks.append(stripped)
-        depth += stripped.count("(") + stripped.count("[") + stripped.count("{")
-        depth -= stripped.count(")") + stripped.count("]") + stripped.count("}")
+        depth += (
+            stripped.count("(") + stripped.count("[") + stripped.count("{")
+        )
+        depth -= (
+            stripped.count(")") + stripped.count("]") + stripped.count("}")
+        )
         if stripped.endswith(":") and depth <= 0:
             break
         idx += 1
@@ -1357,8 +1600,12 @@ def collect_python_assignment(lines: list[str], start: int) -> tuple[str, int]:
         idx += 1
         stripped = lines[idx].strip()
         chunks.append(stripped)
-        depth += stripped.count("{") + stripped.count("[") + stripped.count("(")
-        depth -= stripped.count("}") + stripped.count("]") + stripped.count(")")
+        depth += (
+            stripped.count("{") + stripped.count("[") + stripped.count("(")
+        )
+        depth -= (
+            stripped.count("}") + stripped.count("]") + stripped.count(")")
+        )
     return "\n".join(chunks), idx
 
 
@@ -1398,12 +1645,16 @@ def collect_python_docstring(lines: list[str], start: int) -> tuple[str, int]:
 def clean_python_docstring(doc: str) -> str:
     doc = textwrap.dedent(doc).strip()
     doc = doc.replace("\\\n", "")
-    doc = doc.replace("{resources_docstring}", "resources : cuvs.common.Resources, optional")
+    doc = doc.replace(
+        "{resources_docstring}", "resources : cuvs.common.Resources, optional"
+    )
     return strip_sphinx_roles(doc)
 
 
 def strip_sphinx_roles(value: str) -> str:
-    return SPHINX_ROLE_RE.sub(lambda match: sphinx_role_label(match.group("target")), value)
+    return SPHINX_ROLE_RE.sub(
+        lambda match: sphinx_role_label(match.group("target")), value
+    )
 
 
 def sphinx_role_label(target: str) -> str:
@@ -1428,7 +1679,9 @@ NUMPY_FIELD_SECTIONS = {
     "yields",
 }
 NUMPY_SECTION_UNDERLINE_RE = re.compile(r"^-{3,}\s*$")
-NUMPY_FIELD_RE = re.compile(r"^(?P<name>[A-Za-z_*][A-Za-z0-9_*,\s]*?)\s*:\s*(?P<type>.*)$")
+NUMPY_FIELD_RE = re.compile(
+    r"^(?P<name>[A-Za-z_*][A-Za-z0-9_*,\s]*?)\s*:\s*(?P<type>.*)$"
+)
 
 
 def render_doc_text(doc: str) -> list[str]:
@@ -1452,7 +1705,9 @@ def render_doc_text(doc: str) -> list[str]:
     return trim_blank_lines(lines)
 
 
-def split_numpy_doc_sections(raw_lines: list[str]) -> tuple[list[str], list[tuple[str, list[str]]]]:
+def split_numpy_doc_sections(
+    raw_lines: list[str],
+) -> tuple[list[str], list[tuple[str, list[str]]]]:
     preamble: list[str] = []
     sections: list[tuple[str, list[str]]] = []
     current_title: str | None = None
@@ -1495,10 +1750,12 @@ def render_numpy_field_section(title: str, raw_lines: list[str]) -> list[str]:
         "| Name | Type | Description |",
         "| --- | --- | --- |",
     ]
-    for field in fields:
-        name = render_numpy_field_names(field["name"])
-        field_type = f"`{escape_code(field['type'])}`" if field["type"] else ""
-        description = render_table_description(field["description"])
+    for doc_field in fields:
+        name = render_numpy_field_names(doc_field["name"])
+        field_type = (
+            f"`{escape_code(doc_field['type'])}`" if doc_field["type"] else ""
+        )
+        description = render_table_description(doc_field["description"])
         lines.append(f"| {name} | {field_type} | {description} |")
     return lines
 
@@ -1508,7 +1765,11 @@ def parse_numpy_fields(raw_lines: list[str]) -> list[dict[str, str]]:
     current: dict[str, object] | None = None
     for raw_line in dedent_doc_lines(raw_lines):
         stripped = raw_line.strip()
-        field_match = NUMPY_FIELD_RE.match(stripped) if stripped and indentation(raw_line) == 0 else None
+        field_match = (
+            NUMPY_FIELD_RE.match(stripped)
+            if stripped and indentation(raw_line) == 0
+            else None
+        )
         if field_match:
             if current is not None:
                 fields.append(finish_numpy_field(current))
@@ -1524,7 +1785,11 @@ def parse_numpy_fields(raw_lines: list[str]) -> list[dict[str, str]]:
             continue
         description = current["description"]
         assert isinstance(description, list)
-        if stripped and not description and numpy_type_needs_continuation(str(current["type"])):
+        if (
+            stripped
+            and not description
+            and numpy_type_needs_continuation(str(current["type"]))
+        ):
             current["type"] = f"{current['type']} {stripped}"
         else:
             description.append(stripped)
@@ -1573,7 +1838,9 @@ def render_table_description(value: str) -> str:
         current.append(stripped)
     if current:
         paragraphs.append(" ".join(current))
-    return "<br /><br />".join(escape_text(paragraph) for paragraph in paragraphs)
+    return "<br /><br />".join(
+        escape_text(paragraph) for paragraph in paragraphs
+    )
 
 
 def render_doc_lines(raw_lines: list[str]) -> list[str]:
@@ -1693,7 +1960,9 @@ def java_signature_at(text: str, start: int) -> tuple[str, int]:
 
 def comment_before(text: str, start: int) -> str:
     prefix = text[:start].rstrip()
-    match = re.search(r"/\*\*.*?\*/\s*(?:@\w+(?:\([^)]*\))?\s*)*$", prefix, re.DOTALL)
+    match = re.search(
+        r"/\*\*.*?\*/\s*(?:@\w+(?:\([^)]*\))?\s*)*$", prefix, re.DOTALL
+    )
     return match.group(0) if match else ""
 
 
@@ -1705,7 +1974,9 @@ def parse_javadoc(raw: str) -> JavaDoc:
     if not comment_match:
         return JavaDoc()
     body = comment_match.group(1)
-    lines = [re.sub(r"^\s*\* ?", "", line).rstrip() for line in body.splitlines()]
+    lines = [
+        re.sub(r"^\s*\* ?", "", line).rstrip() for line in body.splitlines()
+    ]
     doc = JavaDoc()
     summary_lines: list[str] = []
     active: DoxygenParam | None = None
@@ -1718,13 +1989,17 @@ def parse_javadoc(raw: str) -> JavaDoc:
             continue
         param_match = re.match(r"@param\s+(\w+)\s*(.*)", stripped)
         if param_match:
-            active = DoxygenParam(param_match.group(1), param_match.group(2).strip())
+            active = DoxygenParam(
+                param_match.group(1), param_match.group(2).strip()
+            )
             doc.params.append(active)
             active_kind = "param"
             continue
         throws_match = re.match(r"@throws\s+([\w.]+)\s*(.*)", stripped)
         if throws_match:
-            active = DoxygenParam(throws_match.group(1), throws_match.group(2).strip())
+            active = DoxygenParam(
+                throws_match.group(1), throws_match.group(2).strip()
+            )
             doc.throws.append(active)
             active_kind = "throws"
             continue
@@ -1750,7 +2025,11 @@ def parse_javadoc(raw: str) -> JavaDoc:
 
 def clean_javadoc_text(text: str) -> str:
     text = re.sub(r"\{@code\s+([^}]+)\}", r"`\1`", text)
-    text = re.sub(r"\{@link\s+([^}\s]+)(?:\s+([^}]+))?\}", lambda m: m.group(2) or f"`{m.group(1)}`", text)
+    text = re.sub(
+        r"\{@link\s+([^}\s]+)(?:\s+([^}]+))?\}",
+        lambda m: m.group(2) or f"`{m.group(1)}`",
+        text,
+    )
     text = re.sub(r"<a\b[^>]*>(.*?)</a>", r"\1", text)
     text = re.sub(r"</?p>", "", text)
     text = re.sub(r"<[^>]+>", "", text)
@@ -1763,16 +2042,24 @@ def render_javadoc(doc: JavaDoc) -> list[str]:
         lines.extend(escape_text(line) for line in doc.summary.splitlines())
         lines.append("")
     if doc.params:
-        lines.extend(["**Parameters**", "", "| Name | Description |", "| --- | --- |"])
+        lines.extend(
+            ["**Parameters**", "", "| Name | Description |", "| --- | --- |"]
+        )
         for param in doc.params:
-            lines.append(f"| `{escape_code(param.name)}` | {escape_text(param.description)} |")
+            lines.append(
+                f"| `{escape_code(param.name)}` | {escape_text(param.description)} |"
+            )
         lines.append("")
     if doc.returns:
         lines.extend(["**Returns**", "", escape_text(doc.returns), ""])
     if doc.throws:
-        lines.extend(["**Throws**", "", "| Type | Description |", "| --- | --- |"])
+        lines.extend(
+            ["**Throws**", "", "| Type | Description |", "| --- | --- |"]
+        )
         for param in doc.throws:
-            lines.append(f"| `{escape_code(param.name)}` | {escape_text(param.description)} |")
+            lines.append(
+                f"| `{escape_code(param.name)}` | {escape_text(param.description)} |"
+            )
         lines.append("")
     return trim_blank_lines(lines)
 
@@ -1791,7 +2078,9 @@ def generate_rust_api_pages() -> None:
     for group, group_pages in group_rust_pages(pages).items():
         index_lines.extend([f"## {group}", ""])
         for page in group_pages:
-            index_lines.append(f"- [`{page.module}`]({api_doc_url('rust_api', page.slug)})")
+            index_lines.append(
+                f"- [`{page.module}`]({api_doc_url('rust_api', page.slug)})"
+            )
         index_lines.append("")
     write_page(out_dir / "index.md", index_lines)
 
@@ -1811,7 +2100,9 @@ def generate_rust_api_pages() -> None:
         for item in page.items:
             lines.extend(render_rust_item(item))
             lines.append("")
-        write_page(out_dir / f"{api_page_route('rust_api', page.slug)}.md", lines)
+        write_page(
+            out_dir / f"{api_page_route('rust_api', page.slug)}.md", lines
+        )
 
 
 def collect_rust_pages() -> list[RustPage]:
@@ -1830,7 +2121,11 @@ def parse_rust_page(path: Path) -> RustPage:
     lines = path.read_text(encoding="utf-8").splitlines()
     module = rust_module_name(path)
     items = parse_rust_top_level_items(lines, path)
-    items_by_name = {item.name: item for item in items if item.kind in {"struct", "enum", "trait"}}
+    items_by_name = {
+        item.name: item
+        for item in items
+        if item.kind in {"struct", "enum", "trait"}
+    }
 
     for impl_type, methods, impl_line in parse_rust_impl_methods(lines, path):
         if not methods:
@@ -1881,10 +2176,16 @@ def parse_rust_top_level_items(lines: list[str], path: Path) -> list[RustItem]:
             _, signature_end, has_block = collect_rust_signature(lines, idx)
             pending_doc = []
             pending_attributes = []
-            idx = skip_rust_block(lines, signature_end) + 1 if has_block else signature_end + 1
+            idx = (
+                skip_rust_block(lines, signature_end) + 1
+                if has_block
+                else signature_end + 1
+            )
             continue
         if is_public_rust_declaration(stripped):
-            signature, signature_end, has_block = collect_rust_signature(lines, idx)
+            signature, signature_end, has_block = collect_rust_signature(
+                lines, idx
+            )
             kind, name = parse_rust_item_kind_name(signature)
             if kind and name:
                 items.append(
@@ -1900,7 +2201,11 @@ def parse_rust_top_level_items(lines: list[str], path: Path) -> list[RustItem]:
                 )
             pending_doc = []
             pending_attributes = []
-            idx = skip_rust_block(lines, signature_end) + 1 if has_block else signature_end + 1
+            idx = (
+                skip_rust_block(lines, signature_end) + 1
+                if has_block
+                else signature_end + 1
+            )
             continue
         if stripped and not stripped.startswith("//"):
             pending_doc = []
@@ -1909,7 +2214,9 @@ def parse_rust_top_level_items(lines: list[str], path: Path) -> list[RustItem]:
     return items
 
 
-def parse_rust_impl_methods(lines: list[str], path: Path) -> list[tuple[str, list[RustItem], int]]:
+def parse_rust_impl_methods(
+    lines: list[str], path: Path
+) -> list[tuple[str, list[RustItem], int]]:
     impls: list[tuple[str, list[RustItem], int]] = []
     idx = 0
     while idx < len(lines):
@@ -1917,14 +2224,18 @@ def parse_rust_impl_methods(lines: list[str], path: Path) -> list[tuple[str, lis
         if not stripped.startswith("impl"):
             idx += 1
             continue
-        signature, signature_end, has_block = collect_rust_signature(lines, idx)
+        signature, signature_end, has_block = collect_rust_signature(
+            lines, idx
+        )
         if not has_block:
             idx = signature_end + 1
             continue
         block_end = skip_rust_block(lines, signature_end)
         impl_type = parse_rust_impl_type(signature)
         if impl_type:
-            methods = parse_rust_methods_in_impl(lines, signature_end + 1, block_end, path)
+            methods = parse_rust_methods_in_impl(
+                lines, signature_end + 1, block_end, path
+            )
             impls.append((impl_type, methods, idx + 1))
         idx = block_end + 1
     return impls
@@ -1952,7 +2263,9 @@ def parse_rust_methods_in_impl(
             idx += 1
             continue
         if depth == 1 and is_public_rust_function(stripped):
-            signature, signature_end, has_block = collect_rust_signature(lines, idx)
+            signature, signature_end, has_block = collect_rust_signature(
+                lines, idx
+            )
             name = parse_rust_function_name(signature)
             if name:
                 methods.append(
@@ -1968,7 +2281,11 @@ def parse_rust_methods_in_impl(
                 )
             pending_doc = []
             pending_attributes = []
-            idx = skip_rust_block(lines, signature_end) + 1 if has_block else signature_end + 1
+            idx = (
+                skip_rust_block(lines, signature_end) + 1
+                if has_block
+                else signature_end + 1
+            )
             continue
         if depth == 1 and stripped and not stripped.startswith("//"):
             pending_doc = []
@@ -2010,7 +2327,12 @@ def collect_rust_module_doc(lines: list[str]) -> str:
 def is_public_rust_declaration(stripped: str) -> bool:
     if not stripped.startswith("pub ") or stripped.startswith("pub(crate)"):
         return False
-    return bool(re.match(r"pub\s+(?:unsafe\s+|async\s+)?(?:fn|struct|enum|trait|type|use|mod)\b", stripped))
+    return bool(
+        re.match(
+            r"pub\s+(?:unsafe\s+|async\s+)?(?:fn|struct|enum|trait|type|use|mod)\b",
+            stripped,
+        )
+    )
 
 
 def is_public_rust_function(stripped: str) -> bool:
@@ -2019,7 +2341,9 @@ def is_public_rust_function(stripped: str) -> bool:
     return bool(re.match(r"pub\s+(?:unsafe\s+|async\s+)?fn\b", stripped))
 
 
-def collect_rust_signature(lines: list[str], start: int) -> tuple[str, int, bool]:
+def collect_rust_signature(
+    lines: list[str], start: int
+) -> tuple[str, int, bool]:
     chunks: list[str] = []
     paren_depth = 0
     bracket_depth = 0
@@ -2041,7 +2365,12 @@ def collect_rust_signature(lines: list[str], start: int) -> tuple[str, int, bool
                 angle_depth += 1
             elif char == ">":
                 angle_depth = max(angle_depth - 1, 0)
-            elif char in "{;" and paren_depth == 0 and bracket_depth == 0 and angle_depth == 0:
+            elif (
+                char in "{;"
+                and paren_depth == 0
+                and bracket_depth == 0
+                and angle_depth == 0
+            ):
                 prefix = stripped[: char_idx + 1].rstrip()
                 chunks[-1] = prefix
                 signature = normalize_rust_signature("\n".join(chunks))
@@ -2089,7 +2418,10 @@ def strip_rust_line_for_braces(line: str) -> str:
 
 def parse_rust_item_kind_name(signature: str) -> tuple[str, str]:
     first_line = signature.splitlines()[0].strip()
-    match = re.match(r"pub\s+(?P<kind>struct|enum|trait|type|mod)\s+(?P<name>[A-Za-z_]\w*)", first_line)
+    match = re.match(
+        r"pub\s+(?P<kind>struct|enum|trait|type|mod)\s+(?P<name>[A-Za-z_]\w*)",
+        first_line,
+    )
     if match:
         return match.group("kind"), match.group("name")
     if re.match(r"pub\s+(?:unsafe\s+|async\s+)?fn\b", first_line):
@@ -2124,7 +2456,11 @@ def clean_rust_doc(lines: list[str]) -> str:
 
 def render_rust_item(item: RustItem) -> list[str]:
     lines = [f"## {heading_text(item.name)}", ""]
-    signature_lines = [*item.attributes, item.signature] if item.attributes else [item.signature]
+    signature_lines = (
+        [*item.attributes, item.signature]
+        if item.attributes
+        else [item.signature]
+    )
     lines.extend(["```rust", "\n".join(signature_lines), "```", ""])
     if item.doc:
         lines.extend(render_markdown_doc(item.doc))
@@ -2132,11 +2468,17 @@ def render_rust_item(item: RustItem) -> list[str]:
     if item.members:
         lines.extend(["**Methods**", "", "| Name | Source |", "| --- | --- |"])
         for member in item.members:
-            lines.append(f"| `{escape_code(member.name)}` | `{escape_code(f'{member.source}:{member.line}')}` |")
+            lines.append(
+                f"| `{escape_code(member.name)}` | `{escape_code(f'{member.source}:{member.line}')}` |"
+            )
         lines.append("")
         for member in item.members:
             lines.extend([f"### {heading_text(member.name)}", ""])
-            member_signature = [*member.attributes, member.signature] if member.attributes else [member.signature]
+            member_signature = (
+                [*member.attributes, member.signature]
+                if member.attributes
+                else [member.signature]
+            )
             lines.extend(["```rust", "\n".join(member_signature), "```", ""])
             if member.doc:
                 lines.extend(render_markdown_doc(member.doc))
@@ -2158,7 +2500,16 @@ def rust_group(module: str) -> str:
         return "Cluster"
     if "::distance" in module:
         return "Distance"
-    if any(token in module for token in ("::brute_force", "::cagra", "::ivf_flat", "::ivf_pq", "::vamana")):
+    if any(
+        token in module
+        for token in (
+            "::brute_force",
+            "::cagra",
+            "::ivf_flat",
+            "::ivf_pq",
+            "::vamana",
+        )
+    ):
         return "Nearest Neighbors"
     return "Core"
 
@@ -2196,7 +2547,9 @@ def generate_go_api_pages() -> None:
         "",
     ]
     for page in pages:
-        index_lines.append(f"- [`{page.package}`]({api_doc_url('go_api', page.slug)})")
+        index_lines.append(
+            f"- [`{page.package}`]({api_doc_url('go_api', page.slug)})"
+        )
     write_page(out_dir / "index.md", index_lines)
 
     for page in pages:
@@ -2214,7 +2567,9 @@ def generate_go_api_pages() -> None:
             for item in items:
                 lines.extend(render_go_item(item))
                 lines.append("")
-        write_page(out_dir / f"{api_page_route('go_api', page.slug)}.md", lines)
+        write_page(
+            out_dir / f"{api_page_route('go_api', page.slug)}.md", lines
+        )
 
 
 def collect_go_pages() -> list[GoPage]:
@@ -2235,7 +2590,14 @@ def collect_go_pages() -> list[GoPage]:
             title=f"{go_package_title(package)} Package",
             slug=go_slug(package),
             sources=sorted(sources[package]),
-            items=sorted(items, key=lambda item: (go_kind_order(item.kind), item.name, item.line)),
+            items=sorted(
+                items,
+                key=lambda item: (
+                    go_kind_order(item.kind),
+                    item.name,
+                    item.line,
+                ),
+            ),
         )
         for package, items in by_package.items()
         if items
@@ -2267,7 +2629,9 @@ def parse_go_file(path: Path) -> tuple[str, list[GoItem]]:
             continue
         if is_go_declaration(stripped):
             signature, end_idx = collect_go_declaration(lines, idx)
-            kind, name, receiver = parse_go_item_kind_name(signature, pending_doc)
+            kind, name, receiver = parse_go_item_kind_name(
+                signature, pending_doc
+            )
             if name and is_go_exported_item(kind, name, signature):
                 items.append(
                     GoItem(
@@ -2289,7 +2653,9 @@ def parse_go_file(path: Path) -> tuple[str, list[GoItem]]:
     return package, items
 
 
-def collect_go_block_comment(lines: list[str], start: int) -> tuple[list[str], int]:
+def collect_go_block_comment(
+    lines: list[str], start: int
+) -> tuple[list[str], int]:
     body: list[str] = []
     idx = start
     while idx < len(lines):
@@ -2315,13 +2681,19 @@ def collect_go_declaration(lines: list[str], start: int) -> tuple[str, int]:
         return collect_go_function_signature(lines, start)
     if re.match(r"(?:const|var|type)\s*\(", first):
         return collect_go_paren_block(lines, start)
-    if " struct {" in first or first.endswith(" struct {") or " interface {" in first:
+    if (
+        " struct {" in first
+        or first.endswith(" struct {")
+        or " interface {" in first
+    ):
         signature, end_idx = collect_go_brace_block(lines, start)
         return compact_go_type_signature(signature), end_idx
     return first, start
 
 
-def collect_go_function_signature(lines: list[str], start: int) -> tuple[str, int]:
+def collect_go_function_signature(
+    lines: list[str], start: int
+) -> tuple[str, int]:
     chunks: list[str] = []
     paren_depth = 0
     bracket_depth = 0
@@ -2384,9 +2756,14 @@ def normalize_go_signature(signature: str) -> str:
     return "\n".join(line.rstrip() for line in signature.splitlines()).strip()
 
 
-def parse_go_item_kind_name(signature: str, doc_lines: list[str]) -> tuple[str, str, str]:
+def parse_go_item_kind_name(
+    signature: str, doc_lines: list[str]
+) -> tuple[str, str, str]:
     first_line = signature.splitlines()[0].strip()
-    func_match = re.match(r"func\s+(?:\((?P<receiver>[^)]+)\)\s*)?(?P<name>[A-Za-z_]\w*)", first_line)
+    func_match = re.match(
+        r"func\s+(?:\((?P<receiver>[^)]+)\)\s*)?(?P<name>[A-Za-z_]\w*)",
+        first_line,
+    )
     if func_match:
         receiver = go_receiver_type(func_match.group("receiver") or "")
         name = func_match.group("name")
@@ -2403,9 +2780,21 @@ def parse_go_item_kind_name(signature: str, doc_lines: list[str]) -> tuple[str, 
     if const_match:
         return "constant", const_match.group("name"), ""
     if first_line == "const (":
-        return "constant", go_block_heading(doc_lines, go_block_export_name(signature, "Constants")), ""
+        return (
+            "constant",
+            go_block_heading(
+                doc_lines, go_block_export_name(signature, "Constants")
+            ),
+            "",
+        )
     if first_line == "var (":
-        return "variable", go_block_heading(doc_lines, go_block_export_name(signature, "Variables")), ""
+        return (
+            "variable",
+            go_block_heading(
+                doc_lines, go_block_export_name(signature, "Variables")
+            ),
+            "",
+        )
     return "", "", ""
 
 
@@ -2469,15 +2858,32 @@ def group_go_items(items: list[GoItem]) -> dict[str, list[GoItem]]:
     grouped: dict[str, list[GoItem]] = defaultdict(list)
     for item in items:
         grouped[labels.get(item.kind, "Other")].append(item)
-    return {labels[kind]: grouped[labels[kind]] for kind in ["constant", "variable", "type", "function", "method"] if grouped.get(labels[kind])}
+    return {
+        labels[kind]: grouped[labels[kind]]
+        for kind in ["constant", "variable", "type", "function", "method"]
+        if grouped.get(labels[kind])
+    }
 
 
 def go_kind_order(kind: str) -> int:
-    return {"constant": 0, "variable": 1, "type": 2, "function": 3, "method": 4}.get(kind, 9)
+    return {
+        "constant": 0,
+        "variable": 1,
+        "type": 2,
+        "function": 3,
+        "method": 4,
+    }.get(kind, 9)
 
 
 def render_go_item(item: GoItem) -> list[str]:
-    lines = [f"### {heading_text(item.name)}", "", "```go", item.signature, "```", ""]
+    lines = [
+        f"### {heading_text(item.name)}",
+        "",
+        "```go",
+        item.signature,
+        "```",
+        "",
+    ]
     if item.doc:
         lines.extend(render_markdown_doc(item.doc))
         lines.append("")
@@ -2503,7 +2909,9 @@ def update_api_navigation() -> None:
     start = text.find(start_marker)
     end = text.find(end_marker, start)
     if start == -1 or end == -1:
-        raise RuntimeError("Could not find API Reference navigation block in fern/docs.yml")
+        raise RuntimeError(
+            "Could not find API Reference navigation block in fern/docs.yml"
+        )
 
     lines = [
         '  - section: "API Reference"',
@@ -2527,7 +2935,9 @@ def update_api_navigation() -> None:
             )
 
     replacement = "\n".join(lines) + "\n"
-    docs_yml.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+    docs_yml.write_text(
+        text[:start] + replacement + text[end:], encoding="utf-8"
+    )
     print("Updated fern/docs.yml API Reference navigation")
 
 
@@ -2535,7 +2945,10 @@ def read_api_index_slugs(index_path: Path) -> list[str]:
     slugs: list[str] = []
     route_prefix = api_route_prefix(index_path.parent.name)
     for line in index_path.read_text(encoding="utf-8").splitlines():
-        match = re.search(rf"\]\((?:\./|/api-reference/{re.escape(route_prefix)}-)([^)#]+)", line)
+        match = re.search(
+            rf"\]\((?:\./|/api-reference/{re.escape(route_prefix)}-)([^)#]+)",
+            line,
+        )
         if match:
             slugs.append(match.group(1).removesuffix(".md"))
     return slugs
@@ -2614,7 +3027,9 @@ def render_markdown_doc(doc: str) -> list[str]:
             heading_match = re.match(r"^(#{1,6})\s+(.+)", line)
             if heading_match:
                 level = min(len(heading_match.group(1)) + 3, 6)
-                lines.append(f"{'#' * level} {escape_text(heading_match.group(2))}")
+                lines.append(
+                    f"{'#' * level} {escape_text(heading_match.group(2))}"
+                )
             else:
                 lines.append(escape_text(line))
     return trim_blank_lines(lines)
@@ -2624,12 +3039,17 @@ def source_line(entry: DoxygenEntry) -> str:
     return f"_Source: `{entry.source}:{entry.line}`_"
 
 
-def render_param_table(params: list[dict[str, str]], include_direction: bool) -> list[str]:
+def render_param_table(
+    params: list[dict[str, str]], include_direction: bool
+) -> list[str]:
     headers = ["Name"]
     if include_direction:
         headers.append("Direction")
     headers.extend(["Type", "Description"])
-    lines = ["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |"]
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(["---"] * len(headers)) + " |",
+    ]
     for param in params:
         row = [f"`{escape_code(param.get('name', ''))}`"]
         if include_direction:
@@ -2637,7 +3057,9 @@ def render_param_table(params: list[dict[str, str]], include_direction: bool) ->
         row.append(f"`{escape_code(param.get('type', ''))}`")
         description = param.get("description", "")
         if param.get("default"):
-            description = f"{description} Default: `{param['default']}`.".strip()
+            description = (
+                f"{description} Default: `{param['default']}`.".strip()
+            )
         row.append(escape_text(description))
         lines.append("| " + " | ".join(row) + " |")
     return lines
@@ -2675,7 +3097,9 @@ def native_page_title(source: str) -> str:
 
 
 def humanize_slug(value: str) -> str:
-    return " ".join(word.capitalize() for word in re.split(r"[-_/]+", value) if word)
+    return " ".join(
+        word.capitalize() for word in re.split(r"[-_/]+", value) if word
+    )
 
 
 def java_slug(klass: JavaClass) -> str:
@@ -2717,7 +3141,9 @@ def update_depth(depth: dict[str, int], char: str) -> None:
 
 
 def escape_code(value: str) -> str:
-    return str(value).replace("|", "\\|").replace("`", "\\`").replace("\n", " ")
+    return (
+        str(value).replace("|", "\\|").replace("`", "\\`").replace("\n", " ")
+    )
 
 
 def escape_text(value: str) -> str:
@@ -2747,7 +3173,9 @@ def trim_blank_lines(lines: list[str]) -> list[str]:
 
 def write_page(path: Path, lines: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(trim_blank_lines(lines)).rstrip() + "\n", encoding="utf-8")
+    path.write_text(
+        "\n".join(trim_blank_lines(lines)).rstrip() + "\n", encoding="utf-8"
+    )
     print(f"Wrote {path.relative_to(REPO_DIR)}")
 
 
