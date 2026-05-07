@@ -34,8 +34,6 @@ _Source: `c/include/cuvs/neighbors/nn_descent.h:24`_
 
 Parameters used to build an nn-descent index
 
-`metric`: The distance metric to use `metric_arg`: The argument used by distance metrics like Minkowskidistance `graph_degree`: For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree) `intermediate_graph_degree`: Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree `max_iterations`: The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance `termination_threshold`: The delta at which nn-descent will terminate its iterations `return_distances`: Boolean to decide whether to return distances array `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision.
-
 ```c
 struct cuvsNNDescentIndexParams { ... };
 ```
@@ -44,14 +42,14 @@ struct cuvsNNDescentIndexParams { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) |  |
-| `metric_arg` | `float` |  |
-| `graph_degree` | `size_t` |  |
-| `intermediate_graph_degree` | `size_t` |  |
-| `max_iterations` | `size_t` |  |
-| `termination_threshold` | `float` |  |
-| `return_distances` | `bool` |  |
-| `dist_comp_dtype` | [`cuvsNNDescentDistCompDtype`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentdistcompdtype) |  |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | The distance metric to use |
+| `metric_arg` | `float` | The argument used by distance metrics like Minkowskidistance |
+| `graph_degree` | `size_t` | For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree) |
+| `intermediate_graph_degree` | `size_t` | Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree |
+| `max_iterations` | `size_t` | The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance |
+| `termination_threshold` | `float` | The delta at which nn-descent will terminate its iterations |
+| `return_distances` | `bool` | Boolean to decide whether to return distances array |
+| `dist_comp_dtype` | [`cuvsNNDescentDistCompDtype`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentdistcompdtype) | dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision. |
 
 _Source: `c/include/cuvs/neighbors/nn_descent.h:52`_
 

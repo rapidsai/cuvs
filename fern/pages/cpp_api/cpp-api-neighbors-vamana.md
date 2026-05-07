@@ -36,8 +36,6 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:34`_
 
 Parameters used to build DiskANN index
 
-`graph_degree`: Maximum degree of graph; corresponds to the R parameter of Vamana algorithm in the literature. `visited_size`: Maximum number of visited nodes per search during Vamana algorithm. Loosely corresponds to the L parameter in the literature. `vamana_iters`: The number of times all vectors are inserted into the graph. If &gt; 1, all vectors are re-inserted to improve graph quality. `max_fraction`: The maximum batch size is this fraction of the total dataset size. Larger gives faster build but lower graph quality. `alpha`: Used to determine how aggressive the pruning will be.
-
 ```cpp
 struct index_params : cuvs::neighbors::index_params { ... };
 ```
@@ -46,11 +44,11 @@ struct index_params : cuvs::neighbors::index_params { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `graph_degree` | `uint32_t` | Maximum degree of output graph corresponds to the R parameter in the original Vamana literature. |
-| `visited_size` | `uint32_t` | Maximum number of visited nodes per search corresponds to the L parameter in the Vamana literature * |
-| `vamana_iters` | `float` | Number of Vamana vector insertion iterations (each iteration inserts all vectors). |
-| `alpha` | `float` | Alpha for pruning parameter |
-| `max_fraction` | `float` | Maximum fraction of dataset inserted per batch.              * Larger max batch decreases graph quality, but improves speed |
+| `graph_degree` | `uint32_t` | Maximum degree of graph; corresponds to the R parameter of Vamana algorithm in the literature. |
+| `visited_size` | `uint32_t` | Maximum number of visited nodes per search during Vamana algorithm. Loosely corresponds to the L parameter in the literature. |
+| `vamana_iters` | `float` | The number of times all vectors are inserted into the graph. If &gt; 1, all vectors are re-inserted to improve graph quality. |
+| `alpha` | `float` | Used to determine how aggressive the pruning will be. |
+| `max_fraction` | `float` | The maximum batch size is this fraction of the total dataset size. Larger gives faster build but lower graph quality. |
 | `batch_base` | `float` | Base of growth rate of batch sizes * |
 | `queue_size` | `uint32_t` | Size of candidate queue structure - should be (2^x)-1 |
 | `reverse_batchsize` | `uint32_t` | Max batchsize of reverse edge processing (reduces memory footprint) |

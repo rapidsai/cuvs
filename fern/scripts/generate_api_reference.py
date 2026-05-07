@@ -74,7 +74,7 @@ COMMENT_RE = re.compile(r"/\*\*.*?\*/|(?:///[^\n]*(?:\n|$))+", re.DOTALL)
 DOXYGEN_COMMAND_RE = re.compile(r"[@\\](\w+)\b")
 DOXYGEN_LIST_ITEM_RE = re.compile(r"^(?:-\s+|\d+\.\s+)")
 DOXYGEN_FIELD_LIST_ITEM_RE = re.compile(
-    r"^-\s+`?(?P<name>[A-Za-z_]\w*)`?\s*:\s*(?P<description>.*)"
+    r"^(?:-\s+)?`?(?P<name>[A-Za-z_]\w*)`?\s*:\s*(?P<description>.*)"
 )
 PUBLIC_JAVA_TYPE_RE = re.compile(
     r"\bpublic\s+(?:abstract\s+|final\s+|sealed\s+|non-sealed\s+)?"
@@ -1935,8 +1935,10 @@ def extract_field_descriptions(
             while idx < len(details):
                 next_line = details[idx]
                 next_stripped = next_line.strip()
-                if not next_stripped or DOXYGEN_LIST_ITEM_RE.match(
-                    next_stripped
+                if (
+                    not next_stripped
+                    or DOXYGEN_LIST_ITEM_RE.match(next_stripped)
+                    or DOXYGEN_FIELD_LIST_ITEM_RE.match(next_stripped)
                 ):
                     break
                 description.append(next_stripped)
