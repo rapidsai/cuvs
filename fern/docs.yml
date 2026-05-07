@@ -29,7 +29,10 @@ navigation:
   - page: "Installation"
     path: "./pages/build.md"
   - section: "Getting Started"
-    path: "./pages/getting_started.md"
+    contents:
+      - page: "Overview"
+        path: "./pages/getting_started.md"
+  - section: "User Guide"
     contents:
       - section: "Working with ANN Indexes"
         path: "./pages/working_with_ann_indexes.md"
@@ -44,10 +47,6 @@ navigation:
             path: "./pages/working_with_ann_indexes_rust.md"
       - page: "Filtering vector indexes"
         path: "./pages/filtering.md"
-  - section: "User Guide"
-    contents:
-      - page: "Primer on vector search indexes"
-        path: "./pages/choosing_and_configuring_indexes.md"
   - section: "Integrations"
     path: "./pages/integrations.md"
     contents:
