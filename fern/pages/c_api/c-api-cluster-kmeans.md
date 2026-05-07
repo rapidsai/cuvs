@@ -25,8 +25,6 @@ typedef enum { ... } cuvsKMeansInitMethod;
 | `Random` | `1` |
 | `Array` | `2` |
 
-_Source: `c/include/cuvs/cluster/kmeans.h:22`_
-
 <a id="cuvskmeansparams"></a>
 ### cuvsKMeansParams
 
@@ -54,8 +52,6 @@ struct cuvsKMeansParams { ... };
 | `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch for the batched (host-data) API. When set to 0, defaults to n_samples (process all at once). |
 | `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) |  |
 
-_Source: `c/include/cuvs/cluster/kmeans.h:43`_
-
 <a id="cuvskmeansparamscreate"></a>
 ### cuvsKMeansParamsCreate
 
@@ -76,8 +72,6 @@ cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/cluster/kmeans.h:122`_
 
 <a id="cuvskmeansparamsdestroy"></a>
 ### cuvsKMeansParamsDestroy
@@ -100,8 +94,6 @@ cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/cluster/kmeans.h:130`_
-
 <a id="cuvskmeanstype"></a>
 ### cuvsKMeansType
 
@@ -117,8 +109,6 @@ typedef enum { ... } cuvsKMeansType;
 | --- | --- |
 | `CUVS_KMEANS_TYPE_KMEANS` | `0` |
 | `CUVS_KMEANS_TYPE_KMEANS_BALANCED` | `1` |
-
-_Source: `c/include/cuvs/cluster/kmeans.h:135`_
 
 ## k-means clustering APIs
 
@@ -157,8 +147,6 @@ X may reside on either host (CPU) or device (GPU) memory. When X is on the host 
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/cluster/kmeans.h:176`_
-
 <a id="cuvskmeanspredict"></a>
 ### cuvsKMeansPredict
 
@@ -192,8 +180,6 @@ double* inertia);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/cluster/kmeans.h:203`_
-
 <a id="cuvskmeansclustercost"></a>
 ### cuvsKMeansClusterCost
 
@@ -218,5 +204,3 @@ double* cost);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/cluster/kmeans.h:225`_

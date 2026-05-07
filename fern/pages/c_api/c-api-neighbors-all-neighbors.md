@@ -25,8 +25,6 @@ typedef enum { ... } cuvsAllNeighborsAlgo;
 | `CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ` | `1` |
 | `CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT` | `2` |
 
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:38`_
-
 <a id="cuvsallneighborsindexparams"></a>
 ### cuvsAllNeighborsIndexParams
 
@@ -46,8 +44,6 @@ struct cuvsAllNeighborsIndexParams { ... };
 | `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) |  |
 | `ivf_pq_params` | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) |  |
 | `nn_descent_params` | [`cuvsNNDescentIndexParams_t`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindexparams) |  |
-
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:47`_
 
 <a id="cuvsallneighborsindexparamscreate"></a>
 ### cuvsAllNeighborsIndexParamsCreate
@@ -70,8 +66,6 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:70`_
-
 <a id="cuvsallneighborsindexparamsdestroy"></a>
 ### cuvsAllNeighborsIndexParamsDestroy
 
@@ -92,8 +86,6 @@ cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t ind
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:79`_
 
 ## All-neighbors C-API build
 
@@ -129,5 +121,3 @@ resources The function automatically detects whether the dataset is host-residen
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:106`_

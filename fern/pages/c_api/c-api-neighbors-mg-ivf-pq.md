@@ -26,8 +26,6 @@ struct cuvsMultiGpuIvfPqIndexParams { ... };
 | `base_params` | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | Base IVF-PQ index parameters |
 | `mode` | [`cuvsMultiGpuDistributionMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpudistributionmode) | Distribution mode for multi-GPU setup |
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:28`_
-
 <a id="cuvsmultigpuivfpqindexparamscreate"></a>
 ### cuvsMultiGpuIvfPqIndexParamsCreate
 
@@ -49,8 +47,6 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(cuvsMultiGpuIvfPqIndexParams_t* i
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:43`_
-
 <a id="cuvsmultigpuivfpqindexparamsdestroy"></a>
 ### cuvsMultiGpuIvfPqIndexParamsDestroy
 
@@ -71,8 +67,6 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(cuvsMultiGpuIvfPqIndexParams_t i
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:51`_
 
 ## Multi-GPU IVF-PQ index search parameters
 
@@ -96,8 +90,6 @@ struct cuvsMultiGpuIvfPqSearchParams { ... };
 | `merge_mode` | [`cuvsMultiGpuShardedMergeMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpushardedmergemode) | Sharded merge mode |
 | `n_rows_per_batch` | `int64_t` | Number of rows per batch |
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:67`_
-
 <a id="cuvsmultigpuivfpqsearchparamscreate"></a>
 ### cuvsMultiGpuIvfPqSearchParamsCreate
 
@@ -118,8 +110,6 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t*
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:86`_
 
 <a id="cuvsmultigpuivfpqsearchparamsdestroy"></a>
 ### cuvsMultiGpuIvfPqSearchParamsDestroy
@@ -142,8 +132,6 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:94`_
-
 ## Multi-GPU IVF-PQ index
 
 <a id="cuvsmultigpuivfpqindex"></a>
@@ -163,8 +151,6 @@ typedef struct { ... } cuvsMultiGpuIvfPqIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:109`_
 
 <a id="cuvsmultigpuivfpqindexcreate"></a>
 ### cuvsMultiGpuIvfPqIndexCreate
@@ -187,8 +173,6 @@ cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:122`_
-
 <a id="cuvsmultigpuivfpqindexdestroy"></a>
 ### cuvsMultiGpuIvfPqIndexDestroy
 
@@ -209,8 +193,6 @@ cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:130`_
 
 ## Multi-GPU IVF-PQ index build
 
@@ -240,8 +222,6 @@ cuvsMultiGpuIvfPqIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:150`_
 
 ## Multi-GPU IVF-PQ index search
 
@@ -276,8 +256,6 @@ DLManagedTensor* distances_tensor);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:175`_
-
 ## Multi-GPU IVF-PQ index extend
 
 <a id="cuvsmultigpuivfpqextend"></a>
@@ -307,8 +285,6 @@ DLManagedTensor* new_indices_tensor);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:200`_
-
 ## Multi-GPU IVF-PQ index serialize
 
 <a id="cuvsmultigpuivfpqserialize"></a>
@@ -335,8 +311,6 @@ const char* filename);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:222`_
 
 ## Multi-GPU IVF-PQ index deserialize
 
@@ -365,8 +339,6 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:243`_
-
 ## Multi-GPU IVF-PQ index distribute
 
 <a id="cuvsmultigpuivfpqdistribute"></a>
@@ -393,5 +365,3 @@ cuvsMultiGpuIvfPqIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:264`_

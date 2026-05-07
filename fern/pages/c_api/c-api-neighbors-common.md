@@ -25,8 +25,6 @@ enum cuvsFilterType { ... };
 | `BITSET` | `1` |
 | `BITMAP` | `2` |
 
-_Source: `c/include/cuvs/neighbors/common.h:23`_
-
 <a id="cuvsfilter"></a>
 ### cuvsFilter
 
@@ -41,8 +39,6 @@ typedef struct { ... } cuvsFilter;
 | Name | Type | Description |
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
-
-_Source: `c/include/cuvs/neighbors/common.h:36`_
 
 ## Index Merge
 
@@ -61,5 +57,3 @@ typedef enum { ... } cuvsMergeStrategy;
 | --- | --- |
 | `MERGE_STRATEGY_PHYSICAL` | `0` |
 | `MERGE_STRATEGY_LOGICAL` | `1` |
-
-_Source: `c/include/cuvs/neighbors/common.h:54`_

@@ -25,5 +25,3 @@ struct index : cuvs::neighbors::index { ... };
 | `state` | `std::shared_ptr<detail::index_state<UpstreamT>>` |  |
 | `write_mutex` | `std::mutex` |  |
 | `ann_mutex` | `mutable std::shared_mutex` |  |
-
-_Source: `cpp/include/cuvs/neighbors/tiered_index.hpp:36`_

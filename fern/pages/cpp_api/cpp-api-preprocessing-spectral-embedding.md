@@ -30,8 +30,6 @@ struct params { ... };
 | `tolerance` | `float` | Tolerance for the eigenvalue solver. The tolerance for the eigenvalue solver. This is used to determine when to stop the eigenvalue solver. |
 | `seed` | `std::optional<uint64_t>` | Random seed for reproducibility. Controls the random number generation for k-NN graph construction and eigenvalue solver initialization. Use the same seed value to ensure reproducible results across runs. |
 
-_Source: `cpp/include/cuvs/preprocessing/spectral_embedding.hpp:25`_
-
 ## Spectral Embedding
 
 <a id="cuvs-preprocessing-spectral-embedding-transform"></a>
@@ -66,8 +64,6 @@ This function computes the spectral embedding of the input dataset by:
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/spectral_embedding.hpp:115`_
-
 **Additional overload:** `cuvs::preprocessing::spectral_embedding::transform`
 
 Perform spectral embedding using a precomputed connectivity graph
@@ -99,5 +95,3 @@ The function:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/spectral_embedding.hpp:167`_

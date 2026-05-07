@@ -24,8 +24,6 @@ enum cuvsPcaSolver { ... };
 | `CUVS_PCA_COV_EIG_DQ` | `0` |
 | `CUVS_PCA_COV_EIG_JACOBI` | `1` |
 
-_Source: `c/include/cuvs/preprocessing/pca.h:25`_
-
 <a id="cuvspcaparams"></a>
 ### cuvsPcaParams
 
@@ -45,8 +43,6 @@ struct cuvsPcaParams { ... };
 | `algorithm` | [`enum cuvsPcaSolver`](/api-reference/c-api-preprocessing-pca#cuvspcasolver) | Solver algorithm to use. |
 | `tol` | `float` | Tolerance for singular values (used by Jacobi solver). |
 | `n_iterations` | `int` | Number of iterations for the power method (Jacobi solver). |
-
-_Source: `c/include/cuvs/preprocessing/pca.h:35`_
 
 <a id="cuvspcaparamscreate"></a>
 ### cuvsPcaParamsCreate
@@ -69,8 +65,6 @@ cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/pca.h:70`_
-
 <a id="cuvspcaparamsdestroy"></a>
 ### cuvsPcaParamsDestroy
 
@@ -91,8 +85,6 @@ cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/preprocessing/pca.h:78`_
 
 <a id="cuvspcafit"></a>
 ### cuvsPcaFit
@@ -134,8 +126,6 @@ Computes the principal components, explained variances, singular values, and col
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/preprocessing/pca.h:128`_
 
 <a id="cuvspcafittransform"></a>
 ### cuvsPcaFitTransform
@@ -180,8 +170,6 @@ Computes the principal components and transforms the input data into the eigensp
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/pca.h:157`_
-
 <a id="cuvspcatransform"></a>
 ### cuvsPcaTransform
 
@@ -217,8 +205,6 @@ Transforms the input data into the eigenspace using previously computed principa
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/pca.h:183`_
-
 <a id="cuvspcainversetransform"></a>
 ### cuvsPcaInverseTransform
 
@@ -253,5 +239,3 @@ Transforms data from the eigenspace back to the original space.
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/preprocessing/pca.h:205`_

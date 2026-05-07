@@ -24,8 +24,6 @@ enum cuvsCagraGraphBuildAlgo { ... };
 | `AUTO_SELECT` | `0` |
 | `IVF_PQ` | `1` |
 
-_Source: `c/include/cuvs/neighbors/cagra.h:29`_
-
 <a id="cuvscagrahnswheuristictype"></a>
 ### cuvsCagraHnswHeuristicType
 
@@ -38,8 +36,6 @@ Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to constr
 ```c
 enum cuvsCagraHnswHeuristicType { ... };
 ```
-
-_Source: `c/include/cuvs/neighbors/cagra.h:54`_
 
 <a id="cuvscagracompressionparams"></a>
 ### cuvsCagraCompressionParams
@@ -60,8 +56,6 @@ struct cuvsCagraCompressionParams { ... };
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
 | `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). When zero, an optimal value is selected using a heuristic. |
 | `pq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (PQ phase). When zero, an optimal value is selected using a heuristic. |
-
-_Source: `c/include/cuvs/neighbors/cagra.h:82`_
 
 <a id="cuvsaceparams"></a>
 ### cuvsAceParams
@@ -89,8 +83,6 @@ struct cuvsAceParams { ... };
 | `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
 | `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
 
-_Source: `c/include/cuvs/neighbors/cagra.h:136`_
-
 <a id="cuvscagraindexparams"></a>
 ### cuvsCagraIndexParams
 
@@ -111,8 +103,6 @@ struct cuvsCagraIndexParams { ... };
 | `nn_descent_niter` | `size_t` | Number of Iterations to run if building with NN_DESCENT |
 | `compression` | [`cuvsCagraCompressionParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagracompressionparams) | Optional: specify compression parameters if compression is desired. NOTE: this is experimental new API, consider it unsafe. |
 | `graph_build_params` | `void*` | Optional: specify graph build params based on build_algo<br />- IVF_PQ: cuvsIvfPqParams_t<br />- ACE: cuvsAceParams_t<br />- Others: nullptr |
-
-_Source: `c/include/cuvs/neighbors/cagra.h:201`_
 
 <a id="cuvscagraindexparamscreate"></a>
 ### cuvsCagraIndexParamsCreate
@@ -135,8 +125,6 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:235`_
-
 <a id="cuvscagraindexparamsdestroy"></a>
 ### cuvsCagraIndexParamsDestroy
 
@@ -157,8 +145,6 @@ cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:243`_
 
 <a id="cuvscagracompressionparamscreate"></a>
 ### cuvsCagraCompressionParamsCreate
@@ -181,8 +167,6 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:251`_
-
 <a id="cuvscagracompressionparamsdestroy"></a>
 ### cuvsCagraCompressionParamsDestroy
 
@@ -203,8 +187,6 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:259`_
 
 <a id="cuvsaceparamscreate"></a>
 ### cuvsAceParamsCreate
@@ -227,8 +209,6 @@ cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:267`_
-
 <a id="cuvsaceparamsdestroy"></a>
 ### cuvsAceParamsDestroy
 
@@ -249,8 +229,6 @@ cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:275`_
 
 <a id="cuvscagraindexparamsfromhnswparams"></a>
 ### cuvsCagraIndexParamsFromHnswParams
@@ -287,8 +265,6 @@ This factory function creates CAGRA parameters that yield a graph compatible wit
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:292`_
-
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
 <a id="cuvscagraextendparams"></a>
@@ -305,8 +281,6 @@ struct cuvsCagraExtendParams { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `max_chunk_size` | `uint32_t` | The additional dataset is divided into chunks and added to the graph. This is the knob to adjust the tradeoff between the recall and operation throughput. Large chunk sizes can result in high throughput, but use more working memory (O(max_chunk_size*degree^2)). This can also degrade recall because no edges are added between the nodes in the same chunk. Auto select when 0. |
-
-_Source: `c/include/cuvs/neighbors/cagra.h:312`_
 
 <a id="cuvscagraextendparamscreate"></a>
 ### cuvsCagraExtendParamsCreate
@@ -329,8 +303,6 @@ cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:329`_
-
 <a id="cuvscagraextendparamsdestroy"></a>
 ### cuvsCagraExtendParamsDestroy
 
@@ -351,8 +323,6 @@ cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:337`_
 
 <a id="cuvscagraextend"></a>
 ### cuvsCagraExtend
@@ -388,8 +358,6 @@ cuvsCagraIndex_t index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:644`_
-
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
 <a id="cuvscagrasearchalgo"></a>
@@ -410,8 +378,6 @@ enum cuvsCagraSearchAlgo { ... };
 | `MULTI_KERNEL` | `2` |
 | `AUTO` | `100` |
 
-_Source: `c/include/cuvs/neighbors/cagra.h:352`_
-
 <a id="cuvscagrahashmode"></a>
 ### cuvsCagraHashMode
 
@@ -428,8 +394,6 @@ enum cuvsCagraHashMode { ... };
 | `HASH` | `0` |
 | `SMALL` | `1` |
 | `AUTO_HASH` | `100` |
-
-_Source: `c/include/cuvs/neighbors/cagra.h:365`_
 
 <a id="cuvscagrasearchparams"></a>
 ### cuvsCagraSearchParams
@@ -461,8 +425,6 @@ struct cuvsCagraSearchParams { ... };
 | `persistent_lifetime` | `float` | Persistent kernel: time in seconds before the kernel stops if no requests received. |
 | `persistent_device_usage` | `float` | Set the fraction of maximum grid size used by persistent kernel. Value 1.0 means the kernel grid size is maximum possible for the selected device. The value must be greater than 0.0 and not greater than 1.0. One may need to run other kernels alongside this persistent kernel. This parameter can be used to reduce the grid size of the persistent kernel to leave a few SMs idle. Note: running any other work on GPU alongside with the persistent kernel makes the setup fragile.<br />- Running another kernel in another thread usually works, but no progress guaranteed<br />- Any CUDA allocations block the context (this issue may be obscured by using pools)<br />- Memory copies to not-pinned host memory may block the context Even when we know there are no other kernels working at the same time, setting kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care. If you suspect this is an issue, you can reduce this number to ~0.9 without a significant impact on the throughput. |
 
-_Source: `c/include/cuvs/neighbors/cagra.h:371`_
-
 <a id="cuvscagrasearchparamscreate"></a>
 ### cuvsCagraSearchParamsCreate
 
@@ -483,8 +445,6 @@ cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:447`_
 
 <a id="cuvscagrasearchparamsdestroy"></a>
 ### cuvsCagraSearchParamsDestroy
@@ -507,8 +467,6 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:455`_
-
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
 <a id="cuvscagraindex"></a>
@@ -526,8 +484,6 @@ typedef struct { ... } cuvsCagraIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/cagra.h:470`_
 
 <a id="cuvscagraindexcreate"></a>
 ### cuvsCagraIndexCreate
@@ -550,8 +506,6 @@ cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 
 cagraError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:484`_
-
 <a id="cuvscagraindexdestroy"></a>
 ### cuvsCagraIndexDestroy
 
@@ -570,8 +524,6 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/cagra.h:491`_
 
 <a id="cuvscagraindexgetdims"></a>
 ### cuvsCagraIndexGetDims
@@ -595,8 +547,6 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:500`_
-
 <a id="cuvscagraindexgetsize"></a>
 ### cuvsCagraIndexGetSize
 
@@ -619,8 +569,6 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:509`_
-
 <a id="cuvscagraindexgetgraphdegree"></a>
 ### cuvsCagraIndexGetGraphDegree
 
@@ -642,8 +590,6 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:518`_
 
 <a id="cuvscagraindexgetdataset"></a>
 ### cuvsCagraIndexGetDataset
@@ -671,8 +617,6 @@ Note that the DLManagedTensor dataset returned will have an associated 'deleter'
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/cagra.h:539`_
-
 <a id="cuvscagraindexgetgraph"></a>
 ### cuvsCagraIndexGetGraph
 
@@ -698,8 +642,6 @@ Note that the DLManagedTensor graph returned will have an associated 'deleter' f
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:560`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -736,8 +678,6 @@ cuvsCagraIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/cagra.h:615`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -778,8 +718,6 @@ cuvsFilter filter);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/cagra.h:707`_
-
 ## CAGRA C-API serialize functions
 
 <a id="cuvscagraserialize"></a>
@@ -809,8 +747,6 @@ Experimental, both the API and the serialization format are subject to change.
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/cagra.h:745`_
-
 <a id="cuvscagraserializetohnswlib"></a>
 ### cuvsCagraSerializeToHnswlib
 
@@ -838,8 +774,6 @@ Experimental, both the API and the serialization format are subject to change.
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/cagra.h:774`_
-
 <a id="cuvscagradeserialize"></a>
 ### cuvsCagraDeserialize
 
@@ -862,8 +796,6 @@ Experimental, both the API and the serialization format are subject to change.
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/cagra.h:788`_
 
 <a id="cuvscagraindexfromargs"></a>
 ### cuvsCagraIndexFromArgs
@@ -891,8 +823,6 @@ cuvsCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/cagra.h:824`_
 
 ## CAGRA C-API merge functions
 
@@ -935,5 +865,3 @@ Example:
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/cagra.h:891`_

@@ -24,8 +24,6 @@ typedef enum { ... } cuvsError_t;
 | `CUVS_ERROR` | `0` |
 | `CUVS_SUCCESS` | `1` |
 
-_Source: `c/include/cuvs/core/c_api.h:25`_
-
 <a id="cuvsgetlasterrortext"></a>
 ### cuvsGetLastErrorText
 
@@ -40,8 +38,6 @@ NULL if the last function succeeded.
 **Returns**
 
 `const char*`
-
-_Source: `c/include/cuvs/core/c_api.h:30`_
 
 <a id="cuvssetlasterrortext"></a>
 ### cuvsSetLastErrorText
@@ -63,8 +59,6 @@ clears any previously seen error message.
 **Returns**
 
 `void`
-
-_Source: `c/include/cuvs/core/c_api.h:36`_
 
 ## cuVS Logging
 
@@ -89,8 +83,6 @@ typedef enum { ... } cuvsLogLevel_t;
 | `CUVS_LOG_LEVEL_CRITICAL` | `5` |
 | `CUVS_LOG_LEVEL_OFF` | `6` |
 
-_Source: `c/include/cuvs/core/c_api.h:49`_
-
 <a id="cuvsgetloglevel"></a>
 ### cuvsGetLogLevel
 
@@ -103,8 +95,6 @@ cuvsLogLevel_t cuvsGetLogLevel();
 **Returns**
 
 [`cuvsLogLevel_t`](/api-reference/c-api-core-c-api#cuvsloglevel-t)
-
-_Source: `c/include/cuvs/core/c_api.h:61`_
 
 <a id="cuvssetloglevel"></a>
 ### cuvsSetLogLevel
@@ -125,8 +115,6 @@ void cuvsSetLogLevel(cuvsLogLevel_t);
 
 `void`
 
-_Source: `c/include/cuvs/core/c_api.h:65`_
-
 ## cuVS Resources Handle
 
 <a id="cuvsresources-t"></a>
@@ -137,8 +125,6 @@ An opaque C handle for C++ type `raft::resources`
 ```c
 typedef uintptr_t cuvsResources_t;
 ```
-
-_Source: `c/include/cuvs/core/c_api.h:78`_
 
 <a id="cuvsresourcescreate"></a>
 ### cuvsResourcesCreate
@@ -161,8 +147,6 @@ cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:86`_
-
 <a id="cuvsresourcesdestroy"></a>
 ### cuvsResourcesDestroy
 
@@ -183,8 +167,6 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:94`_
 
 <a id="cuvsstreamset"></a>
 ### cuvsStreamSet
@@ -210,8 +192,6 @@ that accept a cuvsResources_t handle
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:104`_
-
 <a id="cuvsstreamget"></a>
 ### cuvsStreamGet
 
@@ -234,8 +214,6 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:113`_
-
 <a id="cuvsstreamsync"></a>
 ### cuvsStreamSync
 
@@ -256,8 +234,6 @@ cuvsError_t cuvsStreamSync(cuvsResources_t res);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:121`_
 
 <a id="cuvsdeviceidget"></a>
 ### cuvsDeviceIdGet
@@ -281,8 +257,6 @@ cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:130`_
-
 <a id="cuvsmultigpuresourcescreate"></a>
 ### cuvsMultiGpuResourcesCreate
 
@@ -305,8 +279,6 @@ for multi-GPU operations
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:139`_
 
 <a id="cuvsmultigpuresourcescreatewithdeviceids"></a>
 ### cuvsMultiGpuResourcesCreateWithDeviceIds
@@ -333,8 +305,6 @@ for multi-GPU operations with specific device IDs
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:149`_
-
 <a id="cuvsmultigpuresourcesdestroy"></a>
 ### cuvsMultiGpuResourcesDestroy
 
@@ -355,8 +325,6 @@ cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:158`_
 
 <a id="cuvsmultigpuresourcessetmemorypool"></a>
 ### cuvsMultiGpuResourcesSetMemoryPool
@@ -379,8 +347,6 @@ cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:167`_
 
 ## cuVS Memory Allocation
 
@@ -407,8 +373,6 @@ cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:184`_
-
 <a id="cuvsrmmfree"></a>
 ### cuvsRMMFree
 
@@ -431,8 +395,6 @@ cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:194`_
 
 <a id="cuvsrmmpoolmemoryresourceenable"></a>
 ### cuvsRMMPoolMemoryResourceEnable
@@ -463,8 +425,6 @@ available memory available memory
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:210`_
-
 <a id="cuvsrmmmemoryresourcereset"></a>
 ### cuvsRMMMemoryResourceReset
 
@@ -479,8 +439,6 @@ cuvsError_t cuvsRMMMemoryResourceReset();
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:217`_
 
 <a id="cuvsrmmhostalloc"></a>
 ### cuvsRMMHostAlloc
@@ -504,8 +462,6 @@ cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:225`_
-
 <a id="cuvsrmmhostfree"></a>
 ### cuvsRMMHostFree
 
@@ -527,8 +483,6 @@ cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:233`_
 
 <a id="cuvsversionget"></a>
 ### cuvsVersionGet
@@ -552,8 +506,6 @@ cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/core/c_api.h:242`_
 
 <a id="cuvsmatrixcopy"></a>
 ### cuvsMatrixCopy
@@ -580,8 +532,6 @@ Both src and dst must have the same shape and dtype, but can have different stri
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/core/c_api.h:259`_
-
 <a id="cuvsmatrixslicerows"></a>
 ### cuvsMatrixSliceRows
 
@@ -605,5 +555,3 @@ cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManaged
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/core/c_api.h:270`_

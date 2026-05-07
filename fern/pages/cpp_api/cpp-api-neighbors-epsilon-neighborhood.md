@@ -51,5 +51,3 @@ Currently, only L2Unexpanded (L2-squared) distance metric is supported. Other me
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/epsilon_neighborhood.hpp:58`_

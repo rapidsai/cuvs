@@ -48,8 +48,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/selection/select_k.hpp:68`_
-
 **Additional overload:** `cuvs::selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
@@ -89,8 +87,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/selection/select_k.hpp:133`_
-
 **Additional overload:** `cuvs::selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
@@ -129,5 +125,3 @@ Example usage
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/selection/select_k.hpp:188`_

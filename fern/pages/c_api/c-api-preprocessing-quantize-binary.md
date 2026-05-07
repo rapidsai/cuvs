@@ -27,8 +27,6 @@ enum cuvsBinaryQuantizerThreshold { ... };
 | `MEAN` | `1` |
 | `SAMPLING_MEDIAN` | `2` |
 
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:26`_
-
 <a id="cuvsbinaryquantizerparams"></a>
 ### cuvsBinaryQuantizerParams
 
@@ -44,8 +42,6 @@ struct cuvsBinaryQuantizerParams { ... };
 | --- | --- | --- |
 | `threshold` | [`/* * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform */ enum cuvsBinaryQuantizerThreshold`](/api-reference/c-api-preprocessing-quantize-binary#cuvsbinaryquantizerthreshold) |  |
 | `sampling_ratio` | `/* * specifies the sampling ratio */ float` |  |
-
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:35`_
 
 <a id="cuvsbinaryquantizerparamscreate"></a>
 ### cuvsBinaryQuantizerParamsCreate
@@ -68,8 +64,6 @@ cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:55`_
-
 <a id="cuvsbinaryquantizerparamsdestroy"></a>
 ### cuvsBinaryQuantizerParamsDestroy
 
@@ -91,8 +85,6 @@ cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:63`_
-
 <a id="cuvsbinaryquantizer"></a>
 ### cuvsBinaryQuantizer
 
@@ -110,8 +102,6 @@ typedef struct { ... } cuvsBinaryQuantizer;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:71`_
 
 <a id="cuvsbinaryquantizercreate"></a>
 ### cuvsBinaryQuantizerCreate
@@ -134,8 +124,6 @@ cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:84`_
-
 <a id="cuvsbinaryquantizerdestroy"></a>
 ### cuvsBinaryQuantizerDestroy
 
@@ -156,8 +144,6 @@ cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:92`_
 
 <a id="cuvsbinaryquantizertrain"></a>
 ### cuvsBinaryQuantizerTrain
@@ -184,8 +170,6 @@ cuvsBinaryQuantizer_t quantizer);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:102`_
-
 <a id="cuvsbinaryquantizertransform"></a>
 ### cuvsBinaryQuantizerTransform
 
@@ -210,8 +194,6 @@ This applies binary quantization to a dataset, changing any positive values to a
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:118`_
 
 <a id="cuvsbinaryquantizertransformwithparams"></a>
 ### cuvsBinaryQuantizerTransformWithParams
@@ -239,5 +221,3 @@ This applies binary quantization to a dataset, changing any values that are larg
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/preprocessing/quantize/binary.h:134`_

@@ -26,8 +26,6 @@ struct index_params : cuvs::neighbors::index_params { ... };
 | `n_queues` | `size_t` | The number of independent request queues. Each queue is associated with a unique CUDA stream and IO device buffers. If the number of concurrent requests is high, using multiple queues allows to fill-in data and prepare the batch while the other queue is busy. Moreover, the queues are submitted concurrently; this allows to better utilize the GPU by hiding the kernel launch latencies, which helps to improve the throughput. |
 | `conservative_dispatch` | `bool` | By default (`conservative_dispatch = false`) the first CPU thread to commit a query to a batch dispatches the upstream search function as soon as possible (before the batch is full). In that case, it does not know the final batch size at the time of calling the upstream search and thus runs the upstream search with the maximum batch size every time, even if only one valid query is present in the batch. This reduces the latency at the cost of wasted GPU resources. The alternative behavaior (`conservative_dispatch = true`) is more conservative: the dispatcher thread starts the kernel that gathers input queries, but waits till the batch is full or the waiting time is exceeded. Only then it acquires the actual batch size and launches the upstream search. As a result, less GPU resources are wasted at the cost of exposing upstream search latency. *Rule of Thumb*: for a large `max_batch_size` set `conservative_dispatch = true`, otherwise keep it disabled. |
 
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:21`_
-
 ## Dynamic Batching search parameters
 
 <a id="cuvs-neighbors-dynamic-batching-search-params"></a>
@@ -44,8 +42,6 @@ struct search_params : cuvs::neighbors::search_params { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `dispatch_timeout_ms` | `double` | How long a request can stay in the queue (milliseconds). Note, this only affects the dispatch time and does not reflect full request latency; the latter depends on the upstream search parameters and the batch size. |
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:60`_
 
 ## Dynamic Batching index type
 
@@ -74,8 +70,6 @@ struct index : cuvs::neighbors::index { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `runner` | `std::shared_ptr<detail::batch_runner<T, IdxT>>` |  |
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:155`_
 
 <a id="cuvs-neighbors-dynamic-batching-index-index"></a>
 ### cuvs::neighbors::dynamic_batching::index::index
@@ -110,8 +104,6 @@ const cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:174`_
 
 ## Dynamic Batching search
 
@@ -150,8 +142,6 @@ Dynamic batching search is thread-safe: call the search function with copies of 
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:214`_
-
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
 ```cpp
@@ -177,8 +167,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:222`_
 
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
@@ -206,8 +194,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:230`_
-
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
 ```cpp
@@ -233,8 +219,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:238`_
 
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
@@ -262,8 +246,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:246`_
-
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
 ```cpp
@@ -289,8 +271,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:254`_
 
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
@@ -318,8 +298,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:262`_
-
 **Additional overload:** `cuvs::neighbors::dynamic_batching::search`
 
 ```cpp
@@ -345,5 +323,3 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:270`_

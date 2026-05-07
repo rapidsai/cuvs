@@ -30,8 +30,6 @@ struct params { ... };
 | `tol` | `float` | Tolerance for singular values computed by svd_solver == 'arpack' or the Jacobi solver. |
 | `n_iterations` | `int` | Number of iterations for the power method computed by the Jacobi solver. |
 
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:20`_
-
 ## PCA (Principal Component Analysis)
 
 <a id="cuvs-preprocessing-pca-fit"></a>
@@ -72,8 +70,6 @@ Computes the principal components, explained variances, singular values, and col
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:99`_
 
 <a id="cuvs-preprocessing-pca-fit-transform"></a>
 ### cuvs::preprocessing::pca::fit_transform
@@ -116,8 +112,6 @@ Computes the principal components and transforms the input data into the eigensp
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:128`_
-
 <a id="cuvs-preprocessing-pca-transform"></a>
 ### cuvs::preprocessing::pca::transform
 
@@ -153,8 +147,6 @@ Transforms the input data into the eigenspace using previously computed principa
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:154`_
-
 <a id="cuvs-preprocessing-pca-inverse-transform"></a>
 ### cuvs::preprocessing::pca::inverse_transform
 
@@ -187,5 +179,3 @@ Transforms data from the eigenspace back to the original space.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:175`_

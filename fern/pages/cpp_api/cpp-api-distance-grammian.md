@@ -25,8 +25,6 @@ template <typename math_t>
 class GramMatrixBase { ... };
 ```
 
-_Source: `cpp/include/cuvs/distance/grammian.hpp:36`_
-
 <a id="cuvs-distance-kernels-polynomialkernel"></a>
 ### cuvs::distance::kernels::PolynomialKernel
 
@@ -36,8 +34,6 @@ Create a kernel matrix using polynomial kernel function.
 template <typename math_t, typename exp_t>
 class PolynomialKernel : public GramMatrixBase<math_t> { ... };
 ```
-
-_Source: `cpp/include/cuvs/distance/grammian.hpp:301`_
 
 <a id="cuvs-distance-kernels-tanhkernel"></a>
 ### cuvs::distance::kernels::TanhKernel
@@ -49,8 +45,6 @@ template <typename math_t>
 class TanhKernel : public GramMatrixBase<math_t> { ... };
 ```
 
-_Source: `cpp/include/cuvs/distance/grammian.hpp:419`_
-
 <a id="cuvs-distance-kernels-rbfkernel"></a>
 ### cuvs::distance::kernels::RBFKernel
 
@@ -60,5 +54,3 @@ Create a kernel matrix using RBF kernel function.
 template <typename math_t>
 class RBFKernel : public GramMatrixBase<math_t> { ... };
 ```
-
-_Source: `cpp/include/cuvs/distance/grammian.hpp:532`_

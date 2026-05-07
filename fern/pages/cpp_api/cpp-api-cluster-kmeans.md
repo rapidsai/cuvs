@@ -23,8 +23,6 @@ struct base_params { ... };
 | --- | --- | --- |
 | `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Metric to use for distance computation. The supported metrics can vary per algorithm. |
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:19`_
-
 ## k-means hyperparameters
 
 <a id="cuvs-cluster-kmeans-params"></a>
@@ -53,8 +51,6 @@ struct params : base_params { ... };
 | `inertia_check` | `bool` | If true, check inertia during iterations for early convergence. |
 | `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. When set to 0, defaults to n_samples (process all at once). Only used by the batched (host-data) code path and ignored by device-data overloads. Default: 0 (process all data at once). |
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:34`_
-
 <a id="cuvs-cluster-kmeans-balanced-params"></a>
 ### cuvs::cluster::kmeans::balanced_params
 
@@ -77,8 +73,6 @@ struct balanced_params : base_params { ... };
 | --- | --- | --- |
 | `n_iters` | `uint32_t` | Number of training iterations |
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:139`_
-
 <a id="cuvs-cluster-kmeans-kmeans-type"></a>
 ### cuvs::cluster::kmeans::kmeans_type
 
@@ -94,8 +88,6 @@ enum class kmeans_type { ... };
 | --- | --- |
 | `KMeans` | `0` |
 | `KMeansBalanced` | `1` |
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:149`_
 
 ## k-means clustering APIs
 
@@ -134,8 +126,6 @@ This overload supports out-of-core computation where the dataset resides on the 
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:217`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm using batched processing of host data.
@@ -165,8 +155,6 @@ raft::host_scalar_view<int64_t> n_iter);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:228`_
 
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
@@ -200,8 +188,6 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:278`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
@@ -233,8 +219,6 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:329`_
 
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
@@ -268,8 +252,6 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:379`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
@@ -301,8 +283,6 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:430`_
 
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
@@ -336,8 +316,6 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:480`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
@@ -363,8 +341,6 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:520`_
 
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
@@ -392,8 +368,6 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:557`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
@@ -420,8 +394,6 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:594`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
@@ -447,8 +419,6 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:631`_
 
 <a id="cuvs-cluster-kmeans-predict"></a>
 ### cuvs::cluster::kmeans::predict
@@ -483,8 +453,6 @@ raft::host_scalar_view<float> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:686`_
-
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
@@ -516,8 +484,6 @@ raft::host_scalar_view<float> inertia);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:753`_
 
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
@@ -551,8 +517,6 @@ raft::host_scalar_view<double> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:811`_
-
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
@@ -585,8 +549,6 @@ raft::host_scalar_view<double> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:869`_
-
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
@@ -612,8 +574,6 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:916`_
 
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
@@ -641,8 +601,6 @@ raft::device_vector_view<int, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:960`_
-
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
@@ -669,8 +627,6 @@ raft::device_vector_view<int, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1004`_
-
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
@@ -696,8 +652,6 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1048`_
 
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
@@ -725,8 +679,6 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1092`_
-
 **Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
@@ -752,8 +704,6 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1136`_
 
 <a id="cuvs-cluster-kmeans-fit-predict"></a>
 ### cuvs::cluster::kmeans::fit_predict
@@ -790,8 +740,6 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1188`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute k-means clustering and predicts cluster index for each sample
@@ -825,8 +773,6 @@ in the input.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1243`_
 
 **Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
@@ -862,8 +808,6 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1298`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute k-means clustering and predicts cluster index for each sample
@@ -898,8 +842,6 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1353`_
-
 **Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute balanced k-means clustering and predicts cluster index for each sample
@@ -927,8 +869,6 @@ in the input.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1400`_
 
 **Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
@@ -958,8 +898,6 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1444`_
-
 <a id="cuvs-cluster-kmeans-transform"></a>
 ### cuvs::cluster::kmeans::transform
 
@@ -987,8 +925,6 @@ raft::device_matrix_view<float, int> X_new);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1463`_
-
 **Additional overload:** `cuvs::cluster::kmeans::transform`
 
 Transform X to a cluster-distance space.
@@ -1014,8 +950,6 @@ raft::device_matrix_view<double, int> X_new);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1482`_
 
 <a id="cuvs-cluster-kmeans-cluster-cost"></a>
 ### cuvs::cluster::kmeans::cluster_cost
@@ -1045,8 +979,6 @@ std::optional<raft::device_vector_view<const float, int>> sample_weight = std::n
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1503`_
-
 **Additional overload:** `cuvs::cluster::kmeans::cluster_cost`
 
 Compute cluster cost
@@ -1073,8 +1005,6 @@ std::optional<raft::device_vector_view<const double, int>> sample_weight = std::
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1524`_
 
 **Additional overload:** `cuvs::cluster::kmeans::cluster_cost`
 
@@ -1103,8 +1033,6 @@ std::optional<raft::device_vector_view<const float, int64_t>> sample_weight = st
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1545`_
-
 **Additional overload:** `cuvs::cluster::kmeans::cluster_cost`
 
 Compute (optionally weighted) cluster cost
@@ -1131,8 +1059,6 @@ std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = s
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1566`_
 
 ## k-means API helpers
 
@@ -1172,5 +1098,3 @@ This method maximizes the Calinski-Harabasz Index while minimizing the per-clust
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1619`_

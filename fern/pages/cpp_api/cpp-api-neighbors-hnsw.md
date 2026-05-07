@@ -25,8 +25,6 @@ enum class HnswHierarchy { ... };
 | --- | --- |
 | `NONE` | `` |
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:40`_
-
 <a id="cuvs-neighbors-hnsw-deprecated"></a>
 ### cuvs::neighbors::hnsw::[[deprecated
 
@@ -57,8 +55,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:114`_
-
 ## hnswlib index wrapper
 
 <a id="cuvs-neighbors-hnsw-index"></a>
@@ -70,8 +66,6 @@ hnswlib index wrapper
 template <typename T>
 struct index : cuvs::neighbors::index { ... };
 ```
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:130`_
 
 <a id="cuvs-neighbors-hnsw-index-index"></a>
 ### cuvs::neighbors::hnsw::index::index
@@ -97,8 +91,6 @@ This is a virtual class and it cannot be used directly. To create an index, use 
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:143`_
-
 <a id="cuvs-neighbors-hnsw-index-get-index"></a>
 ### cuvs::neighbors::hnsw::index::get_index
 
@@ -111,8 +103,6 @@ virtual void const* get_index() const = 0;
 **Returns**
 
 `virtual void const*`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:153`_
 
 <a id="cuvs-neighbors-hnsw-index-set-ef"></a>
 ### cuvs::neighbors::hnsw::index::set_ef
@@ -133,8 +123,6 @@ virtual void set_ef(int ef) const = 0;
 
 `virtual void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:164`_
-
 <a id="cuvs-neighbors-hnsw-index-file-path"></a>
 ### cuvs::neighbors::hnsw::index::file_path
 
@@ -147,8 +135,6 @@ virtual std::string file_path() const;
 **Returns**
 
 `virtual std::string`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:169`_
 
 ## HNSW index extend parameters
 
@@ -166,8 +152,6 @@ struct extend_params { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `num_threads` | `int` | Number of host threads to use to add additional vectors to the index. Value of 0 automatically maximizes parallelism. |
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:186`_
 
 ## Build HNSW index on the GPU
 
@@ -203,8 +187,6 @@ Usage example:
 
 [`std::unique_ptr<index<float>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:254`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
@@ -235,8 +217,6 @@ Usage example:
 **Returns**
 
 [`std::unique_ptr<index<half>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:312`_
 
 **Additional overload:** `cuvs::neighbors::hnsw::build`
 
@@ -269,8 +249,6 @@ Usage example:
 
 [`std::unique_ptr<index<uint8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:370`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
@@ -301,8 +279,6 @@ Usage example:
 **Returns**
 
 [`std::unique_ptr<index<int8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:428`_
 
 ## Load CAGRA index as hnswlib index
 
@@ -340,8 +316,6 @@ Usage example:
 
 [`std::unique_ptr<index<float>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:471`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
@@ -374,8 +348,6 @@ Usage example:
 **Returns**
 
 [`std::unique_ptr<index<half>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:507`_
 
 **Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
 
@@ -410,8 +382,6 @@ Usage example:
 
 [`std::unique_ptr<index<uint8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:543`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
@@ -445,8 +415,6 @@ Usage example:
 
 [`std::unique_ptr<index<int8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:579`_
-
 ## Extend HNSW index with additional vectors
 
 <a id="cuvs-neighbors-hnsw-extend"></a>
@@ -478,8 +446,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:624`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
@@ -507,8 +473,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:658`_
 
 **Additional overload:** `cuvs::neighbors::hnsw::extend`
 
@@ -538,8 +502,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:692`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
@@ -568,8 +530,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:726`_
-
 ## Build CAGRA index and search with hnswlib
 
 <a id="cuvs-neighbors-hnsw-search-params"></a>
@@ -587,8 +547,6 @@ struct search_params : cuvs::neighbors::search_params { ... };
 | --- | --- | --- |
 | `ef` | `int` |  |
 | `num_threads` | `int` |  |
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:740`_
 
 ## Search hnswlib index
 
@@ -627,8 +585,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:794`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::search`
 
 Search HNSW index constructed from a CAGRA index
@@ -662,8 +618,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:838`_
 
 **Additional overload:** `cuvs::neighbors::hnsw::search`
 
@@ -699,8 +653,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:882`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::search`
 
 Search HNSW index constructed from a CAGRA index
@@ -735,8 +687,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:926`_
-
 ## Deserialize CAGRA index as hnswlib index
 
 <a id="cuvs-neighbors-hnsw-serialize"></a>
@@ -764,8 +714,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:969`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
@@ -789,8 +737,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:998`_
 
 **Additional overload:** `cuvs::neighbors::hnsw::serialize`
 
@@ -816,8 +762,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1027`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
@@ -841,8 +785,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1056`_
 
 <a id="cuvs-neighbors-hnsw-deserialize"></a>
 ### cuvs::neighbors::hnsw::deserialize
@@ -877,8 +819,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1094`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
@@ -910,8 +850,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1137`_
 
 **Additional overload:** `cuvs::neighbors::hnsw::deserialize`
 
@@ -945,8 +883,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1180`_
-
 **Additional overload:** `cuvs::neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
@@ -978,5 +914,3 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1223`_

@@ -17,8 +17,6 @@ Scalar quantizer parameters.
 struct cuvsScalarQuantizerParams { ... };
 ```
 
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:23`_
-
 <a id="cuvsscalarquantizerparamscreate"></a>
 ### cuvsScalarQuantizerParamsCreate
 
@@ -39,8 +37,6 @@ cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params)
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:39`_
 
 <a id="cuvsscalarquantizerparamsdestroy"></a>
 ### cuvsScalarQuantizerParamsDestroy
@@ -63,8 +59,6 @@ cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:47`_
-
 <a id="cuvsscalarquantizer"></a>
 ### cuvsScalarQuantizer
 
@@ -82,8 +76,6 @@ typedef struct { ... } cuvsScalarQuantizer;
 | --- | --- | --- |
 | `min_` | `double` |  |
 | `max_` | `double` |  |
-
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:55`_
 
 <a id="cuvsscalarquantizercreate"></a>
 ### cuvsScalarQuantizerCreate
@@ -106,8 +98,6 @@ cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:68`_
-
 <a id="cuvsscalarquantizerdestroy"></a>
 ### cuvsScalarQuantizerDestroy
 
@@ -128,8 +118,6 @@ cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:76`_
 
 <a id="cuvsscalarquantizertrain"></a>
 ### cuvsScalarQuantizerTrain
@@ -156,8 +144,6 @@ cuvsScalarQuantizer_t quantizer);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:86`_
-
 <a id="cuvsscalarquantizertransform"></a>
 ### cuvsScalarQuantizerTransform
 
@@ -182,8 +168,6 @@ DLManagedTensor* out);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:99`_
 
 <a id="cuvsscalarquantizerinversetransform"></a>
 ### cuvsScalarQuantizerInverseTransform
@@ -211,5 +195,3 @@ Note that depending on the chosen data types train dataset the conversion is not
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:116`_

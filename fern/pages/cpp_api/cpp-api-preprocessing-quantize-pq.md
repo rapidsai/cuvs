@@ -18,8 +18,6 @@ using kmeans_params_variant =
 std::variant<cuvs::cluster::kmeans::balanced_params, cuvs::cluster::kmeans::params>;
 ```
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:24`_
-
 <a id="cuvs-preprocessing-quantize-pq-params"></a>
 ### cuvs::preprocessing::quantize::pq::params
 
@@ -41,8 +39,6 @@ struct params { ... };
 | `kmeans_params` | [`kmeans_params_variant`](/api-reference/cpp-api-preprocessing-quantize-pq#kmeans-params-variant) | K-means parameters for PQ codebook training. Set to cuvs::cluster::kmeans::balanced_params for balanced k-means (default), or cuvs::cluster::kmeans::params for regular k-means. The active variant type selects the algorithm; balanced k-means tends to be faster for PQ training where cluster sizes are approximately equal. Only L2Expanded metric is supported. The number of clusters is always set to 1 &lt;&lt; pq_bits. |
 | `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. We will use `pq_n_centers * max_train_points_per_pq_code` training points to train each PQ codebook. |
 | `max_train_points_per_vq_cluster` | `uint32_t` | The max number of data points to use per VQ cluster during training. |
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:30`_
 
 <a id="cuvs-preprocessing-quantize-pq-params-params"></a>
 ### cuvs::preprocessing::quantize::pq::params::params
@@ -81,8 +77,6 @@ uint32_t max_train_points_per_vq_cluster = 1024)
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:34`_
-
 <a id="cuvs-preprocessing-quantize-pq-quantizer"></a>
 ### cuvs::preprocessing::quantize::pq::quantizer
 
@@ -99,8 +93,6 @@ struct quantizer { ... };
 | --- | --- | --- |
 | `params_quantizer` | [`params`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-params) | Parameters used to build this quantizer. |
 | `vpq_codebooks` | [`cuvs::neighbors::vpq_dataset<T, int64_t>`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-vpq-dataset) | VPQ codebooks produced during training. |
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:141`_
 
 <a id="cuvs-preprocessing-quantize-pq-build"></a>
 ### cuvs::preprocessing::quantize::pq::build
@@ -131,8 +123,6 @@ Usage example:
 
 quantizer
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:169`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::pq::build`
 
 ```cpp
@@ -152,8 +142,6 @@ raft::host_matrix_view<const float, int64_t> dataset);
 **Returns**
 
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer)
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:174`_
 
 <a id="cuvs-preprocessing-quantize-pq-transform"></a>
 ### cuvs::preprocessing::quantize::pq::transform
@@ -186,8 +174,6 @@ used, optional
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:201`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::pq::transform`
 
 ```cpp
@@ -212,8 +198,6 @@ std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::null
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:208`_
-
 <a id="cuvs-preprocessing-quantize-pq-get-quantized-dim"></a>
 ### cuvs::preprocessing::quantize::pq::get_quantized_dim
 
@@ -234,8 +218,6 @@ inline int64_t get_quantized_dim(const params& config);
 `inline int64_t`
 
 the dimension of the quantized dataset
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:220`_
 
 <a id="cuvs-preprocessing-quantize-pq-inverse-transform"></a>
 ### cuvs::preprocessing::quantize::pq::inverse_transform
@@ -264,5 +246,3 @@ std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:235`_

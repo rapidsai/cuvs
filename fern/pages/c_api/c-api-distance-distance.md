@@ -41,5 +41,3 @@ typedef enum { ... } cuvsDistanceType;
 | `DiceExpanded` | `19` |
 | `BitwiseHamming` | `20` |
 | `Precomputed` | `100` |
-
-_Source: `c/include/cuvs/distance/distance.h:12`_

@@ -25,8 +25,6 @@ typedef enum { ... } cuvsTieredIndexANNAlgo;
 | `CUVS_TIERED_INDEX_ALGO_IVF_FLAT` | `1` |
 | `CUVS_TIERED_INDEX_ALGO_IVF_PQ` | `2` |
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:24`_
-
 ## Tiered Index
 
 <a id="cuvstieredindex"></a>
@@ -47,8 +45,6 @@ typedef struct { ... } cuvsTieredIndex;
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
 | `algo` | [`cuvsTieredIndexANNAlgo`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexannalgo) |  |
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:39`_
 
 <a id="cuvstieredindexcreate"></a>
 ### cuvsTieredIndexCreate
@@ -71,8 +67,6 @@ cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:53`_
-
 <a id="cuvstieredindexdestroy"></a>
 ### cuvsTieredIndexDestroy
 
@@ -91,8 +85,6 @@ cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:60`_
 
 ## Tiered Index build parameters
 
@@ -117,8 +109,6 @@ struct cuvsTieredIndexParams { ... };
 | `ivf_flat_params` | [`cuvsIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) | Optional parameters for building a ivf_flat index |
 | `ivf_pq_params` | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | Optional parameters for building a ivf-pq index |
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:72`_
-
 <a id="cuvstieredindexparamscreate"></a>
 ### cuvsTieredIndexParamsCreate
 
@@ -140,8 +130,6 @@ cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* index_params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:105`_
-
 <a id="cuvstieredindexparamsdestroy"></a>
 ### cuvsTieredIndexParamsDestroy
 
@@ -162,8 +150,6 @@ cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:113`_
 
 ## Tiered index build
 
@@ -198,8 +184,6 @@ cuvsTieredIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:162`_
 
 ## Tiered index search
 
@@ -236,8 +220,6 @@ cuvsCagraSearchParams_t, cuvsIvfFlatSearchParams_t, cuvsIvfPqSearchParams_t depe
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:212`_
-
 ## Tiered index extend
 
 <a id="cuvstieredindexextend"></a>
@@ -264,8 +246,6 @@ cuvsTieredIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:235`_
 
 ## Tiered index merge
 
@@ -297,5 +277,3 @@ cuvsTieredIndex_t output_index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:256`_

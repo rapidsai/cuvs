@@ -26,8 +26,6 @@ enum cuvsHnswHierarchy { ... };
 | `CPU` | `1` |
 | `GPU` | `2` |
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:30`_
-
 <a id="cuvshnswaceparams"></a>
 ### cuvsHnswAceParams
 
@@ -53,8 +51,6 @@ struct cuvsHnswAceParams { ... };
 | `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. Useful for testing or when running alongside other memory-intensive processes. |
 | `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. Useful for testing or when running alongside other memory-intensive processes. |
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:46`_
-
 <a id="cuvshnswaceparamscreate"></a>
 ### cuvsHnswAceParamsCreate
 
@@ -75,8 +71,6 @@ cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:97`_
 
 <a id="cuvshnswaceparamsdestroy"></a>
 ### cuvsHnswAceParamsDestroy
@@ -99,8 +93,6 @@ cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:105`_
-
 <a id="cuvshnswindexparamscreate"></a>
 ### cuvsHnswIndexParamsCreate
 
@@ -121,8 +113,6 @@ cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:141`_
 
 <a id="cuvshnswindexparamsdestroy"></a>
 ### cuvsHnswIndexParamsDestroy
@@ -145,8 +135,6 @@ cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:149`_
-
 ## C API for hnswlib wrapper index
 
 <a id="cuvshnswindex"></a>
@@ -164,8 +152,6 @@ typedef struct { ... } cuvsHnswIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:164`_
 
 <a id="cuvshnswindexcreate"></a>
 ### cuvsHnswIndexCreate
@@ -188,8 +174,6 @@ cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 
 HnswError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:178`_
-
 <a id="cuvshnswindexdestroy"></a>
 ### cuvsHnswIndexDestroy
 
@@ -209,8 +193,6 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:185`_
-
 ## Parameters for extending HNSW index
 
 <a id="cuvshnswextendparams"></a>
@@ -227,8 +209,6 @@ struct cuvsHnswExtendParams { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `num_threads` | `int` | Number of CPU threads used to extend additional vectors |
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:196`_
 
 <a id="cuvshnswextendparamscreate"></a>
 ### cuvsHnswExtendParamsCreate
@@ -251,8 +231,6 @@ cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:209`_
-
 <a id="cuvshnswextendparamsdestroy"></a>
 ### cuvsHnswExtendParamsDestroy
 
@@ -273,8 +251,6 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:218`_
 
 ## Load CAGRA index as hnswlib index
 
@@ -309,8 +285,6 @@ NOTE: When hierarchy is:
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:270`_
 
 ## Build HNSW index using ACE algorithm
 
@@ -349,8 +323,6 @@ NOTE: This function requires CUDA to be available at runtime.
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:347`_
-
 ## Extend HNSW index with additional vectors
 
 <a id="cuvshnswextend"></a>
@@ -382,8 +354,6 @@ NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when conve
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:405`_
-
 ## C API for hnswlib wrapper search params
 
 <a id="cuvshnswsearchparams"></a>
@@ -401,8 +371,6 @@ struct cuvsHnswSearchParams { ... };
 | --- | --- | --- |
 | `ef` | `int32_t` |  |
 | `num_threads` | `int32_t` |  |
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:419`_
 
 <a id="cuvshnswsearchparamscreate"></a>
 ### cuvsHnswSearchParamsCreate
@@ -425,8 +393,6 @@ cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:432`_
-
 <a id="cuvshnswsearchparamsdestroy"></a>
 ### cuvsHnswSearchParamsDestroy
 
@@ -447,8 +413,6 @@ cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:440`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -487,8 +451,6 @@ DLManagedTensor* distances);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/hnsw.h:499`_
-
 ## HNSW C-API serialize functions
 
 <a id="cuvshnswserialize"></a>
@@ -515,8 +477,6 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:554`_
 
 <a id="cuvshnswdeserialize"></a>
 ### cuvsHnswDeserialize
@@ -548,5 +508,3 @@ NOTE: When hierarchy is `NONE`, the loaded hnswlib index is immutable, and only 
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/hnsw.h:592`_

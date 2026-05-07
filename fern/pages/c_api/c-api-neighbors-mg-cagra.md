@@ -26,8 +26,6 @@ struct cuvsMultiGpuCagraIndexParams { ... };
 | `base_params` | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | Base CAGRA index parameters |
 | `mode` | [`cuvsMultiGpuDistributionMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpudistributionmode) | Distribution mode for multi-GPU setup |
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:28`_
-
 <a id="cuvsmultigpucagraindexparamscreate"></a>
 ### cuvsMultiGpuCagraIndexParamsCreate
 
@@ -49,8 +47,6 @@ cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(cuvsMultiGpuCagraIndexParams_t* i
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:43`_
-
 <a id="cuvsmultigpucagraindexparamsdestroy"></a>
 ### cuvsMultiGpuCagraIndexParamsDestroy
 
@@ -71,8 +67,6 @@ cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(cuvsMultiGpuCagraIndexParams_t i
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:51`_
 
 ## Multi-GPU CAGRA index search parameters
 
@@ -96,8 +90,6 @@ struct cuvsMultiGpuCagraSearchParams { ... };
 | `merge_mode` | [`cuvsMultiGpuShardedMergeMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpushardedmergemode) | Sharded merge mode |
 | `n_rows_per_batch` | `int64_t` | Number of rows per batch |
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:67`_
-
 <a id="cuvsmultigpucagrasearchparamscreate"></a>
 ### cuvsMultiGpuCagraSearchParamsCreate
 
@@ -118,8 +110,6 @@ cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSearchParams_t*
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:86`_
 
 <a id="cuvsmultigpucagrasearchparamsdestroy"></a>
 ### cuvsMultiGpuCagraSearchParamsDestroy
@@ -142,8 +132,6 @@ cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSearchParams_t
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:94`_
-
 ## Multi-GPU CAGRA index
 
 <a id="cuvsmultigpucagraindex"></a>
@@ -163,8 +151,6 @@ typedef struct { ... } cuvsMultiGpuCagraIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:109`_
 
 <a id="cuvsmultigpucagraindexcreate"></a>
 ### cuvsMultiGpuCagraIndexCreate
@@ -187,8 +173,6 @@ cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:122`_
-
 <a id="cuvsmultigpucagraindexdestroy"></a>
 ### cuvsMultiGpuCagraIndexDestroy
 
@@ -209,8 +193,6 @@ cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:130`_
 
 ## Multi-GPU CAGRA index build
 
@@ -240,8 +222,6 @@ cuvsMultiGpuCagraIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:150`_
 
 ## Multi-GPU CAGRA index search
 
@@ -276,8 +256,6 @@ DLManagedTensor* distances_tensor);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:175`_
-
 ## Multi-GPU CAGRA index extend
 
 <a id="cuvsmultigpucagraextend"></a>
@@ -307,8 +285,6 @@ DLManagedTensor* new_indices_tensor);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:200`_
-
 ## Multi-GPU CAGRA index serialize
 
 <a id="cuvsmultigpucagraserialize"></a>
@@ -335,8 +311,6 @@ const char* filename);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:222`_
 
 ## Multi-GPU CAGRA index deserialize
 
@@ -365,8 +339,6 @@ cuvsMultiGpuCagraIndex_t index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:243`_
-
 ## Multi-GPU CAGRA index distribute
 
 <a id="cuvsmultigpucagradistribute"></a>
@@ -393,5 +365,3 @@ cuvsMultiGpuCagraIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_cagra.h:264`_

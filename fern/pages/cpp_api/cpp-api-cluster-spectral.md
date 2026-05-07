@@ -28,8 +28,6 @@ struct params { ... };
 | `tolerance` | `float` | Tolerance for the eigenvalue solver |
 | `rng_state` | `raft::random::RngState` | Random number generator state for reproducibility |
 
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:22`_
-
 ## Spectral Clustering
 
 <a id="cuvs-cluster-spectral-fit-predict"></a>
@@ -59,8 +57,6 @@ n_clusters-1)
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:84`_
-
 **Additional overload:** `cuvs::cluster::spectral::fit_predict`
 
 Perform spectral clustering on a connectivity graph
@@ -86,8 +82,6 @@ n_clusters-1)
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:122`_
 
 **Additional overload:** `cuvs::cluster::spectral::fit_predict`
 
@@ -116,5 +110,3 @@ n_clusters-1)
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:155`_

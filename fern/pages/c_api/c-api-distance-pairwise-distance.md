@@ -38,5 +38,3 @@ Usage example:
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/distance/pairwise_distance.h:48`_

@@ -17,8 +17,6 @@ A type for specifying how PQ codebooks are created.
 enum class codebook_gen { ... };
 ```
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:31`_
-
 <a id="cuvs-neighbors-ivf-pq-list-layout"></a>
 ### cuvs::neighbors::ivf_pq::list_layout
 
@@ -27,8 +25,6 @@ A type for specifying the memory layout of PQ codes in IVF lists.
 ```cpp
 enum class list_layout { ... };
 ```
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:37`_
 
 <a id="cuvs-neighbors-ivf-pq-index-params-from-dataset"></a>
 ### cuvs::neighbors::ivf_pq::index_params::from_dataset
@@ -54,8 +50,6 @@ Usage example:
 
 `static index_params`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:145`_
-
 ## IVF-PQ index search parameters
 
 <a id="cuvs-neighbors-ivf-pq-search-params"></a>
@@ -78,8 +72,6 @@ struct search_params : cuvs::neighbors::search_params { ... };
 | `coarse_search_dtype` | `cudaDataType_t` | [Experimental] The data type to use as the GEMM element type when searching the clusters to probe. Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].<br />- Legacy default: CUDA_R_32F (float)<br />- Recommended for performance: CUDA_R_16F (half)<br />- Experimental/low-precision: CUDA_R_8I (int8_t) (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional) |
 | `max_internal_batch_size` | `uint32_t` | Set the internal batch size to improve GPU utilization at the cost of larger memory footprint. |
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:157`_
-
 ## Types
 
 <a id="list-extents"></a>
@@ -91,8 +83,6 @@ PQ-encoded data stored in the interleaved format:
 using list_extents = raft::
 extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
 ```
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:243`_
 
 <a id="cuvs-neighbors-ivf-pq-list-spec-flat"></a>
 ### cuvs::neighbors::ivf_pq::list_spec_flat
@@ -115,8 +105,6 @@ struct list_spec_flat { ... };
 | `pq_bits` | `uint32_t` |  |
 | `pq_dim` | `uint32_t` |  |
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:304`_
-
 <a id="cuvs-neighbors-graph-build-params-ivf-pq-params"></a>
 ### cuvs::neighbors::graph_build_params::ivf_pq_params
 
@@ -133,8 +121,6 @@ struct ivf_pq_params { ... };
 | `build_params` | `cuvs::neighbors::ivf_pq::index_params` |  |
 | `search_params` | `cuvs::neighbors::ivf_pq::` |  |
 | `refinement_rate` | `float` |  |
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3364`_
 
 ## IVF-PQ index
 
@@ -172,8 +158,6 @@ template <typename IdxT>
 class index : public index_iface<IdxT>, cuvs::neighbors::index { ... };
 ```
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:472`_
-
 <a id="cuvs-neighbors-ivf-pq-index-index"></a>
 ### cuvs::neighbors::ivf_pq::index::index
 
@@ -194,8 +178,6 @@ Constructs an empty index. This index will either need to be trained with `build
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:493`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::index::index`
 
@@ -231,8 +213,6 @@ This constructor creates an owning index with the given parameters.
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:509`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::index::index`
 
 Construct an index from index parameters.
@@ -253,8 +233,6 @@ index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:525`_
-
 <a id="cuvs-neighbors-ivf-pq-index-size"></a>
 ### cuvs::neighbors::ivf_pq::index::size
 
@@ -268,8 +246,6 @@ IdxT size() const noexcept override;
 
 `IdxT`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:528`_
-
 <a id="cuvs-neighbors-ivf-pq-index-dim"></a>
 ### cuvs::neighbors::ivf_pq::index::dim
 
@@ -282,8 +258,6 @@ uint32_t dim() const noexcept override;
 **Returns**
 
 `uint32_t`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:531`_
 
 <a id="cuvs-neighbors-ivf-pq-index-dim-ext"></a>
 ### cuvs::neighbors::ivf_pq::index::dim_ext
@@ -300,8 +274,6 @@ input data dim extended with vector norms and padded to 8 elems.
 
 `uint32_t`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:537`_
-
 <a id="cuvs-neighbors-ivf-pq-index-rot-dim"></a>
 ### cuvs::neighbors::ivf_pq::index::rot_dim
 
@@ -317,8 +289,6 @@ uint32_t rot_dim() const noexcept;
 
 `uint32_t`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:543`_
-
 <a id="cuvs-neighbors-ivf-pq-index-pq-bits"></a>
 ### cuvs::neighbors::ivf_pq::index::pq_bits
 
@@ -331,8 +301,6 @@ uint32_t pq_bits() const noexcept override;
 **Returns**
 
 `uint32_t`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:546`_
 
 <a id="cuvs-neighbors-ivf-pq-index-pq-dim"></a>
 ### cuvs::neighbors::ivf_pq::index::pq_dim
@@ -347,8 +315,6 @@ uint32_t pq_dim() const noexcept override;
 
 `uint32_t`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:549`_
-
 <a id="cuvs-neighbors-ivf-pq-index-pq-len"></a>
 ### cuvs::neighbors::ivf_pq::index::pq_len
 
@@ -361,8 +327,6 @@ uint32_t pq_len() const noexcept;
 **Returns**
 
 `uint32_t`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:552`_
 
 <a id="cuvs-neighbors-ivf-pq-index-pq-book-size"></a>
 ### cuvs::neighbors::ivf_pq::index::pq_book_size
@@ -377,8 +341,6 @@ uint32_t pq_book_size() const noexcept;
 
 `uint32_t`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:555`_
-
 <a id="cuvs-neighbors-ivf-pq-index-metric"></a>
 ### cuvs::neighbors::ivf_pq::index::metric
 
@@ -391,8 +353,6 @@ cuvs::distance::DistanceType metric() const noexcept override;
 **Returns**
 
 [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:558`_
 
 <a id="cuvs-neighbors-ivf-pq-index-codebook-kind"></a>
 ### cuvs::neighbors::ivf_pq::index::codebook_kind
@@ -407,8 +367,6 @@ codebook_gen codebook_kind() const noexcept override;
 
 [`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-codebook-gen)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:561`_
-
 <a id="cuvs-neighbors-ivf-pq-index-codes-layout"></a>
 ### cuvs::neighbors::ivf_pq::index::codes_layout
 
@@ -422,8 +380,6 @@ list_layout codes_layout() const noexcept override;
 
 [`list_layout`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-list-layout)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:564`_
-
 <a id="cuvs-neighbors-ivf-pq-index-n-lists"></a>
 ### cuvs::neighbors::ivf_pq::index::n_lists
 
@@ -436,8 +392,6 @@ uint32_t n_lists() const noexcept;
 **Returns**
 
 `uint32_t`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:567`_
 
 <a id="cuvs-neighbors-ivf-pq-index-conservative-memory-allocation"></a>
 ### cuvs::neighbors::ivf_pq::index::conservative_memory_allocation
@@ -453,8 +407,6 @@ bool conservative_memory_allocation() const noexcept override;
 **Returns**
 
 `bool`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:573`_
 
 <a id="cuvs-neighbors-ivf-pq-index-pq-centers"></a>
 ### cuvs::neighbors::ivf_pq::index::pq_centers
@@ -473,8 +425,6 @@ const noexcept override;
 
 `raft::device_mdspan<const float, pq_centers_extents, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:581`_
-
 <a id="cuvs-neighbors-ivf-pq-index-lists"></a>
 ### cuvs::neighbors::ivf_pq::index::lists
 
@@ -487,8 +437,6 @@ std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
 **Returns**
 
 `std::vector<std::shared_ptr<list_data_base<IdxT>>>&`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:585`_
 
 <a id="cuvs-neighbors-ivf-pq-index-data-ptrs"></a>
 ### cuvs::neighbors::ivf_pq::index::data_ptrs
@@ -503,8 +451,6 @@ raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexce
 
 `raft::device_vector_view<uint8_t*, uint32_t, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:589`_
-
 <a id="cuvs-neighbors-ivf-pq-index-inds-ptrs"></a>
 ### cuvs::neighbors::ivf_pq::index::inds_ptrs
 
@@ -517,8 +463,6 @@ raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept 
 **Returns**
 
 `raft::device_vector_view<IdxT*, uint32_t, raft::row_major>`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:594`_
 
 <a id="cuvs-neighbors-ivf-pq-index-rotation-matrix"></a>
 ### cuvs::neighbors::ivf_pq::index::rotation_matrix
@@ -533,8 +477,6 @@ const noexcept override;
 **Returns**
 
 `raft::device_matrix_view<const float, uint32_t, raft::row_major>`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:599`_
 
 <a id="cuvs-neighbors-ivf-pq-index-accum-sorted-sizes"></a>
 ### cuvs::neighbors::ivf_pq::index::accum_sorted_sizes
@@ -555,8 +497,6 @@ This span is used during search to estimate the maximum size of the workspace.
 
 `raft::host_vector_view<IdxT, uint32_t, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:616`_
-
 <a id="cuvs-neighbors-ivf-pq-index-list-sizes"></a>
 ### cuvs::neighbors::ivf_pq::index::list_sizes
 
@@ -569,8 +509,6 @@ raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexc
 **Returns**
 
 `raft::device_vector_view<uint32_t, uint32_t, raft::row_major>`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:621`_
 
 <a id="cuvs-neighbors-ivf-pq-index-centers"></a>
 ### cuvs::neighbors::ivf_pq::index::centers
@@ -586,8 +524,6 @@ const noexcept override;
 
 `raft::device_matrix_view<const float, uint32_t, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:626`_
-
 <a id="cuvs-neighbors-ivf-pq-index-centers-rot"></a>
 ### cuvs::neighbors::ivf_pq::index::centers_rot
 
@@ -601,8 +537,6 @@ const noexcept override;
 **Returns**
 
 `raft::device_matrix_view<const float, uint32_t, raft::row_major>`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:635`_
 
 <a id="cuvs-neighbors-ivf-pq-index-get-list-size-in-bytes"></a>
 ### cuvs::neighbors::ivf_pq::index::get_list_size_in_bytes
@@ -625,8 +559,6 @@ Usage example:
 
 `uint32_t`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:654`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::index::index`
 
 Construct index from implementation pointer.
@@ -646,8 +578,6 @@ This constructor is used internally by build/extend/deserialize functions.
 **Returns**
 
 `explicit`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:663`_
 
 ## IVF-PQ index build
 
@@ -678,8 +608,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:699`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -714,8 +642,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:729`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -742,8 +668,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:752`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -778,8 +702,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:782`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -806,8 +728,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:804`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -842,8 +762,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:834`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -870,8 +788,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:857`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -906,8 +822,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:887`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -936,8 +850,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:916`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -974,8 +886,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:953`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -1004,8 +914,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:983`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1040,8 +948,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1013`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -1068,8 +974,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1036`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1106,8 +1010,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1073`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -1136,8 +1038,6 @@ Usage example:
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
 the constructed ivf-pq index
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1103`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1173,8 +1073,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1140`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1219,8 +1117,6 @@ dim]
 
 A view-type ivf_pq index that references the provided data
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1174`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from device memory centroids and codebook.
@@ -1263,8 +1159,6 @@ dim]
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1211`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from host memory centroids and codebook (in-place).
@@ -1296,8 +1190,6 @@ std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> ro
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1231`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1332,8 +1224,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1253`_
-
 ## IVF-PQ index extend
 
 <a id="cuvs-neighbors-ivf-pq-extend"></a>
@@ -1364,8 +1254,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1293`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1392,8 +1280,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1322`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1421,8 +1307,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1350`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1448,8 +1332,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1379`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
@@ -1478,8 +1360,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1407`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1505,8 +1385,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1436`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
@@ -1535,8 +1413,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1464`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1562,8 +1438,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1493`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
@@ -1594,8 +1468,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1527`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1624,8 +1496,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1562`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1655,8 +1525,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1596`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1684,8 +1552,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1631`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
@@ -1716,8 +1582,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1665`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1745,8 +1609,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1700`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
@@ -1777,8 +1639,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1734`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
@@ -1806,8 +1666,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1770`_
 
 ## IVF-PQ index transform
 
@@ -1840,8 +1698,6 @@ cluster ids (labels) for each vector in the input dataset index.pq_bits(), 8)]] 
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1981`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::transform`
 
 ```cpp
@@ -1865,8 +1721,6 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1987`_
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::transform`
 
@@ -1892,8 +1746,6 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1993`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::transform`
 
 ```cpp
@@ -1917,8 +1769,6 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1999`_
 
 ## IVF-PQ index serialize
 
@@ -1945,8 +1795,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2031`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::serialize`
 
 Save the index to file.
@@ -1968,8 +1816,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2054`_
 
 <a id="cuvs-neighbors-ivf-pq-deserialize"></a>
 ### cuvs::neighbors::ivf_pq::deserialize
@@ -1994,8 +1840,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2081`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::deserialize`
 
 Load index from file.
@@ -2017,8 +1861,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2106`_
 
 ## IVF-PQ helper methods
 
@@ -2057,8 +1899,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2594`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-contiguous"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous
 
@@ -2096,8 +1936,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2634`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::pack
 
@@ -2130,8 +1968,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2666`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-contiguous"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_contiguous
@@ -2172,8 +2008,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2702`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-list-data"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_list_data
 
@@ -2206,8 +2040,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2736`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-contiguous-list-data"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_contiguous_list_data
@@ -2246,8 +2078,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2779`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-list-data"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_list_data
 
@@ -2279,8 +2109,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2815`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_list_data`
 
 Unpack a series of records of a single list (cluster) in the compressed index
@@ -2310,8 +2138,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2851`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-contiguous-list-data"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data
@@ -2346,8 +2172,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2892`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-reconstruct-list-data"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data
 
@@ -2379,8 +2203,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2929`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data`
 
 Decode a series of records of a single list (cluster) in the compressed index
@@ -2410,8 +2232,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2984`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list-with-codes"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list_with_codes
@@ -2444,8 +2264,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3032`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list-with-contiguous-codes"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes
@@ -2481,8 +2299,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3071`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list"></a>
 ### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list
 
@@ -2514,8 +2330,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3106`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-erase-list"></a>
 ### cuvs::neighbors::ivf_pq::helpers::erase_list
 
@@ -2538,8 +2352,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3141`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-reset-index"></a>
 ### cuvs::neighbors::ivf_pq::helpers::reset_index
@@ -2564,8 +2376,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3163`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-pad-centers-with-norms"></a>
 ### cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms
@@ -2593,8 +2403,6 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3176`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms`
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
@@ -2619,8 +2427,6 @@ This function takes cluster centers and pads them with their L2 norms to create 
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3192`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-rotate-padded-centers"></a>
 ### cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers
@@ -2648,8 +2454,6 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3205`_
-
 <a id="cuvs-neighbors-ivf-pq-helpers-extract-centers"></a>
 ### cuvs::neighbors::ivf_pq::helpers::extract_centers
 
@@ -2675,8 +2479,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3228`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::helpers::extract_centers`
 
 ```cpp
@@ -2696,8 +2498,6 @@ raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3233`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-recompute-internal-state"></a>
 ### cuvs::neighbors::ivf_pq::helpers::recompute_internal_state
@@ -2722,8 +2522,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3262`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-make-rotation-matrix"></a>
 ### cuvs::neighbors::ivf_pq::helpers::make_rotation_matrix
@@ -2752,8 +2550,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3289`_
 
 <a id="cuvs-neighbors-ivf-pq-helpers-resize-list"></a>
 ### cuvs::neighbors::ivf_pq::helpers::resize_list
@@ -2786,8 +2582,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3319`_
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::helpers::resize_list`
 
 Resize an IVF-PQ list with interleaved layout.
@@ -2817,5 +2611,3 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3350`_

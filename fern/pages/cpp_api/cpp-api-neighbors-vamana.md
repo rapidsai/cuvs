@@ -29,8 +29,6 @@ struct codebook_params { ... };
 | `pq_encoding_table` | `std::vector<T>` |  |
 | `rotation_matrix` | `std::vector<T>` |  |
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:34`_
-
 <a id="cuvs-neighbors-vamana-index-params"></a>
 ### cuvs::neighbors::vamana::index_params
 
@@ -54,8 +52,6 @@ struct index_params : cuvs::neighbors::index_params { ... };
 | `reverse_batchsize` | `uint32_t` | Max batchsize of reverse edge processing (reduces memory footprint) |
 | `codebooks` | [`std::optional<codebook_params<float>>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-codebook-params) | Codebooks and related parameters |
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:56`_
-
 ## Vamana index type
 
 <a id="cuvs-neighbors-vamana-index"></a>
@@ -70,8 +66,6 @@ template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:101`_
-
 <a id="cuvs-neighbors-vamana-index-metric"></a>
 ### cuvs::neighbors::vamana::index::metric
 
@@ -84,8 +78,6 @@ Distance metric used for clustering.
 **Returns**
 
 [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:108`_
 
 <a id="cuvs-neighbors-vamana-index-size"></a>
 ### cuvs::neighbors::vamana::index::size
@@ -100,8 +92,6 @@ Total length of the index (number of vectors).
 
 `IdxT`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:114`_
-
 <a id="cuvs-neighbors-vamana-index-dim"></a>
 ### cuvs::neighbors::vamana::index::dim
 
@@ -114,8 +104,6 @@ Dimensionality of the data.
 **Returns**
 
 `uint32_t`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:121`_
 
 <a id="cuvs-neighbors-vamana-index-graph-degree"></a>
 ### cuvs::neighbors::vamana::index::graph_degree
@@ -130,8 +118,6 @@ Graph degree
 
 `uint32_t`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:123`_
-
 <a id="cuvs-neighbors-vamana-index-data"></a>
 ### cuvs::neighbors::vamana::index::data
 
@@ -144,8 +130,6 @@ Dataset [size, dim]
 **Returns**
 
 [`const cuvs::neighbors::dataset<int64_t>&`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-dataset)
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:129`_
 
 <a id="cuvs-neighbors-vamana-index-quantized-data"></a>
 ### cuvs::neighbors::vamana::index::quantized_data
@@ -161,8 +145,6 @@ Quantized dataset [size, codes_rowlen]
 
 `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:135`_
-
 <a id="cuvs-neighbors-vamana-index-graph"></a>
 ### cuvs::neighbors::vamana::index::graph
 
@@ -177,8 +159,6 @@ vamana graph [size, graph-degree]
 
 `raft::device_matrix_view<const IdxT, int64_t, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:142`_
-
 <a id="cuvs-neighbors-vamana-index-medoid"></a>
 ### cuvs::neighbors::vamana::index::medoid
 
@@ -191,8 +171,6 @@ Return the id of the vector selected as the medoid.
 **Returns**
 
 `IdxT`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:149`_
 
 <a id="cuvs-neighbors-vamana-index-index"></a>
 ### cuvs::neighbors::vamana::index::index
@@ -210,8 +188,6 @@ index(const index&)                    = delete;
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:153`_
 
 **Additional overload:** `cuvs::neighbors::vamana::index::index`
 
@@ -233,8 +209,6 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:161`_
 
 **Additional overload:** `cuvs::neighbors::vamana::index::index`
 
@@ -265,8 +239,6 @@ IdxT medoid_id)
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:174`_
-
 <a id="cuvs-neighbors-vamana-index-update-graph"></a>
 ### cuvs::neighbors::vamana::index::update_graph
 
@@ -290,8 +262,6 @@ Since the new graph is a device array, we store a reference to that, and it is t
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:201`_
-
 **Additional overload:** `cuvs::neighbors::vamana::index::update_graph`
 
 Replace the graph with a new graph.
@@ -313,8 +283,6 @@ We create a copy of the graph on the device. The index manages the lifetime of t
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:212`_
 
 <a id="cuvs-neighbors-vamana-index-update-quantized-dataset"></a>
 ### cuvs::neighbors::vamana::index::update_quantized_dataset
@@ -339,8 +307,6 @@ We create a copy of the quantized dataset on the device. The index manages the l
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:240`_
 
 ## Vamana index build functions
 
@@ -378,8 +344,6 @@ Usage example:
 
 the constructed vamana index
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:305`_
-
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
@@ -412,8 +376,6 @@ Usage example:
 [`cuvs::neighbors::vamana::index<float, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
 
 the constructed vamana index
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:339`_
 
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
@@ -448,8 +410,6 @@ Usage example:
 
 the constructed vamana index
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:373`_
-
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
@@ -482,8 +442,6 @@ Usage example:
 [`cuvs::neighbors::vamana::index<int8_t, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
 
 the constructed vamana index
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:407`_
 
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
@@ -518,8 +476,6 @@ Usage example:
 
 the constructed vamana index
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:441`_
-
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
@@ -553,8 +509,6 @@ Usage example:
 
 the constructed vamana index
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:475`_
-
 ## Vamana serialize functions
 
 <a id="cuvs-neighbors-vamana-serialize"></a>
@@ -586,8 +540,6 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:514`_
-
 **Additional overload:** `cuvs::neighbors::vamana::serialize`
 
 Save the index to file.
@@ -615,8 +567,6 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:544`_
 
 **Additional overload:** `cuvs::neighbors::vamana::serialize`
 
@@ -646,8 +596,6 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:574`_
-
 ## Vamana codebook functions
 
 <a id="cuvs-neighbors-vamana-deserialize-codebooks"></a>
@@ -672,5 +620,3 @@ Expects pq pivots file at "$\{codebook_prefix\}_pq_pivots.bin" and rotation matr
 **Returns**
 
 [`codebook_params<float>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-codebook-params)
-
-_Source: `cpp/include/cuvs/neighbors/vamana.hpp:611`_

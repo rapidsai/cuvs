@@ -41,5 +41,3 @@ modified.
 `double`
 
 Trustworthiness score
-
-_Source: `cpp/include/cuvs/stats/trustworthiness_score.hpp:30`_

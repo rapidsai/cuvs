@@ -31,8 +31,6 @@ struct cuvsVamanaIndexParams { ... };
 | `queue_size` | `uint32_t` | Size of candidate queue structure - should be (2^x)-1 |
 | `reverse_batchsize` | `uint32_t` | Max batchsize of reverse edge processing (reduces memory footprint) |
 
-_Source: `c/include/cuvs/neighbors/vamana.h:37`_
-
 <a id="cuvsvamanaindexparamscreate"></a>
 ### cuvsVamanaIndexParamsCreate
 
@@ -53,8 +51,6 @@ cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/vamana.h:69`_
 
 <a id="cuvsvamanaindexparamsdestroy"></a>
 ### cuvsVamanaIndexParamsDestroy
@@ -77,8 +73,6 @@ cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/vamana.h:77`_
-
 ## Vamana index
 
 <a id="cuvsvamanaindex"></a>
@@ -96,8 +90,6 @@ typedef struct { ... } cuvsVamanaIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/vamana.h:92`_
 
 <a id="cuvsvamanaindexcreate"></a>
 ### cuvsVamanaIndexCreate
@@ -120,8 +112,6 @@ cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/vamana.h:106`_
-
 <a id="cuvsvamanaindexdestroy"></a>
 ### cuvsVamanaIndexDestroy
 
@@ -142,8 +132,6 @@ cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/vamana.h:114`_
 
 <a id="cuvsvamanaindexgetdims"></a>
 ### cuvsVamanaIndexGetDims
@@ -166,8 +154,6 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/vamana.h:123`_
 
 ## Vamana index build
 
@@ -208,8 +194,6 @@ Usage example:
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/vamana.h:169`_
-
 ## Vamana index serialize
 
 <a id="cuvsvamanaserialize"></a>
@@ -242,5 +226,3 @@ Serialized Index is to be used by the DiskANN open-source repository for graph s
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/vamana.h:205`_

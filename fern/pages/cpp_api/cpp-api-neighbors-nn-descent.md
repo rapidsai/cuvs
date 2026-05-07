@@ -25,8 +25,6 @@ enum class DIST_COMP_DTYPE { ... };
 | `FP32` | `1` | Use fp32 distance computation for better precision at the cost of performance and memory usage. |
 | `FP16` | `2` | Use fp16 distance computation. |
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:35`_
-
 <a id="cuvs-neighbors-nn-descent-index-params"></a>
 ### cuvs::neighbors::nn_descent::index_params
 
@@ -46,8 +44,6 @@ struct index_params : cuvs::neighbors::index_params { ... };
 | `termination_threshold` | `float` | The delta at which nn-descent will terminate its iterations |
 | `return_distances` | `bool` | Boolean to decide whether to return distances array |
 | `dist_comp_dtype` | [`DIST_COMP_DTYPE`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-dist-comp-dtype) | dtype to use for distance computation. Defaults to `AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `FP16` for better performance and memory usage at the cost of precision. |
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:56`_
 
 <a id="cuvs-neighbors-nn-descent-index-params-index-params"></a>
 ### cuvs::neighbors::nn_descent::index_params::index_params
@@ -70,8 +66,6 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:69`_
-
 ## nn-descent index
 
 <a id="cuvs-neighbors-nn-descent-index"></a>
@@ -87,8 +81,6 @@ Reference: Hui Wang, Wan-Lei Zhao, Xiangxiang Zeng, and Jianye Yang. 2021. Fast 
 template <typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:94`_
 
 <a id="cuvs-neighbors-nn-descent-index-index"></a>
 ### cuvs::neighbors::nn_descent::index::index
@@ -120,8 +112,6 @@ This constructor creates an nn-descent index which is a knn-graph in host memory
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:110`_
-
 **Additional overload:** `cuvs::neighbors::nn_descent::index::index`
 
 Construct a new index object
@@ -152,8 +142,6 @@ distances
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:141`_
-
 <a id="cuvs-neighbors-nn-descent-index-metric"></a>
 ### cuvs::neighbors::nn_descent::index::metric
 
@@ -166,8 +154,6 @@ Distance metric used for clustering.
 **Returns**
 
 [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:157`_
 
 <a id="cuvs-neighbors-nn-descent-index-size"></a>
 ### cuvs::neighbors::nn_descent::index::size
@@ -182,8 +168,6 @@ Total length of the index (number of vectors).
 
 `IdxT`
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:163`_
-
 <a id="cuvs-neighbors-nn-descent-index-graph-degree"></a>
 ### cuvs::neighbors::nn_descent::index::graph_degree
 
@@ -196,8 +180,6 @@ Graph degree
 **Returns**
 
 `uint32_t`
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:169`_
 
 <a id="cuvs-neighbors-nn-descent-index-graph"></a>
 ### cuvs::neighbors::nn_descent::index::graph
@@ -213,8 +195,6 @@ neighborhood graph [size, graph-degree]
 
 `raft::host_matrix_view<IdxT, int64_t, raft::row_major>`
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:175`_
-
 <a id="cuvs-neighbors-nn-descent-index-distances"></a>
 ### cuvs::neighbors::nn_descent::index::distances
 
@@ -228,8 +208,6 @@ neighborhood graph distances [size, graph-degree]
 **Returns**
 
 `std::optional<device_matrix_view<float, int64_t, row_major>>`
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:182`_
 
 ## nn-descent index build
 
@@ -272,8 +250,6 @@ the output graph
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:244`_
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -321,8 +297,6 @@ the output graph
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:283`_
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
@@ -361,8 +335,6 @@ the output graph
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:320`_
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -410,8 +382,6 @@ the output graph
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:359`_
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
@@ -451,8 +421,6 @@ the output graph
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:397`_
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -501,8 +469,6 @@ the output graph
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:437`_
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
@@ -542,8 +508,6 @@ the output graph
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:475`_
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -591,5 +555,3 @@ the output graph
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
 index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
-_Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:515`_

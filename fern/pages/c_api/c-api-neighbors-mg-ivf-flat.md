@@ -26,8 +26,6 @@ struct cuvsMultiGpuIvfFlatIndexParams { ... };
 | `base_params` | [`cuvsIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) | Base IVF-Flat index parameters |
 | `mode` | [`cuvsMultiGpuDistributionMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpudistributionmode) | Distribution mode for multi-GPU setup |
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:28`_
-
 <a id="cuvsmultigpuivfflatindexparamscreate"></a>
 ### cuvsMultiGpuIvfFlatIndexParamsCreate
 
@@ -49,8 +47,6 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexParamsCreate(cuvsMultiGpuIvfFlatIndexParams_
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:43`_
-
 <a id="cuvsmultigpuivfflatindexparamsdestroy"></a>
 ### cuvsMultiGpuIvfFlatIndexParamsDestroy
 
@@ -71,8 +67,6 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexParamsDestroy(cuvsMultiGpuIvfFlatIndexParams
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:51`_
 
 ## Multi-GPU IVF-Flat index search parameters
 
@@ -96,8 +90,6 @@ struct cuvsMultiGpuIvfFlatSearchParams { ... };
 | `merge_mode` | [`cuvsMultiGpuShardedMergeMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpushardedmergemode) | Sharded merge mode |
 | `n_rows_per_batch` | `int64_t` | Number of rows per batch |
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:67`_
-
 <a id="cuvsmultigpuivfflatsearchparamscreate"></a>
 ### cuvsMultiGpuIvfFlatSearchParamsCreate
 
@@ -118,8 +110,6 @@ cuvsError_t cuvsMultiGpuIvfFlatSearchParamsCreate(cuvsMultiGpuIvfFlatSearchParam
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:86`_
 
 <a id="cuvsmultigpuivfflatsearchparamsdestroy"></a>
 ### cuvsMultiGpuIvfFlatSearchParamsDestroy
@@ -142,8 +132,6 @@ cuvsError_t cuvsMultiGpuIvfFlatSearchParamsDestroy(cuvsMultiGpuIvfFlatSearchPara
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:94`_
-
 ## Multi-GPU IVF-Flat index
 
 <a id="cuvsmultigpuivfflatindex"></a>
@@ -163,8 +151,6 @@ typedef struct { ... } cuvsMultiGpuIvfFlatIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:109`_
 
 <a id="cuvsmultigpuivfflatindexcreate"></a>
 ### cuvsMultiGpuIvfFlatIndexCreate
@@ -187,8 +173,6 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexCreate(cuvsMultiGpuIvfFlatIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:122`_
-
 <a id="cuvsmultigpuivfflatindexdestroy"></a>
 ### cuvsMultiGpuIvfFlatIndexDestroy
 
@@ -209,8 +193,6 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:130`_
 
 ## Multi-GPU IVF-Flat index build
 
@@ -240,8 +222,6 @@ cuvsMultiGpuIvfFlatIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:150`_
 
 ## Multi-GPU IVF-Flat index search
 
@@ -276,8 +256,6 @@ DLManagedTensor* distances_tensor);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:175`_
-
 ## Multi-GPU IVF-Flat index extend
 
 <a id="cuvsmultigpuivfflatextend"></a>
@@ -307,8 +285,6 @@ DLManagedTensor* new_indices_tensor);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:200`_
-
 ## Multi-GPU IVF-Flat index serialize
 
 <a id="cuvsmultigpuivfflatserialize"></a>
@@ -335,8 +311,6 @@ const char* filename);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:222`_
 
 ## Multi-GPU IVF-Flat index deserialize
 
@@ -365,8 +339,6 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:243`_
-
 ## Multi-GPU IVF-Flat index distribute
 
 <a id="cuvsmultigpuivfflatdistribute"></a>
@@ -393,5 +365,3 @@ cuvsMultiGpuIvfFlatIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:264`_

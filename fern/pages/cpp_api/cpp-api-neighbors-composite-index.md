@@ -21,5 +21,3 @@ Usage example:
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
 class composite_index { ... };
 ```
-
-_Source: `cpp/include/cuvs/neighbors/composite/index.hpp:40`_

@@ -45,8 +45,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:60`_
-
 **Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
@@ -82,8 +80,6 @@ Example usage
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:105`_
 
 **Additional overload:** `cuvs::neighbors::refine`
 
@@ -121,8 +117,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:150`_
-
 **Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
@@ -158,8 +152,6 @@ Example usage
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:195`_
 
 **Additional overload:** `cuvs::neighbors::refine`
 
@@ -197,8 +189,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:240`_
-
 **Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
@@ -234,8 +224,6 @@ Example usage
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:285`_
 
 **Additional overload:** `cuvs::neighbors::refine`
 
@@ -273,8 +261,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:330`_
-
 **Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
@@ -310,8 +296,6 @@ Example usage
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:375`_
 
 **Additional overload:** `cuvs::neighbors::refine`
 
@@ -349,8 +333,6 @@ Example usage
 
 `void`
 
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:420`_
-
 **Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
@@ -386,5 +368,3 @@ Example usage
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/refine.hpp:465`_

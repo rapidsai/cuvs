@@ -24,8 +24,6 @@ enum cuvsIvfPqCodebookGen { ... };
 | `CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE` | `0` |
 | `CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER` | `1` |
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:26`_
-
 <a id="cuvsivfpqlistlayout"></a>
 ### cuvsIvfPqListLayout
 
@@ -41,8 +39,6 @@ enum cuvsIvfPqListLayout { ... };
 | --- | --- |
 | `CUVS_IVF_PQ_LIST_LAYOUT_FLAT` | `0` |
 | `CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED` | `1` |
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:35`_
 
 <a id="cuvsivfpqindexparams"></a>
 ### cuvsIvfPqIndexParams
@@ -71,8 +67,6 @@ struct cuvsIvfPqIndexParams { ... };
 | `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training points to train each codebook. |
 | `codes_layout` | [`enum cuvsIvfPqListLayout`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqlistlayout) | Memory layout of the IVF-PQ list data.<br />- CUVS_IVF_PQ_LIST_LAYOUT_FLAT: Codes are stored contiguously, one vector's codes after another.<br />- CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED: Codes are interleaved for optimized search performance. This is the default and recommended for search workloads. |
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:44`_
-
 <a id="cuvsivfpqindexparamscreate"></a>
 ### cuvsIvfPqIndexParamsCreate
 
@@ -94,8 +88,6 @@ cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* index_params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:144`_
-
 <a id="cuvsivfpqindexparamsdestroy"></a>
 ### cuvsIvfPqIndexParamsDestroy
 
@@ -116,8 +108,6 @@ cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index_params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:152`_
 
 ## IVF-PQ index search parameters
 
@@ -141,8 +131,6 @@ struct cuvsIvfPqSearchParams { ... };
 | `max_internal_batch_size` | `uint32_t` | Set the internal batch size to improve GPU utilization at the cost of larger memory footprint. |
 | `preferred_shmem_carveout` | `double` | Preferred fraction of SM's unified memory / L1 cache to be used as shared memory. Possible values: [0.0 - 1.0] as a fraction of the `sharedMemPerMultiprocessor`. One wants to increase the carveout to make sure a good GPU occupancy for the main search kernel, but not to keep it too high to leave some memory to be used as L1 cache. Note, this value is interpreted only as a hint. Moreover, a GPU usually allows only a fixed set of cache configurations, so the provided value is rounded up to the nearest configuration. Refer to the NVIDIA tuning guide for the target GPU architecture. Note, this is a low-level tuning parameter that can have drastic negative effects on the search performance if tweaked incorrectly. |
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:165`_
-
 <a id="cuvsivfpqsearchparamscreate"></a>
 ### cuvsIvfPqSearchParamsCreate
 
@@ -163,8 +151,6 @@ cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:227`_
 
 <a id="cuvsivfpqsearchparamsdestroy"></a>
 ### cuvsIvfPqSearchParamsDestroy
@@ -187,8 +173,6 @@ cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:235`_
-
 ## IVF-PQ index
 
 <a id="cuvsivfpqindex"></a>
@@ -206,8 +190,6 @@ typedef struct { ... } cuvsIvfPqIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:248`_
 
 <a id="cuvsivfpqindexcreate"></a>
 ### cuvsIvfPqIndexCreate
@@ -230,8 +212,6 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:261`_
-
 <a id="cuvsivfpqindexdestroy"></a>
 ### cuvsIvfPqIndexDestroy
 
@@ -250,8 +230,6 @@ cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:268`_
 
 <a id="cuvsivfpqindexgetnlists"></a>
 ### cuvsIvfPqIndexGetNLists
@@ -273,8 +251,6 @@ cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:271`_
-
 <a id="cuvsivfpqindexgetdim"></a>
 ### cuvsIvfPqIndexGetDim
 
@@ -294,8 +270,6 @@ cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:274`_
 
 <a id="cuvsivfpqindexgetsize"></a>
 ### cuvsIvfPqIndexGetSize
@@ -317,8 +291,6 @@ cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* size);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:277`_
-
 <a id="cuvsivfpqindexgetpqdim"></a>
 ### cuvsIvfPqIndexGetPqDim
 
@@ -339,8 +311,6 @@ cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:280`_
-
 <a id="cuvsivfpqindexgetpqbits"></a>
 ### cuvsIvfPqIndexGetPqBits
 
@@ -360,8 +330,6 @@ cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:283`_
 
 <a id="cuvsivfpqindexgetpqlen"></a>
 ### cuvsIvfPqIndexGetPqLen
@@ -385,8 +353,6 @@ components mapped to a subspace
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:287`_
-
 <a id="cuvsivfpqindexgetcenters"></a>
 ### cuvsIvfPqIndexGetCenters
 
@@ -408,8 +374,6 @@ cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* ce
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:296`_
 
 <a id="cuvsivfpqindexgetcenterspadded"></a>
 ### cuvsIvfPqIndexGetCentersPadded
@@ -437,8 +401,6 @@ This returns the full padded centers as a contiguous array, suitable for use wit
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:309`_
-
 <a id="cuvsivfpqindexgetpqcenters"></a>
 ### cuvsIvfPqIndexGetPqCenters
 
@@ -464,8 +426,6 @@ cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* 
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:321`_
-
 <a id="cuvsivfpqindexgetcentersrot"></a>
 ### cuvsIvfPqIndexGetCentersRot
 
@@ -489,8 +449,6 @@ where rot_dim = pq_len * pq_dim
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:331`_
 
 <a id="cuvsivfpqindexgetrotationmatrix"></a>
 ### cuvsIvfPqIndexGetRotationMatrix
@@ -519,8 +477,6 @@ data
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:342`_
-
 <a id="cuvsivfpqindexgetlistsizes"></a>
 ### cuvsIvfPqIndexGetListSizes
 
@@ -542,8 +498,6 @@ cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index, DLManagedTensor* 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:352`_
 
 <a id="cuvsivfpqindexunpackcontiguouslistdata"></a>
 ### cuvsIvfPqIndexUnpackContiguousListData
@@ -574,8 +528,6 @@ compressed index starting at given `offset`, not expanded to one code per byte. 
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:371`_
-
 <a id="cuvsivfpqindexgetlistindices"></a>
 ### cuvsIvfPqIndexGetListIndices
 
@@ -600,8 +552,6 @@ DLManagedTensor* out_labels);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:386`_
 
 ## IVF-PQ index build
 
@@ -638,8 +588,6 @@ cuvsIvfPqIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:440`_
 
 <a id="cuvsivfpqbuildprecomputed"></a>
 ### cuvsIvfPqBuildPrecomputed
@@ -686,8 +634,6 @@ matrices) dim]
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:474`_
-
 ## IVF-PQ index search
 
 <a id="cuvsivfpqsearch"></a>
@@ -725,8 +671,6 @@ DLManagedTensor* distances);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:534`_
-
 ## IVF-PQ C-API serialize functions
 
 <a id="cuvsivfpqserialize"></a>
@@ -752,8 +696,6 @@ Experimental, both the API and the serialization format are subject to change.
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:568`_
-
 <a id="cuvsivfpqdeserialize"></a>
 ### cuvsIvfPqDeserialize
 
@@ -776,8 +718,6 @@ Experimental, both the API and the serialization format are subject to change.
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:579`_
 
 ## IVF-PQ index extend
 
@@ -807,8 +747,6 @@ cuvsIvfPqIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:597`_
 
 ## IVF-PQ index transform
 
@@ -840,5 +778,3 @@ DLManagedTensor* output_dataset);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_pq.h:619`_

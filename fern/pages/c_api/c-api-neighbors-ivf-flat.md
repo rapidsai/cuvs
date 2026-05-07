@@ -30,8 +30,6 @@ struct cuvsIvfFlatIndexParams { ... };
 | `adaptive_centers` | `bool` | By default (adaptive_centers = false), the cluster centers are trained in `ivf_flat::build`, and never modified in `ivf_flat::extend`. As a result, you may need to retrain the index from scratch after invoking (`ivf_flat::extend`) a few times with new data, the distribution of which is no longer representative of the original training set. The alternative behavior (adaptive_centers = true) is to update the cluster centers for new data when it is added. In this case, `index.centers()` are always exactly the centroids of the data in the corresponding clusters. The drawback of this behavior is that the centroids depend on the order of adding new data (through the classification of the added data); that is, `index.centers()` "drift" together with the changing distribution of the newly added data. |
 | `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:27`_
-
 <a id="cuvsivfflatindexparamscreate"></a>
 ### cuvsIvfFlatIndexParamsCreate
 
@@ -52,8 +50,6 @@ cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* index_params)
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:80`_
 
 <a id="cuvsivfflatindexparamsdestroy"></a>
 ### cuvsIvfFlatIndexParamsDestroy
@@ -76,8 +72,6 @@ cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:88`_
-
 ## IVF-Flat index search parameters
 
 <a id="cuvsivfflatsearchparams"></a>
@@ -94,8 +88,6 @@ struct cuvsIvfFlatSearchParams { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_probes` | `uint32_t` | The number of clusters to search. |
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:101`_
 
 <a id="cuvsivfflatsearchparamscreate"></a>
 ### cuvsIvfFlatSearchParamsCreate
@@ -118,8 +110,6 @@ cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:114`_
-
 <a id="cuvsivfflatsearchparamsdestroy"></a>
 ### cuvsIvfFlatSearchParamsDestroy
 
@@ -141,8 +131,6 @@ cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:122`_
-
 ## IVF-Flat index
 
 <a id="cuvsivfflatindex"></a>
@@ -160,8 +148,6 @@ typedef struct { ... } cuvsIvfFlatIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:135`_
 
 <a id="cuvsivfflatindexcreate"></a>
 ### cuvsIvfFlatIndexCreate
@@ -184,8 +170,6 @@ cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:148`_
-
 <a id="cuvsivfflatindexdestroy"></a>
 ### cuvsIvfFlatIndexDestroy
 
@@ -204,8 +188,6 @@ cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:155`_
 
 <a id="cuvsivfflatindexgetnlists"></a>
 ### cuvsIvfFlatIndexGetNLists
@@ -227,8 +209,6 @@ cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:158`_
-
 <a id="cuvsivfflatindexgetdim"></a>
 ### cuvsIvfFlatIndexGetDim
 
@@ -248,8 +228,6 @@ cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:161`_
 
 <a id="cuvsivfflatindexgetcenters"></a>
 ### cuvsIvfFlatIndexGetCenters
@@ -272,8 +250,6 @@ cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLManagedTensor
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:170`_
 
 ## IVF-Flat index build
 
@@ -309,8 +285,6 @@ cuvsIvfFlatIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:222`_
 
 ## IVF-Flat index search
 
@@ -351,8 +325,6 @@ cuvsFilter filter);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:279`_
-
 ## IVF-Flat C-API serialize functions
 
 <a id="cuvsivfflatserialize"></a>
@@ -380,8 +352,6 @@ Experimental, both the API and the serialization format are subject to change.
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:315`_
-
 <a id="cuvsivfflatdeserialize"></a>
 ### cuvsIvfFlatDeserialize
 
@@ -406,8 +376,6 @@ Experimental, both the API and the serialization format are subject to change.
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:328`_
 
 ## IVF-Flat index extend
 
@@ -437,5 +405,3 @@ cuvsIvfFlatIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/ivf_flat.h:348`_

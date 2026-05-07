@@ -24,8 +24,6 @@ typedef struct { ... } cuvsBruteForceIndex;
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
 
-_Source: `c/include/cuvs/neighbors/brute_force.h:26`_
-
 <a id="cuvsbruteforceindexcreate"></a>
 ### cuvsBruteForceIndexCreate
 
@@ -47,8 +45,6 @@ cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/brute_force.h:39`_
-
 <a id="cuvsbruteforceindexdestroy"></a>
 ### cuvsBruteForceIndexDestroy
 
@@ -67,8 +63,6 @@ cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/brute_force.h:46`_
 
 ## Bruteforce index build
 
@@ -105,8 +99,6 @@ cuvsBruteForceIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/brute_force.h:92`_
 
 ## Bruteforce index search
 
@@ -145,8 +137,6 @@ cuvsFilter prefilter);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/brute_force.h:148`_
-
 ## BRUTEFORCE C-API serialize functions
 
 <a id="cuvsbruteforceserialize"></a>
@@ -174,8 +164,6 @@ The serialization format can be subject to changes, therefore loading an index s
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/neighbors/brute_force.h:184`_
-
 <a id="cuvsbruteforcedeserialize"></a>
 ### cuvsBruteForceDeserialize
 
@@ -200,5 +188,3 @@ The serialization format can be subject to changes, therefore loading an index s
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/brute_force.h:211`_

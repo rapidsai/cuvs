@@ -25,8 +25,6 @@ typedef enum { ... } cuvsNNDescentDistCompDtype;
 | `NND_DIST_COMP_FP32` | `1` | Use fp32 distance computation for better precision at the cost of performance and memory usage. |
 | `NND_DIST_COMP_FP16` | `2` | Use fp16 distance computation. |
 
-_Source: `c/include/cuvs/neighbors/nn_descent.h:24`_
-
 ## The nn-descent algorithm parameters.
 
 <a id="cuvsnndescentindexparams"></a>
@@ -51,8 +49,6 @@ struct cuvsNNDescentIndexParams { ... };
 | `return_distances` | `bool` | Boolean to decide whether to return distances array |
 | `dist_comp_dtype` | [`cuvsNNDescentDistCompDtype`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentdistcompdtype) | dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision. |
 
-_Source: `c/include/cuvs/neighbors/nn_descent.h:52`_
-
 <a id="cuvsnndescentindexparamscreate"></a>
 ### cuvsNNDescentIndexParamsCreate
 
@@ -73,8 +69,6 @@ cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_par
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/nn_descent.h:71`_
 
 <a id="cuvsnndescentindexparamsdestroy"></a>
 ### cuvsNNDescentIndexParamsDestroy
@@ -97,8 +91,6 @@ cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_par
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/nn_descent.h:79`_
-
 ## NN-Descent index
 
 <a id="cuvsnndescentindex"></a>
@@ -116,8 +108,6 @@ typedef struct { ... } cuvsNNDescentIndex;
 | --- | --- | --- |
 | `addr` | `uintptr_t` |  |
 | `dtype` | `DLDataType` |  |
-
-_Source: `c/include/cuvs/neighbors/nn_descent.h:92`_
 
 <a id="cuvsnndescentindexcreate"></a>
 ### cuvsNNDescentIndexCreate
@@ -140,8 +130,6 @@ cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/nn_descent.h:105`_
-
 <a id="cuvsnndescentindexdestroy"></a>
 ### cuvsNNDescentIndexDestroy
 
@@ -160,8 +148,6 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/nn_descent.h:112`_
 
 ## NN-Descent index build
 
@@ -200,5 +186,3 @@ cuvsNNDescentIndex_t index);
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/nn_descent.h:165`_

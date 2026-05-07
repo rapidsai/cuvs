@@ -27,8 +27,6 @@ enum class bit_threshold { ... };
 | `mean` | `` |
 | `sampling_median` | `` |
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:27`_
-
 <a id="cuvs-preprocessing-quantize-binary-params"></a>
 ### cuvs::preprocessing::quantize::binary::params
 
@@ -44,8 +42,6 @@ struct params { ... };
 | --- | --- | --- |
 | `threshold` | [`bit_threshold`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-bit-threshold) | Threshold method for binarization. |
 | `sampling_ratio` | `float` | Specifies the sampling ratio. |
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:32`_
 
 <a id="cuvs-preprocessing-quantize-binary-quantizer"></a>
 ### cuvs::preprocessing::quantize::binary::quantizer
@@ -65,8 +61,6 @@ struct quantizer { ... };
 | --- | --- | --- |
 | `threshold` | `raft::device_vector<T, int64_t>` | Threshold vector used for binarization. |
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:48`_
-
 <a id="cuvs-preprocessing-quantize-binary-quantizer-quantizer"></a>
 ### cuvs::preprocessing::quantize::binary::quantizer::quantizer
 
@@ -85,8 +79,6 @@ quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, in
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:54`_
 
 <a id="cuvs-preprocessing-quantize-binary-train"></a>
 ### cuvs::preprocessing::quantize::binary::train
@@ -115,8 +107,6 @@ Usage example:
 
 quantizer
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:73`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -142,8 +132,6 @@ Usage example:
 [`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
 
 quantizer
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:93`_
 
 <a id="cuvs-preprocessing-quantize-binary-transform"></a>
 ### cuvs::preprocessing::quantize::binary::transform
@@ -174,8 +162,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:119`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -204,8 +190,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:146`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -231,8 +215,6 @@ Usage example:
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
 
 quantizer
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:167`_
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
@@ -260,8 +242,6 @@ Usage example:
 
 quantizer
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:187`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -289,8 +269,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:215`_
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
@@ -320,8 +298,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:244`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -347,8 +323,6 @@ Usage example:
 [`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
 
 quantizer
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:265`_
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
@@ -376,8 +350,6 @@ Usage example:
 
 quantizer
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:285`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset.
@@ -403,8 +375,6 @@ Usage example:
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:312`_
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
@@ -432,8 +402,6 @@ Usage example:
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:340`_
-
 <a id="cuvs-preprocessing-quantize-binary-deprecated"></a>
 ### cuvs::preprocessing::quantize::binary::[[deprecated
 
@@ -458,8 +426,6 @@ is positive, set the corresponding bit to 1.
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:354`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
@@ -482,8 +448,6 @@ is positive, set the corresponding bit to 1.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:368`_
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
@@ -508,8 +472,6 @@ is positive, set the corresponding bit to 1.
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:382`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
@@ -532,8 +494,6 @@ is positive, set the corresponding bit to 1.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:396`_
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
@@ -558,8 +518,6 @@ is positive, set the corresponding bit to 1.
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:410`_
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
@@ -582,5 +540,3 @@ is positive, set the corresponding bit to 1.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:424`_

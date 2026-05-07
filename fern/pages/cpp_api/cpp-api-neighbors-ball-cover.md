@@ -31,8 +31,6 @@ struct index : cuvs::neighbors::index { ... };
 | `X` | `raft::device_matrix_view<const float, idx_t, raft::row_major>` |  |
 | `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 
-_Source: `cpp/include/cuvs/neighbors/ball_cover.hpp:35`_
-
 ## Random Ball Cover algorithm
 
 <a id="cuvs-neighbors-ball-cover-build"></a>
@@ -58,5 +56,3 @@ cuvs::neighbors::ball_cover::index
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/neighbors/ball_cover.hpp:170`_

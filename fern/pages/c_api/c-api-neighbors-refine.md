@@ -40,5 +40,3 @@ Refinement is an operation that follows an approximate NN search. The approximat
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-_Source: `c/include/cuvs/neighbors/refine.h:37`_

@@ -689,7 +689,6 @@ def render_native_function(
             lines.extend(["", escape_text(entry.returns)])
         lines.append("")
 
-    lines.extend([source_line(entry), ""])
     return trim_blank_lines(lines)
 
 
@@ -784,7 +783,6 @@ def render_native_compound(
             )
             lines.append("")
 
-    lines.extend([source_line(entry), ""])
     return trim_blank_lines(lines)
 
 
@@ -799,7 +797,6 @@ def render_native_member(entry: DoxygenEntry, language: str) -> list[str]:
     lines.extend(
         [f"```{language}", normalize_signature(entry.signature), "```", ""]
     )
-    lines.extend([source_line(entry), ""])
     return trim_blank_lines(lines)
 
 
@@ -3611,10 +3608,6 @@ def render_markdown_doc(doc: str) -> list[str]:
             else:
                 lines.append(escape_text(line))
     return trim_blank_lines(lines)
-
-
-def source_line(entry: DoxygenEntry) -> str:
-    return f"_Source: `{entry.source}:{entry.line}`_"
 
 
 def render_param_table(
