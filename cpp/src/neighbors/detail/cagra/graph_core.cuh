@@ -530,7 +530,7 @@ void sort_knn_graph(
   const uint64_t input_graph_degree = knn_graph.extent(1);
   IdxT* const input_graph_ptr       = knn_graph.data_handle();
 
-  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource_ref(res);
 
   auto d_input_graph = raft::make_device_mdarray<IdxT>(
     res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
@@ -1155,7 +1155,7 @@ void optimize(
   const bool use_gpu                          = true,
   const double variable_graph_degree_fraction = 1.0)
 {
-  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource_ref(res);
 
   RAFT_EXPECTS(knn_graph.extent(0) == new_graph.extent(0),
                "Each input array is expected to have the same number of rows");
