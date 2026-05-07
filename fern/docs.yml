@@ -47,6 +47,10 @@ navigation:
             path: "./pages/working_with_ann_indexes_rust.md"
       - page: "Filtering vector indexes"
         path: "./pages/filtering.md"
+      - section: "Developer Guide"
+        contents:
+          - page: "Developer Guide"
+            path: "./pages/developer_guide.md"
   - section: "Integrations"
     path: "./pages/integrations.md"
     contents:
@@ -379,5 +383,3 @@ navigation:
         path: "./pages/jit_lto_guide.md"
   - page: "Contributing"
     path: "./pages/contributing.md"
-  - page: "Developer Guide"
-    path: "./pages/developer_guide.md"
