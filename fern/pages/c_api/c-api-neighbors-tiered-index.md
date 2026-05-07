@@ -137,7 +137,10 @@ DLManagedTensor* dataset,
 cuvsTieredIndex_t index);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 **Parameters**
 

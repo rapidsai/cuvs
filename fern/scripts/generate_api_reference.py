@@ -72,6 +72,7 @@ API_NAV_SECTIONS = [
 
 COMMENT_RE = re.compile(r"/\*\*.*?\*/|(?:///[^\n]*(?:\n|$))+", re.DOTALL)
 DOXYGEN_COMMAND_RE = re.compile(r"[@\\](\w+)\b")
+DOXYGEN_LIST_ITEM_RE = re.compile(r"^(?:-\s+|\d+\.\s+)")
 PUBLIC_JAVA_TYPE_RE = re.compile(
     r"\bpublic\s+(?:abstract\s+|final\s+|sealed\s+|non-sealed\s+)?"
     r"(?P<kind>class|interface|enum|record)\s+(?P<name>[A-Za-z_]\w*)"
@@ -483,14 +484,8 @@ def render_native_function(
     lines.extend([f"```{language}", signature, "```", ""])
 
     if entry.details:
-        lines.extend(
-            [
-                escape_text(
-                    " ".join(line for line in entry.details if line.strip())
-                ),
-                "",
-            ]
-        )
+        lines.extend(render_doxygen_details(entry.details))
+        lines.append("")
 
     if entry.tparams:
         lines.extend(["**Template Parameters**", ""])
@@ -544,14 +539,8 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
     if entry.details:
-        lines.extend(
-            [
-                escape_text(
-                    " ".join(line for line in entry.details if line.strip())
-                ),
-                "",
-            ]
-        )
+        lines.extend(render_doxygen_details(entry.details))
+        lines.append("")
     lines.extend(
         [
             f"```{language}",
@@ -1218,7 +1207,7 @@ def parse_doxygen_entry(
         if active_param is not None and (
             raw_line.startswith((" ", "\t")) or not line_text
         ):
-            active_param.description = append_sentence(
+            active_param.description = append_doxygen_line(
                 active_param.description, clean_doxygen_text(line_text)
             )
             continue
@@ -1278,6 +1267,20 @@ def append_sentence(existing: str, addition: str) -> str:
     if not existing:
         return addition
     return f"{existing} {addition}"
+
+
+def append_doxygen_line(existing: str, addition: str) -> str:
+    addition = addition.strip()
+    if not addition:
+        return existing
+    if not existing:
+        return addition
+    lines = existing.splitlines()
+    if DOXYGEN_LIST_ITEM_RE.match(addition):
+        lines.append(addition)
+    else:
+        lines[-1] = append_sentence(lines[-1], addition)
+    return "\n".join(lines)
 
 
 def parse_doxygen_kind(declaration: str) -> str:
@@ -1844,21 +1847,93 @@ def render_numpy_field_names(value: str) -> str:
 
 
 def render_table_description(value: str) -> str:
-    paragraphs: list[str] = []
+    paragraphs: list[list[str]] = []
     current: list[str] = []
     for raw_line in value.splitlines():
         stripped = raw_line.strip()
         if not stripped:
             if current:
-                paragraphs.append(" ".join(current))
+                paragraphs.append(current)
                 current = []
             continue
         current.append(stripped)
     if current:
-        paragraphs.append(" ".join(current))
-    return "<br /><br />".join(
-        escape_text(paragraph) for paragraph in paragraphs
-    )
+        paragraphs.append(current)
+
+    rendered: list[str] = []
+    for paragraph in paragraphs:
+        normalized = normalize_description_lines(paragraph)
+        if any(DOXYGEN_LIST_ITEM_RE.match(line) for line in normalized):
+            rendered.append(
+                "<br />".join(escape_text(line) for line in normalized)
+            )
+        else:
+            rendered.append(escape_text(" ".join(normalized)))
+    return "<br /><br />".join(rendered)
+
+
+def normalize_description_lines(raw_lines: list[str]) -> list[str]:
+    lines: list[str] = []
+    paragraph: list[str] = []
+    in_list = False
+
+    for raw_line in raw_lines:
+        line = raw_line.strip()
+        if DOXYGEN_LIST_ITEM_RE.match(line):
+            if paragraph:
+                lines.append(" ".join(paragraph))
+                paragraph = []
+            lines.append(line)
+            in_list = True
+            continue
+
+        if in_list and lines:
+            lines[-1] = append_sentence(lines[-1], line)
+            continue
+
+        paragraph.append(line)
+
+    if paragraph:
+        lines.append(" ".join(paragraph))
+    return lines
+
+
+def render_doxygen_details(raw_lines: list[str]) -> list[str]:
+    lines: list[str] = []
+    paragraph: list[str] = []
+    in_list = False
+
+    def flush_paragraph() -> None:
+        nonlocal paragraph
+        if paragraph:
+            lines.append(escape_text(" ".join(paragraph)))
+            paragraph = []
+
+    for raw_line in raw_lines:
+        stripped = raw_line.strip()
+        if not stripped:
+            flush_paragraph()
+            if lines and lines[-1] != "":
+                lines.append("")
+            in_list = False
+            continue
+
+        if DOXYGEN_LIST_ITEM_RE.match(stripped):
+            flush_paragraph()
+            if lines and lines[-1] != "" and not in_list:
+                lines.append("")
+            lines.append(escape_text(stripped))
+            in_list = True
+            continue
+
+        if in_list and lines and lines[-1] != "":
+            lines[-1] = f"{lines[-1]} {escape_text(stripped)}"
+            continue
+
+        paragraph.append(stripped)
+
+    flush_paragraph()
+    return trim_blank_lines(lines)
 
 
 def render_doc_lines(raw_lines: list[str]) -> list[str]:
@@ -3078,7 +3153,7 @@ def render_param_table(
             description = (
                 f"{description} Default: `{param['default']}`.".strip()
             )
-        row.append(escape_text(description))
+        row.append(render_table_description(description))
         lines.append("| " + " | ".join(row) + " |")
     return lines
 

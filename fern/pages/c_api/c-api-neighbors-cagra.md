@@ -31,7 +31,9 @@ _Source: `c/include/cuvs/neighbors/cagra.h:29`_
 
 A strategy for selecting the graph build parameters based on similar HNSW index
 
-parameters. Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
+parameters.
+
+Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
 
 ```c
 enum cuvsCagraHnswHeuristicType { ... } ;
@@ -64,7 +66,11 @@ _Source: `c/include/cuvs/neighbors/cagra.h:82`_
 
 Parameters for ACE (Augmented Core Extraction) graph build.
 
-ACE enables building indexes for datasets too large to fit in GPU memory by: 1. Partitioning the dataset in core (closest) and augmented (second-closest) partitions using balanced k-means. 2. Building sub-indexes for each partition independently 3. Concatenating sub-graphs into a final unified index
+ACE enables building indexes for datasets too large to fit in GPU memory by:
+
+1. Partitioning the dataset in core (closest) and augmented (second-closest) partitions using balanced k-means.
+2. Building sub-indexes for each partition independently
+3. Concatenating sub-graphs into a final unified index
 
 ```c
 struct cuvsAceParams { ... } ;
@@ -348,7 +354,12 @@ DLManagedTensor* additional_dataset,
 cuvsCagraIndex_t index);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` 3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -606,7 +617,9 @@ Returns a view of the CAGRA dataset
 cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
 ```
 
-This function returns a non-owning view of the CAGRA dataset. The output will be referencing device memory that is directly used in CAGRA, without copying the dataset at all. This means that the output is only valid as long as the CAGRA index is alive, and once cuvsCagraIndexDestroy is called on the cagra index - the returned dataset view will be invalid. Note that the DLManagedTensor dataset returned will have an associated 'deleter' function that must be called when the dataset is no longer needed. This will free up host memory that stores the shape of the dataset view.
+This function returns a non-owning view of the CAGRA dataset. The output will be referencing device memory that is directly used in CAGRA, without copying the dataset at all. This means that the output is only valid as long as the CAGRA index is alive, and once cuvsCagraIndexDestroy is called on the cagra index - the returned dataset view will be invalid.
+
+Note that the DLManagedTensor dataset returned will have an associated 'deleter' function that must be called when the dataset is no longer needed. This will free up host memory that stores the shape of the dataset view.
 
 **Parameters**
 
@@ -631,7 +644,9 @@ Returns a view of the CAGRA graph
 cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph);
 ```
 
-This function returns a non-owning view of the CAGRA graph. The output will be referencing device memory that is directly used in CAGRA, without copying the graph at all. This means that the output is only valid as long as the CAGRA index is alive, and once cuvsCagraIndexDestroy is called on the cagra index - the returned graph view will be invalid. Note that the DLManagedTensor graph returned will have an associated 'deleter' function that must be called when the graph is no longer needed. This will free up host memory that stores the metadata for the graph view.
+This function returns a non-owning view of the CAGRA graph. The output will be referencing device memory that is directly used in CAGRA, without copying the graph at all. This means that the output is only valid as long as the CAGRA index is alive, and once cuvsCagraIndexDestroy is called on the cagra index - the returned graph view will be invalid.
+
+Note that the DLManagedTensor graph returned will have an associated 'deleter' function that must be called when the graph is no longer needed. This will free up host memory that stores the metadata for the graph view.
 
 **Parameters**
 
@@ -663,7 +678,12 @@ DLManagedTensor* dataset,
 cuvsCagraIndex_t index);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` 3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -700,7 +720,11 @@ DLManagedTensor* distances,
 cuvsFilter filter);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the CAGRA Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the CAGRA Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
+
+1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 
@@ -762,7 +786,9 @@ const char* filename,
 cuvsCagraIndex_t index);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -847,7 +873,16 @@ cuvsFilter filter,
 cuvsCagraIndex_t output_index);
 ```
 
-All input indices must have been built with the same data type (`index.dtype`) and have the same dimensionality (`index.dims`). The merged index uses the output parameters specified in `cuvsCagraIndexParams`. Input indices must have: - `index.dtype.code` and `index.dtype.bits` matching across all indices. - Supported data types for indices: a. `kDLFloat` with `bits = 32` b. `kDLFloat` with `bits = 16` c. `kDLInt` with `bits = 8` d. `kDLUInt` with `bits = 8` The resulting output index will have the same data type as the input indices. Example:
+All input indices must have been built with the same data type (`index.dtype`) and have the same dimensionality (`index.dims`). The merged index uses the output parameters specified in `cuvsCagraIndexParams`.
+
+Input indices must have:
+
+- `index.dtype.code` and `index.dtype.bits` matching across all indices.
+- Supported data types for indices: a. `kDLFloat` with `bits = 32` b. `kDLFloat` with `bits = 16` c. `kDLInt` with `bits = 8` d. `kDLUInt` with `bits = 8`
+
+The resulting output index will have the same data type as the input indices.
+
+Example:
 
 **Parameters**
 

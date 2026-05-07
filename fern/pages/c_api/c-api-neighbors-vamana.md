@@ -166,7 +166,15 @@ DLManagedTensor* dataset,
 cuvsVamanaIndex_t index);
 ```
 
-Build the index from the dataset for efficient DiskANN search. The build uses the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively inserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+Build the index from the dataset for efficient DiskANN search.
+
+The build uses the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively inserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 
@@ -200,7 +208,9 @@ cuvsVamanaIndex_t index,
 bool include_dataset);
 ```
 
-Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility. Serialized Index is to be used by the DiskANN open-source repository for graph search.
+Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+
+Serialized Index is to be used by the DiskANN open-source repository for graph search.
 
 **Parameters**
 

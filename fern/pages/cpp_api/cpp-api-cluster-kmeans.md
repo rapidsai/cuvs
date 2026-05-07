@@ -44,7 +44,12 @@ _Source: `cpp/include/cuvs/cluster/kmeans.hpp:34`_
 
 Simple object to specify hyper-parameters to the balanced k-means algorithm.
 
-The following metrics are currently supported in k-means balanced: - CosineExpanded - InnerProduct - L2Expanded - L2SqrtExpanded
+The following metrics are currently supported in k-means balanced:
+
+- CosineExpanded
+- InnerProduct
+- L2Expanded
+- L2SqrtExpanded
 
 ```cpp
 struct balanced_params : base_params { ... } ;
@@ -93,7 +98,9 @@ raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int64_t> n_iter);
 ```
 
-TODO: Evaluate replacing the extent type with int64_t. Reference issue: https://github.com/rapidsai/cuvs/issues/1961 This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by params.streaming_batch_size.
+TODO: Evaluate replacing the extent type with int64_t. Reference issue: https://github.com/rapidsai/cuvs/issues/1961
+
+This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by params.streaming_batch_size.
 
 **Parameters**
 

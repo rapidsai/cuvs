@@ -129,7 +129,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft handle for resource reuse |
 | `X` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | data points on device memory (size n_rows * d) |
-| `linkage_graph_params` | in | `std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>` | Parameters controlling how the KNN graph is built. This can be either: - distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering. - mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
+| `linkage_graph_params` | in | `std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>` | Parameters controlling how the KNN graph is built. This can be either:<br />- distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering.<br />- mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
 | `metric` | in | `cuvs::distance::DistanceType` | distance metric to use |
 | `out_mst` | out | `raft::device_coo_matrix_view<float, int64_t, int64_t, size_t>` | output MST sorted by edge weights (size n_rows - 1) |
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
@@ -169,7 +169,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft handle for resource reuse |
 | `X` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | data points on host memory (size n_rows * d) |
-| `linkage_graph_params` | in | `std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>` | Parameters controlling how the KNN graph is built. This can be either: - distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering. - mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
+| `linkage_graph_params` | in | `std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>` | Parameters controlling how the KNN graph is built. This can be either:<br />- distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering.<br />- mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
 | `metric` | in | `cuvs::distance::DistanceType` | distance metric to use |
 | `out_mst` | out | `raft::device_coo_matrix_view<float, int64_t, int64_t, size_t>` | output MST sorted by edge weights (size n_rows - 1) |
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
@@ -197,7 +197,9 @@ raft::device_vector_view<float, int64_t> out_delta,
 raft::device_vector_view<int64_t, int64_t> out_size);
 ```
 
-This function takes a sorted MST (represented as edges with source, destination, and weights) and constructs a dendrogram (hierarchical clustering tree) on the host. nnz)
+This function takes a sorted MST (represented as edges with source, destination, and weights) and constructs a dendrogram (hierarchical clustering tree) on the host.
+
+nnz)
 
 **Parameters**
 

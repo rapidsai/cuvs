@@ -43,7 +43,7 @@ Parameters for building a Vamana index
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `str, default="sqeuclidean"` | String denoting the metric type. Supported metrics include: - "sqeuclidean" - "l2" |
+| `metric` | `str, default="sqeuclidean"` | String denoting the metric type. Supported metrics include:<br />- "sqeuclidean"<br />- "l2" |
 | `graph_degree` | `int, default=32` | Maximum degree of graph; corresponds to the R parameter of Vamana algorithm in the literature. |
 | `visited_size` | `int, default=64` | Maximum number of visited nodes per search during Vamana algorithm. Loosely corresponds to the L parameter in the literature. |
 | `vamana_iters` | `float, default=1` | Number of Vamana vector insertion iterations (each iteration inserts all vectors). |

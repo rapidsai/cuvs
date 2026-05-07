@@ -267,7 +267,11 @@ DLManagedTensor* dataset,
 cuvsIvfFlatIndex_t index);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -304,7 +308,11 @@ DLManagedTensor* distances,
 cuvsFilter filter);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
+
+1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 

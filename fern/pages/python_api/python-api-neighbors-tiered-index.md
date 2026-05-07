@@ -42,7 +42,7 @@ Parameters to build index for Tiered Index nearest neighbor search
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where - sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2, - euclidean is the euclidean distance - inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i. - cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
+| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where<br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- euclidean is the euclidean distance<br />- inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
 | `algo` | `str, default = "cagra"` | The algorithm to use for the ANN portion of the tiered index |
 | `upstream_params` | `object, optional` | The IndexParams for the upstream ANN object to use (ie the Cagra IndexParams for cagra etc) |
 | `min_ann_rows` | `int` | The minimum number of rows necessary to create an ann index |

@@ -102,7 +102,9 @@ raft::device_matrix_view<float, int, raft::row_major> dataset,
 raft::device_vector_view<int, int> labels);
 ```
 
-This overload automatically constructs the connectivity graph from the input dataset using k-nearest neighbors. n_clusters-1)
+This overload automatically constructs the connectivity graph from the input dataset using k-nearest neighbors.
+
+n_clusters-1)
 
 **Parameters**
 

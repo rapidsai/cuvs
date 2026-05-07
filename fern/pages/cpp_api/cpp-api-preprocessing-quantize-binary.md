@@ -134,7 +134,9 @@ raft::device_matrix_view<const double, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
 
-set the corresponding bit to 1. Usage example:
+set the corresponding bit to 1.
+
+Usage example:
 
 **Parameters**
 
@@ -162,7 +164,9 @@ raft::host_matrix_view<const double, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
 
-set the corresponding bit to 1. Usage example:
+set the corresponding bit to 1.
+
+Usage example:
 
 **Parameters**
 
@@ -246,7 +250,9 @@ raft::device_matrix_view<const float, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
 
-set the corresponding bit to 1. Usage example:
+set the corresponding bit to 1.
+
+Usage example:
 
 **Parameters**
 
@@ -274,7 +280,9 @@ raft::host_matrix_view<const float, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
 
-set the corresponding bit to 1. Usage example:
+set the corresponding bit to 1.
+
+Usage example:
 
 **Parameters**
 

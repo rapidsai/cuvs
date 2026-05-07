@@ -594,7 +594,9 @@ const cuvs::neighbors::brute_force::index<half, float>& index,
 bool include_dataset = true);
 ```
 
-The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work. output
+The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
+
+output
 
 **Template Parameters**
 
@@ -628,7 +630,9 @@ const cuvs::neighbors::brute_force::index<float, float>& index,
 bool include_dataset = true);
 ```
 
-The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work. output
+The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
+
+output
 
 **Template Parameters**
 

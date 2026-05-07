@@ -98,7 +98,7 @@ Parameters to build index for HNSW nearest neighbor search
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `hierarchy` | `string, default = "gpu" (optional)` | The hierarchy of the HNSW index. Valid values are ["none", "cpu", "gpu"]. - "none": No hierarchy is built. - "cpu": Hierarchy is built using CPU. - "gpu": Hierarchy is built using GPU. |
+| `hierarchy` | `string, default = "gpu" (optional)` | The hierarchy of the HNSW index. Valid values are ["none", "cpu", "gpu"].<br />- "none": No hierarchy is built.<br />- "cpu": Hierarchy is built using CPU.<br />- "gpu": Hierarchy is built using GPU. |
 | `ef_construction` | `int, default = 200 (optional)` | Maximum number of candidate list size used during construction when hierarchy is `cpu`. |
 | `num_threads` | `int, default = 0 (optional)` | Number of CPU threads used to increase construction parallelism when hierarchy is `cpu` or `gpu`. When the value is 0, the number of threads is automatically determined to the maximum number of threads available. NOTE: When hierarchy is `gpu`, while the majority of the work is done on the GPU, initialization of the HNSW index itself and some other work is parallelized with the help of CPU threads. |
 | `M` | `int, default = 32 (optional)` | HNSW M parameter: number of bi-directional links per node (used when building with ACE). graph_degree = m * 2, intermediate_graph_degree = m * 3. |
@@ -411,7 +411,7 @@ version of cuVS is not guaranteed to work.
 | `filename` | `string` | Name of the file. |
 | `dim` | `int` | Dimensions of the training dataest |
 | `dtype` | `np.dtype of the saved index` | Valid values for dtype: [np.float32, np.byte, np.ubyte] |
-| `metric` | `string denoting the metric type, default="sqeuclidean"` | Valid values for metric: ["sqeuclidean", "inner_product"], where - sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2, - inner_product distance is defined as distance(a, b) = \\sum_i a_i * b_i. |
+| `metric` | `string denoting the metric type, default="sqeuclidean"` | Valid values for metric: ["sqeuclidean", "inner_product"], where<br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- inner_product distance is defined as distance(a, b) = \\sum_i a_i * b_i. |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
 **Returns**

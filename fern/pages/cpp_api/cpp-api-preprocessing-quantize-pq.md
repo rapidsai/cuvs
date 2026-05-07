@@ -82,7 +82,9 @@ const params params,
 raft::device_matrix_view<const float, int64_t> dataset);
 ```
 
-The use of a pool memory resource is recommended for more consistent training performance. Usage example:
+The use of a pool memory resource is recommended for more consistent training performance.
+
+Usage example:
 
 **Parameters**
 
@@ -134,7 +136,9 @@ raft::device_matrix_view<uint8_t, int64_t> codes_out,
 std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt);
 ```
 
-Usage example: used, optional
+Usage example:
+
+used, optional
 
 **Parameters**
 

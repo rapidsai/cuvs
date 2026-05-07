@@ -28,7 +28,7 @@ Create a pre-filter from an array with type of uint32.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `bitmap` | `numpy.ndarray` | An array with type of `uint32` where each bit in the array corresponds to if a sample and query pair is greenlit (not filtered) or filtered. The array is row-major, meaning the bits are ordered by rows first. Each bit in a `uint32` element represents a different sample-query pair.<br /><br />- Bit value of 1: The sample-query pair is greenlit (allowed). - Bit value of 0: The sample-query pair is filtered. |
+| `bitmap` | `numpy.ndarray` | An array with type of `uint32` where each bit in the array corresponds to if a sample and query pair is greenlit (not filtered) or filtered. The array is row-major, meaning the bits are ordered by rows first. Each bit in a `uint32` element represents a different sample-query pair.<br /><br />- Bit value of 1: The sample-query pair is greenlit (allowed).<br />- Bit value of 0: The sample-query pair is filtered. |
 
 **Returns**
 
@@ -66,7 +66,7 @@ Create a pre-filter from an array with type of uint32.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `bitset` | `numpy.ndarray` | An array with type of `uint32` where each bit in the array corresponds to if a sample is greenlit (not filtered) or filtered. Each bit in a `uint32` element represents a different sample of the dataset.<br /><br />- Bit value of 1: The sample is greenlit (allowed). - Bit value of 0: The sample pair is filtered. |
+| `bitset` | `numpy.ndarray` | An array with type of `uint32` where each bit in the array corresponds to if a sample is greenlit (not filtered) or filtered. Each bit in a `uint32` element represents a different sample of the dataset.<br /><br />- Bit value of 1: The sample is greenlit (allowed).<br />- Bit value of 0: The sample pair is filtered. |
 
 **Returns**
 

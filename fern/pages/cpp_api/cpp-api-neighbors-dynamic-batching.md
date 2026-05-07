@@ -105,7 +105,11 @@ raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
 raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-The search parameters of the upstream index and the optional filtering function are configured at the dynamic batching index construction time. Like with many other indexes, the dynamic batching search has the stream-ordered semantics: the host function may return the control before the results are ready. Synchronize with the main CUDA stream in the given resource object to wait for arrival of the search results. Dynamic batching search is thread-safe: call the search function with copies of the same index in multiple threads to increase the occupancy of the batches.
+The search parameters of the upstream index and the optional filtering function are configured at the dynamic batching index construction time.
+
+Like with many other indexes, the dynamic batching search has the stream-ordered semantics: the host function may return the control before the results are ready. Synchronize with the main CUDA stream in the given resource object to wait for arrival of the search results.
+
+Dynamic batching search is thread-safe: call the search function with copies of the same index in multiple threads to increase the occupancy of the batches.
 
 **Parameters**
 

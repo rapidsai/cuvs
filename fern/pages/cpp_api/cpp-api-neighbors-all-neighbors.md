@@ -62,7 +62,11 @@ std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distance
 float alpha                                                                       = 1.0);
 ```
 
-training vectors) Usage example: compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space.
+training vectors)
+
+Usage example:
+
+compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space.
 
 **Parameters**
 
@@ -97,7 +101,11 @@ std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distance
 float alpha                                                                       = 1.0);
 ```
 
-vectors) params.n_clusters should be 1 for data on device. To use a larger params.n_clusters for efficient device memory usage, put data on host RAM. Usage example: compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space.
+vectors) params.n_clusters should be 1 for data on device. To use a larger params.n_clusters for efficient device memory usage, put data on host RAM.
+
+Usage example:
+
+compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space.
 
 **Parameters**
 

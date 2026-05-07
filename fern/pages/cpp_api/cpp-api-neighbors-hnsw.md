@@ -41,7 +41,11 @@ int ef_construction,
 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 ```
 
-* IMPORTANT NOTE * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS. However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the curve). Usage example:
+* IMPORTANT NOTE *
+
+The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS. However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the curve).
+
+Usage example:
 
 **Parameters**
 
@@ -177,7 +181,13 @@ const index_params& params,
 raft::host_matrix_view<const float, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -204,7 +214,13 @@ const index_params& params,
 raft::host_matrix_view<const half, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -231,7 +247,13 @@ const index_params& params,
 raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -258,7 +280,13 @@ const index_params& params,
 raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -291,7 +319,12 @@ std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dat
 std::nullopt);
 ```
 
-NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library. Usage example:
+NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -321,7 +354,12 @@ std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> data
 std::nullopt);
 ```
 
-NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library. Usage example:
+NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -351,7 +389,12 @@ std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> d
 std::nullopt);
 ```
 
-NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library. Usage example:
+NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -381,7 +424,12 @@ std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> da
 std::nullopt);
 ```
 
-NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library. Usage example:
+NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -413,7 +461,9 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset
 index<float>& idx);
 ```
 
-NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index. Usage example:
+NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index.
+
+Usage example:
 
 **Parameters**
 
@@ -441,7 +491,9 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
 index<half>& idx);
 ```
 
-NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index. Usage example:
+NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index.
+
+Usage example:
 
 **Parameters**
 
@@ -469,7 +521,9 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_datas
 index<uint8_t>& idx);
 ```
 
-NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index. Usage example:
+NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index.
+
+Usage example:
 
 **Parameters**
 
@@ -497,7 +551,9 @@ raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_datase
 index<int8_t>& idx);
 ```
 
-NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index. Usage example:
+NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU` when converting from a CAGRA index.
+
+Usage example:
 
 **Parameters**
 
@@ -552,7 +608,11 @@ raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
 raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib. [n_queries, k] k] Usage example:
+NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib.
+
+[n_queries, k] k]
+
+Usage example:
 
 **Parameters**
 
@@ -584,7 +644,11 @@ raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
 raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib. [n_queries, k] k] Usage example:
+NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib.
+
+[n_queries, k] k]
+
+Usage example:
 
 **Parameters**
 
@@ -616,7 +680,11 @@ raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
 raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib. [n_queries, k] k] Usage example:
+NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib.
+
+[n_queries, k] k]
+
+Usage example:
 
 **Parameters**
 
@@ -648,7 +716,11 @@ raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
 raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib. [n_queries, k] k] Usage example:
+NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is `NONE`, as the format is not compatible with the original hnswlib.
+
+[n_queries, k] k]
+
+Usage example:
 
 **Parameters**
 
@@ -679,7 +751,9 @@ Serialize the HNSW index to file
 void serialize(raft::resources const& res, const std::string& filename, const index<float>& idx);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -703,7 +777,9 @@ Serialize the HNSW index to file
 void serialize(raft::resources const& res, const std::string& filename, const index<half>& idx);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -727,7 +803,9 @@ Serialize the HNSW index to file
 void serialize(raft::resources const& res, const std::string& filename, const index<uint8_t>& idx);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -751,7 +829,9 @@ Serialize the HNSW index to file
 void serialize(raft::resources const& res, const std::string& filename, const index<int8_t>& idx);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -780,7 +860,9 @@ cuvs::distance::DistanceType metric,
 index<float>** index);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -812,7 +894,9 @@ cuvs::distance::DistanceType metric,
 index<half>** index);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -844,7 +928,9 @@ cuvs::distance::DistanceType metric,
 index<uint8_t>** index);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 
@@ -876,7 +962,9 @@ cuvs::distance::DistanceType metric,
 index<int8_t>** index);
 ```
 
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library. Usage example:
+NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
+
+Usage example:
 
 **Parameters**
 

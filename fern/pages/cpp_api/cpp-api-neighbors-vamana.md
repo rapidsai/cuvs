@@ -314,7 +314,13 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::vamana::index<float, uint32_t>;
 ```
 
-The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 
@@ -343,7 +349,13 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::vamana::index<float, uint32_t>;
 ```
 
-The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 
@@ -372,7 +384,13 @@ raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::vamana::index<int8_t, uint32_t>;
 ```
 
-The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 
@@ -401,7 +419,13 @@ raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::vamana::index<int8_t, uint32_t>;
 ```
 
-The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 
@@ -430,7 +454,13 @@ raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 ```
 
-The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 
@@ -459,7 +489,13 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 ```
 
-The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph. The following distance metrics are supported: - L2 Usage example:
+The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm starts with an empty graph and iteratively iserts batches of nodes. Each batch involves performing a greedy search for each vector to be inserted, and inserting it with edges to all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied to improve graph quality. The index_params struct controls the degree of the final graph.
+
+The following distance metrics are supported:
+
+- L2
+
+Usage example:
 
 **Parameters**
 

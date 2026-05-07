@@ -106,7 +106,9 @@ raft::device_vector_view<float, int64_t> mu,
 raft::device_matrix_view<float, int64_t, raft::col_major> trans_input);
 ```
 
-Transforms the input data into the eigenspace using previously computed principal components. (mean-centered then restored).
+Transforms the input data into the eigenspace using previously computed principal components.
+
+(mean-centered then restored).
 
 **Parameters**
 

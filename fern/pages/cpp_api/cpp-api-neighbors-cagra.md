@@ -38,7 +38,9 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:42`_
 
 A strategy for selecting the graph build parameters based on similar HNSW index
 
-parameters. Define how `cagra::index_params::from_hnsw_params` should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
+parameters.
+
+Define how `cagra::index_params::from_hnsw_params` should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
 
 ```cpp
 enum class hnsw_heuristic_type : uint32_t { ... } ;
@@ -59,7 +61,11 @@ hnsw_heuristic_type heuristic       = hnsw_heuristic_type::SIMILAR_SEARCH_PERFOR
 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 ```
 
-* IMPORTANT NOTE * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce exactly the same recalls and QPS for the same parameter `ef`. The graphs are different internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve may be shifted along the curve right or left. See the heuristics descriptions for more details. Usage example:
+* IMPORTANT NOTE *
+
+The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce exactly the same recalls and QPS for the same parameter `ef`. The graphs are different internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve may be shifted along the curve right or left. See the heuristics descriptions for more details.
+
+Usage example:
 
 **Parameters**
 
@@ -341,7 +347,17 @@ graph_accessor> knn_graph)
 : cuvs::neighbors::index(),
 ```
 
-If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around these that stores a non-owning a reference to the arrays. The constructor also accepts host arrays. In that case they are copied to the device, and the device arrays will be owned by the index. In case the dasates rows are not 16 bytes aligned, then we create a padded copy in device memory to ensure alignment for vectorized load. Usage examples: - Cagra index is normally created by the cagra::build In the above example, we have passed a host dataset to build. The returned index will own a device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a device_mdspan to build, then it will only store a reference to it. - Constructing index using existing knn-graph
+If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around these that stores a non-owning a reference to the arrays.
+
+The constructor also accepts host arrays. In that case they are copied to the device, and the device arrays will be owned by the index.
+
+In case the dasates rows are not 16 bytes aligned, then we create a padded copy in device memory to ensure alignment for vectorized load.
+
+Usage examples:
+
+- Cagra index is normally created by the cagra::build In the above example, we have passed a host dataset to build. The returned index will own a device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a device_mdspan to build, then it will only store a reference to it.
+
+- Constructing index using existing knn-graph
 
 **Parameters**
 
@@ -367,7 +383,9 @@ void update_dataset(raft::resources const& res,
 raft::device_matrix_view<const T, int64_t, raft::row_major> dataset);
 ```
 
-If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the index. It is expected that the same set of vectors are used for update_dataset and index build. Note: This will clear any precomputed dataset norms.
+If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the index. It is expected that the same set of vectors are used for update_dataset and index build.
+
+Note: This will clear any precomputed dataset norms.
 
 **Parameters**
 
@@ -413,7 +431,9 @@ void update_dataset(raft::resources const& res,
 raft::host_matrix_view<const T, int64_t, raft::row_major> dataset);
 ```
 
-We create a copy of the dataset on the device. The index manages the lifetime of this copy. It is expected that the same set of vectors are used for update_dataset and index build. Note: This will clear any precomputed dataset norms.
+We create a copy of the dataset on the device. The index manages the lifetime of this copy. It is expected that the same set of vectors are used for update_dataset and index build.
+
+Note: This will clear any precomputed dataset norms.
 
 **Parameters**
 
@@ -438,7 +458,9 @@ auto update_dataset(raft::resources const& res, DatasetT&& dataset)
 -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>;
 ```
 
-for update_dataset and index build. Note: This will clear any precomputed dataset norms.
+for update_dataset and index build.
+
+Note: This will clear any precomputed dataset norms.
 
 **Parameters**
 
@@ -632,7 +654,16 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<float, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - InnerProduct (currently only supported with IVF-PQ as the build algorithm) - CosineExpanded - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+- CosineExpanded
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -661,7 +692,16 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<float, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - InnerProduct (currently only supported with IVF-PQ as the build algorithm) - CosineExpanded - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+- CosineExpanded
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -690,7 +730,16 @@ raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<half, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - InnerProduct (currently only supported with IVF-PQ as the build algorithm) - CosineExpanded (dataset norms are computed as float regardless of input data type) - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+- CosineExpanded (dataset norms are computed as float regardless of input data type)
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -719,7 +768,15 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<half, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - CosineExpanded (dataset norms are computed as float regardless of input data type) - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- CosineExpanded (dataset norms are computed as float regardless of input data type)
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -748,7 +805,16 @@ raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - CosineExpanded (dataset norms are computed as float regardless of input data type) - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- CosineExpanded (dataset norms are computed as float regardless of input data type)
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -777,7 +843,17 @@ raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - InnerProduct (currently only supported with IVF-PQ as the build algorithm) - CosineExpanded (dataset norms are computed as float regardless of input data type) - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+- CosineExpanded (dataset norms are computed as float regardless of input data type)
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -806,7 +882,17 @@ raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - InnerProduct (currently only supported with IVF-PQ as the build algorithm) - CosineExpanded (dataset norms are computed as float regardless of input data type) - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+- CosineExpanded (dataset norms are computed as float regardless of input data type)
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -835,7 +921,17 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported: - L2 - InnerProduct (currently only supported with IVF-PQ as the build algorithm) - CosineExpanded (dataset norms are computed as float regardless of input data type) - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
+
+- L2
+- InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+- CosineExpanded (dataset norms are computed as float regardless of input data type)
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -872,7 +968,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -906,7 +1004,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -940,7 +1040,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -974,7 +1076,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -1008,7 +1112,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -1042,7 +1148,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -1076,7 +1184,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -1110,7 +1220,9 @@ new_dataset_buffer_view                                                        =
 std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 ```
 
-Usage example: part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
+Usage example:
+
+part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
 
 **Parameters**
 
@@ -1599,7 +1711,9 @@ std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dat
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1629,7 +1743,9 @@ std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dat
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1659,7 +1775,9 @@ std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> data
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1689,7 +1807,9 @@ std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> data
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1719,7 +1839,9 @@ std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> da
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1749,7 +1871,9 @@ std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> da
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1779,7 +1903,9 @@ std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> d
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1809,7 +1935,9 @@ std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> d
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 

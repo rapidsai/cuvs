@@ -121,7 +121,9 @@ const std::string& file_prefix,
 const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
 ```
 
-This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+This serializes the index into a list of files for integration into OSS ScaNN for use with search
+
+NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
 
 **Parameters**
 
@@ -151,7 +153,9 @@ const std::string& file_prefix,
 const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
 ```
 
-This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+This serializes the index into a list of files for integration into OSS ScaNN for use with search
+
+NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
 
 **Parameters**
 

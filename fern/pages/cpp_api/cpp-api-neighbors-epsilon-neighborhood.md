@@ -25,7 +25,9 @@ value_t eps,
 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
 ```
 
-The epsilon neighbors is represented by a dense boolean adjacency matrix of size m * n and an array of degrees for each vertex, which can be used as a compressed sparse row (CSR) indptr array. Currently, only L2Unexpanded (L2-squared) distance metric is supported. Other metrics will throw an exception.
+The epsilon neighbors is represented by a dense boolean adjacency matrix of size m * n and an array of degrees for each vertex, which can be used as a compressed sparse row (CSR) indptr array.
+
+Currently, only L2Unexpanded (L2-squared) distance metric is supported. Other metrics will throw an exception.
 
 **Template Parameters**
 

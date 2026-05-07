@@ -149,7 +149,9 @@ raft::device_matrix_view<const int8_t, int64_t> dataset,
 raft::device_matrix_view<double, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless.
+
+Usage example:
 
 **Parameters**
 
@@ -177,7 +179,9 @@ raft::host_matrix_view<const int8_t, int64_t> dataset,
 raft::host_matrix_view<double, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless.
+
+Usage example:
 
 **Parameters**
 
@@ -317,7 +321,9 @@ raft::device_matrix_view<const int8_t, int64_t> dataset,
 raft::device_matrix_view<float, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless.
+
+Usage example:
 
 **Parameters**
 
@@ -345,7 +351,9 @@ raft::host_matrix_view<const int8_t, int64_t> dataset,
 raft::host_matrix_view<float, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless.
+
+Usage example:
 
 **Parameters**
 
@@ -485,7 +493,9 @@ raft::device_matrix_view<const int8_t, int64_t> dataset,
 raft::device_matrix_view<half, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless.
+
+Usage example:
 
 **Parameters**
 
@@ -513,7 +523,9 @@ raft::host_matrix_view<const int8_t, int64_t> dataset,
 raft::host_matrix_view<half, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless.
+
+Usage example:
 
 **Parameters**
 

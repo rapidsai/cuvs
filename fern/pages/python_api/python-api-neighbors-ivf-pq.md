@@ -230,7 +230,7 @@ Parameters to build index for IvfPq nearest neighbor search
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_lists` | `int, default = 1024` | The number of clusters used in the coarse quantizer. |
-| `metric` | `str, default="sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where:<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2, - euclidean is the euclidean distance - inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i. - cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
+| `metric` | `str, default="sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where:<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- euclidean is the euclidean distance<br />- inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
 | `kmeans_n_iters` | `int, default = 20` | The number of iterations searching for kmeans centers during index building. |
 | `kmeans_trainset_fraction` | `int, default = 0.5` | If kmeans_trainset_fraction is less than 1, then the dataset is subsampled, and only n_samples * kmeans_trainset_fraction rows are used for training. |
 | `pq_bits` | `int, default = 8` | The bit length of the vector element after quantization. |
@@ -240,7 +240,7 @@ Parameters to build index for IvfPq nearest neighbor search
 | `add_data_on_build` | `bool, default = True` | After training the coarse and fine quantizers, we will populate the index with the dataset if add_data_on_build == True, otherwise the index is left empty, and the extend method can be used to add new vectors to the index. |
 | `conservative_memory_allocation` | `bool, default = True` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). To disable this behavior and use as little GPU memory for the database as possible, set this flat to `True`. |
 | `max_train_points_per_pq_code` | `int, default = 256` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and PER_CLUSTER. In both cases, we will use pq_book_size * max_train_points_per_pq_code training points to train each codebook. |
-| `codes_layout` | `string, default = "interleaved"` | Memory layout of the IVF-PQ list data. Valid values ["flat", "interleaved"]<br /><br />- flat: Codes are stored contiguously, one vector's codes after another. - interleaved: Codes are interleaved for optimized search performance. This is the default and recommended for search workloads. |
+| `codes_layout` | `string, default = "interleaved"` | Memory layout of the IVF-PQ list data. Valid values ["flat", "interleaved"]<br /><br />- flat: Codes are stored contiguously, one vector's codes after another.<br />- interleaved: Codes are interleaved for optimized search performance. This is the default and recommended for search workloads. |
 
 **Constructor**
 
@@ -414,7 +414,7 @@ Supplemental parameters to search IVF-Pq index
 | `n_probes` | `int` | The number of clusters to search. |
 | `lut_dtype` | `default = np.float32` | Data type of look up table to be created dynamically at search time. The use of low-precision types reduces the amount of shared memory required at search time, so fast shared memory kernels can be used even for datasets with large dimansionality. Note that the recall is slightly degraded when low-precision type is selected. Possible values [np.float32, np.float16, np.uint8] |
 | `internal_distance_dtype` | `default = np.float32` | Storage data type for distance/similarity computation. Possible values [np.float32, np.float16] |
-| `coarse_search_dtype` | `default = np.float32` | [Experimental] The data type to use as the GEMM element type when searching the clusters to probe. Possible values: [np.float32, np.float16, np.int8]. - Legacy default: np.float32 - Recommended for performance: np.float16 (half) - Experimental/low-precision: np.int8 |
+| `coarse_search_dtype` | `default = np.float32` | [Experimental] The data type to use as the GEMM element type when searching the clusters to probe. Possible values: [np.float32, np.float16, np.int8].<br />- Legacy default: np.float32<br />- Recommended for performance: np.float16 (half)<br />- Experimental/low-precision: np.int8 |
 | `max_internal_batch_size` | `default = 4096` | Set the internal batch size to improve GPU utilization at the cost of larger memory footprint. |
 
 **Constructor**
@@ -567,7 +567,7 @@ The index_params must be consistent with the provided matrices. Specifically:
 | --- | --- | --- |
 | `index_params` | `cuvs.neighbors.ivf_pq.IndexParams` | Parameters that must be consistent with the provided matrices |
 | `dim` | `int` | Dimensionality of the input data |
-| `pq_centers` | `CUDA array interface compliant tensor` | PQ codebook on device memory with required shape: - codebook_kind "subspace": [pq_dim, pq_len, pq_book_size] - codebook_kind "cluster":  [n_lists, pq_len, pq_book_size] Supported dtype: float32 |
+| `pq_centers` | `CUDA array interface compliant tensor` | PQ codebook on device memory with required shape:<br />- codebook_kind "subspace": [pq_dim, pq_len, pq_book_size]<br />- codebook_kind "cluster":  [n_lists, pq_len, pq_book_size] Supported dtype: float32 |
 | `centers` | `CUDA array interface compliant matrix` | Cluster centers in the original space [n_lists, dim_ext] where dim_ext = round_up(dim + 1, 8). Supported dtype: float32 |
 | `centers_rot` | `CUDA array interface compliant matrix` | Rotated cluster centers [n_lists, rot_dim] where rot_dim = pq_len * pq_dim. Supported dtype: float32 |
 | `rotation_matrix` | `CUDA array interface compliant matrix` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, dim]. Supported dtype: float32 |

@@ -423,7 +423,9 @@ int max_pool_size_percent,
 bool managed);
 ```
 
-bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed. available memory available memory
+bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed.
+
+available memory available memory
 
 **Parameters**
 
@@ -535,7 +537,9 @@ Copy a matrix
 cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
 ```
 
-This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides. Both src and dst must have the same shape and dtype, but can have different strides and device type. The memory for the output dst tensor must already be allocated and the tensor initialized.
+This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides.
+
+Both src and dst must have the same shape and dtype, but can have different strides and device type. The memory for the output dst tensor must already be allocated and the tensor initialized.
 
 **Parameters**
 

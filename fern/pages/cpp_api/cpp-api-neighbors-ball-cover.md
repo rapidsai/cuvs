@@ -18,7 +18,9 @@ Builds and populates a previously unbuilt cuvs::neighbors::ball_cover::index
 void build(raft::resources const& handle, index<int64_t, float>& index);
 ```
 
-Usage example: cuvs::neighbors::ball_cover::index
+Usage example:
+
+cuvs::neighbors::ball_cover::index
 
 **Parameters**
 

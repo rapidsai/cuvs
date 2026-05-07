@@ -14,7 +14,9 @@ _Doxygen group: `nn_descent_cpp_index_params`_
 
 Dtype to use for distance computation
 
-- `AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions. - `FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage. - `FP16`: Use fp16 distance computation.
+- `AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions.
+- `FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage.
+- `FP16`: Use fp16 distance computation.
 
 ```cpp
 enum class DIST_COMP_DTYPE { ... } ;
@@ -34,7 +36,12 @@ _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:35`_
 
 Parameters used to build an nn-descent index
 
-- `graph_degree`: For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree) - `intermediate_graph_degree`: Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree - `max_iterations`: The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance - `termination_threshold`: The delta at which nn-descent will terminate its iterations - `return_distances`: Boolean to decide whether to return distances array - `dist_comp_dtype`: dtype to use for distance computation. Defaults to `AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `FP16` for better performance and memory usage at the cost of precision.
+- `graph_degree`: For an input dataset of dimensions (N, D), determines the final dimensions of the all-neighbors knn graph which turns out to be of dimensions (N, graph_degree)
+- `intermediate_graph_degree`: Internally, nn-descent builds an all-neighbors knn graph of dimensions (N, intermediate_graph_degree) before selecting the final `graph_degree` neighbors. It's recommended that `intermediate_graph_degree` &gt;= 1.5 * graph_degree
+- `max_iterations`: The number of iterations that nn-descent will refine the graph for. More iterations produce a better quality graph at cost of performance
+- `termination_threshold`: The delta at which nn-descent will terminate its iterations
+- `return_distances`: Boolean to decide whether to return distances array
+- `dist_comp_dtype`: dtype to use for distance computation. Defaults to `AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `FP16` for better performance and memory usage at the cost of precision.
 
 ```cpp
 struct index_params : cuvs::neighbors::index_params { ... } ;
@@ -124,7 +131,9 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 : cuvs::neighbors::index(),
 ```
 
-This constructor creates an nn-descent index using a user allocated host memory knn-graph. The type of the knn-graph is a dense raft::host_matrix and dimensions are (n_rows, n_cols). distances
+This constructor creates an nn-descent index using a user allocated host memory knn-graph. The type of the knn-graph is a dense raft::host_matrix and dimensions are (n_rows, n_cols).
+
+distances
 
 **Parameters**
 
@@ -229,7 +238,17 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+
+Usage example:
+
+the output graph
 
 **Parameters**
 
@@ -260,7 +279,17 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+
+Usage example:
+
+the output graph
 
 **Template Parameters**
 
@@ -298,7 +327,17 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+
+Usage example:
+
+the output graph
 
 **Parameters**
 
@@ -329,7 +368,17 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+
+Usage example:
+
+the output graph
 
 **Template Parameters**
 
@@ -367,7 +416,18 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 - BitwiseHamming Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+- BitwiseHamming
+
+Usage example:
+
+the output graph
 
 **Parameters**
 
@@ -398,7 +458,18 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 - BitwiseHamming Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+- BitwiseHamming
+
+Usage example:
+
+the output graph
 
 **Template Parameters**
 
@@ -436,7 +507,18 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 - BitwiseHamming Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+- BitwiseHamming
+
+Usage example:
+
+the output graph
 
 **Parameters**
 
@@ -467,7 +549,18 @@ std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph 
 std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 ```
 
-The following distance metrics are supported: - L2Expanded - L2SqrtExpanded - CosineExpanded - InnerProduct - L1 - BitwiseHamming Usage example: the output graph
+The following distance metrics are supported:
+
+- L2Expanded
+- L2SqrtExpanded
+- CosineExpanded
+- InnerProduct
+- L1
+- BitwiseHamming
+
+Usage example:
+
+the output graph
 
 **Template Parameters**
 

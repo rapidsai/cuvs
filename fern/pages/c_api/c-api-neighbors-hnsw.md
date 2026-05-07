@@ -33,7 +33,11 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:30`_
 
 Parameters for ACE (Augmented Core Extraction) graph build for HNSW.
 
-ACE enables building indexes for datasets too large to fit in GPU memory by: 1. Partitioning the dataset in core and augmented partitions using balanced k-means 2. Building sub-indexes for each partition independently 3. Concatenating sub-graphs into a final unified index
+ACE enables building indexes for datasets too large to fit in GPU memory by:
+
+1. Partitioning the dataset in core and augmented partitions using balanced k-means
+2. Building sub-indexes for each partition independently
+3. Concatenating sub-graphs into a final unified index
 
 ```c
 struct cuvsHnswAceParams { ... } ;
@@ -264,7 +268,10 @@ cuvsCagraIndex_t cagra_index,
 cuvsHnswIndex_t hnsw_index);
 ```
 
-NOTE: When hierarchy is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+NOTE: When hierarchy is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 **Parameters**
 
@@ -298,7 +305,13 @@ DLManagedTensor* dataset,
 cuvsHnswIndex_t index);
 ```
 
-ACE enables building HNSW indexes for datasets too large to fit in GPU memory by: 1. Partitioning the dataset using balanced k-means into core and augmented partitions 2. Building sub-indexes for each partition independently 3. Concatenating sub-graphs into a final unified index NOTE: This function requires CUDA to be available at runtime.
+ACE enables building HNSW indexes for datasets too large to fit in GPU memory by:
+
+1. Partitioning the dataset using balanced k-means into core and augmented partitions
+2. Building sub-indexes for each partition independently
+3. Concatenating sub-graphs into a final unified index
+
+NOTE: This function requires CUDA to be available at runtime.
 
 **Parameters**
 
@@ -433,7 +446,11 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances);
 ```
 
-`DLDeviceType` equal to `kDLCPU`, `kDLCUDAHost`, or `kDLCUDAManaged`. It is also important to note that the HNSW Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Supported types for input are: 1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` NOTE: When hierarchy is `NONE`, the HNSW index can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+`DLDeviceType` equal to `kDLCPU`, `kDLCUDAHost`, or `kDLCUDAManaged`. It is also important to note that the HNSW Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Supported types for input are:
+
+1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` NOTE: When hierarchy is `NONE`, the HNSW index can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 
 **Parameters**
 

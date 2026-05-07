@@ -390,7 +390,9 @@ Get the padded cluster centers [n_lists, dim_ext]
 cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
 ```
 
-where dim_ext = round_up(dim + 1, 8) This returns the full padded centers as a contiguous array, suitable for use with cuvsIvfPqBuildPrecomputed.
+where dim_ext = round_up(dim + 1, 8)
+
+This returns the full padded centers as a contiguous array, suitable for use with cuvsIvfPqBuildPrecomputed.
 
 **Parameters**
 
@@ -415,7 +417,8 @@ Get the PQ cluster centers
 cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* pq_centers);
 ```
 
-- CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim , pq_len, pq_book_size] - CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+- CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
+- CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
 
 **Parameters**
 
@@ -466,7 +469,9 @@ cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
 DLManagedTensor* rotation_matrix);
 ```
 
-Transform matrix (original space -&gt; rotated padded space) data
+Transform matrix (original space -&gt; rotated padded space)
+
+data
 
 **Parameters**
 
@@ -577,7 +582,12 @@ DLManagedTensor* dataset,
 cuvsIvfPqIndex_t index);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` 3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -611,7 +621,15 @@ DLManagedTensor* rotation_matrix,
 cuvsIvfPqIndex_t index);
 ```
 
-This function creates a non-owning index that stores a reference to the provided device data. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index. The index_params must be consistent with the provided matrices. Specifically: - index_params.codebook_kind determines the expected shape of pq_centers - index_params.metric will be stored in the index - index_params.conservative_memory_allocation will be stored in the index The function will verify consistency between index_params, dim, and the matrix extents. matrices) dim]
+This function creates a non-owning index that stores a reference to the provided device data. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index.
+
+The index_params must be consistent with the provided matrices. Specifically:
+
+- index_params.codebook_kind determines the expected shape of pq_centers
+- index_params.metric will be stored in the index
+- index_params.conservative_memory_allocation will be stored in the index The function will verify consistency between index_params, dim, and the matrix extents.
+
+matrices) dim]
 
 **Parameters**
 
@@ -620,7 +638,7 @@ This function creates a non-owning index that stores a reference to the provided
 | `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
 | `params` | in | `cuvsIvfPqIndexParams_t` | cuvsIvfPqIndexParams_t used to configure the index (must be consistent with |
 | `dim` | in | `uint32_t` | dimensionality of the input data |
-| `pq_centers` | in | `DLManagedTensor*` | PQ codebook on device memory with required shape: - codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim, pq_len, pq_book_size] - codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size] |
+| `pq_centers` | in | `DLManagedTensor*` | PQ codebook on device memory with required shape:<br />- codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]<br />- codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size] |
 | `centers` | in | `DLManagedTensor*` | Cluster centers in the original space [n_lists, dim_ext] where dim_ext = round_up(dim + 1, 8) |
 | `centers_rot` | in | `DLManagedTensor*` | Rotated cluster centers [n_lists, rot_dim] where rot_dim = pq_len * pq_dim |
 | `rotation_matrix` | in | `DLManagedTensor*` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, |
@@ -651,7 +669,11 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-PQ Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or `kDLDataType.bits = 16` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-PQ Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
+
+1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or `kDLDataType.bits = 16`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 

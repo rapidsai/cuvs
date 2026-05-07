@@ -21,7 +21,12 @@ raft::device_matrix_view<float, int, raft::row_major> dataset,
 raft::device_matrix_view<float, int, raft::col_major> embedding);
 ```
 
-This function computes the spectral embedding of the input dataset by: 1. Constructing a k-nearest neighbors graph from the input data 2. Computing the graph Laplacian (normalized or unnormalized) 3. Finding the eigenvectors corresponding to the smallest eigenvalues 4. Using these eigenvectors as the embedding coordinates
+This function computes the spectral embedding of the input dataset by:
+
+1. Constructing a k-nearest neighbors graph from the input data
+2. Computing the graph Laplacian (normalized or unnormalized)
+3. Finding the eigenvectors corresponding to the smallest eigenvalues
+4. Using these eigenvectors as the embedding coordinates
 
 **Parameters**
 
@@ -49,7 +54,13 @@ raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
 raft::device_matrix_view<float, int, raft::col_major> embedding);
 ```
 
-This function computes the spectral embedding from a precomputed sparse connectivity graph (e.g., from a k-NN search or custom similarity matrix). This is useful when you want to use a custom graph construction method or when you have a precomputed similarity/affinity matrix. The function: 1. Converts the COO matrix to the graph Laplacian 2. Computes eigenvectors of the Laplacian 3. Returns the eigenvectors as the embedding
+This function computes the spectral embedding from a precomputed sparse connectivity graph (e.g., from a k-NN search or custom similarity matrix). This is useful when you want to use a custom graph construction method or when you have a precomputed similarity/affinity matrix.
+
+The function:
+
+1. Converts the COO matrix to the graph Laplacian
+2. Computes eigenvectors of the Laplacian
+3. Returns the eigenvectors as the embedding
 
 **Parameters**
 
