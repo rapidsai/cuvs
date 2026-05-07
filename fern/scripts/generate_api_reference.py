@@ -1061,14 +1061,12 @@ def render_python_symbol(symbol: PythonSymbol) -> list[str]:
             [
                 "**Members**",
                 "",
-                "| Name | Kind | Source |",
-                "| --- | --- | --- |",
+                "| Name | Kind |",
+                "| --- | --- |",
             ]
         )
         for member in visible_members:
-            lines.append(
-                f"| `{escape_code(member.name)}` | {member.kind} | `{escape_code(f'{member.source}:{member.line}')}` |"
-            )
+            lines.append(f"| `{escape_code(member.name)}` | {member.kind} |")
         lines.append("")
         for member in visible_members:
             lines.extend(

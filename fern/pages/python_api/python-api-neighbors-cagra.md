@@ -37,15 +37,15 @@ def __init__(self, *, npartitions=0, ef_construction=120, build_dir="/tmp/ace_bu
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `npartitions` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:211` |
-| `ef_construction` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:215` |
-| `build_dir` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:219` |
-| `use_disk` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:226` |
-| `max_host_memory_gb` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:230` |
-| `max_gpu_memory_gb` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:234` |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:237` |
+| Name | Kind |
+| --- | --- |
+| `npartitions` | property |
+| `ef_construction` | property |
+| `build_dir` | property |
+| `use_disk` | property |
+| `max_host_memory_gb` | property |
+| `max_gpu_memory_gb` | property |
+| `get_handle` | method |
 
 ### npartitions
 
@@ -132,15 +132,15 @@ def __init__(self, *, pq_bits=8, pq_dim=0, vq_n_centers=0, kmeans_n_iters=25, vq
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `pq_bits` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:100` |
-| `pq_dim` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:104` |
-| `vq_n_centers` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:108` |
-| `kmeans_n_iters` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:112` |
-| `vq_kmeans_trainset_fraction` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:116` |
-| `pq_kmeans_trainset_fraction` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:120` |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:123` |
+| Name | Kind |
+| --- | --- |
+| `pq_bits` | property |
+| `pq_dim` | property |
+| `vq_n_centers` | property |
+| `kmeans_n_iters` | property |
+| `vq_kmeans_trainset_fraction` | property |
+| `pq_kmeans_trainset_fraction` | property |
+| `get_handle` | method |
 
 ### pq_bits
 
@@ -222,9 +222,9 @@ def __init__(self, *, max_chunk_size=None)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `max_chunk_size` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:1060` |
+| Name | Kind |
+| --- | --- |
+| `max_chunk_size` | property |
 
 ### max_chunk_size
 
@@ -244,14 +244,14 @@ cdef class Index
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:436` |
-| `dim` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:440` |
-| `graph_degree` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:446` |
-| `dtype` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:457` |
-| `dataset` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:461` |
-| `graph` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:479` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
+| `dim` | property |
+| `graph_degree` | property |
+| `dtype` | property |
+| `dataset` | property |
+| `graph` | property |
 
 ### trained
 
@@ -333,15 +333,15 @@ def __init__(self, *, metric="sqeuclidean", intermediate_graph_degree=128, graph
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:389` |
-| `metric` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:393` |
-| `intermediate_graph_degree` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:397` |
-| `graph_degree` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:401` |
-| `build_algo` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:405` |
-| `nn_descent_niter` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:409` |
-| `refinement_rate` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:413` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `metric` | property |
+| `intermediate_graph_degree` | property |
+| `graph_degree` | property |
+| `build_algo` | property |
+| `nn_descent_niter` | property |
+| `refinement_rate` | property |
 
 ### get_handle
 
@@ -438,22 +438,22 @@ def __init__(self, *, max_queries=0, itopk_size=64, max_iterations=0, algo="auto
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:737` |
-| `max_queries` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:741` |
-| `itopk_size` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:745` |
-| `max_iterations` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:749` |
-| `algo` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:753` |
-| `team_size` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:757` |
-| `search_width` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:761` |
-| `min_iterations` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:765` |
-| `thread_block_size` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:769` |
-| `hashmap_mode` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:773` |
-| `hashmap_min_bitlen` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:777` |
-| `hashmap_max_fill_rate` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:781` |
-| `num_random_samplings` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:785` |
-| `rand_xor_mask` | property | `python/cuvs/cuvs/neighbors/cagra/cagra.pyx:789` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `max_queries` | property |
+| `itopk_size` | property |
+| `max_iterations` | property |
+| `algo` | property |
+| `team_size` | property |
+| `search_width` | property |
+| `min_iterations` | property |
+| `thread_block_size` | property |
+| `hashmap_mode` | property |
+| `hashmap_min_bitlen` | property |
+| `hashmap_max_fill_rate` | property |
+| `num_random_samplings` | property |
+| `rand_xor_mask` | property |
 
 ### get_handle
 

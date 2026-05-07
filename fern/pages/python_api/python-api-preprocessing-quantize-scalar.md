@@ -19,10 +19,10 @@ float data type to the full range of the quantized int type.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `min` | property | `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:63` |
-| `max` | property | `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:67` |
+| Name | Kind |
+| --- | --- |
+| `min` | property |
+| `max` | property |
 
 ### min
 
@@ -64,9 +64,9 @@ def __init__(self, *, quantile=None)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `quantile` | property | `python/cuvs/cuvs/preprocessing/quantize/scalar/scalar.pyx:43` |
+| Name | Kind |
+| --- | --- |
+| `quantile` | property |
 
 ### quantile
 

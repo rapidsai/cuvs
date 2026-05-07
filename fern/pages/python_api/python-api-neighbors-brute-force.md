@@ -17,9 +17,9 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:52` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 

@@ -33,14 +33,14 @@ def __init__(self, *, n_components=None, copy=None, whiten=None, algorithm=None,
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `n_components` | property | `python/cuvs/cuvs/preprocessing/pca/pca.pyx:82` |
-| `copy` | property | `python/cuvs/cuvs/preprocessing/pca/pca.pyx:86` |
-| `whiten` | property | `python/cuvs/cuvs/preprocessing/pca/pca.pyx:90` |
-| `algorithm` | property | `python/cuvs/cuvs/preprocessing/pca/pca.pyx:94` |
-| `tol` | property | `python/cuvs/cuvs/preprocessing/pca/pca.pyx:98` |
-| `n_iterations` | property | `python/cuvs/cuvs/preprocessing/pca/pca.pyx:102` |
+| Name | Kind |
+| --- | --- |
+| `n_components` | property |
+| `copy` | property |
+| `whiten` | property |
+| `algorithm` | property |
+| `tol` | property |
+| `n_iterations` | property |
 
 ### n_components
 

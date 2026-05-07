@@ -17,23 +17,23 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:256` |
-| `n_lists` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:263` |
-| `dim` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:270` |
-| `pq_dim` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:277` |
-| `pq_len` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:284` |
-| `pq_bits` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:292` |
-| `centers` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:305` |
-| `centers_padded` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:319` |
-| `pq_centers` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:335` |
-| `centers_rot` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:349` |
-| `rotation_matrix` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:364` |
-| `list_sizes` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:379` |
-| `lists` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:392` |
-| `list_data` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:411` |
-| `list_indices` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:451` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
+| `n_lists` | property |
+| `dim` | property |
+| `pq_dim` | property |
+| `pq_len` | property |
+| `pq_bits` | property |
+| `centers` | property |
+| `centers_padded` | property |
+| `pq_centers` | property |
+| `centers_rot` | property |
+| `rotation_matrix` | property |
+| `list_sizes` | property |
+| `lists` | method |
+| `list_data` | method |
+| `list_indices` | method |
 
 ### trained
 
@@ -250,24 +250,24 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:174` |
-| `metric` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:178` |
-| `metric_arg` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:182` |
-| `add_data_on_build` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:186` |
-| `n_lists` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:190` |
-| `kmeans_n_iters` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:194` |
-| `kmeans_trainset_fraction` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:198` |
-| `pq_bits` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:202` |
-| `pq_dim` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:206` |
-| `codebook_kind` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:210` |
-| `force_random_rotation` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:214` |
-| `add_data_on_build` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:218` |
-| `conservative_memory_allocation` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:222` |
-| `max_train_points_per_pq_code` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:226` |
-| `codes_layout` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:230` |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:236` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `metric` | property |
+| `metric_arg` | property |
+| `add_data_on_build` | property |
+| `n_lists` | property |
+| `kmeans_n_iters` | property |
+| `kmeans_trainset_fraction` | property |
+| `pq_bits` | property |
+| `pq_dim` | property |
+| `codebook_kind` | property |
+| `force_random_rotation` | property |
+| `add_data_on_build` | property |
+| `conservative_memory_allocation` | property |
+| `max_train_points_per_pq_code` | property |
+| `codes_layout` | property |
+| `get_handle` | method |
 
 ### get_handle
 
@@ -425,15 +425,15 @@ def __init__(self, *, n_probes=20, lut_dtype=np.float32, internal_distance_dtype
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:716` |
-| `n_probes` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:720` |
-| `lut_dtype` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:724` |
-| `internal_distance_dtype` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:728` |
-| `coarse_search_dtype` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:732` |
-| `max_internal_batch_size` | property | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:736` |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_pq/ivf_pq.pyx:739` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `n_probes` | property |
+| `lut_dtype` | property |
+| `internal_distance_dtype` | property |
+| `coarse_search_dtype` | property |
+| `max_internal_batch_size` | property |
+| `get_handle` | method |
 
 ### get_handle
 

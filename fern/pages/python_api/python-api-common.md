@@ -66,10 +66,10 @@ Using a cuPy stream with cuVS Resources:
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `sync` | method | `python/cuvs/cuvs/common/resources.pyx:60` |
-| `get_c_obj` | method | `python/cuvs/cuvs/common/resources.pyx:63` |
+| Name | Kind |
+| --- | --- |
+| `sync` | method |
+| `get_c_obj` | method |
 
 ### sync
 
@@ -146,11 +146,11 @@ Using specific device IDs:
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `sync` | method | `python/cuvs/cuvs/common/mg_resources.pyx:90` |
-| `set_memory_pool` | method | `python/cuvs/cuvs/common/mg_resources.pyx:93` |
-| `get_c_obj` | method | `python/cuvs/cuvs/common/mg_resources.pyx:111` |
+| Name | Kind |
+| --- | --- |
+| `sync` | method |
+| `set_memory_pool` | method |
+| `get_c_obj` | method |
 
 ### sync
 

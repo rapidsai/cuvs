@@ -18,11 +18,11 @@ building
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:165` |
-| `graph` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:169` |
-| `distances` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:173` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
+| `graph` | property |
+| `distances` | property |
 
 ### trained
 
@@ -78,15 +78,15 @@ def __init__(self, *, metric=None, metric_arg=None, graph_degree=None, intermedi
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `metric` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:116` |
-| `metric_arg` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:120` |
-| `graph_degree` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:124` |
-| `intermediate_graph_degree` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:128` |
-| `max_iterations` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:132` |
-| `termination_threshold` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:136` |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:139` |
+| Name | Kind |
+| --- | --- |
+| `metric` | property |
+| `metric_arg` | property |
+| `graph_degree` | property |
+| `intermediate_graph_degree` | property |
+| `max_iterations` | property |
+| `termination_threshold` | property |
+| `get_handle` | method |
 
 ### metric
 

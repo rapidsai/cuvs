@@ -33,13 +33,13 @@ def __init__(self, *, algo="nn_descent", overlap_factor=2, n_clusters=1, metric=
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:159` |
-| `algo` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:164` |
-| `overlap_factor` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:176` |
-| `n_clusters` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:181` |
-| `metric` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:186` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `algo` | property |
+| `overlap_factor` | property |
+| `n_clusters` | property |
+| `metric` | property |
 
 ### get_handle
 

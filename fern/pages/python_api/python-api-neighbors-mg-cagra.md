@@ -18,9 +18,9 @@ multiple GPUs.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:126` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
@@ -60,10 +60,10 @@ def __init__(self, *, distribution_mode="sharded", **kwargs)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:97` |
-| `distribution_mode` | property | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:101` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `distribution_mode` | property |
 
 ### get_handle
 
@@ -99,15 +99,15 @@ def __init__(self, *, search_mode="load_balancer", merge_mode="merge_on_root_ran
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:222` |
-| `search_mode` | property | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:226` |
-| `search_mode` | method | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:232` |
-| `merge_mode` | property | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:243` |
-| `merge_mode` | method | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:249` |
-| `n_rows_per_batch` | property | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:260` |
-| `n_rows_per_batch` | method | `python/cuvs/cuvs/neighbors/mg/cagra/cagra.pyx:265` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `search_mode` | property |
+| `search_mode` | method |
+| `merge_mode` | property |
+| `merge_mode` | method |
+| `n_rows_per_batch` | property |
+| `n_rows_per_batch` | method |
 
 ### get_handle
 

@@ -17,9 +17,9 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:49` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
@@ -61,17 +61,17 @@ def __init__(self, *, metric="sqeuclidean", graph_degree=32, visited_size=64, va
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `metric` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:122` |
-| `graph_degree` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:126` |
-| `visited_size` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:130` |
-| `vamana_iters` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:134` |
-| `alpha` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:138` |
-| `max_fraction` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:142` |
-| `batch_base` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:146` |
-| `queue_size` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:150` |
-| `reverse_batchsize` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:154` |
+| Name | Kind |
+| --- | --- |
+| `metric` | property |
+| `graph_degree` | property |
+| `visited_size` | property |
+| `vamana_iters` | property |
+| `alpha` | property |
+| `max_fraction` | property |
+| `batch_base` | property |
+| `queue_size` | property |
+| `reverse_batchsize` | property |
 
 ### metric
 

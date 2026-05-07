@@ -18,9 +18,9 @@ across multiple GPUs.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:125` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
@@ -56,10 +56,10 @@ def __init__(self, *, distribution_mode="sharded", **kwargs)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:96` |
-| `distribution_mode` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:100` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `distribution_mode` | property |
 
 ### get_handle
 
@@ -95,15 +95,15 @@ def __init__(self, *, n_probes=1, search_mode="load_balancer", merge_mode="merge
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:223` |
-| `search_mode` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:227` |
-| `search_mode` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:233` |
-| `merge_mode` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:244` |
-| `merge_mode` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:250` |
-| `n_rows_per_batch` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:261` |
-| `n_rows_per_batch` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:266` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `search_mode` | property |
+| `search_mode` | method |
+| `merge_mode` | property |
+| `merge_mode` | method |
+| `n_rows_per_batch` | property |
+| `n_rows_per_batch` | method |
 
 ### get_handle
 

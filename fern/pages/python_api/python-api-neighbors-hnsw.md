@@ -36,13 +36,13 @@ def __init__(self, *, npartitions=0, build_dir="/tmp/hnsw_ace_build", use_disk=F
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `npartitions` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:98` |
-| `build_dir` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:102` |
-| `use_disk` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:108` |
-| `max_host_memory_gb` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:112` |
-| `max_gpu_memory_gb` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:116` |
+| Name | Kind |
+| --- | --- |
+| `npartitions` | property |
+| `build_dir` | property |
+| `use_disk` | property |
+| `max_host_memory_gb` | property |
+| `max_gpu_memory_gb` | property |
 
 ### npartitions
 
@@ -113,13 +113,13 @@ def __init__(self, *, hierarchy="gpu", ef_construction=200, num_threads=0, M=32,
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `hierarchy` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:193` |
-| `ef_construction` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:202` |
-| `num_threads` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:206` |
-| `m` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:210` |
-| `ace_params` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:214` |
+| Name | Kind |
+| --- | --- |
+| `hierarchy` | property |
+| `ef_construction` | property |
+| `num_threads` | property |
+| `m` | property |
+| `ace_params` | property |
 
 ### hierarchy
 
@@ -174,9 +174,9 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:236` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
@@ -210,9 +210,9 @@ def __init__(self, *, num_threads=0)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `num_threads` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:269` |
+| Name | Kind |
+| --- | --- |
+| `num_threads` | property |
 
 ### num_threads
 
@@ -360,10 +360,10 @@ def __init__(self, *, ef=200, num_threads=0)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `ef` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:638` |
-| `num_threads` | property | `python/cuvs/cuvs/neighbors/hnsw/hnsw.pyx:642` |
+| Name | Kind |
+| --- | --- |
+| `ef` | property |
+| `num_threads` | property |
 
 ### ef
 

@@ -19,14 +19,14 @@ float data type to the full range of the quantized int type.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `pq_bits` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:139` |
-| `pq_dim` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:145` |
-| `pq_codebook` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:151` |
-| `vq_codebook` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:164` |
-| `encoded_dim` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:177` |
-| `use_vq` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:187` |
+| Name | Kind |
+| --- | --- |
+| `pq_bits` | property |
+| `pq_dim` | property |
+| `pq_codebook` | property |
+| `vq_codebook` | property |
+| `encoded_dim` | property |
+| `use_vq` | property |
 
 ### pq_bits
 
@@ -114,17 +114,17 @@ def __init__(self, *, pq_bits=8, pq_dim=0, use_subspaces=True, use_vq=False, vq_
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `pq_bits` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:87` |
-| `pq_dim` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:91` |
-| `vq_n_centers` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:95` |
-| `kmeans_n_iters` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:99` |
-| `pq_kmeans_type` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:103` |
-| `max_train_points_per_pq_code` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:107` |
-| `max_train_points_per_vq_cluster` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:111` |
-| `use_vq` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:115` |
-| `use_subspaces` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:119` |
+| Name | Kind |
+| --- | --- |
+| `pq_bits` | property |
+| `pq_dim` | property |
+| `vq_n_centers` | property |
+| `kmeans_n_iters` | property |
+| `pq_kmeans_type` | property |
+| `max_train_points_per_pq_code` | property |
+| `max_train_points_per_vq_cluster` | property |
+| `use_vq` | property |
+| `use_subspaces` | property |
 
 ### pq_bits
 

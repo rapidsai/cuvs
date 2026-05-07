@@ -16,9 +16,9 @@ Tiered Index object.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:159` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
@@ -56,13 +56,13 @@ def __init__(self, *, metric="sqeuclidean", algo="cagra", upstream_params=None, 
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `metric` | property | `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:124` |
-| `algo` | property | `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:128` |
-| `min_ann_rows` | property | `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:132` |
-| `create_ann_index_on_extend` | property | `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:136` |
-| `upstream_params` | property | `python/cuvs/cuvs/neighbors/tiered_index/tiered_index.pyx:140` |
+| Name | Kind |
+| --- | --- |
+| `metric` | property |
+| `algo` | property |
+| `min_ann_rows` | property |
+| `create_ann_index_on_extend` | property |
+| `upstream_params` | property |
 
 ### metric
 

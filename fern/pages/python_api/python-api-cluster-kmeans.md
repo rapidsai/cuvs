@@ -40,21 +40,21 @@ def __init__(self, *, metric=None, n_clusters=None, init_method=None, max_iter=N
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `metric` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:150` |
-| `n_clusters` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:154` |
-| `init_method` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:158` |
-| `max_iter` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:162` |
-| `tol` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:166` |
-| `n_init` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:170` |
-| `oversampling_factor` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:174` |
-| `batch_samples` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:178` |
-| `batch_centroids` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:182` |
-| `inertia_check` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:186` |
-| `streaming_batch_size` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:190` |
-| `hierarchical` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:194` |
-| `hierarchical_n_iters` | property | `python/cuvs/cuvs/cluster/kmeans/kmeans.pyx:198` |
+| Name | Kind |
+| --- | --- |
+| `metric` | property |
+| `n_clusters` | property |
+| `init_method` | property |
+| `max_iter` | property |
+| `tol` | property |
+| `n_init` | property |
+| `oversampling_factor` | property |
+| `batch_samples` | property |
+| `batch_centroids` | property |
+| `inertia_check` | property |
+| `streaming_batch_size` | property |
+| `hierarchical` | property |
+| `hierarchical_n_iters` | property |
 
 ### metric
 

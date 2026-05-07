@@ -17,12 +17,12 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:170` |
-| `n_lists` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:177` |
-| `dim` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:184` |
-| `centers` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:191` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
+| `n_lists` | property |
+| `dim` | property |
+| `centers` | property |
 
 ### trained
 
@@ -92,17 +92,17 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:117` |
-| `metric` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:121` |
-| `metric_arg` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:125` |
-| `add_data_on_build` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:129` |
-| `n_lists` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:133` |
-| `kmeans_n_iters` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:137` |
-| `kmeans_trainset_fraction` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:141` |
-| `adaptive_centers` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:145` |
-| `conservative_memory_allocation` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:149` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `metric` | property |
+| `metric_arg` | property |
+| `add_data_on_build` | property |
+| `n_lists` | property |
+| `kmeans_n_iters` | property |
+| `kmeans_trainset_fraction` | property |
+| `adaptive_centers` | property |
+| `conservative_memory_allocation` | property |
 
 ### get_handle
 
@@ -200,10 +200,10 @@ def __init__(self, *, n_probes=20)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:285` |
-| `n_probes` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:289` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `n_probes` | property |
 
 ### get_handle
 
