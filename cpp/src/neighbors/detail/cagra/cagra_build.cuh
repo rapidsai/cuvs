@@ -1729,11 +1729,12 @@ void build_knn_graph(
   bool first                    = true;
   const auto start_clock        = std::chrono::system_clock::now();
 
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
+  auto vec_batches = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<DataT>(
+    res,
     dataset.data_handle(),
-    dataset.extent(0),
-    dataset.extent(1),
-    static_cast<int64_t>(max_queries),
+    static_cast<int64_t>(dataset.extent(0)),
+    static_cast<int64_t>(dataset.extent(1)),
+    static_cast<size_t>(max_queries),
     raft::resource::get_cuda_stream(res),
     workspace_mr);
 
@@ -2114,10 +2115,11 @@ auto iterative_build_graph(
 
     // Search.
     // Since there are many queries, divide them into batches and search them.
-    cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
+    auto query_batch = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<T>(
+      res,
       dev_query_view.data_handle(),
-      curr_query_size,
-      dev_query_view.extent(1),
+      static_cast<int64_t>(curr_query_size),
+      static_cast<int64_t>(dev_query_view.extent(1)),
       max_chunk_size,
       raft::resource::get_cuda_stream(res),
       raft::resource::get_workspace_resource_ref(res));

@@ -812,41 +812,45 @@ void merge_graph_gpu(
   uint32_t batch_size      = static_cast<uint32_t>(std::min<uint64_t>(graph_size, 256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
-  batched_device_view<IdxT, int64_t, AccessorOutputGraph> d_output_graph(res,
-                                                                         output_graph,
-                                                                         /*batch_size*/ batch_size,
-                                                                         /*host_writeback*/ true,
-                                                                         /*initialize*/ true);
+  namespace bli                       = cuvs::spatial::knn::detail::utils;
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
-  batched_device_view<
-    IdxT,
-    int64_t,
-    raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
-    d_mst_graph(res,
-                mst_graph,
-                /*batch_size*/ batch_size,
-                /*host_writeback*/ false,
-                /*initialize*/ true);
+  bli::batch_load_iterator<
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>>
+    d_output_graph(res,
+                   output_graph,
+                   batch_size,
+                   copy_stream,
+                   workspace_mr,
+                   enable_prefetch,
+                   /*initialize=*/true,
+                   /*host_writeback=*/true);
 
-  batched_device_view<
-    uint32_t,
-    int64_t,
-    raft::host_device_accessor<cuda::std::default_accessor<uint32_t>, raft::memory_type::host>>
-    d_mst_graph_num_edges(res,
-                          raft::make_host_matrix_view<uint32_t, int64_t>(
-                            mst_graph_num_edges.data_handle(), mst_graph_num_edges.extent(0), 1l),
-                          /*batch_size*/ batch_size,
-                          /*host_writeback*/ false,
-                          /*initialize*/ true);
+  bli::batch_load_iterator<raft::host_matrix_view<IdxT, int64_t>> d_mst_graph(
+    res, mst_graph, batch_size, copy_stream, workspace_mr, enable_prefetch);
+
+  bli::batch_load_iterator<raft::host_matrix_view<uint32_t, int64_t>> d_mst_graph_num_edges(
+    res,
+    raft::make_host_matrix_view<uint32_t, int64_t>(
+      mst_graph_num_edges.data_handle(), mst_graph_num_edges.extent(0), 1l),
+    batch_size,
+    copy_stream,
+    workspace_mr,
+    enable_prefetch);
+
+  d_output_graph.prefetch_next_batch();
+  d_mst_graph.prefetch_next_batch();
+  d_mst_graph_num_edges.prefetch_next_batch();
 
   const uint32_t num_warps = 4;
   const dim3 threads_merge(raft::WarpSize * num_warps, 1, 1);
   const dim3 blocks_merge(raft::ceildiv(batch_size, num_warps), 1, 1);
   const size_t merge_smem_size = num_warps * output_graph_degree * sizeof(IdxT);
   for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
-    auto mst_graph_view           = d_mst_graph.next_view();
-    auto mst_graph_num_edges_view = d_mst_graph_num_edges.next_view();
-    auto output_view              = d_output_graph.next_view();
+    auto mst_graph_view           = (*d_mst_graph).view();
+    auto mst_graph_num_edges_view = (*d_mst_graph_num_edges).view();
+    auto output_view              = (*d_output_graph).view();
     kern_merge_graph<IdxT, num_warps>
       <<<blocks_merge, threads_merge, merge_smem_size, raft::resource::get_cuda_stream(res)>>>(
         output_view,
@@ -859,9 +863,12 @@ void merge_graph_gpu(
         guarantee_connectivity,
         d_check_num_protected_edges.data_handle());
 
-    d_output_graph.prefetch_next();
-    d_mst_graph.prefetch_next();
-    d_mst_graph_num_edges.prefetch_next();
+    d_output_graph.prefetch_next_batch();
+    d_mst_graph.prefetch_next_batch();
+    d_mst_graph_num_edges.prefetch_next_batch();
+    ++d_output_graph;
+    ++d_mst_graph;
+    ++d_mst_graph_num_edges;
   }
 
   bool check_num_protected_edges = true;
@@ -1576,18 +1583,28 @@ void prune_graph_gpu(
   auto host_stats                           = raft::make_host_vector<uint64_t>(2);
   raft::matrix::fill(res, dev_stats.view(), uint64_t(0));
 
-  batched_device_view<IdxT, int64_t, AccessorKnnGraph> d_input_graph(res,
-                                                                     knn_graph,
-                                                                     /*batch_size*/ graph_size,
-                                                                     /*host_writeback*/ false,
-                                                                     /*initialize*/ true);
-  auto input_view = d_input_graph.next_view();
+  namespace bli                       = cuvs::spatial::knn::detail::utils;
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
-  batched_device_view<IdxT, int64_t, AccessorOutputGraph> d_output_graph(res,
-                                                                         output_graph,
-                                                                         /*batch_size*/ batch_size,
-                                                                         /*host_writeback*/ true,
-                                                                         /*initialize*/ false);
+  // Single-batch read-only iterator for the input graph (graph_size rows fit in one batch).
+  bli::batch_load_iterator<
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph>>
+    d_input_graph(res, knn_graph, graph_size, copy_stream, workspace_mr);
+  d_input_graph.prefetch_next_batch();
+  auto input_view = (*d_input_graph).view();
+
+  bli::batch_load_iterator<
+    raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>>
+    d_output_graph(res,
+                   output_graph,
+                   batch_size,
+                   copy_stream,
+                   workspace_mr,
+                   enable_prefetch,
+                   /*initialize=*/false,
+                   /*host_writeback=*/true);
+  d_output_graph.prefetch_next_batch();
 
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 
@@ -1597,7 +1614,7 @@ void prune_graph_gpu(
   const size_t prune_smem_size = num_warps * knn_graph_degree * (sizeof(IdxT) + sizeof(uint32_t));
 
   for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
-    auto output_view = d_output_graph.next_view();
+    auto output_view = (*d_output_graph).view();
     kern_fused_prune<IdxT, num_warps>
       <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
         input_view,
@@ -1607,7 +1624,8 @@ void prune_graph_gpu(
         d_invalid_neighbor_list.data_handle(),
         dev_stats.data_handle());
 
-    d_output_graph.prefetch_next();
+    d_output_graph.prefetch_next_batch();
+    ++d_output_graph;
     RAFT_LOG_DEBUG(
       "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
       (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);

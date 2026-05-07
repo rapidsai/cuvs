@@ -5,7 +5,6 @@
 
 #include <gtest/gtest.h>
 
-#include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -17,11 +16,12 @@
 #include <raft/core/pinned_mdarray.hpp>
 
 #include <raft/core/copy.cuh>
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/init.cuh>
 #include <raft/util/cudart_utils.hpp>
 
-#include "../../../src/neighbors/detail/cagra/utils.hpp"
+#include "../../../src/neighbors/detail/ann_utils.cuh"
 
 #include <array>
 #include <cstdint>
@@ -29,6 +29,8 @@
 #include <vector>
 
 namespace cuvs::neighbors::cagra {
+
+namespace bli = cuvs::spatial::knn::detail::utils;
 
 using IdxT = uint32_t;
 using DeviceAccessor =
@@ -51,13 +53,20 @@ struct DimsConfig {
   uint64_t batch_size;
 };
 
-class BatchedDeviceViewTest : public ::testing::Test {
+class BatchLoadIteratorTest : public ::testing::Test {
  protected:
-  void SetUp() override { raft::resource::sync_stream(res); }
+  void SetUp() override
+  {
+    // Provide a stream pool so get_prefetch_stream(res) returns a non-main stream and
+    // the iterator exercises its real pipelined path.
+    raft::resource::set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(1));
+    raft::resource::sync_stream(res);
+  }
 
   /**
-   * Run batched_device_view over host data, copy device views back,
-   * and verify against the input.
+   * Run batch_load_iterator over input_view, copy device views back, and verify against the
+   * input. Mirrors the old batched_device_view test: writeback fills with IdxT(17), readback
+   * (when initialize==true) verifies pre-fill of IdxT(13).
    */
   template <typename AccessorInputView>
   void run_and_verify_batched(
@@ -66,6 +75,8 @@ class BatchedDeviceViewTest : public ::testing::Test {
     bool host_writeback,
     bool initialize)
   {
+    using mdspan_t = decltype(input_view);
+
     int64_t n_rows = input_view.extent(0);
     int64_t n_cols = input_view.extent(1);
 
@@ -73,12 +84,24 @@ class BatchedDeviceViewTest : public ::testing::Test {
 
     int64_t total_processed = 0;
 
+    auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+    auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
+
     {
-      cagra::detail::batched_device_view<IdxT, int64_t, AccessorInputView> batched(
-        res, input_view, batch_size, host_writeback, initialize);
-      while (true) {
-        auto dev_view = batched.next_view();
-        if (dev_view.extent(0) == 0) break;
+      bli::batch_load_iterator<mdspan_t> iter(res,
+                                              input_view,
+                                              batch_size,
+                                              copy_stream,
+                                              workspace_mr,
+                                              enable_prefetch,
+                                              initialize,
+                                              host_writeback);
+      iter.prefetch_next_batch();
+
+      for (auto& batch : iter) {
+        if (batch.size() == 0) break;
+
+        auto dev_view = batch.view();
 
         if (initialize) {
           raft::copy(readback.data() + total_processed * n_cols,
@@ -87,14 +110,12 @@ class BatchedDeviceViewTest : public ::testing::Test {
                      raft::resource::get_cuda_stream(res));
         }
         if (host_writeback) {
-          // Re-wrap as a plain device_matrix_view to strip the (potentially
-          // layout_stride / pinned- or managed-accessor) shape that the
-          // passthrough path would otherwise hand us, so raft::matrix::fill's
-          // device_matrix_view overload accepts the call. dev_view is always
-          // exhaustive (contiguous row range of a row-major matrix), so
-          // (data_handle, extent(0), extent(1)) describes the same memory.
-          // This should eventually be fixed by adding a more generic
-          // overload to raft::matrix::fill.
+          // The passthrough strategy returns `cuda::std::submdspan(input_view, ...)`, which
+          // may be `layout_stride` and/or carry a non-default accessor (e.g. PinnedAccessor),
+          // neither of which `raft::matrix::fill`'s `device_matrix_view` overload accepts.
+          // Re-wrap as a plain device_matrix_view since the slice is always exhaustive
+          // (a contiguous row range of a row-major input). This re-wrap should eventually be
+          // removed once raft::matrix::fill grows a more generic mdspan overload.
           raft::matrix::fill(res,
                              raft::make_device_matrix_view<IdxT, int64_t>(
                                dev_view.data_handle(), dev_view.extent(0), dev_view.extent(1)),
@@ -102,10 +123,7 @@ class BatchedDeviceViewTest : public ::testing::Test {
         }
         total_processed += dev_view.extent(0);
 
-        // Pair next_view() with prefetch_next(): the next batch's H2D and the
-        // previous batch's D2H run on copy_stream_ concurrently with the
-        // raft::copy / raft::matrix::fill kernels we just queued on res_.
-        batched.prefetch_next();
+        iter.prefetch_next_batch();
       }
     }
     raft::resource::sync_stream(res);
@@ -130,38 +148,38 @@ class BatchedDeviceViewTest : public ::testing::Test {
   raft::resources res;
 };
 
-TEST_F(BatchedDeviceViewTest, EmptyViewFromHost)
+TEST_F(BatchLoadIteratorTest, EmptyViewFromHost)
 {
   auto host_empty = raft::make_host_matrix<IdxT, int64_t>(0, 8);
   auto host_view  = host_empty.view();
-  cagra::detail::batched_device_view<IdxT, int64_t, HostAccessor> batched(
-    res, host_view, /*batch_size=*/128, /*host_writeback=*/false, /*initialize=*/true);
 
-  auto view = batched.next_view();
-  EXPECT_EQ(view.extent(0), 0);
-  EXPECT_EQ(view.extent(1), 8);
-  EXPECT_EQ(view.data_handle(), nullptr);
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
+
+  bli::batch_load_iterator<raft::host_matrix_view<IdxT, int64_t>> iter(
+    res, host_view, /*batch_size=*/128, copy_stream, workspace_mr, enable_prefetch);
+  EXPECT_TRUE(iter.begin() == iter.end());
 }
 
-TEST_F(BatchedDeviceViewTest, EmptyViewFromDevice)
+TEST_F(BatchLoadIteratorTest, EmptyViewFromDevice)
 {
   auto device_empty = raft::make_device_matrix<IdxT, int64_t>(res, 0, 8);
   auto device_view  = device_empty.view();
-  cagra::detail::batched_device_view<IdxT, int64_t, DeviceAccessor> batched(
-    res, device_view, /*batch_size=*/128, /*host_writeback=*/false, /*initialize=*/true);
 
-  auto view = batched.next_view();
-  EXPECT_EQ(view.extent(0), 0);
-  EXPECT_EQ(view.extent(1), 8);
-  EXPECT_EQ(view.data_handle(), nullptr);
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
+
+  bli::batch_load_iterator<raft::device_matrix_view<IdxT, int64_t>> iter(
+    res, device_view, /*batch_size=*/128, copy_stream, workspace_mr, enable_prefetch);
+  EXPECT_TRUE(iter.begin() == iter.end());
 }
 
 using BatchDimsParam = std::tuple<BatchConfig, DimsConfig>;
 
-class BatchedDeviceViewParameterizedTest : public BatchedDeviceViewTest,
+class BatchLoadIteratorParameterizedTest : public BatchLoadIteratorTest,
                                            public ::testing::WithParamInterface<BatchDimsParam> {};
 
-TEST_P(BatchedDeviceViewParameterizedTest, VectorHostData)
+TEST_P(BatchLoadIteratorParameterizedTest, VectorHostData)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
@@ -175,14 +193,13 @@ TEST_P(BatchedDeviceViewParameterizedTest, VectorHostData)
   run_and_verify_batched(host_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewParameterizedTest, PinnedMemory)
+TEST_P(BatchLoadIteratorParameterizedTest, PinnedMemory)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
   auto [n_rows, n_cols, batch_size] = dims_config;
 
   auto pinned_matrix = raft::make_pinned_matrix<IdxT, int64_t>(res, n_rows, n_cols);
-  // auto pinned_view   = pinned_matrix.view();
   auto pinned_view =
     raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, PinnedAccessor>(
       pinned_matrix.data_handle(), n_rows, n_cols);
@@ -191,7 +208,7 @@ TEST_P(BatchedDeviceViewParameterizedTest, PinnedMemory)
   run_and_verify_batched(pinned_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewParameterizedTest, PinnedMemoryForcedToHost)
+TEST_P(BatchLoadIteratorParameterizedTest, PinnedMemoryForcedToHost)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
@@ -207,7 +224,7 @@ TEST_P(BatchedDeviceViewParameterizedTest, PinnedMemoryForcedToHost)
   run_and_verify_batched(pinned_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewParameterizedTest, ManagedMemory)
+TEST_P(BatchLoadIteratorParameterizedTest, ManagedMemory)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
@@ -221,7 +238,7 @@ TEST_P(BatchedDeviceViewParameterizedTest, ManagedMemory)
   run_and_verify_batched(managed_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewParameterizedTest, ManagedMemoryForcedToHost)
+TEST_P(BatchLoadIteratorParameterizedTest, ManagedMemoryForcedToHost)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
@@ -238,7 +255,7 @@ TEST_P(BatchedDeviceViewParameterizedTest, ManagedMemoryForcedToHost)
   run_and_verify_batched(managed_view, batch_size, host_writeback, initialize);
 }
 
-TEST_P(BatchedDeviceViewParameterizedTest, DeviceMemory)
+TEST_P(BatchLoadIteratorParameterizedTest, DeviceMemory)
 {
   auto [batch_config, dims_config]  = GetParam();
   auto [initialize, host_writeback] = batch_config;
@@ -250,6 +267,89 @@ TEST_P(BatchedDeviceViewParameterizedTest, DeviceMemory)
   raft::matrix::fill(res, device_view, IdxT(13));
 
   run_and_verify_batched(device_view, batch_size, host_writeback, initialize);
+}
+
+/**
+ * Drive the runtime-dispatched wrapper. Verifies that:
+ *   * a host pointer dispatches to the copy_device branch (does_copy() == true), and
+ *   * a device pointer dispatches to passthrough (does_copy() == false),
+ * and that initialize-only iteration yields the expected pre-fill on each batch.
+ */
+TEST_F(BatchLoadIteratorTest, MakeBatchLoadIteratorHostPtr)
+{
+  const int64_t n_rows         = 256;
+  const int64_t n_cols         = 32;
+  const size_t batch_size_rows = 64;
+
+  std::vector<IdxT> host_data(n_rows * n_cols, IdxT(13));
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+
+  auto iter = bli::make_batch_load_iterator<IdxT>(res,
+                                                  host_data.data(),
+                                                  n_rows,
+                                                  n_cols,
+                                                  batch_size_rows,
+                                                  copy_stream,
+                                                  raft::resource::get_workspace_resource_ref(res),
+                                                  enable_prefetch);
+  EXPECT_TRUE(iter.does_copy());
+
+  std::vector<IdxT> readback(n_rows * n_cols, IdxT(0));
+  int64_t total = 0;
+  iter.prefetch_next_batch();
+  for (auto const& batch : iter) {
+    if (batch.size() == 0) break;
+    raft::copy(readback.data() + total * n_cols,
+               batch.data(),
+               batch.size() * n_cols,
+               raft::resource::get_cuda_stream(res));
+    total += batch.size();
+    iter.prefetch_next_batch();
+  }
+  raft::resource::sync_stream(res);
+  EXPECT_EQ(total, n_rows);
+  for (int64_t i = 0; i < n_rows * n_cols; ++i) {
+    EXPECT_EQ(readback[i], IdxT(13)) << "Mismatch at index " << i;
+  }
+}
+
+TEST_F(BatchLoadIteratorTest, MakeBatchLoadIteratorDevicePtr)
+{
+  const int64_t n_rows         = 256;
+  const int64_t n_cols         = 32;
+  const size_t batch_size_rows = 64;
+
+  auto device_matrix = raft::make_device_matrix<IdxT, int64_t>(res, n_rows, n_cols);
+  raft::matrix::fill(res, device_matrix.view(), IdxT(13));
+
+  auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
+  auto iter                           = bli::make_batch_load_iterator<IdxT>(res,
+                                                  device_matrix.data_handle(),
+                                                  n_rows,
+                                                  n_cols,
+                                                  batch_size_rows,
+                                                  copy_stream,
+                                                  raft::resource::get_workspace_resource_ref(res),
+                                                  enable_prefetch);
+  EXPECT_FALSE(iter.does_copy());
+
+  std::vector<IdxT> readback(n_rows * n_cols, IdxT(0));
+  int64_t total = 0;
+  iter.prefetch_next_batch();
+  for (auto const& batch : iter) {
+    if (batch.size() == 0) break;
+    raft::copy(readback.data() + total * n_cols,
+               batch.data(),
+               batch.size() * n_cols,
+               raft::resource::get_cuda_stream(res));
+    total += batch.size();
+    iter.prefetch_next_batch();
+  }
+  raft::resource::sync_stream(res);
+  EXPECT_EQ(total, n_rows);
+  for (int64_t i = 0; i < n_rows * n_cols; ++i) {
+    EXPECT_EQ(readback[i], IdxT(13)) << "Mismatch at index " << i;
+  }
 }
 
 static const std::array<BatchConfig, 3> kBatchConfigs = {{
@@ -268,7 +368,7 @@ static const std::array<DimsConfig, 4> kDimsConfigs = {{
 }};
 
 INSTANTIATE_TEST_SUITE_P(BatchConfigs,
-                         BatchedDeviceViewParameterizedTest,
+                         BatchLoadIteratorParameterizedTest,
                          ::testing::Combine(::testing::ValuesIn(kBatchConfigs),
                                             ::testing::ValuesIn(kDimsConfigs)));
 
