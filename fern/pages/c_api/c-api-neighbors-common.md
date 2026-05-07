@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/common.h`_
 
 _Doxygen group: `filters`_
 
+<a id="cuvsfiltertype"></a>
 ### cuvsFilterType
 
 Enum to denote filter type.
@@ -28,10 +29,28 @@ enum cuvsFilterType { ... } ;
 
 _Source: `c/include/cuvs/neighbors/common.h:23`_
 
+<a id="cuvsfilter"></a>
+### cuvsFilter
+
+Struct to hold address of cuvs::neighbors::prefilter and its type
+
+```c
+typedef struct { ... } cuvsFilter;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+
+_Source: `c/include/cuvs/neighbors/common.h:36`_
+
 ## Index Merge
 
 _Doxygen group: `index_merge`_
 
+<a id="cuvsmergestrategy"></a>
 ### cuvsMergeStrategy
 
 Strategy for merging indices.

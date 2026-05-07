@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/cagra.h`_
 
 _Doxygen group: `cagra_c_index_params`_
 
+<a id="cuvscagragraphbuildalgo"></a>
 ### cuvsCagraGraphBuildAlgo
 
 Enum to denote which ANN algorithm is used to build CAGRA graph
@@ -27,6 +28,7 @@ enum cuvsCagraGraphBuildAlgo { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:29`_
 
+<a id="cuvscagrahnswheuristictype"></a>
 ### cuvsCagraHnswHeuristicType
 
 A strategy for selecting the graph build parameters based on similar HNSW index
@@ -41,6 +43,7 @@ enum cuvsCagraHnswHeuristicType { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:54`_
 
+<a id="cuvscagracompressionparams"></a>
 ### cuvsCagraCompressionParams
 
 Parameters for VPQ compression.
@@ -62,6 +65,7 @@ struct cuvsCagraCompressionParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:82`_
 
+<a id="cuvsaceparams"></a>
 ### cuvsAceParams
 
 Parameters for ACE (Augmented Core Extraction) graph build.
@@ -89,6 +93,7 @@ struct cuvsAceParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:136`_
 
+<a id="cuvscagraindexparams"></a>
 ### cuvsCagraIndexParams
 
 Supplemental parameters to build CAGRA Index
@@ -101,16 +106,17 @@ struct cuvsCagraIndexParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvsDistanceType` | Distance type. |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
 | `intermediate_graph_degree` | `size_t` | Degree of input graph for pruning. |
 | `graph_degree` | `size_t` | Degree of output graph. |
-| `build_algo` | `enum cuvsCagraGraphBuildAlgo` | ANN algorithm to build knn graph. |
+| `build_algo` | [`enum cuvsCagraGraphBuildAlgo`](/api-reference/c-api-neighbors-cagra#cuvscagragraphbuildalgo) | ANN algorithm to build knn graph. |
 | `nn_descent_niter` | `size_t` | Number of Iterations to run if building with NN_DESCENT |
-| `compression` | `cuvsCagraCompressionParams_t` | Optional: specify compression parameters if compression is desired. NOTE: this is experimental new API, consider it unsafe. |
+| `compression` | [`cuvsCagraCompressionParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagracompressionparams) | Optional: specify compression parameters if compression is desired. NOTE: this is experimental new API, consider it unsafe. |
 | `graph_build_params` | `void*` | Optional: specify graph build params based on build_algo<br />- IVF_PQ: cuvsIvfPqParams_t<br />- ACE: cuvsAceParams_t<br />- Others: nullptr |
 
 _Source: `c/include/cuvs/neighbors/cagra.h:201`_
 
+<a id="cuvscagraindexparamscreate"></a>
 ### cuvsCagraIndexParamsCreate
 
 Allocate CAGRA Index params, and populate with default values
@@ -123,16 +129,17 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraIndexParams_t*` | cuvsCagraIndexParams_t to allocate |
+| `params` | in | [`cuvsCagraIndexParams_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | cuvsCagraIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:235`_
 
+<a id="cuvscagraindexparamsdestroy"></a>
 ### cuvsCagraIndexParamsDestroy
 
 De-allocate CAGRA Index params
@@ -145,16 +152,17 @@ cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraIndexParams_t` |  |
+| `params` | in | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:243`_
 
+<a id="cuvscagracompressionparamscreate"></a>
 ### cuvsCagraCompressionParamsCreate
 
 Allocate CAGRA Compression params, and populate with default values
@@ -167,16 +175,17 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraCompressionParams_t*` | cuvsCagraCompressionParams_t to allocate |
+| `params` | in | [`cuvsCagraCompressionParams_t*`](/api-reference/c-api-neighbors-cagra#cuvscagracompressionparams) | cuvsCagraCompressionParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:251`_
 
+<a id="cuvscagracompressionparamsdestroy"></a>
 ### cuvsCagraCompressionParamsDestroy
 
 De-allocate CAGRA Compression params
@@ -189,16 +198,17 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraCompressionParams_t` |  |
+| `params` | in | [`cuvsCagraCompressionParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagracompressionparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:259`_
 
+<a id="cuvsaceparamscreate"></a>
 ### cuvsAceParamsCreate
 
 Allocate ACE params, and populate with default values
@@ -211,16 +221,17 @@ cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsAceParams_t*` | cuvsAceParams_t to allocate |
+| `params` | in | [`cuvsAceParams_t*`](/api-reference/c-api-neighbors-cagra#cuvsaceparams) | cuvsAceParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:267`_
 
+<a id="cuvsaceparamsdestroy"></a>
 ### cuvsAceParamsDestroy
 
 De-allocate ACE params
@@ -233,16 +244,17 @@ cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsAceParams_t` |  |
+| `params` | in | [`cuvsAceParams_t`](/api-reference/c-api-neighbors-cagra#cuvsaceparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:275`_
 
+<a id="cuvscagraindexparamsfromhnswparams"></a>
 ### cuvsCagraIndexParamsFromHnswParams
 
 Create CAGRA index parameters similar to an HNSW index
@@ -263,17 +275,17 @@ This factory function creates CAGRA parameters that yield a graph compatible wit
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | out | `cuvsCagraIndexParams_t` | The CAGRA index params to populate |
+| `params` | out | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | The CAGRA index params to populate |
 | `n_rows` | in | `int64_t` | Number of rows in the dataset |
 | `dim` | in | `int64_t` | Number of dimensions in the dataset |
 | `M` | in | `int` | HNSW index parameter M |
 | `ef_construction` | in | `int` | HNSW index parameter ef_construction |
-| `heuristic` | in | `enum cuvsCagraHnswHeuristicType` | Strategy for parameter selection |
-| `metric` | in | `cuvsDistanceType` | Distance metric to use |
+| `heuristic` | in | [`enum cuvsCagraHnswHeuristicType`](/api-reference/c-api-neighbors-cagra#cuvscagrahnswheuristictype) | Strategy for parameter selection |
+| `metric` | in | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance metric to use |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -283,6 +295,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:292`_
 
 _Doxygen group: `cagra_c_extend_params`_
 
+<a id="cuvscagraextendparams"></a>
 ### cuvsCagraExtendParams
 
 Supplemental parameters to extend CAGRA Index
@@ -299,6 +312,7 @@ struct cuvsCagraExtendParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:312`_
 
+<a id="cuvscagraextendparamscreate"></a>
 ### cuvsCagraExtendParamsCreate
 
 Allocate CAGRA Extend params, and populate with default values
@@ -311,16 +325,17 @@ cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraExtendParams_t*` | cuvsCagraExtendParams_t to allocate |
+| `params` | in | [`cuvsCagraExtendParams_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraextendparams) | cuvsCagraExtendParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:329`_
 
+<a id="cuvscagraextendparamsdestroy"></a>
 ### cuvsCagraExtendParamsDestroy
 
 De-allocate CAGRA Extend params
@@ -333,16 +348,17 @@ cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraExtendParams_t` |  |
+| `params` | in | [`cuvsCagraExtendParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraextendparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:337`_
 
+<a id="cuvscagraextend"></a>
 ### cuvsCagraExtend
 
 Extend a CAGRA index with a `DLManagedTensor` which has underlying
@@ -365,14 +381,14 @@ cuvsCagraIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsCagraExtendParams_t` | cuvsCagraExtendParams_t used to extend CAGRA index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsCagraExtendParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraextendparams) | cuvsCagraExtendParams_t used to extend CAGRA index |
 | `additional_dataset` | in | `DLManagedTensor*` | DLManagedTensor* additional dataset |
-| `index` | in,out | `cuvsCagraIndex_t` | cuvsCagraIndex_t CAGRA index |
+| `index` | in,out | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t CAGRA index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -382,6 +398,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:644`_
 
 _Doxygen group: `cagra_c_search_params`_
 
+<a id="cuvscagrasearchalgo"></a>
 ### cuvsCagraSearchAlgo
 
 Enum to denote algorithm used to search CAGRA Index
@@ -401,6 +418,7 @@ enum cuvsCagraSearchAlgo { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:352`_
 
+<a id="cuvscagrahashmode"></a>
 ### cuvsCagraHashMode
 
 Enum to denote Hash Mode used while searching CAGRA index
@@ -419,6 +437,7 @@ enum cuvsCagraHashMode { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:365`_
 
+<a id="cuvscagrasearchparams"></a>
 ### cuvsCagraSearchParams
 
 Supplemental parameters to search CAGRA index
@@ -434,12 +453,12 @@ struct cuvsCagraSearchParams { ... } ;
 | `max_queries` | `size_t` | Maximum number of queries to search at the same time (batch size). Auto select when 0. |
 | `itopk_size` | `size_t` | Number of intermediate search results retained during the search. This is the main knob to adjust trade off between accuracy and search speed. Higher values improve the search accuracy. |
 | `max_iterations` | `size_t` | Upper limit of search iterations. Auto select when 0. |
-| `algo` | `enum cuvsCagraSearchAlgo` | Which search implementation to use. |
+| `algo` | [`enum cuvsCagraSearchAlgo`](/api-reference/c-api-neighbors-cagra#cuvscagrasearchalgo) | Which search implementation to use. |
 | `team_size` | `size_t` | Number of threads used to calculate a single distance. 4, 8, 16, or 32. |
 | `search_width` | `size_t` | Number of graph nodes to select as the starting point for the search in each iteration. aka search width? |
 | `min_iterations` | `size_t` | Lower limit of search iterations. |
 | `thread_block_size` | `size_t` | Thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when 0. |
-| `hashmap_mode` | `enum cuvsCagraHashMode` | Hashmap type. Auto selection when AUTO. |
+| `hashmap_mode` | [`enum cuvsCagraHashMode`](/api-reference/c-api-neighbors-cagra#cuvscagrahashmode) | Hashmap type. Auto selection when AUTO. |
 | `hashmap_min_bitlen` | `size_t` | Lower limit of hashmap bit length. More than 8. |
 | `hashmap_max_fill_rate` | `float` | Upper limit of hashmap fill rate. More than 0.1, less than 0.9. |
 | `num_random_samplings` | `uint32_t` | Number of iterations of initial random seed node selection. 1 or more. |
@@ -450,6 +469,7 @@ struct cuvsCagraSearchParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/cagra.h:371`_
 
+<a id="cuvscagrasearchparamscreate"></a>
 ### cuvsCagraSearchParamsCreate
 
 Allocate CAGRA search params, and populate with default values
@@ -462,16 +482,17 @@ cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraSearchParams_t*` | cuvsCagraSearchParams_t to allocate |
+| `params` | in | [`cuvsCagraSearchParams_t*`](/api-reference/c-api-neighbors-cagra#cuvscagrasearchparams) | cuvsCagraSearchParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:447`_
 
+<a id="cuvscagrasearchparamsdestroy"></a>
 ### cuvsCagraSearchParamsDestroy
 
 De-allocate CAGRA search params
@@ -484,11 +505,11 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsCagraSearchParams_t` |  |
+| `params` | in | [`cuvsCagraSearchParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagrasearchparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -498,6 +519,25 @@ _Source: `c/include/cuvs/neighbors/cagra.h:455`_
 
 _Doxygen group: `cagra_c_index`_
 
+<a id="cuvscagraindex"></a>
+### cuvsCagraIndex
+
+Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsCagraIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/cagra.h:470`_
+
+<a id="cuvscagraindexcreate"></a>
 ### cuvsCagraIndexCreate
 
 Allocate CAGRA index
@@ -510,16 +550,17 @@ cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t*` | cuvsCagraIndex_t to allocate |
+| `index` | in | [`cuvsCagraIndex_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cagraError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:484`_
 
+<a id="cuvscagraindexdestroy"></a>
 ### cuvsCagraIndexDestroy
 
 De-allocate CAGRA index
@@ -532,14 +573,15 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t` | cuvsCagraIndex_t to de-allocate |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:491`_
 
+<a id="cuvscagraindexgetdims"></a>
 ### cuvsCagraIndexGetDims
 
 Get dimension of the CAGRA index
@@ -552,17 +594,18 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `dim` | out | `int64_t*` | return dimension of the index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:500`_
 
+<a id="cuvscagraindexgetsize"></a>
 ### cuvsCagraIndexGetSize
 
 Get size of the CAGRA index
@@ -575,17 +618,18 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `size` | out | `int64_t*` | return number of vectors in the index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:509`_
 
+<a id="cuvscagraindexgetgraphdegree"></a>
 ### cuvsCagraIndexGetGraphDegree
 
 Get graph degree of the CAGRA index
@@ -598,17 +642,18 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `graph_degree` | out | `int64_t*` | return graph degree |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:518`_
 
+<a id="cuvscagraindexgetdataset"></a>
 ### cuvsCagraIndexGetDataset
 
 Returns a view of the CAGRA dataset
@@ -625,17 +670,18 @@ Note that the DLManagedTensor dataset returned will have an associated 'deleter'
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `dataset` | out | `DLManagedTensor*` | the dataset used in cagra |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/cagra.h:539`_
 
+<a id="cuvscagraindexgetgraph"></a>
 ### cuvsCagraIndexGetGraph
 
 Returns a view of the CAGRA graph
@@ -652,12 +698,12 @@ Note that the DLManagedTensor graph returned will have an associated 'deleter' f
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `graph` | out | `DLManagedTensor*` | the output knn graph. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -667,6 +713,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:560`_
 
 _Doxygen group: `cagra_c_index_build`_
 
+<a id="cuvscagrabuild"></a>
 ### cuvsCagraBuild
 
 Build a CAGRA index with a `DLManagedTensor` which has underlying
@@ -689,14 +736,14 @@ cuvsCagraIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsCagraIndexParams_t` | cuvsCagraIndexParams_t used to build CAGRA index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | cuvsCagraIndexParams_t used to build CAGRA index |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | inout | `cuvsCagraIndex_t` | cuvsCagraIndex_t Newly built CAGRA index. This index needs to be already created with cuvsCagraIndexCreate. |
+| `index` | inout | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t Newly built CAGRA index. This index needs to be already created with cuvsCagraIndexCreate. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -706,6 +753,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:615`_
 
 _Doxygen group: `cagra_c_index_search`_
 
+<a id="cuvscagrasearch"></a>
 ### cuvsCagraSearch
 
 Search a CAGRA index with a `DLManagedTensor` which has underlying
@@ -730,17 +778,17 @@ cuvsFilter filter);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsCagraSearchParams_t` | cuvsCagraSearchParams_t used to search CAGRA index |
-| `index` | in | `cuvsCagraIndex_t` | cuvsCagraIndex which has been returned by `cuvsCagraBuild` |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsCagraSearchParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagrasearchparams) | cuvsCagraSearchParams_t used to search CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex which has been returned by `cuvsCagraBuild` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-| `filter` | in | `cuvsFilter` | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:707`_
 
@@ -748,6 +796,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:707`_
 
 _Doxygen group: `cagra_c_index_serialize`_
 
+<a id="cuvscagraserialize"></a>
 ### cuvsCagraSerialize
 
 Save the index to file.
@@ -765,17 +814,18 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the file name for saving the index |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `include_dataset` | in | `bool` | Whether or not to write out the dataset to the file. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:745`_
 
+<a id="cuvscagraserializetohnswlib"></a>
 ### cuvsCagraSerializeToHnswlib
 
 Save the CAGRA index to file in hnswlib format.
@@ -794,16 +844,17 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the file name for saving the index |
-| `index` | in | `cuvsCagraIndex_t` | CAGRA index |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:774`_
 
+<a id="cuvscagradeserialize"></a>
 ### cuvsCagraDeserialize
 
 Load index from file.
@@ -818,16 +869,17 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the name of the file that stores the index |
-| `index` | inout | `cuvsCagraIndex_t` | cuvsCagraIndex_t CAGRA index loaded from disk. This index needs to be already created with cuvsCagraIndexCreate. |
+| `index` | inout | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t CAGRA index loaded from disk. This index needs to be already created with cuvsCagraIndexCreate. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:788`_
 
+<a id="cuvscagraindexfromargs"></a>
 ### cuvsCagraIndexFromArgs
 
 Load index from a dataset and graph
@@ -844,15 +896,15 @@ cuvsCagraIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `metric` | in | `cuvsDistanceType` | cuvsDistanceType to use in the index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `metric` | in | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | cuvsDistanceType to use in the index |
 | `graph` | in | `DLManagedTensor*` | the knn graph to use, shape (size, graph_degree) |
 | `dataset` | in | `DLManagedTensor*` | the dataset to use, shape (size, dim) |
-| `index` | inout | `cuvsCagraIndex_t` | cuvsCagraIndex_t CAGRA index populated with the graph and dataset. This index needs to be already created with cuvsCagraIndexCreate. |
+| `index` | inout | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t CAGRA index populated with the graph and dataset. This index needs to be already created with cuvsCagraIndexCreate. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:824`_
 
@@ -860,6 +912,7 @@ _Source: `c/include/cuvs/neighbors/cagra.h:824`_
 
 _Doxygen group: `cagra_c_index_merge`_
 
+<a id="cuvscagramerge"></a>
 ### cuvsCagraMerge
 
 Merge multiple CAGRA indices into a single CAGRA index.
@@ -888,15 +941,15 @@ Example:
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsCagraIndexParams_t` | cuvsCagraIndexParams_t parameters controlling merge behavior |
-| `indices` | in | `cuvsCagraIndex_t*` | Array of input cuvsCagraIndex_t handles to merge |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | cuvsCagraIndexParams_t parameters controlling merge behavior |
+| `indices` | in | [`cuvsCagraIndex_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Array of input cuvsCagraIndex_t handles to merge |
 | `num_indices` | in | `size_t` | Number of input indices |
-| `filter` | in | `cuvsFilter` | Filter that can be used to filter out vectors from the merged index |
-| `output_index` | out | `cuvsCagraIndex_t` | Output handle that will store the merged index. Must be initialized using `cuvsCagraIndexCreate` before use. |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | Filter that can be used to filter out vectors from the merged index |
+| `output_index` | out | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Output handle that will store the merged index. Must be initialized using `cuvsCagraIndexCreate` before use. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/cagra.h:891`_

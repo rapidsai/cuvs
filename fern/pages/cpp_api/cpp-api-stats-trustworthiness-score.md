@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/stats/trustworthiness_score.hpp`_
 
 _Doxygen group: `stats_trustworthiness`_
 
+<a id="stats-trustworthiness-score"></a>
 ### stats::trustworthiness_score
 
 Compute the trustworthiness score
@@ -34,7 +35,7 @@ modified.
 | `X` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | : Data in original dimension |
 | `X_embedded` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | : Data in target dimension (embedding) |
 | `n_neighbors` | in | `int` | Number of neighbors considered by trustworthiness score |
-| `metric` | in | `cuvs::distance::DistanceType` | Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2SqrtUnexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2SqrtUnexpanded`. |
 | `batch_size` | in | `int` | Batch size Default: `512`. |
 
 **Returns**

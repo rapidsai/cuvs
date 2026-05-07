@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/all_neighbors.hpp`_
 
 _Doxygen group: `all_neighbors_cpp_params`_
 
+<a id="graphbuildparams"></a>
 ### GraphBuildParams
 
 The all-neighbors algorithm parameters.
@@ -22,6 +23,7 @@ graph_build_params::brute_force_params>;
 
 _Source: `cpp/include/cuvs/neighbors/all_neighbors.hpp:22`_
 
+<a id="cuvs-neighbors-all-neighbors-all-neighbors-params"></a>
 ### cuvs::neighbors::all_neighbors::all_neighbors_params
 
 Parameters used to build an all-neighbors graph (find nearest neighbors for all the
@@ -36,10 +38,10 @@ struct all_neighbors_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `graph_build_params` | `GraphBuildParams` | Parameters for knn graph building algorithm Approximate nearest neighbors methods or a brute force approach are supported to build the knn graph. Currently supported options are 'IVF-PQ', 'NN Descent', or 'Brute Force'. IVF-PQ is more accurate, but slower compared to NN Descent. Note that 'Brute Force' can also be approximate if n_clusters &gt; 1. Set ivf_pq_params, nn_descent_params, or brute_force_params to select the graph build algorithm and control their parameters. |
+| `graph_build_params` | [`GraphBuildParams`](/api-reference/cpp-api-neighbors-all-neighbors#graphbuildparams) | Parameters for knn graph building algorithm Approximate nearest neighbors methods or a brute force approach are supported to build the knn graph. Currently supported options are 'IVF-PQ', 'NN Descent', or 'Brute Force'. IVF-PQ is more accurate, but slower compared to NN Descent. Note that 'Brute Force' can also be approximate if n_clusters &gt; 1. Set ivf_pq_params, nn_descent_params, or brute_force_params to select the graph build algorithm and control their parameters. |
 | `overlap_factor` | `size_t` | Number of nearest clusters each data point will be assigned to in the batching algorithm. Start with `overlap_factor = 2` and gradually increase (2-&gt;3-&gt;4 ...) for better accuracy at the cost of device memory usage. |
 | `n_clusters` | `size_t` | Number of total clusters (aka batches) to split the data into. If set to 1, algorithm creates an all-neighbors graph without batching. Start with `n_clusters = 4` and increase (4 → 8 → 16...) for less device memory usage at the cost of accuracy. This is independent from `overlap_factor` as long as `overlap_factor` &lt; `n_clusters`. The ratio of `overlap_factor / n_clusters` determines device memory usage. Approximately `(overlap_factor / n_clusters) * num_rows_in_entire_data` number of rows will be put on device memory at once. E.g. between `(overlap_factor / n_clusters)` = 2/10 and 2/20, the latter will use less device memory. Larger `overlap_factor` results in better accuracy of the final all-neighbors knn graph. E.g. While using similar device memory, `(overlap_factor / n_clusters)` = 4/20 will have better accuracy than 2/10 at the cost of performance. |
-| `metric` | `cuvs::distance::DistanceType` | Metric used. |
+| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Metric used. |
 
 _Source: `cpp/include/cuvs/neighbors/all_neighbors.hpp:37`_
 
@@ -47,6 +49,7 @@ _Source: `cpp/include/cuvs/neighbors/all_neighbors.hpp:37`_
 
 _Doxygen group: `all_neighbors_cpp_build`_
 
+<a id="cuvs-neighbors-all-neighbors-build"></a>
 ### cuvs::neighbors::all_neighbors::build
 
 Builds an approximate all-neighbors knn graph  (find nearest neighbors for all the
@@ -73,7 +76,7 @@ compute core_distances. If core_distances is given, the resulting indices and di
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | raft::resources is an object managing resources |
-| `params` | in | `const all_neighbors_params&` | an instance of all_neighbors::all_neighbors_params that are parameters to build all-neighbors knn graph |
+| `params` | in | [`const all_neighbors_params&`](/api-reference/cpp-api-neighbors-all-neighbors#cuvs-neighbors-all-neighbors-all-neighbors-params) | an instance of all_neighbors::all_neighbors_params that are parameters to build all-neighbors knn graph |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, row_major>` | raft::host_matrix_view input dataset expected to be located in host memory |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, row_major>` | nearest neighbor indices of shape [n_row x k] |
 | `distances` | out | `std::optional<raft::device_matrix_view<float, int64_t, row_major>>` | nearest neighbor distances [n_row x k] Default: `std::nullopt`. |
@@ -112,7 +115,7 @@ compute core_distances. If core_distances is given, the resulting indices and di
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | raft::resources is an object managing resources |
-| `params` | in | `const all_neighbors_params&` | an instance of all_neighbors::all_neighbors_params that are parameters to build all-neighbors knn graph |
+| `params` | in | [`const all_neighbors_params&`](/api-reference/cpp-api-neighbors-all-neighbors#cuvs-neighbors-all-neighbors-all-neighbors-params) | an instance of all_neighbors::all_neighbors_params that are parameters to build all-neighbors knn graph |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, row_major>` | raft::device_matrix_view input dataset expected to be located in device memory |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, row_major>` | nearest neighbor indices of shape [n_row x k] |
 | `distances` | out | `std::optional<raft::device_matrix_view<float, int64_t, row_major>>` | nearest neighbor distances [n_row x k] Default: `std::nullopt`. |

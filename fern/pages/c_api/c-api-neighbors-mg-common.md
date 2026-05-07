@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/mg_common.h`_
 
 _Doxygen group: `mg_c_common_types`_
 
+<a id="cuvsmultigpudistributionmode"></a>
 ### cuvsMultiGpuDistributionMode
 
 Distribution mode for multi-GPU indexes
@@ -20,6 +21,7 @@ typedef enum { ... } cuvsMultiGpuDistributionMode;
 
 _Source: `c/include/cuvs/neighbors/mg_common.h:22`_
 
+<a id="cuvsmultigpureplicatedsearchmode"></a>
 ### cuvsMultiGpuReplicatedSearchMode
 
 Search mode when using a replicated index
@@ -37,6 +39,7 @@ typedef enum { ... } cuvsMultiGpuReplicatedSearchMode;
 
 _Source: `c/include/cuvs/neighbors/mg_common.h:32`_
 
+<a id="cuvsmultigpushardedmergemode"></a>
 ### cuvsMultiGpuShardedMergeMode
 
 Merge mode when using a sharded index

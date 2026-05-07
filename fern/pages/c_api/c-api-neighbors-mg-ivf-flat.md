@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/mg_ivf_flat.h`_
 
 _Doxygen group: `mg_ivf_flat_c_index_params`_
 
+<a id="cuvsmultigpuivfflatindexparams"></a>
 ### cuvsMultiGpuIvfFlatIndexParams
 
 Multi-GPU parameters to build IVF-Flat Index
@@ -24,11 +25,12 @@ struct cuvsMultiGpuIvfFlatIndexParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `base_params` | `cuvsIvfFlatIndexParams_t` | Base IVF-Flat index parameters |
-| `mode` | `cuvsMultiGpuDistributionMode` | Distribution mode for multi-GPU setup |
+| `base_params` | [`cuvsIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) | Base IVF-Flat index parameters |
+| `mode` | [`cuvsMultiGpuDistributionMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpudistributionmode) | Distribution mode for multi-GPU setup |
 
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:28`_
 
+<a id="cuvsmultigpuivfflatindexparamscreate"></a>
 ### cuvsMultiGpuIvfFlatIndexParamsCreate
 
 Allocate Multi-GPU IVF-Flat Index params, and populate with default values
@@ -41,16 +43,17 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexParamsCreate(cuvsMultiGpuIvfFlatIndexParams_
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsMultiGpuIvfFlatIndexParams_t*` | cuvsMultiGpuIvfFlatIndexParams_t to allocate |
+| `index_params` | in | [`cuvsMultiGpuIvfFlatIndexParams_t*`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindexparams) | cuvsMultiGpuIvfFlatIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:43`_
 
+<a id="cuvsmultigpuivfflatindexparamsdestroy"></a>
 ### cuvsMultiGpuIvfFlatIndexParamsDestroy
 
 De-allocate Multi-GPU IVF-Flat Index params
@@ -63,11 +66,11 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexParamsDestroy(cuvsMultiGpuIvfFlatIndexParams
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsMultiGpuIvfFlatIndexParams_t` |  |
+| `index_params` | in | [`cuvsMultiGpuIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -77,6 +80,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:51`_
 
 _Doxygen group: `mg_ivf_flat_c_search_params`_
 
+<a id="cuvsmultigpuivfflatsearchparams"></a>
 ### cuvsMultiGpuIvfFlatSearchParams
 
 Multi-GPU parameters to search IVF-Flat index
@@ -91,13 +95,14 @@ struct cuvsMultiGpuIvfFlatSearchParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `base_params` | `cuvsIvfFlatSearchParams_t` | Base IVF-Flat search parameters |
-| `search_mode` | `cuvsMultiGpuReplicatedSearchMode` | Replicated search mode |
-| `merge_mode` | `cuvsMultiGpuShardedMergeMode` | Sharded merge mode |
+| `base_params` | [`cuvsIvfFlatSearchParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatsearchparams) | Base IVF-Flat search parameters |
+| `search_mode` | [`cuvsMultiGpuReplicatedSearchMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpureplicatedsearchmode) | Replicated search mode |
+| `merge_mode` | [`cuvsMultiGpuShardedMergeMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpushardedmergemode) | Sharded merge mode |
 | `n_rows_per_batch` | `int64_t` | Number of rows per batch |
 
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:67`_
 
+<a id="cuvsmultigpuivfflatsearchparamscreate"></a>
 ### cuvsMultiGpuIvfFlatSearchParamsCreate
 
 Allocate Multi-GPU IVF-Flat search params, and populate with default values
@@ -110,16 +115,17 @@ cuvsError_t cuvsMultiGpuIvfFlatSearchParamsCreate(cuvsMultiGpuIvfFlatSearchParam
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsMultiGpuIvfFlatSearchParams_t*` | cuvsMultiGpuIvfFlatSearchParams_t to allocate |
+| `params` | in | [`cuvsMultiGpuIvfFlatSearchParams_t*`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatsearchparams) | cuvsMultiGpuIvfFlatSearchParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:86`_
 
+<a id="cuvsmultigpuivfflatsearchparamsdestroy"></a>
 ### cuvsMultiGpuIvfFlatSearchParamsDestroy
 
 De-allocate Multi-GPU IVF-Flat search params
@@ -132,11 +138,11 @@ cuvsError_t cuvsMultiGpuIvfFlatSearchParamsDestroy(cuvsMultiGpuIvfFlatSearchPara
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsMultiGpuIvfFlatSearchParams_t` |  |
+| `params` | in | [`cuvsMultiGpuIvfFlatSearchParams_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatsearchparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -146,6 +152,27 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:94`_
 
 _Doxygen group: `mg_ivf_flat_c_index`_
 
+<a id="cuvsmultigpuivfflatindex"></a>
+### cuvsMultiGpuIvfFlatIndex
+
+Struct to hold address of cuvs::neighbors::mg_index&lt;ivf_flat::index&gt; and its active
+
+trained dtype
+
+```c
+typedef struct { ... } cuvsMultiGpuIvfFlatIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:109`_
+
+<a id="cuvsmultigpuivfflatindexcreate"></a>
 ### cuvsMultiGpuIvfFlatIndexCreate
 
 Allocate Multi-GPU IVF-Flat index
@@ -158,16 +185,17 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexCreate(cuvsMultiGpuIvfFlatIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsMultiGpuIvfFlatIndex_t*` | cuvsMultiGpuIvfFlatIndex_t to allocate |
+| `index` | in | [`cuvsMultiGpuIvfFlatIndex_t*`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | cuvsMultiGpuIvfFlatIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:122`_
 
+<a id="cuvsmultigpuivfflatindexdestroy"></a>
 ### cuvsMultiGpuIvfFlatIndexDestroy
 
 De-allocate Multi-GPU IVF-Flat index
@@ -180,11 +208,11 @@ cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsMultiGpuIvfFlatIndex_t` | cuvsMultiGpuIvfFlatIndex_t to de-allocate |
+| `index` | in | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | cuvsMultiGpuIvfFlatIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -194,6 +222,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:130`_
 
 _Doxygen group: `mg_ivf_flat_c_index_build`_
 
+<a id="cuvsmultigpuivfflatbuild"></a>
 ### cuvsMultiGpuIvfFlatBuild
 
 Build a Multi-GPU IVF-Flat index
@@ -209,14 +238,14 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsMultiGpuIvfFlatIndexParams_t` | Multi-GPU IVF-Flat index parameters |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsMultiGpuIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindexparams) | Multi-GPU IVF-Flat index parameters |
 | `dataset_tensor` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | out | `cuvsMultiGpuIvfFlatIndex_t` | Multi-GPU IVF-Flat index |
+| `index` | out | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | Multi-GPU IVF-Flat index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -226,6 +255,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:150`_
 
 _Doxygen group: `mg_ivf_flat_c_index_search`_
 
+<a id="cuvsmultigpuivfflatsearch"></a>
 ### cuvsMultiGpuIvfFlatSearch
 
 Search a Multi-GPU IVF-Flat index
@@ -243,16 +273,16 @@ DLManagedTensor* distances_tensor);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsMultiGpuIvfFlatSearchParams_t` | Multi-GPU IVF-Flat search parameters |
-| `index` | in | `cuvsMultiGpuIvfFlatIndex_t` | Multi-GPU IVF-Flat index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsMultiGpuIvfFlatSearchParams_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatsearchparams) | Multi-GPU IVF-Flat search parameters |
+| `index` | in | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | Multi-GPU IVF-Flat index |
 | `queries_tensor` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset |
 | `neighbors_tensor` | out | `DLManagedTensor*` | DLManagedTensor* output neighbors |
 | `distances_tensor` | out | `DLManagedTensor*` | DLManagedTensor* output distances |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -262,6 +292,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:175`_
 
 _Doxygen group: `mg_ivf_flat_c_index_extend`_
 
+<a id="cuvsmultigpuivfflatextend"></a>
 ### cuvsMultiGpuIvfFlatExtend
 
 Extend a Multi-GPU IVF-Flat index
@@ -277,14 +308,14 @@ DLManagedTensor* new_indices_tensor);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index` | in,out | `cuvsMultiGpuIvfFlatIndex_t` | Multi-GPU IVF-Flat index to extend |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index` | in,out | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | Multi-GPU IVF-Flat index to extend |
 | `new_vectors_tensor` | in | `DLManagedTensor*` | DLManagedTensor* new vectors to add |
 | `new_indices_tensor` | in | `DLManagedTensor*` | DLManagedTensor* new indices (optional, can be NULL) |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -294,6 +325,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:200`_
 
 _Doxygen group: `mg_ivf_flat_c_index_serialize`_
 
+<a id="cuvsmultigpuivfflatserialize"></a>
 ### cuvsMultiGpuIvfFlatSerialize
 
 Serialize a Multi-GPU IVF-Flat index to file
@@ -308,13 +340,13 @@ const char* filename);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index` | in | `cuvsMultiGpuIvfFlatIndex_t` | Multi-GPU IVF-Flat index to serialize |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index` | in | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | Multi-GPU IVF-Flat index to serialize |
 | `filename` | in | `const char*` | Path to the output file |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -324,6 +356,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:222`_
 
 _Doxygen group: `mg_ivf_flat_c_index_deserialize`_
 
+<a id="cuvsmultigpuivfflatdeserialize"></a>
 ### cuvsMultiGpuIvfFlatDeserialize
 
 Deserialize a Multi-GPU IVF-Flat index from file
@@ -338,13 +371,13 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | Path to the input file |
-| `index` | out | `cuvsMultiGpuIvfFlatIndex_t` | Multi-GPU IVF-Flat index |
+| `index` | out | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | Multi-GPU IVF-Flat index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -354,6 +387,7 @@ _Source: `c/include/cuvs/neighbors/mg_ivf_flat.h:243`_
 
 _Doxygen group: `mg_ivf_flat_c_index_distribute`_
 
+<a id="cuvsmultigpuivfflatdistribute"></a>
 ### cuvsMultiGpuIvfFlatDistribute
 
 Distribute a local IVF-Flat index to create a Multi-GPU index
@@ -368,13 +402,13 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | Path to the local index file |
-| `index` | out | `cuvsMultiGpuIvfFlatIndex_t` | Multi-GPU IVF-Flat index |
+| `index` | out | [`cuvsMultiGpuIvfFlatIndex_t`](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatindex) | Multi-GPU IVF-Flat index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 

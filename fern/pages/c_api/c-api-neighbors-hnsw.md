@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/hnsw.h`_
 
 _Doxygen group: `hnsw_c_index_params`_
 
+<a id="cuvshnswhierarchy"></a>
 ### cuvsHnswHierarchy
 
 Hierarchy for HNSW index when converting from CAGRA index
@@ -29,6 +30,7 @@ enum cuvsHnswHierarchy { ... } ;
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:30`_
 
+<a id="cuvshnswaceparams"></a>
 ### cuvsHnswAceParams
 
 Parameters for ACE (Augmented Core Extraction) graph build for HNSW.
@@ -55,6 +57,7 @@ struct cuvsHnswAceParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:46`_
 
+<a id="cuvshnswaceparamscreate"></a>
 ### cuvsHnswAceParamsCreate
 
 Allocate HNSW ACE params, and populate with default values
@@ -67,16 +70,17 @@ cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsHnswAceParams_t*` | cuvsHnswAceParams_t to allocate |
+| `params` | in | [`cuvsHnswAceParams_t*`](/api-reference/c-api-neighbors-hnsw#cuvshnswaceparams) | cuvsHnswAceParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:97`_
 
+<a id="cuvshnswaceparamsdestroy"></a>
 ### cuvsHnswAceParamsDestroy
 
 De-allocate HNSW ACE params
@@ -89,16 +93,17 @@ cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsHnswAceParams_t` |  |
+| `params` | in | [`cuvsHnswAceParams_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswaceparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:105`_
 
+<a id="cuvshnswindexparamscreate"></a>
 ### cuvsHnswIndexParamsCreate
 
 Allocate HNSW Index params, and populate with default values
@@ -115,12 +120,13 @@ cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:141`_
 
+<a id="cuvshnswindexparamsdestroy"></a>
 ### cuvsHnswIndexParamsDestroy
 
 De-allocate HNSW Index params
@@ -137,7 +143,7 @@ cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -147,6 +153,25 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:149`_
 
 _Doxygen group: `hnsw_c_index`_
 
+<a id="cuvshnswindex"></a>
+### cuvsHnswIndex
+
+Struct to hold address of cuvs::neighbors::Hnsw::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsHnswIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/hnsw.h:164`_
+
+<a id="cuvshnswindexcreate"></a>
 ### cuvsHnswIndexCreate
 
 Allocate HNSW index
@@ -159,16 +184,17 @@ cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsHnswIndex_t*` | cuvsHnswIndex_t to allocate |
+| `index` | in | [`cuvsHnswIndex_t*`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 HnswError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:178`_
 
+<a id="cuvshnswindexdestroy"></a>
 ### cuvsHnswIndexDestroy
 
 De-allocate HNSW index
@@ -181,11 +207,11 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsHnswIndex_t` | cuvsHnswIndex_t to de-allocate |
+| `index` | in | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:185`_
 
@@ -193,6 +219,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:185`_
 
 _Doxygen group: `hnsw_c_extend_params`_
 
+<a id="cuvshnswextendparams"></a>
 ### cuvsHnswExtendParams
 
 Parameters for extending HNSW index
@@ -209,6 +236,7 @@ struct cuvsHnswExtendParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:196`_
 
+<a id="cuvshnswextendparamscreate"></a>
 ### cuvsHnswExtendParamsCreate
 
 Allocate HNSW extend params, and populate with default values
@@ -221,16 +249,17 @@ cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsHnswExtendParams_t*` | cuvsHnswExtendParams_t to allocate |
+| `params` | in | [`cuvsHnswExtendParams_t*`](/api-reference/c-api-neighbors-hnsw#cuvshnswextendparams) | cuvsHnswExtendParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:209`_
 
+<a id="cuvshnswextendparamsdestroy"></a>
 ### cuvsHnswExtendParamsDestroy
 
 De-allocate HNSW extend params
@@ -243,11 +272,11 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsHnswExtendParams_t` | cuvsHnswExtendParams_t to de-allocate |
+| `params` | in | [`cuvsHnswExtendParams_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswextendparams) | cuvsHnswExtendParams_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -257,6 +286,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:218`_
 
 _Doxygen group: `hnsw_c_index_load`_
 
+<a id="cuvshnswfromcagra"></a>
 ### cuvsHnswFromCagra
 
 Convert a CAGRA Index to an HNSW index.
@@ -277,14 +307,14 @@ NOTE: When hierarchy is:
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `params` | in | `cuvsHnswIndexParams_t` | cuvsHnswIndexParams_t used to load Hnsw index |
-| `cagra_index` | in | `cuvsCagraIndex_t` | cuvsCagraIndex_t to convert to HNSW index |
-| `hnsw_index` | out | `cuvsHnswIndex_t` | cuvsHnswIndex_t to return the HNSW index |
+| `cagra_index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | cuvsCagraIndex_t to convert to HNSW index |
+| `hnsw_index` | out | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex_t to return the HNSW index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -294,6 +324,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:270`_
 
 _Doxygen group: `hnsw_c_index_build`_
 
+<a id="cuvshnswbuild"></a>
 ### cuvsHnswBuild
 
 Build an HNSW index using ACE (Augmented Core Extraction) algorithm.
@@ -317,14 +348,14 @@ NOTE: This function requires CUDA to be available at runtime.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `params` | in | `cuvsHnswIndexParams_t` | cuvsHnswIndexParams_t with ACE parameters configured |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* host dataset to build index from |
-| `index` | out | `cuvsHnswIndex_t` | cuvsHnswIndex_t to return the built HNSW index |
+| `index` | out | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex_t to return the built HNSW index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -334,6 +365,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:347`_
 
 _Doxygen group: `hnsw_c_index_extend`_
 
+<a id="cuvshnswextend"></a>
 ### cuvsHnswExtend
 
 Add new vectors to an HNSW index
@@ -351,14 +383,14 @@ NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when conve
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsHnswExtendParams_t` | cuvsHnswExtendParams_t used to extend Hnsw index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsHnswExtendParams_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswextendparams) | cuvsHnswExtendParams_t used to extend Hnsw index |
 | `additional_dataset` | in | `DLManagedTensor*` | DLManagedTensor* additional dataset to extend the index |
-| `index` | inout | `cuvsHnswIndex_t` | cuvsHnswIndex_t to extend |
+| `index` | inout | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex_t to extend |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -368,6 +400,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:405`_
 
 _Doxygen group: `hnsw_c_search_params`_
 
+<a id="cuvshnswsearchparams"></a>
 ### cuvsHnswSearchParams
 
 C API for hnswlib wrapper search params
@@ -385,6 +418,7 @@ struct cuvsHnswSearchParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:419`_
 
+<a id="cuvshnswsearchparamscreate"></a>
 ### cuvsHnswSearchParamsCreate
 
 Allocate HNSW search params, and populate with default values
@@ -397,16 +431,17 @@ cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsHnswSearchParams_t*` | cuvsHnswSearchParams_t to allocate |
+| `params` | in | [`cuvsHnswSearchParams_t*`](/api-reference/c-api-neighbors-hnsw#cuvshnswsearchparams) | cuvsHnswSearchParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:432`_
 
+<a id="cuvshnswsearchparamsdestroy"></a>
 ### cuvsHnswSearchParamsDestroy
 
 De-allocate HNSW search params
@@ -419,11 +454,11 @@ cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsHnswSearchParams_t` | cuvsHnswSearchParams_t to de-allocate |
+| `params` | in | [`cuvsHnswSearchParams_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswsearchparams) | cuvsHnswSearchParams_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -433,6 +468,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:440`_
 
 _Doxygen group: `hnsw_c_index_search`_
 
+<a id="cuvshnswsearch"></a>
 ### cuvsHnswSearch
 
 Search a HNSW index with a `DLManagedTensor` which has underlying
@@ -456,16 +492,16 @@ DLManagedTensor* distances);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsHnswSearchParams_t` | cuvsHnswSearchParams_t used to search Hnsw index |
-| `index` | in | `cuvsHnswIndex_t` | cuvsHnswIndex which has been returned by `cuvsHnswFromCagra` |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsHnswSearchParams_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswsearchparams) | cuvsHnswSearchParams_t used to search Hnsw index |
+| `index` | in | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex which has been returned by `cuvsHnswFromCagra` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:499`_
 
@@ -473,6 +509,7 @@ _Source: `c/include/cuvs/neighbors/hnsw.h:499`_
 
 _Doxygen group: `hnsw_c_index_serialize`_
 
+<a id="cuvshnswserialize"></a>
 ### cuvsHnswSerialize
 
 Serialize a CAGRA index to a file as an hnswlib index
@@ -487,18 +524,19 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the name of the file to save the index |
-| `index` | in | `cuvsHnswIndex_t` | cuvsHnswIndex_t to serialize |
+| `index` | in | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | cuvsHnswIndex_t to serialize |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:554`_
 
+<a id="cuvshnswdeserialize"></a>
 ### cuvsHnswDeserialize
 
 Load hnswlib index from file which was serialized from a HNSW index.
@@ -518,15 +556,15 @@ NOTE: When hierarchy is `NONE`, the loaded hnswlib index is immutable, and only 
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `params` | in | `cuvsHnswIndexParams_t` | cuvsHnswIndexParams_t used to load Hnsw index |
 | `filename` | in | `const char*` | the name of the file that stores the index |
 | `dim` | in | `int` | the dimension of the vectors in the index |
-| `metric` | in | `cuvsDistanceType` | the distance metric used to build the index |
-| `index` | out | `cuvsHnswIndex_t` | HNSW index loaded disk |
+| `metric` | in | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | the distance metric used to build the index |
+| `index` | out | [`cuvsHnswIndex_t`](/api-reference/c-api-neighbors-hnsw#cuvshnswindex) | HNSW index loaded disk |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/hnsw.h:592`_

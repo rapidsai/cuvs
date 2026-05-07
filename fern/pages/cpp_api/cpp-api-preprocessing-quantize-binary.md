@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/preprocessing/quantize/binary.hpp`_
 
 _Doxygen group: `binary`_
 
+<a id="cuvs-preprocessing-quantize-binary-bit-threshold"></a>
 ### cuvs::preprocessing::quantize::binary::bit_threshold
 
 quantizer algorithms. The mean and sampling_median thresholds are calculated separately
@@ -30,6 +31,7 @@ enum class bit_threshold { ... } ;
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:27`_
 
+<a id="cuvs-preprocessing-quantize-binary-params"></a>
 ### cuvs::preprocessing::quantize::binary::params
 
 quantizer parameters.
@@ -42,11 +44,12 @@ struct params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `threshold` | `bit_threshold` | Threshold method for binarization. |
+| `threshold` | [`bit_threshold`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-bit-threshold) | Threshold method for binarization. |
 | `sampling_ratio` | `float` | Specifies the sampling ratio. |
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:32`_
 
+<a id="cuvs-preprocessing-quantize-binary-quantizer"></a>
 ### cuvs::preprocessing::quantize::binary::quantizer
 
 Construct a quantizer with an empty threshold vector.
@@ -67,6 +70,7 @@ quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, in
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:54`_
 
+<a id="cuvs-preprocessing-quantize-binary-train"></a>
 ### cuvs::preprocessing::quantize::binary::train
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -84,7 +88,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::device_matrix_view<const double, int64_t>` | a row-major matrix view on device |
 
 **Returns**
@@ -112,7 +116,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::host_matrix_view<const double, int64_t>` | a row-major matrix view on host |
 
 **Returns**
@@ -123,6 +127,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:93`_
 
+<a id="cuvs-preprocessing-quantize-binary-transform"></a>
 ### cuvs::preprocessing::quantize::binary::transform
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -200,7 +205,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device |
 
 **Returns**
@@ -228,7 +233,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t>` | a row-major matrix view on host |
 
 **Returns**
@@ -316,7 +321,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t>` | a row-major matrix view on device |
 
 **Returns**
@@ -344,7 +349,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t>` | a row-major matrix view on host |
 
 **Returns**
@@ -411,6 +416,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:340`_
 
+<a id="cuvs-preprocessing-quantize-binary-deprecated"></a>
 ### cuvs::preprocessing::quantize::binary::[[deprecated
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element

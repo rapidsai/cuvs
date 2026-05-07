@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/cluster/spectral.hpp`_
 
 _Doxygen group: `spectral_params`_
 
+<a id="cuvs-cluster-spectral-params"></a>
 ### cuvs::cluster::spectral::params
 
 Parameters for spectral clustering
@@ -35,6 +36,7 @@ _Source: `cpp/include/cuvs/cluster/spectral.hpp:22`_
 
 _Doxygen group: `spectral`_
 
+<a id="cuvs-cluster-spectral-fit-predict"></a>
 ### cuvs::cluster::spectral::fit_predict
 
 Perform spectral clustering on a connectivity graph
@@ -53,7 +55,7 @@ n_clusters-1)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
-| `config` | in | `params` | Spectral clustering parameters |
+| `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cuvs-cluster-spectral-params) | Spectral clustering parameters |
 | `connectivity_graph` | in | `raft::device_coo_matrix_view<float, int, int, int>` | Sparse COO matrix representing connectivity between data points |
 | `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
 
@@ -81,7 +83,7 @@ n_clusters-1)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
-| `config` | in | `params` | Spectral clustering parameters |
+| `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cuvs-cluster-spectral-params) | Spectral clustering parameters |
 | `connectivity_graph` | in | `raft::device_coo_matrix_view<double, int, int, int>` | Sparse COO matrix representing connectivity between data points |
 | `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
 
@@ -111,7 +113,7 @@ n_clusters-1)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
-| `config` | in | `params` | Spectral clustering parameters |
+| `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cuvs-cluster-spectral-params) | Spectral clustering parameters |
 | `dataset` | in | `raft::device_matrix_view<float, int, raft::row_major>` | Dense row-major matrix of shape (n_samples, n_features) |
 | `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
 

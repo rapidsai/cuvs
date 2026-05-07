@@ -6,10 +6,101 @@ slug: api-reference/cpp-api-distance-distance
 
 _Source header: `cpp/include/cuvs/distance/distance.hpp`_
 
+## Types
+
+<a id="cuvs-distance-distancetype"></a>
+### cuvs::distance::DistanceType
+
+enum to tell how to compute distance
+
+```cpp
+enum class DistanceType : int { ... } ;
+```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `L2Expanded` | `0` |
+| `CosineExpanded` | `2` |
+| `L1` | `3` |
+| `L2Unexpanded` | `4` |
+| `InnerProduct` | `6` |
+| `Linf` | `7` |
+| `Canberra` | `8` |
+| `LpUnexpanded` | `9` |
+| `CorrelationExpanded` | `10` |
+| `JaccardExpanded` | `11` |
+| `HellingerExpanded` | `12` |
+| `Haversine` | `13` |
+| `BrayCurtis` | `14` |
+| `JensenShannon` | `15` |
+| `HammingUnexpanded` | `16` |
+| `KLDivergence` | `17` |
+| `RusselRaoExpanded` | `18` |
+| `DiceExpanded` | `19` |
+| `BitwiseHamming` | `20` |
+| `Precomputed` | `100` |
+| `CustomUDF` | `101` |
+
+_Source: `cpp/include/cuvs/distance/distance.hpp:17`_
+
+<a id="cuvs-distance-densitykerneltype"></a>
+### cuvs::distance::DensityKernelType
+
+Density kernel type for Kernel Density Estimation.
+
+These are the smoothing kernels used in KDE — distinct from the dot-product kernels (RBF, Polynomial, etc.) in cuvs::distance::kernels used by SVMs.
+
+```cpp
+enum class DensityKernelType : int { ... } ;
+```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `Gaussian` | `0` |
+| `Tophat` | `1` |
+| `Epanechnikov` | `2` |
+| `Exponential` | `3` |
+| `Linear` | `4` |
+| `Cosine` | `5` |
+
+_Source: `cpp/include/cuvs/distance/distance.hpp:91`_
+
+<a id="kernels-kernelparams"></a>
+### kernels::KernelParams
+
+Parameters for kernel matrices.
+
+The following kernels are implemented:
+
+- LINEAR \f[ K(x_1,x_2) = &lt;x_1,x_2&gt;, \f] where \f$&lt; , &gt;\f$ is the dot product
+- POLYNOMIAL \f[ K(x_1, x_2) = (\gamma &lt;x_1,x_2&gt; + \mathrm\{coef0\})^\mathrm\{degree\} \f]
+- RBF \f[ K(x_1, x_2) = \exp(- \gamma \|x_1-x_2\|^2) \f]
+- TANH \f[ K(x_1, x_2) = \tanh(\gamma &lt;x_1,x_2&gt; + \mathrm\{coef0\}) \f]
+
+```cpp
+struct KernelParams { ... } ;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `kernel` | `KernelType` |  |
+| `degree` | `int` |  |
+| `gamma` | `double` |  |
+| `coef0` | `double` |  |
+
+_Source: `cpp/include/cuvs/distance/distance.hpp:111`_
+
 ## Pairwise Distances API
 
 _Doxygen group: `pairwise_distance`_
 
+<a id="kernels-pairwise-distance"></a>
 ### kernels::pairwise_distance
 
 Compute pairwise distances for two matrices
@@ -36,7 +127,7 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -71,7 +162,7 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -106,7 +197,7 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -141,7 +232,7 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -176,7 +267,7 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -211,7 +302,7 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -243,7 +334,7 @@ input configuration and distance function.
 | `x` | in | `raft::device_csr_matrix_view<const float, int, int, int>` | raft::device_csr_matrix_view |
 | `y` | in | `raft::device_csr_matrix_view<const float, int, int, int>` | raft::device_csr_matrix_view |
 | `dist` | out | `raft::device_matrix_view<float, int, raft::row_major>` | raft::device_matrix_view dense matrix |
-| `metric` | in | `cuvs::distance::DistanceType` | distance metric to use |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
@@ -275,7 +366,7 @@ input configuration and distance function.
 | `x` | in | `raft::device_csr_matrix_view<const double, int, int, int>` | raft::device_csr_matrix_view |
 | `y` | in | `raft::device_csr_matrix_view<const double, int, int, int>` | raft::device_csr_matrix_view |
 | `dist` | out | `raft::device_matrix_view<double, int, raft::row_major>` | raft::device_matrix_view dense matrix |
-| `metric` | in | `cuvs::distance::DistanceType` | distance metric to use |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**

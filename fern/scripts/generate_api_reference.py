@@ -11,7 +11,7 @@ directly so the Fern reference can be refreshed in lightweight docs jobs.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 import ast
 import re
@@ -281,12 +281,23 @@ class DoxygenHeaderIndex:
                     entry = parse_doxygen_entry(
                         comment, declaration, rel_path, decl_line
                     )
-                    if entry.kind == "member":
+                    if entry.kind == "member" and not is_type_alias_signature(
+                        entry.signature
+                    ):
                         continue
                     self._qualify_function(entry, text[: match.start()])
-                    for candidate in candidate_groups:
+                    target_groups = candidate_groups
+                    if not target_groups and is_native_type_entry(entry):
+                        target_groups = [synthetic_native_group_name(rel_path)]
+                    for candidate in target_groups:
                         self.groups.setdefault(
-                            candidate, DoxygenGroup(candidate)
+                            candidate,
+                            DoxygenGroup(
+                                candidate,
+                                "Types"
+                                if is_synthetic_native_group(candidate)
+                                else "",
+                            ),
                         ).entries.append(entry)
                     self._index_compound(entry, text[: match.start()])
 
@@ -309,6 +320,11 @@ class DoxygenHeaderIndex:
                 current_groups.pop()
 
     def _index_compound(self, entry: DoxygenEntry, prefix: str) -> None:
+        if (
+            is_type_alias_signature(entry.signature)
+            and "{" not in entry.signature
+        ):
+            return
         namespace = infer_namespace(prefix)
         struct_name = parse_struct_name(entry.signature)
         if struct_name:
@@ -341,8 +357,17 @@ class DoxygenHeaderIndex:
 def main() -> int:
     remove_old_api_pages()
     native_index = DoxygenHeaderIndex.build(NATIVE_HEADER_DIRS)
-    generate_native_api_pages(native_index, "c")
-    generate_native_api_pages(native_index, "cpp")
+    native_pages_by_api = {
+        "c": collect_native_pages(native_index, "c"),
+        "cpp": collect_native_pages(native_index, "cpp"),
+    }
+    global_links, page_links = build_native_symbol_links(native_pages_by_api)
+    generate_native_api_pages(
+        native_pages_by_api["c"], "c", global_links, page_links
+    )
+    generate_native_api_pages(
+        native_pages_by_api["cpp"], "cpp", global_links, page_links
+    )
     generate_python_api_pages()
     generate_java_api_pages()
     generate_rust_api_pages()
@@ -373,10 +398,33 @@ def remove_old_api_pages() -> None:
             path.unlink()
 
 
-def generate_native_api_pages(index: DoxygenHeaderIndex, api: str) -> None:
+def is_type_alias_signature(signature: str) -> bool:
+    stripped = signature.strip()
+    return stripped.startswith("typedef ") or stripped.startswith("using ")
+
+
+def is_native_type_entry(entry: DoxygenEntry) -> bool:
+    return entry.kind in {"enum", "struct"} or is_type_alias_signature(
+        entry.signature
+    )
+
+
+def synthetic_native_group_name(source: str) -> str:
+    return f"__types__:{source}"
+
+
+def is_synthetic_native_group(group_name: str) -> bool:
+    return group_name.startswith("__types__:")
+
+
+def generate_native_api_pages(
+    pages: list[NativePage],
+    api: str,
+    global_links: dict[str, dict[str, str]],
+    page_links: dict[tuple[str, str], dict[str, str]],
+) -> None:
     out_dir = FERN_PAGES / f"{api}_api"
     out_dir.mkdir(parents=True, exist_ok=True)
-    pages = collect_native_pages(index, api)
     title = "C API Documentation" if api == "c" else "C++ API Documentation"
     directory = f"{api}_api"
 
@@ -402,8 +450,16 @@ def generate_native_api_pages(index: DoxygenHeaderIndex, api: str) -> None:
             "",
         ]
         page_headings: set[str] = set()
+        symbol_links = {
+            **global_links.get(api, {}),
+            **page_links.get((directory, page.slug), {}),
+        }
         for group in page.groups:
-            lines.extend(render_native_group(group, language, page_headings))
+            lines.extend(
+                render_native_group(
+                    group, language, page_headings, symbol_links
+                )
+            )
             lines.append("")
         write_page(
             out_dir / f"{api_page_route(directory, page.slug)}.md", lines
@@ -446,27 +502,82 @@ def collect_native_pages(
     return ordered
 
 
+def build_native_symbol_links(
+    pages_by_api: dict[str, list[NativePage]],
+) -> tuple[dict[str, dict[str, str]], dict[tuple[str, str], dict[str, str]]]:
+    global_links: dict[str, dict[str, str]] = defaultdict(dict)
+    page_links: dict[tuple[str, str], dict[str, str]] = {}
+
+    for api, pages in pages_by_api.items():
+        directory = f"{api}_api"
+        for page in pages:
+            entries = [
+                entry
+                for group in page.groups
+                for entry in group.entries
+                if is_linkable_native_type(entry)
+            ]
+            short_counts = Counter(
+                short_symbol_name(entry.name) for entry in entries
+            )
+            local_links: dict[str, str] = {}
+            for entry in entries:
+                url = f"{api_doc_url(directory, page.slug)}#{symbol_anchor(entry.name)}"
+                for symbol in native_link_symbols(entry, api):
+                    global_links[api].setdefault(symbol, url)
+                    local_links[symbol] = url
+                short_name = short_symbol_name(entry.name)
+                if short_counts[short_name] == 1:
+                    local_links[short_name] = url
+            page_links[(directory, page.slug)] = local_links
+
+    return dict(global_links), page_links
+
+
+def is_linkable_native_type(entry: DoxygenEntry) -> bool:
+    return is_native_type_entry(entry)
+
+
+def native_link_symbols(entry: DoxygenEntry, api: str) -> list[str]:
+    symbols = [entry.name]
+    if api == "c" and entry.kind == "struct" and not entry.name.endswith("_t"):
+        symbols.append(f"{entry.name}_t")
+    return symbols
+
+
+def short_symbol_name(name: str) -> str:
+    return name.split("::")[-1]
+
+
 def render_native_group(
-    group: DoxygenGroup, language: str, page_headings: set[str] | None = None
+    group: DoxygenGroup,
+    language: str,
+    page_headings: set[str] | None = None,
+    symbol_links: dict[str, str] | None = None,
 ) -> list[str]:
     lines = [f"## {heading_text(group.title or group.name)}", ""]
-    if group.name:
+    if group.name and not is_synthetic_native_group(group.name):
         lines.extend([f"_Doxygen group: `{group.name}`_", ""])
 
     if page_headings is None:
         page_headings = set()
+    if symbol_links is None:
+        symbol_links = {}
     for entry in group.entries:
         if entry.kind == "function":
             include_heading = entry.name not in page_headings
             page_headings.add(entry.name)
             lines.extend(
                 render_native_function(
-                    entry, language, include_heading=include_heading
+                    entry,
+                    language,
+                    include_heading=include_heading,
+                    symbol_links=symbol_links,
                 )
             )
         elif entry.kind in {"struct", "enum"}:
             page_headings.add(entry.name)
-            lines.extend(render_native_compound(entry, language))
+            lines.extend(render_native_compound(entry, language, symbol_links))
         else:
             page_headings.add(entry.name)
             lines.extend(render_native_member(entry, language))
@@ -475,11 +586,20 @@ def render_native_group(
 
 
 def render_native_function(
-    entry: DoxygenEntry, language: str, include_heading: bool = True
+    entry: DoxygenEntry,
+    language: str,
+    include_heading: bool = True,
+    symbol_links: dict[str, str] | None = None,
 ) -> list[str]:
+    if symbol_links is None:
+        symbol_links = {}
     signature = normalize_signature(entry.signature)
     if include_heading:
-        lines = [f"### {heading_text(entry.name)}", ""]
+        lines = [
+            symbol_anchor_line(entry.name),
+            f"### {heading_text(entry.name)}",
+            "",
+        ]
     else:
         lines = [f"**Additional overload:** `{escape_code(entry.name)}`", ""]
     if entry.summary:
@@ -523,12 +643,22 @@ def render_native_function(
         )
     if rows:
         lines.extend(["**Parameters**", ""])
-        lines.extend(render_param_table(rows, include_direction=True))
+        lines.extend(
+            render_param_table(
+                rows, include_direction=True, symbol_links=symbol_links
+            )
+        )
         lines.append("")
 
     return_type = parse_return_type(signature)
     if return_type:
-        lines.extend(["**Returns**", "", f"`{escape_code(return_type)}`"])
+        lines.extend(
+            [
+                "**Returns**",
+                "",
+                render_type_reference(return_type, symbol_links),
+            ]
+        )
         if entry.returns:
             lines.extend(["", escape_text(entry.returns)])
         lines.append("")
@@ -537,8 +667,18 @@ def render_native_function(
     return trim_blank_lines(lines)
 
 
-def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
-    lines = [f"### {heading_text(entry.name)}", ""]
+def render_native_compound(
+    entry: DoxygenEntry,
+    language: str,
+    symbol_links: dict[str, str] | None = None,
+) -> list[str]:
+    if symbol_links is None:
+        symbol_links = {}
+    lines = [
+        symbol_anchor_line(entry.name),
+        f"### {heading_text(entry.name)}",
+        "",
+    ]
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
 
@@ -551,7 +691,7 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
         field_descriptions, details = extract_field_descriptions(
             entry.details, {value["name"] for value in values}
         )
-    else:
+    elif not is_class_signature(entry.signature):
         members = parse_struct_members(entry)
         field_descriptions, details = extract_field_descriptions(
             entry.details, {member.name for member in members}
@@ -611,7 +751,11 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
                         ),
                     }
                 )
-            lines.extend(render_param_table(rows, include_direction=False))
+            lines.extend(
+                render_param_table(
+                    rows, include_direction=False, symbol_links=symbol_links
+                )
+            )
             lines.append("")
 
     lines.extend([source_line(entry), ""])
@@ -619,7 +763,11 @@ def render_native_compound(entry: DoxygenEntry, language: str) -> list[str]:
 
 
 def render_native_member(entry: DoxygenEntry, language: str) -> list[str]:
-    lines = [f"### {heading_text(entry.name)}", ""]
+    lines = [
+        symbol_anchor_line(entry.name),
+        f"### {heading_text(entry.name)}",
+        "",
+    ]
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
     lines.extend(
@@ -1260,11 +1408,14 @@ def parse_doxygen_entry(
         summary = details.pop(0).strip()
 
     kind = parse_doxygen_kind(declaration)
-    name = (
-        parse_member_name(declaration)
-        if kind == "member"
-        else parse_entry_name(declaration)
-    )
+    if is_type_alias_signature(declaration):
+        name = parse_type_alias_name(declaration) or parse_entry_name(
+            declaration
+        )
+    elif kind == "member":
+        name = parse_member_name(declaration)
+    else:
+        name = parse_entry_name(declaration)
     return DoxygenEntry(
         kind=kind,
         name=name,
@@ -1321,9 +1472,9 @@ def append_doxygen_line(existing: str, addition: str) -> str:
 
 
 def parse_doxygen_kind(declaration: str) -> str:
-    if re.search(
-        r"^\s*(?:typedef\s+)?(?:struct|class)\s+\w+", declaration
-    ) and ("{" in declaration or declaration.lstrip().startswith("typedef")):
+    if re.search(r"^\s*(?:typedef\s+)?(?:struct|class)\b", declaration) and (
+        "{" in declaration or not declaration.lstrip().startswith("typedef")
+    ):
         return "struct"
     if (
         re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", declaration)
@@ -1333,6 +1484,27 @@ def parse_doxygen_kind(declaration: str) -> str:
     if "(" in declaration and ")" in declaration:
         return "function"
     return "member"
+
+
+def parse_type_alias_name(declaration: str) -> str | None:
+    signature = normalize_signature(declaration).rstrip(";").strip()
+    using_match = re.match(r"using\s+([A-Za-z_]\w*)\s*=", signature)
+    if using_match:
+        return using_match.group(1)
+    function_pointer_match = re.search(
+        r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", signature
+    )
+    if function_pointer_match:
+        return function_pointer_match.group(1)
+    compound_alias_match = re.search(
+        r"}\s*([A-Za-z_]\w*)\s*$", signature, re.DOTALL
+    )
+    if compound_alias_match:
+        return compound_alias_match.group(1)
+    typedef_match = re.search(r"\b([A-Za-z_]\w*)\s*$", signature)
+    if typedef_match and signature.startswith("typedef "):
+        return typedef_match.group(1)
+    return None
 
 
 def parse_entry_name(declaration: str) -> str:
@@ -1371,7 +1543,17 @@ def parse_struct_name(declaration: str) -> str | None:
     return match.group(1) if match else None
 
 
+def is_class_signature(signature: str) -> bool:
+    return bool(
+        re.match(
+            r"^\s*(?:template\s*<[^>]+>\s*)?(?:typedef\s+)?class\b", signature
+        )
+    )
+
+
 def parse_enum_name(declaration: str) -> str | None:
+    if not re.search(r"^\s*(?:typedef\s+)?enum(?:\s+class)?\b", declaration):
+        return None
     match = re.search(
         r"^\s*(?:typedef\s+)?enum(?:\s+class)?\s+([A-Za-z_]\w*)", declaration
     )
@@ -1546,8 +1728,10 @@ def parse_plain_struct_members(
         return []
     members: list[DoxygenEntry] = []
     for declaration in top_level_member_declarations(body):
+        if "(" in declaration:
+            continue
         declaration = strip_member_initializer(declaration)
-        if not declaration or "(" in declaration:
+        if not declaration:
             continue
         if not declaration or declaration.startswith(
             (
@@ -3248,8 +3432,12 @@ def source_line(entry: DoxygenEntry) -> str:
 
 
 def render_param_table(
-    params: list[dict[str, str]], include_direction: bool
+    params: list[dict[str, str]],
+    include_direction: bool,
+    symbol_links: dict[str, str] | None = None,
 ) -> list[str]:
+    if symbol_links is None:
+        symbol_links = {}
     headers = ["Name"]
     if include_direction:
         headers.append("Direction")
@@ -3262,7 +3450,7 @@ def render_param_table(
         row = [f"`{escape_code(param.get('name', ''))}`"]
         if include_direction:
             row.append(escape_text(param.get("direction", "")))
-        row.append(f"`{escape_code(param.get('type', ''))}`")
+        row.append(render_type_reference(param.get("type", ""), symbol_links))
         description = param.get("description", "")
         if param.get("default"):
             description = (
@@ -3271,6 +3459,39 @@ def render_param_table(
         row.append(render_table_description(description))
         lines.append("| " + " | ".join(row) + " |")
     return lines
+
+
+def render_type_reference(value: str, symbol_links: dict[str, str]) -> str:
+    rendered = f"`{escape_code(value)}`"
+    link = find_native_symbol_link(value, symbol_links)
+    return f"[{rendered}]({link})" if link else rendered
+
+
+def find_native_symbol_link(
+    value: str, symbol_links: dict[str, str]
+) -> str | None:
+    if not value or not symbol_links:
+        return None
+    matches = [
+        (len(name), name, link)
+        for name, link in symbol_links.items()
+        if native_symbol_occurs(value, name)
+    ]
+    if not matches:
+        return None
+    return max(matches)[2]
+
+
+def native_symbol_occurs(value: str, name: str) -> bool:
+    return bool(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", value))
+
+
+def symbol_anchor_line(name: str) -> str:
+    return f'<a id="{symbol_anchor(name)}"></a>'
+
+
+def symbol_anchor(name: str) -> str:
+    return slugify(name)
 
 
 def native_page_slug(source: str) -> str:

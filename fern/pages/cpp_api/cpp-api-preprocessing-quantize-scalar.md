@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp`_
 
 _Doxygen group: `scalar`_
 
+<a id="cuvs-preprocessing-quantize-scalar-params"></a>
 ### cuvs::preprocessing::quantize::scalar::params
 
 quantizer parameters.
@@ -26,6 +27,7 @@ struct params { ... } ;
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:26`_
 
+<a id="cuvs-preprocessing-quantize-scalar-train"></a>
 ### cuvs::preprocessing::quantize::scalar::train
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
@@ -43,7 +45,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::device_matrix_view<const double, int64_t>` | a row-major matrix view on device |
 
 **Returns**
@@ -71,7 +73,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::host_matrix_view<const double, int64_t>` | a row-major matrix view on host |
 
 **Returns**
@@ -82,6 +84,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:87`_
 
+<a id="cuvs-preprocessing-quantize-scalar-transform"></a>
 ### cuvs::preprocessing::quantize::scalar::transform
 
 Applies quantization transform to given dataset
@@ -138,6 +141,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:134`_
 
+<a id="cuvs-preprocessing-quantize-scalar-inverse-transform"></a>
 ### cuvs::preprocessing::quantize::scalar::inverse_transform
 
 Perform inverse quantization step on previously quantized dataset
@@ -215,7 +219,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device |
 
 **Returns**
@@ -243,7 +247,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t>` | a row-major matrix view on host |
 
 **Returns**
@@ -387,7 +391,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t>` | a row-major matrix view on device |
 
 **Returns**
@@ -415,7 +419,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | `const params` | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t>` | a row-major matrix view on host |
 
 **Returns**

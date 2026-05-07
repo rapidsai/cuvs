@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/vamana.hpp`_
 
 _Doxygen group: `vamana_cpp_index_params`_
 
+<a id="cuvs-neighbors-vamana-index-params"></a>
 ### cuvs::neighbors::vamana::index_params
 
 Parameters used to build DiskANN index
@@ -40,6 +41,7 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:56`_
 
 _Doxygen group: `vamana_cpp_index`_
 
+<a id="cuvs-neighbors-vamana-metric"></a>
 ### cuvs::neighbors::vamana::metric
 
 Distance metric used for clustering.
@@ -50,10 +52,11 @@ Distance metric used for clustering.
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:108`_
 
+<a id="cuvs-neighbors-vamana-size"></a>
 ### cuvs::neighbors::vamana::size
 
 Total length of the index (number of vectors).
@@ -68,6 +71,7 @@ Total length of the index (number of vectors).
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:114`_
 
+<a id="cuvs-neighbors-vamana-dim"></a>
 ### cuvs::neighbors::vamana::dim
 
 Dimensionality of the data.
@@ -82,6 +86,7 @@ Dimensionality of the data.
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:121`_
 
+<a id="cuvs-neighbors-vamana-graph-degree"></a>
 ### cuvs::neighbors::vamana::graph_degree
 
 Graph degree
@@ -96,6 +101,7 @@ Graph degree
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:123`_
 
+<a id="cuvs-neighbors-vamana-data"></a>
 ### cuvs::neighbors::vamana::data
 
 Dataset [size, dim]
@@ -110,6 +116,7 @@ Dataset [size, dim]
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:129`_
 
+<a id="cuvs-neighbors-vamana-quantized-data"></a>
 ### cuvs::neighbors::vamana::quantized_data
 
 Quantized dataset [size, codes_rowlen]
@@ -125,6 +132,7 @@ Quantized dataset [size, codes_rowlen]
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:135`_
 
+<a id="cuvs-neighbors-vamana-graph"></a>
 ### cuvs::neighbors::vamana::graph
 
 vamana graph [size, graph-degree]
@@ -140,6 +148,7 @@ vamana graph [size, graph-degree]
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:142`_
 
+<a id="cuvs-neighbors-vamana-medoid"></a>
 ### cuvs::neighbors::vamana::medoid
 
 Return the id of the vector selected as the medoid.
@@ -154,6 +163,7 @@ Return the id of the vector selected as the medoid.
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:149`_
 
+<a id="cuvs-neighbors-vamana-index"></a>
 ### cuvs::neighbors::vamana::index
 
 ```cpp
@@ -187,7 +197,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` | Default: `cuvs::distance::DistanceType::L2Expanded`. |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Default: `cuvs::distance::DistanceType::L2Expanded`. |
 
 **Returns**
 
@@ -215,7 +225,7 @@ IdxT medoid_id)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `dataset` |  | `raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor>` |  |
 | `vamana_graph` |  | `raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>` |  |
 | `medoid_id` |  | `IdxT` |  |
@@ -226,6 +236,7 @@ IdxT medoid_id)
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:174`_
 
+<a id="cuvs-neighbors-vamana-update-graph"></a>
 ### cuvs::neighbors::vamana::update_graph
 
 Replace the graph with a new graph.
@@ -274,6 +285,7 @@ We create a copy of the graph on the device. The index manages the lifetime of t
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:212`_
 
+<a id="cuvs-neighbors-vamana-update-quantized-dataset"></a>
 ### cuvs::neighbors::vamana::update_quantized_dataset
 
 Replace the current quantized dataset with a new quantized dataset.
@@ -303,6 +315,7 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:240`_
 
 _Doxygen group: `vamana_cpp_index_build`_
 
+<a id="cuvs-neighbors-vamana-build"></a>
 ### cuvs::neighbors::vamana::build
 
 Build the index from the dataset for efficient DiskANN search.
@@ -327,7 +340,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `params` | in | `const cuvs::neighbors::vamana::index_params&` | parameters for building the index |
+| `params` | in | [`const cuvs::neighbors::vamana::index_params&`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index-params) | parameters for building the index |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a matrix view (device) to a row-major matrix [n_rows, dim] |
 
 **Returns**
@@ -362,7 +375,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `params` | in | `const cuvs::neighbors::vamana::index_params&` | parameters for building the index |
+| `params` | in | [`const cuvs::neighbors::vamana::index_params&`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index-params) | parameters for building the index |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a matrix view (host) to a row-major matrix [n_rows, dim] |
 
 **Returns**
@@ -397,7 +410,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `params` | in | `const cuvs::neighbors::vamana::index_params&` | parameters for building the index |
+| `params` | in | [`const cuvs::neighbors::vamana::index_params&`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index-params) | parameters for building the index |
 | `dataset` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | a matrix view (device) to a row-major matrix [n_rows, dim] |
 
 **Returns**
@@ -432,7 +445,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `params` | in | `const cuvs::neighbors::vamana::index_params&` | parameters for building the index |
+| `params` | in | [`const cuvs::neighbors::vamana::index_params&`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index-params) | parameters for building the index |
 | `dataset` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | a matrix view (host) to a row-major matrix [n_rows, dim] |
 
 **Returns**
@@ -467,7 +480,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `params` | in | `const cuvs::neighbors::vamana::index_params&` | parameters for building the index |
+| `params` | in | [`const cuvs::neighbors::vamana::index_params&`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index-params) | parameters for building the index |
 | `dataset` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | a matrix view (device) to a row-major matrix [n_rows, dim] |
 
 **Returns**
@@ -502,7 +515,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `params` | in | `const cuvs::neighbors::vamana::index_params&` | parameters for building the index |
+| `params` | in | [`const cuvs::neighbors::vamana::index_params&`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index-params) | parameters for building the index |
 | `dataset` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | a matrix view (host) to a row-major matrix [n_rows, dim] |
 
 **Returns**
@@ -517,6 +530,7 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:475`_
 
 _Doxygen group: `vamana_cpp_serialize`_
 
+<a id="cuvs-neighbors-vamana-serialize"></a>
 ### cuvs::neighbors::vamana::serialize
 
 Save the index to file.
@@ -611,6 +625,7 @@ _Source: `cpp/include/cuvs/neighbors/vamana.hpp:574`_
 
 _Doxygen group: `vamana_cpp_codebook`_
 
+<a id="cuvs-neighbors-vamana-deserialize-codebooks"></a>
 ### cuvs::neighbors::vamana::deserialize_codebooks
 
 Construct codebook parameters from input codebook files

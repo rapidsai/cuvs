@@ -10,6 +10,25 @@ _Source header: `c/include/cuvs/neighbors/brute_force.h`_
 
 _Doxygen group: `bruteforce_c_index`_
 
+<a id="cuvsbruteforceindex"></a>
+### cuvsBruteForceIndex
+
+Struct to hold address of cuvs::neighbors::brute_force::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsBruteForceIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/brute_force.h:26`_
+
+<a id="cuvsbruteforceindexcreate"></a>
 ### cuvsBruteForceIndexCreate
 
 Allocate BRUTEFORCE index
@@ -22,16 +41,17 @@ cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsBruteForceIndex_t*` | cuvsBruteForceIndex_t to allocate |
+| `index` | in | [`cuvsBruteForceIndex_t*`](/api-reference/c-api-neighbors-brute-force#cuvsbruteforceindex) | cuvsBruteForceIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/brute_force.h:39`_
 
+<a id="cuvsbruteforceindexdestroy"></a>
 ### cuvsBruteForceIndexDestroy
 
 De-allocate BRUTEFORCE index
@@ -44,11 +64,11 @@ cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsBruteForceIndex_t` | cuvsBruteForceIndex_t to de-allocate |
+| `index` | in | [`cuvsBruteForceIndex_t`](/api-reference/c-api-neighbors-brute-force#cuvsbruteforceindex) | cuvsBruteForceIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/brute_force.h:46`_
 
@@ -56,6 +76,7 @@ _Source: `c/include/cuvs/neighbors/brute_force.h:46`_
 
 _Doxygen group: `bruteforce_c_index_build`_
 
+<a id="cuvsbruteforcebuild"></a>
 ### cuvsBruteForceBuild
 
 Build a BRUTEFORCE index with a `DLManagedTensor` which has underlying
@@ -77,15 +98,15 @@ cuvsBruteForceIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `metric` | in | `cuvsDistanceType` | metric |
+| `metric` | in | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | metric |
 | `metric_arg` | in | `float` | metric_arg |
-| `index` | out | `cuvsBruteForceIndex_t` | cuvsBruteForceIndex_t Newly built BRUTEFORCE index |
+| `index` | out | [`cuvsBruteForceIndex_t`](/api-reference/c-api-neighbors-brute-force#cuvsbruteforceindex) | cuvsBruteForceIndex_t Newly built BRUTEFORCE index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -95,6 +116,7 @@ _Source: `c/include/cuvs/neighbors/brute_force.h:92`_
 
 _Doxygen group: `bruteforce_c_index_search`_
 
+<a id="cuvsbruteforcesearch"></a>
 ### cuvsBruteForceSearch
 
 Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying
@@ -118,16 +140,16 @@ cuvsFilter prefilter);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index` | in | `cuvsBruteForceIndex_t` | cuvsBruteForceIndex which has been returned by `cuvsBruteForceBuild` |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index` | in | [`cuvsBruteForceIndex_t`](/api-reference/c-api-neighbors-brute-force#cuvsbruteforceindex) | cuvsBruteForceIndex which has been returned by `cuvsBruteForceBuild` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-| `prefilter` | in | `cuvsFilter` | cuvsFilter input prefilter that can be used to filter queries and neighbors based on the given bitmap. |
+| `prefilter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter input prefilter that can be used to filter queries and neighbors based on the given bitmap. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/brute_force.h:148`_
 
@@ -135,6 +157,7 @@ _Source: `c/include/cuvs/neighbors/brute_force.h:148`_
 
 _Doxygen group: `bruteforce_c_index_serialize`_
 
+<a id="cuvsbruteforceserialize"></a>
 ### cuvsBruteForceSerialize
 
 Save the index to file.
@@ -151,16 +174,17 @@ The serialization format can be subject to changes, therefore loading an index s
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the file name for saving the index |
-| `index` | in | `cuvsBruteForceIndex_t` | BRUTEFORCE index |
+| `index` | in | [`cuvsBruteForceIndex_t`](/api-reference/c-api-neighbors-brute-force#cuvsbruteforceindex) | BRUTEFORCE index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/brute_force.h:184`_
 
+<a id="cuvsbruteforcedeserialize"></a>
 ### cuvsBruteForceDeserialize
 
 Load index from file.
@@ -177,12 +201,12 @@ The serialization format can be subject to changes, therefore loading an index s
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the name of the file that stores the index |
-| `index` | out | `cuvsBruteForceIndex_t` | BRUTEFORCE index loaded disk |
+| `index` | out | [`cuvsBruteForceIndex_t`](/api-reference/c-api-neighbors-brute-force#cuvsbruteforceindex) | BRUTEFORCE index loaded disk |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/brute_force.h:211`_

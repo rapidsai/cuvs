@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/ivf_flat.h`_
 
 _Doxygen group: `ivf_flat_c_index_params`_
 
+<a id="cuvsivfflatindexparams"></a>
 ### cuvsIvfFlatIndexParams
 
 Supplemental parameters to build IVF-Flat Index
@@ -22,7 +23,7 @@ struct cuvsIvfFlatIndexParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvsDistanceType` | Distance type. |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
 | `metric_arg` | `float` | The argument used by some distance metrics. |
 | `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
 | `n_lists` | `uint32_t` | The number of inverted lists (clusters) |
@@ -33,6 +34,7 @@ struct cuvsIvfFlatIndexParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:27`_
 
+<a id="cuvsivfflatindexparamscreate"></a>
 ### cuvsIvfFlatIndexParamsCreate
 
 Allocate IVF-Flat Index params, and populate with default values
@@ -45,16 +47,17 @@ cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* index_params)
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsIvfFlatIndexParams_t*` | cuvsIvfFlatIndexParams_t to allocate |
+| `index_params` | in | [`cuvsIvfFlatIndexParams_t*`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) | cuvsIvfFlatIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:80`_
 
+<a id="cuvsivfflatindexparamsdestroy"></a>
 ### cuvsIvfFlatIndexParamsDestroy
 
 De-allocate IVF-Flat Index params
@@ -67,11 +70,11 @@ cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params)
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsIvfFlatIndexParams_t` |  |
+| `index_params` | in | [`cuvsIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -81,6 +84,7 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:88`_
 
 _Doxygen group: `ivf_flat_c_search_params`_
 
+<a id="cuvsivfflatsearchparams"></a>
 ### cuvsIvfFlatSearchParams
 
 Supplemental parameters to search IVF-Flat index
@@ -97,6 +101,7 @@ struct cuvsIvfFlatSearchParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:101`_
 
+<a id="cuvsivfflatsearchparamscreate"></a>
 ### cuvsIvfFlatSearchParamsCreate
 
 Allocate IVF-Flat search params, and populate with default values
@@ -109,16 +114,17 @@ cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsIvfFlatSearchParams_t*` | cuvsIvfFlatSearchParams_t to allocate |
+| `params` | in | [`cuvsIvfFlatSearchParams_t*`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatsearchparams) | cuvsIvfFlatSearchParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:114`_
 
+<a id="cuvsivfflatsearchparamsdestroy"></a>
 ### cuvsIvfFlatSearchParamsDestroy
 
 De-allocate IVF-Flat search params
@@ -131,11 +137,11 @@ cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsIvfFlatSearchParams_t` |  |
+| `params` | in | [`cuvsIvfFlatSearchParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatsearchparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -145,6 +151,25 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:122`_
 
 _Doxygen group: `ivf_flat_c_index`_
 
+<a id="cuvsivfflatindex"></a>
+### cuvsIvfFlatIndex
+
+Struct to hold address of cuvs::neighbors::ivf_flat::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsIvfFlatIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/ivf_flat.h:135`_
+
+<a id="cuvsivfflatindexcreate"></a>
 ### cuvsIvfFlatIndexCreate
 
 Allocate IVF-Flat index
@@ -157,16 +182,17 @@ cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfFlatIndex_t*` | cuvsIvfFlatIndex_t to allocate |
+| `index` | in | [`cuvsIvfFlatIndex_t*`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | cuvsIvfFlatIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:148`_
 
+<a id="cuvsivfflatindexdestroy"></a>
 ### cuvsIvfFlatIndexDestroy
 
 De-allocate IVF-Flat index
@@ -179,14 +205,15 @@ cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfFlatIndex_t` | cuvsIvfFlatIndex_t to de-allocate |
+| `index` | in | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | cuvsIvfFlatIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:155`_
 
+<a id="cuvsivfflatindexgetnlists"></a>
 ### cuvsIvfFlatIndexGetNLists
 
 Get the number of clusters/inverted lists
@@ -199,15 +226,16 @@ cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfFlatIndex_t` |  |
+| `index` |  | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) |  |
 | `n_lists` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:158`_
 
+<a id="cuvsivfflatindexgetdim"></a>
 ### cuvsIvfFlatIndexGetDim
 
 Get the dimensionality of the data
@@ -220,15 +248,16 @@ cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfFlatIndex_t` |  |
+| `index` |  | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) |  |
 | `dim` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:161`_
 
+<a id="cuvsivfflatindexgetcenters"></a>
 ### cuvsIvfFlatIndexGetCenters
 
 Get the cluster centers corresponding to the lists [n_lists, dim]
@@ -241,12 +270,12 @@ cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLManagedTensor
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfFlatIndex_t` | cuvsIvfFlatIndex_t Built Ivf-Flat Index |
+| `index` | in | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | cuvsIvfFlatIndex_t Built Ivf-Flat Index |
 | `centers` | out | `DLManagedTensor*` | Preallocated array on host or device memory to store output, [n_lists, dim] |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -256,6 +285,7 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:170`_
 
 _Doxygen group: `ivf_flat_c_index_build`_
 
+<a id="cuvsivfflatbuild"></a>
 ### cuvsIvfFlatBuild
 
 Build a IVF-Flat index with a `DLManagedTensor` which has underlying
@@ -277,14 +307,14 @@ cuvsIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index_params` | in | `cuvsIvfFlatIndexParams_t` | cuvsIvfFlatIndexParams_t used to build IVF-Flat index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index_params` | in | [`cuvsIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) | cuvsIvfFlatIndexParams_t used to build IVF-Flat index |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | out | `cuvsIvfFlatIndex_t` | cuvsIvfFlatIndex_t Newly built IVF-Flat index |
+| `index` | out | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | cuvsIvfFlatIndex_t Newly built IVF-Flat index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -294,6 +324,7 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:222`_
 
 _Doxygen group: `ivf_flat_c_index_search`_
 
+<a id="cuvsivfflatsearch"></a>
 ### cuvsIvfFlatSearch
 
 Search a IVF-Flat index with a `DLManagedTensor` which has underlying
@@ -318,17 +349,17 @@ cuvsFilter filter);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `search_params` | in | `cuvsIvfFlatSearchParams_t` | cuvsIvfFlatSearchParams_t used to search IVF-Flat index |
-| `index` | in | `cuvsIvfFlatIndex_t` | ivfFlatIndex which has been returned by `ivfFlatBuild` |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `search_params` | in | [`cuvsIvfFlatSearchParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatsearchparams) | cuvsIvfFlatSearchParams_t used to search IVF-Flat index |
+| `index` | in | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | ivfFlatIndex which has been returned by `ivfFlatBuild` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-| `filter` | in | `cuvsFilter` | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:279`_
 
@@ -336,6 +367,7 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:279`_
 
 _Doxygen group: `ivf_flat_c_index_serialize`_
 
+<a id="cuvsivfflatserialize"></a>
 ### cuvsIvfFlatSerialize
 
 Save the index to file.
@@ -352,16 +384,17 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the file name for saving the index |
-| `index` | in | `cuvsIvfFlatIndex_t` | IVF-Flat index |
+| `index` | in | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | IVF-Flat index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:315`_
 
+<a id="cuvsivfflatdeserialize"></a>
 ### cuvsIvfFlatDeserialize
 
 Load index from file.
@@ -378,13 +411,13 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the name of the file that stores the index |
-| `index` | out | `cuvsIvfFlatIndex_t` | IVF-Flat index loaded disk |
+| `index` | out | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | IVF-Flat index loaded disk |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_flat.h:328`_
 
@@ -392,6 +425,7 @@ _Source: `c/include/cuvs/neighbors/ivf_flat.h:328`_
 
 _Doxygen group: `ivf_flat_c_index_extend`_
 
+<a id="cuvsivfflatextend"></a>
 ### cuvsIvfFlatExtend
 
 Extend the index with the new data.
@@ -407,14 +441,14 @@ cuvsIvfFlatIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `new_vectors` | in | `DLManagedTensor*` | DLManagedTensor* the new vectors to add to the index |
 | `new_indices` | in | `DLManagedTensor*` | DLManagedTensor* vector of new indices for the new vectors |
-| `index` | inout | `cuvsIvfFlatIndex_t` | IVF-Flat index to be extended |
+| `index` | inout | [`cuvsIvfFlatIndex_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindex) | IVF-Flat index to be extended |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 

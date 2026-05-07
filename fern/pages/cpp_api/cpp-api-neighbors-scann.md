@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/scann.hpp`_
 
 _Doxygen group: `scann_cpp_index_params`_
 
+<a id="cuvs-neighbors-experimental-scann-index-params"></a>
 ### cuvs::neighbors::experimental::scann::index_params
 
 ANN parameters used by ScaNN to build index
@@ -40,6 +41,7 @@ _Source: `cpp/include/cuvs/neighbors/scann.hpp:36`_
 
 _Doxygen group: `scann_cpp_index`_
 
+<a id="cuvs-neighbors-experimental-scann-metric"></a>
 ### cuvs::neighbors::experimental::scann::metric
 
 Distance metric used for clustering.
@@ -50,10 +52,11 @@ Distance metric used for clustering.
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:110`_
 
+<a id="cuvs-neighbors-experimental-scann-size"></a>
 ### cuvs::neighbors::experimental::scann::size
 
 Total length of the index (number of vectors).
@@ -68,6 +71,7 @@ IdxT size() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:116`_
 
+<a id="cuvs-neighbors-experimental-scann-dim"></a>
 ### cuvs::neighbors::experimental::scann::dim
 
 Dimensionality of the data.
@@ -86,6 +90,7 @@ _Source: `cpp/include/cuvs/neighbors/scann.hpp:119`_
 
 _Doxygen group: `scann_cpp_index_build`_
 
+<a id="cuvs-neighbors-experimental-scann-build"></a>
 ### cuvs::neighbors::experimental::scann::build
 
 Build the index from the dataset for efficient search.
@@ -102,7 +107,7 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
-| `params` |  | `const cuvs::neighbors::experimental::scann::index_params&` |  |
+| `params` |  | [`const cuvs::neighbors::experimental::scann::index_params&`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index-params) |  |
 | `dataset` |  | `raft::device_matrix_view<const float, int64_t, raft::row_major>` |  |
 
 **Returns**
@@ -111,6 +116,7 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 
 _Source: `cpp/include/cuvs/neighbors/scann.hpp:291`_
 
+<a id="cuvs-neighbors-experimental-scann-serialize"></a>
 ### cuvs::neighbors::experimental::scann::serialize
 
 Save the index to files in a directory

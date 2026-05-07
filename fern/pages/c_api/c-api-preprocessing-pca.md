@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/preprocessing/pca.h`_
 
 _Doxygen group: `preprocessing_c_pca`_
 
+<a id="cuvspcasolver"></a>
 ### cuvsPcaSolver
 
 Solver algorithm for PCA eigen decomposition.
@@ -27,6 +28,7 @@ enum cuvsPcaSolver { ... } ;
 
 _Source: `c/include/cuvs/preprocessing/pca.h:25`_
 
+<a id="cuvspcaparams"></a>
 ### cuvsPcaParams
 
 Parameters for PCA decomposition.
@@ -42,12 +44,13 @@ struct cuvsPcaParams { ... } ;
 | `n_components` | `int` | Number of principal components to keep. |
 | `copy` | `bool` | If false, data passed to fit are overwritten and running fit(X).transform(X) will not yield the expected results; use fit_transform(X) instead. |
 | `whiten` | `bool` | When true the component vectors are multiplied by the square root of n_samples and then divided by the singular values to ensure uncorrelated outputs with unit component-wise variances. |
-| `algorithm` | `enum cuvsPcaSolver` | Solver algorithm to use. |
+| `algorithm` | [`enum cuvsPcaSolver`](/api-reference/c-api-preprocessing-pca#cuvspcasolver) | Solver algorithm to use. |
 | `tol` | `float` | Tolerance for singular values (used by Jacobi solver). |
 | `n_iterations` | `int` | Number of iterations for the power method (Jacobi solver). |
 
 _Source: `c/include/cuvs/preprocessing/pca.h:35`_
 
+<a id="cuvspcaparamscreate"></a>
 ### cuvsPcaParamsCreate
 
 Allocate PCA params and populate with default values.
@@ -60,16 +63,17 @@ cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | out | `cuvsPcaParams_t*` | cuvsPcaParams_t to allocate |
+| `params` | out | [`cuvsPcaParams_t*`](/api-reference/c-api-preprocessing-pca#cuvspcaparams) | cuvsPcaParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/pca.h:70`_
 
+<a id="cuvspcaparamsdestroy"></a>
 ### cuvsPcaParamsDestroy
 
 De-allocate PCA params.
@@ -82,16 +86,17 @@ cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsPcaParams_t` | cuvsPcaParams_t to de-allocate |
+| `params` | in | [`cuvsPcaParams_t`](/api-reference/c-api-preprocessing-pca#cuvspcaparams) | cuvsPcaParams_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/pca.h:78`_
 
+<a id="cuvspcafit"></a>
 ### cuvsPcaFit
 
 Perform PCA fit operation.
@@ -115,8 +120,8 @@ Computes the principal components, explained variances, singular values, and col
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsPcaParams_t` | PCA parameters |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsPcaParams_t`](/api-reference/c-api-preprocessing-pca#cuvspcaparams) | PCA parameters |
 | `input` | inout | `DLManagedTensor*` | input data [n_rows x n_cols] (col-major, float32, device) |
 | `components` | out | `DLManagedTensor*` | principal components [n_components x n_cols] (col-major, float32, device) |
 | `explained_var` | out | `DLManagedTensor*` | explained variances [n_components] (float32, device) |
@@ -128,12 +133,13 @@ Computes the principal components, explained variances, singular values, and col
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/pca.h:128`_
 
+<a id="cuvspcafittransform"></a>
 ### cuvsPcaFitTransform
 
 Perform PCA fit and transform in a single operation.
@@ -158,8 +164,8 @@ Computes the principal components and transforms the input data into the eigensp
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsPcaParams_t` | PCA parameters |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsPcaParams_t`](/api-reference/c-api-preprocessing-pca#cuvspcaparams) | PCA parameters |
 | `input` | inout | `DLManagedTensor*` | input data [n_rows x n_cols] (col-major, float32, device) |
 | `trans_input` | out | `DLManagedTensor*` | transformed data [n_rows x n_components] (col-major, float32, device) |
 | `components` | out | `DLManagedTensor*` | principal components [n_components x n_cols] (col-major, float32, device) |
@@ -172,12 +178,13 @@ Computes the principal components and transforms the input data into the eigensp
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/pca.h:157`_
 
+<a id="cuvspcatransform"></a>
 ### cuvsPcaTransform
 
 Perform PCA transform operation.
@@ -198,8 +205,8 @@ Transforms the input data into the eigenspace using previously computed principa
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsPcaParams_t` | PCA parameters |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsPcaParams_t`](/api-reference/c-api-preprocessing-pca#cuvspcaparams) | PCA parameters |
 | `input` | inout | `DLManagedTensor*` | data to transform [n_rows x n_cols] (col-major, float32, device) |
 | `components` | in | `DLManagedTensor*` | principal components [n_components x n_cols] (col-major, float32, device) |
 | `singular_vals` | in | `DLManagedTensor*` | singular values [n_components] (float32, device) |
@@ -208,12 +215,13 @@ Transforms the input data into the eigenspace using previously computed principa
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/pca.h:183`_
 
+<a id="cuvspcainversetransform"></a>
 ### cuvsPcaInverseTransform
 
 Perform PCA inverse transform operation.
@@ -234,8 +242,8 @@ Transforms data from the eigenspace back to the original space.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsPcaParams_t` | PCA parameters |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsPcaParams_t`](/api-reference/c-api-preprocessing-pca#cuvspcaparams) | PCA parameters |
 | `trans_input` | in | `DLManagedTensor*` | transformed data [n_rows x n_components] (col-major, float32, device) |
 | `components` | in | `DLManagedTensor*` | principal components [n_components x n_cols] (col-major, float32, device) |
 | `singular_vals` | in | `DLManagedTensor*` | singular values [n_components] (float32, device) |
@@ -244,7 +252,7 @@ Transforms data from the eigenspace back to the original space.
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 

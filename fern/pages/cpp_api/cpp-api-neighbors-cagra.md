@@ -6,10 +6,35 @@ slug: api-reference/cpp-api-neighbors-cagra
 
 _Source header: `cpp/include/cuvs/neighbors/cagra.hpp`_
 
+## Types
+
+<a id="cuvs-neighbors-graph-build-params-ace-params"></a>
+### cuvs::neighbors::graph_build_params::ace_params
+
+Specialized parameters for ACE (Augmented Core Extraction) graph build
+
+```cpp
+struct ace_params { ... } ;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build. When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests). If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
+| `ef_construction` | `size_t` | The index quality for the ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
+| `build_dir` | `std::string` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
+| `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
+| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+
+_Source: `cpp/include/cuvs/neighbors/cagra.hpp:37`_
+
 ## CAGRA index build parameters
 
 _Doxygen group: `cagra_cpp_index_params`_
 
+<a id="cuvs-neighbors-vpq-params"></a>
 ### cuvs::neighbors::vpq_params
 
 Parameters for VPQ compression.
@@ -28,12 +53,13 @@ struct vpq_params { ... } ;
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
 | `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). When zero, an optimal value is selected using a heuristic. |
 | `pq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (PQ phase). When zero, an optimal value is selected using a heuristic. |
-| `pq_kmeans_type` | `cuvs::cluster::kmeans::kmeans_type` | Type of k-means algorithm for PQ training. Balanced k-means tends to be faster than regular k-means for PQ training, for problem sets where the number of points per cluster are approximately equal. Regular k-means may be better for skewed cluster distributions. |
+| `pq_kmeans_type` | [`cuvs::cluster::kmeans::kmeans_type`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-kmeans-type) | Type of k-means algorithm for PQ training. Balanced k-means tends to be faster than regular k-means for PQ training, for problem sets where the number of points per cluster are approximately equal. Regular k-means may be better for skewed cluster distributions. |
 | `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. We will use `pq_n_centers * max_train_points_per_pq_code` training points to train each PQ codebook. |
 | `max_train_points_per_vq_cluster` | `uint32_t` | The max number of data points to use per VQ cluster during training. |
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:42`_
 
+<a id="cuvs-neighbors-cagra-hnsw-heuristic-type"></a>
 ### cuvs::neighbors::cagra::hnsw_heuristic_type
 
 A strategy for selecting the graph build parameters based on similar HNSW index
@@ -48,6 +74,7 @@ enum class hnsw_heuristic_type : uint32_t { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:115`_
 
+<a id="cuvs-neighbors-cagra-from-hnsw-params"></a>
 ### cuvs::neighbors::cagra::from_hnsw_params
 
 Create a CAGRA index parameters compatible with HNSW index
@@ -74,8 +101,8 @@ Usage example:
 | `dataset` |  | `raft::matrix_extent<int64_t>` | The shape of the input dataset |
 | `M` |  | `int` | HNSW index parameter M |
 | `ef_construction` |  | `int` | HNSW index parameter ef_construction |
-| `heuristic` |  | `hnsw_heuristic_type` | The heuristic to use for selecting the graph build parameters Default: `hnsw_heuristic_type::SIMILAR_SEARCH_PERFORMANCE`. |
-| `metric` |  | `cuvs::distance::DistanceType` | The distance metric to search Default: `cuvs::distance::DistanceType::L2Expanded`. |
+| `heuristic` |  | [`hnsw_heuristic_type`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-hnsw-heuristic-type) | The heuristic to use for selecting the graph build parameters Default: `hnsw_heuristic_type::SIMILAR_SEARCH_PERFORMANCE`. |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | The distance metric to search Default: `cuvs::distance::DistanceType::L2Expanded`. |
 
 **Returns**
 
@@ -87,6 +114,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:245`_
 
 _Doxygen group: `cagra_cpp_search_params`_
 
+<a id="cuvs-neighbors-cagra-search-algo"></a>
 ### cuvs::neighbors::cagra::search_algo
 
 CAGRA index search parameters
@@ -110,6 +138,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:262`_
 
 _Doxygen group: `cagra_cpp_extend_params`_
 
+<a id="cuvs-neighbors-cagra-extend-params"></a>
 ### cuvs::neighbors::cagra::extend_params
 
 CAGRA index extend parameters
@@ -130,6 +159,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:357`_
 
 _Doxygen group: `cagra_cpp_index`_
 
+<a id="cuvs-neighbors-cagra-metric"></a>
 ### cuvs::neighbors::cagra::metric
 
 Distance metric used for clustering.
@@ -140,10 +170,11 @@ Distance metric used for clustering.
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:401`_
 
+<a id="cuvs-neighbors-cagra-size"></a>
 ### cuvs::neighbors::cagra::size
 
 Total length of the index (number of vectors).
@@ -158,6 +189,7 @@ Total length of the index (number of vectors).
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:407`_
 
+<a id="cuvs-neighbors-cagra-dim"></a>
 ### cuvs::neighbors::cagra::dim
 
 Dimensionality of the data.
@@ -172,6 +204,7 @@ Dimensionality of the data.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:415`_
 
+<a id="cuvs-neighbors-cagra-graph-degree"></a>
 ### cuvs::neighbors::cagra::graph_degree
 
 Graph degree
@@ -186,6 +219,7 @@ Graph degree
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:420`_
 
+<a id="cuvs-neighbors-cagra-data"></a>
 ### cuvs::neighbors::cagra::data
 
 Dataset [size, dim]
@@ -200,6 +234,7 @@ Dataset [size, dim]
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:435`_
 
+<a id="cuvs-neighbors-cagra-graph"></a>
 ### cuvs::neighbors::cagra::graph
 
 neighborhood graph [size, graph-degree]
@@ -215,6 +250,7 @@ neighborhood graph [size, graph-degree]
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:441`_
 
+<a id="cuvs-neighbors-cagra-source-indices"></a>
 ### cuvs::neighbors::cagra::source_indices
 
 Mapping from internal graph node indices to the original user-provided indices.
@@ -230,6 +266,7 @@ Mapping from internal graph node indices to the original user-provided indices.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:448`_
 
+<a id="cuvs-neighbors-cagra-dataset-fd"></a>
 ### cuvs::neighbors::cagra::dataset_fd
 
 Get the dataset file descriptor (for disk-backed index)
@@ -241,10 +278,11 @@ Get the dataset file descriptor (for disk-backed index)
 
 **Returns**
 
-`const std::optional<cuvs::util::file_descriptor>&`
+[`const std::optional<cuvs::util::file_descriptor>&`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor)
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:458`_
 
+<a id="cuvs-neighbors-cagra-graph-fd"></a>
 ### cuvs::neighbors::cagra::graph_fd
 
 Get the graph file descriptor (for disk-backed index)
@@ -256,10 +294,11 @@ Get the graph file descriptor (for disk-backed index)
 
 **Returns**
 
-`const std::optional<cuvs::util::file_descriptor>&`
+[`const std::optional<cuvs::util::file_descriptor>&`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor)
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:465`_
 
+<a id="cuvs-neighbors-cagra-mapping-fd"></a>
 ### cuvs::neighbors::cagra::mapping_fd
 
 Get the mapping file descriptor (for disk-backed index)
@@ -271,10 +310,11 @@ Get the mapping file descriptor (for disk-backed index)
 
 **Returns**
 
-`const std::optional<cuvs::util::file_descriptor>&`
+[`const std::optional<cuvs::util::file_descriptor>&`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor)
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:472`_
 
+<a id="cuvs-neighbors-cagra-dataset-norms"></a>
 ### cuvs::neighbors::cagra::dataset_norms
 
 Dataset norms for cosine distance [size]
@@ -290,6 +330,7 @@ Dataset norms for cosine distance [size]
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:479`_
 
+<a id="cuvs-neighbors-cagra-index"></a>
 ### cuvs::neighbors::cagra::index
 
 ```cpp
@@ -323,7 +364,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` | Default: `cuvs::distance::DistanceType::L2Expanded`. |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Default: `cuvs::distance::DistanceType::L2Expanded`. |
 
 **Returns**
 
@@ -364,7 +405,7 @@ Usage examples:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `dataset` |  | `raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor>` |  |
 | `knn_graph` |  | `raft::mdspan<const graph_index_type, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>` |  |
 
@@ -374,6 +415,7 @@ Usage examples:
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:559`_
 
+<a id="cuvs-neighbors-cagra-update-dataset"></a>
 ### cuvs::neighbors::cagra::update_dataset
 
 Replace the dataset with a new dataset.
@@ -475,6 +517,7 @@ Note: This will clear any precomputed dataset norms.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:644`_
 
+<a id="cuvs-neighbors-cagra-update-graph"></a>
 ### cuvs::neighbors::cagra::update_graph
 
 Replace the graph with a new graph.
@@ -525,6 +568,7 @@ We create a copy of the graph on the device. The index manages the lifetime of t
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:689`_
 
+<a id="cuvs-neighbors-cagra-update-source-indices"></a>
 ### cuvs::neighbors::cagra::update_source_indices
 
 Replace the source indices with a new source indices taking the ownership of the passed vector.
@@ -585,7 +629,7 @@ This method configures the index to use a disk-based dataset. The dataset file s
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `fd` | in | `cuvs::util::file_descriptor&&` | File descriptor (will be moved into the index for lifetime management) |
+| `fd` | in | [`cuvs::util::file_descriptor&&`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor) | File descriptor (will be moved into the index for lifetime management) |
 
 **Returns**
 
@@ -608,7 +652,7 @@ This method configures the index to use a disk-based graph. The graph file shoul
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `fd` | in | `cuvs::util::file_descriptor&&` | File descriptor (will be moved into the index for lifetime management) |
+| `fd` | in | [`cuvs::util::file_descriptor&&`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor) | File descriptor (will be moved into the index for lifetime management) |
 
 **Returns**
 
@@ -616,6 +660,7 @@ This method configures the index to use a disk-based graph. The graph file shoul
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:794`_
 
+<a id="cuvs-neighbors-cagra-update-mapping"></a>
 ### cuvs::neighbors::cagra::update_mapping
 
 Update the dataset mapping from a disk file using a file descriptor.
@@ -631,7 +676,7 @@ This method configures the index to use a disk-based dataset mapping. The mappin
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `fd` | in | `cuvs::util::file_descriptor&&` | File descriptor (will be moved into the index for lifetime management) |
+| `fd` | in | [`cuvs::util::file_descriptor&&`](/api-reference/cpp-api-util-file-io#cuvs-util-file-descriptor) | File descriptor (will be moved into the index for lifetime management) |
 
 **Returns**
 
@@ -643,6 +688,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:834`_
 
 _Doxygen group: `cagra_cpp_index_build`_
 
+<a id="cuvs-neighbors-cagra-build"></a>
 ### cuvs::neighbors::cagra::build
 
 Build the index from the dataset for efficient search.
@@ -953,6 +999,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1202`_
 
 _Doxygen group: `cagra_cpp_index_extend`_
 
+<a id="cuvs-neighbors-cagra-extend"></a>
 ### cuvs::neighbors::cagra::extend
 
 Add new vectors to a CAGRA index
@@ -977,7 +1024,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | additional dataset on device memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<float, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1013,7 +1060,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<float, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1049,7 +1096,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | additional dataset on device memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<half, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1085,7 +1132,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<half, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1121,7 +1168,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | additional dataset on device memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<int8_t, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1157,7 +1204,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<int8_t, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1193,7 +1240,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<uint8_t, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1229,7 +1276,7 @@ part. The data will be copied from the current index in this function. The num r
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resources |
-| `params` | in | `const cagra::extend_params&` | extend params |
+| `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | `cuvs::neighbors::cagra::index<uint8_t, uint32_t>&` | CAGRA index |
 | `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
@@ -1245,6 +1292,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1510`_
 
 _Doxygen group: `cagra_cpp_index_search`_
 
+<a id="none-sample-filter"></a>
 ### none_sample_filter
 
 Search ANN using the constructed index.
@@ -1266,6 +1314,7 @@ _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1541`_
 
 _Doxygen group: `cagra_cpp_serialize`_
 
+<a id="cuvs-neighbors-cagra-serialize"></a>
 ### cuvs::neighbors::cagra::serialize
 
 Save the index to file.
@@ -1294,6 +1343,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1758`_
 
+<a id="cuvs-neighbors-cagra-deserialize"></a>
 ### cuvs::neighbors::cagra::deserialize
 
 Load index from file.
@@ -1698,6 +1748,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2152`_
 
+<a id="cuvs-neighbors-cagra-serialize-to-hnswlib"></a>
 ### cuvs::neighbors::cagra::serialize_to_hnswlib
 
 Write the CAGRA built index as a base layer HNSW index to an output stream

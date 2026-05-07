@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/ball_cover.hpp`_
 
 _Doxygen group: `random_ball_cover`_
 
+<a id="cuvs-neighbors-ball-cover-build"></a>
 ### cuvs::neighbors::ball_cover::build
 
 Builds and populates a previously unbuilt cuvs::neighbors::ball_cover::index

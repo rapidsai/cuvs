@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/brute_force.hpp`_
 
 _Doxygen group: `bruteforce_cpp_index`_
 
+<a id="cuvs-neighbors-brute-force-index"></a>
 ### cuvs::neighbors::brute_force::index
 
 Construct an empty index.
@@ -53,7 +54,7 @@ Constructs a brute force index from a dataset. This lets us precompute norms for
 | `res` |  | `raft::resources const&` |  |
 | `dataset_view` |  | `raft::host_matrix_view<const T, int64_t, raft::row_major>` |  |
 | `norms` |  | `std::optional<raft::device_vector<DistT, int64_t>>&&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `metric_arg` |  | `DistT` | Default: `0.0`. |
 
 **Returns**
@@ -83,7 +84,7 @@ Constructs a brute force index from a dataset. This lets us precompute norms for
 | `res` |  | `raft::resources const&` |  |
 | `dataset_view` |  | `raft::device_matrix_view<const T, int64_t, raft::row_major>` |  |
 | `norms` |  | `std::optional<raft::device_vector<DistT, int64_t>>&&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `metric_arg` |  | `DistT` | Default: `0.0`. |
 
 **Returns**
@@ -113,7 +114,7 @@ This class stores a non-owning reference to the dataset and norms. Having precom
 | `res` |  | `raft::resources const&` |  |
 | `dataset_view` |  | `raft::device_matrix_view<const T, int64_t, raft::row_major>` |  |
 | `norms_view` |  | `std::optional<raft::device_vector_view<const DistT, int64_t>>` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `metric_arg` |  | `DistT` | Default: `0.0`. |
 
 **Returns**
@@ -143,7 +144,7 @@ Constructs a brute force index from a dataset. This lets us precompute norms for
 | `res` |  | `raft::resources const&` |  |
 | `dataset_view` |  | `raft::device_matrix_view<const T, int64_t, raft::col_major>` |  |
 | `norms` |  | `std::optional<raft::device_vector<DistT, int64_t>>&&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `metric_arg` |  | `DistT` | Default: `0.0`. |
 
 **Returns**
@@ -173,7 +174,7 @@ This class stores a non-owning reference to the dataset and norms, with the data
 | `res` |  | `raft::resources const&` |  |
 | `dataset_view` |  | `raft::device_matrix_view<const T, int64_t, raft::col_major>` |  |
 | `norms_view` |  | `std::optional<raft::device_vector_view<const DistT, int64_t>>` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `metric_arg` |  | `DistT` | Default: `0.0`. |
 
 **Returns**
@@ -182,6 +183,7 @@ This class stores a non-owning reference to the dataset and norms, with the data
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:111`_
 
+<a id="cuvs-neighbors-brute-force-update-dataset"></a>
 ### cuvs::neighbors::brute_force::update_dataset
 
 Replace the dataset with a new dataset.
@@ -228,6 +230,7 @@ We create a copy of the dataset on the device. The index manages the lifetime of
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:128`_
 
+<a id="cuvs-neighbors-brute-force-metric"></a>
 ### cuvs::neighbors::brute_force::metric
 
 Distance metric used for retrieval
@@ -238,10 +241,11 @@ cuvs::distance::DistanceType metric() const noexcept;
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:132`_
 
+<a id="cuvs-neighbors-brute-force-metric-arg"></a>
 ### cuvs::neighbors::brute_force::metric_arg
 
 Metric argument
@@ -256,6 +260,7 @@ DistT metric_arg() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:135`_
 
+<a id="cuvs-neighbors-brute-force-size"></a>
 ### cuvs::neighbors::brute_force::size
 
 Total length of the index (number of vectors).
@@ -270,6 +275,7 @@ size_t size() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:138`_
 
+<a id="cuvs-neighbors-brute-force-dim"></a>
 ### cuvs::neighbors::brute_force::dim
 
 Dimensionality of the data.
@@ -284,6 +290,7 @@ size_t dim() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:141`_
 
+<a id="cuvs-neighbors-brute-force-dataset"></a>
 ### cuvs::neighbors::brute_force::dataset
 
 Dataset [size, dim]
@@ -298,6 +305,7 @@ raft::device_matrix_view<const T, int64_t, raft::row_major> dataset() const noex
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:144`_
 
+<a id="cuvs-neighbors-brute-force-norms"></a>
 ### cuvs::neighbors::brute_force::norms
 
 Dataset norms
@@ -312,6 +320,7 @@ raft::device_vector_view<const DistT, int64_t, raft::row_major> norms() const;
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:150`_
 
+<a id="cuvs-neighbors-brute-force-has-norms"></a>
 ### cuvs::neighbors::brute_force::has_norms
 
 Whether ot not this index has dataset norms
@@ -330,6 +339,7 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:156`_
 
 _Doxygen group: `bruteforce_cpp_index_build`_
 
+<a id="cuvs-neighbors-brute-force-build"></a>
 ### cuvs::neighbors::brute_force::build
 
 Build the index from the dataset for efficient search.
@@ -504,6 +514,7 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:298`_
 
 _Doxygen group: `sparse_bruteforce_cpp_index`_
 
+<a id="cuvs-neighbors-brute-force-sparse-index"></a>
 ### cuvs::neighbors::brute_force::sparse_index
 
 Construct a sparse brute force sparse_index from dataset
@@ -521,7 +532,7 @@ T metric_arg);
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
 | `dataset` |  | `raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT>` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `metric_arg` |  | `T` |  |
 
 **Returns**
@@ -540,7 +551,7 @@ cuvs::distance::DistanceType metric() const noexcept;
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:615`_
 
@@ -562,6 +573,7 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:618`_
 
 _Doxygen group: `sparse_bruteforce_cpp_index_search`_
 
+<a id="cuvs-neighbors-brute-force-sparse-search-params"></a>
 ### cuvs::neighbors::brute_force::sparse_search_params
 
 Sparse Brute Force index search
@@ -576,6 +588,7 @@ _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:668`_
 
 _Doxygen group: `bruteforce_cpp_index_serialize`_
 
+<a id="cuvs-neighbors-brute-force-serialize"></a>
 ### cuvs::neighbors::brute_force::serialize
 
 Save the index to file.
@@ -704,6 +717,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:811`_
 
+<a id="cuvs-neighbors-brute-force-deserialize"></a>
 ### cuvs::neighbors::brute_force::deserialize
 
 Load index from file.

@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/ivf_flat.hpp`_
 
 _Doxygen group: `ivf_flat_cpp_search_params`_
 
+<a id="cuvs-neighbors-ivf-flat-search-params"></a>
 ### cuvs::neighbors::ivf_flat::search_params
 
 IVF-Flat index search parameters
@@ -27,6 +28,7 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:73`_
 
+<a id="cuvs-neighbors-ivf-flat-make-list-extents"></a>
 ### cuvs::neighbors::ivf_flat::make_list_extents
 
 Determine the extents of an array enough to hold a given amount of data.
@@ -43,7 +45,7 @@ constexpr auto make_list_extents(SizeT n_rows) const -> list_extents;
 
 **Returns**
 
-`list_extents`
+[`list_extents`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents)
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:108`_
 
@@ -51,6 +53,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:108`_
 
 _Doxygen group: `ivf_flat_cpp_index`_
 
+<a id="cuvs-neighbors-ivf-flat-index"></a>
 ### cuvs::neighbors::ivf_flat::index
 
 Construct an empty index.
@@ -113,7 +116,7 @@ uint32_t dim);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `metric` |  | `cuvs::distance::DistanceType` |  |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
 | `n_lists` |  | `uint32_t` |  |
 | `adaptive_centers` |  | `bool` |  |
 | `conservative_memory_allocation` |  | `bool` |  |
@@ -125,6 +128,7 @@ uint32_t dim);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:159`_
 
+<a id="cuvs-neighbors-ivf-flat-veclen"></a>
 ### cuvs::neighbors::ivf_flat::veclen
 
 Vectorized load/store size in elements, determines the size of interleaved data chunks.
@@ -139,6 +143,7 @@ uint32_t veclen() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:169`_
 
+<a id="cuvs-neighbors-ivf-flat-metric"></a>
 ### cuvs::neighbors::ivf_flat::metric
 
 Distance metric used for clustering.
@@ -149,10 +154,11 @@ cuvs::distance::DistanceType metric() const noexcept;
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:172`_
 
+<a id="cuvs-neighbors-ivf-flat-adaptive-centers"></a>
 ### cuvs::neighbors::ivf_flat::adaptive_centers
 
 Whether `centers()` change upon extending the index (ivf_flat::extend).
@@ -167,6 +173,7 @@ bool adaptive_centers() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:175`_
 
+<a id="cuvs-neighbors-ivf-flat-list-sizes"></a>
 ### cuvs::neighbors::ivf_flat::list_sizes
 
 Sizes of the lists (clusters) [n_lists]
@@ -183,6 +190,7 @@ NB: This may differ from the actual list size if the shared lists have been exte
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:204`_
 
+<a id="cuvs-neighbors-ivf-flat-centers"></a>
 ### cuvs::neighbors::ivf_flat::centers
 
 k-means cluster centers corresponding to the lists [n_lists, dim]
@@ -197,6 +205,7 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:208`_
 
+<a id="cuvs-neighbors-ivf-flat-center-norms"></a>
 ### cuvs::neighbors::ivf_flat::center_norms
 
 (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
@@ -213,6 +222,7 @@ NB: this may be empty if the index is empty or if the metric does not require th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:217`_
 
+<a id="cuvs-neighbors-ivf-flat-accum-sorted-sizes"></a>
 ### cuvs::neighbors::ivf_flat::accum_sorted_sizes
 
 Accumulated list sizes, sorted in descending order [n_lists + 1].
@@ -233,6 +243,7 @@ This span is used during search to estimate the maximum size of the workspace.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:229`_
 
+<a id="cuvs-neighbors-ivf-flat-size"></a>
 ### cuvs::neighbors::ivf_flat::size
 
 Total length of the index.
@@ -247,6 +258,7 @@ IdxT size() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:234`_
 
+<a id="cuvs-neighbors-ivf-flat-dim"></a>
 ### cuvs::neighbors::ivf_flat::dim
 
 Dimensionality of the data.
@@ -261,6 +273,7 @@ uint32_t dim() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:237`_
 
+<a id="cuvs-neighbors-ivf-flat-n-lists"></a>
 ### cuvs::neighbors::ivf_flat::n_lists
 
 Number of clusters/inverted lists.
@@ -275,6 +288,7 @@ uint32_t n_lists() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:240`_
 
+<a id="cuvs-neighbors-ivf-flat-inds-ptrs"></a>
 ### cuvs::neighbors::ivf_flat::inds_ptrs
 
 Pointers to the inverted lists (clusters) indices  [n_lists].
@@ -289,6 +303,7 @@ raft::device_vector_view<IdxT*, uint32_t> inds_ptrs() noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:245`_
 
+<a id="cuvs-neighbors-ivf-flat-conservative-memory-allocation"></a>
 ### cuvs::neighbors::ivf_flat::conservative_memory_allocation
 
 Whether to use conservative memory allocation when extending the list (cluster) data
@@ -305,6 +320,7 @@ bool conservative_memory_allocation() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:252`_
 
+<a id="cuvs-neighbors-ivf-flat-lists"></a>
 ### cuvs::neighbors::ivf_flat::lists
 
 Lists' data and indices.
@@ -323,6 +339,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:257`_
 
 _Doxygen group: `ivf_flat_cpp_index_build`_
 
+<a id="cuvs-neighbors-ivf-flat-build"></a>
 ### cuvs::neighbors::ivf_flat::build
 
 Build the index from the dataset for efficient search.
@@ -911,6 +928,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:824`_
 
 _Doxygen group: `ivf_flat_cpp_index_extend`_
 
+<a id="cuvs-neighbors-ivf-flat-extend"></a>
 ### cuvs::neighbors::ivf_flat::extend
 
 Build a new index containing the data of the original plus new extra vectors.
@@ -1419,6 +1437,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1393`_
 
 _Doxygen group: `ivf_flat_cpp_serialize`_
 
+<a id="cuvs-neighbors-ivf-flat-serialize"></a>
 ### cuvs::neighbors::ivf_flat::serialize
 
 Save the index to file.
@@ -1445,6 +1464,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1612`_
 
+<a id="cuvs-neighbors-ivf-flat-deserialize"></a>
 ### cuvs::neighbors::ivf_flat::deserialize
 
 Load index from file.
@@ -1839,6 +1859,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2018`_
 
 _Doxygen group: `ivf_flat_helpers`_
 
+<a id="namespace-codepacker"></a>
 ### namespace codepacker \{
 
 Helper functions for IVF Flat
@@ -1849,6 +1870,7 @@ namespace codepacker {
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2484`_
 
+<a id="codepacker-pack"></a>
 ### codepacker::pack
 
 Write flat codes into an existing list by the given offset.
@@ -1875,7 +1897,7 @@ Usage example:
 | `codes` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | flat codes [n_vec, dim] |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
-| `list_data` | inout | `raft::device_mdspan<float, typename list_spec<uint32_t, float, int64_t>::list_extents, raft::row_major>` | block to write into |
+| `list_data` | inout | [`raft::device_mdspan<float, typename list_spec<uint32_t, float, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to write into |
 
 **Returns**
 
@@ -1909,7 +1931,7 @@ Usage example:
 | `codes` | in | `raft::device_matrix_view<const half, uint32_t, raft::row_major>` | flat codes [n_vec, dim] |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
-| `list_data` | inout | `raft::device_mdspan<half, typename list_spec<uint32_t, half, int64_t>::list_extents, raft::row_major>` | block to write into |
+| `list_data` | inout | [`raft::device_mdspan<half, typename list_spec<uint32_t, half, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to write into |
 
 **Returns**
 
@@ -1943,7 +1965,7 @@ Usage example:
 | `codes` | in | `raft::device_matrix_view<const int8_t, uint32_t, raft::row_major>` | flat codes [n_vec, dim] |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
-| `list_data` | inout | `raft::device_mdspan<int8_t, typename list_spec<uint32_t, int8_t, int64_t>::list_extents, raft::row_major>` | block to write into |
+| `list_data` | inout | [`raft::device_mdspan<int8_t, typename list_spec<uint32_t, int8_t, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to write into |
 
 **Returns**
 
@@ -1977,7 +1999,7 @@ Usage example:
 | `codes` | in | `raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major>` | flat codes [n_vec, dim] |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
-| `list_data` | inout | `raft::device_mdspan<uint8_t, typename list_spec<uint32_t, uint8_t, int64_t>::list_extents, raft::row_major>` | block to write into |
+| `list_data` | inout | [`raft::device_mdspan<uint8_t, typename list_spec<uint32_t, uint8_t, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to write into |
 
 **Returns**
 
@@ -1985,6 +2007,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2598`_
 
+<a id="codepacker-unpack"></a>
 ### codepacker::unpack
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
@@ -2008,7 +2031,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `list_data` | in | `raft::device_mdspan<const float, typename list_spec<uint32_t, float, int64_t>::list_extents, raft::row_major>` | block to read from |
+| `list_data` | in | [`raft::device_mdspan<const float, typename list_spec<uint32_t, float, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 | `codes` | inout | `raft::device_matrix_view<float, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
@@ -2042,7 +2065,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `list_data` | in | `raft::device_mdspan<const half, typename list_spec<uint32_t, half, int64_t>::list_extents, raft::row_major>` | block to read from |
+| `list_data` | in | [`raft::device_mdspan<const half, typename list_spec<uint32_t, half, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 | `codes` | inout | `raft::device_matrix_view<half, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
@@ -2076,7 +2099,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `list_data` | in | `raft::device_mdspan<const int8_t, typename list_spec<uint32_t, int8_t, int64_t>::list_extents, raft::row_major>` | block to read from |
+| `list_data` | in | [`raft::device_mdspan<const int8_t, typename list_spec<uint32_t, int8_t, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 | `codes` | inout | `raft::device_matrix_view<int8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
@@ -2110,7 +2133,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `list_data` | in | `raft::device_mdspan<const uint8_t, typename list_spec<uint32_t, uint8_t, int64_t>::list_extents, raft::row_major>` | block to read from |
+| `list_data` | in | [`raft::device_mdspan<const uint8_t, typename list_spec<uint32_t, uint8_t, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 | `codes` | inout | `raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
@@ -2121,6 +2144,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2729`_
 
+<a id="codepacker-pack-1"></a>
 ### codepacker::pack_1
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
@@ -2226,6 +2250,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2791`_
 
+<a id="codepacker-unpack-1"></a>
 ### codepacker::unpack_1
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
@@ -2340,6 +2365,7 @@ interleaved format.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2845`_
 
+<a id="codepacker-reset-index"></a>
 ### codepacker::reset_index
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
@@ -2440,6 +2466,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2936`_
 
+<a id="codepacker-recompute-internal-state"></a>
 ### codepacker::recompute_internal_state
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been

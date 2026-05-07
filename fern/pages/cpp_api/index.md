@@ -28,3 +28,5 @@ These pages are generated from the documented public headers in the cuVS source 
 - [Select K](/api-reference/cpp-api-selection-select-k)
 - [Silhouette Score](/api-reference/cpp-api-stats-silhouette-score)
 - [Trustworthiness Score](/api-reference/cpp-api-stats-trustworthiness-score)
+- [Cutlass Utils](/api-reference/cpp-api-util-cutlass-utils)
+- [File Io](/api-reference/cpp-api-util-file-io)

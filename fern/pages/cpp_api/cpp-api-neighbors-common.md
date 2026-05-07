@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/common.hpp`_
 
 _Doxygen group: `neighbors_index`_
 
+<a id="cuvs-neighbors-index"></a>
 ### cuvs::neighbors::index
 
 The base for approximate KNN index structures.
@@ -20,6 +21,7 @@ struct index { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:107`_
 
+<a id="cuvs-neighbors-index-params"></a>
 ### cuvs::neighbors::index_params
 
 The base for KNN index parameters.
@@ -32,11 +34,12 @@ struct index_params { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvs::distance::DistanceType` | Distance type. |
+| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Distance type. |
 | `metric_arg` | `float` | The argument used by some distance metrics. |
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:110`_
 
+<a id="cuvs-neighbors-mergestrategy"></a>
 ### cuvs::neighbors::MergeStrategy
 
 Strategy for merging indices.
@@ -60,6 +63,7 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:125`_
 
 _Doxygen group: `neighbors_filtering`_
 
+<a id="filtering-filtertype"></a>
 ### filtering::FilterType
 
 Filtering for ANN Types
@@ -78,6 +82,7 @@ enum class FilterType { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:496`_
 
+<a id="filtering-operator"></a>
 ### filtering::operator
 
 ```cpp
@@ -96,6 +101,7 @@ const uint32_t sample_ix) const;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:506`_
 
+<a id="filtering-get-filter-type"></a>
 ### filtering::get_filter_type
 
 ```cpp
@@ -104,7 +110,7 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-`FilterType`
+[`FilterType`](/api-reference/cpp-api-neighbors-common#filtering-filtertype)
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:520`_
 
@@ -154,10 +160,11 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-`FilterType`
+[`FilterType`](/api-reference/cpp-api-neighbors-common#filtering-filtertype)
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:578`_
 
+<a id="filtering-bitset-filter"></a>
 ### filtering::bitset_filter
 
 ```cpp
@@ -184,7 +191,7 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-`FilterType`
+[`FilterType`](/api-reference/cpp-api-neighbors-common#filtering-filtertype)
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:608`_
 
@@ -192,6 +199,7 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:608`_
 
 _Doxygen group: `mg_cpp_index_params`_
 
+<a id="ivf-distribution-mode"></a>
 ### ivf::distribution_mode
 
 ```cpp
@@ -204,6 +212,7 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:904`_
 
 _Doxygen group: `mg_cpp_search_params`_
 
+<a id="ivf-replicated-search-mode"></a>
 ### ivf::replicated_search_mode
 
 ```cpp
@@ -219,6 +228,7 @@ enum replicated_search_mode { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:915`_
 
+<a id="ivf-sharded-merge-mode"></a>
 ### ivf::sharded_merge_mode
 
 ```cpp

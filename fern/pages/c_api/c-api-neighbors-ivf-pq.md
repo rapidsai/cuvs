@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/ivf_pq.h`_
 
 _Doxygen group: `ivf_pq_c_index_params`_
 
+<a id="cuvsivfpqcodebookgen"></a>
 ### cuvsIvfPqCodebookGen
 
 A type for specifying how PQ codebooks are created
@@ -27,6 +28,7 @@ enum cuvsIvfPqCodebookGen { ... } ;
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:26`_
 
+<a id="cuvsivfpqlistlayout"></a>
 ### cuvsIvfPqListLayout
 
 A type for specifying the memory layout of IVF-PQ list data
@@ -44,6 +46,7 @@ enum cuvsIvfPqListLayout { ... } ;
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:35`_
 
+<a id="cuvsivfpqindexparams"></a>
 ### cuvsIvfPqIndexParams
 
 Supplemental parameters to build IVF-PQ Index
@@ -56,7 +59,7 @@ struct cuvsIvfPqIndexParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvsDistanceType` | Distance type. |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
 | `metric_arg` | `float` | The argument used by some distance metrics. |
 | `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
 | `n_lists` | `uint32_t` | The number of inverted lists (clusters) Hint: the number of vectors per cluster (`n_rows/n_lists`) should be approximately 1,000 to 10,000. |
@@ -64,14 +67,15 @@ struct cuvsIvfPqIndexParams { ... } ;
 | `kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building. |
 | `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: [4, 5, 6, 7, 8]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
 | `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. NB: `pq_dim * pq_bits` must be a multiple of 8. Hint: a smaller 'pq_dim' results in a smaller index size and better search performance, but lower recall. If 'pq_bits' is 8, 'pq_dim' can be set to any number, but multiple of 8 are desirable for good performance. If 'pq_bits' is not 8, 'pq_dim' should be a multiple of 8. For good performance, it is desirable that 'pq_dim' is a multiple of 32. Ideally, 'pq_dim' should be also a divisor of the dataset dim. |
-| `codebook_kind` | `enum cuvsIvfPqCodebookGen` | How PQ codebooks are created. |
+| `codebook_kind` | [`enum cuvsIvfPqCodebookGen`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqcodebookgen) | How PQ codebooks are created. |
 | `force_random_rotation` | `bool` | Apply a random rotation matrix on the input data and queries even if `dim % pq_dim == 0`. Note: if `dim` is not multiple of `pq_dim`, a random rotation is always applied to the input data and queries to transform the working space from `dim` to `rot_dim`, which may be slightly larger than the original space and and is a multiple of `pq_dim` (`rot_dim % pq_dim == 0`). However, this transform is not necessary when `dim` is multiple of `pq_dim` (`dim == rot_dim`, hence no need in adding "extra" data columns / features). By default, if `dim == rot_dim`, the rotation transform is initialized with the identity matrix. When `force_random_rotation == true`, a random orthogonal transform matrix is generated regardless of the values of `dim` and `pq_dim`. |
 | `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
 | `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training points to train each codebook. |
-| `codes_layout` | `enum cuvsIvfPqListLayout` | Memory layout of the IVF-PQ list data.<br />- CUVS_IVF_PQ_LIST_LAYOUT_FLAT: Codes are stored contiguously, one vector's codes after another.<br />- CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED: Codes are interleaved for optimized search performance. This is the default and recommended for search workloads. |
+| `codes_layout` | [`enum cuvsIvfPqListLayout`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqlistlayout) | Memory layout of the IVF-PQ list data.<br />- CUVS_IVF_PQ_LIST_LAYOUT_FLAT: Codes are stored contiguously, one vector's codes after another.<br />- CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED: Codes are interleaved for optimized search performance. This is the default and recommended for search workloads. |
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:44`_
 
+<a id="cuvsivfpqindexparamscreate"></a>
 ### cuvsIvfPqIndexParamsCreate
 
 Allocate IVF-PQ Index params, and populate with default values
@@ -84,16 +88,17 @@ cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* index_params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsIvfPqIndexParams_t*` | cuvsIvfPqIndexParams_t to allocate |
+| `index_params` | in | [`cuvsIvfPqIndexParams_t*`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | cuvsIvfPqIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:144`_
 
+<a id="cuvsivfpqindexparamsdestroy"></a>
 ### cuvsIvfPqIndexParamsDestroy
 
 De-allocate IVF-PQ Index params
@@ -106,11 +111,11 @@ cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index_params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsIvfPqIndexParams_t` |  |
+| `index_params` | in | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -120,6 +125,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:152`_
 
 _Doxygen group: `ivf_pq_c_search_params`_
 
+<a id="cuvsivfpqsearchparams"></a>
 ### cuvsIvfPqSearchParams
 
 Supplemental parameters to search IVF-PQ index
@@ -141,6 +147,7 @@ struct cuvsIvfPqSearchParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:165`_
 
+<a id="cuvsivfpqsearchparamscreate"></a>
 ### cuvsIvfPqSearchParamsCreate
 
 Allocate IVF-PQ search params, and populate with default values
@@ -153,16 +160,17 @@ cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsIvfPqSearchParams_t*` | cuvsIvfPqSearchParams_t to allocate |
+| `params` | in | [`cuvsIvfPqSearchParams_t*`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqsearchparams) | cuvsIvfPqSearchParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:227`_
 
+<a id="cuvsivfpqsearchparamsdestroy"></a>
 ### cuvsIvfPqSearchParamsDestroy
 
 De-allocate IVF-PQ search params
@@ -175,11 +183,11 @@ cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsIvfPqSearchParams_t` |  |
+| `params` | in | [`cuvsIvfPqSearchParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqsearchparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -189,6 +197,25 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:235`_
 
 _Doxygen group: `ivf_pq_c_index`_
 
+<a id="cuvsivfpqindex"></a>
+### cuvsIvfPqIndex
+
+Struct to hold address of cuvs::neighbors::ivf_pq::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsIvfPqIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/ivf_pq.h:248`_
+
+<a id="cuvsivfpqindexcreate"></a>
 ### cuvsIvfPqIndexCreate
 
 Allocate IVF-PQ index
@@ -201,16 +228,17 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t*` | cuvsIvfPqIndex_t to allocate |
+| `index` | in | [`cuvsIvfPqIndex_t*`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:261`_
 
+<a id="cuvsivfpqindexdestroy"></a>
 ### cuvsIvfPqIndexDestroy
 
 De-allocate IVF-PQ index
@@ -223,14 +251,15 @@ cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t to de-allocate |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:268`_
 
+<a id="cuvsivfpqindexgetnlists"></a>
 ### cuvsIvfPqIndexGetNLists
 
 Get the number of clusters/inverted lists
@@ -243,15 +272,16 @@ cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfPqIndex_t` |  |
+| `index` |  | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) |  |
 | `n_lists` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:271`_
 
+<a id="cuvsivfpqindexgetdim"></a>
 ### cuvsIvfPqIndexGetDim
 
 Get the dimensionality
@@ -264,15 +294,16 @@ cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfPqIndex_t` |  |
+| `index` |  | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) |  |
 | `dim` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:274`_
 
+<a id="cuvsivfpqindexgetsize"></a>
 ### cuvsIvfPqIndexGetSize
 
 Get the size of the index
@@ -285,15 +316,16 @@ cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* size);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfPqIndex_t` |  |
+| `index` |  | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) |  |
 | `size` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:277`_
 
+<a id="cuvsivfpqindexgetpqdim"></a>
 ### cuvsIvfPqIndexGetPqDim
 
 Get the dimensionality of an encoded vector after compression by PQ.
@@ -306,15 +338,16 @@ cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfPqIndex_t` |  |
+| `index` |  | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) |  |
 | `pq_dim` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:280`_
 
+<a id="cuvsivfpqindexgetpqbits"></a>
 ### cuvsIvfPqIndexGetPqBits
 
 Get the bit length of an encoded vector element after compression by PQ.
@@ -327,15 +360,16 @@ cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfPqIndex_t` |  |
+| `index` |  | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) |  |
 | `pq_bits` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:283`_
 
+<a id="cuvsivfpqindexgetpqlen"></a>
 ### cuvsIvfPqIndexGetPqLen
 
 Get the Dimensionality of a subspace, i.e. the number of vector
@@ -350,15 +384,16 @@ components mapped to a subspace
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` |  | `cuvsIvfPqIndex_t` |  |
+| `index` |  | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) |  |
 | `pq_len` |  | `int64_t*` |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:287`_
 
+<a id="cuvsivfpqindexgetcenters"></a>
 ### cuvsIvfPqIndexGetCenters
 
 Get the cluster centers corresponding to the lists in the original space
@@ -371,17 +406,18 @@ cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* ce
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `centers` | out | `DLManagedTensor*` | Output tensor that will be populated with a non-owning view of the data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:296`_
 
+<a id="cuvsivfpqindexgetcenterspadded"></a>
 ### cuvsIvfPqIndexGetCentersPadded
 
 Get the padded cluster centers [n_lists, dim_ext]
@@ -398,17 +434,18 @@ This returns the full padded centers as a contiguous array, suitable for use wit
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `centers` | out | `DLManagedTensor*` | Output tensor that will be populated with a non-owning view of the data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:309`_
 
+<a id="cuvsivfpqindexgetpqcenters"></a>
 ### cuvsIvfPqIndexGetPqCenters
 
 Get the PQ cluster centers
@@ -424,17 +461,18 @@ cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* 
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `pq_centers` | out | `DLManagedTensor*` | Output tensor that will be populated with a non-owning view of the data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:321`_
 
+<a id="cuvsivfpqindexgetcentersrot"></a>
 ### cuvsIvfPqIndexGetCentersRot
 
 Get the rotated cluster centers [n_lists, rot_dim]
@@ -449,17 +487,18 @@ where rot_dim = pq_len * pq_dim
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `centers_rot` | out | `DLManagedTensor*` | Output tensor that will be populated with a non-owning view of the data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:331`_
 
+<a id="cuvsivfpqindexgetrotationmatrix"></a>
 ### cuvsIvfPqIndexGetRotationMatrix
 
 Get the rotation matrix [rot_dim, dim]
@@ -477,17 +516,18 @@ data
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `rotation_matrix` | out | `DLManagedTensor*` | Output tensor that will be populated with a non-owning view of the |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:342`_
 
+<a id="cuvsivfpqindexgetlistsizes"></a>
 ### cuvsIvfPqIndexGetListSizes
 
 Get the sizes of each list
@@ -500,17 +540,18 @@ cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index, DLManagedTensor* 
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `list_sizes` | out | `DLManagedTensor*` | Output tensor that will be populated with a non-owning view of the data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:352`_
 
+<a id="cuvsivfpqindexunpackcontiguouslistdata"></a>
 ### cuvsIvfPqIndexUnpackContiguousListData
 
 Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
@@ -529,18 +570,19 @@ compressed index starting at given `offset`, not expanded to one code per byte. 
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | raft resource |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | raft resource |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `out_codes` | out | `DLManagedTensor*` | the destination buffer [n_rows, ceildiv(index.pq_dim() * index.pq_bits(), 8)]. The length `n_rows` defines how many records to unpack, offset + n_rows must be smaller than or equal to the list size. This DLManagedTensor must already point to allocated device memory |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:371`_
 
+<a id="cuvsivfpqindexgetlistindices"></a>
 ### cuvsIvfPqIndexGetListIndices
 
 Get the indices of each vector in a ivf-pq list
@@ -555,13 +597,13 @@ DLManagedTensor* out_labels);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Built Ivf-Pq index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Built Ivf-Pq index |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
 | `out_labels` | out | `DLManagedTensor*` | output tensor that will be populated with a non-owning view of the data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -571,6 +613,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:386`_
 
 _Doxygen group: `ivf_pq_c_index_build`_
 
+<a id="cuvsivfpqbuild"></a>
 ### cuvsIvfPqBuild
 
 Build a IVF-PQ index with a `DLManagedTensor` which has underlying
@@ -593,19 +636,20 @@ cuvsIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsIvfPqIndexParams_t` | cuvsIvfPqIndexParams_t used to build IVF-PQ index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | cuvsIvfPqIndexParams_t used to build IVF-PQ index |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | out | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Newly built IVF-PQ index |
+| `index` | out | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Newly built IVF-PQ index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:440`_
 
+<a id="cuvsivfpqbuildprecomputed"></a>
 ### cuvsIvfPqBuildPrecomputed
 
 Build a view-type IVF-PQ index from device memory precomputed centroids and codebook.
@@ -635,18 +679,18 @@ matrices) dim]
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsIvfPqIndexParams_t` | cuvsIvfPqIndexParams_t used to configure the index (must be consistent with |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | cuvsIvfPqIndexParams_t used to configure the index (must be consistent with |
 | `dim` | in | `uint32_t` | dimensionality of the input data |
 | `pq_centers` | in | `DLManagedTensor*` | PQ codebook on device memory with required shape:<br />- codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]<br />- codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size] |
 | `centers` | in | `DLManagedTensor*` | Cluster centers in the original space [n_lists, dim_ext] where dim_ext = round_up(dim + 1, 8) |
 | `centers_rot` | in | `DLManagedTensor*` | Rotated cluster centers [n_lists, rot_dim] where rot_dim = pq_len * pq_dim |
 | `rotation_matrix` | in | `DLManagedTensor*` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, |
-| `index` | out | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex_t Newly built view-type IVF-PQ index |
+| `index` | out | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex_t Newly built view-type IVF-PQ index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -656,6 +700,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:474`_
 
 _Doxygen group: `ivf_pq_c_index_search`_
 
+<a id="cuvsivfpqsearch"></a>
 ### cuvsIvfPqSearch
 
 Search a IVF-PQ index with a `DLManagedTensor` which has underlying
@@ -679,16 +724,16 @@ DLManagedTensor* distances);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `search_params` | in | `cuvsIvfPqSearchParams_t` | cuvsIvfPqSearchParams_t used to search IVF-PQ index |
-| `index` | in | `cuvsIvfPqIndex_t` | cuvsIvfPqIndex which has been returned by `cuvsIvfPqBuild` |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `search_params` | in | [`cuvsIvfPqSearchParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqsearchparams) | cuvsIvfPqSearchParams_t used to search IVF-PQ index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | cuvsIvfPqIndex which has been returned by `cuvsIvfPqBuild` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:534`_
 
@@ -696,6 +741,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:534`_
 
 _Doxygen group: `ivf_pq_c_index_serialize`_
 
+<a id="cuvsivfpqserialize"></a>
 ### cuvsIvfPqSerialize
 
 Save the index to file.
@@ -710,16 +756,17 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the file name for saving the index |
-| `index` | in | `cuvsIvfPqIndex_t` | IVF-PQ index |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | IVF-PQ index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:568`_
 
+<a id="cuvsivfpqdeserialize"></a>
 ### cuvsIvfPqDeserialize
 
 Load index from file.
@@ -734,13 +781,13 @@ Experimental, both the API and the serialization format are subject to change.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the name of the file that stores the index |
-| `index` | out | `cuvsIvfPqIndex_t` | IVF-PQ index loaded disk |
+| `index` | out | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | IVF-PQ index loaded disk |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/ivf_pq.h:579`_
 
@@ -748,6 +795,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:579`_
 
 _Doxygen group: `ivf_pq_c_index_extend`_
 
+<a id="cuvsivfpqextend"></a>
 ### cuvsIvfPqExtend
 
 Extend the index with the new data.
@@ -763,14 +811,14 @@ cuvsIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `new_vectors` | in | `DLManagedTensor*` | DLManagedTensor* the new vectors to add to the index |
 | `new_indices` | in | `DLManagedTensor*` | DLManagedTensor* vector of new indices for the new vectors |
-| `index` | inout | `cuvsIvfPqIndex_t` | IVF-PQ index to be extended |
+| `index` | inout | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | IVF-PQ index to be extended |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -780,6 +828,7 @@ _Source: `c/include/cuvs/neighbors/ivf_pq.h:597`_
 
 _Doxygen group: `ivf_pq_c_index_transform`_
 
+<a id="cuvsivfpqtransform"></a>
 ### cuvsIvfPqTransform
 
 Transform the input data by applying pq-encoding
@@ -796,15 +845,15 @@ DLManagedTensor* output_dataset);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index` | in | `cuvsIvfPqIndex_t` | IVF-PQ index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index` | in | [`cuvsIvfPqIndex_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindex) | IVF-PQ index |
 | `input_dataset` | in | `DLManagedTensor*` | DLManagedTensor* vectors to transform |
 | `output_labels` | out | `DLManagedTensor*` | DLManagedTensor* Vector of cluster labels for each vector in the input |
 | `output_dataset` | out | `DLManagedTensor*` | DLManagedTensor* input vectors after pq-encoding |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 

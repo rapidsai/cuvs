@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/ivf_pq.hpp`_
 
 _Doxygen group: `ivf_pq_cpp_index_params`_
 
+<a id="cuvs-neighbors-ivf-pq-codebook-gen"></a>
 ### cuvs::neighbors::ivf_pq::codebook_gen
 
 A type for specifying how PQ codebooks are created.
@@ -20,6 +21,7 @@ enum class codebook_gen { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:31`_
 
+<a id="cuvs-neighbors-ivf-pq-list-layout"></a>
 ### cuvs::neighbors::ivf_pq::list_layout
 
 A type for specifying the memory layout of PQ codes in IVF lists.
@@ -30,6 +32,7 @@ enum class list_layout { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:37`_
 
+<a id="cuvs-neighbors-ivf-pq-from-dataset"></a>
 ### cuvs::neighbors::ivf_pq::from_dataset
 
 Creates index_params based on shape of the input dataset.
@@ -47,7 +50,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `dataset` |  | `raft::matrix_extent<int64_t>` |  |
-| `metric` |  | `cuvs::distance::DistanceType` | Default: `cuvs::distance::DistanceType::L2Expanded`. |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Default: `cuvs::distance::DistanceType::L2Expanded`. |
 
 **Returns**
 
@@ -59,6 +62,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:145`_
 
 _Doxygen group: `ivf_pq_cpp_search_params`_
 
+<a id="cuvs-neighbors-ivf-pq-search-params"></a>
 ### cuvs::neighbors::ivf_pq::search_params
 
 IVF-PQ index search parameters
@@ -80,10 +84,44 @@ struct search_params : cuvs::neighbors::search_params { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:157`_
 
+## Types
+
+<a id="list-extents"></a>
+### list_extents
+
+PQ-encoded data stored in the interleaved format:
+
+```cpp
+using list_extents = raft::
+extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
+```
+
+_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:243`_
+
+<a id="cuvs-neighbors-graph-build-params-ivf-pq-params"></a>
+### cuvs::neighbors::graph_build_params::ivf_pq_params
+
+Specialized parameters utilizing IVF-PQ to build knn graph
+
+```cpp
+struct ivf_pq_params { ... } ;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `build_params` | `cuvs::neighbors::ivf_pq::` |  |
+| `search_params` | `cuvs::neighbors::ivf_pq::` |  |
+| `refinement_rate` | `float` |  |
+
+_Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3364`_
+
 ## IVF-PQ index
 
 _Doxygen group: `ivf_pq_cpp_index`_
 
+<a id="cuvs-neighbors-ivf-pq-index"></a>
 ### cuvs::neighbors::ivf_pq::index
 
 Construct an empty index.
@@ -128,8 +166,8 @@ This constructor creates an owning index with the given parameters.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` | RAFT resources handle |
-| `metric` |  | `cuvs::distance::DistanceType` | Distance metric for clustering |
-| `codebook_kind` |  | `codebook_gen` | How PQ codebooks are created |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Distance metric for clustering |
+| `codebook_kind` |  | [`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-codebook-gen) | How PQ codebooks are created |
 | `n_lists` |  | `uint32_t` | Number of inverted lists (clusters) |
 | `dim` |  | `uint32_t` | Dimensionality of the input data |
 | `pq_bits` |  | `uint32_t` | Bit length of vector elements after PQ compression Default: `8`. |
@@ -164,6 +202,7 @@ index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:525`_
 
+<a id="cuvs-neighbors-ivf-pq-size"></a>
 ### cuvs::neighbors::ivf_pq::size
 
 Total length of the index.
@@ -178,6 +217,7 @@ IdxT size() const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:528`_
 
+<a id="cuvs-neighbors-ivf-pq-dim"></a>
 ### cuvs::neighbors::ivf_pq::dim
 
 Dimensionality of the input data.
@@ -192,6 +232,7 @@ uint32_t dim() const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:531`_
 
+<a id="cuvs-neighbors-ivf-pq-dim-ext"></a>
 ### cuvs::neighbors::ivf_pq::dim_ext
 
 Dimensionality of the cluster centers:
@@ -208,6 +249,7 @@ input data dim extended with vector norms and padded to 8 elems.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:537`_
 
+<a id="cuvs-neighbors-ivf-pq-rot-dim"></a>
 ### cuvs::neighbors::ivf_pq::rot_dim
 
 Dimensionality of the data after transforming it for PQ processing
@@ -224,6 +266,7 @@ uint32_t rot_dim() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:543`_
 
+<a id="cuvs-neighbors-ivf-pq-pq-bits"></a>
 ### cuvs::neighbors::ivf_pq::pq_bits
 
 The bit length of an encoded vector element after compression by PQ.
@@ -238,6 +281,7 @@ uint32_t pq_bits() const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:546`_
 
+<a id="cuvs-neighbors-ivf-pq-pq-dim"></a>
 ### cuvs::neighbors::ivf_pq::pq_dim
 
 The dimensionality of an encoded vector after compression by PQ.
@@ -252,6 +296,7 @@ uint32_t pq_dim() const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:549`_
 
+<a id="cuvs-neighbors-ivf-pq-pq-len"></a>
 ### cuvs::neighbors::ivf_pq::pq_len
 
 Dimensionality of a subspace, i.e. the number of vector components mapped to a subspace
@@ -266,6 +311,7 @@ uint32_t pq_len() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:552`_
 
+<a id="cuvs-neighbors-ivf-pq-pq-book-size"></a>
 ### cuvs::neighbors::ivf_pq::pq_book_size
 
 The number of vectors in a PQ codebook (`1 &lt;&lt; pq_bits`).
@@ -280,6 +326,7 @@ uint32_t pq_book_size() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:555`_
 
+<a id="cuvs-neighbors-ivf-pq-metric"></a>
 ### cuvs::neighbors::ivf_pq::metric
 
 Distance metric used for clustering.
@@ -290,10 +337,11 @@ cuvs::distance::DistanceType metric() const noexcept override;
 
 **Returns**
 
-`cuvs::distance::DistanceType`
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:558`_
 
+<a id="cuvs-neighbors-ivf-pq-codebook-kind"></a>
 ### cuvs::neighbors::ivf_pq::codebook_kind
 
 How PQ codebooks are created.
@@ -304,10 +352,11 @@ codebook_gen codebook_kind() const noexcept override;
 
 **Returns**
 
-`codebook_gen`
+[`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-codebook-gen)
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:561`_
 
+<a id="cuvs-neighbors-ivf-pq-codes-layout"></a>
 ### cuvs::neighbors::ivf_pq::codes_layout
 
 Memory layout of PQ codes in IVF lists.
@@ -318,10 +367,11 @@ list_layout codes_layout() const noexcept override;
 
 **Returns**
 
-`list_layout`
+[`list_layout`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-list-layout)
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:564`_
 
+<a id="cuvs-neighbors-ivf-pq-n-lists"></a>
 ### cuvs::neighbors::ivf_pq::n_lists
 
 Number of clusters/inverted lists (first level quantization).
@@ -336,6 +386,7 @@ uint32_t n_lists() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:567`_
 
+<a id="cuvs-neighbors-ivf-pq-conservative-memory-allocation"></a>
 ### cuvs::neighbors::ivf_pq::conservative_memory_allocation
 
 Whether to use conservative memory allocation when extending the list (cluster) data
@@ -352,6 +403,7 @@ bool conservative_memory_allocation() const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:573`_
 
+<a id="cuvs-neighbors-ivf-pq-pq-centers"></a>
 ### cuvs::neighbors::ivf_pq::pq_centers
 
 PQ cluster centers
@@ -370,6 +422,7 @@ const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:581`_
 
+<a id="cuvs-neighbors-ivf-pq-lists"></a>
 ### cuvs::neighbors::ivf_pq::lists
 
 Lists' data and indices (polymorphic, works for both FLAT and INTERLEAVED layouts).
@@ -384,6 +437,7 @@ std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:585`_
 
+<a id="cuvs-neighbors-ivf-pq-data-ptrs"></a>
 ### cuvs::neighbors::ivf_pq::data_ptrs
 
 Pointers to the inverted lists (clusters) data  [n_lists].
@@ -398,6 +452,7 @@ raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexce
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:589`_
 
+<a id="cuvs-neighbors-ivf-pq-inds-ptrs"></a>
 ### cuvs::neighbors::ivf_pq::inds_ptrs
 
 Pointers to the inverted lists (clusters) indices  [n_lists].
@@ -412,6 +467,7 @@ raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:594`_
 
+<a id="cuvs-neighbors-ivf-pq-rotation-matrix"></a>
 ### cuvs::neighbors::ivf_pq::rotation_matrix
 
 The transform matrix (original space -&gt; rotated padded space) [rot_dim, dim]
@@ -427,6 +483,7 @@ const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:599`_
 
+<a id="cuvs-neighbors-ivf-pq-accum-sorted-sizes"></a>
 ### cuvs::neighbors::ivf_pq::accum_sorted_sizes
 
 Accumulated list sizes, sorted in descending order [n_lists + 1].
@@ -447,6 +504,7 @@ This span is used during search to estimate the maximum size of the workspace.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:616`_
 
+<a id="cuvs-neighbors-ivf-pq-list-sizes"></a>
 ### cuvs::neighbors::ivf_pq::list_sizes
 
 Sizes of the lists [n_lists].
@@ -461,6 +519,7 @@ raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexc
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:621`_
 
+<a id="cuvs-neighbors-ivf-pq-centers"></a>
 ### cuvs::neighbors::ivf_pq::centers
 
 Cluster centers corresponding to the lists in the original space [n_lists, dim_ext]
@@ -476,6 +535,7 @@ const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:626`_
 
+<a id="cuvs-neighbors-ivf-pq-centers-rot"></a>
 ### cuvs::neighbors::ivf_pq::centers_rot
 
 Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim]
@@ -491,6 +551,7 @@ const noexcept override;
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:635`_
 
+<a id="cuvs-neighbors-ivf-pq-get-list-size-in-bytes"></a>
 ### cuvs::neighbors::ivf_pq::get_list_size_in_bytes
 
 fetch size of a particular IVF list in bytes using the list extents.
@@ -539,6 +600,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:663`_
 
 _Doxygen group: `ivf_pq_cpp_index_build`_
 
+<a id="cuvs-neighbors-ivf-pq-build"></a>
 ### cuvs::neighbors::ivf_pq::build
 
 Build the index from the dataset for efficient search.
@@ -1225,6 +1287,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1253`_
 
 _Doxygen group: `ivf_pq_cpp_index_extend`_
 
+<a id="cuvs-neighbors-ivf-pq-extend"></a>
 ### cuvs::neighbors::ivf_pq::extend
 
 Extend the index with the new data.
@@ -1701,6 +1764,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1770`_
 
 _Doxygen group: `ivf_pq_cpp_transform`_
 
+<a id="cuvs-neighbors-ivf-pq-transform"></a>
 ### cuvs::neighbors::ivf_pq::transform
 
 Transform a dataset by applying pq-encoding to each vector
@@ -1813,6 +1877,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1999`_
 
 _Doxygen group: `ivf_pq_cpp_serialize`_
 
+<a id="cuvs-neighbors-ivf-pq-serialize"></a>
 ### cuvs::neighbors::ivf_pq::serialize
 
 Write the index to an output stream
@@ -1861,6 +1926,7 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2054`_
 
+<a id="cuvs-neighbors-ivf-pq-deserialize"></a>
 ### cuvs::neighbors::ivf_pq::deserialize
 
 Load index from input stream
@@ -1913,6 +1979,7 @@ _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2106`_
 
 _Doxygen group: `ivf_pq_cpp_helpers`_
 
+<a id="namespace-codepacker"></a>
 ### namespace codepacker \{
 
 IVF-PQ helper methods
@@ -1923,6 +1990,7 @@ namespace codepacker {
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2561`_
 
+<a id="codepacker-unpack"></a>
 ### codepacker::unpack
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
@@ -1948,7 +2016,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `list_data` | in | `raft::device_mdspan<const uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>` | block to read from |
+| `list_data` | in | [`raft::device_mdspan<const uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `pq_bits` | in | `uint32_t` | bit length of encoded vector elements |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 | `codes` | out | `raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.pq_dim()]. The length `n_take` defines how many records to unpack, it must be smaller than the list size. |
@@ -1959,6 +2027,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2594`_
 
+<a id="codepacker-unpack-contiguous"></a>
 ### codepacker::unpack_contiguous
 
 Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
@@ -1984,7 +2053,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `list_data` | in | `raft::device_mdspan<const uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>` | block to read from |
+| `list_data` | in | [`raft::device_mdspan<const uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `pq_bits` | in | `uint32_t` | bit length of encoded vector elements |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
 | `n_rows` | in | `uint32_t` | How many records to unpack |
@@ -1997,6 +2066,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2634`_
 
+<a id="codepacker-pack"></a>
 ### codepacker::pack
 
 Write flat PQ codes into an existing list by the given offset.
@@ -2023,7 +2093,7 @@ Usage example:
 | `codes` | in | `raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major>` | flat PQ codes, one code per byte [n_vec, pq_dim] |
 | `pq_bits` | in | `uint32_t` | bit length of encoded vector elements |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
-| `list_data` | in | `raft::device_mdspan<uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>` | block to write into |
+| `list_data` | in | [`raft::device_mdspan<uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to write into |
 
 **Returns**
 
@@ -2031,6 +2101,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2666`_
 
+<a id="codepacker-pack-contiguous"></a>
 ### codepacker::pack_contiguous
 
 Write flat PQ codes into an existing list by the given offset. The input codes of a single vector
@@ -2063,7 +2134,7 @@ Usage example:
 | `pq_dim` | in | `uint32_t` |  |
 | `pq_bits` | in | `uint32_t` | bit length of encoded vector elements |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
-| `list_data` | in | `raft::device_mdspan<uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>` | block to write into |
+| `list_data` | in | [`raft::device_mdspan<uint8_t, list_spec_interleaved<uint32_t, uint32_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to write into |
 
 **Returns**
 
@@ -2071,6 +2142,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2702`_
 
+<a id="codepacker-pack-list-data"></a>
 ### codepacker::pack_list_data
 
 Write flat PQ codes into an existing list by the given offset.
@@ -2105,6 +2177,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2736`_
 
+<a id="codepacker-pack-contiguous-list-data"></a>
 ### codepacker::pack_contiguous_list_data
 
 Write flat PQ codes into an existing list by the given offset. Use this when the input
@@ -2143,6 +2216,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2779`_
 
+<a id="codepacker-unpack-list-data"></a>
 ### codepacker::unpack_list_data
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
@@ -2207,6 +2281,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2851`_
 
+<a id="codepacker-unpack-contiguous-list-data"></a>
 ### codepacker::unpack_contiguous_list_data
 
 Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
@@ -2241,6 +2316,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2892`_
 
+<a id="codepacker-reconstruct-list-data"></a>
 ### codepacker::reconstruct_list_data
 
 Decode `n_take` consecutive records of a single list (cluster) in the compressed index
@@ -2305,6 +2381,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2984`_
 
+<a id="codepacker-extend-list-with-codes"></a>
 ### codepacker::extend_list_with_codes
 
 Extend one list of the index in-place, by the list label, skipping the classification and
@@ -2338,6 +2415,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3032`_
 
+<a id="codepacker-extend-list-with-contiguous-codes"></a>
 ### codepacker::extend_list_with_contiguous_codes
 
 Extend one list of the index in-place, by the list label, skipping the classification and
@@ -2373,6 +2451,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3071`_
 
+<a id="codepacker-extend-list"></a>
 ### codepacker::extend_list
 
 Extend one list of the index in-place, by the list label, skipping the classification
@@ -2405,6 +2484,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3106`_
 
+<a id="codepacker-erase-list"></a>
 ### codepacker::erase_list
 
 Remove all data from a single list (cluster) in the index.
@@ -2429,6 +2509,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3141`_
 
+<a id="codepacker-reset-index"></a>
 ### codepacker::reset_index
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
@@ -2454,6 +2535,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3163`_
 
+<a id="codepacker-pad-centers-with-norms"></a>
 ### codepacker::pad_centers_with_norms
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
@@ -2508,6 +2590,7 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3192`_
 
+<a id="codepacker-rotate-padded-centers"></a>
 ### codepacker::rotate_padded_centers
 
 Rotate padded centers with the rotation matrix.
@@ -2535,6 +2618,7 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3205`_
 
+<a id="codepacker-extract-centers"></a>
 ### codepacker::extract_centers
 
 Public helper API for fetching a trained index's IVF centroids
@@ -2583,6 +2667,7 @@ raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3233`_
 
+<a id="codepacker-recompute-internal-state"></a>
 ### codepacker::recompute_internal_state
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
@@ -2608,6 +2693,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3262`_
 
+<a id="codepacker-make-rotation-matrix"></a>
 ### codepacker::make_rotation_matrix
 
 Generate a rotation matrix into user-provided buffer (standalone version).
@@ -2637,6 +2723,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3289`_
 
+<a id="codepacker-resize-list"></a>
 ### codepacker::resize_list
 
 Resize an IVF-PQ list with flat layout.

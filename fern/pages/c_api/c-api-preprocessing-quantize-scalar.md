@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/preprocessing/quantize/scalar.h`_
 
 _Doxygen group: `preprocessing_c_scalar`_
 
+<a id="cuvsscalarquantizerparams"></a>
 ### cuvsScalarQuantizerParams
 
 Scalar quantizer parameters.
@@ -20,6 +21,7 @@ struct cuvsScalarQuantizerParams { ... } ;
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:23`_
 
+<a id="cuvsscalarquantizerparamscreate"></a>
 ### cuvsScalarQuantizerParamsCreate
 
 Allocate Scalar Quantizer params, and populate with default values
@@ -32,16 +34,17 @@ cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params)
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsScalarQuantizerParams_t*` | cuvsScalarQuantizerParams_t to allocate |
+| `params` | in | [`cuvsScalarQuantizerParams_t*`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizerparams) | cuvsScalarQuantizerParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:39`_
 
+<a id="cuvsscalarquantizerparamsdestroy"></a>
 ### cuvsScalarQuantizerParamsDestroy
 
 De-allocate Scalar Quantizer params
@@ -54,16 +57,37 @@ cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params)
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsScalarQuantizerParams_t` |  |
+| `params` | in | [`cuvsScalarQuantizerParams_t`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizerparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:47`_
 
+<a id="cuvsscalarquantizer"></a>
+### cuvsScalarQuantizer
+
+Defines and stores scalar for quantisation upon training
+
+The quantization is performed by a linear mapping of an interval in the float data type to the full range of the quantized int type.
+
+```c
+typedef struct { ... } cuvsScalarQuantizer;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `min_` | `double` |  |
+| `max_` | `double` |  |
+
+_Source: `c/include/cuvs/preprocessing/quantize/scalar.h:55`_
+
+<a id="cuvsscalarquantizercreate"></a>
 ### cuvsScalarQuantizerCreate
 
 Allocate Scalar Quantizer and populate with default values
@@ -76,16 +100,17 @@ cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `quantizer` | in | `cuvsScalarQuantizer_t*` | cuvsScalarQuantizer_t to allocate |
+| `quantizer` | in | [`cuvsScalarQuantizer_t*`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizer) | cuvsScalarQuantizer_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:68`_
 
+<a id="cuvsscalarquantizerdestroy"></a>
 ### cuvsScalarQuantizerDestroy
 
 De-allocate Scalar Quantizer
@@ -98,16 +123,17 @@ cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `quantizer` | in | `cuvsScalarQuantizer_t` |  |
+| `quantizer` | in | [`cuvsScalarQuantizer_t`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizer) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:76`_
 
+<a id="cuvsscalarquantizertrain"></a>
 ### cuvsScalarQuantizerTrain
 
 Trains a scalar quantizer to be used later for quantizing the dataset.
@@ -123,17 +149,18 @@ cuvsScalarQuantizer_t quantizer);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | raft resource |
-| `params` | in | `cuvsScalarQuantizerParams_t` | configure scalar quantizer, e.g. quantile |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | raft resource |
+| `params` | in | [`cuvsScalarQuantizerParams_t`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizerparams) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `DLManagedTensor*` | a row-major host or device matrix |
-| `quantizer` | out | `cuvsScalarQuantizer_t` | trained scalar quantizer |
+| `quantizer` | out | [`cuvsScalarQuantizer_t`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizer) | trained scalar quantizer |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:86`_
 
+<a id="cuvsscalarquantizertransform"></a>
 ### cuvsScalarQuantizerTransform
 
 Applies quantization transform to given dataset
@@ -149,17 +176,18 @@ DLManagedTensor* out);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | raft resource |
-| `quantizer` | in | `cuvsScalarQuantizer_t` | a scalar quantizer |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | raft resource |
+| `quantizer` | in | [`cuvsScalarQuantizer_t`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizer) | a scalar quantizer |
 | `dataset` | in | `DLManagedTensor*` | a row-major host or device matrix to transform |
 | `out` | out | `DLManagedTensor*` | a row-major host or device matrix to store transformed data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:99`_
 
+<a id="cuvsscalarquantizerinversetransform"></a>
 ### cuvsScalarQuantizerInverseTransform
 
 Perform inverse quantization step on previously quantized dataset
@@ -177,13 +205,13 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | raft resource |
-| `quantizer` | in | `cuvsScalarQuantizer_t` | a scalar quantizer |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | raft resource |
+| `quantizer` | in | [`cuvsScalarQuantizer_t`](/api-reference/c-api-preprocessing-quantize-scalar#cuvsscalarquantizer) | a scalar quantizer |
 | `dataset` | in | `DLManagedTensor*` | a row-major host or device matrix |
 | `out` | out | `DLManagedTensor*` | a row-major host or device matrix |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/preprocessing/quantize/scalar.h:116`_

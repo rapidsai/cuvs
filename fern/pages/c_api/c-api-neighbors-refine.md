@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/refine.h`_
 
 _Doxygen group: `ann_refine_c`_
 
+<a id="cuvsrefine"></a>
 ### cuvsRefine
 
 Refine nearest neighbor search.
@@ -30,16 +31,16 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `dataset` | in | `DLManagedTensor*` | device matrix that stores the dataset [n_rows, dims] |
 | `queries` | in | `DLManagedTensor*` | device matrix of the queries [n_queris, dims] |
 | `candidates` | in | `DLManagedTensor*` | indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
-| `metric` | in | `cuvsDistanceType` | distance metric to use. Euclidean (L2) is used by default |
+| `metric` | in | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | distance metric to use. Euclidean (L2) is used by default |
 | `indices` | out | `DLManagedTensor*` | device matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `DLManagedTensor*` | device matrix that stores the refined distances [n_queries, k] |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/refine.h:37`_

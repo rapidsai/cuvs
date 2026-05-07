@@ -10,6 +10,7 @@ _Source header: `c/include/cuvs/neighbors/vamana.h`_
 
 _Doxygen group: `vamana_c_index_params`_
 
+<a id="cuvsvamanaindexparams"></a>
 ### cuvsVamanaIndexParams
 
 Supplemental parameters to build Vamana Index
@@ -24,7 +25,7 @@ struct cuvsVamanaIndexParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvsDistanceType` | Distance type. |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
 | `graph_degree` | `uint32_t` | Maximum degree of output graph corresponds to the R parameter in the original Vamana literature. |
 | `visited_size` | `uint32_t` | Maximum number of visited nodes per search corresponds to the L parameter in the Vamana literature * |
 | `vamana_iters` | `float` | Number of Vamana vector insertion iterations (each iteration inserts all vectors). |
@@ -36,6 +37,7 @@ struct cuvsVamanaIndexParams { ... } ;
 
 _Source: `c/include/cuvs/neighbors/vamana.h:37`_
 
+<a id="cuvsvamanaindexparamscreate"></a>
 ### cuvsVamanaIndexParamsCreate
 
 Allocate Vamana Index params, and populate with default values
@@ -48,16 +50,17 @@ cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsVamanaIndexParams_t*` | cuvsVamanaIndexParams_t to allocate |
+| `params` | in | [`cuvsVamanaIndexParams_t*`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindexparams) | cuvsVamanaIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/vamana.h:69`_
 
+<a id="cuvsvamanaindexparamsdestroy"></a>
 ### cuvsVamanaIndexParamsDestroy
 
 De-allocate Vamana Index params
@@ -70,11 +73,11 @@ cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsVamanaIndexParams_t` | cuvsVamanaIndexParams_t to de-allocate |
+| `params` | in | [`cuvsVamanaIndexParams_t`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindexparams) | cuvsVamanaIndexParams_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -84,6 +87,25 @@ _Source: `c/include/cuvs/neighbors/vamana.h:77`_
 
 _Doxygen group: `vamana_c_index`_
 
+<a id="cuvsvamanaindex"></a>
+### cuvsVamanaIndex
+
+Struct to hold address of cuvs::neighbors::vamana::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsVamanaIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/vamana.h:92`_
+
+<a id="cuvsvamanaindexcreate"></a>
 ### cuvsVamanaIndexCreate
 
 Allocate Vamana index
@@ -96,16 +118,17 @@ cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsVamanaIndex_t*` | cuvsVamanaIndex_t to allocate |
+| `index` | in | [`cuvsVamanaIndex_t*`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindex) | cuvsVamanaIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/vamana.h:106`_
 
+<a id="cuvsvamanaindexdestroy"></a>
 ### cuvsVamanaIndexDestroy
 
 De-allocate Vamana index
@@ -118,16 +141,17 @@ cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsVamanaIndex_t` | cuvsVamanaIndex_t to de-allocate |
+| `index` | in | [`cuvsVamanaIndex_t`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindex) | cuvsVamanaIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/vamana.h:114`_
 
+<a id="cuvsvamanaindexgetdims"></a>
 ### cuvsVamanaIndexGetDims
 
 Get the dimension of the index
@@ -140,12 +164,12 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsVamanaIndex_t` | cuvsVamanaIndex_t to get dimension of |
+| `index` | in | [`cuvsVamanaIndex_t`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindex) | cuvsVamanaIndex_t to get dimension of |
 | `dim` | out | `int*` | pointer to dimension to set |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -155,6 +179,7 @@ _Source: `c/include/cuvs/neighbors/vamana.h:123`_
 
 _Doxygen group: `vamana_c_index_build`_
 
+<a id="cuvsvamanabuild"></a>
 ### cuvsVamanaBuild
 
 Build Vamana index
@@ -180,14 +205,14 @@ Usage example:
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsVamanaIndexParams_t` | cuvsVamanaIndexParams_t used to build Vamana index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsVamanaIndexParams_t`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindexparams) | cuvsVamanaIndexParams_t used to build Vamana index |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | out | `cuvsVamanaIndex_t` | cuvsVamanaIndex_t Vamana index |
+| `index` | out | [`cuvsVamanaIndex_t`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindex) | cuvsVamanaIndex_t Vamana index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -197,6 +222,7 @@ _Source: `c/include/cuvs/neighbors/vamana.h:169`_
 
 _Doxygen group: `vamana_c_index_serialize`_
 
+<a id="cuvsvamanaserialize"></a>
 ### cuvsVamanaSerialize
 
 Save Vamana index to file
@@ -216,14 +242,14 @@ Serialized Index is to be used by the DiskANN open-source repository for graph s
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | the file prefix for where the index is saved |
-| `index` | in | `cuvsVamanaIndex_t` | cuvsVamanaIndex_t to serialize |
+| `index` | in | [`cuvsVamanaIndex_t`](/api-reference/c-api-neighbors-vamana#cuvsvamanaindex) | cuvsVamanaIndex_t to serialize |
 | `include_dataset` | in | `bool` | whether to include the dataset in the serialized index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 

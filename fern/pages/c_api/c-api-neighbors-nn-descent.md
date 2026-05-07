@@ -6,10 +6,32 @@ slug: api-reference/c-api-neighbors-nn-descent
 
 _Source header: `c/include/cuvs/neighbors/nn_descent.h`_
 
+## Types
+
+<a id="cuvsnndescentdistcompdtype"></a>
+### cuvsNNDescentDistCompDtype
+
+Dtype to use for distance computation
+
+```c
+typedef enum { ... } cuvsNNDescentDistCompDtype;
+```
+
+**Values**
+
+| Name | Value | Description |
+| --- | --- | --- |
+| `NND_DIST_COMP_AUTO` | `0` | Automatically determine the best dtype for distance computation based on the dataset dimensions. |
+| `NND_DIST_COMP_FP32` | `1` | Use fp32 distance computation for better precision at the cost of performance and memory usage. |
+| `NND_DIST_COMP_FP16` | `2` | Use fp16 distance computation. |
+
+_Source: `c/include/cuvs/neighbors/nn_descent.h:24`_
+
 ## The nn-descent algorithm parameters.
 
 _Doxygen group: `nn_descent_c_index_params`_
 
+<a id="cuvsnndescentindexparams"></a>
 ### cuvsNNDescentIndexParams
 
 Parameters used to build an nn-descent index
@@ -24,17 +46,18 @@ struct cuvsNNDescentIndexParams { ... } ;
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvsDistanceType` |  |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) |  |
 | `metric_arg` | `float` |  |
 | `graph_degree` | `size_t` |  |
 | `intermediate_graph_degree` | `size_t` |  |
 | `max_iterations` | `size_t` |  |
 | `termination_threshold` | `float` |  |
 | `return_distances` | `bool` |  |
-| `dist_comp_dtype` | `cuvsNNDescentDistCompDtype` |  |
+| `dist_comp_dtype` | [`cuvsNNDescentDistCompDtype`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentdistcompdtype) |  |
 
 _Source: `c/include/cuvs/neighbors/nn_descent.h:52`_
 
+<a id="cuvsnndescentindexparamscreate"></a>
 ### cuvsNNDescentIndexParamsCreate
 
 Allocate NN-Descent Index params, and populate with default values
@@ -47,16 +70,17 @@ cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_par
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsNNDescentIndexParams_t*` | cuvsNNDescentIndexParams_t to allocate |
+| `index_params` | in | [`cuvsNNDescentIndexParams_t*`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindexparams) | cuvsNNDescentIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/nn_descent.h:71`_
 
+<a id="cuvsnndescentindexparamsdestroy"></a>
 ### cuvsNNDescentIndexParamsDestroy
 
 De-allocate NN-Descent Index params
@@ -69,11 +93,11 @@ cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_par
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsNNDescentIndexParams_t` |  |
+| `index_params` | in | [`cuvsNNDescentIndexParams_t`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
@@ -83,6 +107,25 @@ _Source: `c/include/cuvs/neighbors/nn_descent.h:79`_
 
 _Doxygen group: `nn_descent_c_index`_
 
+<a id="cuvsnndescentindex"></a>
+### cuvsNNDescentIndex
+
+Struct to hold address of cuvs::neighbors::nn_descent::index and its active trained dtype
+
+```c
+typedef struct { ... } cuvsNNDescentIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+_Source: `c/include/cuvs/neighbors/nn_descent.h:92`_
+
+<a id="cuvsnndescentindexcreate"></a>
 ### cuvsNNDescentIndexCreate
 
 Allocate NN-Descent index
@@ -95,16 +138,17 @@ cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsNNDescentIndex_t*` | cuvsNNDescentIndex_t to allocate |
+| `index` | in | [`cuvsNNDescentIndex_t*`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindex) | cuvsNNDescentIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
 _Source: `c/include/cuvs/neighbors/nn_descent.h:105`_
 
+<a id="cuvsnndescentindexdestroy"></a>
 ### cuvsNNDescentIndexDestroy
 
 De-allocate NN-Descent index
@@ -117,11 +161,11 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsNNDescentIndex_t` | cuvsNNDescentIndex_t to de-allocate |
+| `index` | in | [`cuvsNNDescentIndex_t`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindex) | cuvsNNDescentIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 _Source: `c/include/cuvs/neighbors/nn_descent.h:112`_
 
@@ -129,6 +173,7 @@ _Source: `c/include/cuvs/neighbors/nn_descent.h:112`_
 
 _Doxygen group: `nn_descent_c_index_build`_
 
+<a id="cuvsnndescentbuild"></a>
 ### cuvsNNDescentBuild
 
 Build a NN-Descent index with a `DLManagedTensor` which has underlying
@@ -152,15 +197,15 @@ cuvsNNDescentIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index_params` | in | `cuvsNNDescentIndexParams_t` | cuvsNNDescentIndexParams_t used to build NN-Descent index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index_params` | in | [`cuvsNNDescentIndexParams_t`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindexparams) | cuvsNNDescentIndexParams_t used to build NN-Descent index |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset on host or device memory |
 | `graph` | inout | `DLManagedTensor*` | Optional preallocated graph on host memory to store output |
-| `index` | out | `cuvsNNDescentIndex_t` | cuvsNNDescentIndex_t Newly built NN-Descent index |
+| `index` | out | [`cuvsNNDescentIndex_t`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindex) | cuvsNNDescentIndex_t Newly built NN-Descent index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 

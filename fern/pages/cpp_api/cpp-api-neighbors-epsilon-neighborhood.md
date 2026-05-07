@@ -10,6 +10,7 @@ _Source header: `cpp/include/cuvs/neighbors/epsilon_neighborhood.hpp`_
 
 _Doxygen group: `epsilon_neighborhood_cpp_l2`_
 
+<a id="cuvs-neighbors-epsilon-neighborhood-compute"></a>
 ### cuvs::neighbors::epsilon_neighborhood::compute
 
 Computes epsilon neighborhood for the given distance metric and ball size.
@@ -47,7 +48,7 @@ Currently, only L2Unexpanded (L2-squared) distance metric is supported. Other me
 | `adj` | out | `raft::device_matrix_view<bool, matrix_idx_t, raft::row_major>` | adjacency matrix [row-major] [on device] [dim = m x n] |
 | `vd` | out | `raft::device_vector_view<idx_t, matrix_idx_t>` | vertex degree array [on device] [len = m + 1] `vd + m` stores the total number of edges in the adjacency matrix. Pass a nullptr if you don't need this info. |
 | `eps` | in | `value_t` | defines epsilon neighborhood radius (should be passed as squared when using L2Unexpanded metric) |
-| `metric` | in | `cuvs::distance::DistanceType` | distance metric to use. Currently only L2Unexpanded is supported. Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use. Currently only L2Unexpanded is supported. Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
