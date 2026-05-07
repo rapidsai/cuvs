@@ -54,7 +54,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:67`_
 
-### cuvs::preprocessing::quantize::scalar::train
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -110,7 +110,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:110`_
 
-### cuvs::preprocessing::quantize::scalar::transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -166,7 +166,7 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:161`_
 
-### cuvs::preprocessing::quantize::scalar::inverse_transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -194,7 +194,7 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:187`_
 
-### cuvs::preprocessing::quantize::scalar::train
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -222,7 +222,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:208`_
 
-### cuvs::preprocessing::quantize::scalar::train
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -250,7 +250,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:228`_
 
-### cuvs::preprocessing::quantize::scalar::transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -278,7 +278,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:251`_
 
-### cuvs::preprocessing::quantize::scalar::transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -306,7 +306,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:275`_
 
-### cuvs::preprocessing::quantize::scalar::inverse_transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -334,7 +334,7 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:301`_
 
-### cuvs::preprocessing::quantize::scalar::inverse_transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -362,7 +362,7 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:327`_
 
-### cuvs::preprocessing::quantize::scalar::train
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -390,7 +390,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:348`_
 
-### cuvs::preprocessing::quantize::scalar::train
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -418,7 +418,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:368`_
 
-### cuvs::preprocessing::quantize::scalar::transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -446,7 +446,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:391`_
 
-### cuvs::preprocessing::quantize::scalar::transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -474,7 +474,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:415`_
 
-### cuvs::preprocessing::quantize::scalar::inverse_transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -502,7 +502,7 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp:441`_
 
-### cuvs::preprocessing::quantize::scalar::inverse_transform
+**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 

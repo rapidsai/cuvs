@@ -43,7 +43,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:161`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -76,7 +76,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:205`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -109,7 +109,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:248`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -142,7 +142,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:292`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -175,7 +175,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:335`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -208,7 +208,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:378`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute sparse pairwise distances between x and y, using the provided
 
@@ -240,7 +240,7 @@ input configuration and distance function.
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:419`_
 
-### kernels::pairwise_distance
+**Additional overload:** `kernels::pairwise_distance`
 
 Compute sparse pairwise distances between x and y, using the provided
 

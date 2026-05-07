@@ -38,7 +38,7 @@ This function computes the spectral embedding of the input dataset by: 1. Constr
 
 _Source: `cpp/include/cuvs/preprocessing/spectral_embedding.hpp:115`_
 
-### cuvs::preprocessing::spectral_embedding::transform
+**Additional overload:** `cuvs::preprocessing::spectral_embedding::transform`
 
 Perform spectral embedding using a precomputed connectivity graph
 

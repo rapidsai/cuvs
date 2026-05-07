@@ -397,8 +397,9 @@ def generate_native_api_pages(index: DoxygenHeaderIndex, api: str) -> None:
             f"_Source header: `{page.source}`_",
             "",
         ]
+        page_headings: set[str] = set()
         for group in page.groups:
-            lines.extend(render_native_group(group, language))
+            lines.extend(render_native_group(group, language, page_headings))
             lines.append("")
         write_page(
             out_dir / f"{api_page_route(directory, page.slug)}.md", lines
@@ -441,25 +442,42 @@ def collect_native_pages(
     return ordered
 
 
-def render_native_group(group: DoxygenGroup, language: str) -> list[str]:
+def render_native_group(
+    group: DoxygenGroup, language: str, page_headings: set[str] | None = None
+) -> list[str]:
     lines = [f"## {heading_text(group.title or group.name)}", ""]
     if group.name:
         lines.extend([f"_Doxygen group: `{group.name}`_", ""])
 
+    if page_headings is None:
+        page_headings = set()
     for entry in group.entries:
         if entry.kind == "function":
-            lines.extend(render_native_function(entry, language))
+            include_heading = entry.name not in page_headings
+            page_headings.add(entry.name)
+            lines.extend(
+                render_native_function(
+                    entry, language, include_heading=include_heading
+                )
+            )
         elif entry.kind in {"struct", "enum"}:
+            page_headings.add(entry.name)
             lines.extend(render_native_compound(entry, language))
         else:
+            page_headings.add(entry.name)
             lines.extend(render_native_member(entry, language))
         lines.append("")
     return trim_blank_lines(lines)
 
 
-def render_native_function(entry: DoxygenEntry, language: str) -> list[str]:
+def render_native_function(
+    entry: DoxygenEntry, language: str, include_heading: bool = True
+) -> list[str]:
     signature = normalize_signature(entry.signature)
-    lines = [f"### {heading_text(entry.name)}", ""]
+    if include_heading:
+        lines = [f"### {heading_text(entry.name)}", ""]
+    else:
+        lines = [f"**Additional overload:** `{escape_code(entry.name)}`", ""]
     if entry.summary:
         lines.extend([escape_text(entry.summary), ""])
     lines.extend([f"```{language}", signature, "```", ""])

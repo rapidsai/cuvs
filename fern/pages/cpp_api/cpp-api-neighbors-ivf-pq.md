@@ -106,7 +106,7 @@ Constructs an empty index. This index will either need to be trained with `build
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:493`_
 
-### cuvs::neighbors::ivf_pq::index
+**Additional overload:** `cuvs::neighbors::ivf_pq::index`
 
 Construct an index with specified parameters.
 
@@ -142,7 +142,7 @@ This constructor creates an owning index with the given parameters.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:509`_
 
-### cuvs::neighbors::ivf_pq::index
+**Additional overload:** `cuvs::neighbors::ivf_pq::index`
 
 Construct an index from index parameters.
 
@@ -508,7 +508,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:654`_
 
-### cuvs::neighbors::ivf_pq::index
+**Additional overload:** `cuvs::neighbors::ivf_pq::index`
 
 Construct index from implementation pointer.
 
@@ -563,7 +563,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:699`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -591,7 +591,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:729`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -620,7 +620,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:752`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -648,7 +648,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:782`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -677,7 +677,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:804`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -705,7 +705,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:834`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -734,7 +734,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:857`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -762,7 +762,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:887`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -791,7 +791,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:916`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -819,7 +819,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:953`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -848,7 +848,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:983`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -876,7 +876,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1013`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -905,7 +905,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1036`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -933,7 +933,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1073`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -962,7 +962,7 @@ the constructed ivf-pq index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1103`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -990,7 +990,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1140`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build a view-type IVF-PQ index from device memory centroids and codebook.
 
@@ -1027,7 +1027,7 @@ A view-type ivf_pq index that references the provided data
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1174`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from device memory centroids and codebook.
 
@@ -1063,7 +1063,7 @@ This function creates a non-owning index that references the provided device dat
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1211`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from host memory centroids and codebook (in-place).
 
@@ -1097,7 +1097,7 @@ std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> ro
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1231`_
 
-### cuvs::neighbors::ivf_pq::build
+**Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from host memory centroids and codebook (in-place).
 
@@ -1165,7 +1165,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1293`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1193,7 +1193,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1322`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1222,7 +1222,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1350`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1250,7 +1250,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1379`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1279,7 +1279,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1407`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1307,7 +1307,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1436`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1336,7 +1336,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1464`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1364,7 +1364,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1493`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1393,7 +1393,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1527`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1421,7 +1421,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1562`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1450,7 +1450,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1596`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1478,7 +1478,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1631`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1507,7 +1507,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1665`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1535,7 +1535,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1700`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1564,7 +1564,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1734`_
 
-### cuvs::neighbors::ivf_pq::extend
+**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1626,7 +1626,7 @@ cluster ids (labels) for each vector in the input dataset index.pq_bits(), 8)]] 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1981`_
 
-### cuvs::neighbors::ivf_pq::transform
+**Additional overload:** `cuvs::neighbors::ivf_pq::transform`
 
 ```cpp
 void transform(raft::resources const& handle,
@@ -1652,7 +1652,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1987`_
 
-### cuvs::neighbors::ivf_pq::transform
+**Additional overload:** `cuvs::neighbors::ivf_pq::transform`
 
 ```cpp
 void transform(raft::resources const& handle,
@@ -1678,7 +1678,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:1993`_
 
-### cuvs::neighbors::ivf_pq::transform
+**Additional overload:** `cuvs::neighbors::ivf_pq::transform`
 
 ```cpp
 void transform(raft::resources const& handle,
@@ -1732,7 +1732,7 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2031`_
 
-### cuvs::neighbors::ivf_pq::serialize
+**Additional overload:** `cuvs::neighbors::ivf_pq::serialize`
 
 Save the index to file.
 
@@ -1780,7 +1780,7 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2081`_
 
-### cuvs::neighbors::ivf_pq::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_pq::deserialize`
 
 Load index from file.
 
@@ -2046,7 +2046,7 @@ starting at given `offset`, one code per byte (independently of pq_bits). Usage 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2815`_
 
-### codepacker::unpack_list_data
+**Additional overload:** `codepacker::unpack_list_data`
 
 Unpack a series of records of a single list (cluster) in the compressed index
 
@@ -2138,7 +2138,7 @@ starting at given `offset`. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2929`_
 
-### codepacker::reconstruct_list_data
+**Additional overload:** `codepacker::reconstruct_list_data`
 
 Decode a series of records of a single list (cluster) in the compressed index
 
@@ -2334,7 +2334,7 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3176`_
 
-### codepacker::pad_centers_with_norms
+**Additional overload:** `codepacker::pad_centers_with_norms`
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
 
@@ -2414,7 +2414,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3228`_
 
-### codepacker::extract_centers
+**Additional overload:** `codepacker::extract_centers`
 
 ```cpp
 void extract_centers(raft::resources const& res,
@@ -2516,7 +2516,7 @@ This helper resizes an IVF list that uses the flat (non-interleaved) PQ code lay
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3319`_
 
-### codepacker::resize_list
+**Additional overload:** `codepacker::resize_list`
 
 Resize an IVF-PQ list with interleaved layout.
 

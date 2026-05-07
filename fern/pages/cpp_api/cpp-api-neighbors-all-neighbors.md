@@ -82,7 +82,7 @@ training vectors) Usage example: compute core_distances. If core_distances is gi
 
 _Source: `cpp/include/cuvs/neighbors/all_neighbors.hpp:126`_
 
-### cuvs::neighbors::all_neighbors::build
+**Additional overload:** `cuvs::neighbors::all_neighbors::build`
 
 Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
 

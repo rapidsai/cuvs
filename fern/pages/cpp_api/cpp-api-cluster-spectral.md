@@ -63,7 +63,7 @@ n_clusters-1)
 
 _Source: `cpp/include/cuvs/cluster/spectral.hpp:84`_
 
-### cuvs::cluster::spectral::fit_predict
+**Additional overload:** `cuvs::cluster::spectral::fit_predict`
 
 Perform spectral clustering on a connectivity graph
 
@@ -91,7 +91,7 @@ n_clusters-1)
 
 _Source: `cpp/include/cuvs/cluster/spectral.hpp:122`_
 
-### cuvs::cluster::spectral::fit_predict
+**Additional overload:** `cuvs::cluster::spectral::fit_predict`
 
 Perform spectral clustering on a dense dataset
 

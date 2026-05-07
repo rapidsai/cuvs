@@ -82,7 +82,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 
 _Source: `cpp/include/cuvs/stats/silhouette_score.hpp:54`_
 
-### stats::silhouette_score
+**Additional overload:** `stats::silhouette_score`
 
 main function that returns the average silhouette score for a given set of data and its
 
@@ -117,7 +117,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 
 _Source: `cpp/include/cuvs/stats/silhouette_score.hpp:77`_
 
-### stats::silhouette_score_batched
+**Additional overload:** `stats::silhouette_score_batched`
 
 function that returns the average silhouette score for a given set of data and its
 

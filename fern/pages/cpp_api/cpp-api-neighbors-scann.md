@@ -141,7 +141,7 @@ _Source: `cpp/include/cuvs/neighbors/scann.hpp:316`_
 
 _Doxygen group: `scann_cpp_serialize`_
 
-### cuvs::neighbors::experimental::scann::serialize
+**Additional overload:** `cuvs::neighbors::experimental::scann::serialize`
 
 Save the index to files in a directory
 

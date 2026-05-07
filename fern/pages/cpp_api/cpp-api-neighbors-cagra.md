@@ -302,7 +302,7 @@ index(const index&)                    = delete;
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:488`_
 
-### cuvs::neighbors::cagra::index
+**Additional overload:** `cuvs::neighbors::cagra::index`
 
 Construct an empty index.
 
@@ -325,7 +325,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:496`_
 
-### cuvs::neighbors::cagra::index
+**Additional overload:** `cuvs::neighbors::cagra::index`
 
 Construct an index from dataset and knn_graph arrays
 
@@ -382,7 +382,7 @@ If the new dataset rows are aligned on 16 bytes, then only a reference is stored
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:597`_
 
-### cuvs::neighbors::cagra::update_dataset
+**Additional overload:** `cuvs::neighbors::cagra::update_dataset`
 
 Set the dataset reference explicitly to a device matrix view with padding.
 
@@ -404,7 +404,7 @@ raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset);
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:609`_
 
-### cuvs::neighbors::cagra::update_dataset
+**Additional overload:** `cuvs::neighbors::cagra::update_dataset`
 
 Replace the dataset with a new dataset.
 
@@ -428,7 +428,7 @@ We create a copy of the dataset on the device. The index manages the lifetime of
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:628`_
 
-### cuvs::neighbors::cagra::update_dataset
+**Additional overload:** `cuvs::neighbors::cagra::update_dataset`
 
 Replace the dataset with a new dataset. It is expected that the same set of vectors are used
 
@@ -478,7 +478,7 @@ Since the new graph is a device array, we store a reference to that, and it is t
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:677`_
 
-### cuvs::neighbors::cagra::update_graph
+**Additional overload:** `cuvs::neighbors::cagra::update_graph`
 
 Replace the graph with a new graph.
 
@@ -523,7 +523,7 @@ void update_source_indices(raft::device_vector<index_type, int64_t>&& source_ind
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:713`_
 
-### cuvs::neighbors::cagra::update_source_indices
+**Additional overload:** `cuvs::neighbors::cagra::update_source_indices`
 
 Copy the provided source indices into the index.
 
@@ -548,7 +548,7 @@ source_indices);
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:723`_
 
-### cuvs::neighbors::cagra::update_dataset
+**Additional overload:** `cuvs::neighbors::cagra::update_dataset`
 
 Update the dataset from a disk file using a file descriptor.
 
@@ -571,7 +571,7 @@ This method configures the index to use a disk-based dataset. The dataset file s
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:759`_
 
-### cuvs::neighbors::cagra::update_graph
+**Additional overload:** `cuvs::neighbors::cagra::update_graph`
 
 Update the graph from a disk file using a file descriptor.
 
@@ -650,7 +650,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:923`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -679,7 +679,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:962`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -708,7 +708,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1001`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -737,7 +737,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1039`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -766,7 +766,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1079`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -795,7 +795,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1120`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -824,7 +824,7 @@ the constructed cagra index
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1161`_
 
-### cuvs::neighbors::cagra::build
+**Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
 
@@ -891,7 +891,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1244`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -925,7 +925,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1282`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -959,7 +959,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1320`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -993,7 +993,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1358`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -1027,7 +1027,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1396`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -1061,7 +1061,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1434`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -1095,7 +1095,7 @@ Usage example: part. The data will be copied from the current index in this func
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1472`_
 
-### cuvs::neighbors::cagra::extend
+**Additional overload:** `cuvs::neighbors::cagra::extend`
 
 Add new vectors to a CAGRA index
 
@@ -1208,7 +1208,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1785`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Write the index to an output stream
 
@@ -1236,7 +1236,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1811`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from input stream
 
@@ -1262,7 +1262,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1837`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Save the index to file.
 
@@ -1290,7 +1290,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1863`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from file.
 
@@ -1316,7 +1316,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1890`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Write the index to an output stream
 
@@ -1344,7 +1344,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1916`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from input stream
 
@@ -1370,7 +1370,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1942`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Save the index to file.
 
@@ -1398,7 +1398,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1968`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from file.
 
@@ -1424,7 +1424,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:1995`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Write the index to an output stream
 
@@ -1452,7 +1452,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2021`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from input stream
 
@@ -1478,7 +1478,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2047`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Save the index to file.
 
@@ -1506,7 +1506,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2073`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from file.
 
@@ -1532,7 +1532,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2100`_
 
-### cuvs::neighbors::cagra::serialize
+**Additional overload:** `cuvs::neighbors::cagra::serialize`
 
 Write the index to an output stream
 
@@ -1560,7 +1560,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2126`_
 
-### cuvs::neighbors::cagra::deserialize
+**Additional overload:** `cuvs::neighbors::cagra::deserialize`
 
 Load index from input stream
 
@@ -1616,7 +1616,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2182`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Save a CAGRA build index in hnswlib base-layer-only serialized format
 
@@ -1646,7 +1646,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2216`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Write the CAGRA built index as a base layer HNSW index to an output stream
 
@@ -1676,7 +1676,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2249`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Save a CAGRA build index in hnswlib base-layer-only serialized format
 
@@ -1706,7 +1706,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2283`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Write the CAGRA built index as a base layer HNSW index to an output stream
 
@@ -1736,7 +1736,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2316`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Save a CAGRA build index in hnswlib base-layer-only serialized format
 
@@ -1766,7 +1766,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2350`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Write the CAGRA built index as a base layer HNSW index to an output stream
 
@@ -1796,7 +1796,7 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 _Source: `cpp/include/cuvs/neighbors/cagra.hpp:2383`_
 
-### cuvs::neighbors::cagra::serialize_to_hnswlib
+**Additional overload:** `cuvs::neighbors::cagra::serialize_to_hnswlib`
 
 Save a CAGRA build index in hnswlib base-layer-only serialized format
 

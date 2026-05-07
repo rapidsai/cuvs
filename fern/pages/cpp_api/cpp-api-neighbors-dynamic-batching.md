@@ -124,7 +124,7 @@ The search parameters of the upstream index and the optional filtering function 
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:214`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,
@@ -152,7 +152,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:222`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,
@@ -180,7 +180,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:230`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,
@@ -208,7 +208,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:238`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,
@@ -236,7 +236,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:246`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,
@@ -264,7 +264,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:254`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,
@@ -292,7 +292,7 @@ raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 _Source: `cpp/include/cuvs/neighbors/dynamic_batching.hpp:262`_
 
-### detail::search
+**Additional overload:** `detail::search`
 
 ```cpp
 void search(raft::resources const& res,

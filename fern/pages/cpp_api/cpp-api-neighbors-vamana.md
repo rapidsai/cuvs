@@ -172,7 +172,7 @@ index(const index&)                    = delete;
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:153`_
 
-### cuvs::neighbors::vamana::index
+**Additional overload:** `cuvs::neighbors::vamana::index`
 
 Construct an empty index.
 
@@ -195,7 +195,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:161`_
 
-### cuvs::neighbors::vamana::index
+**Additional overload:** `cuvs::neighbors::vamana::index`
 
 Construct an index from dataset and vamana graph
 
@@ -250,7 +250,7 @@ Since the new graph is a device array, we store a reference to that, and it is t
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:201`_
 
-### cuvs::neighbors::vamana::update_graph
+**Additional overload:** `cuvs::neighbors::vamana::update_graph`
 
 Replace the graph with a new graph.
 
@@ -332,7 +332,7 @@ the constructed vamana index
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:305`_
 
-### cuvs::neighbors::vamana::build
+**Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
 
@@ -361,7 +361,7 @@ the constructed vamana index
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:339`_
 
-### cuvs::neighbors::vamana::build
+**Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
 
@@ -390,7 +390,7 @@ the constructed vamana index
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:373`_
 
-### cuvs::neighbors::vamana::build
+**Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
 
@@ -419,7 +419,7 @@ the constructed vamana index
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:407`_
 
-### cuvs::neighbors::vamana::build
+**Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
 
@@ -448,7 +448,7 @@ the constructed vamana index
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:441`_
 
-### cuvs::neighbors::vamana::build
+**Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
 
@@ -511,7 +511,7 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:514`_
 
-### cuvs::neighbors::vamana::serialize
+**Additional overload:** `cuvs::neighbors::vamana::serialize`
 
 Save the index to file.
 
@@ -541,7 +541,7 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 
 _Source: `cpp/include/cuvs/neighbors/vamana.hpp:544`_
 
-### cuvs::neighbors::vamana::serialize
+**Additional overload:** `cuvs::neighbors::vamana::serialize`
 
 Save the index to file.
 

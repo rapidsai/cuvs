@@ -193,7 +193,7 @@ The resulting graph is compatible for HNSW search, but is not an exact equivalen
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:254`_
 
-### cuvs::neighbors::hnsw::build
+**Additional overload:** `cuvs::neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
 
@@ -220,7 +220,7 @@ The resulting graph is compatible for HNSW search, but is not an exact equivalen
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:312`_
 
-### cuvs::neighbors::hnsw::build
+**Additional overload:** `cuvs::neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
 
@@ -247,7 +247,7 @@ The resulting graph is compatible for HNSW search, but is not an exact equivalen
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:370`_
 
-### cuvs::neighbors::hnsw::build
+**Additional overload:** `cuvs::neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
 
@@ -308,7 +308,7 @@ NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the fi
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:471`_
 
-### cuvs::neighbors::hnsw::from_cagra
+**Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
 
@@ -338,7 +338,7 @@ NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the fi
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:507`_
 
-### cuvs::neighbors::hnsw::from_cagra
+**Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
 
@@ -368,7 +368,7 @@ NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the fi
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:543`_
 
-### cuvs::neighbors::hnsw::from_cagra
+**Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
 
@@ -430,7 +430,7 @@ NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:624`_
 
-### cuvs::neighbors::hnsw::extend
+**Additional overload:** `cuvs::neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
 
@@ -458,7 +458,7 @@ NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:658`_
 
-### cuvs::neighbors::hnsw::extend
+**Additional overload:** `cuvs::neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
 
@@ -486,7 +486,7 @@ NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:692`_
 
-### cuvs::neighbors::hnsw::extend
+**Additional overload:** `cuvs::neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
 
@@ -571,7 +571,7 @@ NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when th
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:794`_
 
-### cuvs::neighbors::hnsw::search
+**Additional overload:** `cuvs::neighbors::hnsw::search`
 
 Search HNSW index constructed from a CAGRA index
 
@@ -603,7 +603,7 @@ NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when th
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:838`_
 
-### cuvs::neighbors::hnsw::search
+**Additional overload:** `cuvs::neighbors::hnsw::search`
 
 Search HNSWindex constructed from a CAGRA index
 
@@ -635,7 +635,7 @@ NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when th
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:882`_
 
-### cuvs::neighbors::hnsw::search
+**Additional overload:** `cuvs::neighbors::hnsw::search`
 
 Search HNSW index constructed from a CAGRA index
 
@@ -695,7 +695,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:969`_
 
-### cuvs::neighbors::hnsw::serialize
+**Additional overload:** `cuvs::neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
 
@@ -719,7 +719,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:998`_
 
-### cuvs::neighbors::hnsw::serialize
+**Additional overload:** `cuvs::neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
 
@@ -743,7 +743,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1027`_
 
-### cuvs::neighbors::hnsw::serialize
+**Additional overload:** `cuvs::neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
 
@@ -799,7 +799,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1094`_
 
-### cuvs::neighbors::hnsw::deserialize
+**Additional overload:** `cuvs::neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 
@@ -831,7 +831,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1137`_
 
-### cuvs::neighbors::hnsw::deserialize
+**Additional overload:** `cuvs::neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 
@@ -863,7 +863,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 _Source: `cpp/include/cuvs/neighbors/hnsw.hpp:1180`_
 
-### cuvs::neighbors::hnsw::deserialize
+**Additional overload:** `cuvs::neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 

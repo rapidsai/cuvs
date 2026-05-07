@@ -108,7 +108,7 @@ FilterType get_filter_type() const override;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:520`_
 
-### filtering::operator
+**Additional overload:** `filtering::operator`
 
 If the original filter takes three arguments, then don't modify the arguments.
 
@@ -130,7 +130,7 @@ If the original filter takes two arguments, then we are using `inds_ptr_` to obt
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:544`_
 
-### filtering::operator
+**Additional overload:** `filtering::operator`
 
 ```cpp
 inline _RAFT_HOST_DEVICE bool operator()(
@@ -146,7 +146,7 @@ const uint32_t sample_ix) const;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:571`_
 
-### filtering::get_filter_type
+**Additional overload:** `filtering::get_filter_type`
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -176,7 +176,7 @@ _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:600`_
 
-### filtering::get_filter_type
+**Additional overload:** `filtering::get_filter_type`
 
 ```cpp
 FilterType get_filter_type() const override;

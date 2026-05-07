@@ -49,7 +49,7 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 
 _Source: `cpp/include/cuvs/selection/select_k.hpp:68`_
 
-### cuvs::selection::select_k
+**Additional overload:** `cuvs::selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
 
@@ -88,7 +88,7 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 
 _Source: `cpp/include/cuvs/selection/select_k.hpp:133`_
 
-### cuvs::selection::select_k
+**Additional overload:** `cuvs::selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
 

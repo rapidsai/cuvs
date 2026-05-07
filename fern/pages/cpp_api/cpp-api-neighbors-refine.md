@@ -44,7 +44,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:60`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -78,7 +78,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:105`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -112,7 +112,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:150`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -146,7 +146,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:195`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -180,7 +180,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:240`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -214,7 +214,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:285`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -248,7 +248,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:330`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -282,7 +282,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:375`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 
@@ -316,7 +316,7 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 _Source: `cpp/include/cuvs/neighbors/refine.hpp:420`_
 
-### cuvs::neighbors::refine
+**Additional overload:** `cuvs::neighbors::refine`
 
 Refine nearest neighbor search.
 

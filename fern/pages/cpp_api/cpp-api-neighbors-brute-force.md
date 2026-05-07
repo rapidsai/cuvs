@@ -32,7 +32,7 @@ Constructs an empty index. This index will either need to be trained with `build
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:54`_
 
-### cuvs::neighbors::brute_force::index
+**Additional overload:** `cuvs::neighbors::brute_force::index`
 
 Construct a brute force index from dataset
 
@@ -62,7 +62,7 @@ Constructs a brute force index from a dataset. This lets us precompute norms for
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:63`_
 
-### cuvs::neighbors::brute_force::index
+**Additional overload:** `cuvs::neighbors::brute_force::index`
 
 Construct a brute force index from dataset
 
@@ -92,7 +92,7 @@ Constructs a brute force index from a dataset. This lets us precompute norms for
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:76`_
 
-### cuvs::neighbors::brute_force::index
+**Additional overload:** `cuvs::neighbors::brute_force::index`
 
 Construct a brute force index from dataset
 
@@ -122,7 +122,7 @@ This class stores a non-owning reference to the dataset and norms. Having precom
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:87`_
 
-### cuvs::neighbors::brute_force::index
+**Additional overload:** `cuvs::neighbors::brute_force::index`
 
 Construct a brute force index from dataset
 
@@ -152,7 +152,7 @@ Constructs a brute force index from a dataset. This lets us precompute norms for
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:100`_
 
-### cuvs::neighbors::brute_force::index
+**Additional overload:** `cuvs::neighbors::brute_force::index`
 
 Construct a brute force index from dataset
 
@@ -204,7 +204,7 @@ raft::device_matrix_view<const T, int64_t, raft::row_major> dataset);
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:120`_
 
-### cuvs::neighbors::brute_force::update_dataset
+**Additional overload:** `cuvs::neighbors::brute_force::update_dataset`
 
 Replace the dataset with a new dataset.
 
@@ -359,7 +359,7 @@ the constructed brute-force index
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:191`_
 
-### cuvs::neighbors::brute_force::build
+**Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
 
@@ -386,7 +386,7 @@ the constructed brute-force index
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:205`_
 
-### cuvs::neighbors::brute_force::build
+**Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
 
@@ -415,7 +415,7 @@ the constructed brute force index
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:232`_
 
-### cuvs::neighbors::brute_force::build
+**Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
 
@@ -442,7 +442,7 @@ the constructed brute-force index
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:246`_
 
-### cuvs::neighbors::brute_force::build
+**Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
 
@@ -471,7 +471,7 @@ the constructed brute force index
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:272`_
 
-### cuvs::neighbors::brute_force::build
+**Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
 
@@ -530,7 +530,7 @@ T metric_arg);
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:609`_
 
-### cuvs::neighbors::brute_force::metric
+**Additional overload:** `cuvs::neighbors::brute_force::metric`
 
 Distance metric used for retrieval
 
@@ -544,7 +544,7 @@ cuvs::distance::DistanceType metric() const noexcept;
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:615`_
 
-### cuvs::neighbors::brute_force::metric_arg
+**Additional overload:** `cuvs::neighbors::brute_force::metric_arg`
 
 Metric argument
 
@@ -617,7 +617,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:724`_
 
-### cuvs::neighbors::brute_force::serialize
+**Additional overload:** `cuvs::neighbors::brute_force::serialize`
 
 Save the index to file.
 
@@ -651,7 +651,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:755`_
 
-### cuvs::neighbors::brute_force::serialize
+**Additional overload:** `cuvs::neighbors::brute_force::serialize`
 
 Write the index to an output stream
 
@@ -679,7 +679,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:783`_
 
-### cuvs::neighbors::brute_force::serialize
+**Additional overload:** `cuvs::neighbors::brute_force::serialize`
 
 Write the index to an output stream
 
@@ -733,7 +733,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:840`_
 
-### cuvs::neighbors::brute_force::deserialize
+**Additional overload:** `cuvs::neighbors::brute_force::deserialize`
 
 Load index from file.
 
@@ -759,7 +759,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:867`_
 
-### cuvs::neighbors::brute_force::deserialize
+**Additional overload:** `cuvs::neighbors::brute_force::deserialize`
 
 Load index from input stream
 
@@ -785,7 +785,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 _Source: `cpp/include/cuvs/neighbors/brute_force.hpp:894`_
 
-### cuvs::neighbors::brute_force::deserialize
+**Additional overload:** `cuvs::neighbors::brute_force::deserialize`
 
 Load index from input stream
 

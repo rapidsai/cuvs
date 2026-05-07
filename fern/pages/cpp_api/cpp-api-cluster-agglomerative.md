@@ -143,7 +143,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:188`_
 
-### linkage_graph_params::build_linkage
+**Additional overload:** `linkage_graph_params::build_linkage`
 
 Given a dataset, builds the KNN graph, connects graph components and builds a linkage
 

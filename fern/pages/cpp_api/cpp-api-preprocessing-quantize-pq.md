@@ -34,7 +34,7 @@ struct params { ... } ;
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:30`_
 
-### cuvs::preprocessing::quantize::pq::params
+**Additional overload:** `cuvs::preprocessing::quantize::pq::params`
 
 Simplified constructor that will build an appropriate kmeans params object.
 
@@ -100,7 +100,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:169`_
 
-### cuvs::preprocessing::quantize::pq::build
+**Additional overload:** `cuvs::preprocessing::quantize::pq::build`
 
 ```cpp
 quantizer<float> build(raft::resources const& res,
@@ -152,7 +152,7 @@ Usage example: used, optional
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/pq.hpp:201`_
 
-### cuvs::preprocessing::quantize::pq::transform
+**Additional overload:** `cuvs::preprocessing::quantize::pq::transform`
 
 ```cpp
 void transform(raft::resources const& res,

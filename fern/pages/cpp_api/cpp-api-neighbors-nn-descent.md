@@ -54,7 +54,7 @@ struct index_params : cuvs::neighbors::index_params { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:56`_
 
-### cuvs::neighbors::nn_descent::index_params
+**Additional overload:** `cuvs::neighbors::nn_descent::index_params`
 
 Construct NN descent parameters for a specific kNN graph degree
 
@@ -111,7 +111,7 @@ This constructor creates an nn-descent index which is a knn-graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:110`_
 
-### cuvs::neighbors::nn_descent::index
+**Additional overload:** `cuvs::neighbors::nn_descent::index`
 
 Construct a new index object
 
@@ -248,7 +248,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:244`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in host memory
 
@@ -286,7 +286,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:283`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
 
@@ -317,7 +317,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:320`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in host memory
 
@@ -355,7 +355,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:359`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
 
@@ -386,7 +386,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:397`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in host memory
 
@@ -424,7 +424,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:437`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
 
@@ -455,7 +455,7 @@ index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 _Source: `cpp/include/cuvs/neighbors/nn_descent.hpp:475`_
 
-### cuvs::neighbors::nn_descent::build
+**Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in host memory
 

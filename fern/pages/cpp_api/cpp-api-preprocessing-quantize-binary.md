@@ -95,7 +95,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:73`_
 
-### cuvs::preprocessing::quantize::binary::train
+**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -151,7 +151,7 @@ set the corresponding bit to 1. Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:119`_
 
-### cuvs::preprocessing::quantize::binary::transform
+**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -179,7 +179,7 @@ set the corresponding bit to 1. Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:146`_
 
-### cuvs::preprocessing::quantize::binary::train
+**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -207,7 +207,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:167`_
 
-### cuvs::preprocessing::quantize::binary::train
+**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -235,7 +235,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:187`_
 
-### cuvs::preprocessing::quantize::binary::transform
+**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -263,7 +263,7 @@ set the corresponding bit to 1. Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:215`_
 
-### cuvs::preprocessing::quantize::binary::transform
+**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -291,7 +291,7 @@ set the corresponding bit to 1. Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:244`_
 
-### cuvs::preprocessing::quantize::binary::train
+**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -319,7 +319,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:265`_
 
-### cuvs::preprocessing::quantize::binary::train
+**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -347,7 +347,7 @@ quantizer
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:285`_
 
-### cuvs::preprocessing::quantize::binary::transform
+**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset.
 
@@ -375,7 +375,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:312`_
 
-### cuvs::preprocessing::quantize::binary::transform
+**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset.
 
@@ -428,7 +428,7 @@ is positive, set the corresponding bit to 1.
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:354`_
 
-### cuvs::preprocessing::quantize::binary::[[deprecated
+**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -453,7 +453,7 @@ is positive, set the corresponding bit to 1.
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:368`_
 
-### cuvs::preprocessing::quantize::binary::[[deprecated
+**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -478,7 +478,7 @@ is positive, set the corresponding bit to 1.
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:382`_
 
-### cuvs::preprocessing::quantize::binary::[[deprecated
+**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -503,7 +503,7 @@ is positive, set the corresponding bit to 1.
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:396`_
 
-### cuvs::preprocessing::quantize::binary::[[deprecated
+**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -528,7 +528,7 @@ is positive, set the corresponding bit to 1.
 
 _Source: `cpp/include/cuvs/preprocessing/quantize/binary.hpp:410`_
 
-### cuvs::preprocessing::quantize::binary::[[deprecated
+**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 

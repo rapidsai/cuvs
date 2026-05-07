@@ -73,7 +73,7 @@ Constructs an empty index. This index will either need to be trained with `build
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:154`_
 
-### cuvs::neighbors::ivf_flat::index
+**Additional overload:** `cuvs::neighbors::ivf_flat::index`
 
 Construct an empty index. It needs to be trained and then populated.
 
@@ -95,7 +95,7 @@ index(raft::resources const& res, const index_params& params, uint32_t dim);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:157`_
 
-### cuvs::neighbors::ivf_flat::index
+**Additional overload:** `cuvs::neighbors::ivf_flat::index`
 
 Construct an empty index. It needs to be trained and then populated.
 
@@ -348,7 +348,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:325`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -376,7 +376,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:355`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -405,7 +405,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:384`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -433,7 +433,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:414`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -462,7 +462,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:443`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -490,7 +490,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:473`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -519,7 +519,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:502`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -547,7 +547,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:532`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -576,7 +576,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:568`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -604,7 +604,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:605`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -633,7 +633,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:641`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -661,7 +661,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:678`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -690,7 +690,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:714`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -718,7 +718,7 @@ NB: Currently, the following distance metrics are supported: - L2Expanded - L2Un
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:751`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -747,7 +747,7 @@ the constructed ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:787`_
 
-### cuvs::neighbors::ivf_flat::build
+**Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
 
@@ -810,7 +810,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:866`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -838,7 +838,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:896`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -869,7 +869,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:930`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -897,7 +897,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:960`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -928,7 +928,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:994`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -956,7 +956,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1025`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -987,7 +987,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1059`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -1015,7 +1015,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1089`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -1046,7 +1046,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1129`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -1074,7 +1074,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1165`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -1105,7 +1105,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1205`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -1133,7 +1133,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1241`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -1164,7 +1164,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1281`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -1192,7 +1192,7 @@ Note, the user can set a stream pool in the input raft::resource with at least o
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1317`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Build a new index containing the data of the original plus new extra vectors.
 
@@ -1223,7 +1223,7 @@ the constructed extended ivf-flat index
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1357`_
 
-### cuvs::neighbors::ivf_flat::extend
+**Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
 
@@ -1307,7 +1307,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1640`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Write the index to an output stream
 
@@ -1333,7 +1333,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1666`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from input stream
 
@@ -1359,7 +1359,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1694`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Save the index to file.
 
@@ -1385,7 +1385,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1720`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from file.
 
@@ -1411,7 +1411,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1748`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Write the index to an output stream
 
@@ -1437,7 +1437,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1774`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from input stream
 
@@ -1463,7 +1463,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1802`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Save the index to file.
 
@@ -1489,7 +1489,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1828`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from file.
 
@@ -1515,7 +1515,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1856`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Write the index to an output stream
 
@@ -1541,7 +1541,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1882`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from input stream
 
@@ -1567,7 +1567,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1910`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Save the index to file.
 
@@ -1593,7 +1593,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1936`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from file.
 
@@ -1619,7 +1619,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1964`_
 
-### cuvs::neighbors::ivf_flat::serialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::serialize`
 
 Write the index to an output stream
 
@@ -1645,7 +1645,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:1990`_
 
-### cuvs::neighbors::ivf_flat::deserialize
+**Additional overload:** `cuvs::neighbors::ivf_flat::deserialize`
 
 Load index from input stream
 
@@ -1717,7 +1717,7 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ve
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2508`_
 
-### codepacker::pack
+**Additional overload:** `codepacker::pack`
 
 Write flat codes into an existing list by the given offset.
 
@@ -1749,7 +1749,7 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ve
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2538`_
 
-### codepacker::pack
+**Additional overload:** `codepacker::pack`
 
 Write flat codes into an existing list by the given offset.
 
@@ -1781,7 +1781,7 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ve
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2568`_
 
-### codepacker::pack
+**Additional overload:** `codepacker::pack`
 
 Write flat codes into an existing list by the given offset.
 
@@ -1845,7 +1845,7 @@ starting at given `offset`. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2631`_
 
-### codepacker::unpack
+**Additional overload:** `codepacker::unpack`
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -1877,7 +1877,7 @@ starting at given `offset`. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2664`_
 
-### codepacker::unpack
+**Additional overload:** `codepacker::unpack`
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -1909,7 +1909,7 @@ starting at given `offset`. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2696`_
 
-### codepacker::unpack
+**Additional overload:** `codepacker::unpack`
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -1967,7 +1967,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2749`_
 
-### codepacker::pack_1
+**Additional overload:** `codepacker::pack_1`
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -1993,7 +1993,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2763`_
 
-### codepacker::pack_1
+**Additional overload:** `codepacker::pack_1`
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -2019,7 +2019,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2777`_
 
-### codepacker::pack_1
+**Additional overload:** `codepacker::pack_1`
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -2072,7 +2072,7 @@ indicates the id of the record. This function fetches one flat code from an inte
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2805`_
 
-### codepacker::unpack_1
+**Additional overload:** `codepacker::unpack_1`
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2098,7 +2098,7 @@ indicates the id of the record. This function fetches one flat code from an inte
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2818`_
 
-### codepacker::unpack_1
+**Additional overload:** `codepacker::unpack_1`
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2125,7 +2125,7 @@ indicates the id of the record. This function fetches one flat code from an inte
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2831`_
 
-### codepacker::unpack_1
+**Additional overload:** `codepacker::unpack_1`
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2175,7 +2175,7 @@ externally modifying the index without going through the build stage. The data a
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2870`_
 
-### codepacker::reset_index
+**Additional overload:** `codepacker::reset_index`
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2198,7 +2198,7 @@ externally modifying the index without going through the build stage. The data a
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2892`_
 
-### codepacker::reset_index
+**Additional overload:** `codepacker::reset_index`
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2221,7 +2221,7 @@ externally modifying the index without going through the build stage. The data a
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2914`_
 
-### codepacker::reset_index
+**Additional overload:** `codepacker::reset_index`
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2267,7 +2267,7 @@ modified externally. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2964`_
 
-### codepacker::recompute_internal_state
+**Additional overload:** `codepacker::recompute_internal_state`
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2290,7 +2290,7 @@ modified externally. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2992`_
 
-### codepacker::recompute_internal_state
+**Additional overload:** `codepacker::recompute_internal_state`
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2313,7 +2313,7 @@ modified externally. Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:3020`_
 
-### codepacker::recompute_internal_state
+**Additional overload:** `codepacker::recompute_internal_state`
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
