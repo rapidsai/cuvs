@@ -104,7 +104,7 @@ jobs:
       matrix_name: conda-cpp-build
       matrix_filter: map(select(.ARCH == "amd64"))
   go-build:
-    needs: cpp-build
+    needs: go-build-matrix
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
@@ -130,7 +130,7 @@ jobs:
       matrix_name: conda-cpp-build
       matrix_filter: map(select(.ARCH == "amd64"))
   java-build:
-    needs: cpp-build
+    needs: java-build-matrix
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
