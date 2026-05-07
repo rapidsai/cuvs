@@ -66,8 +66,8 @@ scale the algorithm beyond the n^2 memory consumption of implementations that us
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:104`_
 
-<a id="linkage-graph-params-distance-params"></a>
-### linkage_graph_params::distance_params
+<a id="cuvs-cluster-agglomerative-helpers-linkage-graph-params-distance-params"></a>
+### cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params
 
 Specialized parameters to build the KNN graph with regular distances
 
@@ -84,8 +84,8 @@ struct distance_params { ... } ;
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:118`_
 
-<a id="linkage-graph-params-mutual-reachability-params"></a>
-### linkage_graph_params::mutual_reachability_params
+<a id="cuvs-cluster-agglomerative-helpers-linkage-graph-params-mutual-reachability-params"></a>
+### cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params
 
 Specialized parameters to build the Mutual Reachability graph
 
@@ -103,8 +103,8 @@ struct mutual_reachability_params { ... } ;
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:130`_
 
-<a id="linkage-graph-params-build-linkage"></a>
-### linkage_graph_params::build_linkage
+<a id="cuvs-cluster-agglomerative-helpers-build-linkage"></a>
+### cuvs::cluster::agglomerative::helpers::build_linkage
 
 Given a dataset, builds the KNN graph, connects graph components and builds a linkage
 
@@ -130,7 +130,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft handle for resource reuse |
 | `X` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | data points on device memory (size n_rows * d) |
-| `linkage_graph_params` | in | [`std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>`](/api-reference/cpp-api-cluster-agglomerative#linkage-graph-params-mutual-reachability-params) | Parameters controlling how the KNN graph is built. This can be either:<br />- distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering.<br />- mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
+| `linkage_graph_params` | in | [`std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>`](/api-reference/cpp-api-cluster-agglomerative#cuvs-cluster-agglomerative-helpers-linkage-graph-params-mutual-reachability-params) | Parameters controlling how the KNN graph is built. This can be either:<br />- distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering.<br />- mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
 | `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use |
 | `out_mst` | out | `raft::device_coo_matrix_view<float, int64_t, int64_t, size_t>` | output MST sorted by edge weights (size n_rows - 1) |
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
@@ -144,7 +144,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:188`_
 
-**Additional overload:** `linkage_graph_params::build_linkage`
+**Additional overload:** `cuvs::cluster::agglomerative::helpers::build_linkage`
 
 Given a dataset, builds the KNN graph, connects graph components and builds a linkage
 
@@ -170,7 +170,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft handle for resource reuse |
 | `X` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | data points on host memory (size n_rows * d) |
-| `linkage_graph_params` | in | [`std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>`](/api-reference/cpp-api-cluster-agglomerative#linkage-graph-params-mutual-reachability-params) | Parameters controlling how the KNN graph is built. This can be either:<br />- distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering.<br />- mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
+| `linkage_graph_params` | in | [`std::variant<linkage_graph_params::distance_params, linkage_graph_params::mutual_reachability_params>`](/api-reference/cpp-api-cluster-agglomerative#cuvs-cluster-agglomerative-helpers-linkage-graph-params-mutual-reachability-params) | Parameters controlling how the KNN graph is built. This can be either:<br />- distance_params: standard distance-based KNN graph construction for traditional agglomerative clustering.<br />- mutual_reachability_params: parameters to compute a mutual reachability graph for density-aware hierarchical clustering (e.g. HDBSCAN). |
 | `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use |
 | `out_mst` | out | `raft::device_coo_matrix_view<float, int64_t, int64_t, size_t>` | output MST sorted by edge weights (size n_rows - 1) |
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
@@ -184,8 +184,8 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 
 _Source: `cpp/include/cuvs/cluster/agglomerative.hpp:219`_
 
-<a id="linkage-graph-params-build-dendrogram"></a>
-### linkage_graph_params::build_dendrogram
+<a id="cuvs-cluster-agglomerative-helpers-build-dendrogram"></a>
+### cuvs::cluster::agglomerative::helpers::build_dendrogram
 
 Build dendrogram from a Minimum Spanning Tree (MST).
 

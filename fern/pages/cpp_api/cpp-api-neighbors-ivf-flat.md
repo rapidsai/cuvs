@@ -1858,8 +1858,8 @@ namespace codepacker {
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2484`_
 
-<a id="codepacker-pack"></a>
-### codepacker::pack
+<a id="cuvs-neighbors-ivf-flat-helpers-codepacker-pack"></a>
+### cuvs::neighbors::ivf_flat::helpers::codepacker::pack
 
 Write flat codes into an existing list by the given offset.
 
@@ -1893,7 +1893,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2508`_
 
-**Additional overload:** `codepacker::pack`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::pack`
 
 Write flat codes into an existing list by the given offset.
 
@@ -1927,7 +1927,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2538`_
 
-**Additional overload:** `codepacker::pack`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::pack`
 
 Write flat codes into an existing list by the given offset.
 
@@ -1961,7 +1961,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2568`_
 
-**Additional overload:** `codepacker::pack`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::pack`
 
 Write flat codes into an existing list by the given offset.
 
@@ -1995,8 +1995,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2598`_
 
-<a id="codepacker-unpack"></a>
-### codepacker::unpack
+<a id="cuvs-neighbors-ivf-flat-helpers-codepacker-unpack"></a>
+### cuvs::neighbors::ivf_flat::helpers::codepacker::unpack
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2030,7 +2030,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2631`_
 
-**Additional overload:** `codepacker::unpack`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::unpack`
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2064,7 +2064,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2664`_
 
-**Additional overload:** `codepacker::unpack`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::unpack`
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2098,7 +2098,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2696`_
 
-**Additional overload:** `codepacker::unpack`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::unpack`
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2132,8 +2132,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2729`_
 
-<a id="codepacker-pack-1"></a>
-### codepacker::pack_1
+<a id="cuvs-neighbors-ivf-flat-helpers-codepacker-pack-1"></a>
+### cuvs::neighbors::ivf_flat::helpers::codepacker::pack_1
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -2159,7 +2159,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2749`_
 
-**Additional overload:** `codepacker::pack_1`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::pack_1`
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -2185,7 +2185,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2763`_
 
-**Additional overload:** `codepacker::pack_1`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::pack_1`
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -2211,7 +2211,7 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2777`_
 
-**Additional overload:** `codepacker::pack_1`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::pack_1`
 
 Write one flat code into a block by the given offset. The offset indicates the id of the record
 
@@ -2238,8 +2238,8 @@ in the list. This function interleaves the code and is intended to later copy th
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2791`_
 
-<a id="codepacker-unpack-1"></a>
-### codepacker::unpack_1
+<a id="cuvs-neighbors-ivf-flat-helpers-codepacker-unpack-1"></a>
+### cuvs::neighbors::ivf_flat::helpers::codepacker::unpack_1
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2267,7 +2267,7 @@ interleaved format.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2805`_
 
-**Additional overload:** `codepacker::unpack_1`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::unpack_1`
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2295,7 +2295,7 @@ interleaved format.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2818`_
 
-**Additional overload:** `codepacker::unpack_1`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::unpack_1`
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2324,7 +2324,7 @@ interleaved format.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2831`_
 
-**Additional overload:** `codepacker::unpack_1`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::codepacker::unpack_1`
 
 Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
 
@@ -2353,8 +2353,8 @@ interleaved format.
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2845`_
 
-<a id="codepacker-reset-index"></a>
-### codepacker::reset_index
+<a id="cuvs-neighbors-ivf-flat-helpers-reset-index"></a>
+### cuvs::neighbors::ivf_flat::helpers::reset_index
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2379,7 +2379,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2870`_
 
-**Additional overload:** `codepacker::reset_index`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::reset_index`
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2404,7 +2404,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2892`_
 
-**Additional overload:** `codepacker::reset_index`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::reset_index`
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2429,7 +2429,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2914`_
 
-**Additional overload:** `codepacker::reset_index`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::reset_index`
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2454,8 +2454,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2936`_
 
-<a id="codepacker-recompute-internal-state"></a>
-### codepacker::recompute_internal_state
+<a id="cuvs-neighbors-ivf-flat-helpers-recompute-internal-state"></a>
+### cuvs::neighbors::ivf_flat::helpers::recompute_internal_state
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2480,7 +2480,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2964`_
 
-**Additional overload:** `codepacker::recompute_internal_state`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::recompute_internal_state`
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2505,7 +2505,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:2992`_
 
-**Additional overload:** `codepacker::recompute_internal_state`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::recompute_internal_state`
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2530,7 +2530,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_flat.hpp:3020`_
 
-**Additional overload:** `codepacker::recompute_internal_state`
+**Additional overload:** `cuvs::neighbors::ivf_flat::helpers::recompute_internal_state`
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 

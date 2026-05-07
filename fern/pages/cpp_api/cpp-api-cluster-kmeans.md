@@ -1136,8 +1136,8 @@ _Source: `cpp/include/cuvs/cluster/kmeans.hpp:1566`_
 
 ## k-means API helpers
 
-<a id="helpers-find-k"></a>
-### helpers::find_k
+<a id="cuvs-cluster-kmeans-helpers-find-k"></a>
+### cuvs::cluster::kmeans::helpers::find_k
 
 Automatically find the optimal value of k using a binary search.
 

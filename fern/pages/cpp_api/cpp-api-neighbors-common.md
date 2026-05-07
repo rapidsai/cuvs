@@ -59,8 +59,8 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:125`_
 
 ## Filtering for ANN Types
 
-<a id="filtering-filtertype"></a>
-### filtering::FilterType
+<a id="cuvs-neighbors-filtering-filtertype"></a>
+### cuvs::neighbors::filtering::FilterType
 
 Filtering for ANN Types
 
@@ -78,8 +78,8 @@ enum class FilterType { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:496`_
 
-<a id="filtering-operator"></a>
-### filtering::operator
+<a id="cuvs-neighbors-filtering-operator"></a>
+### cuvs::neighbors::filtering::operator
 
 ```cpp
 constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
@@ -97,8 +97,8 @@ const uint32_t sample_ix) const;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:506`_
 
-<a id="filtering-get-filter-type"></a>
-### filtering::get_filter_type
+<a id="cuvs-neighbors-filtering-get-filter-type"></a>
+### cuvs::neighbors::filtering::get_filter_type
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -106,11 +106,11 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-[`FilterType`](/api-reference/cpp-api-neighbors-common#filtering-filtertype)
+[`FilterType`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-filtering-filtertype)
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:520`_
 
-**Additional overload:** `filtering::operator`
+**Additional overload:** `cuvs::neighbors::filtering::operator`
 
 If the original filter takes three arguments, then don't modify the arguments.
 
@@ -132,7 +132,7 @@ If the original filter takes two arguments, then we are using `inds_ptr_` to obt
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:544`_
 
-**Additional overload:** `filtering::operator`
+**Additional overload:** `cuvs::neighbors::filtering::operator`
 
 ```cpp
 inline _RAFT_HOST_DEVICE bool operator()(
@@ -148,7 +148,7 @@ const uint32_t sample_ix) const;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:571`_
 
-**Additional overload:** `filtering::get_filter_type`
+**Additional overload:** `cuvs::neighbors::filtering::get_filter_type`
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -156,12 +156,12 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-[`FilterType`](/api-reference/cpp-api-neighbors-common#filtering-filtertype)
+[`FilterType`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-filtering-filtertype)
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:578`_
 
-<a id="filtering-bitset-filter"></a>
-### filtering::bitset_filter
+<a id="cuvs-neighbors-filtering-bitset-filter"></a>
+### cuvs::neighbors::filtering::bitset_filter
 
 ```cpp
 _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
@@ -179,7 +179,7 @@ _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:600`_
 
-**Additional overload:** `filtering::get_filter_type`
+**Additional overload:** `cuvs::neighbors::filtering::get_filter_type`
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -187,14 +187,14 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-[`FilterType`](/api-reference/cpp-api-neighbors-common#filtering-filtertype)
+[`FilterType`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-filtering-filtertype)
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:608`_
 
 ## ANN MG index build parameters
 
-<a id="ivf-distribution-mode"></a>
-### ivf::distribution_mode
+<a id="cuvs-neighbors-distribution-mode"></a>
+### cuvs::neighbors::distribution_mode
 
 ```cpp
 enum distribution_mode { ... } ;
@@ -204,8 +204,8 @@ _Source: `cpp/include/cuvs/neighbors/common.hpp:904`_
 
 ## ANN MG search parameters
 
-<a id="ivf-replicated-search-mode"></a>
-### ivf::replicated_search_mode
+<a id="cuvs-neighbors-replicated-search-mode"></a>
+### cuvs::neighbors::replicated_search_mode
 
 ```cpp
 enum replicated_search_mode { ... } ;
@@ -220,8 +220,8 @@ enum replicated_search_mode { ... } ;
 
 _Source: `cpp/include/cuvs/neighbors/common.hpp:915`_
 
-<a id="ivf-sharded-merge-mode"></a>
-### ivf::sharded_merge_mode
+<a id="cuvs-neighbors-sharded-merge-mode"></a>
+### cuvs::neighbors::sharded_merge_mode
 
 ```cpp
 enum sharded_merge_mode { ... } ;

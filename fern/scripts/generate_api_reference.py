@@ -474,7 +474,10 @@ def collect_native_pages(
 
     for group in index.groups.values():
         entries = [
-            entry for entry in group.entries if entry.source.startswith(prefix)
+            entry
+            for entry in group.entries
+            if entry.source.startswith(prefix)
+            and not is_detail_namespace_entry(entry)
         ]
         if not entries:
             continue
@@ -547,6 +550,10 @@ def native_link_symbols(entry: DoxygenEntry, api: str) -> list[str]:
 
 def short_symbol_name(name: str) -> str:
     return name.split("::")[-1]
+
+
+def is_detail_namespace_entry(entry: DoxygenEntry) -> bool:
+    return "detail" in entry.name.split("::")
 
 
 def render_native_group(
@@ -1564,14 +1571,27 @@ def parse_enum_name(declaration: str) -> str | None:
 
 
 def infer_namespace(prefix: str) -> str:
-    matches = list(
-        re.finditer(
-            r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;]+)?\s*{", prefix
-        )
+    text = COMMENT_RE.sub("", prefix)
+    text = re.sub(r"//.*", "", text)
+    namespace_stack: list[tuple[str, int]] = []
+    depth = 0
+    token_re = re.compile(
+        r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;{}]+)?\s*{|[{}]"
     )
-    if not matches:
-        return ""
-    return matches[-1].group(1)
+    for match in token_re.finditer(text):
+        namespace_name = match.group(1)
+        if namespace_name:
+            depth += 1
+            namespace_stack.append((namespace_name, depth))
+            continue
+        token = match.group(0)
+        if token == "{":
+            depth += 1
+        elif token == "}":
+            depth = max(depth - 1, 0)
+            while namespace_stack and namespace_stack[-1][1] > depth:
+                namespace_stack.pop()
+    return "::".join(name for name, _ in namespace_stack)
 
 
 def normalize_entry_signature(declaration: str, kind: str) -> str:

@@ -8,8 +8,8 @@ _Source header: `cpp/include/cuvs/stats/silhouette_score.hpp`_
 
 ## Silhouette Score
 
-<a id="stats-silhouette-score"></a>
-### stats::silhouette_score
+<a id="cuvs-stats-silhouette-score"></a>
+### cuvs::stats::silhouette_score
 
 main function that returns the average silhouette score for a given set of data and its
 
@@ -44,8 +44,8 @@ clusterings nRows) for every sample (length: nRows)
 
 _Source: `cpp/include/cuvs/stats/silhouette_score.hpp:31`_
 
-<a id="stats-silhouette-score-batched"></a>
-### stats::silhouette_score_batched
+<a id="cuvs-stats-silhouette-score-batched"></a>
+### cuvs::stats::silhouette_score_batched
 
 function that returns the average silhouette score for a given set of data and its
 
@@ -82,7 +82,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 
 _Source: `cpp/include/cuvs/stats/silhouette_score.hpp:54`_
 
-**Additional overload:** `stats::silhouette_score`
+**Additional overload:** `cuvs::stats::silhouette_score`
 
 main function that returns the average silhouette score for a given set of data and its
 
@@ -117,7 +117,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 
 _Source: `cpp/include/cuvs/stats/silhouette_score.hpp:77`_
 
-**Additional overload:** `stats::silhouette_score_batched`
+**Additional overload:** `cuvs::stats::silhouette_score_batched`
 
 function that returns the average silhouette score for a given set of data and its
 

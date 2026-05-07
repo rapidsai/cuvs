@@ -1974,8 +1974,8 @@ namespace codepacker {
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2561`_
 
-<a id="codepacker-unpack"></a>
-### codepacker::unpack
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2011,8 +2011,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2594`_
 
-<a id="codepacker-unpack-contiguous"></a>
-### codepacker::unpack_contiguous
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-contiguous"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous
 
 Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
 
@@ -2050,8 +2050,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2634`_
 
-<a id="codepacker-pack"></a>
-### codepacker::pack
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::pack
 
 Write flat PQ codes into an existing list by the given offset.
 
@@ -2085,8 +2085,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2666`_
 
-<a id="codepacker-pack-contiguous"></a>
-### codepacker::pack_contiguous
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-contiguous"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_contiguous
 
 Write flat PQ codes into an existing list by the given offset. The input codes of a single vector
 
@@ -2126,8 +2126,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2702`_
 
-<a id="codepacker-pack-list-data"></a>
-### codepacker::pack_list_data
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-list-data"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_list_data
 
 Write flat PQ codes into an existing list by the given offset.
 
@@ -2161,8 +2161,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2736`_
 
-<a id="codepacker-pack-contiguous-list-data"></a>
-### codepacker::pack_contiguous_list_data
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-contiguous-list-data"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_contiguous_list_data
 
 Write flat PQ codes into an existing list by the given offset. Use this when the input
 
@@ -2200,8 +2200,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2779`_
 
-<a id="codepacker-unpack-list-data"></a>
-### codepacker::unpack_list_data
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-list-data"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_list_data
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2233,7 +2233,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2815`_
 
-**Additional overload:** `codepacker::unpack_list_data`
+**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_list_data`
 
 Unpack a series of records of a single list (cluster) in the compressed index
 
@@ -2265,8 +2265,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2851`_
 
-<a id="codepacker-unpack-contiguous-list-data"></a>
-### codepacker::unpack_contiguous_list_data
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-contiguous-list-data"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data
 
 Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
 
@@ -2300,8 +2300,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2892`_
 
-<a id="codepacker-reconstruct-list-data"></a>
-### codepacker::reconstruct_list_data
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-reconstruct-list-data"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data
 
 Decode `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2333,7 +2333,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2929`_
 
-**Additional overload:** `codepacker::reconstruct_list_data`
+**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data`
 
 Decode a series of records of a single list (cluster) in the compressed index
 
@@ -2365,8 +2365,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:2984`_
 
-<a id="codepacker-extend-list-with-codes"></a>
-### codepacker::extend_list_with_codes
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list-with-codes"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list_with_codes
 
 Extend one list of the index in-place, by the list label, skipping the classification and
 
@@ -2399,8 +2399,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3032`_
 
-<a id="codepacker-extend-list-with-contiguous-codes"></a>
-### codepacker::extend_list_with_contiguous_codes
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list-with-contiguous-codes"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes
 
 Extend one list of the index in-place, by the list label, skipping the classification and
 
@@ -2435,8 +2435,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3071`_
 
-<a id="codepacker-extend-list"></a>
-### codepacker::extend_list
+<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list"></a>
+### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list
 
 Extend one list of the index in-place, by the list label, skipping the classification
 
@@ -2468,8 +2468,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3106`_
 
-<a id="codepacker-erase-list"></a>
-### codepacker::erase_list
+<a id="cuvs-neighbors-ivf-pq-helpers-erase-list"></a>
+### cuvs::neighbors::ivf_pq::helpers::erase_list
 
 Remove all data from a single list (cluster) in the index.
 
@@ -2493,8 +2493,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3141`_
 
-<a id="codepacker-reset-index"></a>
-### codepacker::reset_index
+<a id="cuvs-neighbors-ivf-pq-helpers-reset-index"></a>
+### cuvs::neighbors::ivf_pq::helpers::reset_index
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2519,8 +2519,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3163`_
 
-<a id="codepacker-pad-centers-with-norms"></a>
-### codepacker::pad_centers_with_norms
+<a id="cuvs-neighbors-ivf-pq-helpers-pad-centers-with-norms"></a>
+### cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
 
@@ -2547,7 +2547,7 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3176`_
 
-**Additional overload:** `codepacker::pad_centers_with_norms`
+**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms`
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
 
@@ -2574,8 +2574,8 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3192`_
 
-<a id="codepacker-rotate-padded-centers"></a>
-### codepacker::rotate_padded_centers
+<a id="cuvs-neighbors-ivf-pq-helpers-rotate-padded-centers"></a>
+### cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers
 
 Rotate padded centers with the rotation matrix.
 
@@ -2602,8 +2602,8 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3205`_
 
-<a id="codepacker-extract-centers"></a>
-### codepacker::extract_centers
+<a id="cuvs-neighbors-ivf-pq-helpers-extract-centers"></a>
+### cuvs::neighbors::ivf_pq::helpers::extract_centers
 
 Public helper API for fetching a trained index's IVF centroids
 
@@ -2629,7 +2629,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3228`_
 
-**Additional overload:** `codepacker::extract_centers`
+**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::extract_centers`
 
 ```cpp
 void extract_centers(raft::resources const& res,
@@ -2651,8 +2651,8 @@ raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3233`_
 
-<a id="codepacker-recompute-internal-state"></a>
-### codepacker::recompute_internal_state
+<a id="cuvs-neighbors-ivf-pq-helpers-recompute-internal-state"></a>
+### cuvs::neighbors::ivf_pq::helpers::recompute_internal_state
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2677,8 +2677,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3262`_
 
-<a id="codepacker-make-rotation-matrix"></a>
-### codepacker::make_rotation_matrix
+<a id="cuvs-neighbors-ivf-pq-helpers-make-rotation-matrix"></a>
+### cuvs::neighbors::ivf_pq::helpers::make_rotation_matrix
 
 Generate a rotation matrix into user-provided buffer (standalone version).
 
@@ -2707,8 +2707,8 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3289`_
 
-<a id="codepacker-resize-list"></a>
-### codepacker::resize_list
+<a id="cuvs-neighbors-ivf-pq-helpers-resize-list"></a>
+### cuvs::neighbors::ivf_pq::helpers::resize_list
 
 Resize an IVF-PQ list with flat layout.
 
@@ -2740,7 +2740,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/neighbors/ivf_pq.hpp:3319`_
 
-**Additional overload:** `codepacker::resize_list`
+**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::resize_list`
 
 Resize an IVF-PQ list with interleaved layout.
 

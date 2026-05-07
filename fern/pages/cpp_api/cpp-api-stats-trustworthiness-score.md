@@ -8,8 +8,8 @@ _Source header: `cpp/include/cuvs/stats/trustworthiness_score.hpp`_
 
 ## Trustworthiness
 
-<a id="stats-trustworthiness-score"></a>
-### stats::trustworthiness_score
+<a id="cuvs-stats-trustworthiness-score"></a>
+### cuvs::stats::trustworthiness_score
 
 Compute the trustworthiness score
 

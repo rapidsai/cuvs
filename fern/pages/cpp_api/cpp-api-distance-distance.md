@@ -69,8 +69,8 @@ enum class DensityKernelType : int { ... } ;
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:91`_
 
-<a id="kernels-kernelparams"></a>
-### kernels::KernelParams
+<a id="cuvs-distance-kernels-kernelparams"></a>
+### cuvs::distance::kernels::KernelParams
 
 Parameters for kernel matrices.
 
@@ -98,8 +98,8 @@ _Source: `cpp/include/cuvs/distance/distance.hpp:111`_
 
 ## Pairwise Distances API
 
-<a id="kernels-pairwise-distance"></a>
-### kernels::pairwise_distance
+<a id="cuvs-distance-pairwise-distance"></a>
+### cuvs::distance::pairwise_distance
 
 Compute pairwise distances for two matrices
 
@@ -134,7 +134,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:161`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -169,7 +169,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:205`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -204,7 +204,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:248`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -239,7 +239,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:292`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -274,7 +274,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:335`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -309,7 +309,7 @@ Usage example:
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:378`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute sparse pairwise distances between x and y, using the provided
 
@@ -341,7 +341,7 @@ input configuration and distance function.
 
 _Source: `cpp/include/cuvs/distance/distance.hpp:419`_
 
-**Additional overload:** `kernels::pairwise_distance`
+**Additional overload:** `cuvs::distance::pairwise_distance`
 
 Compute sparse pairwise distances between x and y, using the provided
 
