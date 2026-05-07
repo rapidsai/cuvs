@@ -1493,7 +1493,15 @@ void fit(const raft::resources& handle,
          raft::host_scalar_view<IndexT> n_iter)
 {
   raft_comms_reduce_op reduce_op(handle);
-  fit_impl(handle, params, reduce_op, X, sample_weight, centroids, inertia, n_iter);
+  host_matrix_parts_t<DataT, IndexT> X_parts{X};
+
+  std::optional<host_weight_parts_t<DataT, IndexT>> sample_weight_parts = std::nullopt;
+  if (sample_weight.has_value()) {
+    sample_weight_parts.emplace(host_weight_parts_t<DataT, IndexT>{sample_weight.value()});
+  }
+
+  fit_partitions_impl(
+    handle, params, reduce_op, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
 /**
