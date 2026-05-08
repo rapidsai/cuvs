@@ -4,12 +4,12 @@
  */
 
 use std::ffi::CString;
-use std::io::{stderr, Write};
+use std::io::{Write, stderr};
 use std::path::Path;
 
 use crate::cagra::{IndexParams, SearchParams};
 use crate::dlpack::ManagedTensor;
-use crate::error::{check_cuvs, Error, Result};
+use crate::error::{Error, Result, check_cuvs};
 use crate::resources::Resources;
 
 /// CAGRA ANN Index
@@ -43,12 +43,7 @@ impl Index {
         let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsCagraBuild(
-                res.0,
-                params.0,
-                dataset.as_ptr(),
-                index.0,
-            ))?;
+            check_cuvs(ffi::cuvsCagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
         }
         Ok(index)
     }
@@ -80,10 +75,7 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
-            let prefilter = ffi::cuvsFilter {
-                addr: 0,
-                type_: ffi::cuvsFilterType::NO_FILTER,
-            };
+            let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
 
             check_cuvs(ffi::cuvsCagraSearch(
                 res.0,
@@ -156,12 +148,7 @@ impl Index {
     ) -> Result<()> {
         let c_filename = path_to_cstring(filename.as_ref())?;
         unsafe {
-            check_cuvs(ffi::cuvsCagraSerialize(
-                res.0,
-                c_filename.as_ptr(),
-                self.0,
-                include_dataset,
-            ))
+            check_cuvs(ffi::cuvsCagraSerialize(res.0, c_filename.as_ptr(), self.0, include_dataset))
         }
     }
 
@@ -178,13 +165,7 @@ impl Index {
     /// * `filename` - The file path for saving the index
     pub fn serialize_to_hnswlib<P: AsRef<Path>>(&self, res: &Resources, filename: P) -> Result<()> {
         let c_filename = path_to_cstring(filename.as_ref())?;
-        unsafe {
-            check_cuvs(ffi::cuvsCagraSerializeToHnswlib(
-                res.0,
-                c_filename.as_ptr(),
-                self.0,
-            ))
-        }
+        unsafe { check_cuvs(ffi::cuvsCagraSerializeToHnswlib(res.0, c_filename.as_ptr(), self.0)) }
     }
 
     /// Load a CAGRA index from file.
@@ -199,11 +180,7 @@ impl Index {
         let c_filename = path_to_cstring(filename.as_ref())?;
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsCagraDeserialize(
-                res.0,
-                c_filename.as_ptr(),
-                index.0,
-            ))?;
+            check_cuvs(ffi::cuvsCagraDeserialize(res.0, c_filename.as_ptr(), index.0))?;
         }
         Ok(index)
     }
@@ -222,8 +199,8 @@ impl Drop for Index {
 mod tests {
     use super::*;
     use ndarray::s;
-    use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
+    use ndarray_rand::rand_distr::Uniform;
 
     const N_DATAPOINTS: usize = 256;
     const N_FEATURES: usize = 16;
@@ -259,9 +236,7 @@ mod tests {
         let distances = ManagedTensor::from(&distances_host).to_device(res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
-        index
-            .search(res, &search_params, &queries, &neighbors, &distances)
-            .expect("search failed");
+        index.search(res, &search_params, &queries, &neighbors, &distances).expect("search failed");
 
         distances.to_host(res, &mut distances_host).unwrap();
         neighbors.to_host(res, &mut neighbors_host).unwrap();
@@ -290,9 +265,8 @@ mod tests {
     #[test]
     fn test_cagra_compression() {
         use crate::cagra::CompressionParams;
-        let build_params = IndexParams::new()
-            .unwrap()
-            .set_compression(CompressionParams::new().unwrap());
+        let build_params =
+            IndexParams::new().unwrap().set_compression(CompressionParams::new().unwrap());
         test_cagra(build_params);
     }
 
@@ -327,25 +301,14 @@ mod tests {
 
         let k = 10;
         let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host)
-            .to_device(&res)
-            .unwrap();
+        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host)
-            .to_device(&res)
-            .unwrap();
+        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
 
         index
-            .search_with_filter(
-                &res,
-                &search_params,
-                &queries,
-                &neighbors,
-                &distances,
-                &bitset,
-            )
+            .search_with_filter(&res, &search_params, &queries, &neighbors, &distances, &bitset)
             .unwrap();
 
         neighbors.to_host(&res, &mut neighbors_host).unwrap();
@@ -386,9 +349,7 @@ mod tests {
         let (dataset, index) = build_test_index(&res, &build_params);
 
         let filepath = std::env::temp_dir().join("test_cagra_index.bin");
-        index
-            .serialize(&res, &filepath, true)
-            .expect("failed to serialize cagra index");
+        index.serialize(&res, &filepath, true).expect("failed to serialize cagra index");
 
         assert!(filepath.exists(), "serialized index file should exist");
         assert!(
@@ -433,10 +394,7 @@ mod tests {
             .serialize_to_hnswlib(&res, &filepath)
             .expect("failed to serialize cagra index to hnswlib format");
 
-        assert!(
-            filepath.exists(),
-            "serialized hnswlib index file should exist"
-        );
+        assert!(filepath.exists(), "serialized hnswlib index file should exist");
         assert!(
             std::fs::metadata(&filepath).unwrap().len() > 0,
             "serialized hnswlib index file should not be empty"
@@ -459,9 +417,6 @@ mod tests {
         let err = index
             .serialize(&res, &bad_path, true)
             .expect_err("serialize should reject paths with interior NUL");
-        assert!(
-            matches!(err, Error::InvalidArgument(_)),
-            "expected InvalidArgument, got {err:?}"
-        );
+        assert!(matches!(err, Error::InvalidArgument(_)), "expected InvalidArgument, got {err:?}");
     }
 }

@@ -19,11 +19,13 @@
 #include <utility>
 #include <vector>
 
+#include <cuvs/core/export.hpp>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace cuvs::util {
+namespace CUVS_EXPORT cuvs {
+namespace util {
 /**
  * @brief Streambuf that reads from a POSIX file descriptor
  */
@@ -294,4 +296,5 @@ class buffered_ofstream {
   size_t pos_;
 };
 
-}  // namespace cuvs::util
+}  // namespace util
+}  // namespace CUVS_EXPORT cuvs
