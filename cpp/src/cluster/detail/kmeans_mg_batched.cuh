@@ -266,25 +266,26 @@ void mnmg_fit(const raft::resources& handle,
   rmm::device_uvector<char> workspace(0, stream);
   rmm::device_uvector<char> batch_workspace(0, stream);
 
-  // Weight normalization: rescale so global weights sum to global_n
+  // Weight normalization: rescale so global weights sum to global_n.
   T weight_scale = T{1};
   if (sample_weight.has_value()) {
     auto d_n_local = raft::make_device_scalar<IdxT>(dev_res, static_cast<IdxT>(n_local));
-    SNMG_ALLREDUCE(d_n_local.data_handle(), d_n_local.data_handle(), 1);
-    IdxT global_n{};
-    raft::copy(&global_n, d_n_local.data_handle(), 1, stream);
-    raft::resource::sync_stream(dev_res);
-
-    T local_wt_sum = T{0};
-    const T* sw    = sample_weight->data_handle();
-    for (IdxT i = 0; i < n_local; ++i) {
-      local_wt_sum += sw[i];
+    auto d_wt      = raft::make_device_scalar<T>(dev_res, T{0});
+    if (has_data) {
+      cuvs::cluster::kmeans::detail::weightSum(dev_res, sample_weight.value(), d_wt.view());
     }
-    auto d_wt = raft::make_device_scalar<T>(dev_res, local_wt_sum);
+
+    SNMG_GROUP_START();
+    SNMG_ALLREDUCE(d_n_local.data_handle(), d_n_local.data_handle(), 1);
     SNMG_ALLREDUCE(d_wt.data_handle(), d_wt.data_handle(), 1);
+    SNMG_GROUP_END();
+
+    IdxT global_n{};
     T global_wt{};
+    raft::copy(&global_n, d_n_local.data_handle(), 1, stream);
     raft::copy(&global_wt, d_wt.data_handle(), 1, stream);
     raft::resource::sync_stream(dev_res);
+
     RAFT_EXPECTS(std::isfinite(global_wt) && global_wt > T{0},
                  "invalid parameter (sum of sample weights must be finite and positive)");
     const auto global_n_wt = static_cast<T>(global_n);
@@ -579,7 +580,6 @@ void mnmg_fit(const raft::resources& handle,
   if (rank == 0) {
     raft::copy(
       centroids.data_handle(), rank_centroids.data_handle(), n_clusters * n_features, stream);
-    raft::resource::sync_stream(dev_res);
     inertia[0] = local_inertia;
     n_iter[0]  = local_n_iter;
   }
