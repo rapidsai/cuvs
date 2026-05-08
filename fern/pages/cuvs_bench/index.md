@@ -16,6 +16,8 @@ This tool offers several benefits, including
 
 1. Investigating the relationship between different parameter settings, index build times, and search performance.
 
+For dataset file formats, conversion utilities, and ground-truth generation, see [cuVS Bench Datasets](datasets.md).
+
 - [Installing the benchmarks](#installing-the-benchmarks)
 
   * [Conda](#conda)

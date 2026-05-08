@@ -102,8 +102,6 @@ navigation:
           - page: "Build cuVS Bench From Source"
             hidden: true
             path: "./pages/cuvs_bench/build.md"
-          - page: "cuVS Bench Datasets"
-            path: "./pages/cuvs_bench/datasets.md"
           - page: "cuVS Bench Parameter Tuning Guide"
             hidden: true
             path: "./pages/cuvs_bench/param_tuning.md"

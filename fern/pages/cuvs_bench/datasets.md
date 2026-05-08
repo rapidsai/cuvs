@@ -1,59 +1,67 @@
 # cuVS Bench Datasets
 
-A dataset usually has 4 binary files containing database vectors, query vectors, ground truth neighbors and their corresponding distances. For example, Glove-100 dataset has files `base.fbin` (database vectors), `query.fbin` (query vectors), `groundtruth.neighbors.ibin` (ground truth neighbors), and `groundtruth.distances.fbin` (ground truth distances). The first two files are for index building and searching, while the other two are associated with a particular distance and are used for evaluation.
+cuVS Bench datasets usually contain four binary files:
 
-The file suffixes `.fbin`, `.f16bin`, `.ibin`, `.u8bin`, and `.i8bin` denote that the data type of vectors stored in the file are `float32`, `float16`(a.k.a `half`), `int`, `uint8`, and `int8`, respectively.
-These binary files are little-endian and the format is: the first 8 bytes are `num_vectors` (`uint32_t`) and `num_dimensions` (`uint32_t`), and the following `num_vectors * num_dimensions * sizeof(type)` bytes are vectors stored in row-major order.
+| File | Purpose |
+| --- | --- |
+| `base.fbin` | Database vectors used to build the index |
+| `query.fbin` | Query vectors used during search |
+| `groundtruth.neighbors.ibin` | Exact nearest-neighbor ids |
+| `groundtruth.distances.fbin` | Exact nearest-neighbor distances |
 
-Some implementation can take `float16` database and query vectors as inputs and will have better performance. Use `python/cuvs_bench/cuvs_bench/get_dataset/fbin_to_f16bin.py` to transform dataset from `float32` to `float16` type.
+The vector files are used for build and search. The ground-truth files are tied to a distance metric and are used to evaluate recall.
 
-Commonly used datasets can be downloaded from two websites:
-1. Million-scale datasets can be found at the [Data sets](https://github.com/erikbern/ann-benchmarks#data-sets) section of [ann-benchmarks](https://github.com/erikbern/ann-benchmarks).
+## Binary format
 
-    However, these datasets are in HDF5 format. Use `python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py` to transform the format. The usage of this script is:
+Dataset suffixes describe the stored type:
 
-    ```bash
-    $ python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py
-    usage: hdf5_to_fbin.py [-n] &lt;input>.hdf5
-       -n: normalize base/query set
-     outputs: &lt;input>.base.fbin
-              &lt;input>.query.fbin
-              &lt;input>.groundtruth.neighbors.ibin
-              &lt;input>.groundtruth.distances.fbin
-    ```
+| Suffix | Type |
+| --- | --- |
+| `.fbin` | `float32` |
+| `.f16bin` | `float16` |
+| `.ibin` | `int32` |
+| `.u8bin` | `uint8` |
+| `.i8bin` | `int8` |
 
-    So for an input `.hdf5` file, four output binary files will be produced. See previous section for an example of prepossessing GloVe dataset.
+All binary files are little-endian. The first 8 bytes store `num_vectors` and `num_dimensions` as `uint32_t` values. The remaining bytes store `num_vectors * num_dimensions` values in row-major order.
 
-    Most datasets provided by `ann-benchmarks` use `Angular` or `Euclidean` distance. `Angular` denotes cosine distance. However, computing cosine distance reduces to computing inner product by normalizing vectors beforehand. In practice, we can always do the normalization to decrease computation cost, so it's better to measure the performance of inner product rather than cosine distance. The `-n` option of `hdf5_to_fbin.py` can be used to normalize the dataset.
+Some implementations can use `float16` vectors for better performance. Convert `float32` files with:
 
-1. Billion-scale datasets can be found at [big-ann-benchmarks](http://big-ann-benchmarks.com). The ground truth file contains both neighbors and distances, thus should be split. A script is provided for this:
+```bash
+python/cuvs_bench/cuvs_bench/get_dataset/fbin_to_f16bin.py
+```
 
-    Take Deep-1B dataset as an example:
+## Dataset sources
 
-    ```bash
-    mkdir -p data/deep-1B && cd data/deep-1B
+Million-scale datasets are available from [ann-benchmarks](https://github.com/erikbern/ann-benchmarks#data-sets). These datasets are distributed as HDF5 files. Convert them to cuVS Bench binary files with:
 
-    # download manually "Ground Truth" file of "Yandex DEEP"
-    # suppose the file name is deep_new_groundtruth.public.10K.bin
-    python -m cuvs_bench.split_groundtruth deep_new_groundtruth.public.10K.bin groundtruth
+```bash
+python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py [-n] <input>.hdf5
+```
 
-    # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
-    ```
+Use `-n` to normalize base and query vectors. This is useful for angular datasets because normalized cosine search can be measured as inner-product search.
 
-    Besides ground truth files for the whole billion-scale datasets, this site also provides ground truth files for the first 10M or 100M vectors of the base sets. This mean we can use these billion-scale datasets as million-scale datasets. To facilitate this, an optional parameter `subset_size` for dataset can be used. See the next step for further explanation.
+Billion-scale datasets are available from [big-ann-benchmarks](http://big-ann-benchmarks.com). Their ground-truth files contain both neighbors and distances, so split them before running benchmarks:
+
+```bash
+python -m cuvs_bench.split_groundtruth deep_new_groundtruth.public.10K.bin groundtruth
+```
+
+This produces `groundtruth.neighbors.ibin` and `groundtruth.distances.fbin`.
 
 ## Generate ground truth
 
-If you have a dataset, but no corresponding ground truth file, then you can generate ground trunth using the `generate_groundtruth` utility. Example usage:
+If a dataset does not include ground truth, generate it with `cuvs_bench.generate_groundtruth`:
 
 ```bash
-# With existing query file
+# With an existing query file
 python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.fbin --output=groundtruth_dir --queries=/dataset/query.public.10K.fbin
 
 # With randomly generated queries
 python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.fbin --output=groundtruth_dir --queries=random --n_queries=10000
 
-# Using only a subset of the dataset. Define queries by randomly
-# selecting vectors from the (subset of the) dataset.
+# With random queries selected from a subset of the dataset
 python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.fbin --nrows=2000000 --output=groundtruth_dir --queries=random-choice --n_queries=10000
 ```
+
+For billion-scale sources that provide ground truth for only the first 10M or 100M base vectors, use `subset_size` in the dataset configuration so the benchmark uses the matching prefix of the base file.
