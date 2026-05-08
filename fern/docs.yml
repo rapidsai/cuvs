@@ -64,6 +64,13 @@ navigation:
         path: "./pages/getting_started.md"
       - page: "Integrations"
         path: "./pages/integrations.md"
+      - section: "Benchmarking"
+        path: "./pages/cuvs_bench/index.md"
+        contents:
+          - page: "cuVS Bench Datasets"
+            path: "./pages/cuvs_bench/datasets.md"
+          - page: "Pluggable Backend"
+            path: "./pages/cuvs_bench/pluggable_backend.md"
   - section: "Developer Guide"
     contents:
       - page: "Developer Guide"
@@ -83,13 +90,6 @@ navigation:
             path: "./pages/working_with_ann_indexes_python.md"
           - page: "Working with ANN Indexes in Rust"
             path: "./pages/working_with_ann_indexes_rust.md"
-      - section: "Benchmarking"
-        path: "./pages/cuvs_bench/index.md"
-        contents:
-          - page: "cuVS Bench Datasets"
-            path: "./pages/cuvs_bench/datasets.md"
-          - page: "Pluggable Backend"
-            path: "./pages/cuvs_bench/pluggable_backend.md"
   - section: "API Reference"
     path: "./pages/api_docs.md"
     contents:
