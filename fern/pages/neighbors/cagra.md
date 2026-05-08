@@ -296,11 +296,187 @@ cuVS can convert a CAGRA graph to an HNSW graph. This lets the GPU build the gra
 
 If the graph is being serialized or converted to HNSW right after build, set `attach_data_on_build` to `False` to avoid keeping the dataset attached to the CAGRA index.
 
-## Filtering considerations
+## Using Filters
 
 CAGRA supports filtered search. A filter hides some vectors from the search result, so CAGRA may need to explore more of the graph to find enough valid neighbors.
 
 CAGRA can adjust `itopk_size` internally based on the filtering rate. To disable this automatic adjustment, set `filtering_rate` to `0.0`.
+
+The examples below use a bitset filter. A bit value of `1` means a vector is allowed; a bit value of `0` means it is filtered out.
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/common.h>
+
+cuvsResources_t res;
+cuvsCagraSearchParams_t search_params;
+cuvsCagraIndex_t index;
+DLManagedTensor *queries;
+DLManagedTensor *neighbors;
+DLManagedTensor *distances;
+
+// Create a device uint32 bitset with one bit per indexed vector.
+// Bit 1 means allowed; bit 0 means filtered out.
+DLManagedTensor *bitset = make_device_bitset(allowed_indices, n_vectors);
+
+cuvsFilter filter;
+filter.type = BITSET;
+filter.addr = (uintptr_t)bitset;
+
+// ... build or load index ...
+cuvsCagraSearch(res, search_params, index, queries, neighbors, distances, filter);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/core/bitset.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+cagra::index index;
+cagra::search_params search_params;
+raft::device_matrix_view<float> queries = load_queries();
+raft::device_matrix_view<uint32_t> neighbors = make_device_matrix_view<uint32_t>(n_queries, k);
+raft::device_matrix_view<float> distances = make_device_matrix_view<float>(n_queries, k);
+
+// Load a list of all samples that should be filtered out.
+std::vector<uint32_t> removed_indices_host = get_invalid_indices();
+auto removed_indices_device =
+      raft::make_device_vector<uint32_t, uint32_t>(res, removed_indices_host.size());
+
+raft::copy(removed_indices_device.data_handle(),
+           removed_indices_host.data(),
+           removed_indices_host.size(),
+           raft::resource::get_cuda_stream(res));
+
+// Create a bitset and pass it to CAGRA search.
+cuvs::core::bitset<uint32_t, uint32_t> removed_indices_bitset(
+    res, removed_indices_device.view(), index.size());
+auto bitset_filter =
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
+
+cagra::search(res, search_params, index, queries, neighbors, distances, bitset_filter);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+import cupy as cp
+import numpy as np
+from cuvs.neighbors import cagra, filters
+
+n_vectors = dataset.shape[0]
+allowed_indices = np.asarray(get_allowed_indices(), dtype=np.uint32)
+
+bitset_host = np.zeros((n_vectors + 31) // 32, dtype=np.uint32)
+for idx in allowed_indices:
+    bitset_host[idx // 32] |= np.uint32(1 << (idx % 32))
+
+prefilter = filters.from_bitset(cp.asarray(bitset_host))
+search_params = cagra.SearchParams()
+
+# ... build or load index ...
+distances, neighbors = cagra.search(
+    search_params,
+    index,
+    queries,
+    k,
+    filter=prefilter,
+)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+import java.util.BitSet;
+
+BitSet prefilter = new BitSet(vectors.length);
+prefilter.set(0, vectors.length);
+
+for (int row : getFilteredRows()) {
+  prefilter.clear(row);
+}
+
+CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+CagraQuery cuvsQuery =
+    new CagraQuery.Builder()
+        .withTopK(10)
+        .withSearchParams(searchParams)
+        .withQueryVectors(queries)
+        .withPrefilter(prefilter, vectors.length)
+        .build();
+
+// ... build or load index ...
+SearchResults results = index.search(cuvsQuery);
+```
+
+</Tab>
+<Tab title="Rust">
+
+```rust
+use cuvs::cagra::SearchParams;
+use cuvs::{ManagedTensor, Resources, Result};
+
+fn search_with_filter(
+    res: &Resources,
+    index: &cuvs::cagra::Index,
+    queries: &ManagedTensor,
+    neighbors: &ManagedTensor,
+    distances: &ManagedTensor,
+    n_vectors: usize,
+) -> Result<()> {
+    let n_words = (n_vectors + 31) / 32;
+    let mut bitset_host = ndarray::Array::<u32, _>::zeros(ndarray::Ix1(n_words));
+
+    for idx in get_allowed_indices() {
+        bitset_host[idx / 32] |= 1u32 << (idx % 32);
+    }
+
+    let bitset = ManagedTensor::from(&bitset_host).to_device(res)?;
+    let search_params = SearchParams::new()?;
+
+    index.search_with_filter(res, &search_params, queries, neighbors, distances, &bitset)
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+searchParams, err := cagra.CreateSearchParams()
+if err != nil {
+	return err
+}
+defer searchParams.Close()
+
+// The Go CAGRA API accepts an allow list and converts it to a bitset.
+allowList := []uint32{0, 2, 4, 6}
+
+err = cagra.SearchIndex(
+	resource,
+	searchParams,
+	index,
+	&queries,
+	&neighbors,
+	&distances,
+	allowList,
+)
+if err != nil {
+	return err
+}
+```
+
+</Tab>
+</Tabs>
 
 ## Configuration parameters
 

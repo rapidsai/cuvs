@@ -12,51 +12,11 @@ A bitset is an array of bits where each bit can have two possible values: `0` an
 
 Bitsets are optimized to use as little memory as possible and are available through RAFT. See the RAFT [bitset API documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitset/) for more information. When calling a search function of an ANN index, the bitset length should match the number of vectors present in the database.
 
+For CAGRA bitset examples, see [Using Filters](neighbors/cagra.md#using-filters).
+
 ### Bitmap
 
 A bitmap is based on the same principle as a bitset, but in two dimensions. This allows users to provide a different bitset for each query being searched. See the RAFT [bitmap API documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitmap/) for more information.
-
-### Using a Bitset filter on a CAGRA index
-
-```c++
-#include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/core/bitset.hpp>
-
-using namespace cuvs::neighbors;
-cagra::index index;
-
-// ... build index ...
-
-cagra::search_params search_params;
-raft::device_resources res;
-raft::device_matrix_view<float> queries = load_queries();
-raft::device_matrix_view<uint32_t> neighbors = make_device_matrix_view<uint32_t>(n_queries, k);
-raft::device_matrix_view<float> distances = make_device_matrix_view<float>(n_queries, k);
-
-// Load a list of all the samples that will get filtered.
-std::vector<uint32_t> removed_indices_host = get_invalid_indices();
-auto removed_indices_device =
-      raft::make_device_vector<uint32_t, uint32_t>(res, removed_indices_host.size());
-
-// Copy this list to device.
-raft::copy(removed_indices_device.data_handle(), removed_indices_host.data(),
-           removed_indices_host.size(), raft::resource::get_cuda_stream(res));
-
-// Create a bitset with the list of samples to filter.
-cuvs::core::bitset<uint32_t, uint32_t> removed_indices_bitset(
-    res, removed_indices_device.view(), index.size());
-
-// Use a `bitset_filter` in the `cagra::search` function call.
-auto bitset_filter =
-      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
-cagra::search(res,
-              search_params,
-              index,
-              queries,
-              neighbors,
-              distances,
-              bitset_filter);
-```
 
 ### Using a Bitmap filter on a Brute-force index
 
