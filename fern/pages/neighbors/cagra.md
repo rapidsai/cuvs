@@ -1,29 +1,42 @@
 # CAGRA
 
-CAGRA, or (C)UDA (A)NN (GRA)ph-based, is a graph-based index that is based loosely on the popular navigable small-world graph (NSG) algorithm, but which has been
-built from the ground-up specifically for the GPU. CAGRA constructs a flat graph representation by first building a kNN graph
-of the training points and then removing redundant paths between neighbors.
+CAGRA is a GPU-optimized graph index for approximate nearest-neighbor search. Think of every vector as a point, and think of the graph as a map that connects each point to nearby points. During search, CAGRA follows that map toward better matches instead of checking every vector.
 
-The CAGRA algorithm has two basic steps-
-* 1. Construct a kNN graph
-* 2. Prune redundant routes from the kNN graph.
-
-I-force could be used to construct the initial kNN graph. This would yield the most accurate graph but would be very slow and
-we find that in practice the kNN graph does not need to be very accurate since the pruning step helps to boost the overall recall of
-the index. cuVS provides IVF-PQ and NN-Descent strategies for building the initial kNN graph and these can be selected in index params object during index construction.
+CAGRA works well when you want strong recall, high GPU throughput, and fast graph construction.
 
 [C API](/api-reference/c-api-neighbors-cagra) | [C++ API](/api-reference/cpp-api-neighbors-cagra) | [Python API](/api-reference/python-api-neighbors-cagra) | [Java API](/api-reference/java-api-com-nvidia-cuvs-cagraindex) | [Rust API](/api-reference/rust-api-cuvs-cagra) | [Go API](/api-reference/go-api-cagra)
 
+## How CAGRA works
+
+CAGRA builds and searches a nearest-neighbor graph.
+
+First, CAGRA builds an initial kNN graph. This is the first draft of the map: each vector is connected to vectors that look nearby. An exact brute-force build can create a very accurate initial graph, but it is usually too slow. In practice, the first graph does not need to be perfect because CAGRA improves it later. cuVS can build this initial graph with IVF-PQ or NN-Descent.
+
+Second, CAGRA prunes the initial graph. This removes redundant paths and keeps the links that are most useful for search.
+
+At search time, CAGRA starts from one or more graph vertices, follows links to better candidates, and keeps a working set of the best candidates it has seen so far.
+
+## When to use CAGRA
+
+Use CAGRA when the index fits in GPU memory and you want fast approximate search.
+
+Use CAGRA when build speed matters. CAGRA can build graphs quickly on the GPU.
+
+Use CAGRA in hybrid environments where a GPU-built graph is converted to HNSW for CPU search.
+
+Use brute-force instead when exact results are required or the dataset is small enough that a full scan is already fast enough.
+
 ## Interoperability with HNSW
 
-cuVS provides the capability to convert a CAGRA graph to an HNSW graph, which enables the GPU to be used only for building the index
-while the CPU can be leveraged for search.
+cuVS can convert a CAGRA graph to an HNSW graph. This lets the GPU build the graph while the CPU handles search later. This is useful when GPUs are available for indexing, but production search runs on CPUs.
+
+If the graph is being serialized or converted to HNSW right after build, set `attach_data_on_build` to `False` to avoid keeping the dataset attached to the CAGRA index.
 
 ## Filtering considerations
 
-CAGRA supports filtered search and has improved multi-CTA algorithm in branch-25.02 to provide reasonable recall and performance for filtering rate as high as 90% or more.
+CAGRA supports filtered search. A filter hides some vectors from the search result, so CAGRA may need to explore more of the graph to find enough valid neighbors.
 
-To obtain an appropriate recall in filtered search, it is necessary to set search parameters according to the filtering rate, but since it is difficult for users to do this, CAGRA automatically adjusts `itopk_size` internally according to the filtering rate on a heuristic basis. If you want to disable this automatic adjustment, set `filtering_rate`, one of the search parameters, to `0.0`, and `itopk_size` will not be adjusted automatically.
+CAGRA can adjust `itopk_size` internally based on the filtering rate. To disable this automatic adjustment, set `filtering_rate` to `0.0`.
 
 ## Configuration parameters
 
@@ -31,194 +44,247 @@ To obtain an appropriate recall in filtered search, it is necessary to set searc
 
 | Name | Default | Description |
 | --- | --- | --- |
-| compression | None | For large datasets, the raw vectors can be compressed using product quantization so they can be placed on device. This comes at the cost of lowering recall, though a refinement reranking step can be used to make up the lost recall after search. |
-| graph_build_algo | 'IVF_PQ' | The graph build algorithm to use for building |
-| graph_build_params | None | Specify explicit build parameters for the corresponding graph build algorithms |
-| graph_degree | 32 | The degree of the final CAGRA graph. All vertices in the graph will have this degree. During search, a larger graph degree allows for more exploration of the search space and improves recall but at the expense of searching more vertices. |
-| intermediate_graph_degree | 64 | The degree of the initial knn graph before it is optimized into the final CAGRA graph. A larger value increases connectivity of the initial graph so that it performs better once pruned. Larger values come at the cost of increased device memory usage and increases the time of initial knn graph construction. |
-| guarantee_connectivity | False | Uses a degree-constrained minimum spanning tree to guarantee the initial knn graph is connected. This can improve recall on some datasets. |
-| attach_data_on_build | True | Should the dataset be attached to the index after the index is built? Setting this to `False` can improve memory usage and performance, for example if the graph is being serialized to disk or converted to HNSW right after building it. |
+| `compression` | None | Compresses the raw vectors with product quantization so larger datasets can fit on device. This can lower recall, so refinement reranking may be needed after search. |
+| `graph_build_algo` | `IVF_PQ` | Algorithm used to build the initial kNN graph. |
+| `graph_build_params` | None | Explicit build parameters for the selected graph build algorithm. |
+| `graph_degree` | 32 | Number of neighbors kept for each vertex in the final graph. Larger values can improve recall, but use more memory and search work. |
+| `intermediate_graph_degree` | 64 | Number of neighbors kept in the initial graph before pruning. Larger values can improve the final graph, but increase build time and memory use. |
+| `guarantee_connectivity` | False | Uses a degree-constrained minimum spanning tree to guarantee the initial kNN graph is connected. This can improve recall on some datasets. |
+| `attach_data_on_build` | True | Keeps the dataset attached to the index after build. Set to `False` when serializing or converting to HNSW right after build. |
 
 ### Search parameters
 
 | Name | Default | Description |
 | --- | --- | --- |
-| itopk_size | 64 | Number of intermediate search results retained during search. This value needs to be >=k. This is the main knob to tweak search performance. |
-| max_iterations | 0 | The maximum number of iterations during search. Default is to auto-select. |
-| max_queries | 0 | Max number of search queries to perform concurrently (batch size). Default is to auto-select. |
-| team_size | 0 | Number of CUDA threads for calculating each distance. Can be 4, 8, 16, or 32. Default is to auto-select. |
-| search_width | 1 | Number of vertices to select as the starting point for the search in each iteration. |
-| min_iterations | 0 | Minimum number of search iterations to perform |
+| `itopk_size` | 64 | Number of intermediate search results kept during search. This must be at least `k` and is the main search tuning knob. |
+| `max_iterations` | 0 | Maximum number of search iterations. `0` lets cuVS choose automatically. |
+| `max_queries` | 0 | Maximum number of queries searched concurrently. `0` lets cuVS choose automatically. |
+| `team_size` | 0 | Number of CUDA threads used to calculate each distance. Valid values are 4, 8, 16, or 32. `0` lets cuVS choose automatically. |
+| `search_width` | 1 | Number of vertices selected as starting points for each search iteration. |
+| `min_iterations` | 0 | Minimum number of search iterations. |
 
-## Tuning Considerations
+## Tuning
 
-The 3 hyper-parameters that are most often tuned are `graph_degree`, `intermediate_graph_degree`, and `itopk_size`.
+The three parameters most often tuned are `itopk_size`, `graph_degree`, and `intermediate_graph_degree`.
 
-# Memory footprint
+Start with `itopk_size`. Increasing it usually improves recall, but lowers throughput because CAGRA keeps more candidates during search.
 
-CAGRA builds a nearest-neighbor graph (stored on host) while keeping the original dataset vectors around. During index build, the dataset must reside in device (GPU) memory. After building, the dataset can optionally be detached from the index — for example, when immediately converting the CAGRA graph to a CPU-based format like HNSW for search.
+If search-time tuning is not enough, increase `graph_degree`. This gives each vertex more links to follow, but uses more memory and search work.
 
-## Baseline Memory Footprint
+If the final graph quality is still too low, increase `intermediate_graph_degree`. This gives pruning more choices, but makes build more expensive.
 
-The baseline memory footprint after index construction:
+## Memory footprint
+
+CAGRA memory has two main parts: the dataset and the graph. During build, the dataset must be in GPU memory. After build, the dataset can be detached if it is not needed for search, for example when immediately converting the graph to HNSW.
+
+To keep the formulas readable, this section uses the following symbols:
+
+| Symbol | Meaning |
+| --- | --- |
+| `N` | Number of vectors |
+| `D` | Vector dimension |
+| `B` | Bytes per vector dimension |
+| `G` | `graph_degree` |
+| `I` | `intermediate_graph_degree` |
+| `C` | `n_clusters` |
+| `R` | `train_set_ratio` |
+| `Q` | `batch_size` |
+| `K` | `topk` |
+| `S_idx` | `sizeof(IdxT)` |
+
+### Baseline memory after build
+
+The baseline memory footprint after index construction is:
 
 $$
+\begin{aligned}
 \text{dataset\_size (device)}
-\;=\;
-\text{number\_vectors} \times \text{vector\_dimension} \times \text{bytes\_per\_dimension}
+&= N \times D \times B
+\end{aligned}
 $$
 
 $$
+\begin{aligned}
 \text{graph\_size (host)}
-\;=\;
-\text{number\_vectors} \times \text{graph\_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
+&= N \times G \times S_{\text{idx}}
+\end{aligned}
 $$
 
-Note: The dataset must be in GPU memory during index build, but can be detached afterward if not needed for search.
+The dataset must be in GPU memory during index build, but can be detached afterward if it is not needed for search.
 
-**Example** (1,000,000 vectors, dim = 1024, fp32, graph\_degree = 64, IdxT = int32):
+**Example** (1,000,000 vectors, dim = 1024, fp32, `graph_degree = 64`, `IdxT = int32`):
 
-- dataset\_size = 4,096,000,000 B = 3906.25 MB
-- graph\_size   = 256,000,000 B = 244.14 MB
+- `dataset_size = 4,096,000,000 B = 3906.25 MB`
+- `graph_size = 256,000,000 B = 244.14 MB`
 
-## Build peak memory usage
+### Build peak memory usage
 
-Index build has two phases: (1) construct a knn graph, then (2) optimize it to remove redundant and unnecessary paths.
-The initial knn graph can be built with IVF-PQ or nn-descent. IVF-PQ has the additional benefit that it supports out-of-core construction, allowing CAGRA to be trained on datasets larger than available GPU memory.
-The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured RMM memory resource.
+Index build has two phases: construct an initial kNN graph, then optimize it by pruning redundant paths. These steps run sequentially, so their peak memory use is not additive. The overall peak depends on the configured RMM memory resource.
 
-### knn graph build phase using IVF-PQ
+The initial graph can be built with IVF-PQ or NN-Descent. IVF-PQ can build in batches, which allows CAGRA to train on datasets larger than available GPU memory.
 
-The knn graph can be constructed using the IVF-PQ algorithm, which works in two stages: first, an IVF-PQ index is trained on a subset of vectors to learn cluster centroids; then, the full dataset is queried against this index in batches to find approximate nearest neighbors for each vector.
+### Initial graph build using IVF-PQ
 
-**IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and PQ codebooks.
+IVF-PQ builds the initial graph in two stages. First, it trains cluster centroids and PQ codebooks. Then it queries the IVF-PQ index in batches to form approximate nearest-neighbor lists.
+
+**IVF-PQ build peak:**
 
 $$
+\begin{aligned}
 \text{IVFPQ\_build\_peak}
-\;=\;
-\frac{n_{\text{vectors}}}{\text{train\_set\_ratio}} \times \text{dim} \times 4
-\;+\;
-n_{\text{clusters}} \times \text{dim} \times 4
-\;+\;
-\frac{n_{\text{vectors}}}{\text{train\_set\_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
+&= \frac{N}{R} \times D \times 4 \\
+&\quad + C \times D \times 4 \\
+&\quad + \frac{N}{R}
+  \times \operatorname{sizeof}(\mathrm{uint32\_t})
+\end{aligned}
 $$
 
-**Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): 395.01 MB
+**Example** (`N = 1e6`, `D = 1024`, `C = 1024`, `R = 10`): 395.01 MB
 
-**IVF-PQ Search (forms the intermediate graph)** — Constructs the knn graph in batches by querying the IVF-PQ index for the nearest neighbors of all training points.
+**IVF-PQ search peak:**
 
 $$
+\begin{aligned}
 \text{IVFPQ\_search\_peak}
-\;=\;
-\text{batch\_size} \times \text{dim} \times 4
-\;+\;
-\text{batch\_size} \times \text{intermediate\_degree} \times \operatorname{sizeof}(\mathrm{uint32\_t})
-\;+\;
-\text{batch\_size} \times \text{intermediate\_degree} \times 4
+&= Q \times D \times 4 \\
+&\quad + Q \times I
+  \times \operatorname{sizeof}(\mathrm{uint32\_t}) \\
+&\quad + Q \times I \times 4
+\end{aligned}
 $$
 
-**Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): 5.00 MB
+**Example** (`Q = 1024`, `D = 1024`, `I = 128`): 5.00 MB
 
-### knn graph build phase using NN-DESCENT
+### Initial graph build using NN-Descent
 
 **Peak device memory:**
 
 $$
+\begin{aligned}
 \text{NND\_device\_peak}
-\;=\;
-n_{\text{vectors}} \times (n_{\text{dims}} \times 2 + 276)
+&= N \times (D \times 2 + 276)
+\end{aligned}
 $$
 
-- Data vectors (transferred to device and stored as fp16): $n_{\text{dims}} \times 2$ bytes per vector
-- Small working graph, locks, edge counters: 276 bytes per vector (fixed)
-- Additional $4$ bytes per vector when using L2 metric (for precomputed norms)
+- Data vectors are transferred to device and stored as fp16: `D * 2` bytes per vector.
+- The small working graph, locks, and edge counters use 276 bytes per vector.
+- L2 metric adds 4 bytes per vector for precomputed norms.
 
 **Peak host memory:**
 
 $$
+\begin{aligned}
 \text{NND\_host\_peak}
-\;=\;
-n_{\text{vectors}} \times (13 \times \text{intermediate\_graph\_degree} + 912)
+&= N \times (13 \times I + 912)
+\end{aligned}
 $$
 
-- Full graph with distances (~1.3x overallocation): $1.3 \times 8 \times \text{intermediate\_graph\_degree}$ bytes per vector
-- Bloom filter for sampling: $1.3 \times 2 \times \text{intermediate\_graph\_degree}$ bytes per vector
-- 5 sample buffers (degree 32 each): 640 bytes per vector
-- Graph update buffer (degree 32): 256 bytes per vector
-- Edge counters: 16 bytes per vector
+- Full graph with distances: `1.3 * 8 * I` bytes per vector.
+- Bloom filter for sampling: `1.3 * 2 * I` bytes per vector.
+- 5 sample buffers with degree 32: 640 bytes per vector.
+- Graph update buffer with degree 32: 256 bytes per vector.
+- Edge counters: 16 bytes per vector.
 
 ### Optimize phase
 
-Pruning/reordering the intermediate graph; peak scales linearly with intermediate degree.
+The optimize phase prunes and reorders the intermediate graph. Its peak memory scales linearly with the intermediate degree:
 
 $$
+\begin{aligned}
 \text{optimize\_peak}
-\;=\;
-n_{\text{vectors}} \times
-\Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate\_degree} \Big)
+&= N \times
+  \Big( 4 + (S_{\text{idx}} + 1) \times I \Big)
+\end{aligned}
 $$
 
-**Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): 614.17 MB
-Out-of-core CAGRA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimization. Note that these steps are performed sequentially, so they are not additive.
+**Example** (`N = 1e6`, `I = 128`, `IdxT = int32`): 614.17 MB
 
-### Overall Build Peak Memory Usage
+Out-of-core CAGRA build consists of IVF-PQ build, IVF-PQ search, and CAGRA optimization. These steps are sequential, so their temporary memory peaks are not added together.
 
-The overall peak memory footprint on the device is the maximum allocation across each sequential step, since RMM's `device_memory_resource` releases memory between steps.
+### Overall build peak memory usage
+
+The overall device peak is the dataset size plus the largest temporary allocation from the sequential build steps.
 
 **Using IVF-PQ:**
 
 $$
+\begin{aligned}
 \text{build\_peak}
-\;=\;
-\text{dataset\_size}
-\;+\;
-\max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
+&= \text{dataset\_size} \\
+&\quad + \max\!\big(
+  \text{IVFPQ\_build\_peak}, \\
+&\qquad\qquad
+  \text{IVFPQ\_search\_peak}, \\
+&\qquad\qquad
+  \text{optimize\_peak}
+\big)
+\end{aligned}
 $$
 
-**Example:** 3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB
+**Example:** `3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB`
 
 **Using NN-Descent:**
 
 $$
+\begin{aligned}
 \text{build\_peak}
-\;=\;
-\text{dataset\_size}^{*}
-\;+\;
-\max\!\big(\text{NND\_device\_peak},\ \text{optimize\_peak}\big)
+&= \text{dataset\_size}^{*} \\
+&\quad + \max\!\big(
+  \text{NND\_device\_peak}, \\
+&\qquad\qquad
+  \text{optimize\_peak}
+\big)
+\end{aligned}
 $$
 
-$\text{dataset\_size}^{*}$ applies only when the user passes data residing in device memory; NN-Descent internally copies the dataset to the device as fp16, so host-memory inputs do not add this term.
+`dataset_size*` applies only when the user passes data that is already in device memory. NN-Descent internally copies the dataset to the device as fp16, so host-memory inputs do not add this term.
 
 ## Search peak memory usage
 
-CAGRA search requires the dataset and graph to already be resident in GPU memory. When using CAGRA-Q (compressed/quantized), the original dataset can reside in host memory instead. Additionally, temporary workspace memory is needed to store the search results for a batch of queries.
-If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each.
-The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
+CAGRA search requires the dataset and graph to already be resident in GPU memory. When using CAGRA-Q, the original dataset can reside in host memory instead. Search also needs temporary workspace for query vectors and results.
+
+If multiple batches run concurrently or overlap, each batch needs separate result buffers. The estimate below assumes one query batch at a time and reused buffers.
 
 $$
+\begin{aligned}
 \text{search\_memory}
-\;=\;
-\text{dataset\_size} + \text{graph\_size} + \text{workspace\_size}
+&= \text{dataset\_size} \\
+&\quad + \text{graph\_size} \\
+&\quad + \text{workspace\_size}
+\end{aligned}
 $$
 
-Where `workspace_size` is the temporary memory used for query vectors and result storage:
+The workspace contains query vectors and result storage:
 
 $$
+\begin{aligned}
 \text{query\_size}
-\;=\;
-\text{batch\_size} \times \text{dim} \times \operatorname{sizeof}(\mathrm{float})
+&= Q \times D
+  \times \operatorname{sizeof}(\mathrm{float})
+\end{aligned}
 $$
 
 $$
+\begin{aligned}
 \text{result\_size}
-\;=\;
-\text{batch\_size} \times \text{topk} \times
-\big(\operatorname{sizeof}(\mathrm{IdxT}) + \operatorname{sizeof}(\mathrm{float})\big)
+&= Q \times K \\
+&\quad \times
+  \big(S_{\text{idx}}
+  + \operatorname{sizeof}(\mathrm{float})\big)
+\end{aligned}
 $$
 
-**Example** (dim = 1024, batch\_size = 100, topk = 10, IdxT = int32):
+$$
+\begin{aligned}
+\text{workspace\_size}
+&= \text{query\_size}
+  + \text{result\_size}
+\end{aligned}
+$$
 
-- query\_size  = 409,600 B = 0.39 MB
-- result\_size = 8,000 B = 0.0076 MB
-- workspace\_size = query\_size + result\_size = 0.40 MB
-- Total search memory ≈ 3906.25 + 244.14 + 0.40 = 4150.79 MB
+**Example** (`D = 1024`, `Q = 100`, `K = 10`, `IdxT = int32`):
+
+- `query_size = 409,600 B = 0.39 MB`
+- `result_size = 8,000 B = 0.0076 MB`
+- `workspace_size = query_size + result_size = 0.40 MB`
+- `total search memory ~= 3906.25 + 244.14 + 0.40 = 4150.79 MB`
