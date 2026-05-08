@@ -6,10 +6,33 @@ slug: api-reference/cpp-api-preprocessing-pca
 
 _Source header: `cpp/include/cuvs/preprocessing/pca.hpp`_
 
+## Types
+
+<a id="cuvs-preprocessing-pca-params"></a>
+### cuvs::preprocessing::pca::params
+
+Parameters for PCA decomposition. Ref:
+
+http://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
+
+```cpp
+struct params { ... };
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `n_components` | `int` | Number of components to keep. |
+| `copy` | `bool` | If false, data passed to fit are overwritten and running fit(X).transform(X) will not yield the expected results, use fit_transform(X) instead. |
+| `whiten` | `bool` | When true (false by default) the components vectors are multiplied by the square root of n_samples and then divided by the singular values to ensure uncorrelated outputs with unit component-wise variances. |
+| `algorithm` | `solver` | The solver algorithm to use. |
+| `tol` | `float` | Tolerance for singular values computed by svd_solver == 'arpack' or the Jacobi solver. |
+| `n_iterations` | `int` | Number of iterations for the power method computed by the Jacobi solver. |
+
 ## PCA (Principal Component Analysis)
 
-_Doxygen group: `pca`_
-
+<a id="cuvs-preprocessing-pca-fit"></a>
 ### cuvs::preprocessing::pca::fit
 
 Perform PCA fit operation.
@@ -34,7 +57,7 @@ Computes the principal components, explained variances, singular values, and col
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | `const params&` | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
 | `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | input data [n_rows x n_cols] (col-major). Modified temporarily. |
 | `components` | out | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `explained_var` | out | `raft::device_vector_view<float, int64_t>` | explained variances [n_components] |
@@ -48,8 +71,7 @@ Computes the principal components, explained variances, singular values, and col
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:99`_
-
+<a id="cuvs-preprocessing-pca-fit-transform"></a>
 ### cuvs::preprocessing::pca::fit_transform
 
 Perform PCA fit and transform operations.
@@ -75,7 +97,7 @@ Computes the principal components and transforms the input data into the eigensp
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | `const params&` | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
 | `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | input data [n_rows x n_cols] (col-major). Modified temporarily. |
 | `trans_input` | out | `raft::device_matrix_view<float, int64_t, raft::col_major>` | transformed data [n_rows x n_components] (col-major) |
 | `components` | out | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
@@ -90,8 +112,7 @@ Computes the principal components and transforms the input data into the eigensp
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:128`_
-
+<a id="cuvs-preprocessing-pca-transform"></a>
 ### cuvs::preprocessing::pca::transform
 
 Perform PCA transform operation.
@@ -106,14 +127,16 @@ raft::device_vector_view<float, int64_t> mu,
 raft::device_matrix_view<float, int64_t, raft::col_major> trans_input);
 ```
 
-Transforms the input data into the eigenspace using previously computed principal components. (mean-centered then restored).
+Transforms the input data into the eigenspace using previously computed principal components.
+
+(mean-centered then restored).
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | `const params&` | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
 | `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | data to transform [n_rows x n_cols] (col-major). Modified temporarily |
 | `components` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `singular_vals` | in | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |
@@ -124,8 +147,7 @@ Transforms the input data into the eigenspace using previously computed principa
 
 `void`
 
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:154`_
-
+<a id="cuvs-preprocessing-pca-inverse-transform"></a>
 ### cuvs::preprocessing::pca::inverse_transform
 
 Perform PCA inverse transform operation.
@@ -147,7 +169,7 @@ Transforms data from the eigenspace back to the original space.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | `const params&` | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
 | `trans_input` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | transformed data [n_rows x n_components] (col-major) |
 | `components` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `singular_vals` | in | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |
@@ -157,5 +179,3 @@ Transforms data from the eigenspace back to the original space.
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/preprocessing/pca.hpp:175`_

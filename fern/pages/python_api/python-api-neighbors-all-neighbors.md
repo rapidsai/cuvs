@@ -33,13 +33,13 @@ def __init__(self, *, algo="nn_descent", overlap_factor=2, n_clusters=1, metric=
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:159` |
-| `algo` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:164` |
-| `overlap_factor` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:176` |
-| `n_clusters` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:181` |
-| `metric` | property | `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:186` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `algo` | property |
+| `overlap_factor` | property |
+| `n_clusters` | property |
+| `metric` | property |
 
 ### get_handle
 
@@ -49,8 +49,6 @@ def get_handle(self)
 
 Get a pointer to the underlying C object.
 
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:159`_
-
 ### algo
 
 ```python
@@ -58,8 +56,6 @@ def algo(self)
 ```
 
 Algorithm used for local k-NN graph building.
-
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:164`_
 
 ### overlap_factor
 
@@ -69,8 +65,6 @@ def overlap_factor(self)
 
 Number of clusters each point is assigned to.
 
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:176`_
-
 ### n_clusters
 
 ```python
@@ -79,8 +73,6 @@ def n_clusters(self)
 
 Number of clusters/batches to partition the dataset into.
 
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:181`_
-
 ### metric
 
 ```python
@@ -88,10 +80,6 @@ def metric(self)
 ```
 
 Distance metric used for graph construction.
-
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:186`_
-
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:66`_
 
 ## build
 
@@ -125,5 +113,3 @@ vectors in the dataset.
 | `indices` | `array_like` | k-NN indices for each point [num_rows x k], always on device. If indices buffer was provided, returns the same array filled with results. |
 | `distances` | `array_like or None` | k-NN distances if distances buffer was provided, None otherwise |
 | `core_distances` | `array_like or None` | Core distances if core_distances buffer was provided, None otherwise |
-
-_Source: `python/cuvs/cuvs/neighbors/all_neighbors/all_neighbors.pyx:196`_

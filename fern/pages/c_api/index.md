@@ -4,6 +4,7 @@ These pages are generated from the documented public headers in the cuVS source 
 
 - [K-Means](/api-reference/c-api-cluster-kmeans)
 - [C API](/api-reference/c-api-core-c-api)
+- [Distance](/api-reference/c-api-distance-distance)
 - [Pairwise Distance](/api-reference/c-api-distance-pairwise-distance)
 - [All Neighbors](/api-reference/c-api-neighbors-all-neighbors)
 - [Brute Force](/api-reference/c-api-neighbors-brute-force)

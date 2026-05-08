@@ -17,19 +17,15 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:52` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
 ```python
 def trained(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:52`_
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:34`_
 
 ## build
 
@@ -73,8 +69,6 @@ Build the Brute Force index from the dataset for efficient search.
 >>> neighbors = cp.asarray(neighbors)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:60`_
-
 ## search
 
 `@auto_sync_resources`
@@ -95,7 +89,7 @@ Find the k nearest neighbors for each query.
 | `k` | `int` | The number of neighbors. |
 | `neighbors` | `Optional CUDA array interface compliant matrix shape` | (n_queries, k), dtype int64_t. If supplied, neighbor indices will be written here in-place. (default None) |
 | `distances` | `Optional CUDA array interface compliant matrix shape` | (n_queries, k) If supplied, the distances to the neighbors will be written here in-place. (default None) |
-| `prefilter` | `Optional, cuvs.neighbors.cuvsFilter` | An optional filter to exclude certain query-neighbor pairs using a bitmap or bitset. The filter function should have a row-major layout with logical shape `(n_prefilter_rows, n_samples)`, where: - `n_prefilter_rows == n_queries` when using a bitmap filter. - `n_prefilter_rows == 1` when using a bitset prefilter. Each bit in `n_samples` determines whether `queries[i]` should be considered for distance computation with the index. (default None) |
+| `prefilter` | `Optional, cuvs.neighbors.cuvsFilter` | An optional filter to exclude certain query-neighbor pairs using a bitmap or bitset. The filter function should have a row-major layout with logical shape `(n_prefilter_rows, n_samples)`, where:<br />- `n_prefilter_rows == n_queries` when using a bitmap filter.<br />- `n_prefilter_rows == 1` when using a bitset prefilter. Each bit in `n_samples` determines whether `queries[i]` should be considered for distance computation with the index. (default None) |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
 **Examples**
@@ -160,8 +154,6 @@ Find the k nearest neighbors for each query.
 >>> distances = cp.asarray(distances)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:120`_
-
 ## save
 
 `@auto_sync_resources`
@@ -199,8 +191,6 @@ to work.
 >>> brute_force.save("my_index.bin", index)
 >>> index_loaded = brute_force.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:266`_
 
 ## load
 
@@ -244,5 +234,3 @@ to work.
 >>> brute_force.save("my_index.bin", index)
 >>> index_loaded = brute_force.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/brute_force/brute_force.pyx:304`_

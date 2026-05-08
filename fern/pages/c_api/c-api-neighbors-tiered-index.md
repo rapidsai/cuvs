@@ -6,10 +6,47 @@ slug: api-reference/c-api-neighbors-tiered-index
 
 _Source header: `c/include/cuvs/neighbors/tiered_index.h`_
 
+## Types
+
+<a id="cuvstieredindexannalgo"></a>
+### cuvsTieredIndexANNAlgo
+
+Enum to hold which ANN algorithm is being used in the tiered index
+
+```c
+typedef enum { ... } cuvsTieredIndexANNAlgo;
+```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `CUVS_TIERED_INDEX_ALGO_CAGRA` | `0` |
+| `CUVS_TIERED_INDEX_ALGO_IVF_FLAT` | `1` |
+| `CUVS_TIERED_INDEX_ALGO_IVF_PQ` | `2` |
+
 ## Tiered Index
 
-_Doxygen group: `tiered_index_c_index`_
+<a id="cuvstieredindex"></a>
+### cuvsTieredIndex
 
+Struct to hold address of cuvs::neighbors::tiered_index::index and its active trained
+
+dtype
+
+```c
+typedef struct { ... } cuvsTieredIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+| `algo` | [`cuvsTieredIndexANNAlgo`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexannalgo) |  |
+
+<a id="cuvstieredindexcreate"></a>
 ### cuvsTieredIndexCreate
 
 Allocate Tiered Index
@@ -22,16 +59,15 @@ cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsTieredIndex_t*` | cuvsTieredIndex_t to allocate |
+| `index` | in | [`cuvsTieredIndex_t*`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | cuvsTieredIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:53`_
-
+<a id="cuvstieredindexdestroy"></a>
 ### cuvsTieredIndexDestroy
 
 De-allocate Tiered index
@@ -44,40 +80,36 @@ cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsTieredIndex_t` | cuvsTieredIndex_t to de-allocate |
+| `index` | in | [`cuvsTieredIndex_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | cuvsTieredIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:60`_
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered Index build parameters
 
-_Doxygen group: `tiered_c_index_params`_
-
+<a id="cuvstieredindexparams"></a>
 ### cuvsTieredIndexParams
 
 Supplemental parameters to build a TieredIndex
 
 ```c
-struct cuvsTieredIndexParams { ... } ;
+struct cuvsTieredIndexParams { ... };
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `cuvsDistanceType` | Distance type. |
-| `algo` | `cuvsTieredIndexANNAlgo` | The type of ANN algorithm we are using |
-| `min_ann_rows` | `int64_t` | The minimum number of rows necessary in the index to create an |
-| `create_ann_index_on_extend` | `bool` | Whether or not to create a new ann index on extend, if the number |
-| `cagra_params` | `cuvsCagraIndexParams_t` | Optional parameters for building a cagra index |
-| `ivf_flat_params` | `cuvsIvfFlatIndexParams_t` | Optional parameters for building a ivf_flat index |
-| `ivf_pq_params` | `cuvsIvfPqIndexParams_t` | Optional parameters for building a ivf-pq index |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
+| `algo` | [`cuvsTieredIndexANNAlgo`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexannalgo) | The type of ANN algorithm we are using |
+| `min_ann_rows` | `int64_t` | The minimum number of rows necessary in the index to create an ann index |
+| `create_ann_index_on_extend` | `bool` | Whether or not to create a new ann index on extend, if the number of rows in the incremental (bfknn) portion is above min_ann_rows |
+| `cagra_params` | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | Optional parameters for building a cagra index |
+| `ivf_flat_params` | [`cuvsIvfFlatIndexParams_t`](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatindexparams) | Optional parameters for building a ivf_flat index |
+| `ivf_pq_params` | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | Optional parameters for building a ivf-pq index |
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:72`_
-
+<a id="cuvstieredindexparamscreate"></a>
 ### cuvsTieredIndexParamsCreate
 
 Allocate Tiered Index Params and populate with default values
@@ -90,16 +122,15 @@ cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* index_params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsTieredIndexParams_t*` | cuvsTieredIndexParams_t to allocate |
+| `index_params` | in | [`cuvsTieredIndexParams_t*`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexparams) | cuvsTieredIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:105`_
-
+<a id="cuvstieredindexparamsdestroy"></a>
 ### cuvsTieredIndexParamsDestroy
 
 De-allocate Tiered Index params
@@ -112,20 +143,17 @@ cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsTieredIndexParams_t` |  |
+| `index_params` | in | [`cuvsTieredIndexParams_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:113`_
-
 ## Tiered index build
 
-_Doxygen group: `tieredindex_c_index_build`_
-
+<a id="cuvstieredindexbuild"></a>
 ### cuvsTieredIndexBuild
 
 Build a TieredIndex index with a `DLManagedTensor` which has underlying
@@ -137,29 +165,29 @@ DLManagedTensor* dataset,
 cuvsTieredIndex_t index);
 ```
 
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index_params` | in | `cuvsTieredIndexParams_t` | Index parameters to use when building the index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index_params` | in | [`cuvsTieredIndexParams_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexparams) | Index parameters to use when building the index |
 | `dataset` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | out | `cuvsTieredIndex_t` | cuvsTieredIndex_t Newly built TieredIndex index |
+| `index` | out | [`cuvsTieredIndex_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | cuvsTieredIndex_t Newly built TieredIndex index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:162`_
-
 ## Tiered index search
 
-_Doxygen group: `tieredindex_c_index_search`_
-
+<a id="cuvstieredindexsearch"></a>
 ### cuvsTieredIndexSearch
 
 Search a TieredIndex index with a `DLManagedTensor`
@@ -180,24 +208,21 @@ cuvsCagraSearchParams_t, cuvsIvfFlatSearchParams_t, cuvsIvfPqSearchParams_t depe
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `search_params` | in | `void*` | params used to the ANN index, should be one of |
-| `index` | in | `cuvsTieredIndex_t` | cuvsTieredIndex which has been returned by `cuvsTieredIndexBuild` |
+| `index` | in | [`cuvsTieredIndex_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | cuvsTieredIndex which has been returned by `cuvsTieredIndexBuild` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-| `prefilter` | in | `cuvsFilter` | cuvsFilter input prefilter that can be used to filter queries and neighbors based on the given bitmap. |
+| `prefilter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter input prefilter that can be used to filter queries and neighbors based on the given bitmap. |
 
 **Returns**
 
-`cuvsError_t`
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:212`_
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered index extend
 
-_Doxygen group: `tiered_c_index_extend`_
-
+<a id="cuvstieredindexextend"></a>
 ### cuvsTieredIndexExtend
 
 Extend the index with the new data.
@@ -212,22 +237,19 @@ cuvsTieredIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `new_vectors` | in | `DLManagedTensor*` | DLManagedTensor* the new vectors to add to the index |
-| `index` | inout | `cuvsTieredIndex_t` | Tiered index to be extended |
+| `index` | inout | [`cuvsTieredIndex_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | Tiered index to be extended |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/tiered_index.h:235`_
-
 ## Tiered index merge
 
-_Doxygen group: `tiered_c_index_merge`_
-
+<a id="cuvstieredindexmerge"></a>
 ### cuvsTieredIndexMerge
 
 Merge multiple indices together into a single index
@@ -244,16 +266,14 @@ cuvsTieredIndex_t output_index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index_params` | in | `cuvsTieredIndexParams_t` | Index parameters to use when merging |
-| `indices` | in | `cuvsTieredIndex_t*` | pointers to indices to merge together |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index_params` | in | [`cuvsTieredIndexParams_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindexparams) | Index parameters to use when merging |
+| `indices` | in | [`cuvsTieredIndex_t*`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | pointers to indices to merge together |
 | `num_indices` | in | `size_t` | the number of indices to merge |
-| `output_index` | out | `cuvsTieredIndex_t` | the merged index |
+| `output_index` | out | [`cuvsTieredIndex_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | the merged index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/tiered_index.h:256`_

@@ -17,19 +17,15 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:49` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
 ```python
 def trained(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:49`_
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:34`_
 
 ## IndexParams
 
@@ -43,7 +39,7 @@ Parameters for building a Vamana index
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `str, default="sqeuclidean"` | String denoting the metric type. Supported metrics include: - "sqeuclidean" - "l2" |
+| `metric` | `str, default="sqeuclidean"` | String denoting the metric type. Supported metrics include:<br />- "sqeuclidean"<br />- "l2" |
 | `graph_degree` | `int, default=32` | Maximum degree of graph; corresponds to the R parameter of Vamana algorithm in the literature. |
 | `visited_size` | `int, default=64` | Maximum number of visited nodes per search during Vamana algorithm. Loosely corresponds to the L parameter in the literature. |
 | `vamana_iters` | `float, default=1` | Number of Vamana vector insertion iterations (each iteration inserts all vectors). |
@@ -61,17 +57,17 @@ def __init__(self, *, metric="sqeuclidean", graph_degree=32, visited_size=64, va
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `metric` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:122` |
-| `graph_degree` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:126` |
-| `visited_size` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:130` |
-| `vamana_iters` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:134` |
-| `alpha` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:138` |
-| `max_fraction` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:142` |
-| `batch_base` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:146` |
-| `queue_size` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:150` |
-| `reverse_batchsize` | property | `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:154` |
+| Name | Kind |
+| --- | --- |
+| `metric` | property |
+| `graph_degree` | property |
+| `visited_size` | property |
+| `vamana_iters` | property |
+| `alpha` | property |
+| `max_fraction` | property |
+| `batch_base` | property |
+| `queue_size` | property |
+| `reverse_batchsize` | property |
 
 ### metric
 
@@ -79,15 +75,11 @@ def __init__(self, *, metric="sqeuclidean", graph_degree=32, visited_size=64, va
 def metric(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:122`_
-
 ### graph_degree
 
 ```python
 def graph_degree(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:126`_
 
 ### visited_size
 
@@ -95,15 +87,11 @@ _Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:126`_
 def visited_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:130`_
-
 ### vamana_iters
 
 ```python
 def vamana_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:134`_
 
 ### alpha
 
@@ -111,15 +99,11 @@ _Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:134`_
 def alpha(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:138`_
-
 ### max_fraction
 
 ```python
 def max_fraction(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:142`_
 
 ### batch_base
 
@@ -127,25 +111,17 @@ _Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:142`_
 def batch_base(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:146`_
-
 ### queue_size
 
 ```python
 def queue_size(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:150`_
-
 ### reverse_batchsize
 
 ```python
 def reverse_batchsize(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:154`_
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:58`_
 
 ## build
 
@@ -197,8 +173,6 @@ The following distance metrics are supported:
 >>> vamana.save("my_index.bin", index)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:159`_
-
 ## save
 
 `@auto_sync_resources`
@@ -235,5 +209,3 @@ allowing cross-compatibility.
 >>> # Serialize and save the vamana index
 >>> vamana.save("my_index.bin", index)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/vamana/vamana.pyx:228`_

@@ -52,5 +52,3 @@ BitwiseHamming distance type.
 ...                            build_algo="iterative_cagra_search")
 >>> idx = cagra.build(params, transformed)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/binary/binary.pyx:21`_

@@ -19,14 +19,14 @@ float data type to the full range of the quantized int type.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `pq_bits` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:139` |
-| `pq_dim` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:145` |
-| `pq_codebook` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:151` |
-| `vq_codebook` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:164` |
-| `encoded_dim` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:177` |
-| `use_vq` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:187` |
+| Name | Kind |
+| --- | --- |
+| `pq_bits` | property |
+| `pq_dim` | property |
+| `pq_codebook` | property |
+| `vq_codebook` | property |
+| `encoded_dim` | property |
+| `use_vq` | property |
 
 ### pq_bits
 
@@ -34,15 +34,11 @@ float data type to the full range of the quantized int type.
 def pq_bits(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:139`_
-
 ### pq_dim
 
 ```python
 def pq_dim(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:145`_
 
 ### pq_codebook
 
@@ -52,8 +48,6 @@ def pq_codebook(self)
 
 Returns the PQ codebook
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:151`_
-
 ### vq_codebook
 
 ```python
@@ -61,8 +55,6 @@ def vq_codebook(self)
 ```
 
 Returns the VQ codebook
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:164`_
 
 ### encoded_dim
 
@@ -72,17 +64,11 @@ def encoded_dim(self)
 
 Returns the encoded dimension of the quantized dataset
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:177`_
-
 ### use_vq
 
 ```python
 def use_vq(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:187`_
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:123`_
 
 ## QuantizerParams
 
@@ -114,17 +100,17 @@ def __init__(self, *, pq_bits=8, pq_dim=0, use_subspaces=True, use_vq=False, vq_
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `pq_bits` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:87` |
-| `pq_dim` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:91` |
-| `vq_n_centers` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:95` |
-| `kmeans_n_iters` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:99` |
-| `pq_kmeans_type` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:103` |
-| `max_train_points_per_pq_code` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:107` |
-| `max_train_points_per_vq_cluster` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:111` |
-| `use_vq` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:115` |
-| `use_subspaces` | property | `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:119` |
+| Name | Kind |
+| --- | --- |
+| `pq_bits` | property |
+| `pq_dim` | property |
+| `vq_n_centers` | property |
+| `kmeans_n_iters` | property |
+| `pq_kmeans_type` | property |
+| `max_train_points_per_pq_code` | property |
+| `max_train_points_per_vq_cluster` | property |
+| `use_vq` | property |
+| `use_subspaces` | property |
 
 ### pq_bits
 
@@ -132,15 +118,11 @@ def __init__(self, *, pq_bits=8, pq_dim=0, use_subspaces=True, use_vq=False, vq_
 def pq_bits(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:87`_
-
 ### pq_dim
 
 ```python
 def pq_dim(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:91`_
 
 ### vq_n_centers
 
@@ -148,15 +130,11 @@ _Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:91`_
 def vq_n_centers(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:95`_
-
 ### kmeans_n_iters
 
 ```python
 def kmeans_n_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:99`_
 
 ### pq_kmeans_type
 
@@ -164,15 +142,11 @@ _Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:99`_
 def pq_kmeans_type(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:103`_
-
 ### max_train_points_per_pq_code
 
 ```python
 def max_train_points_per_pq_code(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:107`_
 
 ### max_train_points_per_vq_cluster
 
@@ -180,25 +154,17 @@ _Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:107`_
 def max_train_points_per_vq_cluster(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:111`_
-
 ### use_vq
 
 ```python
 def use_vq(self)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:115`_
-
 ### use_subspaces
 
 ```python
 def use_subspaces(self)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:119`_
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:25`_
 
 ## build
 
@@ -238,8 +204,6 @@ the dataset.
 >>> quantizer = pq.build(params, dataset)
 >>> transformed, _ = pq.transform(quantizer, dataset)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:198`_
 
 ## transform
 
@@ -283,8 +247,6 @@ Applies Product Quantization transform to given dataset
 >>> transformed, _ = pq.transform(quantizer, dataset)
 ```
 
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:247`_
-
 ## inverse_transform
 
 `@auto_sync_resources`
@@ -326,5 +288,3 @@ Applies Product Quantization inverse transform to given codes
 >>> transformed, vq_labels = pq.transform(quantizer, dataset)
 >>> reconstructed = pq.inverse_transform(quantizer, transformed, vq_labels=vq_labels)
 ```
-
-_Source: `python/cuvs/cuvs/preprocessing/quantize/pq/pq.pyx:314`_

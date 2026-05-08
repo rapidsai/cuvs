@@ -17,20 +17,18 @@ which can be used to perform nearest neighbors searches.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:170` |
-| `n_lists` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:177` |
-| `dim` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:184` |
-| `centers` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:191` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
+| `n_lists` | property |
+| `dim` | property |
+| `centers` | property |
 
 ### trained
 
 ```python
 def trained(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:170`_
 
 ### n_lists
 
@@ -40,8 +38,6 @@ def n_lists(self)
 
 The number of inverted lists (clusters)
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:177`_
-
 ### dim
 
 ```python
@@ -49,8 +45,6 @@ def dim(self)
 ```
 
 dimensionality of the cluster centers
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:184`_
 
 ### centers
 
@@ -60,10 +54,6 @@ def centers(self)
 
 Get the cluster centers corresponding to the lists in the
 original space
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:191`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:153`_
 
 ## IndexParams
 
@@ -78,7 +68,7 @@ Parameters to build index for IvfFlat nearest neighbor search
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_lists` | `int, default = 1024` | The number of clusters used in the coarse quantizer. |
-| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2, - euclidean is the euclidean distance - inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i. - cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
+| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- euclidean is the euclidean distance<br />- inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
 | `kmeans_n_iters` | `int, default = 20` | The number of iterations searching for kmeans centers during index building. The default setting is often fine, but this parameter can be decreased to improve training time wih larger trainset fractions (10M+ vectors) or increased for smaller trainset fractions (very small number of vectors) to improve recall. |
 | `kmeans_trainset_fraction` | `int, default = 0.5` | If kmeans_trainset_fraction is less than 1, then the dataset is subsampled, and only n_samples * kmeans_trainset_fraction rows are used for training. |
 | `add_data_on_build` | `bool, default = True` | After training the coarse and fine quantizers, we will populate the index with the dataset if add_data_on_build == True, otherwise the index is left empty, and the extend method can be used to add new vectors to the index. |
@@ -92,17 +82,17 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:117` |
-| `metric` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:121` |
-| `metric_arg` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:125` |
-| `add_data_on_build` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:129` |
-| `n_lists` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:133` |
-| `kmeans_n_iters` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:137` |
-| `kmeans_trainset_fraction` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:141` |
-| `adaptive_centers` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:145` |
-| `conservative_memory_allocation` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:149` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `metric` | property |
+| `metric_arg` | property |
+| `add_data_on_build` | property |
+| `n_lists` | property |
+| `kmeans_n_iters` | property |
+| `kmeans_trainset_fraction` | property |
+| `adaptive_centers` | property |
+| `conservative_memory_allocation` | property |
 
 ### get_handle
 
@@ -110,15 +100,11 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:117`_
-
 ### metric
 
 ```python
 def metric(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:121`_
 
 ### metric_arg
 
@@ -126,15 +112,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:121`_
 def metric_arg(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:125`_
-
 ### add_data_on_build
 
 ```python
 def add_data_on_build(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:129`_
 
 ### n_lists
 
@@ -142,15 +124,11 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:129`_
 def n_lists(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:133`_
-
 ### kmeans_n_iters
 
 ```python
 def kmeans_n_iters(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:137`_
 
 ### kmeans_trainset_fraction
 
@@ -158,25 +136,17 @@ _Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:137`_
 def kmeans_trainset_fraction(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:141`_
-
 ### adaptive_centers
 
 ```python
 def adaptive_centers(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:145`_
-
 ### conservative_memory_allocation
 
 ```python
 def conservative_memory_allocation(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:149`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:41`_
 
 ## SearchParams
 
@@ -200,10 +170,10 @@ def __init__(self, *, n_probes=20)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:285` |
-| `n_probes` | property | `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:289` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `n_probes` | property |
 
 ### get_handle
 
@@ -211,17 +181,11 @@ def __init__(self, *, n_probes=20)
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:285`_
-
 ### n_probes
 
 ```python
 def n_probes(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:289`_
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:265`_
 
 ## build
 
@@ -266,8 +230,6 @@ Build the IvfFlat index from the dataset for efficient search.
 >>> distances = cp.asarray(distances)
 >>> neighbors = cp.asarray(neighbors)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:207`_
 
 ## extend
 
@@ -321,8 +283,6 @@ array interface compliant matrix in host memory.
 ...                                      k=10)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:467`_
-
 ## load
 
 `@auto_sync_resources`
@@ -349,8 +309,6 @@ version of cuvs is not guaranteed to work.
 | Name | Type | Description |
 | --- | --- | --- |
 | `index` | `Index` |  |
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:434`_
 
 ## save
 
@@ -388,8 +346,6 @@ subject to change.
 >>> ivf_flat.save("my_index.bin", index)
 >>> index_loaded = ivf_flat.load("my_index.bin")
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:397`_
 
 ## search
 
@@ -437,5 +393,3 @@ Find the k nearest neighbors for each query.
 >>> distances, neighbors = ivf_flat.search(search_params, index, queries,
 ...                                     k)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/ivf_flat/ivf_flat.pyx:295`_

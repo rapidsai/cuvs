@@ -18,19 +18,15 @@ across multiple GPUs.
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:125` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
 
 ### trained
 
 ```python
 def trained(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:125`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:105`_
 
 ## IndexParams
 
@@ -56,10 +52,10 @@ def __init__(self, *, distribution_mode="sharded", **kwargs)
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:96` |
-| `distribution_mode` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:100` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `distribution_mode` | property |
 
 ### get_handle
 
@@ -67,17 +63,11 @@ def __init__(self, *, distribution_mode="sharded", **kwargs)
 def get_handle(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:96`_
-
 ### distribution_mode
 
 ```python
 def distribution_mode(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:100`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:56`_
 
 ## SearchParams
 
@@ -95,23 +85,21 @@ def __init__(self, *, n_probes=1, search_mode="load_balancer", merge_mode="merge
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:223` |
-| `search_mode` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:227` |
-| `search_mode` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:233` |
-| `merge_mode` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:244` |
-| `merge_mode` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:250` |
-| `n_rows_per_batch` | property | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:261` |
-| `n_rows_per_batch` | method | `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:266` |
+| Name | Kind |
+| --- | --- |
+| `get_handle` | method |
+| `search_mode` | property |
+| `search_mode` | method |
+| `merge_mode` | property |
+| `merge_mode` | method |
+| `n_rows_per_batch` | property |
+| `n_rows_per_batch` | method |
 
 ### get_handle
 
 ```python
 def get_handle(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:223`_
 
 ### search_mode
 
@@ -121,8 +109,6 @@ def search_mode(self)
 
 Get the search mode for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:227`_
-
 ### search_mode
 
 ```python
@@ -130,8 +116,6 @@ def search_mode(self, value)
 ```
 
 Set the search mode for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:233`_
 
 ### merge_mode
 
@@ -141,8 +125,6 @@ def merge_mode(self)
 
 Get the merge mode for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:244`_
-
 ### merge_mode
 
 ```python
@@ -150,8 +132,6 @@ def merge_mode(self, value)
 ```
 
 Set the merge mode for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:250`_
 
 ### n_rows_per_batch
 
@@ -161,8 +141,6 @@ def n_rows_per_batch(self)
 
 Get the number of rows per batch for multi-GPU search.
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:261`_
-
 ### n_rows_per_batch
 
 ```python
@@ -170,10 +148,6 @@ def n_rows_per_batch(self, value)
 ```
 
 Set the number of rows per batch for multi-GPU search.
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:266`_
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:192`_
 
 ## build
 
@@ -219,8 +193,6 @@ Build the multi-GPU IVF-Flat index from the dataset for efficient search.
 >>> # Results are already in host memory (NumPy arrays)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:130`_
-
 ## extend
 
 `@auto_sync_multi_gpu_resources`
@@ -258,8 +230,6 @@ Extend the multi-GPU IVF-Flat index with new vectors.
 >>> index = ivf_flat.build(build_params, dataset)
 >>> ivf_flat.extend(index, new_vectors, new_indices)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:387`_
 
 ## search
 
@@ -314,8 +284,6 @@ of each query.
 >>> # Results are already in host memory (NumPy arrays)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:275`_
-
 ## save
 
 `@auto_sync_multi_gpu_resources`
@@ -349,8 +317,6 @@ Serialize the multi-GPU IVF-Flat index to a file.
 >>> ivf_flat.save(index, "index.bin")
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:459`_
-
 ## load
 
 `@auto_sync_multi_gpu_resources`
@@ -381,8 +347,6 @@ Deserialize the multi-GPU IVF-Flat index from a file.
 >>> index = ivf_flat.load("index.bin")  # doctest: +SKIP
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:498`_
-
 ## distribute
 
 `@auto_sync_multi_gpu_resources`
@@ -412,5 +376,3 @@ Distribute a single-GPU IVF-Flat index across multiple GPUs from a file.
 >>> from cuvs.neighbors.mg import ivf_flat
 >>> index = ivf_flat.distribute("single_gpu_index.bin")  # doctest: +SKIP
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/mg/ivf_flat/ivf_flat.pyx:533`_

@@ -8,14 +8,13 @@ _Source header: `c/include/cuvs/neighbors/common.h`_
 
 ## Filters APIs
 
-_Doxygen group: `filters`_
-
+<a id="cuvsfiltertype"></a>
 ### cuvsFilterType
 
 Enum to denote filter type.
 
 ```c
-enum cuvsFilterType { ... } ;
+enum cuvsFilterType { ... };
 ```
 
 **Values**
@@ -26,12 +25,24 @@ enum cuvsFilterType { ... } ;
 | `BITSET` | `1` |
 | `BITMAP` | `2` |
 
-_Source: `c/include/cuvs/neighbors/common.h:23`_
+<a id="cuvsfilter"></a>
+### cuvsFilter
+
+Struct to hold address of cuvs::neighbors::prefilter and its type
+
+```c
+typedef struct { ... } cuvsFilter;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
 
 ## Index Merge
 
-_Doxygen group: `index_merge`_
-
+<a id="cuvsmergestrategy"></a>
 ### cuvsMergeStrategy
 
 Strategy for merging indices.
@@ -46,5 +57,3 @@ typedef enum { ... } cuvsMergeStrategy;
 | --- | --- |
 | `MERGE_STRATEGY_PHYSICAL` | `0` |
 | `MERGE_STRATEGY_LOGICAL` | `1` |
-
-_Source: `c/include/cuvs/neighbors/common.h:54`_

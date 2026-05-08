@@ -8,8 +8,7 @@ _Source header: `cpp/include/cuvs/selection/select_k.hpp`_
 
 ## Batched-select k smallest or largest key/values
 
-_Doxygen group: `select_k`_
-
+<a id="cuvs-selection-select-k"></a>
 ### cuvs::selection::select_k
 
 Select k smallest or largest key/values from each row in the input data.
@@ -27,7 +26,9 @@ SelectAlgo algo                                                       = SelectAl
 std::optional<raft::device_vector_view<const int64_t, int64_t>> len_i = std::nullopt);
 ```
 
-If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k). Example usage
+If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k).
+
+Example usage
 
 **Parameters**
 
@@ -47,9 +48,7 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 
 `void`
 
-_Source: `cpp/include/cuvs/selection/select_k.hpp:68`_
-
-### cuvs::selection::select_k
+**Additional overload:** `cuvs::selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
 
@@ -66,7 +65,9 @@ SelectAlgo algo                                                        = SelectA
 std::optional<raft::device_vector_view<const uint32_t, int64_t>> len_i = std::nullopt);
 ```
 
-If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k). Example usage
+If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k).
+
+Example usage
 
 **Parameters**
 
@@ -86,9 +87,7 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 
 `void`
 
-_Source: `cpp/include/cuvs/selection/select_k.hpp:133`_
-
-### cuvs::selection::select_k
+**Additional overload:** `cuvs::selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
 
@@ -105,7 +104,9 @@ SelectAlgo algo                                                        = SelectA
 std::optional<raft::device_vector_view<const uint32_t, int64_t>> len_i = std::nullopt);
 ```
 
-If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k). Example usage
+If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k).
+
+Example usage
 
 **Parameters**
 
@@ -124,5 +125,3 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/selection/select_k.hpp:188`_

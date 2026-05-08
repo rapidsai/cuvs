@@ -65,5 +65,3 @@ the same memory space.
 >>> k = 10
 >>> distances, neighbors = refine(dataset, queries, candidates, k)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/refine.pyx:34`_

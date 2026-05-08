@@ -63,15 +63,15 @@ CAGRA builds a nearest-neighbor graph (stored on host) while keeping the origina
 The baseline memory footprint after index construction:
 
 $$
-\text\\\\\\\\{dataset_size (device)\\\\\\\\}
+\text{dataset\_size (device)}
 \;=\;
-\text\\\\\\\\{number_vectors\\\\\\\\} \times \text\\\\\\\\{vector_dimension\\\\\\\\} \times \text\\\\\\\\{bytes_per_dimension\\\\\\\\}
+\text{number\_vectors} \times \text{vector\_dimension} \times \text{bytes\_per\_dimension}
 $$
 
 $$
-\text\\\\\\\\{graph_size (host)\\\\\\\\}
+\text{graph\_size (host)}
 \;=\;
-\text\\\\\\\\{number_vectors\\\\\\\\} \times \text\\\\\\\\{graph_degree\\\\\\\\} \times \operatorname\\\\\\\\{sizeof\\\\\\\\}\!\big(\mathrm\\\\\\\\{IdxT\\\\\\\\}\big)
+\text{number\_vectors} \times \text{graph\_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
 $$
 
 Note: The dataset must be in GPU memory during index build, but can be detached afterward if not needed for search.
@@ -94,13 +94,13 @@ The knn graph can be constructed using the IVF-PQ algorithm, which works in two 
 **IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and PQ codebooks.
 
 $$
-\text\\\\\\\\{IVFPQ_build_peak\\\\\\\\}
+\text{IVFPQ\_build\_peak}
 \;=\;
-\frac\\\\\\\\{n_\\\\\\\\{\text\\\\\\\\{vectors\\\\\\\\}\\\\\\\\}\\\\\\\\}\\\\\\\\{\text\\\\\\\\{train_set_ratio\\\\\\\\}\\\\\\\\} \times \text\\\\\\\\{dim\\\\\\\\} \times 4
+\frac{n_{\text{vectors}}}{\text{train\_set\_ratio}} \times \text{dim} \times 4
 \;+\;
-n_\\\\\\\\{\text\\\\\\\\{clusters\\\\\\\\}\\\\\\\\} \times \text\\\\\\\\{dim\\\\\\\\} \times 4
+n_{\text{clusters}} \times \text{dim} \times 4
 \;+\;
-\frac\\\\\\\\{n_\\\\\\\\{\text\\\\\\\\{vectors\\\\\\\\}\\\\\\\\}\\\\\\\\}\\\\\\\\{\text\\\\\\\\{train_set_ratio\\\\\\\\}\\\\\\\\} \times \operatorname\\\\\\\\{sizeof\\\\\\\\}(\mathrm\\\\\\\\{uint32\_t\\\\\\\\})
+\frac{n_{\text{vectors}}}{\text{train\_set\_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
 $$
 
 **Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): 395.01 MB
@@ -108,13 +108,13 @@ $$
 **IVF-PQ Search (forms the intermediate graph)** — Constructs the knn graph in batches by querying the IVF-PQ index for the nearest neighbors of all training points.
 
 $$
-\text\\\\\\\\{IVFPQ_search_peak\\\\\\\\}
+\text{IVFPQ\_search\_peak}
 \;=\;
-\text\\\\\\\\{batch_size\\\\\\\\} \times \text\\\\\\\\{dim\\\\\\\\} \times 4
+\text{batch\_size} \times \text{dim} \times 4
 \;+\;
-\text\\\\\\\\{batch_size\\\\\\\\} \times \text\\\\\\\\{intermediate_degree\\\\\\\\} \times \operatorname\\\\\\\\{sizeof\\\\\\\\}(\mathrm\\\\\\\\{uint32\_t\\\\\\\\})
+\text{batch\_size} \times \text{intermediate\_degree} \times \operatorname{sizeof}(\mathrm{uint32\_t})
 \;+\;
-\text\\\\\\\\{batch_size\\\\\\\\} \times \text\\\\\\\\{intermediate_degree\\\\\\\\} \times 4
+\text{batch\_size} \times \text{intermediate\_degree} \times 4
 $$
 
 **Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): 5.00 MB
@@ -124,25 +124,25 @@ $$
 **Peak device memory:**
 
 $$
-\text\\\\\\\\{NND_device_peak\\\\\\\\}
+\text{NND\_device\_peak}
 \;=\;
-n_\text\\\\\\\\{vectors\\\\\\\\} \times (n_\text\\\\\\\\{dims\\\\\\\\} \times 2 + 276)
+n_{\text{vectors}} \times (n_{\text{dims}} \times 2 + 276)
 $$
 
-- Data vectors (transferred to device and stored as fp16): $n_\text\\\\\\\\{dims\\\\\\\\} \times 2$ bytes per vector
+- Data vectors (transferred to device and stored as fp16): $n_{\text{dims}} \times 2$ bytes per vector
 - Small working graph, locks, edge counters: 276 bytes per vector (fixed)
 - Additional $4$ bytes per vector when using L2 metric (for precomputed norms)
 
 **Peak host memory:**
 
 $$
-\text\\\\\\\\{NND_host_peak\\\\\\\\}
+\text{NND\_host\_peak}
 \;=\;
-n_\text\\\\\\\\{vectors\\\\\\\\} \times (13 \times \text\\\\\\\\{intermediate_graph_degree\\\\\\\\} + 912)
+n_{\text{vectors}} \times (13 \times \text{intermediate\_graph\_degree} + 912)
 $$
 
-- Full graph with distances (~1.3x overallocation): $1.3 \times 8 \times \text\\\\\\\\{intermediate_graph_degree\\\\\\\\}$ bytes per vector
-- Bloom filter for sampling: $1.3 \times 2 \times \text\\\\\\\\{intermediate_graph_degree\\\\\\\\}$ bytes per vector
+- Full graph with distances (~1.3x overallocation): $1.3 \times 8 \times \text{intermediate\_graph\_degree}$ bytes per vector
+- Bloom filter for sampling: $1.3 \times 2 \times \text{intermediate\_graph\_degree}$ bytes per vector
 - 5 sample buffers (degree 32 each): 640 bytes per vector
 - Graph update buffer (degree 32): 256 bytes per vector
 - Edge counters: 16 bytes per vector
@@ -152,10 +152,10 @@ $$
 Pruning/reordering the intermediate graph; peak scales linearly with intermediate degree.
 
 $$
-\text\\\\\\\\{optimize_peak\\\\\\\\}
+\text{optimize\_peak}
 \;=\;
-n_\\\\\\\\{\text\\\\\\\\{vectors\\\\\\\\}\\\\\\\\} \times
-\Big( 4 + \big(\operatorname\\\\\\\\{sizeof\\\\\\\\}(\mathrm\\\\\\\\{IdxT\\\\\\\\}) + 1\big)\times \text\\\\\\\\{intermediate_degree\\\\\\\\} \Big)
+n_{\text{vectors}} \times
+\Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate\_degree} \Big)
 $$
 
 **Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): 614.17 MB
@@ -168,11 +168,11 @@ The overall peak memory footprint on the device is the maximum allocation across
 **Using IVF-PQ:**
 
 $$
-\text\\\\\\\\{build_peak\\\\\\\\}
+\text{build\_peak}
 \;=\;
-\text\\\\\\\\{dataset_size\\\\\\\\}
+\text{dataset\_size}
 \;+\;
-\max\!\big(\text\\\\\\\\{IVFPQ_build_peak\\\\\\\\},\ \text\\\\\\\\{IVFPQ_search_peak\\\\\\\\},\ \text\\\\\\\\{optimize_peak\\\\\\\\}\big)
+\max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
 $$
 
 **Example:** 3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB
@@ -180,14 +180,14 @@ $$
 **Using NN-Descent:**
 
 $$
-\text\\\\\\\\{build_peak\\\\\\\\}
+\text{build\_peak}
 \;=\;
-\text\\\\\\\\{dataset_size\\\\\\\\}^\\\\\\\\{*\\\\\\\\}
+\text{dataset\_size}^{*}
 \;+\;
-\max\!\big(\text\\\\\\\\{NND_device_peak\\\\\\\\},\ \text\\\\\\\\{optimize_peak\\\\\\\\}\big)
+\max\!\big(\text{NND\_device\_peak},\ \text{optimize\_peak}\big)
 $$
 
-$\text\\\\\\\\{dataset_size\\\\\\\\}^\\\\\\\\{*\\\\\\\\}$ applies only when the user passes data residing in device memory; NN-Descent internally copies the dataset to the device as fp16, so host-memory inputs do not add this term.
+$\text{dataset\_size}^{*}$ applies only when the user passes data residing in device memory; NN-Descent internally copies the dataset to the device as fp16, so host-memory inputs do not add this term.
 
 ## Search peak memory usage
 
@@ -196,24 +196,24 @@ If multiple batches are to be launched concurrently or overlapped, separate resu
 The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
 
 $$
-\text\\\\\\\\{search_memory\\\\\\\\}
+\text{search\_memory}
 \;=\;
-\text\\\\\\\\{dataset_size\\\\\\\\} + \text\\\\\\\\{graph_size\\\\\\\\} + \text\\\\\\\\{workspace_size\\\\\\\\}
+\text{dataset\_size} + \text{graph\_size} + \text{workspace\_size}
 $$
 
 Where `workspace_size` is the temporary memory used for query vectors and result storage:
 
 $$
-\text\\\\\\\\{query_size\\\\\\\\}
+\text{query\_size}
 \;=\;
-\text\\\\\\\\{batch_size\\\\\\\\} \times \text\\\\\\\\{dim\\\\\\\\} \times \operatorname\\\\\\\\{sizeof\\\\\\\\}(\mathrm\\\\\\\\{float\\\\\\\\})
+\text{batch\_size} \times \text{dim} \times \operatorname{sizeof}(\mathrm{float})
 $$
 
 $$
-\text\\\\\\\\{result_size\\\\\\\\}
+\text{result\_size}
 \;=\;
-\text\\\\\\\\{batch_size\\\\\\\\} \times \text\\\\\\\\{topk\\\\\\\\} \times
-\big(\operatorname\\\\\\\\{sizeof\\\\\\\\}(\mathrm\\\\\\\\{IdxT\\\\\\\\}) + \operatorname\\\\\\\\{sizeof\\\\\\\\}(\mathrm\\\\\\\\{float\\\\\\\\})\big)
+\text{batch\_size} \times \text{topk} \times
+\big(\operatorname{sizeof}(\mathrm{IdxT}) + \operatorname{sizeof}(\mathrm{float})\big)
 $$
 
 **Example** (dim = 1024, batch\_size = 100, topk = 10, IdxT = int32):

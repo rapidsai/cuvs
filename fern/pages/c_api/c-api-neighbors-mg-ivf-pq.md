@@ -8,8 +8,7 @@ _Source header: `c/include/cuvs/neighbors/mg_ivf_pq.h`_
 
 ## Multi-GPU IVF-PQ index build parameters
 
-_Doxygen group: `mg_ivf_pq_c_index_params`_
-
+<a id="cuvsmultigpuivfpqindexparams"></a>
 ### cuvsMultiGpuIvfPqIndexParams
 
 Multi-GPU parameters to build IVF-PQ Index
@@ -17,18 +16,17 @@ Multi-GPU parameters to build IVF-PQ Index
 This structure extends the base IVF-PQ index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfPqIndexParams { ... } ;
+struct cuvsMultiGpuIvfPqIndexParams { ... };
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `base_params` | `cuvsIvfPqIndexParams_t` | Base IVF-PQ index parameters |
-| `mode` | `cuvsMultiGpuDistributionMode` | Distribution mode for multi-GPU setup |
+| `base_params` | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) | Base IVF-PQ index parameters |
+| `mode` | [`cuvsMultiGpuDistributionMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpudistributionmode) | Distribution mode for multi-GPU setup |
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:28`_
-
+<a id="cuvsmultigpuivfpqindexparamscreate"></a>
 ### cuvsMultiGpuIvfPqIndexParamsCreate
 
 Allocate Multi-GPU IVF-PQ Index params, and populate with default values
@@ -41,16 +39,15 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(cuvsMultiGpuIvfPqIndexParams_t* i
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsMultiGpuIvfPqIndexParams_t*` | cuvsMultiGpuIvfPqIndexParams_t to allocate |
+| `index_params` | in | [`cuvsMultiGpuIvfPqIndexParams_t*`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindexparams) | cuvsMultiGpuIvfPqIndexParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:43`_
-
+<a id="cuvsmultigpuivfpqindexparamsdestroy"></a>
 ### cuvsMultiGpuIvfPqIndexParamsDestroy
 
 De-allocate Multi-GPU IVF-PQ Index params
@@ -63,20 +60,17 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(cuvsMultiGpuIvfPqIndexParams_t i
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsMultiGpuIvfPqIndexParams_t` |  |
+| `index_params` | in | [`cuvsMultiGpuIvfPqIndexParams_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindexparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:51`_
-
 ## Multi-GPU IVF-PQ index search parameters
 
-_Doxygen group: `mg_ivf_pq_c_search_params`_
-
+<a id="cuvsmultigpuivfpqsearchparams"></a>
 ### cuvsMultiGpuIvfPqSearchParams
 
 Multi-GPU parameters to search IVF-PQ index
@@ -84,20 +78,19 @@ Multi-GPU parameters to search IVF-PQ index
 This structure extends the base IVF-PQ search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfPqSearchParams { ... } ;
+struct cuvsMultiGpuIvfPqSearchParams { ... };
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `base_params` | `cuvsIvfPqSearchParams_t` | Base IVF-PQ search parameters |
-| `search_mode` | `cuvsMultiGpuReplicatedSearchMode` | Replicated search mode |
-| `merge_mode` | `cuvsMultiGpuShardedMergeMode` | Sharded merge mode |
+| `base_params` | [`cuvsIvfPqSearchParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqsearchparams) | Base IVF-PQ search parameters |
+| `search_mode` | [`cuvsMultiGpuReplicatedSearchMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpureplicatedsearchmode) | Replicated search mode |
+| `merge_mode` | [`cuvsMultiGpuShardedMergeMode`](/api-reference/c-api-neighbors-mg-common#cuvsmultigpushardedmergemode) | Sharded merge mode |
 | `n_rows_per_batch` | `int64_t` | Number of rows per batch |
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:67`_
-
+<a id="cuvsmultigpuivfpqsearchparamscreate"></a>
 ### cuvsMultiGpuIvfPqSearchParamsCreate
 
 Allocate Multi-GPU IVF-PQ search params, and populate with default values
@@ -110,16 +103,15 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t*
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsMultiGpuIvfPqSearchParams_t*` | cuvsMultiGpuIvfPqSearchParams_t to allocate |
+| `params` | in | [`cuvsMultiGpuIvfPqSearchParams_t*`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqsearchparams) | cuvsMultiGpuIvfPqSearchParams_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:86`_
-
+<a id="cuvsmultigpuivfpqsearchparamsdestroy"></a>
 ### cuvsMultiGpuIvfPqSearchParamsDestroy
 
 De-allocate Multi-GPU IVF-PQ search params
@@ -132,20 +124,35 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `params` | in | `cuvsMultiGpuIvfPqSearchParams_t` |  |
+| `params` | in | [`cuvsMultiGpuIvfPqSearchParams_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqsearchparams) |  |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:94`_
-
 ## Multi-GPU IVF-PQ index
 
-_Doxygen group: `mg_ivf_pq_c_index`_
+<a id="cuvsmultigpuivfpqindex"></a>
+### cuvsMultiGpuIvfPqIndex
 
+Struct to hold address of cuvs::neighbors::mg_index&lt;ivf_pq::index&gt; and its active trained
+
+dtype
+
+```c
+typedef struct { ... } cuvsMultiGpuIvfPqIndex;
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `addr` | `uintptr_t` |  |
+| `dtype` | `DLDataType` |  |
+
+<a id="cuvsmultigpuivfpqindexcreate"></a>
 ### cuvsMultiGpuIvfPqIndexCreate
 
 Allocate Multi-GPU IVF-PQ index
@@ -158,16 +165,15 @@ cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsMultiGpuIvfPqIndex_t*` | cuvsMultiGpuIvfPqIndex_t to allocate |
+| `index` | in | [`cuvsMultiGpuIvfPqIndex_t*`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | cuvsMultiGpuIvfPqIndex_t to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:122`_
-
+<a id="cuvsmultigpuivfpqindexdestroy"></a>
 ### cuvsMultiGpuIvfPqIndexDestroy
 
 De-allocate Multi-GPU IVF-PQ index
@@ -180,20 +186,17 @@ cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index` | in | `cuvsMultiGpuIvfPqIndex_t` | cuvsMultiGpuIvfPqIndex_t to de-allocate |
+| `index` | in | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | cuvsMultiGpuIvfPqIndex_t to de-allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:130`_
-
 ## Multi-GPU IVF-PQ index build
 
-_Doxygen group: `mg_ivf_pq_c_index_build`_
-
+<a id="cuvsmultigpuivfpqbuild"></a>
 ### cuvsMultiGpuIvfPqBuild
 
 Build a Multi-GPU IVF-PQ index
@@ -209,23 +212,20 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsMultiGpuIvfPqIndexParams_t` | Multi-GPU IVF-PQ index parameters |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsMultiGpuIvfPqIndexParams_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindexparams) | Multi-GPU IVF-PQ index parameters |
 | `dataset_tensor` | in | `DLManagedTensor*` | DLManagedTensor* training dataset |
-| `index` | out | `cuvsMultiGpuIvfPqIndex_t` | Multi-GPU IVF-PQ index |
+| `index` | out | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | Multi-GPU IVF-PQ index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:150`_
-
 ## Multi-GPU IVF-PQ index search
 
-_Doxygen group: `mg_ivf_pq_c_index_search`_
-
+<a id="cuvsmultigpuivfpqsearch"></a>
 ### cuvsMultiGpuIvfPqSearch
 
 Search a Multi-GPU IVF-PQ index
@@ -243,25 +243,22 @@ DLManagedTensor* distances_tensor);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `params` | in | `cuvsMultiGpuIvfPqSearchParams_t` | Multi-GPU IVF-PQ search parameters |
-| `index` | in | `cuvsMultiGpuIvfPqIndex_t` | Multi-GPU IVF-PQ index |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `params` | in | [`cuvsMultiGpuIvfPqSearchParams_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqsearchparams) | Multi-GPU IVF-PQ search parameters |
+| `index` | in | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | Multi-GPU IVF-PQ index |
 | `queries_tensor` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset |
 | `neighbors_tensor` | out | `DLManagedTensor*` | DLManagedTensor* output neighbors |
 | `distances_tensor` | out | `DLManagedTensor*` | DLManagedTensor* output distances |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:175`_
-
 ## Multi-GPU IVF-PQ index extend
 
-_Doxygen group: `mg_ivf_pq_c_index_extend`_
-
+<a id="cuvsmultigpuivfpqextend"></a>
 ### cuvsMultiGpuIvfPqExtend
 
 Extend a Multi-GPU IVF-PQ index
@@ -277,23 +274,20 @@ DLManagedTensor* new_indices_tensor);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index` | in,out | `cuvsMultiGpuIvfPqIndex_t` | Multi-GPU IVF-PQ index to extend |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index` | in,out | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | Multi-GPU IVF-PQ index to extend |
 | `new_vectors_tensor` | in | `DLManagedTensor*` | DLManagedTensor* new vectors to add |
 | `new_indices_tensor` | in | `DLManagedTensor*` | DLManagedTensor* new indices (optional, can be NULL) |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:200`_
-
 ## Multi-GPU IVF-PQ index serialize
 
-_Doxygen group: `mg_ivf_pq_c_index_serialize`_
-
+<a id="cuvsmultigpuivfpqserialize"></a>
 ### cuvsMultiGpuIvfPqSerialize
 
 Serialize a Multi-GPU IVF-PQ index to file
@@ -308,22 +302,19 @@ const char* filename);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
-| `index` | in | `cuvsMultiGpuIvfPqIndex_t` | Multi-GPU IVF-PQ index to serialize |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
+| `index` | in | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | Multi-GPU IVF-PQ index to serialize |
 | `filename` | in | `const char*` | Path to the output file |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:222`_
-
 ## Multi-GPU IVF-PQ index deserialize
 
-_Doxygen group: `mg_ivf_pq_c_index_deserialize`_
-
+<a id="cuvsmultigpuivfpqdeserialize"></a>
 ### cuvsMultiGpuIvfPqDeserialize
 
 Deserialize a Multi-GPU IVF-PQ index from file
@@ -338,22 +329,19 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | Path to the input file |
-| `index` | out | `cuvsMultiGpuIvfPqIndex_t` | Multi-GPU IVF-PQ index |
+| `index` | out | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | Multi-GPU IVF-PQ index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:243`_
-
 ## Multi-GPU IVF-PQ index distribute
 
-_Doxygen group: `mg_ivf_pq_c_index_distribute`_
-
+<a id="cuvsmultigpuivfpqdistribute"></a>
 ### cuvsMultiGpuIvfPqDistribute
 
 Distribute a local IVF-PQ index to create a Multi-GPU index
@@ -368,14 +356,12 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `filename` | in | `const char*` | Path to the local index file |
-| `index` | out | `cuvsMultiGpuIvfPqIndex_t` | Multi-GPU IVF-PQ index |
+| `index` | out | [`cuvsMultiGpuIvfPqIndex_t`](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqindex) | Multi-GPU IVF-PQ index |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
-
-_Source: `c/include/cuvs/neighbors/mg_ivf_pq.h:264`_

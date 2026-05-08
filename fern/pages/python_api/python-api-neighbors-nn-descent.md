@@ -18,11 +18,11 @@ building
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `trained` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:165` |
-| `graph` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:169` |
-| `distances` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:173` |
+| Name | Kind |
+| --- | --- |
+| `trained` | property |
+| `graph` | property |
+| `distances` | property |
 
 ### trained
 
@@ -30,25 +30,17 @@ building
 def trained(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:165`_
-
 ### graph
 
 ```python
 def graph(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:169`_
-
 ### distances
 
 ```python
 def distances(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:173`_
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:143`_
 
 ## IndexParams
 
@@ -78,15 +70,15 @@ def __init__(self, *, metric=None, metric_arg=None, graph_degree=None, intermedi
 
 **Members**
 
-| Name | Kind | Source |
-| --- | --- | --- |
-| `metric` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:116` |
-| `metric_arg` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:120` |
-| `graph_degree` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:124` |
-| `intermediate_graph_degree` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:128` |
-| `max_iterations` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:132` |
-| `termination_threshold` | property | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:136` |
-| `get_handle` | method | `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:139` |
+| Name | Kind |
+| --- | --- |
+| `metric` | property |
+| `metric_arg` | property |
+| `graph_degree` | property |
+| `intermediate_graph_degree` | property |
+| `max_iterations` | property |
+| `termination_threshold` | property |
+| `get_handle` | method |
 
 ### metric
 
@@ -94,15 +86,11 @@ def __init__(self, *, metric=None, metric_arg=None, graph_degree=None, intermedi
 def metric(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:116`_
-
 ### metric_arg
 
 ```python
 def metric_arg(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:120`_
 
 ### graph_degree
 
@@ -110,15 +98,11 @@ _Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:120`_
 def graph_degree(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:124`_
-
 ### intermediate_graph_degree
 
 ```python
 def intermediate_graph_degree(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:128`_
 
 ### max_iterations
 
@@ -126,15 +110,11 @@ _Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:128`_
 def max_iterations(self)
 ```
 
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:132`_
-
 ### termination_threshold
 
 ```python
 def termination_threshold(self)
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:136`_
 
 ### get_handle
 
@@ -143,10 +123,6 @@ def get_handle(self)
 ```
 
 Get a pointer to the underlying C object.
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:139`_
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:39`_
 
 ## build
 
@@ -188,5 +164,3 @@ Build KNN graph from the dataset
 >>> index = nn_descent.build(build_params, dataset)
 >>> graph = index.graph
 ```
-
-_Source: `python/cuvs/cuvs/neighbors/nn_descent/nn_descent.pyx:210`_

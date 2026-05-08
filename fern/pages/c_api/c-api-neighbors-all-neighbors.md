@@ -8,8 +8,7 @@ _Source header: `c/include/cuvs/neighbors/all_neighbors.h`_
 
 ## All-neighbors C-API build parameters
 
-_Doxygen group: `all_neighbors_c_params`_
-
+<a id="cuvsallneighborsalgo"></a>
 ### cuvsAllNeighborsAlgo
 
 Graph build algorithm selection.
@@ -26,29 +25,27 @@ typedef enum { ... } cuvsAllNeighborsAlgo;
 | `CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ` | `1` |
 | `CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT` | `2` |
 
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:38`_
-
+<a id="cuvsallneighborsindexparams"></a>
 ### cuvsAllNeighborsIndexParams
 
 Parameters controlling SNMG all-neighbors build.
 
 ```c
-struct cuvsAllNeighborsIndexParams { ... } ;
+struct cuvsAllNeighborsIndexParams { ... };
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `algo` | `cuvsAllNeighborsAlgo` |  |
+| `algo` | [`cuvsAllNeighborsAlgo`](/api-reference/c-api-neighbors-all-neighbors#cuvsallneighborsalgo) |  |
 | `overlap_factor` | `size_t` |  |
 | `n_clusters` | `size_t` |  |
-| `metric` | `cuvsDistanceType` |  |
-| `ivf_pq_params` | `cuvsIvfPqIndexParams_t` |  |
-| `nn_descent_params` | `cuvsNNDescentIndexParams_t` |  |
+| `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) |  |
+| `ivf_pq_params` | [`cuvsIvfPqIndexParams_t`](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqindexparams) |  |
+| `nn_descent_params` | [`cuvsNNDescentIndexParams_t`](/api-reference/c-api-neighbors-nn-descent#cuvsnndescentindexparams) |  |
 
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:47`_
-
+<a id="cuvsallneighborsindexparamscreate"></a>
 ### cuvsAllNeighborsIndexParamsCreate
 
 Create a default all-neighbors index parameters struct.
@@ -61,16 +58,15 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | out | `cuvsAllNeighborsIndexParams_t*` | Pointer to allocated index_params struct |
+| `index_params` | out | [`cuvsAllNeighborsIndexParams_t*`](/api-reference/c-api-neighbors-all-neighbors#cuvsallneighborsindexparams) | Pointer to allocated index_params struct |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:70`_
-
+<a id="cuvsallneighborsindexparamsdestroy"></a>
 ### cuvsAllNeighborsIndexParamsDestroy
 
 Destroy an all-neighbors index parameters struct.
@@ -83,20 +79,17 @@ cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t ind
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `index_params` | in | `cuvsAllNeighborsIndexParams_t` | Index parameters struct to destroy |
+| `index_params` | in | [`cuvsAllNeighborsIndexParams_t`](/api-reference/c-api-neighbors-all-neighbors#cuvsallneighborsindexparams) | Index parameters struct to destroy |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:79`_
-
 ## All-neighbors C-API build
 
-_Doxygen group: `all_neighbors_c_build`_
-
+<a id="cuvsallneighborsbuild"></a>
 ### cuvsAllNeighborsBuild
 
 Build an all-neighbors k-NN graph automatically detecting host vs device dataset.
@@ -117,8 +110,8 @@ resources The function automatically detects whether the dataset is host-residen
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | Can be a SNMG multi-GPU resources (`cuvsResources_t`) or single-GPU |
-| `params` | in | `cuvsAllNeighborsIndexParams_t` | Build parameters (see cuvsAllNeighborsIndexParams) |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | Can be a SNMG multi-GPU resources (`cuvsResources_t`) or single-GPU |
+| `params` | in | [`cuvsAllNeighborsIndexParams_t`](/api-reference/c-api-neighbors-all-neighbors#cuvsallneighborsindexparams) | Build parameters (see cuvsAllNeighborsIndexParams) |
 | `dataset` | in | `DLManagedTensor*` | 2D tensor [num_rows x dim] on host or device (auto-detected) |
 | `indices` | out | `DLManagedTensor*` | 2D tensor [num_rows x k] on device (int64) |
 | `distances` | out | `DLManagedTensor*` | Optional 2D tensor [num_rows x k] on device (float32); can be NULL |
@@ -127,6 +120,4 @@ resources The function automatically detects whether the dataset is host-residen
 
 **Returns**
 
-`cuvsError_t`
-
-_Source: `c/include/cuvs/neighbors/all_neighbors.h:106`_
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

@@ -6,48 +6,65 @@ slug: api-reference/cpp-api-cluster-kmeans
 
 _Source header: `cpp/include/cuvs/cluster/kmeans.hpp`_
 
-## k-means hyperparameters
+## Types
 
-_Doxygen group: `kmeans_params`_
+<a id="cuvs-cluster-kmeans-base-params"></a>
+### cuvs::cluster::kmeans::base_params
 
-### cuvs::cluster::kmeans::params
-
-Simple object to specify hyper-parameters to the kmeans algorithm.
+Base structure for parameters that are common to all k-means algorithms
 
 ```cpp
-struct params : base_params { ... } ;
+struct base_params { ... };
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `KMeansPlusPlus,` | `KMeansPlusPlus,` | Sample the centroids using the kmeans++ strategy |
-| `Random,` | `Random,` | Sample the centroids uniformly at random |
-| `Array` | `Array` | User provides the array of initial centroids |
+| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Metric to use for distance computation. The supported metrics can vary per algorithm. |
+
+## k-means hyperparameters
+
+<a id="cuvs-cluster-kmeans-params"></a>
+### cuvs::cluster::kmeans::params
+
+Simple object to specify hyper-parameters to the kmeans algorithm.
+
+```cpp
+struct params : base_params { ... };
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
 | `n_clusters` | `int` | The number of clusters to form as well as the number of centroids to generate (default:8). |
-| `init` | `InitMethod` | Method for initialization, defaults to k-means++: |
+| `init` | `InitMethod` | Method for initialization, defaults to k-means++:<br />- InitMethod::KMeansPlusPlus (k-means++): Use scalable k-means++ algorithm to select the initial cluster centers.<br />- InitMethod::Random (random): Choose 'n_clusters' observations (rows) at random from the input data for the initial centroids.<br />- InitMethod::Array (ndarray): Use 'centroids' as initial cluster centers. |
 | `max_iter` | `int` | Maximum number of iterations of the k-means algorithm for a single run. |
 | `tol` | `double` | Relative tolerance with regards to inertia to declare convergence. |
 | `verbosity` | `rapids_logger::level_enum` | verbosity level. |
-| `raft::random::RngState rng_state{0}` | `raft::random::RngState rng_state{0}` | Seed to the random number generator. |
+| `rng_state` | `raft::random::RngState` | Seed to the random number generator. |
 | `n_init` | `int` | Number of instance k-means algorithm will be run with different seeds. |
 | `oversampling_factor` | `double` | Oversampling factor for use in the k-means\|\| algorithm |
-| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is |
+| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids NB: These parameters are unrelated to streaming_batch_size, which controls how many samples to transfer from host to device per batch when processing out-of-core data. |
 | `batch_centroids` | `int` | if 0 then batch_centroids = n_clusters |
 | `inertia_check` | `bool` | If true, check inertia during iterations for early convergence. |
-| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. |
+| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. When set to 0, defaults to n_samples (process all at once). Only used by the batched (host-data) code path and ignored by device-data overloads. Default: 0 (process all data at once). |
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:34`_
-
+<a id="cuvs-cluster-kmeans-balanced-params"></a>
 ### cuvs::cluster::kmeans::balanced_params
 
 Simple object to specify hyper-parameters to the balanced k-means algorithm.
 
-The following metrics are currently supported in k-means balanced: - CosineExpanded - InnerProduct - L2Expanded - L2SqrtExpanded
+The following metrics are currently supported in k-means balanced:
+
+- CosineExpanded
+- InnerProduct
+- L2Expanded
+- L2SqrtExpanded
 
 ```cpp
-struct balanced_params : base_params { ... } ;
+struct balanced_params : base_params { ... };
 ```
 
 **Fields**
@@ -56,14 +73,13 @@ struct balanced_params : base_params { ... } ;
 | --- | --- | --- |
 | `n_iters` | `uint32_t` | Number of training iterations |
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:139`_
-
+<a id="cuvs-cluster-kmeans-kmeans-type"></a>
 ### cuvs::cluster::kmeans::kmeans_type
 
 Type of k-means algorithm.
 
 ```cpp
-enum class kmeans_type { ... } ;
+enum class kmeans_type { ... };
 ```
 
 **Values**
@@ -73,12 +89,9 @@ enum class kmeans_type { ... } ;
 | `KMeans` | `0` |
 | `KMeansBalanced` | `1` |
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:149`_
-
 ## k-means clustering APIs
 
-_Doxygen group: `kmeans`_
-
+<a id="cuvs-cluster-kmeans-fit"></a>
 ### cuvs::cluster::kmeans::fit
 
 Find clusters with k-means algorithm using batched processing of host data.
@@ -93,14 +106,16 @@ raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int64_t> n_iter);
 ```
 
-TODO: Evaluate replacing the extent type with int64_t. Reference issue: https://github.com/rapidsai/cuvs/issues/1961 This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by params.streaming_batch_size.
+TODO: Evaluate replacing the extent type with int64_t. Reference issue: https://github.com/rapidsai/cuvs/issues/1961
+
+This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by params.streaming_batch_size.
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const cuvs::cluster::kmeans::params&` | Parameters for KMeans model. Batch size is read from params.streaming_batch_size. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. Batch size is read from params.streaming_batch_size. |
 | `X` | in | `raft::host_matrix_view<const float, int64_t>` | Training instances on HOST memory. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::host_vector_view<const float, int64_t>>` | Optional weights for each observation in X (on host). [len = n_samples] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [in] When init is InitMethod::Array, use centroids as the initial cluster centers. [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -111,9 +126,7 @@ TODO: Evaluate replacing the extent type with int64_t. Reference issue: https://
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:217`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm using batched processing of host data.
 
@@ -132,7 +145,7 @@ raft::host_scalar_view<int64_t> n_iter);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
-| `params` |  | `const cuvs::cluster::kmeans::params&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) |  |
 | `X` |  | `raft::host_matrix_view<const double, int64_t>` |  |
 | `sample_weight` |  | `std::optional<raft::host_vector_view<const double, int64_t>>` |  |
 | `centroids` |  | `raft::device_matrix_view<double, int64_t>` |  |
@@ -143,9 +156,7 @@ raft::host_scalar_view<int64_t> n_iter);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:228`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
 
@@ -166,7 +177,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const cuvs::cluster::kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `raft::device_matrix_view<float, int>` | [in] When init is InitMethod::Array, use centroids as the initial cluster centers. [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -177,9 +188,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:278`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
 
@@ -200,7 +209,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const cuvs::cluster::kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int64_t>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [in] When init is InitMethod::Array, use centroids as the initial cluster centers. [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -211,9 +220,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:329`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
 
@@ -234,7 +241,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const cuvs::cluster::kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `raft::device_matrix_view<double, int>` | [in] When init is InitMethod::Array, use centroids as the initial cluster centers. [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -245,9 +252,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:379`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
 
@@ -268,7 +273,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const cuvs::cluster::kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int64_t>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `raft::device_matrix_view<double, int64_t>` | [in] When init is InitMethod::Array, use centroids as the initial cluster centers. [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -279,9 +284,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:430`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find clusters with k-means algorithm.
 
@@ -302,7 +305,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const cuvs::cluster::kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const int8_t, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const int8_t, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `raft::device_matrix_view<int8_t, int>` | [in] When init is InitMethod::Array, use centroids as the initial cluster centers. [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -313,9 +316,7 @@ Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinit
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:480`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
 
@@ -332,7 +333,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | out | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
 | `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
@@ -341,9 +342,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:520`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
 
@@ -360,7 +359,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const int8_t, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
 | `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
@@ -369,9 +368,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:557`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
 
@@ -388,7 +385,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const half, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
 | `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
@@ -397,9 +394,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:594`_
-
-### cuvs::cluster::kmeans::fit
+**Additional overload:** `cuvs::cluster::kmeans::fit`
 
 Find balanced clusters with k-means algorithm.
 
@@ -416,7 +411,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const uint8_t, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
 | `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
@@ -425,8 +420,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:631`_
-
+<a id="cuvs-cluster-kmeans-predict"></a>
 ### cuvs::cluster::kmeans::predict
 
 Predict the closest cluster each sample in X belongs to.
@@ -447,7 +441,7 @@ raft::host_scalar_view<float> inertia);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int>` | New data to predict. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | in | `raft::device_matrix_view<const float, int>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
@@ -459,9 +453,7 @@ raft::host_scalar_view<float> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:686`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -481,7 +473,7 @@ raft::host_scalar_view<float> inertia);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int64_t>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
@@ -493,9 +485,7 @@ raft::host_scalar_view<float> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:753`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -515,7 +505,7 @@ raft::host_scalar_view<double> inertia);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int>` | New data to predict. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | in | `raft::device_matrix_view<const double, int>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
@@ -527,9 +517,7 @@ raft::host_scalar_view<double> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:811`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -549,7 +537,7 @@ raft::host_scalar_view<double> inertia);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int64_t>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | in | `raft::device_matrix_view<const double, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
@@ -561,9 +549,7 @@ raft::host_scalar_view<double> inertia);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:869`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -580,7 +566,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const int8_t, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -589,9 +575,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:916`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -608,7 +592,7 @@ raft::device_vector_view<int, int64_t> labels);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const int8_t, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<int, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -617,9 +601,7 @@ raft::device_vector_view<int, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:960`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -636,7 +618,7 @@ raft::device_vector_view<int, int64_t> labels);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<int, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -645,9 +627,7 @@ raft::device_vector_view<int, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1004`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -664,7 +644,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -673,9 +653,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1048`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -692,7 +670,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const half, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -701,9 +679,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1092`_
-
-### cuvs::cluster::kmeans::predict
+**Additional overload:** `cuvs::cluster::kmeans::predict`
 
 Predict the closest cluster each sample in X belongs to.
 
@@ -720,7 +696,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const uint8_t, int64_t>` | New data to predict. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -729,8 +705,7 @@ raft::device_vector_view<uint32_t, int64_t> labels);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1136`_
-
+<a id="cuvs-cluster-kmeans-fit-predict"></a>
 ### cuvs::cluster::kmeans::fit_predict
 
 Compute k-means clustering and predicts cluster index for each sample
@@ -753,7 +728,7 @@ in the input.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `std::optional<raft::device_matrix_view<float, int>>` | Optional [in] When init is InitMethod::Array, use centroids  as the initial cluster centers [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -765,9 +740,7 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1188`_
-
-### cuvs::cluster::kmeans::fit_predict
+**Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute k-means clustering and predicts cluster index for each sample
 
@@ -789,7 +762,7 @@ in the input.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int64_t>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `std::optional<raft::device_matrix_view<float, int64_t>>` | Optional [in] When init is InitMethod::Array, use centroids  as the initial cluster centers [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -801,9 +774,7 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1243`_
-
-### cuvs::cluster::kmeans::fit_predict
+**Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute k-means clustering and predicts cluster index for each sample
 
@@ -825,7 +796,7 @@ in the input.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `std::optional<raft::device_matrix_view<double, int>>` | Optional [in] When init is InitMethod::Array, use centroids  as the initial cluster centers [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -837,9 +808,7 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1298`_
-
-### cuvs::cluster::kmeans::fit_predict
+**Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute k-means clustering and predicts cluster index for each sample
 
@@ -861,7 +830,7 @@ in the input.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int64_t>>` | Optional weights for each observation in X. [len = n_samples] |
 | `centroids` | inout | `std::optional<raft::device_matrix_view<double, int64_t>>` | Optional [in] When init is InitMethod::Array, use centroids  as the initial cluster centers [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
@@ -873,9 +842,7 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1353`_
-
-### cuvs::cluster::kmeans::fit_predict
+**Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute balanced k-means clustering and predicts cluster index for each sample
 
@@ -894,7 +861,7 @@ in the input.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | Optional [in] When init is InitMethod::Array, use centroids  as the initial cluster centers [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -903,9 +870,7 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1400`_
-
-### cuvs::cluster::kmeans::fit_predict
+**Additional overload:** `cuvs::cluster::kmeans::fit_predict`
 
 Compute balanced k-means clustering and predicts cluster index for each sample
 
@@ -924,7 +889,7 @@ in the input.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `const raft::resources&` | The raft handle. |
-| `params` | in | `cuvs::cluster::kmeans::balanced_params const&` | Parameters for KMeans model. |
+| `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const int8_t, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | Optional [in] When init is InitMethod::Array, use centroids  as the initial cluster centers [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
 | `labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | Index of the cluster each sample in X belongs to. [len = n_samples] |
@@ -933,8 +898,7 @@ in the input.
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1444`_
-
+<a id="cuvs-cluster-kmeans-transform"></a>
 ### cuvs::cluster::kmeans::transform
 
 Transform X to a cluster-distance space.
@@ -952,7 +916,7 @@ raft::device_matrix_view<float, int> X_new);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int>` | Training instances to cluster. The data must be in row-major format [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `X_new` | out | `raft::device_matrix_view<float, int>` | X transformed in the new space. [dim = n_samples x n_features] |
@@ -961,9 +925,7 @@ raft::device_matrix_view<float, int> X_new);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1463`_
-
-### cuvs::cluster::kmeans::transform
+**Additional overload:** `cuvs::cluster::kmeans::transform`
 
 Transform X to a cluster-distance space.
 
@@ -980,7 +942,7 @@ raft::device_matrix_view<double, int> X_new);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | The raft handle. |
-| `params` | in | `const kmeans::params&` | Parameters for KMeans model. |
+| `params` | in | [`const kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cuvs-cluster-kmeans-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const double, int>` | Training instances to cluster. The data must be in row-major format [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const double, int>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `X_new` | out | `raft::device_matrix_view<double, int>` | X transformed in the new space. [dim = n_samples x n_features] |
@@ -989,8 +951,7 @@ raft::device_matrix_view<double, int> X_new);
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1482`_
-
+<a id="cuvs-cluster-kmeans-cluster-cost"></a>
 ### cuvs::cluster::kmeans::cluster_cost
 
 Compute (optionally weighted) cluster cost
@@ -1018,9 +979,7 @@ std::optional<raft::device_vector_view<const float, int>> sample_weight = std::n
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1503`_
-
-### cuvs::cluster::kmeans::cluster_cost
+**Additional overload:** `cuvs::cluster::kmeans::cluster_cost`
 
 Compute cluster cost
 
@@ -1047,9 +1006,7 @@ std::optional<raft::device_vector_view<const double, int>> sample_weight = std::
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1524`_
-
-### cuvs::cluster::kmeans::cluster_cost
+**Additional overload:** `cuvs::cluster::kmeans::cluster_cost`
 
 Compute (optionally weighted) cluster cost
 
@@ -1076,9 +1033,7 @@ std::optional<raft::device_vector_view<const float, int64_t>> sample_weight = st
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1545`_
-
-### cuvs::cluster::kmeans::cluster_cost
+**Additional overload:** `cuvs::cluster::kmeans::cluster_cost`
 
 Compute (optionally weighted) cluster cost
 
@@ -1105,13 +1060,10 @@ std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = s
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1566`_
-
 ## k-means API helpers
 
-_Doxygen group: `kmeans_helpers`_
-
-### helpers::find_k
+<a id="cuvs-cluster-kmeans-helpers-find-k"></a>
+### cuvs::cluster::kmeans::helpers::find_k
 
 Automatically find the optimal value of k using a binary search.
 
@@ -1146,5 +1098,3 @@ This method maximizes the Calinski-Harabasz Index while minimizing the per-clust
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/kmeans.hpp:1619`_

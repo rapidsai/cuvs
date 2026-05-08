@@ -8,8 +8,7 @@ _Source header: `c/include/cuvs/core/c_api.h`_
 
 ## cuVS Error Messages
 
-_Doxygen group: `error_c`_
-
+<a id="cuvserror-t"></a>
 ### cuvsError_t
 
 An enum denoting error statuses for function calls
@@ -25,8 +24,7 @@ typedef enum { ... } cuvsError_t;
 | `CUVS_ERROR` | `0` |
 | `CUVS_SUCCESS` | `1` |
 
-_Source: `c/include/cuvs/core/c_api.h:25`_
-
+<a id="cuvsgetlasterrortext"></a>
 ### cuvsGetLastErrorText
 
 Returns a string describing the last seen error on this thread, or
@@ -41,8 +39,7 @@ NULL if the last function succeeded.
 
 `const char*`
 
-_Source: `c/include/cuvs/core/c_api.h:30`_
-
+<a id="cuvssetlasterrortext"></a>
 ### cuvsSetLastErrorText
 
 Sets a string describing an error seen on the thread. Passing NULL
@@ -63,12 +60,9 @@ clears any previously seen error message.
 
 `void`
 
-_Source: `c/include/cuvs/core/c_api.h:36`_
-
 ## cuVS Logging
 
-_Doxygen group: `log_c`_
-
+<a id="cuvsloglevel-t"></a>
 ### cuvsLogLevel_t
 
 An enum denoting log levels
@@ -89,8 +83,7 @@ typedef enum { ... } cuvsLogLevel_t;
 | `CUVS_LOG_LEVEL_CRITICAL` | `5` |
 | `CUVS_LOG_LEVEL_OFF` | `6` |
 
-_Source: `c/include/cuvs/core/c_api.h:49`_
-
+<a id="cuvsgetloglevel"></a>
 ### cuvsGetLogLevel
 
 Returns the current log level
@@ -101,10 +94,9 @@ cuvsLogLevel_t cuvsGetLogLevel();
 
 **Returns**
 
-`cuvsLogLevel_t`
+[`cuvsLogLevel_t`](/api-reference/c-api-core-c-api#cuvsloglevel-t)
 
-_Source: `c/include/cuvs/core/c_api.h:61`_
-
+<a id="cuvssetloglevel"></a>
 ### cuvsSetLogLevel
 
 Sets the log level
@@ -117,18 +109,24 @@ void cuvsSetLogLevel(cuvsLogLevel_t);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | `cuvsLogLevel_t` |  |
+| `arg1` |  | [`cuvsLogLevel_t`](/api-reference/c-api-core-c-api#cuvsloglevel-t) |  |
 
 **Returns**
 
 `void`
 
-_Source: `c/include/cuvs/core/c_api.h:65`_
-
 ## cuVS Resources Handle
 
-_Doxygen group: `resources_c`_
+<a id="cuvsresources-t"></a>
+### cuvsResources_t
 
+An opaque C handle for C++ type `raft::resources`
+
+```c
+typedef uintptr_t cuvsResources_t;
+```
+
+<a id="cuvsresourcescreate"></a>
 ### cuvsResourcesCreate
 
 Create an Initialized opaque C handle for C++ type `raft::resources`
@@ -141,16 +139,15 @@ cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t*` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t*`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:86`_
-
+<a id="cuvsresourcesdestroy"></a>
 ### cuvsResourcesDestroy
 
 Destroy and de-allocate opaque C handle for C++ type `raft::resources`
@@ -163,16 +160,15 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:94`_
-
+<a id="cuvsstreamset"></a>
 ### cuvsStreamSet
 
 Set cudaStream_t on cuvsResources_t to queue CUDA kernels on APIs
@@ -187,17 +183,16 @@ that accept a cuvsResources_t handle
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `stream` | in | `cudaStream_t` | cudaStream_t stream to queue CUDA kernels |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:104`_
-
+<a id="cuvsstreamget"></a>
 ### cuvsStreamGet
 
 Get the cudaStream_t from a cuvsResources_t
@@ -210,17 +205,16 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `stream` | out | `cudaStream_t*` | cudaStream_t stream to queue CUDA kernels |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:113`_
-
+<a id="cuvsstreamsync"></a>
 ### cuvsStreamSync
 
 Syncs the current CUDA stream on the resources object
@@ -233,16 +227,15 @@ cuvsError_t cuvsStreamSync(cuvsResources_t res);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:121`_
-
+<a id="cuvsdeviceidget"></a>
 ### cuvsDeviceIdGet
 
 Get the id of the device associated with this cuvsResources_t
@@ -255,17 +248,16 @@ cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `device_id` | out | `int*` | int the id of the device associated with res |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:130`_
-
+<a id="cuvsmultigpuresourcescreate"></a>
 ### cuvsMultiGpuResourcesCreate
 
 Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
@@ -280,16 +272,15 @@ for multi-GPU operations
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t*` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t*`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:139`_
-
+<a id="cuvsmultigpuresourcescreatewithdeviceids"></a>
 ### cuvsMultiGpuResourcesCreateWithDeviceIds
 
 Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
@@ -305,17 +296,16 @@ for multi-GPU operations with specific device IDs
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t*` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t*`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `device_ids` | in | `DLManagedTensor*` | DLManagedTensor* containing device IDs to use |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:149`_
-
+<a id="cuvsmultigpuresourcesdestroy"></a>
 ### cuvsMultiGpuResourcesDestroy
 
 Destroy and de-allocate opaque C handle for C++ type `raft::device_resources_snmg`
@@ -328,16 +318,15 @@ cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:158`_
-
+<a id="cuvsmultigpuresourcessetmemorypool"></a>
 ### cuvsMultiGpuResourcesSetMemoryPool
 
 Set a memory pool on all devices managed by the multi-GPU resources
@@ -350,21 +339,18 @@ cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle for multi-GPU resources |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle for multi-GPU resources |
 | `percent_of_free_memory` | in | `int` | Percent of free memory to allocate for the pool |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:167`_
-
 ## cuVS Memory Allocation
 
-_Doxygen group: `memory_c`_
-
+<a id="cuvsrmmalloc"></a>
 ### cuvsRMMAlloc
 
 Allocates device memory using RMM
@@ -377,18 +363,17 @@ cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `ptr` | out | `void**` | Pointer to allocated device memory |
 | `bytes` | in | `size_t` | Size in bytes to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:184`_
-
+<a id="cuvsrmmfree"></a>
 ### cuvsRMMFree
 
 Deallocates device memory using RMM
@@ -401,18 +386,17 @@ cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `ptr` | in | `void*` | Pointer to allocated device memory to free |
 | `bytes` | in | `size_t` | Size in bytes to allocate |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:194`_
-
+<a id="cuvsrmmpoolmemoryresourceenable"></a>
 ### cuvsRMMPoolMemoryResourceEnable
 
 Switches the working memory resource to use the RMM pool memory resource, which will
@@ -423,7 +407,9 @@ int max_pool_size_percent,
 bool managed);
 ```
 
-bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed. available memory available memory
+bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed.
+
+available memory available memory
 
 **Parameters**
 
@@ -435,12 +421,11 @@ bypass unnecessary synchronizations by allocating a chunk of device memory up fr
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:210`_
-
+<a id="cuvsrmmmemoryresourcereset"></a>
 ### cuvsRMMMemoryResourceReset
 
 Resets the memory resource to use the default memory resource (cuda_memory_resource)
@@ -451,12 +436,11 @@ cuvsError_t cuvsRMMMemoryResourceReset();
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:217`_
-
+<a id="cuvsrmmhostalloc"></a>
 ### cuvsRMMHostAlloc
 
 Allocates pinned memory on the host using RMM
@@ -474,12 +458,11 @@ cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:225`_
-
+<a id="cuvsrmmhostfree"></a>
 ### cuvsRMMHostFree
 
 Deallocates pinned memory on the host using RMM
@@ -497,12 +480,11 @@ cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:233`_
-
+<a id="cuvsversionget"></a>
 ### cuvsVersionGet
 
 Get the version of the cuVS library
@@ -521,12 +503,11 @@ cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 cuvsError_t
 
-_Source: `c/include/cuvs/core/c_api.h:242`_
-
+<a id="cuvsmatrixcopy"></a>
 ### cuvsMatrixCopy
 
 Copy a matrix
@@ -535,22 +516,23 @@ Copy a matrix
 cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
 ```
 
-This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides. Both src and dst must have the same shape and dtype, but can have different strides and device type. The memory for the output dst tensor must already be allocated and the tensor initialized.
+This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides.
+
+Both src and dst must have the same shape and dtype, but can have different strides and device type. The memory for the output dst tensor must already be allocated and the tensor initialized.
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `src` | in | `DLManagedTensor*` | Pointer to DLManagedTensor to copy |
 | `dst` | out | `DLManagedTensor*` | Pointer to DLManagedTensor to receive copy of data |
 
 **Returns**
 
-`cuvsError_t`
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-_Source: `c/include/cuvs/core/c_api.h:259`_
-
+<a id="cuvsmatrixslicerows"></a>
 ### cuvsMatrixSliceRows
 
 Slices rows from a matrix
@@ -564,7 +546,7 @@ cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManaged
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvsResources_t opaque C handle |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `src` | in | `DLManagedTensor*` | Pointer to DLManagedTensor to copy |
 | `start` | in | `int64_t` | First row index to include in the output |
 | `end` | in | `int64_t` | Last row index to include in the output |
@@ -572,6 +554,4 @@ cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManaged
 
 **Returns**
 
-`cuvsError_t`
-
-_Source: `c/include/cuvs/core/c_api.h:270`_
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

@@ -8,8 +8,7 @@ _Source header: `c/include/cuvs/distance/pairwise_distance.h`_
 
 ## C pairwise distance
 
-_Doxygen group: `pairwise_distance_c`_
-
+<a id="cuvspairwisedistance"></a>
 ### cuvsPairwiseDistance
 
 Compute pairwise distances for two matrices
@@ -29,15 +28,13 @@ Usage example:
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | `cuvsResources_t` | cuvs resources object for managing expensive resources |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvs resources object for managing expensive resources |
 | `x` | in | `DLManagedTensor*` | first set of points (size n*k) |
 | `y` | in | `DLManagedTensor*` | second set of points (size m*k) |
 | `dist` | out | `DLManagedTensor*` | output distance matrix (size n*m) |
-| `metric` | in | `cuvsDistanceType` | distance to evaluate |
+| `metric` | in | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) |
 
 **Returns**
 
-`cuvsError_t`
-
-_Source: `c/include/cuvs/distance/pairwise_distance.h:48`_
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

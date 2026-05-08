@@ -8,14 +8,13 @@ _Source header: `cpp/include/cuvs/cluster/spectral.hpp`_
 
 ## Spectral Clustering Parameters
 
-_Doxygen group: `spectral_params`_
-
+<a id="cuvs-cluster-spectral-params"></a>
 ### cuvs::cluster::spectral::params
 
 Parameters for spectral clustering
 
 ```cpp
-struct params { ... } ;
+struct params { ... };
 ```
 
 **Fields**
@@ -27,14 +26,11 @@ struct params { ... } ;
 | `n_init` | `int` | Number of k-means runs with different centroid seeds |
 | `n_neighbors` | `int` | Number of nearest neighbors for constructing the connectivity graph |
 | `tolerance` | `float` | Tolerance for the eigenvalue solver |
-| `raft::random::RngState rng_state{0}` | `raft::random::RngState rng_state{0}` | Random number generator state for reproducibility |
-
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:22`_
+| `rng_state` | `raft::random::RngState` | Random number generator state for reproducibility |
 
 ## Spectral Clustering
 
-_Doxygen group: `spectral`_
-
+<a id="cuvs-cluster-spectral-fit-predict"></a>
 ### cuvs::cluster::spectral::fit_predict
 
 Perform spectral clustering on a connectivity graph
@@ -53,7 +49,7 @@ n_clusters-1)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
-| `config` | in | `params` | Spectral clustering parameters |
+| `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cuvs-cluster-spectral-params) | Spectral clustering parameters |
 | `connectivity_graph` | in | `raft::device_coo_matrix_view<float, int, int, int>` | Sparse COO matrix representing connectivity between data points |
 | `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
 
@@ -61,9 +57,7 @@ n_clusters-1)
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:84`_
-
-### cuvs::cluster::spectral::fit_predict
+**Additional overload:** `cuvs::cluster::spectral::fit_predict`
 
 Perform spectral clustering on a connectivity graph
 
@@ -81,7 +75,7 @@ n_clusters-1)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
-| `config` | in | `params` | Spectral clustering parameters |
+| `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cuvs-cluster-spectral-params) | Spectral clustering parameters |
 | `connectivity_graph` | in | `raft::device_coo_matrix_view<double, int, int, int>` | Sparse COO matrix representing connectivity between data points |
 | `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
 
@@ -89,9 +83,7 @@ n_clusters-1)
 
 `void`
 
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:122`_
-
-### cuvs::cluster::spectral::fit_predict
+**Additional overload:** `cuvs::cluster::spectral::fit_predict`
 
 Perform spectral clustering on a dense dataset
 
@@ -102,19 +94,19 @@ raft::device_matrix_view<float, int, raft::row_major> dataset,
 raft::device_vector_view<int, int> labels);
 ```
 
-This overload automatically constructs the connectivity graph from the input dataset using k-nearest neighbors. n_clusters-1)
+This overload automatically constructs the connectivity graph from the input dataset using k-nearest neighbors.
+
+n_clusters-1)
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
-| `config` | in | `params` | Spectral clustering parameters |
+| `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cuvs-cluster-spectral-params) | Spectral clustering parameters |
 | `dataset` | in | `raft::device_matrix_view<float, int, raft::row_major>` | Dense row-major matrix of shape (n_samples, n_features) |
 | `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
 
 **Returns**
 
 `void`
-
-_Source: `cpp/include/cuvs/cluster/spectral.hpp:155`_
