@@ -123,6 +123,8 @@ navigation:
             path: "./pages/cuvs_bench/wiki_all_dataset.md"
   - section: "Developer Guide"
     contents:
+      - page: "Guidelines"
+        path: "./pages/developer_guide.md"
       - section: "Advanced Topics"
         path: "./pages/advanced_topics.md"
         contents:
@@ -130,8 +132,6 @@ navigation:
             path: "./pages/jit_lto_guide.md"
   - section: "Contribution Guide"
     contents:
-      - page: "Guidelines"
-        path: "./pages/developer_guide.md"
       - page: "Contributing"
         path: "./pages/contributing.md"
   - section: "API Reference"
