@@ -133,7 +133,6 @@ navigation:
           - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
             path: "./pages/jit_lto_guide.md"
   - section: "API Reference"
-    path: "./pages/api_docs.md"
     contents:
       - section: "C API Documentation"
         path: "./pages/c_api/index.md"

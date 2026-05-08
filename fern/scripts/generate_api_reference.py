@@ -3503,7 +3503,6 @@ def update_api_navigation() -> None:
 
     lines = [
         '  - section: "API Reference"',
-        '    path: "./pages/api_docs.md"',
         "    contents:",
     ]
     for title, directory, _, _, _ in API_NAV_SECTIONS:
