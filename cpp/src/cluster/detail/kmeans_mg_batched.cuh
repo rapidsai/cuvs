@@ -165,8 +165,9 @@ inline ncclDataType_t nccl_dtype<int64_t>()
  * `raft::resource::is_multi_gpu(handle)`. Each rank streams its local shard
  * through Lloyd iterations using batched device-side reductions, allreducing
  * partial centroid sums, weights, and clustering cost at the end of each
- * iteration. Best-of-`n_init` is tracked per rank and the converged centroids
- * are written back to @p centroids by rank 0.
+ * iteration. Best-of-`n_init` is tracked per rank. RAFT comms ranks each write
+ * their own caller-provided outputs; SNMG OMP threads share caller-provided
+ * outputs, so only rank 0 writes them.
  *
  * @tparam T    Data / weight type (float or double)
  * @tparam IdxT Index type (int or int64_t)
@@ -181,12 +182,14 @@ inline ncclDataType_t nccl_dtype<int64_t>()
  *                           When unset, all samples are weighted equally.
  * @param[in,out] centroids  Device matrix [n_clusters x n_features]. On entry,
  *                           used as the initial centers when
- *                           `params.init == InitMethod::Array`. On return, only
- *                           rank 0 writes the converged centroids.
+ *                           `params.init == InitMethod::Array`. On return,
+ *                           all RAFT comms ranks write the converged centroids;
+ *                           SNMG writes them from rank 0 only.
  * @param[out] inertia       Host scalar receiving the final clustering cost on
- *                           rank 0 (untouched on other ranks).
+ *                           all RAFT comms ranks, or rank 0 for SNMG.
  * @param[out] n_iter        Host scalar receiving the iteration count at which
- *                           the run terminated on rank 0 (untouched elsewhere).
+ *                           the run terminated on all RAFT comms ranks, or
+ *                           rank 0 for SNMG.
  * @param[in,out] scaled_weights_cache
  *                           Optional pinned host slice of size n_local used to
  *                           cache this rank's normalized weights so each batch
@@ -352,6 +355,12 @@ void mnmg_fit(const raft::resources& handle,
                              true);
   }
 
+  bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
+                            metric == cuvs::distance::DistanceType::L2SqrtExpanded;
+  auto h_norm_cache =
+    raft::make_pinned_vector<T, IdxT>(dev_res, (need_compute_norms && has_data) ? n_local : 0);
+  bool norms_cached = false;
+
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = params;
     iter_params.rng_state.seed                = gen();
@@ -423,10 +432,21 @@ void mnmg_fit(const raft::resources& handle,
           auto L2NormBatch_view =
             raft::make_device_vector_view<T, IdxT>(L2NormBatch.data_handle(), current_batch_size);
 
-          if (metric == cuvs::distance::DistanceType::L2Expanded ||
-              metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-            raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-              dev_res, batch_data_view, L2NormBatch_view);
+          if (need_compute_norms) {
+            auto batch_offset = static_cast<IdxT>(data_batch.offset());
+            if (!norms_cached) {
+              raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+                dev_res, batch_data_view, L2NormBatch_view);
+              raft::copy(h_norm_cache.data_handle() + batch_offset,
+                         L2NormBatch.data_handle(),
+                         current_batch_size,
+                         stream);
+            } else {
+              raft::copy(L2NormBatch.data_handle(),
+                         h_norm_cache.data_handle() + batch_offset,
+                         current_batch_size,
+                         stream);
+            }
           }
 
           auto L2NormBatch_const = raft::make_const_mdspan(L2NormBatch_view);
@@ -452,6 +472,7 @@ void mnmg_fit(const raft::resources& handle,
             raft::make_device_scalar_view(clustering_cost.data_handle()),
             batch_workspace);
         }
+        if (need_compute_norms) { norms_cached = true; }
       }
 
       // Phase 2: grouped allreduce
@@ -569,7 +590,8 @@ void mnmg_fit(const raft::resources& handle,
     }
   }
 
-  // Final output: rank 0 writes the caller-provided views
+  // Final output: RAFT comms ranks are separate processes with separate output views.
+  // SNMG ranks are OMP threads sharing the caller outputs, so only rank 0 writes.
   if (n_init > 1) {
     raft::copy(
       rank_centroids.data_handle(), best_centroids.data_handle(), n_clusters * n_features, stream);
@@ -577,7 +599,8 @@ void mnmg_fit(const raft::resources& handle,
     local_n_iter  = best_n_iter;
   }
 
-  if (rank == 0) {
+  bool write_outputs = !use_nccl || rank == 0;
+  if (write_outputs) {
     raft::copy(
       centroids.data_handle(), rank_centroids.data_handle(), n_clusters * n_features, stream);
     inertia[0] = local_inertia;
