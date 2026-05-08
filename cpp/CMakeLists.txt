@@ -619,6 +619,7 @@ if(NOT BUILD_CPU_ONLY)
                               "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    KERNEL_EXTRA_COMPILE_OPTIONS --maxrregcount=64
   )
   generate_jit_lto_kernels(
     jit_lto_files
@@ -634,6 +635,7 @@ if(NOT BUILD_CPU_ONLY)
                               "<cuvs/detail/jit_lto/common_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    KERNEL_EXTRA_COMPILE_OPTIONS --maxrregcount=64
   )
   generate_jit_lto_kernels(
     jit_lto_files

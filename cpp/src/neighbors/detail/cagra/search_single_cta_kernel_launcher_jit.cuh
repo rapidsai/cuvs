@@ -477,14 +477,37 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     SampleFilterT sample_filter,
     float persistent_lifetime,
     float persistent_device_usage,
-    std::shared_ptr<AlgorithmLauncher> /* launcher_ptr - not part of hash */,
-    const void* /* dataset_desc - not part of hash */) -> uint64_t
+    bool topk_by_bitonic_sort,
+    bool bitonic_sort_and_merge_multi_warps) -> uint64_t
   {
+    (void)small_hash_bitlen;
+    (void)sample_filter;
+    const uint64_t bitonic_key =
+      (topk_by_bitonic_sort ? 1ULL : 0ULL) ^ (bitonic_sort_and_merge_multi_warps ? 2ULL : 0ULL);
     return uint64_t(graph.data_handle()) ^ uint64_t(source_indices_ptr) ^
            dataset_desc.get().team_size ^ num_itopk_candidates ^ block_size ^ smem_size ^
            hash_bitlen ^ small_hash_reset_interval ^ num_random_samplings ^ rand_xor_mask ^
            num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^
-           uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000);
+           uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000) ^
+           bitonic_key;
+  }
+
+  static auto make_persistent_launcher(
+    const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+    bool topk_by_bitonic_sort,
+    bool bitonic_sort_and_merge_multi_warps) -> std::shared_ptr<AlgorithmLauncher>
+  {
+    auto launcher = make_cagra_single_cta_jit_launcher<DataT,
+                                                       IndexT,
+                                                       DistanceT,
+                                                       SourceIndexT,
+                                                       sample_filter_jit_tag_t<SampleFilterT>>(
+      dataset_desc,
+      topk_by_bitonic_sort,
+      bitonic_sort_and_merge_multi_warps,
+      true /* persistent */);
+    if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA persistent search kernel"); }
+    return launcher;
   }
 
   persistent_runner_jit_t(
@@ -509,10 +532,11 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     SampleFilterT sample_filter,
     float persistent_lifetime,
     float persistent_device_usage,
-    std::shared_ptr<AlgorithmLauncher> launcher_ptr,
-    const void* /* dataset_desc - descriptor contains all needed info */)
+    bool topk_by_bitonic_sort,
+    bool bitonic_sort_and_merge_multi_warps)
     : persistent_runner_base_t{persistent_lifetime},
-      launcher{launcher_ptr},
+      launcher{make_persistent_launcher(
+        dataset_desc.get(), topk_by_bitonic_sort, bitonic_sort_and_merge_multi_warps)},
       block_size{block_size},
       worker_handles(0, stream, worker_handles_mr),
       job_descriptors(kMaxJobsNum, stream, job_descriptor_mr),
@@ -540,8 +564,8 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
                                           sample_filter,
                                           persistent_lifetime,
                                           persistent_device_usage,
-                                          launcher_ptr,
-                                          nullptr))  // descriptor not needed in hash
+                                          topk_by_bitonic_sort,
+                                          bitonic_sort_and_merge_multi_warps))
   {
     const auto bf                  = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
     this->bitset                   = bf.bitset;
@@ -750,20 +774,10 @@ void select_and_run(
     using runner_type =
       persistent_runner_jit_t<DataT, IndexT, DistanceT, SourceIndexT, SampleFilterT>;
 
-    std::shared_ptr<AlgorithmLauncher> launcher =
-      make_cagra_single_cta_jit_launcher<DataT,
-                                         IndexT,
-                                         DistanceT,
-                                         SourceIndexT,
-                                         sample_filter_jit_tag_t<SampleFilterT>>(
-        dataset_desc,
-        topk_by_bitonic_sort,
-        bitonic_sort_and_merge_multi_warps,
-        true /* persistent */);
-    if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA persistent search kernel"); }
+    // Ensure device descriptor is initialized on every search (including runner cache hits).
+    (void)dataset_desc.dev_ptr(stream);
 
-    // Use get_runner pattern similar to non-JIT version
-    const auto* dev_desc_persistent = dataset_desc.dev_ptr(stream);
+    // Launcher is built inside persistent_runner_jit_t only on cache miss (new runner).
     get_runner_jit<runner_type>(std::cref(dataset_desc),
                                 graph,
                                 source_indices_ptr,
@@ -785,8 +799,8 @@ void select_and_run(
                                 sample_filter,
                                 ps.persistent_lifetime,
                                 ps.persistent_device_usage,
-                                launcher,
-                                dev_desc_persistent)  // Pass descriptor pointer
+                                topk_by_bitonic_sort,
+                                bitonic_sort_and_merge_multi_warps)
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
     return;
   } else {

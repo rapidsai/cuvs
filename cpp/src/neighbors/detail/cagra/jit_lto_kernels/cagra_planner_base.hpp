@@ -34,19 +34,13 @@ struct CagraPlannerBase : AlgorithmPlanner {
   explicit CagraPlannerBase(std::string entrypoint, LauncherJitCache& jit_cache)
     : AlgorithmPlanner(std::move(entrypoint), jit_cache)
   {
-    linktime_extra_options.push_back("-maxrregcount=64");
   }
 
-  void add_setup_workspace_device_function(cuvs::distance::DistanceType metric,
-                                           uint32_t team_size,
-                                           uint32_t dataset_block_dim,
-                                           bool is_vpq,
-                                           uint32_t pq_bits,
-                                           uint32_t pq_len)
+  /// Standard codebook: workspace fragments always use `pq_bits=0`, `pq_len=0`.
+  template <typename CB                                                  = CodebookTag,
+            std::enable_if_t<std::is_same_v<CB, tag_codebook_none>, int> = 0>
+  void add_setup_workspace_device_function(uint32_t team_size, uint32_t dataset_block_dim)
   {
-    (void)metric;
-    (void)is_vpq;
-    (void)pq_bits;
     auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
       this->add_static_fragment<fragment_tag_setup_workspace<DataTag,
                                                              IndexTag,
@@ -58,42 +52,76 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                                              PqBitsV,
                                                              PqLenV>>();
     };
-    if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
-      if (pq_bits != 0 || pq_len != 0) {
-        RAFT_FAIL("CAGRA JIT standard path expects pq_bits==0 and pq_len==0");
-      }
-      dispatch_cagra_team_dim(
-        team_size, dataset_block_dim, [&add]<uint32_t TeamSz, uint32_t Dim>() {
-          add.template operator()<TeamSz, Dim, 0u, 0u>();
-        });
-    } else {
-      if (pq_bits != 8 || (pq_len != 2 && pq_len != 4)) {
-        RAFT_FAIL("CAGRA JIT VPQ path expects pq_bits==8 and pq_len in {2,4}");
-      }
-      dispatch_cagra_team_dim(
-        team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
-          if (pq_len == 2) {
-            add.template operator()<TeamSz, Dim, 8u, 2u>();
-          } else {
-            add.template operator()<TeamSz, Dim, 8u, 4u>();
-          }
-        });
-    }
+    dispatch_cagra_team_dim(team_size, dataset_block_dim, [&add]<uint32_t TeamSz, uint32_t Dim>() {
+      add.template operator()<TeamSz, Dim, 0u, 0u>();
+    });
   }
 
+  /// VPQ (`tag_codebook_half`): JIT matrix fixes `pq_bits=8`; only `pq_len` is selected at runtime.
+  template <typename CB                                                  = CodebookTag,
+            std::enable_if_t<std::is_same_v<CB, tag_codebook_half>, int> = 0>
+  void add_setup_workspace_device_function(uint32_t team_size,
+                                           uint32_t dataset_block_dim,
+                                           uint32_t pq_len)
+  {
+    if (pq_len != 2 && pq_len != 4) {
+      RAFT_FAIL("CAGRA JIT VPQ setup_workspace expects pq_len in {2,4} (matrix uses pq_bits=8)");
+    }
+    auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
+      this->add_static_fragment<fragment_tag_setup_workspace<DataTag,
+                                                             IndexTag,
+                                                             DistanceTag,
+                                                             QueryTag,
+                                                             CodebookTag,
+                                                             TeamSz,
+                                                             Dim,
+                                                             PqBitsV,
+                                                             PqLenV>>();
+    };
+    dispatch_cagra_team_dim(
+      team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
+        if (pq_len == 2) {
+          add.template operator()<TeamSz, Dim, 8u, 2u>();
+        } else {
+          add.template operator()<TeamSz, Dim, 8u, 4u>();
+        }
+      });
+  }
+
+  /// Registers dist_op + normalization + `compute_distance` for standard layout.
+  template <typename CB                                                  = CodebookTag,
+            std::enable_if_t<std::is_same_v<CB, tag_codebook_none>, int> = 0>
   void add_compute_distance_device_function(cuvs::distance::DistanceType metric,
                                             uint32_t team_size,
+                                            uint32_t dataset_block_dim)
+  {
+    add_dist_op_device_function(metric);
+    add_normalization_device_function(metric, team_size, dataset_block_dim);
+    auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
+      this->add_static_fragment<fragment_tag_compute_distance<DataTag,
+                                                              IndexTag,
+                                                              DistanceTag,
+                                                              QueryTag,
+                                                              CodebookTag,
+                                                              TeamSz,
+                                                              Dim,
+                                                              PqBitsV,
+                                                              PqLenV>>();
+    };
+    dispatch_cagra_team_dim(team_size, dataset_block_dim, [&add]<uint32_t TeamSz, uint32_t Dim>() {
+      add.template operator()<TeamSz, Dim, 0u, 0u>();
+    });
+  }
+
+  /// VPQ: only the `compute_distance` fragment (no standard dist_op / normalization in this path).
+  template <typename CB                                                  = CodebookTag,
+            std::enable_if_t<std::is_same_v<CB, tag_codebook_half>, int> = 0>
+  void add_compute_distance_device_function(uint32_t team_size,
                                             uint32_t dataset_block_dim,
-                                            bool is_vpq,
-                                            uint32_t pq_bits,
                                             uint32_t pq_len)
   {
-    (void)is_vpq;
-    // Dist/normalization apply only to standard codebook; constexpr avoids instantiating them
-    // with VPQ's QueryTag=tag_h (runtime !is_vpq would still instantiate those templates).
-    if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
-      add_dist_op_device_function(metric);
-      add_normalization_device_function(metric, team_size, dataset_block_dim);
+    if (pq_len != 2 && pq_len != 4) {
+      RAFT_FAIL("CAGRA JIT VPQ compute_distance expects pq_len in {2,4} (matrix uses pq_bits=8)");
     }
     auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
       this->add_static_fragment<fragment_tag_compute_distance<DataTag,
@@ -106,27 +134,14 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                                               PqBitsV,
                                                               PqLenV>>();
     };
-    if constexpr (std::is_same_v<CodebookTag, tag_codebook_none>) {
-      if (pq_bits != 0 || pq_len != 0) {
-        RAFT_FAIL("CAGRA JIT standard path expects pq_bits==0 and pq_len==0");
-      }
-      dispatch_cagra_team_dim(
-        team_size, dataset_block_dim, [&add]<uint32_t TeamSz, uint32_t Dim>() {
-          add.template operator()<TeamSz, Dim, 0u, 0u>();
-        });
-    } else {
-      if (pq_bits != 8 || (pq_len != 2 && pq_len != 4)) {
-        RAFT_FAIL("CAGRA JIT VPQ path expects pq_bits==8 and pq_len in {2,4}");
-      }
-      dispatch_cagra_team_dim(
-        team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
-          if (pq_len == 2) {
-            add.template operator()<TeamSz, Dim, 8u, 2u>();
-          } else {
-            add.template operator()<TeamSz, Dim, 8u, 4u>();
-          }
-        });
-    }
+    dispatch_cagra_team_dim(
+      team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
+        if (pq_len == 2) {
+          add.template operator()<TeamSz, Dim, 8u, 2u>();
+        } else {
+          add.template operator()<TeamSz, Dim, 8u, 4u>();
+        }
+      });
   }
 
  private:
@@ -149,10 +164,9 @@ struct CagraPlannerBase : AlgorithmPlanner {
           this->add_static_fragment<fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_l2>>();
           break;
         case cuvs::distance::DistanceType::InnerProduct:
-          this->add_static_fragment<
-            fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_inner_product>>();
-          break;
         case cuvs::distance::DistanceType::CosineExpanded:
+          // CosineExpanded reuses the InnerProduct dist_op; the cosine normalization is
+          // layered on by add_normalization_device_function below.
           this->add_static_fragment<
             fragment_tag_dist_op<QueryTag, DistanceTag, tag_metric_inner_product>>();
           break;

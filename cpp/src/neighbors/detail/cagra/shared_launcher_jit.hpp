@@ -44,8 +44,12 @@ constexpr auto get_distance_type_tag()
 template <typename T>
 constexpr auto get_source_index_type_tag()
 {
-  if constexpr (std::is_same_v<T, uint32_t>) { return cuvs::neighbors::detail::tag_index_u32{}; }
-  if constexpr (std::is_same_v<T, int64_t>) { return cuvs::neighbors::detail::tag_index_i64{}; }
+  static_assert(
+    std::is_same_v<T, uint32_t>,
+    "CAGRA JIT LTO: no fatbins are built for this SourceIndexT (matrices only list uint32_t). "
+    "Keep SourceIndexT as the graph index type (typically uint32_t). For int64 neighbor outputs, "
+    "use OutputIndexT = int64_t instead.");
+  return cuvs::neighbors::detail::tag_index_u32{};
 }
 
 template <typename DataTag, cuvs::distance::DistanceType metric>

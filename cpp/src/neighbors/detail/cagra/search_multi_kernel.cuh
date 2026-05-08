@@ -5,7 +5,6 @@
 #pragma once
 
 #include "search_multi_kernel_launcher_jit.cuh"
-#include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 
 #include "set_value_batch.cuh"
 
@@ -610,26 +609,13 @@ struct search
                         result_buffer_allocation_size,
                         stream);
 
-      using apply_filter_data_tag   = decltype(get_data_type_tag<float>());
-      using apply_filter_index_tag  = decltype(get_index_type_tag<INDEX_T>());
-      using apply_filter_dist_tag   = decltype(get_distance_type_tag<DISTANCE_T>());
-      using apply_filter_source_tag = decltype(get_source_index_type_tag<SourceIndexT>());
-      using apply_filter_query_tag =
-        query_type_tag_standard_t<apply_filter_data_tag, cuvs::distance::DistanceType::L2Expanded>;
-      using apply_filter_codebook_tag = tag_codebook_none;
-      CagraMultiKernelSearchPlanner<apply_filter_data_tag,
-                                    apply_filter_index_tag,
-                                    apply_filter_dist_tag,
-                                    apply_filter_source_tag,
-                                    apply_filter_query_tag,
-                                    apply_filter_codebook_tag,
-                                    sample_filter_jit_tag_t<SAMPLE_FILTER_T>>
-        apply_filter_planner(
-          cuvs::distance::DistanceType::L2Expanded, "apply_filter_kernel", 8, 128, false, 0, 0);
-      apply_filter_planner.add_sample_filter_device_function();
-      apply_filter_planner.add_linked_kernel("apply_filter_kernel");
       std::shared_ptr<AlgorithmLauncher> apply_filter_launcher =
-        apply_filter_planner.get_launcher();
+        make_cagra_apply_filter_jit_launcher<DATA_T,
+                                             INDEX_T,
+                                             DISTANCE_T,
+                                             SourceIndexT,
+                                             sample_filter_jit_tag_t<SAMPLE_FILTER_T>>(
+          dataset_desc);
 
       apply_filter_jit<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
         source_indices_ptr,

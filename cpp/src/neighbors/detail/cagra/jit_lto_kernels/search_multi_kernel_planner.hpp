@@ -23,6 +23,14 @@ struct CagraMultiKernelSearchPlanner
   : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag> {
   static inline LauncherJitCache launcher_jit_cache{};
 
+  /// Kernels that only need `sample_filter` + one linked TU (e.g. `apply_filter_kernel`): no
+  /// `setup_workspace` / `compute_distance` fragments. Metric / team / VPQ are unused.
+  explicit CagraMultiKernelSearchPlanner(const std::string& kernel_name)
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag>(
+        kernel_name, launcher_jit_cache)
+  {
+  }
+
   CagraMultiKernelSearchPlanner(cuvs::distance::DistanceType /*metric*/,
                                 const std::string& kernel_name,
                                 uint32_t /*team_size*/,
