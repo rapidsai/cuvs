@@ -44,7 +44,7 @@ cuvs::distance::DistanceType metric,
 DistT metric_arg = 0.0);
 ```
 
-Constructs a brute force index from a dataset. This lets us precompute norms for the dataset, providing a speed benefit over doing this at query time. This index will copy the host dataset onto the device, and take ownership of any precaculated norms.
+Constructs a brute force index from a dataset. This lets us precompute norms for the dataset, providing a speed benefit over doing this at query time. This index will copy the host dataset onto the device, and take ownership of any precalculated norms.
 
 **Parameters**
 
@@ -594,7 +594,7 @@ const cuvs::neighbors::brute_force::index<half, float>& index,
 bool include_dataset = true);
 ```
 
-The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work. output
+The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
 **Template Parameters**
 

@@ -21,7 +21,7 @@ raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> c
 raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0f);
+float metric_arg = 2.0);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently. Usage example:
@@ -35,7 +35,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 | `y` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
 | `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
-| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0`. |
 
 **Returns**
 
@@ -54,7 +54,7 @@ raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> 
 raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const y,
 raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous> dist,
 cuvs::distance::DistanceType metric,
-double metric_arg = 2.0f);
+double metric_arg = 2.0);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently. Usage example:
@@ -68,7 +68,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 | `y` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
 | `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
-| `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0`. |
 
 **Returns**
 
@@ -87,7 +87,7 @@ raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> co
 raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0f);
+float metric_arg = 2.0);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently. Usage example:
@@ -101,7 +101,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 | `y` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
 | `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
-| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0`. |
 
 **Returns**
 
@@ -120,7 +120,7 @@ raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> c
 raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0f);
+float metric_arg = 2.0);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently. Usage example:
@@ -134,7 +134,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 | `y` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
 | `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
-| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0n`. |
 
 **Returns**
 
@@ -153,7 +153,7 @@ raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> 
 raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const y,
 raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous> dist,
 cuvs::distance::DistanceType metric,
-double metric_arg = 2.0f);
+double metric_arg = 2.0);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently. Usage example:
@@ -167,7 +167,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 | `y` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
 | `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
-| `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0`. |
 
 **Returns**
 
@@ -186,7 +186,7 @@ raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> co
 raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0f);
+float metric_arg = 2.0);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently. Usage example:
@@ -200,7 +200,7 @@ Note: Only contiguous row- or column-major layouts supported currently. Usage ex
 | `y` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
 | `metric` | in | `cuvs::distance::DistanceType` | distance to evaluate |
-| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0`. |
 
 **Returns**
 
@@ -218,7 +218,7 @@ raft::device_csr_matrix_view<const float, int, int, int> x,
 raft::device_csr_matrix_view<const float, int, int, int> y,
 raft::device_matrix_view<float, int, raft::row_major> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0f);
+float metric_arg = 2.0);
 ```
 
 input configuration and distance function.
@@ -232,7 +232,7 @@ input configuration and distance function.
 | `y` | in | `raft::device_csr_matrix_view<const float, int, int, int>` | raft::device_csr_matrix_view |
 | `dist` | out | `raft::device_matrix_view<float, int, raft::row_major>` | raft::device_matrix_view dense matrix |
 | `metric` | in | `cuvs::distance::DistanceType` | distance metric to use |
-| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
+| `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0`. |
 
 **Returns**
 
