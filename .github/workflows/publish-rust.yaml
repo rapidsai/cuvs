@@ -2,6 +2,9 @@ name: publish
 
 on:
   workflow_call:
+    secrets:
+      GPUTESTER_CRATES_TOKEN:
+        required: false
 
 defaults:
   run:
