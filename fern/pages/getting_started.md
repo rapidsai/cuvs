@@ -1,47 +1,5 @@
 # Getting Started
 
-- [New to vector search?](#new-to-vector-search)
-
-  * [Primer on vector search](choosing_and_configuring_indexes.md)
-
-  * [Vector Database](vector_databases_vs_vector_search.md)
-
-  * [Tuning Indexes](tuning_guide.md)
-
-  * [Methologies](comparing_indexes.md)
-
-- [Supported indexes](#supported-indexes)
-
-  * [Vector search index guide](neighbors/neighbors.md)
-
-- [Using cuVS APIs](#using-cuvs-apis)
-
-  * [C API Docs](/api-reference/c-api-documentation)
-
-  * [C++ API Docs](/api-reference/cpp-api-documentation)
-
-  * [Python API Docs](/api-reference/python-api-documentation)
-
-  * [Java API Docs](/api-reference/java-api-documentation)
-
-  * [Rust API Docs](/api-reference/rust-api-documentation)
-
-  * [Go API Docs](/api-reference/go-api-documentation)
-
-  * [API basics](api_basics.md)
-
-  * [API interoperability](api_interoperability.md)
-
-- [Where to next?](#where-to-next)
-
-  * [Social media](#social-media)
-
-  * [Blogs](#blogs)
-
-  * [Research](#research)
-
-  * [Get involved](#get-involved)
-
 ## New to vector search?
 
 If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then [this primer on vector search guide](choosing_and_configuring_indexes.md) should provide some good insight. Another good resource for the uninitiated is our [Vector Database](vector_databases_vs_vector_search.md) guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results if not tuned correctly.
