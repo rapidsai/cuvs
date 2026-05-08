@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-tiered-index
 
 # Tiered Index
 
-_Source header: `cpp/include/cuvs/neighbors/tiered_index.hpp`_
+_Source header: `cuvs/neighbors/tiered_index.hpp`_
 
 ## Types
 

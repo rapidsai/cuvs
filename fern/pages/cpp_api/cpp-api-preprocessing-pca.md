@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-preprocessing-pca
 
 # PCA
 
-_Source header: `cpp/include/cuvs/preprocessing/pca.hpp`_
+_Source header: `cuvs/preprocessing/pca.hpp`_
 
 ## Types
 

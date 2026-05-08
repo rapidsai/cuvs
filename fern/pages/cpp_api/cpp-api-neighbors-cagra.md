@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-cagra
 
 # Cagra
 
-_Source header: `cpp/include/cuvs/neighbors/cagra.hpp`_
+_Source header: `cuvs/neighbors/cagra.hpp`_
 
 ## Types
 

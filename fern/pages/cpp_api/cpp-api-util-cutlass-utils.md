@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-util-cutlass-utils
 
 # Cutlass Utils
 
-_Source header: `cpp/include/cuvs/util/cutlass_utils.hpp`_
+_Source header: `cuvs/util/cutlass_utils.hpp`_
 
 ## Types
 

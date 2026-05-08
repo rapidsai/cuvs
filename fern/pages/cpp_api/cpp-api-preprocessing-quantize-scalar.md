@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-preprocessing-quantize-scalar
 
 # Scalar
 
-_Source header: `cpp/include/cuvs/preprocessing/quantize/scalar.hpp`_
+_Source header: `cuvs/preprocessing/quantize/scalar.hpp`_
 
 ## Scalar quantizer utilities
 

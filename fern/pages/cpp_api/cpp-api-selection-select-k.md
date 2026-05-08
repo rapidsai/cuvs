@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-selection-select-k
 
 # Select K
 
-_Source header: `cpp/include/cuvs/selection/select_k.hpp`_
+_Source header: `cuvs/selection/select_k.hpp`_
 
 ## Batched-select k smallest or largest key/values
 

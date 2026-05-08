@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-composite-index
 
 # Index
 
-_Source header: `cpp/include/cuvs/neighbors/composite/index.hpp`_
+_Source header: `cuvs/neighbors/composite/index.hpp`_
 
 ## Types
 

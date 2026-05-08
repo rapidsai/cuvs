@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-stats-trustworthiness-score
 
 # Trustworthiness Score
 
-_Source header: `cpp/include/cuvs/stats/trustworthiness_score.hpp`_
+_Source header: `cuvs/stats/trustworthiness_score.hpp`_
 
 ## Trustworthiness
 

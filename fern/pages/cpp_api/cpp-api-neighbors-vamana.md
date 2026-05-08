@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-vamana
 
 # Vamana
 
-_Source header: `cpp/include/cuvs/neighbors/vamana.hpp`_
+_Source header: `cuvs/neighbors/vamana.hpp`_
 
 ## Vamana index build parameters
 

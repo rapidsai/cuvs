@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-util-file-io
 
 # File Io
 
-_Source header: `cpp/include/cuvs/util/file_io.hpp`_
+_Source header: `cuvs/util/file_io.hpp`_
 
 ## Types
 

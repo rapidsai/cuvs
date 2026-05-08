@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-refine
 
 # Refine
 
-_Source header: `cpp/include/cuvs/neighbors/refine.hpp`_
+_Source header: `cuvs/neighbors/refine.hpp`_
 
 ## Approximate Nearest Neighbors Refinement
 

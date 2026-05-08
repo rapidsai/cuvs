@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-ivf-flat
 
 # IVF Flat
 
-_Source header: `cpp/include/cuvs/neighbors/ivf_flat.hpp`_
+_Source header: `cuvs/neighbors/ivf_flat.hpp`_
 
 ## IVF-Flat index search parameters
 

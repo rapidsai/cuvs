@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-common
 
 # Common
 
-_Source header: `cpp/include/cuvs/neighbors/common.hpp`_
+_Source header: `cuvs/neighbors/common.hpp`_
 
 ## Approximate Nearest Neighbors Types
 

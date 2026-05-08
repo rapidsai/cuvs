@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-dynamic-batching
 
 # Dynamic Batching
 
-_Source header: `cpp/include/cuvs/neighbors/dynamic_batching.hpp`_
+_Source header: `cuvs/neighbors/dynamic_batching.hpp`_
 
 ## Dynamic Batching index parameters
 

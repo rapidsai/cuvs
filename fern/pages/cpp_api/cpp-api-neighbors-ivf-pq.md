@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-ivf-pq
 
 # IVF PQ
 
-_Source header: `cpp/include/cuvs/neighbors/ivf_pq.hpp`_
+_Source header: `cuvs/neighbors/ivf_pq.hpp`_
 
 ## IVF-PQ index build parameters
 

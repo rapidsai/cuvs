@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-stats-silhouette-score
 
 # Silhouette Score
 
-_Source header: `cpp/include/cuvs/stats/silhouette_score.hpp`_
+_Source header: `cuvs/stats/silhouette_score.hpp`_
 
 ## Silhouette Score
 

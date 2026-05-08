@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-cluster-spectral
 
 # Spectral
 
-_Source header: `cpp/include/cuvs/cluster/spectral.hpp`_
+_Source header: `cuvs/cluster/spectral.hpp`_
 
 ## Spectral Clustering Parameters
 

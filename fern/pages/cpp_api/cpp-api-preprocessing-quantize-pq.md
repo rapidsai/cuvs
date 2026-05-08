@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-preprocessing-quantize-pq
 
 # PQ
 
-_Source header: `cpp/include/cuvs/preprocessing/quantize/pq.hpp`_
+_Source header: `cuvs/preprocessing/quantize/pq.hpp`_
 
 ## Product Quantizer utilities
 

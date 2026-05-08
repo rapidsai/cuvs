@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-epsilon-neighborhood
 
 # Epsilon Neighborhood
 
-_Source header: `cpp/include/cuvs/neighbors/epsilon_neighborhood.hpp`_
+_Source header: `cuvs/neighbors/epsilon_neighborhood.hpp`_
 
 ## Epsilon Neighborhood L2 Operations
 

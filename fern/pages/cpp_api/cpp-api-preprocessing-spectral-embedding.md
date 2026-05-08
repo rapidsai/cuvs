@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-preprocessing-spectral-embedding
 
 # Spectral Embedding
 
-_Source header: `cpp/include/cuvs/preprocessing/spectral_embedding.hpp`_
+_Source header: `cuvs/preprocessing/spectral_embedding.hpp`_
 
 ## Types
 

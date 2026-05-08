@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-distance-grammian
 
 # Grammian
 
-_Source header: `cpp/include/cuvs/distance/grammian.hpp`_
+_Source header: `cuvs/distance/grammian.hpp`_
 
 ## Types
 

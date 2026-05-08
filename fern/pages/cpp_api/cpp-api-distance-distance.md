@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-distance-distance
 
 # Distance
 
-_Source header: `cpp/include/cuvs/distance/distance.hpp`_
+_Source header: `cuvs/distance/distance.hpp`_
 
 ## Types
 

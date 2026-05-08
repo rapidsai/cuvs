@@ -462,7 +462,7 @@ def generate_native_api_pages(
             *api_frontmatter(api_page_route(directory, page.slug)),
             f"# {page.title}",
             "",
-            f"_Source header: `{page.source}`_",
+            f"_Source header: `{display_source_header(page.source, api)}`_",
             "",
         ]
         page_headings: set[str] = set()
@@ -480,6 +480,12 @@ def generate_native_api_pages(
         write_page(
             out_dir / f"{api_page_route(directory, page.slug)}.md", lines
         )
+
+
+def display_source_header(source: str, api: str) -> str:
+    if api == "cpp":
+        return source.removeprefix("cpp/include/")
+    return source
 
 
 def collect_native_pages(

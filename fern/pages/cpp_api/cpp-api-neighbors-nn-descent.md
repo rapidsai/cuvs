@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-nn-descent
 
 # NN Descent
 
-_Source header: `cpp/include/cuvs/neighbors/nn_descent.hpp`_
+_Source header: `cuvs/neighbors/nn_descent.hpp`_
 
 ## The nn-descent algorithm parameters.
 

@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-brute-force
 
 # Brute Force
 
-_Source header: `cpp/include/cuvs/neighbors/brute_force.hpp`_
+_Source header: `cuvs/neighbors/brute_force.hpp`_
 
 ## Bruteforce index
 

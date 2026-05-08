@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-scann
 
 # Scann
 
-_Source header: `cpp/include/cuvs/neighbors/scann.hpp`_
+_Source header: `cuvs/neighbors/scann.hpp`_
 
 ## ScaNN index build parameters
 

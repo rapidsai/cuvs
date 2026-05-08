@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-all-neighbors
 
 # All Neighbors
 
-_Source header: `cpp/include/cuvs/neighbors/all_neighbors.hpp`_
+_Source header: `cuvs/neighbors/all_neighbors.hpp`_
 
 ## The all-neighbors algorithm parameters.
 

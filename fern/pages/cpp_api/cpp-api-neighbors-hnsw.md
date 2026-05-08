@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-hnsw
 
 # HNSW
 
-_Source header: `cpp/include/cuvs/neighbors/hnsw.hpp`_
+_Source header: `cuvs/neighbors/hnsw.hpp`_
 
 ## hnswlib index wrapper params
 

@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-preprocessing-quantize-binary
 
 # Binary
 
-_Source header: `cpp/include/cuvs/preprocessing/quantize/binary.hpp`_
+_Source header: `cuvs/preprocessing/quantize/binary.hpp`_
 
 ## Binary quantizer utilities
 

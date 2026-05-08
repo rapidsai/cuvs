@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-neighbors-ball-cover
 
 # Ball Cover
 
-_Source header: `cpp/include/cuvs/neighbors/ball_cover.hpp`_
+_Source header: `cuvs/neighbors/ball_cover.hpp`_
 
 ## Types
 

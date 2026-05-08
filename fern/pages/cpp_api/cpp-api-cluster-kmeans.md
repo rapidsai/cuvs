@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-cluster-kmeans
 
 # K-Means
 
-_Source header: `cpp/include/cuvs/cluster/kmeans.hpp`_
+_Source header: `cuvs/cluster/kmeans.hpp`_
 
 ## Types
 

@@ -4,7 +4,7 @@ slug: api-reference/cpp-api-cluster-agglomerative
 
 # Agglomerative
 
-_Source header: `cpp/include/cuvs/cluster/agglomerative.hpp`_
+_Source header: `cuvs/cluster/agglomerative.hpp`_
 
 ## agglomerative clustering hyperparameters
 
