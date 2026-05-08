@@ -105,8 +105,6 @@ navigation:
           - page: "cuVS Bench Parameter Tuning Guide"
             hidden: true
             path: "./pages/cuvs_bench/param_tuning.md"
-          - page: "Pluggable Backend"
-            path: "./pages/cuvs_bench/pluggable_backend.md"
           - page: "Wiki-all Dataset"
             hidden: true
             path: "./pages/cuvs_bench/wiki_all_dataset.md"

@@ -18,6 +18,8 @@ This tool offers several benefits, including
 
 For dataset file formats, conversion utilities, and ground-truth generation, see [cuVS Bench Datasets](datasets.md).
 
+For custom benchmark execution paths and backend integrations, see [Pluggable Backend](pluggable_backend.md).
+
 - [Installing the benchmarks](#installing-the-benchmarks)
 
   * [Conda](#conda)
