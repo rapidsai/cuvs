@@ -91,16 +91,8 @@ navigation:
       - page: "Interoperability"
         hidden: true
         path: "./pages/api_interoperability.md"
-      - section: "Integrations"
-        contents:
-          - page: "Faiss"
-            path: "./pages/integrations/faiss.md"
-          - page: "Milvus"
-            path: "./pages/integrations/milvus.md"
-          - page: "Lucene"
-            path: "./pages/integrations/lucene.md"
-          - page: "Kinetica"
-            path: "./pages/integrations/kinetica.md"
+      - page: "Integrations"
+        path: "./pages/integrations.md"
       - section: "Benchmarking"
         path: "./pages/cuvs_bench/index.md"
         contents:
