@@ -94,7 +94,6 @@ navigation:
         hidden: true
         path: "./pages/api_interoperability.md"
       - section: "Integrations"
-        path: "./pages/integrations.md"
         contents:
           - page: "Faiss"
             path: "./pages/integrations/faiss.md"
