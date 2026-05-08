@@ -67,8 +67,6 @@ navigation:
             path: "./pages/choosing_and_configuring_indexes.md"
           - page: "Vector search vs Vector DB"
             path: "./pages/vector_databases_vs_vector_search.md"
-          - page: "Comparing performance of vector indexes"
-            path: "./pages/comparing_indexes.md"
           - page: "Index Tuning Guide"
             path: "./pages/tuning_guide.md"
       - section: "Vector search index guide"
@@ -106,6 +104,8 @@ navigation:
       - section: "Benchmarking"
         path: "./pages/cuvs_bench/index.md"
         contents:
+          - page: "Evaluating Performance"
+            path: "./pages/comparing_indexes.md"
           - page: "Build cuVS Bench From Source"
             hidden: true
             path: "./pages/cuvs_bench/build.md"

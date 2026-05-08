@@ -1,4 +1,4 @@
-# Comparing performance of vector indexes
+# Evaluating Performance
 
 Vector search indexes should be compared by both search quality and performance. A fast index is not useful if it misses too many neighbors, and a high-recall index may not be practical if it is too slow to build or query. For index selection guidance, see [vector search indexes vs vector databases](vector_databases_vs_vector_search.md).
 
