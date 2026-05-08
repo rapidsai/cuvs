@@ -3,11 +3,21 @@
 title: "cuVS"
 instances:
   - url: "rapids-cuvs.docs.buildwithfern.com"
+footer: "./theme/nvidia/components/CustomFooter.tsx"
 logo:
-  light: "./assets/rapids_logo.png"
-  dark: "./assets/rapids_logo.png"
-  href: "https://rapids.ai/"
+  light: "./theme/nvidia/assets/NVIDIA_light.svg"
+  dark: "./theme/nvidia/assets/NVIDIA_dark.svg"
+  height: 20
+  href: "/"
+  right-text: "cuVS"
+favicon: "./theme/nvidia/assets/NVIDIA_symbol.svg"
 colors:
+  accentPrimary:
+    light: "#76B900"
+    dark: "#76B900"
+  background:
+    light: "#FFFFFF"
+    dark: "#000000"
   accent-primary:
     light: "#76B900"
     dark: "#A4E600"
@@ -15,7 +25,25 @@ check:
   rules:
     broken-links: "error"
 layout:
-  content-width: "760px"
+  searchbar-placement: "header"
+  page-width: "1376px"
+  sidebar-width: "248px"
+  content-width: "812px"
+  tabs-placement: "header"
+  hide-feedback: true
+theme:
+  page-actions: "toolbar"
+  footer-nav: "minimal"
+css:
+  - "./theme/nvidia/main.css"
+  - "./styles/authors.css"
+  - "./styles/expandable-code.css"
+  - "./styles/metrics-table.css"
+  - "./styles/notebook-viewer.css"
+  - "./styles/trajectory-viewer.css"
+experimental:
+  mdx-components:
+    - "./theme/nvidia/components"
 navbar-links:
   - type: "secondary"
     text: "GitHub"
