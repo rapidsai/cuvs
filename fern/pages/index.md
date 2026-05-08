@@ -60,7 +60,7 @@ In addition to the items above, cuVS shoulders the responsibility of keeping non
 
 cuVS is built on top of the RAPIDS RAFT library of high performance machine learning primitives and provides all the necessary routines for vector search and clustering on the GPU.
 
-![cuVS is built on top of low-level CUDA libraries and provides many important routines that enable vector search and clustering on the GPU](/assets/images/tech_stack.png)
+<img alt="cuVS is built on top of low-level CUDA libraries and provides many important routines that enable vector search and clustering on the GPU" src="/assets/images/tech_stack.png" />
 
 ## Pages
 
