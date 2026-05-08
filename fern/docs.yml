@@ -93,10 +93,8 @@ navigation:
       - page: "Interoperability"
         hidden: true
         path: "./pages/api_interoperability.md"
-      - page: "Integrations"
+      - section: "Integrations"
         path: "./pages/integrations.md"
-      - section: "Integration guides"
-        hidden: true
         contents:
           - page: "Faiss"
             path: "./pages/integrations/faiss.md"
