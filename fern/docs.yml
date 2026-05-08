@@ -59,6 +59,7 @@ navigation:
   - section: "Getting Started"
     contents:
       - section: "Introduction"
+        collapsed: "open-by-default"
         path: "./pages/getting_started.md"
         contents:
           - page: "Vector Search"
@@ -66,6 +67,7 @@ navigation:
           - page: "Vector Database"
             path: "./pages/vector_databases_vs_vector_search.md"
           - section: "Vector Search Index Guide"
+            collapsed: "open-by-default"
             path: "./pages/neighbors/neighbors.md"
             contents:
               - page: "Brute-force"
