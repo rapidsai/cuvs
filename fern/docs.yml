@@ -62,15 +62,69 @@ navigation:
     contents:
       - page: "Overview"
         path: "./pages/getting_started.md"
+      - page: "Primer on vector search indexes"
+        hidden: true
+        path: "./pages/choosing_and_configuring_indexes.md"
+      - page: "Vector search indexes vs vector databases"
+        hidden: true
+        path: "./pages/vector_databases_vs_vector_search.md"
+      - page: "Automated tuning guide"
+        hidden: true
+        path: "./pages/tuning_guide.md"
+      - page: "Comparing performance of vector indexes"
+        hidden: true
+        path: "./pages/comparing_indexes.md"
+      - section: "Vector search index guide"
+        hidden: true
+        path: "./pages/neighbors/neighbors.md"
+        contents:
+          - page: "Brute-force"
+            path: "./pages/neighbors/bruteforce.md"
+          - page: "CAGRA"
+            path: "./pages/neighbors/cagra.md"
+          - page: "IVF-Flat"
+            path: "./pages/neighbors/ivfflat.md"
+          - page: "IVF-PQ"
+            path: "./pages/neighbors/ivfpq.md"
+          - page: "Vamana"
+            path: "./pages/neighbors/vamana.md"
+          - page: "All-neighbors"
+            path: "./pages/neighbors/all_neighbors.md"
+      - page: "cuVS API Basics"
+        hidden: true
+        path: "./pages/api_basics.md"
+      - page: "Interoperability"
+        hidden: true
+        path: "./pages/api_interoperability.md"
       - page: "Integrations"
         path: "./pages/integrations.md"
+      - section: "Integration guides"
+        hidden: true
+        contents:
+          - page: "Faiss"
+            path: "./pages/integrations/faiss.md"
+          - page: "Milvus"
+            path: "./pages/integrations/milvus.md"
+          - page: "Lucene"
+            path: "./pages/integrations/lucene.md"
+          - page: "Kinetica"
+            path: "./pages/integrations/kinetica.md"
       - section: "Benchmarking"
         path: "./pages/cuvs_bench/index.md"
         contents:
+          - page: "Build cuVS Bench From Source"
+            hidden: true
+            path: "./pages/cuvs_bench/build.md"
           - page: "cuVS Bench Datasets"
             path: "./pages/cuvs_bench/datasets.md"
+          - page: "cuVS Bench Parameter Tuning Guide"
+            hidden: true
+            path: "./pages/cuvs_bench/param_tuning.md"
           - page: "Pluggable Backend"
             path: "./pages/cuvs_bench/pluggable_backend.md"
+          - page: "Wiki-all Dataset"
+            hidden: true
+            path: "./pages/cuvs_bench/wiki_all_dataset.md"
   - section: "Developer Guide"
     contents:
       - page: "Developer Guide"
