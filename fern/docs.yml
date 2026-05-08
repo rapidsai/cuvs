@@ -67,7 +67,6 @@ navigation:
           - page: "Vector Database"
             path: "./pages/vector_databases_vs_vector_search.md"
           - section: "Indexing Guide"
-            collapsed: "open-by-default"
             path: "./pages/neighbors/neighbors.md"
             contents:
               - page: "Brute-force"
