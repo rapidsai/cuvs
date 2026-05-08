@@ -282,6 +282,154 @@ This is useful when queries should only search a small subset of the dataset. Fo
 
 Unlike partitioned or graph-based indexes, brute-force does not need to guess which part of the index might contain the answer. If a vector passes the filter, it can be considered.
 
+The examples below use a bitmap filter. A bitmap can express a different allow list for each query. A bit value of `1` means the query may consider that vector; a bit value of `0` means the vector is filtered out for that query.
+
+These examples cover the Brute-force bindings that currently expose filters. The Rust and Go Brute-force wrappers currently search without a filter argument.
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/brute_force.h>
+
+cuvsResources_t res;
+cuvsBruteForceIndex_t index;
+DLManagedTensor *dataset;
+DLManagedTensor *queries;
+DLManagedTensor *neighbors;
+DLManagedTensor *distances;
+
+cuvsResourcesCreate(&res);
+cuvsBruteForceIndexCreate(&index);
+
+load_dataset(dataset);
+load_queries(queries);
+allocate_outputs(neighbors, distances);
+
+cuvsBruteForceBuild(res, dataset, L2Expanded, 0.0f, index);
+
+// Create a device uint32 bitmap with one bit per (query, vector) pair.
+// Bit 1 means the pair is allowed; bit 0 means it is filtered out.
+DLManagedTensor *bitmap = make_device_bitmap(allowed_query_vector_pairs, n_queries, n_vectors);
+
+cuvsFilter prefilter;
+prefilter.type = BITMAP;
+prefilter.addr = (uintptr_t)bitmap;
+
+cuvsBruteForceSearch(res, index, queries, neighbors, distances, prefilter);
+
+cuvsBruteForceIndexDestroy(index);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/core/bitmap.hpp>
+#include <cuvs/core/bitset.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
+
+using namespace cuvs::neighbors;
+using indexing_dtype = int64_t;
+
+raft::device_resources res;
+brute_force::index_params index_params;
+brute_force::search_params search_params;
+auto dataset = load_dataset(n_vectors, dim);
+auto queries = load_queries(n_queries, dim);
+
+auto index = brute_force::build(res, index_params, dataset);
+
+// Store allowed pairs as flattened row-major ids:
+// flattened_id = query_id * n_vectors + vector_id.
+std::vector<indexing_dtype> allowed_pairs_host = get_allowed_query_vector_pairs();
+auto allowed_pairs_device =
+    raft::make_device_vector<indexing_dtype, indexing_dtype>(res, allowed_pairs_host.size());
+
+raft::copy(allowed_pairs_device.data_handle(),
+           allowed_pairs_host.data(),
+           allowed_pairs_host.size(),
+           raft::resource::get_cuda_stream(res));
+
+cuvs::core::bitset<uint32_t, indexing_dtype> allowed_pairs_bitset(
+    res, allowed_pairs_device.view(), n_queries * n_vectors);
+cuvs::core::bitmap_view<const uint32_t, indexing_dtype> allowed_pairs_bitmap(
+    allowed_pairs_bitset.data(), n_queries, n_vectors);
+
+auto bitmap_filter = filtering::bitmap_filter(allowed_pairs_bitmap);
+
+auto neighbors = raft::make_device_matrix<int64_t, indexing_dtype>(res, n_queries, k);
+auto distances = raft::make_device_matrix<float, indexing_dtype>(res, n_queries, k);
+
+brute_force::search(
+    res,
+    search_params,
+    index,
+    queries,
+    neighbors.view(),
+    distances.view(),
+    bitmap_filter);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+import cupy as cp
+import numpy as np
+from cuvs.neighbors import brute_force, filters
+
+n_queries = queries.shape[0]
+n_vectors = dataset.shape[0]
+k = 10
+
+index = brute_force.build(dataset, metric="sqeuclidean")
+
+bitmap_host = np.zeros((n_queries * n_vectors + 31) // 32, dtype=np.uint32)
+for query_id, vector_id in get_allowed_query_vector_pairs():
+    bit = query_id * n_vectors + vector_id
+    bitmap_host[bit // 32] |= np.uint32(1 << (bit % 32))
+
+prefilter = filters.from_bitmap(cp.asarray(bitmap_host))
+
+distances, neighbors = brute_force.search(
+    index,
+    queries,
+    k,
+    prefilter=prefilter,
+)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+import java.util.BitSet;
+
+BitSet[] prefilters = new BitSet[queries.length];
+for (int queryId = 0; queryId < queries.length; queryId++) {
+  BitSet allowed = new BitSet(vectors.length);
+  for (int vectorId : getAllowedRowsForQuery(queryId)) {
+    allowed.set(vectorId);
+  }
+  prefilters[queryId] = allowed;
+}
+
+BruteForceQuery query =
+    new BruteForceQuery.Builder(resources)
+        .withTopK(10)
+        .withQueryVectors(queries)
+        .withPrefilters(prefilters, vectors.length)
+        .build();
+
+// ... build or load index ...
+SearchResults results = index.search(query);
+```
+
+</Tab>
+</Tabs>
+
 ## Configuration parameters
 
 ### Build parameters
