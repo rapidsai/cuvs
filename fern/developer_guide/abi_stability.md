@@ -1,4 +1,3 @@
-````markdown
 # ABI Stability Guarantees
 
 ## Overview
@@ -366,4 +365,3 @@ ABI stability lets applications built against one cuVS C library version run wit
 Developers should preserve existing public C ABI symbols during ABI-compatible releases. Add new symbols instead of changing existing ones. When an incompatible change is required, introduce a suffixed replacement such as `_v1`, keep the old symbol available, and document the migration path.
 
 During planned ABI-breaking releases, developers can consolidate these suffixed replacements by promoting the newest version to the canonical unsuffixed API, removing obsolete variants, and incrementing the ABI major version.
-````

@@ -118,6 +118,8 @@ navigation:
       - section: "Advanced Topics"
         path: "./pages/advanced_topics.md"
         contents:
+          - page: "ABI Stability"
+            path: "./developer_guide/abi_stability.md"
           - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
             path: "./pages/jit_lto_guide.md"
       - page: "Contributing"
