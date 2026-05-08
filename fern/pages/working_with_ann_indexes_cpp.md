@@ -1,4 +1,4 @@
-# Working with ANN Indexes in C++
+# Using APIs in C++
 
 - [Building an index](#building-an-index)
 - [Searching an index](#searching-an-index)

@@ -1,4 +1,4 @@
-# Working with ANN Indexes in Rust
+# Using APIs in Rust
 
 - [Building and Searching an index](#building-and-searching-an-index)
 
