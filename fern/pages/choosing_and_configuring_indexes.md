@@ -85,4 +85,4 @@ Use [CAGRA](neighbors/cagra.md) for high-throughput GPU search, fast GPU index c
 
 Use ScaNN when you want a tuned combination of partitioning, quantization, and reranking.
 
-Use [Vamana/DiskANN](neighbors/vamana.md) for very large datasets, especially when SSD-backed search is important, or for hybrid workflows where cuVS builds the index quickly on GPU and serializes it for CPU DiskANN search.
+Use [Vamana/DiskANN](neighbors/vamana.md) for very large datasets, especially when SSD-backed search is important, or hybrid workflows where a GPU-built graph is converted to CPU for DiskANN search.
