@@ -54,10 +54,10 @@ navbar-links:
 navigation:
   - page: "Home"
     path: "./pages/index.md"
+  - page: "Installation"
+    path: "./pages/build.md"
   - section: "Getting Started"
     contents:
-      - page: "Installation"
-        path: "./pages/build.md"
       - section: "Introduction"
         path: "./pages/getting_started.md"
         contents:
