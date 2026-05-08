@@ -75,12 +75,12 @@ navigation:
             path: "./pages/working_with_ann_indexes_rust.md"
       - page: "Filtering vector indexes"
         path: "./pages/filtering.md"
+      - page: "Integrations"
+        path: "./pages/integrations.md"
   - section: "Developer Guide"
     contents:
       - page: "Developer Guide"
         path: "./pages/developer_guide.md"
-  - page: "Integrations"
-    path: "./pages/integrations.md"
   - section: "cuVS Bench"
     path: "./pages/cuvs_bench/index.md"
     contents:
