@@ -62,6 +62,14 @@ navigation:
     contents:
       - page: "Overview"
         path: "./pages/getting_started.md"
+      - page: "Filtering vector indexes"
+        path: "./pages/filtering.md"
+      - page: "Integrations"
+        path: "./pages/integrations.md"
+  - section: "Developer Guide"
+    contents:
+      - page: "Developer Guide"
+        path: "./pages/developer_guide.md"
       - section: "Working with ANN Indexes"
         path: "./pages/working_with_ann_indexes.md"
         contents:
@@ -73,14 +81,6 @@ navigation:
             path: "./pages/working_with_ann_indexes_python.md"
           - page: "Working with ANN Indexes in Rust"
             path: "./pages/working_with_ann_indexes_rust.md"
-      - page: "Filtering vector indexes"
-        path: "./pages/filtering.md"
-      - page: "Integrations"
-        path: "./pages/integrations.md"
-  - section: "Developer Guide"
-    contents:
-      - page: "Developer Guide"
-        path: "./pages/developer_guide.md"
   - section: "cuVS Bench"
     path: "./pages/cuvs_bench/index.md"
     contents:
