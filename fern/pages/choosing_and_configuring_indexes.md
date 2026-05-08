@@ -1,4 +1,4 @@
-# Brief Introduction to Vector Search
+# What is Vector Search?
 
 Vector search indexes trade build time, search speed, memory use, and recall. Exact indexes compare every vector and return the true nearest neighbors, but they become expensive as datasets grow. Approximate indexes search a smaller candidate set, which is faster, but may miss some exact neighbors.
 
