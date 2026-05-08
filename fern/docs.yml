@@ -110,10 +110,6 @@ navigation:
             path: "./pages/cuvs_bench/wiki_all_dataset.md"
   - section: "Developer Guide"
     contents:
-      - page: "Developer Guide"
-        path: "./pages/developer_guide.md"
-      - page: "Contributing"
-        path: "./pages/contributing.md"
       - section: "Using cuVS APIs"
         path: "./pages/working_with_ann_indexes.md"
         contents:
@@ -127,6 +123,10 @@ navigation:
             path: "./pages/working_with_ann_indexes_rust.md"
           - page: "Filtering vector indexes"
             path: "./pages/filtering.md"
+      - page: "Developer Guide"
+        path: "./pages/developer_guide.md"
+      - page: "Contributing"
+        path: "./pages/contributing.md"
       - section: "Advanced Topics"
         path: "./pages/advanced_topics.md"
         contents:
