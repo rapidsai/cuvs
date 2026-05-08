@@ -130,7 +130,7 @@ navigation:
             path: "./pages/jit_lto_guide.md"
   - section: "Contribution Guide"
     contents:
-      - page: "Developer Guide"
+      - page: "Guidelines"
         path: "./pages/developer_guide.md"
       - page: "Contributing"
         path: "./pages/contributing.md"
