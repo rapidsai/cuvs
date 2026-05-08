@@ -39,8 +39,12 @@ For each recall bucket, summarize build time by taking the points on the Pareto 
 
 ## Large datasets
 
-For large vector databases, tune on representative samples instead of the full dataset. Many databases build several smaller local vector indexes behind a single logical index. If those local indexes contain roughly uniform samples, you can tune on smaller subsets and apply the chosen parameters more broadly.
+Use representative-sample tuning only when the database is hash partitioned, also called blind sharded.
 
-Keep local partition limits in mind. If each database segment is capped at 10M vectors, tune with a sample that resembles that segment size rather than the full database size.
+Think of mixing a big bag of marbles and pouring them into many small buckets without looking. Each bucket should have about the same mix as the big bag. In that case, you can tune on one bucket-sized sample and use those settings for the other buckets.
+
+That is how blind sharding works: each local index receives a roughly uniform slice of the full dataset. Keep the local partition size in mind. If each blind shard is capped at 10M vectors, tune with a sample that resembles a 10M-vector shard instead of tuning against the full database size.
+
+Do not use this shortcut for inverted file indexes or other content-based partitioning. Those systems group vectors by where they live in vector space. That is more like putting red marbles in one bucket and blue marbles in another: one bucket no longer represents the whole bag, and a random sample does not describe how each IVF list or partition behaves.
 
 For a step-by-step workflow, see the [tuning guide](tuning_guide.md).
