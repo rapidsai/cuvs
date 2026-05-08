@@ -1,4 +1,4 @@
-# Vector Database
+# What is a Vector Database?
 
 Vector search indexes and vector databases solve related but different problems. A vector search index is the algorithmic structure used to find nearest neighbors. A vector database is a production system that stores vectors, manages writes, handles failures, scales across machines, and uses one or more vector search indexes internally.
 
