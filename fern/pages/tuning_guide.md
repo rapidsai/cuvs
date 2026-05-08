@@ -1,4 +1,4 @@
-# Index Tuning Guide
+# Tuning Indexes
 
 Tuning a vector search index means choosing parameters that meet your recall, latency, throughput, memory, and build-time goals. The best settings depend on the data distribution, index type, hardware, and production constraints.
 

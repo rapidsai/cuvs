@@ -6,7 +6,7 @@
 
   * [Vector Database](vector_databases_vs_vector_search.md)
 
-  * [Index tuning guide](tuning_guide.md)
+  * [Tuning Indexes](tuning_guide.md)
 
   * [Evaluating performance](comparing_indexes.md)
 
@@ -46,7 +46,7 @@
 
 If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then [this primer on vector search guide](choosing_and_configuring_indexes.md) should provide some good insight. Another good resource for the uninitiated is our [Vector Database](vector_databases_vs_vector_search.md) guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results if not tuned correctly.
 
-Fortunately, this opens up the whole world of hyperparameter optimization to improve vector search performance and quality. Please see our [index tuning guide](tuning_guide.md) for more information.
+Fortunately, this opens up the whole world of hyperparameter optimization to improve vector search performance and quality. Please see [Tuning Indexes](tuning_guide.md) for more information.
 
 When comparing the performance of vector search indexes, it is important that considerations are made with respect to three main dimensions:
 
