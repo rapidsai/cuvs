@@ -59,17 +59,15 @@ The practical difference is that IVF narrows search by choosing partitions, whil
 
 ## Tuning
 
-Start with a representative subset of the data, compute exact ground truth with brute-force, and tune against that subset before scaling up. For many workloads, you can keep build parameters near their defaults and first adjust search-time parameters until recall and latency meet your target.
+Start with a representative subset of the data, compute exact ground truth with brute-force, and tune against that subset before scaling up. Keep build parameters near their defaults at first, then adjust search-time parameters until recall and latency are close to the target.
 
-It helps to separate three ideas when tuning: IVF controls how the data is partitioned, quantization controls how vectors are compressed, and graph-based indexes control how much of the neighbor graph is explored during search.
+For IVF indexes, start with `n_lists = sqrt(n_vectors)` and sweep `n_probes` values such as 1%, 2%, 4%, 8%, and 16% of `n_lists`. Choose the smallest probe count that reaches the recall target.
 
-For IVF indexes, start with `n_lists = sqrt(n_vectors)` and try `n_probes` values such as 1%, 2%, 4%, 8%, and 16% of `n_lists`. More lists create smaller partitions, but can make training and probing more sensitive. More probes search more partitions, which usually improves recall and reduces throughput. [IVF-Flat](neighbors/ivfflat.md) keeps full-precision vectors, so most tuning is about the partition count and probe count.
+For quantized indexes, tune compression together with refinement. Stronger compression can reduce memory and bandwidth, but may need more probes, a larger candidate set, or reranking with original vectors to recover recall.
 
-Quantization is a compression choice, not a partitioning strategy by itself. IVF-SQ and [IVF-PQ](neighbors/ivfpq.md) use IVF partitioning plus compressed vectors. Stronger compression lowers memory use and memory bandwidth, but makes distance estimates less exact. When memory allows keeping the original vectors, use refinement or reranking to recover recall after the compressed search.
+For graph-based indexes, tune search breadth before increasing build complexity. If search-time tuning cannot reach the recall target within the latency budget, then increase graph quality, graph degree, or construction breadth.
 
-For graph-based indexes such as HNSW, [CAGRA](neighbors/cagra.md), and [Vamana/DiskANN](neighbors/vamana.md), tune the graph quality and the search breadth. Higher graph degree, larger construction/search queues, or more visited nodes usually improve recall, but increase build time, memory use, search work, or some combination of those costs. Tune the smallest configuration that reaches the recall target rather than maximizing every quality-related parameter.
-
-Indexes such as ScaNN combine these ideas. Tune partitioning, quantization, candidate set size, and reranking together because each stage changes how much work remains for the next stage.
+For multi-stage indexes such as ScaNN, tune candidate count and reranking together. The goal is to keep the first stage broad enough to preserve recall and the reranking stage small enough to stay fast.
 
 ## When to use each
 
