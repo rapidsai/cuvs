@@ -84,16 +84,10 @@ navigation:
   - section: "cuVS Bench"
     path: "./pages/cuvs_bench/index.md"
     contents:
-      - page: "Build cuVS Bench From Source"
-        path: "./pages/cuvs_bench/build.md"
       - page: "cuVS Bench Datasets"
         path: "./pages/cuvs_bench/datasets.md"
-      - page: "cuVS Bench Parameter Tuning Guide"
-        path: "./pages/cuvs_bench/param_tuning.md"
       - page: "Pluggable Backend"
         path: "./pages/cuvs_bench/pluggable_backend.md"
-      - page: "Wiki-all Dataset"
-        path: "./pages/cuvs_bench/wiki_all_dataset.md"
   - section: "API Reference"
     path: "./pages/api_docs.md"
     contents:
