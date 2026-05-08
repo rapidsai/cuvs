@@ -251,7 +251,7 @@ __global__ void kern_fused_prune(KnnGraphView knn_graph,        // [graph_chunk_
       smem_num_detour[k] = knn_graph_degree;
     }
   }
-  __syncwarp();
+  warp.sync();
 
   // count number of detours (A->D->B)
   for (uint32_t kAD = 0; kAD < knn_graph_degree - 1; kAD++) {
@@ -270,7 +270,7 @@ __global__ void kern_fused_prune(KnnGraphView knn_graph,        // [graph_chunk_
         }
       }
     }
-    __syncwarp();
+    warp.sync();
   }
 
   uint32_t num_edges_no_detour = 0;
@@ -280,7 +280,7 @@ __global__ void kern_fused_prune(KnnGraphView knn_graph,        // [graph_chunk_
     if (smem_indices[k] >= graph_size) { smem_num_detour[k] = maxval16; }
   }
 
-  __syncwarp();
+  warp.sync();
 
   num_edges_no_detour = cg::reduce(warp, num_edges_no_detour, cg::plus<uint32_t>());
   num_edges_no_detour = min(num_edges_no_detour, output_graph_degree);
@@ -319,7 +319,7 @@ __global__ void kern_fused_prune(KnnGraphView knn_graph,        // [graph_chunk_
     for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
       if (smem_indices[k] == selected_node) { smem_num_detour[k] = maxval16; }
     }
-    __syncwarp();
+    warp.sync();
 
     if (lane_id == 0) { output_graph(nid_batch, i) = selected_node; }
   }
@@ -348,16 +348,16 @@ template <typename T>
 __device__ void warp_shift_array_one_right(uint32_t lane_id, T* array, uint64_t num)
 {
   if (num == 0) { return; }
-  for (auto chunk_end = static_cast<int64_t>(num); chunk_end >= 1; chunk_end -= 32) {
+  for (auto chunk_end = static_cast<int64_t>(num); chunk_end >= 1; chunk_end -= 31) {
     const int64_t chunk_start_lo = chunk_end - 31;
-    const int64_t chunk_start    = (chunk_start_lo > 1) ? chunk_start_lo : 1;
+    const int64_t chunk_start    = (chunk_start_lo > 0) ? chunk_start_lo : 0;
     const int64_t k              = chunk_start + static_cast<int64_t>(lane_id);
     T val{};
-    const bool active = (k <= chunk_end);
-    if (active) { val = array[k - 1]; }
-    __syncwarp();
-    if (active) { array[k] = val; }
-    __syncwarp();
+    const bool read_active = (k <= chunk_end);
+    if (read_active) { val = array[k]; }
+    const T shifted         = raft::shfl_up(val, 1);
+    const bool write_active = (lane_id > 0) && read_active;
+    if (write_active) { array[k] = shifted; }
   }
 }
 
@@ -423,7 +423,7 @@ __global__ void kern_merge_graph(
         }
       }
 
-      unsigned int warp_dup = __ballot_sync(0xffffffff, dup);
+      auto warp_dup = raft::ballot(dup);
       if (warp_dup == 0) {
         if (lane_id == 0) smem_sorted_output_graph[output_j] = v;
         output_j++;

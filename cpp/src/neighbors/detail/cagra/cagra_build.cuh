@@ -831,10 +831,11 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
     mst_host += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
   }
 
-  // Prune stage memory
-  // We neglect 8 bytes (both on host and device) for stats
+  // batchsize for both prune and combine stages
   size_t batch_size = std::min(static_cast<size_t>(256 * 1024), n_rows);
 
+  // Prune stage memory
+  // We neglect 8 bytes (both on host and device) for stats
   size_t prune_dev = batch_size * intermediate_degree * 1;  // detour count (uint8_t)
   prune_dev += batch_size * sizeof(uint32_t);               // d_num_detour_edges
   prune_dev += n_rows * intermediate_degree * index_size;   // d_input_graph
