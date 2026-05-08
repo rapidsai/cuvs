@@ -678,14 +678,17 @@ def render_native_function(
 
     return_type = parse_return_type(signature)
     if return_type:
+        rendered_return_type = render_type_reference(return_type, symbol_links)
         lines.extend(
             [
                 "**Returns**",
                 "",
-                render_type_reference(return_type, symbol_links),
+                rendered_return_type,
             ]
         )
-        if entry.returns:
+        if entry.returns and (
+            language != "cpp" or "](" not in rendered_return_type
+        ):
             lines.extend(["", escape_text(entry.returns)])
         lines.append("")
 
@@ -3480,13 +3483,19 @@ def update_api_navigation() -> None:
     docs_yml = REPO_DIR / "fern" / "docs.yml"
     text = docs_yml.read_text(encoding="utf-8")
     start_marker = '  - section: "API Reference"\n'
-    end_marker = '  - section: "Advanced Topics"\n'
     start = text.find(start_marker)
-    end = text.find(end_marker, start)
-    if start == -1 or end == -1:
+    if start == -1:
         raise RuntimeError(
             "Could not find API Reference navigation block in fern/docs.yml"
         )
+    next_top_level = re.search(
+        r"(?m)^  - (?:section|page): ",
+        text[start + len(start_marker) :],
+    )
+    if next_top_level:
+        end = start + len(start_marker) + next_top_level.start()
+    else:
+        end = len(text)
 
     lines = [
         '  - section: "API Reference"',

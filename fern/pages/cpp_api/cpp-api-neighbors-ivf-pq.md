@@ -607,8 +607,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-the constructed ivf-pq index
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -666,8 +664,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-the constructed ivf-pq index
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -727,8 +723,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-the constructed ivf-pq index
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -786,8 +780,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-the constructed ivf-pq index
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -848,8 +840,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-the constructed ivf-pq index
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -913,8 +903,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
 
-the constructed ivf-pq index
-
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
@@ -972,8 +960,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-the constructed ivf-pq index
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1036,8 +1022,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-the constructed ivf-pq index
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 
@@ -1114,8 +1098,6 @@ dim]
 **Returns**
 
 [`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
-
-A view-type ivf_pq index that references the provided data
 
 **Additional overload:** `cuvs::neighbors::ivf_pq::build`
 

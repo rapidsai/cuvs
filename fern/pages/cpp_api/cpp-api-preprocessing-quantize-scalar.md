@@ -67,8 +67,6 @@ Usage example:
 
 [`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
@@ -92,8 +90,6 @@ Usage example:
 **Returns**
 
 [`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
-
-quantizer
 
 <a id="cuvs-preprocessing-quantize-scalar-transform"></a>
 ### cuvs::preprocessing::quantize::scalar::transform
@@ -229,8 +225,6 @@ Usage example:
 
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
@@ -254,8 +248,6 @@ Usage example:
 **Returns**
 
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
-
-quantizer
 
 **Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 
@@ -389,8 +381,6 @@ Usage example:
 
 [`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
@@ -414,8 +404,6 @@ Usage example:
 **Returns**
 
 [`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
-
-quantizer
 
 **Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
 

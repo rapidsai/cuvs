@@ -104,7 +104,7 @@ raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> c
 raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0);
+float metric_arg = 2.0f);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently.
@@ -137,7 +137,7 @@ raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> 
 raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const y,
 raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous> dist,
 cuvs::distance::DistanceType metric,
-double metric_arg = 2.0);
+double metric_arg = 2.0f);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently.
@@ -170,7 +170,7 @@ raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> co
 raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0);
+float metric_arg = 2.0f);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently.
@@ -203,7 +203,7 @@ raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> c
 raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0);
+float metric_arg = 2.0f);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently.
@@ -236,7 +236,7 @@ raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> 
 raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const y,
 raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous> dist,
 cuvs::distance::DistanceType metric,
-double metric_arg = 2.0);
+double metric_arg = 2.0f);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently.
@@ -269,7 +269,7 @@ raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> co
 raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const y,
 raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0);
+float metric_arg = 2.0f);
 ```
 
 Note: Only contiguous row- or column-major layouts supported currently.
@@ -301,7 +301,7 @@ raft::device_csr_matrix_view<const float, int, int, int> x,
 raft::device_csr_matrix_view<const float, int, int, int> y,
 raft::device_matrix_view<float, int, raft::row_major> dist,
 cuvs::distance::DistanceType metric,
-float metric_arg = 2.0);
+float metric_arg = 2.0f);
 ```
 
 input configuration and distance function.

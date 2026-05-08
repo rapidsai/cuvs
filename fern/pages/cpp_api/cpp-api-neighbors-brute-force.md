@@ -53,7 +53,7 @@ cuvs::distance::DistanceType metric,
 DistT metric_arg = 0.0);
 ```
 
-Constructs a brute force index from a dataset. This lets us precompute norms for the dataset, providing a speed benefit over doing this at query time. This index will copy the host dataset onto the device, and take ownership of any precalculated norms.
+Constructs a brute force index from a dataset. This lets us precompute norms for the dataset, providing a speed benefit over doing this at query time. This index will copy the host dataset onto the device, and take ownership of any precaculated norms.
 
 **Parameters**
 
@@ -343,8 +343,6 @@ Usage example:
 
 [`cuvs::neighbors::brute_force::index<float, float>`](/api-reference/cpp-api-neighbors-brute-force#cuvs-neighbors-brute-force-index)
 
-the constructed brute-force index
-
 **Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
@@ -367,8 +365,6 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 **Returns**
 
 [`cuvs::neighbors::brute_force::index<float, float>`](/api-reference/cpp-api-neighbors-brute-force#cuvs-neighbors-brute-force-index)
-
-the constructed brute-force index
 
 **Additional overload:** `cuvs::neighbors::brute_force::build`
 
@@ -395,8 +391,6 @@ Usage example:
 
 [`cuvs::neighbors::brute_force::index<half, float>`](/api-reference/cpp-api-neighbors-brute-force#cuvs-neighbors-brute-force-index)
 
-the constructed brute force index
-
 **Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
@@ -419,8 +413,6 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 **Returns**
 
 [`cuvs::neighbors::brute_force::index<half, float>`](/api-reference/cpp-api-neighbors-brute-force#cuvs-neighbors-brute-force-index)
-
-the constructed brute-force index
 
 **Additional overload:** `cuvs::neighbors::brute_force::build`
 
@@ -447,8 +439,6 @@ Usage example:
 
 [`cuvs::neighbors::brute_force::index<float, float>`](/api-reference/cpp-api-neighbors-brute-force#cuvs-neighbors-brute-force-index)
 
-the constructed brute force index
-
 **Additional overload:** `cuvs::neighbors::brute_force::build`
 
 Build the index from the dataset for efficient search.
@@ -473,8 +463,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::brute_force::index<half, float>`](/api-reference/cpp-api-neighbors-brute-force#cuvs-neighbors-brute-force-index)
-
-the constructed brute force index
 
 ## Sparse Brute Force index
 
@@ -565,6 +553,8 @@ bool include_dataset = true);
 ```
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
+
+output
 
 **Template Parameters**
 

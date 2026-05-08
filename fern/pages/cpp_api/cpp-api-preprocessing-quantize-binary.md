@@ -105,8 +105,6 @@ Usage example:
 
 [`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -130,8 +128,6 @@ Usage example:
 **Returns**
 
 [`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
-
-quantizer
 
 <a id="cuvs-preprocessing-quantize-binary-transform"></a>
 ### cuvs::preprocessing::quantize::binary::transform
@@ -214,8 +210,6 @@ Usage example:
 
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -239,8 +233,6 @@ Usage example:
 **Returns**
 
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
-
-quantizer
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 
@@ -322,8 +314,6 @@ Usage example:
 
 [`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -347,8 +337,6 @@ Usage example:
 **Returns**
 
 [`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
-
-quantizer
 
 **Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
 

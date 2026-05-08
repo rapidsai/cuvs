@@ -340,8 +340,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
-the constructed ivf-flat index
-
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
@@ -406,8 +404,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
@@ -474,8 +470,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
-the constructed ivf-flat index
-
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
@@ -540,8 +534,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
@@ -609,8 +601,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
@@ -681,8 +671,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
-the constructed ivf-flat index
-
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
@@ -751,8 +739,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
@@ -823,8 +809,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
-the constructed ivf-flat index
-
 **Additional overload:** `cuvs::neighbors::ivf_flat::build`
 
 Build the index from the dataset for efficient search.
@@ -892,8 +876,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
-the constructed extended ivf-flat index
-
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
@@ -948,8 +930,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed extended ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
@@ -1006,8 +986,6 @@ Usage example:
 
 [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
 
-the constructed extended ivf-flat index
-
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
 Extend the index in-place with the new data.
@@ -1062,8 +1040,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed extended ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
@@ -1121,8 +1097,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<float, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed extended ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
@@ -1182,8 +1156,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<half, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed extended ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
@@ -1243,8 +1215,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed extended ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 
@@ -1304,8 +1274,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#cuvs-neighbors-ivf-flat-index)
-
-the constructed extended ivf-flat index
 
 **Additional overload:** `cuvs::neighbors::ivf_flat::extend`
 

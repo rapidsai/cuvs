@@ -663,8 +663,6 @@ Usage example:
 
 [`cuvs::neighbors::cagra::index<float, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
 
-the constructed cagra index
-
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
@@ -698,8 +696,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::cagra::index<float, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
-
-the constructed cagra index
 
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
@@ -735,8 +731,6 @@ Usage example:
 
 [`cuvs::neighbors::cagra::index<half, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
 
-the constructed cagra index
-
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
@@ -769,8 +763,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::cagra::index<half, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
-
-the constructed cagra index
 
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
@@ -805,8 +797,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::cagra::index<int8_t, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
-
-the constructed cagra index
 
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
@@ -843,8 +833,6 @@ Usage example:
 
 [`cuvs::neighbors::cagra::index<int8_t, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
 
-the constructed cagra index
-
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
@@ -880,8 +868,6 @@ Usage example:
 
 [`cuvs::neighbors::cagra::index<uint8_t, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
 
-the constructed cagra index
-
 **Additional overload:** `cuvs::neighbors::cagra::build`
 
 Build the index from the dataset for efficient search.
@@ -916,8 +902,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::cagra::index<uint8_t, uint32_t>`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index)
-
-the constructed cagra index
 
 ## CAGRA extend functions
 

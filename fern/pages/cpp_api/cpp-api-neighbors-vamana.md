@@ -342,8 +342,6 @@ Usage example:
 
 [`cuvs::neighbors::vamana::index<float, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
 
-the constructed vamana index
-
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
@@ -374,8 +372,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::vamana::index<float, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
-
-the constructed vamana index
 
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
@@ -408,8 +404,6 @@ Usage example:
 
 [`cuvs::neighbors::vamana::index<int8_t, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
 
-the constructed vamana index
-
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
@@ -440,8 +434,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::vamana::index<int8_t, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
-
-the constructed vamana index
 
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
@@ -474,8 +466,6 @@ Usage example:
 
 [`cuvs::neighbors::vamana::index<uint8_t, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
 
-the constructed vamana index
-
 **Additional overload:** `cuvs::neighbors::vamana::build`
 
 Build the index from the dataset for efficient DiskANN search.
@@ -506,8 +496,6 @@ Usage example:
 **Returns**
 
 [`cuvs::neighbors::vamana::index<uint8_t, uint32_t>`](/api-reference/cpp-api-neighbors-vamana#cuvs-neighbors-vamana-index)
-
-the constructed vamana index
 
 ## Vamana serialize functions
 

@@ -249,8 +249,6 @@ the output graph
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in host memory
@@ -295,8 +293,6 @@ the output graph
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
@@ -333,8 +329,6 @@ the output graph
 **Returns**
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
-
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -380,8 +374,6 @@ the output graph
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
@@ -419,8 +411,6 @@ the output graph
 **Returns**
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
-
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -467,8 +457,6 @@ the output graph
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
 
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
-
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
 Build nn-descent Index with dataset in device memory
@@ -506,8 +494,6 @@ the output graph
 **Returns**
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
-
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory
 
 **Additional overload:** `cuvs::neighbors::nn_descent::build`
 
@@ -553,5 +539,3 @@ the output graph
 **Returns**
 
 [`cuvs::neighbors::nn_descent::index<uint32_t>`](/api-reference/cpp-api-neighbors-nn-descent#cuvs-neighbors-nn-descent-index)
-
-index&lt;IdxT&gt; index containing all-neighbors knn graph in host memory

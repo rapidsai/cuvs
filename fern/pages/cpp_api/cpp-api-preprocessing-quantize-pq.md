@@ -121,8 +121,6 @@ Usage example:
 
 [`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-pq#cuvs-preprocessing-quantize-pq-quantizer)
 
-quantizer
-
 **Additional overload:** `cuvs::preprocessing::quantize::pq::build`
 
 ```cpp
