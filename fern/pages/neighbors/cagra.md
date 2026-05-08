@@ -312,22 +312,40 @@ The examples below use a bitset filter. A bit value of `1` means a vector is all
 #include <cuvs/neighbors/common.h>
 
 cuvsResources_t res;
+cuvsCagraIndexParams_t index_params;
 cuvsCagraSearchParams_t search_params;
 cuvsCagraIndex_t index;
+DLManagedTensor *dataset;
 DLManagedTensor *queries;
 DLManagedTensor *neighbors;
 DLManagedTensor *distances;
 
-// Create a device uint32 bitset with one bit per indexed vector.
-// Bit 1 means allowed; bit 0 means filtered out.
+cuvsResourcesCreate(&res);
+cuvsCagraIndexParamsCreate(&index_params);
+cuvsCagraSearchParamsCreate(&search_params);
+cuvsCagraIndexCreate(&index);
+
+// Populate DLPack tensors with dataset, query, and output data.
+load_dataset(dataset);
+load_queries(queries);
+allocate_outputs(neighbors, distances);
+
+cuvsCagraBuild(res, index_params, dataset, index);
+
+// Create a device uint32 bitset with one bit per indexed vector. Bit 1 means
+// allowed; bit 0 means filtered out.
 DLManagedTensor *bitset = make_device_bitset(allowed_indices, n_vectors);
 
 cuvsFilter filter;
 filter.type = BITSET;
 filter.addr = (uintptr_t)bitset;
 
-// ... build or load index ...
 cuvsCagraSearch(res, search_params, index, queries, neighbors, distances, filter);
+
+cuvsCagraIndexDestroy(index);
+cuvsCagraSearchParamsDestroy(search_params);
+cuvsCagraIndexParamsDestroy(index_params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>
