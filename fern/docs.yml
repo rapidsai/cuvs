@@ -94,8 +94,9 @@ navigation:
       - page: "Integrations"
         path: "./pages/integrations.md"
       - section: "Benchmarking"
-        path: "./pages/cuvs_bench/index.md"
         contents:
+          - page: "cuVS Bench Tool"
+            path: "./pages/cuvs_bench/index.md"
           - page: "Evaluating Performance"
             path: "./pages/comparing_indexes.md"
           - page: "Build cuVS Bench From Source"
