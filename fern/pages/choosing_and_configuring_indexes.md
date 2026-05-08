@@ -61,9 +61,15 @@ The practical difference is that IVF narrows search by choosing partitions, whil
 
 Start with a representative subset of the data, compute exact ground truth with brute-force, and tune against that subset before scaling up. For many workloads, you can keep build parameters near their defaults and first adjust search-time parameters until recall and latency meet your target.
 
-For IVF indexes, start with `n_lists = sqrt(n_vectors)` and try `n_probes` values such as 1%, 2%, 4%, 8%, and 16% of `n_lists`. Increasing `n_probes` usually improves recall and reduces throughput. For IVF-SQ and [IVF-PQ](neighbors/ivfpq.md), consider refinement when memory allows keeping the original vectors.
+It helps to separate three ideas when tuning: IVF controls how the data is partitioned, quantization controls how vectors are compressed, and graph-based indexes control how much of the neighbor graph is explored during search.
 
-For graph indexes, increasing graph quality usually improves recall but increases build time, memory use, or both. Tune the smallest configuration that reaches the recall target rather than simply maximizing every quality-related parameter.
+For IVF indexes, start with `n_lists = sqrt(n_vectors)` and try `n_probes` values such as 1%, 2%, 4%, 8%, and 16% of `n_lists`. More lists create smaller partitions, but can make training and probing more sensitive. More probes search more partitions, which usually improves recall and reduces throughput. [IVF-Flat](neighbors/ivfflat.md) keeps full-precision vectors, so most tuning is about the partition count and probe count.
+
+Quantization is a compression choice, not a partitioning strategy by itself. IVF-SQ and [IVF-PQ](neighbors/ivfpq.md) use IVF partitioning plus compressed vectors. Stronger compression lowers memory use and memory bandwidth, but makes distance estimates less exact. When memory allows keeping the original vectors, use refinement or reranking to recover recall after the compressed search.
+
+For graph-based indexes such as HNSW, [CAGRA](neighbors/cagra.md), and [Vamana/DiskANN](neighbors/vamana.md), tune the graph quality and the search breadth. Higher graph degree, larger construction/search queues, or more visited nodes usually improve recall, but increase build time, memory use, search work, or some combination of those costs. Tune the smallest configuration that reaches the recall target rather than maximizing every quality-related parameter.
+
+Indexes such as ScaNN combine these ideas. Tune partitioning, quantization, candidate set size, and reranking together because each stage changes how much work remains for the next stage.
 
 ## When to use each
 
