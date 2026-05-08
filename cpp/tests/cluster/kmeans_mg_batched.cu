@@ -4,6 +4,7 @@
  */
 
 #include "../test_utils.cuh"
+#include "kmeans_test_blobs.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_resources_snmg.hpp>
@@ -11,7 +12,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -33,11 +33,10 @@ struct KmeansSNMGInputs {
   int n_col;
   int n_clusters;
   T tol;
-  int weight_mode;  // 0 = no weights, 1 = uniform, 2 = mild non-uniform, 3 = extreme non-uniform
+  kmeans_weight_mode weight_mode;
   int streaming_batch_size;
   int n_init;
   cuvs::cluster::kmeans::params::InitMethod init = cuvs::cluster::kmeans::params::Array;
-  bool inertia_check                             = true;
   int max_iter                                   = 20;
 };
 
@@ -57,47 +56,25 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
 
     auto stream = raft::resource::get_cuda_stream(clique_);
 
-    auto X      = raft::make_device_matrix<T, int>(clique_, n_samples, n_features);
-    auto labels = raft::make_device_vector<int, int>(clique_, n_samples);
-
-    raft::random::make_blobs<T, int>(X.data_handle(),
-                                     labels.data_handle(),
-                                     n_samples,
-                                     n_features,
-                                     n_clusters,
-                                     stream,
-                                     true,
-                                     nullptr,
-                                     nullptr,
-                                     T(1.0),
-                                     false,
-                                     (T)-10.0f,
-                                     (T)10.0f,
-                                     (uint64_t)1234);
-
-    // Copy X to host
-    std::vector<T> h_X(n_samples * n_features);
-    raft::update_host(h_X.data(), X.data_handle(), n_samples * n_features, stream);
-    raft::resource::sync_stream(clique_, stream);
-
-    auto h_X_view =
-      raft::make_host_matrix_view<const T, int64_t>(h_X.data(), n_samples, n_features);
+    auto bi       = make_kmeans_blob_inputs<T>(clique_, n_samples, n_features, n_clusters);
+    auto h_X_view = raft::make_const_mdspan(bi.h_X->view());
 
     auto d_centroids_snmg = raft::make_device_matrix<T, int64_t>(clique_, n_clusters, n_features);
     auto d_centroids_ref  = raft::make_device_matrix<T, int64_t>(clique_, n_clusters, n_features);
 
     if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
       std::vector<int> h_labels(n_samples);
-      raft::update_host(h_labels.data(), labels.data_handle(), n_samples, stream);
+      raft::update_host(h_labels.data(), bi.d_labels_ref.data_handle(), n_samples, stream);
       raft::resource::sync_stream(clique_, stream);
 
+      const T* h_X_data = bi.h_X->data_handle();
       std::vector<T> h_centroids(n_clusters * n_features, T(0));
       std::vector<int> counts(n_clusters, 0);
       for (int i = 0; i < n_samples; ++i) {
         int c = h_labels[i];
         counts[c]++;
         for (int j = 0; j < n_features; ++j)
-          h_centroids[c * n_features + j] += h_X[i * n_features + j];
+          h_centroids[c * n_features + j] += h_X_data[i * n_features + j];
       }
       for (int c = 0; c < n_clusters; ++c) {
         if (counts[c] > 0) {
@@ -116,19 +93,13 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     }
 
     // --- Prepare sample weights ---
+    auto const mode = testparams_.weight_mode;
+    auto h_sample_weight =
+      raft::make_host_vector<T, int64_t>(mode != kmeans_weight_mode::none ? n_samples : 0);
     std::optional<raft::host_vector_view<const T, int64_t>> h_sw = std::nullopt;
-    std::vector<T> h_sample_weight;
-    if (testparams_.weight_mode > 0) {
-      h_sample_weight.resize(n_samples);
-      for (int i = 0; i < n_samples; ++i) {
-        if (testparams_.weight_mode == 3)
-          h_sample_weight[i] = (i % 10 == 0) ? T(100) : T(1);
-        else if (testparams_.weight_mode == 2)
-          h_sample_weight[i] = T(1) + T(i % 5);
-        else
-          h_sample_weight[i] = T(1);
-      }
-      h_sw = raft::make_host_vector_view<const T, int64_t>(h_sample_weight.data(), n_samples);
+    if (mode != kmeans_weight_mode::none) {
+      fill_kmeans_test_weights(h_sample_weight.view(), mode);
+      h_sw = std::make_optional(raft::make_const_mdspan(h_sample_weight.view()));
     }
 
     // --- Run SNMG fit ---
@@ -139,7 +110,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     snmg_params.n_init               = testparams_.n_init;
     snmg_params.rng_state.seed       = 42;
     snmg_params.init                 = testparams_.init;
-    snmg_params.inertia_check        = testparams_.inertia_check;
     snmg_params.streaming_batch_size = testparams_.streaming_batch_size;
 
     T snmg_inertia      = T{0};
@@ -188,10 +158,10 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     rmm::device_uvector<int> d_labels_sg(n_samples, sg_stream);
     rmm::device_uvector<int> d_labels_ref(n_samples, sg_stream);
 
-    raft::copy(d_labels_ref.data(), labels.data_handle(), n_samples, sg_stream);
+    raft::copy(d_labels_ref.data(), bi.d_labels_ref.data_handle(), n_samples, sg_stream);
 
     auto X_dev_view =
-      raft::make_device_matrix_view<const T, int>(X.data_handle(), n_samples, n_features);
+      raft::make_device_matrix_view<const T, int>(bi.d_X.data_handle(), n_samples, n_features);
 
     cuvs::cluster::kmeans::params pred_params;
     pred_params.n_clusters = n_clusters;
@@ -320,56 +290,81 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
 // ============================================================================
 const std::vector<KmeansSNMGInputs<float>> snmg_inputsf = {
   // n_row, n_col, n_clusters, tol, weight_mode, streaming_batch_size, n_init[, init]
-  {1000, 32, 5, 0.0001f, 0, 1000, 1},
-  {1000, 32, 5, 0.0001f, 1, 1000, 1},
-  {1000, 32, 5, 0.0001f, 0, 128, 1},
-  {10000, 16, 10, 0.0001f, 0, 2000, 1},
-  {10000, 16, 10, 0.0001f, 1, 2000, 1},
-  {10000, 16, 10, 0.0001f, 0, 500, 1},
-  {1001, 32, 5, 0.0001f, 0, 1001, 1},
-  {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::KMeansPlusPlus},
-  {1001, 32, 5, 0.0001f, 0, 128, 1},
+  {1000, 32, 5, 0.0001f, kmeans_weight_mode::none, 1000, 1},
+  {1000, 32, 5, 0.0001f, kmeans_weight_mode::uniform, 1000, 1},
+  {1000, 32, 5, 0.0001f, kmeans_weight_mode::none, 128, 1},
+  {10000, 16, 10, 0.0001f, kmeans_weight_mode::none, 2000, 1},
+  {10000, 16, 10, 0.0001f, kmeans_weight_mode::uniform, 2000, 1},
+  {10000, 16, 10, 0.0001f, kmeans_weight_mode::none, 500, 1},
+  {1001, 32, 5, 0.0001f, kmeans_weight_mode::none, 1001, 1},
+  {1000,
+   32,
+   5,
+   0.0001f,
+   kmeans_weight_mode::none,
+   1000,
+   1,
+   cuvs::cluster::kmeans::params::KMeansPlusPlus},
+  {1001, 32, 5, 0.0001f, kmeans_weight_mode::none, 128, 1},
   // Non-uniform weights: exercises weight_scale = global_n / global_wt normalization
-  {1000, 32, 5, 0.0001f, 2, 1000, 1},
-  {10000, 16, 10, 0.0001f, 2, 2000, 1},
+  {1000, 32, 5, 0.0001f, kmeans_weight_mode::mild_nonuniform, 1000, 1},
+  {10000, 16, 10, 0.0001f, kmeans_weight_mode::mild_nonuniform, 2000, 1},
   // Extreme non-uniform weights (100:1 ratio): stresses weight normalization
-  {1000, 32, 5, 0.0001f, 3, 1000, 1},
+  {1000, 32, 5, 0.0001f, kmeans_weight_mode::extreme_nonuniform, 1000, 1},
   // Extreme batch size = 1: single-element work buffers, many batch iterations
-  {100, 8, 3, 0.001f, 0, 1, 1},
+  {100, 8, 3, 0.001f, kmeans_weight_mode::none, 1, 1},
   // Very small dataset: some ranks may get only 2-3 rows with 4+ GPUs
-  {10, 4, 3, 0.001f, 0, 10, 1},
+  {10, 4, 3, 0.001f, kmeans_weight_mode::none, 10, 1},
   // Fewer rows than GPUs: exercises empty-rank (has_data=false) partitions on 4+ GPU systems
-  {3, 4, 2, 0.001f, 0, 3, 1},
+  {3, 4, 2, 0.001f, kmeans_weight_mode::none, 3, 1},
   // Trivial single cluster: convergence should be immediate
-  {1000, 16, 1, 0.0001f, 0, 1000, 1},
+  {1000, 16, 1, 0.0001f, kmeans_weight_mode::none, 1000, 1},
   // Batch size > n_samples: tests per-rank clamping logic
-  {1000, 32, 5, 0.0001f, 0, 5000, 1},
+  {1000, 32, 5, 0.0001f, kmeans_weight_mode::none, 5000, 1},
   // n_init > 1 with KMeansPlusPlus: best-of-n seed management across ranks
-  {1000, 32, 5, 0.0001f, 0, 1000, 3, cuvs::cluster::kmeans::params::KMeansPlusPlus},
-  // inertia_check=false: convergence only via centroid shift
-  {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, false},
-  {1000, 32, 5, 0.0001f, 0, 128, 1, cuvs::cluster::kmeans::params::Array, false},
+  {1000,
+   32,
+   5,
+   0.0001f,
+   kmeans_weight_mode::none,
+   1000,
+   3,
+   cuvs::cluster::kmeans::params::KMeansPlusPlus},
   // max_iter saturation: algorithm should stop at max_iter without convergence
-  {1000, 32, 5, 0.0001f, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, true, 2},
+  {1000,
+   32,
+   5,
+   0.0001f,
+   kmeans_weight_mode::none,
+   1000,
+   1,
+   cuvs::cluster::kmeans::params::Array,
+   2},
 };
 
 // ============================================================================
 // Double test inputs
 // ============================================================================
 const std::vector<KmeansSNMGInputs<double>> snmg_inputsd = {
-  {1000, 32, 5, 0.0001, 0, 1000, 1},
-  {1000, 32, 5, 0.0001, 0, 128, 1},
-  {1000, 32, 5, 0.0001, 1, 1000, 1},
-  {1000, 32, 5, 0.0001, 2, 1000, 1},
-  {10000, 16, 10, 0.0001, 0, 2000, 1},
-  {100, 8, 3, 0.001, 0, 1, 1},
-  {10, 4, 3, 0.001, 0, 10, 1},
-  {3, 4, 2, 0.001, 0, 3, 1},
-  {1000, 16, 1, 0.0001, 0, 1000, 1},
-  {1000, 32, 5, 0.0001, 0, 5000, 1},
-  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::KMeansPlusPlus},
-  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, false},
-  {1000, 32, 5, 0.0001, 0, 1000, 1, cuvs::cluster::kmeans::params::Array, true, 2},
+  {1000, 32, 5, 0.0001, kmeans_weight_mode::none, 1000, 1},
+  {1000, 32, 5, 0.0001, kmeans_weight_mode::none, 128, 1},
+  {1000, 32, 5, 0.0001, kmeans_weight_mode::uniform, 1000, 1},
+  {1000, 32, 5, 0.0001, kmeans_weight_mode::mild_nonuniform, 1000, 1},
+  {10000, 16, 10, 0.0001, kmeans_weight_mode::none, 2000, 1},
+  {100, 8, 3, 0.001, kmeans_weight_mode::none, 1, 1},
+  {10, 4, 3, 0.001, kmeans_weight_mode::none, 10, 1},
+  {3, 4, 2, 0.001, kmeans_weight_mode::none, 3, 1},
+  {1000, 16, 1, 0.0001, kmeans_weight_mode::none, 1000, 1},
+  {1000, 32, 5, 0.0001, kmeans_weight_mode::none, 5000, 1},
+  {1000,
+   32,
+   5,
+   0.0001,
+   kmeans_weight_mode::none,
+   1000,
+   1,
+   cuvs::cluster::kmeans::params::KMeansPlusPlus},
+  {1000, 32, 5, 0.0001, kmeans_weight_mode::none, 1000, 1, cuvs::cluster::kmeans::params::Array, 2},
 };
 
 // ============================================================================
