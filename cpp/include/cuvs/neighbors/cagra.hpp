@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "common.hpp"
 #include <cuda_fp16.h>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -558,7 +557,7 @@ struct index : cuvs::neighbors::index {
    * `detail::clone_any_dataset_view_for_cagra_index` stores a shallow copy of the view variant.
    * Supported:
    * `empty_dataset_view`, `indirect_dataset_view`, `device_padded_dataset_view`,
-   * `dataset_view<strided_dataset_container,...>`. The index stores only a **non-owning** view; the
+   * `strided_dataset_view<T, int64_t>`. The index stores only a **non-owning** view; the
    * caller must keep all underlying device storage (and any `indirect_dataset_view` target) alive
    * for the index lifetime.
    *
@@ -693,8 +692,7 @@ struct index : cuvs::neighbors::index {
       static_cast<unsigned>(required_stride),
       static_cast<unsigned>(src_stride));
 
-    ::cuvs::neighbors::dataset_view<strided_dataset_container, T, dataset_index_type, true, false>
-      wrap(dataset_view);
+    ::cuvs::neighbors::strided_dataset_view<T, dataset_index_type> wrap(dataset_view);
     update_dataset(res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(wrap));
   }
 
@@ -1420,7 +1418,7 @@ auto build_ace(raft::resources const& res,
  * is used, returns `build_result` with `.vpq` that the caller must keep alive.
  * See `build(res, params, device_matrix_view)` for full documentation.
  *
- * Strided device rows (`dataset_view<strided_dataset_container, T, int64_t, true, false>`) are
+ * Strided device rows (`strided_dataset_view<T, int64_t>`) are
  * carried as the strided alternative inside `any_dataset_view` and convert implicitly from that
  * view type (`any_dataset_view<T, int64_t>(strided_view)` is optional).
  */

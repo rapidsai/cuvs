@@ -2447,7 +2447,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
  * `convert_dataset_view_to_padded_for_graph_build`.
  *
  * Supported alternatives include `device_padded_dataset_view`,
- * `dataset_view<strided_dataset_container,...>`, and `indirect`
+ * `strided_dataset_view`, and `indirect`
  * to device padded storage matching \p T; this entry point does **not** accept host-backed bases
  * for graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
  */

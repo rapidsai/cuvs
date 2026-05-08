@@ -196,15 +196,13 @@ struct index : cuvs::neighbors::index {
     switch (aligned.index()) {
       case 0: {
         auto up = std::get<0>(std::move(aligned));
-        cuvs::neighbors::dataset_view<strided_dataset_container, T, int64_t, true, false> ds_view(
-          up->view());
+        cuvs::neighbors::strided_dataset_view<T, int64_t> ds_view(up->view());
         full_precision_storage_ = std::move(up);
         dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
         break;
       }
       case 1: {
-        dataset_view<strided_dataset_container, T, int64_t, true, false> view =
-          std::get<1>(std::move(aligned));
+        cuvs::neighbors::strided_dataset_view<T, int64_t> view = std::get<1>(std::move(aligned));
         dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(view);
         full_precision_storage_ = std::move(view);
         break;
@@ -290,7 +288,7 @@ struct index : cuvs::neighbors::index {
    */
   std::variant<std::monostate,
                std::unique_ptr<cuvs::neighbors::strided_owning_dataset<T, int64_t>>,
-               dataset_view<strided_dataset_container, T, int64_t, true, false>>
+               cuvs::neighbors::strided_dataset_view<T, int64_t>>
     full_precision_storage_;
   std::unique_ptr<cuvs::neighbors::any_dataset_view<T, int64_t>> dataset_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;

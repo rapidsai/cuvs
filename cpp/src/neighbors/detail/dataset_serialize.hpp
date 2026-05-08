@@ -34,7 +34,7 @@ void serialize(const raft::resources& res, std::ostream& os, const empty_dataset
 template <typename DataT, typename IdxT>
 void serialize(const raft::resources& res,
                std::ostream& os,
-               const dataset_view<strided_dataset_container, DataT, IdxT, true, false>& dataset)
+               const strided_dataset_view<DataT, IdxT>& dataset)
 {
   auto n_rows = dataset.n_rows();
   auto dim    = dataset.dim();
