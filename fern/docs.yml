@@ -69,9 +69,8 @@ navigation:
             path: "./pages/vector_databases_vs_vector_search.md"
           - page: "Comparing performance of vector indexes"
             path: "./pages/comparing_indexes.md"
-      - page: "Automated tuning guide"
-        hidden: true
-        path: "./pages/tuning_guide.md"
+          - page: "Index Tuning Guide"
+            path: "./pages/tuning_guide.md"
       - section: "Vector search index guide"
         hidden: true
         path: "./pages/neighbors/neighbors.md"
