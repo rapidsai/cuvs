@@ -63,14 +63,13 @@ navigation:
       - section: "Introduction"
         path: "./pages/getting_started.md"
         contents:
+          - page: "Vector search vs Vector DB"
+            path: "./pages/vector_databases_vs_vector_search.md"
           - page: "Comparing performance of vector indexes"
             path: "./pages/comparing_indexes.md"
       - page: "Primer on vector search indexes"
         hidden: true
         path: "./pages/choosing_and_configuring_indexes.md"
-      - page: "Vector search indexes vs vector databases"
-        hidden: true
-        path: "./pages/vector_databases_vs_vector_search.md"
       - page: "Automated tuning guide"
         hidden: true
         path: "./pages/tuning_guide.md"
