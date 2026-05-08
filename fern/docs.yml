@@ -66,7 +66,7 @@ navigation:
             path: "./pages/choosing_and_configuring_indexes.md"
           - page: "Vector Database"
             path: "./pages/vector_databases_vs_vector_search.md"
-          - section: "Vector Search Index Guide"
+          - section: "Indexing Guide"
             collapsed: "open-by-default"
             path: "./pages/neighbors/neighbors.md"
             contents:

@@ -16,7 +16,7 @@ Please see [Methologies](comparing_indexes.md) for more information on methodolo
 
 ## Supported indexes
 
-cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our [vector search index guide](neighbors/neighbors.md) to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
+cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our [indexing guide](neighbors/neighbors.md) to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
 
 The primary goal of cuVS is to enable speed, scale, and flexibility (in that order)- and one of the important value propositions is to enhance existing software deployments with extensible GPU capabilities to improve pain points while not interrupting parts of the system that work well today with CPU.
 
