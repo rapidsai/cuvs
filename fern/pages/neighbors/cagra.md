@@ -4,9 +4,11 @@ CAGRA is a GPU-optimized graph index for approximate nearest-neighbor search. Th
 
 CAGRA works well when you want strong recall, high GPU throughput, and fast graph construction.
 
+## Example API Usage
+
 [C API](/api-reference/c-api-neighbors-cagra) | [C++ API](/api-reference/cpp-api-neighbors-cagra) | [Python API](/api-reference/python-api-neighbors-cagra) | [Java API](/api-reference/java-api-com-nvidia-cuvs-cagraindex) | [Rust API](/api-reference/rust-api-cuvs-cagra) | [Go API](/api-reference/go-api-cagra)
 
-## Building an index
+### Building an index
 
 <Tabs>
 <Tab title="C">
@@ -130,7 +132,7 @@ func buildCagraIndex(dataset cuvs.Tensor[float32]) (*cagra.CagraIndex, error) {
 </Tab>
 </Tabs>
 
-## Searching an index
+### Searching an index
 
 <Tabs>
 <Tab title="C">
