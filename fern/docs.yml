@@ -63,7 +63,7 @@ navigation:
       - section: "Introduction"
         path: "./pages/getting_started.md"
         contents:
-          - page: "Primer on vector search indexes"
+          - page: "Vector Search"
             path: "./pages/choosing_and_configuring_indexes.md"
           - page: "Vector search vs Vector DB"
             path: "./pages/vector_databases_vs_vector_search.md"
