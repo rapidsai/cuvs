@@ -35,51 +35,11 @@ A good example of an acceptable use of host threads within a RAFT algorithm migh
 #include <raft/core/resource/cuda_stream_pool.hpp>
 raft::resources res;
 
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
 ...
-```
-```
-```
-```
-```
-```
-```
-```
-```
-```
 
 sync_stream(res);
 
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
 ...
-```
-```
-```
-```
-```
-```
-```
-```
-```
-```
 
 int n_streams = get_stream_pool_size(res);
 
@@ -388,27 +348,7 @@ E.g. with a CUDA-aware MPI, a RAFT user could use code like this to inject an in
 #include <raft/core/resources.hpp>
 #include <raft/comms/mpi_comms.hpp>
 #include <raft/algo.hpp>
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
-```python
 ...
-```
-```
-```
-```
-```
-```
-```
-```
-```
-```
 int main(int argc, char * argv[])
 {
     MPI_Init(&argc, &argv);
