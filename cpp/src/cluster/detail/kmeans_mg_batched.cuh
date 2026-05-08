@@ -531,12 +531,10 @@ void mnmg_fit(
         static_cast<size_t>(streaming_batch_size),
         stream,
         rmm::mr::get_current_device_resource_ref(),
-        true);
-      data_batches.prefetch_next_batch();
+        false);
 
       for (auto const& data_batch : data_batches) {
         fn(part_idx, data_batch);
-        data_batches.prefetch_next_batch();
       }
     }
   };
