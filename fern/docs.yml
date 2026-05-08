@@ -60,8 +60,11 @@ navigation:
         path: "./pages/build.md"
   - section: "User Guide"
     contents:
-      - page: "Overview"
+      - section: "Overview"
         path: "./pages/getting_started.md"
+        contents:
+          - page: "Comparing performance of vector indexes"
+            path: "./pages/comparing_indexes.md"
       - page: "Primer on vector search indexes"
         hidden: true
         path: "./pages/choosing_and_configuring_indexes.md"
@@ -71,9 +74,6 @@ navigation:
       - page: "Automated tuning guide"
         hidden: true
         path: "./pages/tuning_guide.md"
-      - page: "Comparing performance of vector indexes"
-        hidden: true
-        path: "./pages/comparing_indexes.md"
       - section: "Vector search index guide"
         hidden: true
         path: "./pages/neighbors/neighbors.md"
