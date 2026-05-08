@@ -294,7 +294,211 @@ Use brute-force instead when exact results are required or the dataset is small 
 
 cuVS can convert a CAGRA graph to an HNSW graph. This lets the GPU build the graph while the CPU handles search later. This is useful when GPUs are available for indexing, but production search runs on CPUs.
 
-If the graph is being serialized or converted to HNSW right after build, set `attach_data_on_build` to `False` to avoid keeping the dataset attached to the CAGRA index.
+If the graph is being serialized or converted to HNSW right after build, avoid keeping the dataset attached to the CAGRA index when the binding exposes that option. In C++, for example, set `attach_dataset_on_build` to `false`.
+
+These examples cover the bindings that currently expose CAGRA and HNSW interoperability. Go supports CAGRA build and search, but does not currently expose HNSW conversion.
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/hnsw.h>
+
+cuvsResources_t res;
+cuvsCagraIndexParams_t cagra_params;
+cuvsCagraIndex_t cagra_index;
+cuvsHnswIndexParams_t hnsw_params;
+cuvsHnswIndex_t hnsw_index;
+cuvsHnswSearchParams_t hnsw_search_params;
+DLManagedTensor *dataset;
+DLManagedTensor *queries;
+DLManagedTensor *neighbors;
+DLManagedTensor *distances;
+
+int64_t n_rows = 1000000;
+int64_t dim = 128;
+int M = 32;
+int ef_construction = 200;
+
+cuvsResourcesCreate(&res);
+cuvsCagraIndexParamsCreate(&cagra_params);
+cuvsCagraIndexCreate(&cagra_index);
+cuvsHnswIndexParamsCreate(&hnsw_params);
+cuvsHnswIndexCreate(&hnsw_index);
+cuvsHnswSearchParamsCreate(&hnsw_search_params);
+
+load_dataset(dataset);
+load_host_queries(queries);
+allocate_hnsw_outputs(neighbors, distances);
+
+cuvsCagraIndexParamsFromHnswParams(
+    cagra_params,
+    n_rows,
+    dim,
+    M,
+    ef_construction,
+    CUVS_CAGRA_HEURISTIC_SIMILAR_SEARCH_PERFORMANCE,
+    L2Expanded);
+
+hnsw_params->hierarchy = GPU;
+hnsw_search_params->ef = 200;
+hnsw_search_params->num_threads = 0;
+
+cuvsCagraBuild(res, cagra_params, dataset, cagra_index);
+cuvsHnswFromCagra(res, hnsw_params, cagra_index, hnsw_index);
+cuvsHnswSearch(res, hnsw_search_params, hnsw_index, queries, neighbors, distances);
+
+cuvsHnswSearchParamsDestroy(hnsw_search_params);
+cuvsHnswIndexDestroy(hnsw_index);
+cuvsHnswIndexParamsDestroy(hnsw_params);
+cuvsCagraIndexDestroy(cagra_index);
+cuvsCagraIndexParamsDestroy(cagra_params);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/hnsw.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::resources res;
+auto dataset = load_device_dataset();
+auto queries = load_host_queries();
+
+constexpr int M = 32;
+constexpr int ef_construction = 200;
+constexpr int64_t n_queries = 1000;
+constexpr int64_t k = 10;
+
+auto cagra_params =
+    cagra::index_params::from_hnsw_params(dataset.extents(), M, ef_construction);
+cagra_params.attach_dataset_on_build = false;
+
+auto cagra_index = cagra::build(res, cagra_params, dataset);
+
+hnsw::index_params hnsw_params;
+hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
+
+auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+
+hnsw::search_params search_params;
+search_params.ef = 200;
+search_params.num_threads = 0;
+
+auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+
+hnsw::search(
+    res,
+    search_params,
+    *hnsw_index,
+    queries,
+    neighbors.view(),
+    distances.view());
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import cagra, hnsw
+
+dataset = load_data()
+queries = load_host_queries()
+k = 10
+
+cagra_index = cagra.build(cagra.IndexParams(), dataset)
+
+hnsw_params = hnsw.IndexParams(hierarchy="gpu")
+hnsw_index = hnsw.from_cagra(hnsw_params, cagra_index)
+
+search_params = hnsw.SearchParams(ef=200, num_threads=0)
+distances, neighbors = hnsw.search(search_params, hnsw_index, queries, k)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CagraIndexParams;
+import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.CagraIndexParams.HnswHeuristicType;
+import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.HnswIndexParams;
+import com.nvidia.cuvs.HnswIndexParams.HnswHierarchy;
+import com.nvidia.cuvs.HnswQuery;
+import com.nvidia.cuvs.HnswSearchParams;
+import com.nvidia.cuvs.SearchResults;
+
+try (CuVSResources resources = CuVSResources.create()) {
+  int dim = vectors[0].length;
+  int M = 32;
+  int efConstruction = 200;
+
+  CagraIndexParams cagraParams =
+      CagraIndexParams.fromHnswParams(
+          vectors.length,
+          dim,
+          M,
+          efConstruction,
+          HnswHeuristicType.SIMILAR_SEARCH_PERFORMANCE,
+          CuvsDistanceType.L2Expanded);
+
+  try (CagraIndex cagraIndex =
+      CagraIndex.newBuilder(resources)
+          .withDataset(vectors)
+          .withIndexParams(cagraParams)
+          .build()) {
+    HnswIndexParams hnswParams =
+        new HnswIndexParams.Builder()
+            .withVectorDimension(dim)
+            .withHierarchy(HnswHierarchy.GPU)
+            .build();
+
+    try (HnswIndex hnswIndex = HnswIndex.fromCagra(hnswParams, cagraIndex)) {
+      HnswSearchParams searchParams =
+          new HnswSearchParams.Builder()
+              .withEF(200)
+              .withNumThreads(0)
+              .build();
+      HnswQuery query =
+          new HnswQuery.Builder(resources)
+              .withTopK(10)
+              .withSearchParams(searchParams)
+              .withQueryVectors(queries)
+              .build();
+
+      SearchResults results = hnswIndex.search(query);
+    }
+  }
+}
+```
+
+</Tab>
+<Tab title="Rust">
+
+```rust
+use cuvs::cagra::{Index, IndexParams};
+use cuvs::{Resources, Result};
+
+fn export_cagra_as_hnswlib(dataset: &ndarray::Array2<f32>) -> Result<()> {
+    let res = Resources::new()?;
+    let index_params = IndexParams::new()?;
+    let index = Index::build(&res, &index_params, dataset)?;
+
+    index.serialize_to_hnswlib(&res, "cagra_graph.hnsw")
+}
+```
+
+</Tab>
+</Tabs>
 
 ## Using Filters
 
