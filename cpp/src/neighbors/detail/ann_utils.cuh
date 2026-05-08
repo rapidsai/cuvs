@@ -430,14 +430,24 @@ inline auto get_prefetch_stream(raft::resources const& res)
  * (`initialize=false, host_writeback=true`) when the kernel produces the result from scratch.
  * At least one of them must be true.
  *
- * Stream model:
- *   * The user passes `copy_stream`. With `prefetch=true`, this should be a stream distinct from
- *     `res`'s main stream (use `get_prefetch_stream(res)`); otherwise no real overlap is possible.
- *   * `prefetch_next_batch()` queues D2H of the just-completed batch (if dirty) followed by
- *     H2D of the next batch (if `initialize`) on `copy_stream`. With prefetch enabled it then
- *     calls `sync_stream(res)` so the host stall on the main stream overlaps with the copies on
- *     `copy_stream`. With prefetch disabled, it synchronizes `copy_stream` directly.
- *   * `operator*` drains `copy_stream` so the slot is fully staged before the caller dereferences.
+ * Stream model (prefetch=true):
+ *   * The user passes `copy_stream`, which should be distinct from `res`'s main stream (use
+ *     `get_prefetch_stream(res)`); otherwise no real overlap is possible.
+ *   * Writeback is done with a 2-iteration delay so that the D2H of batch `i` is queued in the
+ *     `prefetch_next_batch()` of iteration `i+2` -- right before the same slot is overwritten by
+ *     the next H2D. This way the D2H reads a slot whose user kernel (`kernel_i`) is two
+ *     iterations old and therefore guaranteed finished, without needing CUDA events for
+ *     cross-stream synchronization.
+ *   * `prefetch_next_batch()` queues, on `copy_stream`, in order: (1) D2H of the prefetch slot's
+ *     stale kernel output (if `host_writeback`), then (2) H2D of `pos` into the prefetch slot
+ *     (if `initialize`); then it `sync_stream(res)`'s so the host stall for the previous kernel
+ *     overlaps with the just-queued copies.
+ *   * `operator*` (next iteration's `load()`) swaps the ring slots and `synchronize()`'s
+ *     `copy_stream` so the swapped-in slot is fully staged before the user's next kernel runs.
+ *
+ * Stream model (prefetch=false):
+ *   * Single buffer; copies happen synchronously inside `operator*` with `copy_stream` then
+ *     `synchronize()`'d from the host. No overlap is attempted.
  *
  * Iteration ends when `operator++` reaches `n_iters_`. The iterator can be reused via `reset()`.
  *
@@ -493,11 +503,26 @@ struct batch_load_iterator {
     ~batch() noexcept
     {
       if constexpr (!kPassthrough) {
-        // Flush any pending writeback for the slot still held in dev_ptr_.
-        // The "other" slot's writeback (if any) was issued at the last load() that swapped to it.
-        if (host_writeback_ && source_ != nullptr && dirty_cur_ && pos_.has_value()) {
-          queue_d2h(dev_ptr_, *pos_);
-          dirty_cur_ = false;
+        if (host_writeback_ && source_ != nullptr) {
+          // Two slots may still hold un-flushed kernel output:
+          //  * `prefetch_dev_ptr_` for the batch the loop didn't reach (its prefetch_next_batch()
+          //    that would have queued the D2H never happened).
+          //  * `dev_ptr_` for the most-recently-loaded batch (its writeback is always deferred to
+          //    the destructor since no future iteration recycles its slot).
+          // The user kernel that wrote either slot may still be in flight on `res`'s main stream
+          // when this destructor runs, so host-stall on it before issuing the D2Hs to avoid a
+          // read-while-write race.
+          const bool has_pending =
+            (prefetch_ && prefetch_dirty_pos_.has_value()) || (dirty_cur_ && pos_.has_value());
+          if (has_pending) { raft::resource::sync_stream(*res_); }
+          if (prefetch_ && prefetch_dirty_pos_.has_value()) {
+            queue_d2h(prefetch_dev_ptr_, *prefetch_dirty_pos_);
+            prefetch_dirty_pos_.reset();
+          }
+          if (dirty_cur_ && pos_.has_value()) {
+            queue_d2h(dev_ptr_, *pos_);
+            dirty_cur_ = false;
+          }
         }
       }
       // Stream is shared with the iterator; it must be sync'd before the underlying buffers (or,
@@ -614,10 +639,21 @@ struct batch_load_iterator {
     }
 
     /**
-     * Make this batch represent position `pos`. In copy_device mode this synchronously stages
-     * H2D if needed; in passthrough mode this is pure bookkeeping (the per-batch view is
-     * recomputed on demand by `view()` via `cuda::std::submdspan`, never via pointer arithmetic
-     * on the input mdspan).
+     * Make this batch represent position `pos`.
+     *
+     * Passthrough: pure bookkeeping; the per-batch view is recomputed on demand by `view()` via
+     * `cuda::std::submdspan`, never via pointer arithmetic on the input mdspan.
+     *
+     * Copy_device, prefetch=true: swap the ring slots and host-sync `copy_stream` so the
+     * swapped-in slot is fully staged before the user's next kernel runs. The slot we swapped
+     * out (now `prefetch_dev_ptr_`) carried the just-completed kernel's writes; if `host_writeback`
+     * is on, its writeback is recorded for the *next* `prefetch_next_batch()` to flush -- when
+     * that slot is about to be overwritten by a new H2D, by which time the kernel that wrote it
+     * is two iterations old and guaranteed finished (the legacy 2-iteration-delay model).
+     *
+     * Copy_device, prefetch=false: synchronously stage H2D into the single buffer and host-sync
+     * `copy_stream`.
+     *
      * No-op if the buffer already holds `pos`. Iteration end is signaled by `pos >= n_iters_`.
      */
     void load(size_type pos)
@@ -643,22 +679,29 @@ struct batch_load_iterator {
           return;
         }
 
-        // Always issue D2H of the slot we're about to leave (or recycle) BEFORE swapping in
-        // / overwriting it with new data. With prefetch=true the prior kernel has already been
-        // sync'd by the previous prefetch_next_batch()'s sync_stream(res); with prefetch=false
-        // copies serialize on a single stream so D2H precedes H2D into the same buffer.
-        if (host_writeback_ && dirty_cur_ && pos_.has_value()) {
-          queue_d2h(dev_ptr_, *pos_);
-          dirty_cur_ = false;
-        }
         if (prefetch_ && prefetch_pos_.has_value() && *prefetch_pos_ == pos) {
-          // Swap to the prefetched slot. The previously-current slot moves into prefetch_dev_ptr_;
-          // its writeback (if any) was issued just above.
+          // Hand-off from the prefetch slot. Before swapping, transfer the soon-to-be-stale
+          // dev_ptr_'s dirty state into prefetch_dirty_pos_: after the swap, the slot that just
+          // received `kernel_(prev pos_)`'s writes becomes prefetch_dev_ptr_, and its D2H will be
+          // queued by the *next* prefetch_next_batch() right before the slot is overwritten by a
+          // new H2D. By that point, the kernel that wrote it is two iterations old -- finished
+          // by main-stream FIFO, no events required.
+          if (host_writeback_ && dirty_cur_ && pos_.has_value()) {
+            prefetch_dirty_pos_ = pos_;
+          } else {
+            prefetch_dirty_pos_.reset();
+          }
           std::swap(dev_ptr_, prefetch_dev_ptr_);
           prefetch_pos_.reset();
-          // Drain copy_stream so the swapped-in slot is fully staged before user reads.
+          // Ensure prefetch_next_batch()'s queued H2D into this slot (and any prior D2H of the
+          // slot from the previous overwrite) finished before the user kernel reads it.
           copy_stream_.synchronize();
         } else {
+          // Non-pipelined fast path (prefetch_=false, or prefetch_pos_ didn't match).
+          if (host_writeback_ && dirty_cur_ && pos_.has_value()) {
+            queue_d2h(dev_ptr_, *pos_);
+            dirty_cur_ = false;
+          }
           if (initialize_) { queue_h2d(dev_ptr_, row_offset, len); }
           copy_stream_.synchronize();
         }
@@ -666,19 +709,29 @@ struct batch_load_iterator {
         batch_len_ = len;
         if (host_writeback_) {
           // Every advanced batch is implicitly dirty: the user kernel will write to it before
-          // the next load() / prefetch() recycles the slot.
+          // the next prefetch_next_batch() (or destructor) recycles the slot.
           dirty_cur_ = true;
         }
       }
     }
 
     /**
-     * Queue H2D for `pos` into the not-currently-visible slot, plus D2H of the previously
-     * dirtied (just-completed) slot. No-op if prefetch is disabled, source is null, or
-     * `pos >= n_iters_`.
+     * Cross-stream pipelining step (called by the user *after* enqueuing the kernel for the
+     * current batch).
      *
-     * With prefetch enabled this is followed by `sync_stream(res)` so the host-side memcpy
-     * stall on `copy_stream` overlaps with the user kernel on `res`'s main stream.
+     * On `copy_stream`, queues -- in this order, into the *prefetch* slot only:
+     *   1. D2H of the prefetch slot's stale kernel output (if `host_writeback` and the slot was
+     *      written by a kernel two iterations ago). The kernel that produced that output is
+     *      already finished by main-stream FIFO (the user has since enqueued the kernel for
+     *      the slot currently in `dev_ptr_`), so no event is needed -- the D2H reads a slot the
+     *      main stream is no longer touching.
+     *   2. H2D of `pos` into the prefetch slot (if `initialize`).
+     *
+     * Then host-stalls on `res`'s main stream so the host has waited out the just-enqueued user
+     * kernel by the time control returns; meanwhile the D2H/H2D queued above runs concurrently
+     * on `copy_stream`, overlapping the writeback with the kernel.
+     *
+     * No-op if prefetch is disabled, source is null, passthrough, or `pos >= n_iters_`.
      */
     void prefetch(size_type pos)
     {
@@ -689,9 +742,18 @@ struct batch_load_iterator {
         return;
       }
 
-      // Issue H2D of `pos` into prefetch_dev_ptr_ (the slot the user kernel is NOT on).
-      // Writeback of the "other" slot is unnecessary here because it was already issued at the
-      // last load() that recycled it.
+      // 2-iteration-delayed writeback: the prefetch slot still holds kernel output from two
+      // iterations ago (from when this slot was last `dev_ptr_`); D2H it now -- right before we
+      // overwrite the slot with the next H2D. The kernel that wrote it is past on the main
+      // stream, so this D2H runs concurrently with the just-enqueued kernel for `dev_ptr_`
+      // without racing (different slots).
+      if (host_writeback_ && prefetch_dirty_pos_.has_value()) {
+        queue_d2h(prefetch_dev_ptr_, *prefetch_dirty_pos_);
+        prefetch_dirty_pos_.reset();
+      }
+
+      // H2D of the next batch into the prefetch slot. Sequenced after the D2H on `copy_stream`,
+      // so the H2D doesn't clobber the slot before its prior contents have been read out.
       if (initialize_) {
         const size_type row_offset = pos * batch_size_;
         const size_type len =
@@ -700,9 +762,10 @@ struct batch_load_iterator {
       }
       prefetch_pos_.emplace(pos);
 
-      // Wait for the kernel paired with this prefetch_next_batch() before returning, so the next
-      // operator* can safely swap-and-read the slot. Do this AFTER queueing copies, so the host
-      // stall overlaps with both the kernel and the copies.
+      // Host-stall on the user's main stream: the just-enqueued kernel runs concurrently with
+      // the copies above. By the time control returns, the kernel is done and the next load()
+      // can safely read its writes (still in `dev_ptr_`'s slot, which becomes prefetch_dev_ptr_
+      // after the upcoming swap).
       raft::resource::sync_stream(*res_);
     }
 
@@ -753,8 +816,15 @@ struct batch_load_iterator {
     // Slot bookkeeping (only meaningful for !kPassthrough).
     element_type* dev_ptr_          = nullptr;
     element_type* prefetch_dev_ptr_ = nullptr;
+    // `pos_`: batch index currently held in `dev_ptr_`'s slot (the user-facing slot).
+    // `prefetch_pos_`: batch index pre-staged in `prefetch_dev_ptr_`'s slot via H2D.
+    // `prefetch_dirty_pos_`: batch index whose kernel output is sitting in `prefetch_dev_ptr_`'s
+    //                       slot and still needs to be D2H'd back to host. Set by `load()`'s
+    //                       swap when the slot it just retired held kernel writes; consumed
+    //                       (D2H'd) by the *next* `prefetch()` -- the legacy 2-iteration delay.
     std::optional<size_type> pos_;
     std::optional<size_type> prefetch_pos_;
+    std::optional<size_type> prefetch_dirty_pos_;
     size_type batch_len_ = 0;
     bool dirty_cur_      = false;
   };
