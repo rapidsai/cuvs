@@ -130,8 +130,6 @@ navigation:
         contents:
           - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
             path: "./pages/jit_lto_guide.md"
-  - section: "Contribution Guide"
-    contents:
       - page: "Contributing"
         path: "./pages/contributing.md"
   - section: "API Reference"
