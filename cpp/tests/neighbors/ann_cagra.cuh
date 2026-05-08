@@ -84,7 +84,9 @@ void cagra_build_into_index(
   if (br.vpq.has_value()) {
     *vpq_keep = std::move(*br.vpq);
     // build() wired the index to &*br.vpq; moving VPQ into *vpq_keep leaves that pointer stale.
-    index.update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(&vpq_keep->value()));
+    index.update_dataset(res,
+                         cuvs::neighbors::any_dataset_view<DataT, int64_t>(
+                           cuvs::neighbors::make_indirect_dataset_view(&vpq_keep->value())));
   }
 }
 
@@ -501,10 +503,13 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        std::unique_ptr<cuvs::neighbors::dataset<int64_t>> loaded_dataset;
+        std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> loaded_dataset;
         cagra::deserialize(handle_, index_file.filename, &index, &loaded_dataset);
 
-        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, device_padded.view); }
+        if (!ps.include_serialized_dataset) {
+          index.update_dataset(
+            handle_, cuvs::neighbors::any_dataset_view<DataT, int64_t>(device_padded.view));
+        }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
@@ -717,15 +722,12 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
                    stream_);
 
         std::size_t row_stride = static_cast<std::size_t>(ps.dim);
-        if (const auto* s =
-              dynamic_cast<const cuvs::neighbors::strided_dataset<DataT, int64_t>*>(&index.data());
-            s != nullptr) {
-          row_stride = static_cast<std::size_t>(s->stride());
-        } else if (const auto* p = dynamic_cast<
-                     const cuvs::neighbors::device_padded_dataset_view<DataT, int64_t>*>(
-                     &index.data());
-                   p != nullptr) {
-          row_stride = static_cast<std::size_t>(p->stride());
+        using VTa              = cuvs::neighbors::any_dataset_view_types<DataT, int64_t>;
+        auto const& vad        = index.data().as_variant();
+        if (std::holds_alternative<typename VTa::strided_view>(vad)) {
+          row_stride = static_cast<std::size_t>(std::get<typename VTa::strided_view>(vad).stride());
+        } else if (std::holds_alternative<typename VTa::padded_view>(vad)) {
+          row_stride = static_cast<std::size_t>(std::get<typename VTa::padded_view>(vad).stride());
         }
 
         auto new_dataset_buffer =
@@ -941,7 +943,10 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                &vpq_keep,
                                &ace_device_keep);
 
-        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, device_padded.view); }
+        if (!ps.include_serialized_dataset) {
+          index.update_dataset(
+            handle_, cuvs::neighbors::any_dataset_view<DataT, int64_t>(device_padded.view));
+        }
 
         if (ps.use_source_indices) {
           auto source_indices =

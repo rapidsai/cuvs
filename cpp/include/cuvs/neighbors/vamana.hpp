@@ -126,8 +126,9 @@ struct index : cuvs::neighbors::index {
   }
 
   /** Non-owning dataset view stored by the index (full-precision vectors may live in
-   * `full_precision_dataset_`). */
-  [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset_view<int64_t>&
+   * `full_precision_storage_`). */
+  [[nodiscard]] inline auto data() const noexcept
+    -> const cuvs::neighbors::any_dataset_view<T, int64_t>&
   {
     return *dataset_;
   }
@@ -164,8 +165,9 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      full_precision_dataset_(),
-      dataset_(std::make_unique<cuvs::neighbors::empty_dataset_view<int64_t>>(0)),
+      full_precision_storage_(),
+      dataset_(std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(
+        cuvs::neighbors::empty_dataset_view<int64_t>(0))),
       quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0))
   {
   }
@@ -183,14 +185,32 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      full_precision_dataset_(make_aligned_dataset(res, dataset, 16)),
-      dataset_(std::make_unique<cuvs::neighbors::non_owning_dataset<T, int64_t>>(
-        full_precision_dataset_->view())),
+      full_precision_storage_(),
+      dataset_{},
       quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)),
       medoid_id_(medoid_id)
   {
     RAFT_EXPECTS(dataset.extent(0) == vamana_graph.extent(0),
                  "Dataset and vamana_graph must have equal number of rows");
+    auto aligned = make_aligned_dataset(res, dataset, 16);
+    switch (aligned.index()) {
+      case 0: {
+        auto up = std::get<0>(std::move(aligned));
+        cuvs::neighbors::dataset_view<strided_dataset_container, T, int64_t, true, false> ds_view(
+          up->view());
+        full_precision_storage_ = std::move(up);
+        dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
+        break;
+      }
+      case 1: {
+        dataset_view<strided_dataset_container, T, int64_t, true, false> view =
+          std::get<1>(std::move(aligned));
+        dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(view);
+        full_precision_storage_ = std::move(view);
+        break;
+      }
+      default: RAFT_FAIL("vamana::index: unexpected make_aligned_dataset return index");
+    }
     update_graph(res, vamana_graph);
 
     raft::resource::sync_stream(res);
@@ -265,9 +285,14 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
-  /** Owns full-precision vectors when built from mdspan; destroyed after `dataset_` view. */
-  std::unique_ptr<cuvs::neighbors::strided_dataset<T, int64_t>> full_precision_dataset_;
-  std::unique_ptr<cuvs::neighbors::dataset_view<int64_t>> dataset_;
+  /** Owns aligned full-precision storage (`layout_stride`) when `make_aligned_dataset` copies;
+   * otherwise holds the non-owning strided device view (caller keeps underlying allocation alive).
+   */
+  std::variant<std::monostate,
+               std::unique_ptr<cuvs::neighbors::strided_owning_dataset<T, int64_t>>,
+               dataset_view<strided_dataset_container, T, int64_t, true, false>>
+    full_precision_storage_;
+  std::unique_ptr<cuvs::neighbors::any_dataset_view<T, int64_t>> dataset_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;
   IdxT medoid_id_;
 };

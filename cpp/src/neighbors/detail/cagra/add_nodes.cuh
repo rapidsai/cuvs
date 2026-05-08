@@ -304,7 +304,10 @@ void add_graph_nodes(
   cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(empty_data_view);
   auto empty_graph_view = raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
   neighbors::cagra::index<T, IdxT> internal_index(
-    handle, index.metric(), empty_dataset_view, empty_graph_view);
+    handle,
+    index.metric(),
+    cuvs::neighbors::any_dataset_view<T, int64_t>(empty_dataset_view),
+    empty_graph_view);
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
        additional_dataset_offset += max_chunk_size_) {
@@ -387,20 +390,14 @@ void extend_core(
       num_new_nodes);
   }
 
-  using ds_idx_type  = decltype(index.data().n_rows());
-  auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
-  auto* padded_dset =
-    dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, ds_idx_type>*>(&index.data());
+  using ds_idx_type = decltype(index.data().n_rows());
 
-  if (strided_dset != nullptr || padded_dset != nullptr) {
+  auto try_extend = [&](auto const& leaf) {
     // Allocate memory space for updated graph on host
     auto updated_graph = raft::make_host_matrix<IdxT, std::int64_t>(new_dataset_size, degree);
 
-    const std::size_t stride  = strided_dset != nullptr
-                                  ? static_cast<std::size_t>(strided_dset->stride())
-                                  : static_cast<std::size_t>(padded_dset->stride());
-    const T* src_rows         = strided_dset != nullptr ? strided_dset->view().data_handle()
-                                                        : padded_dset->view().data_handle();
+    const std::size_t stride  = static_cast<std::size_t>(leaf.stride());
+    const T* src_rows         = leaf.view().data_handle();
     auto updated_dataset_view = new_dataset_buffer_view.value();
 
     // Update dataset on host, then copy to device buffer provided by caller
@@ -440,7 +437,7 @@ void extend_core(
                                     updated_dataset_view.extent(0),
                                     updated_dataset_view.stride(0)),
       dim);
-    index.update_dataset(handle, dv);
+    index.update_dataset(handle, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
 
     // Update index graph
     if (new_graph_buffer_view.has_value()) {
@@ -453,8 +450,15 @@ void extend_core(
     } else {
       index.update_graph(handle, raft::make_const_mdspan(updated_graph.view()));
     }
-  } else if (dynamic_cast<const cuvs::neighbors::empty_dataset_view<int64_t>*>(&index.data()) !=
-             nullptr) {
+  };
+
+  using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
+  auto const& va = index.data().as_variant();
+  if (std::holds_alternative<typename VT::strided_view>(va)) {
+    try_extend(std::get<typename VT::strided_view>(va));
+  } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+    try_extend(std::get<typename VT::padded_view>(va));
+  } else if (std::holds_alternative<typename VT::empty_view>(va)) {
     RAFT_FAIL(
       "cagra::extend only supports an index to which the dataset is attached. Please check if the "
       "index was built with index_param.attach_dataset_on_build = true, or if a dataset was "

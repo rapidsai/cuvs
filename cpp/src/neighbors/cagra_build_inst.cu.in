@@ -83,11 +83,11 @@ auto build_ace(raft::resources const& handle,
 }
 
 // Definition lives in cagra.cuh; callers that only include cagra.hpp need this symbol in libcuvs.
-// The device_matrix_view overload above may inline the dataset_view template, so emit it
+// The device_matrix_view overload above may inline the any_dataset_view template, so emit it
 // explicitly.
 template build_result<data_t, index_t> build<data_t, index_t>(
   raft::resources const& res,
   const index_params& params,
-  cuvs::neighbors::dataset_view<int64_t> const& dataset);
+  cuvs::neighbors::any_dataset_view<data_t, int64_t> const& dataset);
 
 }  // namespace cuvs::neighbors::cagra

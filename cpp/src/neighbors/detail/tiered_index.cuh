@@ -326,7 +326,7 @@ inline void update_cagra_ann_dataset_for_stride(
     // Otherwise assigning to ann_build_pad can destroy the dataset the index still views.
     auto new_pad = cuvs::neighbors::make_padded_dataset(res, dataset);
     ann_index.update_dataset(
-      res, static_cast<cuvs::neighbors::dataset_view<int64_t> const&>(new_pad->as_dataset_view()));
+      res, cuvs::neighbors::any_dataset_view<float, int64_t>(new_pad->as_dataset_view()));
     ann_build_pad =
       std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(new_pad));
   } else {

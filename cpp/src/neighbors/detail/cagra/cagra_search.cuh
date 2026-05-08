@@ -89,10 +89,25 @@ void search_main_core(
   // If query_row_stride>dim, device code still advances with "+= dim*query_id" in setup_workspace;
   // in that case run one query per plan call so every kernel sees query_id==0 and the base pointer
   // selects the row (keeps batched path when stride==dim).
-  auto const query_storage        = cuvs::neighbors::make_aligned_dataset(res, queries);
-  const DataT* const queries_buf  = query_storage->view().data_handle();
-  const uint32_t query_row_stride = query_storage->stride();
-  const bool can_batch_n_queries  = (query_row_stride == query_dim);
+  auto query_aligned = cuvs::neighbors::make_aligned_dataset(res, queries);
+  const DataT* queries_buf{};
+  uint32_t query_row_stride{};
+  switch (query_aligned.index()) {
+    case 0: {
+      auto& own        = *std::get<0>(query_aligned);
+      queries_buf      = own.view().data_handle();
+      query_row_stride = own.stride();
+      break;
+    }
+    case 1: {
+      auto const& v    = std::get<1>(query_aligned);
+      queries_buf      = v.view().data_handle();
+      query_row_stride = v.stride();
+      break;
+    }
+    default: RAFT_FAIL("cagra::search: unexpected make_aligned_dataset variant index");
+  }
+  const bool can_batch_n_queries = (query_row_stride == query_dim);
 
   for (unsigned qid = 0; qid < queries.extent(0); qid += max_queries) {
     const uint32_t n_queries = std::min<std::size_t>(max_queries, queries.extent(0) - qid);
@@ -186,22 +201,7 @@ void search_main(raft::resources const& res,
   using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;
 
-  // Dispatch on dataset type. Unwrap indirect_dataset_view (e.g. VPQ) to the owning target.
-  const cuvs::neighbors::dataset_view<ds_idx_type>* vroot = &index.data();
-  const cuvs::neighbors::dataset<ds_idx_type>* droot      = nullptr;
-  if (auto* ind = dynamic_cast<const cuvs::neighbors::indirect_dataset_view<ds_idx_type>*>(vroot);
-      ind != nullptr) {
-    droot = ind->target();
-    vroot = nullptr;
-  }
-
-  // Strided rows may be a non_owning_dataset (view root) or owning strided storage (indirect
-  // target).
-  const strided_dataset<T, ds_idx_type>* strided_dset =
-    droot != nullptr ? dynamic_cast<const strided_dataset<T, ds_idx_type>*>(droot)
-                     : dynamic_cast<const strided_dataset<T, ds_idx_type>*>(vroot);
-  if (strided_dset != nullptr) {
-    // Search using a plain (strided) row-major dataset
+  auto run_strided_like = [&](auto const& row_dataset) {
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
                    index.dataset_norms().has_value(),
                  "Dataset norms must be provided for CosineExpanded metric");
@@ -211,7 +211,7 @@ void search_main(raft::resources const& res,
       dataset_norms_ptr = index.dataset_norms().value().data_handle();
     }
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *strided_dset, index.metric(), dataset_norms_ptr);
+      res, params, row_dataset, index.metric(), dataset_norms_ptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
       res,
       params,
@@ -222,89 +222,43 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
-  } else if (auto* vpq_dset = droot != nullptr
-                                ? dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(droot)
-                                : nullptr;
-             vpq_dset != nullptr) {
-    // Search using a compressed dataset
-    RAFT_FAIL("FP32 VPQ dataset support is coming soon");
-  } else if (auto* vpq_dset = droot != nullptr
-                                ? dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(droot)
-                                : nullptr;
-             vpq_dset != nullptr) {
-    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *vpq_dset, index.metric(), nullptr);
-    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
-      res,
-      params,
-      desc,
-      index.graph(),
-      index.source_indices(),
-      queries,
-      neighbors,
-      distances,
-      sample_filter);
-  } else if (auto* padded_view_dset =
-               vroot != nullptr
-                 ? dynamic_cast<const device_padded_dataset_view<T, ds_idx_type>*>(vroot)
-                 : nullptr;
-             padded_view_dset != nullptr) {
-    // Search using a padded dataset view (same descriptor as strided)
-    RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
-                   index.dataset_norms().has_value(),
-                 "Dataset norms must be provided for CosineExpanded metric");
+  };
 
-    const float* dataset_norms_ptr = nullptr;
-    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      dataset_norms_ptr = index.dataset_norms().value().data_handle();
-    }
-    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *padded_view_dset, index.metric(), dataset_norms_ptr);
-    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
-      res,
-      params,
-      desc,
-      index.graph(),
-      index.source_indices(),
-      queries,
-      neighbors,
-      distances,
-      sample_filter);
-  } else if (auto* padded_dset =
-               droot != nullptr ? dynamic_cast<const device_padded_dataset<T, ds_idx_type>*>(droot)
-                                : nullptr;
-             padded_dset != nullptr) {
-    // Search using a padded dataset (same descriptor as strided)
-    RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
-                   index.dataset_norms().has_value(),
-                 "Dataset norms must be provided for CosineExpanded metric");
-
-    const float* dataset_norms_ptr = nullptr;
-    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      dataset_norms_ptr = index.dataset_norms().value().data_handle();
-    }
-    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *padded_dset, index.metric(), dataset_norms_ptr);
-    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
-      res,
-      params,
-      desc,
-      index.graph(),
-      index.source_indices(),
-      queries,
-      neighbors,
-      distances,
-      sample_filter);
-  } else if (auto* empty_dset = vroot != nullptr
-                                  ? dynamic_cast<const empty_dataset_view<ds_idx_type>*>(vroot)
-                                  : nullptr;
-             empty_dset != nullptr) {
-    // Forgot to add a dataset.
+  using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
+  auto const& va = index.data().as_variant();
+  if (std::holds_alternative<typename VT::empty_view>(va)) {
     RAFT_FAIL(
       "Attempted to search without a dataset. Please call index.update_dataset(...) first.");
-  } else {
-    // This is a logic error.
-    RAFT_FAIL("Unrecognized dataset format");
+  }
+  if (std::holds_alternative<typename VT::indirect_view>(va)) {
+    auto const& vroot = std::get<typename VT::indirect_view>(va);
+    if (vroot.get_indirect_target_type() == indirect_target_type::vpq_f32) {
+      RAFT_FAIL("FP32 VPQ dataset support is coming soon");
+    } else if (vroot.get_indirect_target_type() == indirect_target_type::vpq_f16) {
+      auto* vpq_dset = static_cast<const vpq_dataset<half, ds_idx_type>*>(vroot.raw_target());
+      auto desc      = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+        res, params, *vpq_dset, index.metric(), nullptr);
+      search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+        res,
+        params,
+        desc,
+        index.graph(),
+        index.source_indices(),
+        queries,
+        neighbors,
+        distances,
+        sample_filter);
+    } else {
+      RAFT_EXPECTS(vroot.get_indirect_target_type() == indirect_padded_type_for_element<T>(),
+                   "search: indirect target must be padded rows matching T or VPQ storage");
+      auto* padded_own =
+        static_cast<const device_padded_dataset<T, ds_idx_type>*>(vroot.raw_target());
+      run_strided_like(*padded_own);
+    }
+  } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+    run_strided_like(std::get<typename VT::padded_view>(va));
+  } else if (std::holds_alternative<typename VT::strided_view>(va)) {
+    run_strided_like(std::get<typename VT::strided_view>(va));
   }
 
   static_assert(std::is_same_v<DistanceT, float>,

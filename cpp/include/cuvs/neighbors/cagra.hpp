@@ -445,34 +445,43 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] inline auto dataset() const noexcept
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
   {
-    auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
-    if (p != nullptr) { return p->view(); }
-    auto p_padded_view = dynamic_cast<device_padded_dataset_view<T, int64_t>*>(dataset_.get());
-    if (p_padded_view != nullptr) {
+    namespace nb   = cuvs::neighbors;
+    using VT       = nb::any_dataset_view_types<T, int64_t>;
+    auto const& va = dataset_->as_variant();
+    if (std::holds_alternative<typename VT::strided_view>(va)) {
+      return std::get<typename VT::strided_view>(va).view();
+    }
+    if (std::holds_alternative<typename VT::padded_view>(va)) {
+      auto const& v = std::get<typename VT::padded_view>(va);
       return raft::make_device_strided_matrix_view<const T, int64_t>(
-        p_padded_view->view().data_handle(),
-        p_padded_view->n_rows(),
-        p_padded_view->dim(),
-        p_padded_view->stride());
+        v.view().data_handle(), v.n_rows(), v.dim(), v.stride());
     }
-    if (auto* p_indirect = dynamic_cast<indirect_dataset_view<dataset_index_type>*>(dataset_.get());
-        p_indirect != nullptr) {
-      const auto* const tgt = p_indirect->target();
-      if (auto* s = dynamic_cast<const strided_dataset<T, dataset_index_type>*>(tgt)) {
-        return s->view();
+    if (std::holds_alternative<typename VT::indirect_view>(va)) {
+      auto const& v = std::get<typename VT::indirect_view>(va);
+      if (v.get_indirect_target_type() == nb::indirect_target_type::vpq_f16 ||
+          v.get_indirect_target_type() == nb::indirect_target_type::vpq_f32) {
+        auto d = v.dim();
+        return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
       }
-      if (auto* dp = dynamic_cast<const device_padded_dataset<T, dataset_index_type>*>(tgt)) {
-        auto pdv = dp->as_dataset_view();
-        return raft::make_device_strided_matrix_view<const T, int64_t>(
-          pdv.view().data_handle(), pdv.n_rows(), pdv.dim(), pdv.stride());
-      }
+      RAFT_EXPECTS(v.get_indirect_target_type() == nb::indirect_padded_type_for_element<T>(),
+                   "dataset(): indirect target must be padded rows matching T or VPQ storage");
+      auto* dp = static_cast<const device_padded_dataset<T, int64_t>*>(v.raw_target());
+      auto pdv = dp->as_dataset_view();
+      return raft::make_device_strided_matrix_view<const T, int64_t>(
+        pdv.view().data_handle(), pdv.n_rows(), pdv.dim(), pdv.stride());
     }
-    auto d = dataset_->dim();
-    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
+    if (std::holds_alternative<typename VT::empty_view>(va)) {
+      auto const& v = std::get<typename VT::empty_view>(va);
+      auto d        = v.dim();
+      return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
+    }
+    RAFT_FAIL("dataset(): unsupported stored dataset view");
+    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, 0, 0);
   }
 
-  /** Non-owning dataset binding stored by the index (mdspan-like). */
-  [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset_view<int64_t>&
+  /** Non-owning dataset binding stored by the index (typed variant view). */
+  [[nodiscard]] inline auto data() const noexcept
+    -> const cuvs::neighbors::any_dataset_view<T, int64_t>&
   {
     return *dataset_;
   }
@@ -538,18 +547,20 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
-      dataset_(std::make_unique<cuvs::neighbors::empty_dataset_view<int64_t>>(0)),
+      dataset_(std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(
+        cuvs::neighbors::empty_dataset_view<int64_t>(0))),
       dataset_norms_(std::nullopt)
   {
   }
 
   /** Construct an index from a `dataset_view` and knn_graph.
    *
-   * `detail::cagra_index_dataset_view_dispatcher` selects the concrete type. Supported:
+   * `detail::clone_any_dataset_view_for_cagra_index` stores a shallow copy of the view variant.
+   * Supported:
    * `empty_dataset_view`, `indirect_dataset_view`, `device_padded_dataset_view`,
-   * `non_owning_dataset`. The index stores only a **non-owning** view; the caller must keep all
-   * underlying device storage (and any `indirect_dataset_view` target) alive for the index
-   * lifetime.
+   * `dataset_view<strided_dataset_container,...>`. The index stores only a **non-owning** view; the
+   * caller must keep all underlying device storage (and any `indirect_dataset_view` target) alive
+   * for the index lifetime.
    *
    * Example — **non-owning** `make_padded_dataset_view` (wraps an existing device matrix; that
    * matrix must outlive the index):
@@ -575,7 +586,7 @@ struct index : cuvs::neighbors::index {
   template <typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
-        cuvs::neighbors::dataset_view<dataset_index_type> const& dataset,
+        cuvs::neighbors::any_dataset_view<T, dataset_index_type> const& dataset,
         raft::mdspan<const graph_index_type,
                      raft::matrix_extent<int64_t>,
                      raft::row_major,
@@ -583,7 +594,7 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
-      dataset_(detail::cagra_index_dataset_view_dispatcher<T, dataset_index_type>(dataset)),
+      dataset_(detail::clone_any_dataset_view_for_cagra_index<T, dataset_index_type>(dataset)),
       dataset_norms_(std::nullopt)
   {
     RAFT_EXPECTS(dataset.n_rows() == static_cast<int64_t>(knn_graph.extent(0)),
@@ -597,21 +608,65 @@ struct index : cuvs::neighbors::index {
     raft::resource::sync_stream(res);
   }
 
+  /** @overload Binds the same behavior as the `any_dataset_view` constructor; kept for API
+   *  stability and overload resolution when passing `device_padded_dataset_view`. */
+  template <typename graph_accessor>
+  index(raft::resources const& res,
+        cuvs::distance::DistanceType metric,
+        cuvs::neighbors::device_padded_dataset_view<T, dataset_index_type> const& dataset,
+        raft::mdspan<const graph_index_type,
+                     raft::matrix_extent<int64_t>,
+                     raft::row_major,
+                     graph_accessor> knn_graph)
+    : index(
+        res, metric, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(dataset), knn_graph)
+  {
+  }
+
+  /** @overload See primary constructor; accepts `indirect_dataset_view` (e.g. VPQ handle). */
+  template <typename graph_accessor>
+  index(raft::resources const& res,
+        cuvs::distance::DistanceType metric,
+        cuvs::neighbors::indirect_dataset_view<dataset_index_type> const& dataset,
+        raft::mdspan<const graph_index_type,
+                     raft::matrix_extent<int64_t>,
+                     raft::row_major,
+                     graph_accessor> knn_graph)
+    : index(
+        res, metric, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(dataset), knn_graph)
+  {
+  }
+
   /**
-   * Replace the dataset with a new `dataset_view` (centralized handling in
-   * `detail::cagra_index_dataset_view_dispatcher`).
+   * Replace the dataset with a new `dataset_view` (stored via
+   * `detail::clone_any_dataset_view_for_cagra_index`).
    *
    * The index owns a heap copy of the view handle only (not the vector storage). The caller must
    * keep the underlying device data (and any indirect target) alive. Clears precomputed norms.
    */
   void update_dataset(raft::resources const& res,
-                      cuvs::neighbors::dataset_view<dataset_index_type> const& dataset)
+                      cuvs::neighbors::any_dataset_view<T, dataset_index_type> const& dataset)
   {
-    dataset_ = detail::cagra_index_dataset_view_dispatcher<T, dataset_index_type>(dataset);
+    dataset_ = detail::clone_any_dataset_view_for_cagra_index<T, dataset_index_type>(dataset);
     dataset_norms_.reset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
       if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
     }
+  }
+
+  /** @overload Forwards to `update_dataset(res, any_dataset_view<T, int64_t>{...})`. */
+  void update_dataset(
+    raft::resources const& res,
+    cuvs::neighbors::device_padded_dataset_view<T, dataset_index_type> const& dataset)
+  {
+    update_dataset(res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(dataset));
+  }
+
+  /** @overload Indirect (e.g. VPQ) dataset binding. */
+  void update_dataset(raft::resources const& res,
+                      cuvs::neighbors::indirect_dataset_view<dataset_index_type> const& dataset)
+  {
+    update_dataset(res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(dataset));
   }
 
   /**
@@ -638,9 +693,9 @@ struct index : cuvs::neighbors::index {
       static_cast<unsigned>(required_stride),
       static_cast<unsigned>(src_stride));
 
-    non_owning_dataset<T, dataset_index_type> wrap(dataset_view);
-    update_dataset(res,
-                   static_cast<cuvs::neighbors::dataset_view<dataset_index_type> const&>(wrap));
+    ::cuvs::neighbors::dataset_view<strided_dataset_container, T, dataset_index_type, true, false>
+      wrap(dataset_view);
+    update_dataset(res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(wrap));
   }
 
   /**
@@ -665,7 +720,8 @@ struct index : cuvs::neighbors::index {
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
-    update_dataset(res, own->as_dataset_view());
+    update_dataset(
+      res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(own->as_dataset_view()));
     host_build_padded_owner_ = std::move(own);
   }
 
@@ -778,7 +834,8 @@ struct index : cuvs::neighbors::index {
     // Re-open the file descriptor in read-only mode for subsequent operations
     dataset_fd_.emplace(std::move(fd));
 
-    dataset_ = std::make_unique<cuvs::neighbors::empty_dataset_view<int64_t>>(0);
+    dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(
+      cuvs::neighbors::empty_dataset_view<int64_t>(0));
     dataset_norms_.reset();
   }
 
@@ -868,7 +925,7 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> graph_view_;
-  std::unique_ptr<neighbors::dataset_view<dataset_index_type>> dataset_;
+  std::unique_ptr<neighbors::any_dataset_view<T, dataset_index_type>> dataset_;
   // Mapping from internal graph node indices to the original user-provided indices.
   std::optional<raft::device_vector<IdxT, int64_t>> source_indices_;
   // only float distances supported at the moment
@@ -1362,18 +1419,22 @@ auto build_ace(raft::resources const& res,
  * stores a copy of the original view when `attach_dataset_on_build` is true. When VPQ compression
  * is used, returns `build_result` with `.vpq` that the caller must keep alive.
  * See `build(res, params, device_matrix_view)` for full documentation.
+ *
+ * Strided device rows (`dataset_view<strided_dataset_container, T, int64_t, true, false>`) are
+ * carried as the strided alternative inside `any_dataset_view` and convert implicitly from that
+ * view type (`any_dataset_view<T, int64_t>(strided_view)` is optional).
  */
 template <typename T, typename IdxT = uint32_t>
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
-           cuvs::neighbors::dataset_view<int64_t> const& dataset)
+           cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
   -> cuvs::neighbors::cagra::build_result<T, IdxT>;
 
 /**
  * @brief Same as `build<T, IdxT>(res, params, dataset_view)` but deduces \p T from
  *        `device_padded_dataset_view<T, int64_t>`.
  *
- * `build(res, params, dataset_view<int64_t>)` cannot deduce `T` from a bare `dataset_view`
+ * `build(res, params, any_dataset_view<T, int64_t>)` requires an explicit element type `T`.
  * reference; use this overload (or specify `build<float, uint32_t>(...)`) when passing a padded
  * view without an explicit template argument list.
  */
@@ -1384,7 +1445,7 @@ auto build(raft::resources const& res,
   -> cuvs::neighbors::cagra::build_result<T, IdxT>
 {
   return cuvs::neighbors::cagra::build<T, IdxT>(
-    res, params, static_cast<cuvs::neighbors::dataset_view<int64_t> const&>(dataset));
+    res, params, cuvs::neighbors::any_dataset_view<T, int64_t>(dataset));
 }
 
 /**
@@ -1969,10 +2030,11 @@ void serialize(raft::resources const& handle,
  *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 const std::string& filename,
-                 cuvs::neighbors::cagra::index<float, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  const std::string& filename,
+  cuvs::neighbors::cagra::index<float, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2025,10 +2087,11 @@ void serialize(raft::resources const& handle,
  *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 std::istream& is,
-                 cuvs::neighbors::cagra::index<float, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  std::istream& is,
+  cuvs::neighbors::cagra::index<float, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 /**
  * Save the index to file.
  *
@@ -2082,10 +2145,11 @@ void serialize(raft::resources const& handle,
  *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 const std::string& filename,
-                 cuvs::neighbors::cagra::index<half, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  const std::string& filename,
+  cuvs::neighbors::cagra::index<half, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2138,10 +2202,11 @@ void serialize(raft::resources const& handle,
  *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 std::istream& is,
-                 cuvs::neighbors::cagra::index<half, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  std::istream& is,
+  cuvs::neighbors::cagra::index<half, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -2195,10 +2260,11 @@ void serialize(raft::resources const& handle,
  *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 const std::string& filename,
-                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  const std::string& filename,
+  cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2251,10 +2317,11 @@ void serialize(raft::resources const& handle,
  *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 std::istream& is,
-                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  std::istream& is,
+  cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -2308,10 +2375,11 @@ void serialize(raft::resources const& handle,
  *            when the file includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 const std::string& filename,
-                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  const std::string& filename,
+  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2364,10 +2432,11 @@ void serialize(raft::resources const& handle,
  *            when the stream includes dataset data; may be left unchanged otherwise. Optional; pass
  *            nullptr to ignore.
  */
-void deserialize(raft::resources const& handle,
-                 std::istream& is,
-                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
+void deserialize(
+  raft::resources const& handle,
+  std::istream& is,
+  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream

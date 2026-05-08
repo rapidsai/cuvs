@@ -49,32 +49,31 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
   for (cagra_index_t* index : indices) {
     RAFT_EXPECTS(index != nullptr,
                  "Null pointer detected in 'indices'. Ensure all elements are valid before usage.");
-    if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
-        strided_dset != nullptr) {
+    using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
+    auto const& va = index->data().as_variant();
+    if (std::holds_alternative<typename VT::strided_view>(va)) {
+      auto const& v = std::get<typename VT::strided_view>(va);
       if (dim == 0) {
         dim    = index->dim();
-        stride = strided_dset->stride();
+        stride = static_cast<int64_t>(v.stride());
       } else {
         RAFT_EXPECTS(dim == index->dim(), "Dimension of datasets in indices must be equal.");
-        RAFT_EXPECTS(stride == strided_dset->stride(),
+        RAFT_EXPECTS(stride == static_cast<int64_t>(v.stride()),
                      "Row stride of datasets in indices must be equal.");
       }
       new_dataset_size += index->size();
-    } else if (auto* padded_dset =
-                 dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, ds_idx_type>*>(
-                   &index->data());
-               padded_dset != nullptr) {
+    } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+      auto const& v = std::get<typename VT::padded_view>(va);
       if (dim == 0) {
         dim    = index->dim();
-        stride = padded_dset->stride();
+        stride = static_cast<int64_t>(v.stride());
       } else {
         RAFT_EXPECTS(dim == index->dim(), "Dimension of datasets in indices must be equal.");
-        RAFT_EXPECTS(stride == padded_dset->stride(),
+        RAFT_EXPECTS(stride == static_cast<int64_t>(v.stride()),
                      "Row stride of datasets in indices must be equal.");
       }
       new_dataset_size += index->size();
-    } else if (dynamic_cast<const cuvs::neighbors::empty_dataset_view<int64_t>*>(&index->data()) !=
-               nullptr) {
+    } else if (std::holds_alternative<typename VT::empty_view>(va)) {
       RAFT_FAIL(
         "cagra::merge only supports an index to which the dataset is attached. Please check if the "
         "index was built with index_param.attach_dataset_on_build = true, or if a dataset was "
@@ -93,16 +92,16 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
     for (cagra_index_t* index : indices) {
       const T* src_ptr   = nullptr;
       std::size_t n_rows = 0;
-      if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
-          strided_dset != nullptr) {
-        src_ptr = strided_dset->view().data_handle();
-        n_rows  = static_cast<std::size_t>(strided_dset->n_rows());
-      } else if (auto* padded_dset =
-                   dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, ds_idx_type>*>(
-                     &index->data());
-                 padded_dset != nullptr) {
-        src_ptr = padded_dset->view().data_handle();
-        n_rows  = static_cast<std::size_t>(padded_dset->n_rows());
+      using VTm          = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
+      auto const& vam    = index->data().as_variant();
+      if (std::holds_alternative<typename VTm::strided_view>(vam)) {
+        auto const& v = std::get<typename VTm::strided_view>(vam);
+        src_ptr       = v.view().data_handle();
+        n_rows        = static_cast<std::size_t>(v.n_rows());
+      } else if (std::holds_alternative<typename VTm::padded_view>(vam)) {
+        auto const& v = std::get<typename VTm::padded_view>(vam);
+        src_ptr       = v.view().data_handle();
+        n_rows        = static_cast<std::size_t>(v.n_rows());
       } else {
         RAFT_FAIL("cagra::merge: unexpected dataset type while copying rows");
       }
@@ -158,14 +157,16 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
 
       cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
         raft::make_const_mdspan(filtered_dataset.view()), static_cast<uint32_t>(dim));
-      auto build_res = cagra::detail::build_from_device_matrix<T, IdxT>(handle, params, dv);
+      auto build_res = cagra::detail::build_from_device_matrix<T, IdxT>(
+        handle, params, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return cagra::merge_result<T, IdxT>{
         std::move(build_res.idx), std::move(filtered_dataset), std::move(build_res.vpq)};
     } else {
       cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
         raft::make_const_mdspan(updated_dataset.view()), static_cast<uint32_t>(dim));
-      auto build_res = cagra::detail::build_from_device_matrix<T, IdxT>(handle, params, dv);
+      auto build_res = cagra::detail::build_from_device_matrix<T, IdxT>(
+        handle, params, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return cagra::merge_result<T, IdxT>{
         std::move(build_res.idx), std::move(updated_dataset), std::move(build_res.vpq)};

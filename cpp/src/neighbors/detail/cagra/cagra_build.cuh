@@ -1099,7 +1099,7 @@ template <typename T, typename IdxT>
 cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
   raft::resources const& res,
   const index_params& params,
-  cuvs::neighbors::dataset_view<int64_t> const& dataset);
+  cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset);
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
 // ACE enables building indexes for datasets too large to fit in GPU memory by:
@@ -1386,7 +1386,9 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
       auto sub_dataset_dev =
         cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(sub_dataset.view()));
       auto sub_build_res = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
-        res, sub_index_params, sub_dataset_dev->as_dataset_view());
+        res,
+        sub_index_params,
+        cuvs::neighbors::any_dataset_view<T, int64_t>(sub_dataset_dev->as_dataset_view()));
       auto sub_index = std::move(sub_build_res.idx);
 
       auto optimize_end = std::chrono::high_resolution_clock::now();
@@ -1499,7 +1501,8 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
           // Tight row-major [n, dim] device storage is often not 16-byte row-pitched; CAGRA search
           // expects padded stride (same as make_padded_dataset / make_padded_dataset_view).
           auto padded = cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(dataset));
-          idx.update_dataset(res, padded->as_dataset_view());
+          idx.update_dataset(
+            res, cuvs::neighbors::any_dataset_view<T, int64_t>(padded->as_dataset_view()));
           device_dataset.emplace(std::move(padded->data_));
         } catch (std::bad_alloc& e) {
           RAFT_LOG_WARN(
@@ -2110,8 +2113,10 @@ auto iterative_build_graph(raft::resources const& res,
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> sub_padded(dev_dataset_view,
                                                                        logical_dim);
 
-    auto idx =
-      index<T, IdxT>(res, params.metric, sub_padded, raft::make_const_mdspan(cagra_graph.view()));
+    auto idx = index<T, IdxT>(res,
+                              params.metric,
+                              cuvs::neighbors::any_dataset_view<T, int64_t>(sub_padded),
+                              raft::make_const_mdspan(cagra_graph.view()));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
@@ -2340,7 +2345,10 @@ auto try_attach_padded_dataset_on_build(
 {
   try {
     cuvs::neighbors::cagra::build_result<T, IdxT> out{
-      index<T, IdxT>(res, params.metric, padded, raft::make_const_mdspan(cagra_graph_host)),
+      index<T, IdxT>(res,
+                     params.metric,
+                     cuvs::neighbors::any_dataset_view<T, int64_t>(padded),
+                     raft::make_const_mdspan(cagra_graph_host)),
       std::nullopt};
     if (deferred_host_dataset != nullptr) {
       out.deferred_host_dataset = std::move(*deferred_host_dataset);
@@ -2412,7 +2420,9 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
       index<T, IdxT>(res, params.metric),
       std::make_optional(vpq_train_from_padded_view<T>(res, *params.compression, padded))};
     out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(&*out.vpq));
+    out.idx.update_dataset(res,
+                           cuvs::neighbors::any_dataset_view<T, int64_t>(
+                             cuvs::neighbors::make_indirect_dataset_view(&*out.vpq)));
     padded_own.reset();
     return out;
   }
@@ -2433,18 +2443,19 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
 }
 
 /**
- * Build from `dataset_view<int64_t>` after resolving graph vectors to **device** padded storage via
+ * Build from `any_dataset_view` after resolving graph vectors to **device** padded storage via
  * `convert_dataset_view_to_padded_for_graph_build`.
  *
- * `dataset_view` is polymorphic (`device_padded_dataset_view`, `non_owning_dataset`, indirect to
- * padded/strided device bases, etc.); this entry point does **not** accept host-backed bases for
- * graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
+ * Supported alternatives include `device_padded_dataset_view`,
+ * `dataset_view<strided_dataset_container,...>`, and `indirect`
+ * to device padded storage matching \p T; this entry point does **not** accept host-backed bases
+ * for graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
  */
 template <typename T, typename IdxT = uint32_t>
 cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
   raft::resources const& res,
   const index_params& params,
-  cuvs::neighbors::dataset_view<int64_t> const& dataset)
+  cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
 {
   const auto padded = convert_dataset_view_to_padded_for_graph_build<T>(dataset);
 
@@ -2480,7 +2491,9 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
       index<T, IdxT>(res, params.metric),
       std::make_optional(vpq_train_from_padded_view<T>(res, *params.compression, padded))};
     out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(&*out.vpq));
+    out.idx.update_dataset(res,
+                           cuvs::neighbors::any_dataset_view<T, int64_t>(
+                             cuvs::neighbors::make_indirect_dataset_view(&*out.vpq)));
     return out;
   }
   if (params.attach_dataset_on_build) {

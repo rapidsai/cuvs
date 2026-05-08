@@ -23,6 +23,7 @@
 #include <fstream>
 #include <optional>
 #include <type_traits>
+#include <variant>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -263,10 +264,11 @@ void serialize_to_hnswlib(
  *
  */
 template <typename T, typename IdxT>
-void deserialize(raft::resources const& res,
-                 std::istream& is,
-                 index<T, IdxT>* index_,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
+void deserialize(
+  raft::resources const& res,
+  std::istream& is,
+  index<T, IdxT>* index_,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
@@ -294,10 +296,40 @@ void deserialize(raft::resources const& res,
     RAFT_EXPECTS(out_dataset != nullptr,
                  "deserialize: index contains a dataset; pass a non-null out_dataset to own it.");
     *out_dataset = cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is);
-    auto* own    = dynamic_cast<const cuvs::neighbors::dataset<int64_t>*>(out_dataset->get());
-    RAFT_EXPECTS(own != nullptr,
-                 "deserialize: loaded dataset must be owning storage (dataset<>, not a view)");
-    index_->update_dataset(res, cuvs::neighbors::indirect_dataset_view<int64_t>(own));
+    auto* box    = out_dataset->get();
+    RAFT_EXPECTS(box != nullptr, "deserialize: out_dataset not set");
+    namespace nb     = cuvs::neighbors;
+    using OT         = nb::any_owning_dataset_types<int64_t>;
+    auto const& ovar = box->as_variant();
+    if (std::holds_alternative<typename OT::empty_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::empty_owning>(ovar)))));
+    } else if (std::holds_alternative<typename OT::padded_f32_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::padded_f32_owning>(ovar)))));
+    } else if (std::holds_alternative<typename OT::padded_f16_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::padded_f16_owning>(ovar)))));
+    } else if (std::holds_alternative<typename OT::padded_i8_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::padded_i8_owning>(ovar)))));
+    } else if (std::holds_alternative<typename OT::padded_u8_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::padded_u8_owning>(ovar)))));
+    } else if (std::holds_alternative<typename OT::vpq_f32_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::vpq_f32_owning>(ovar)))));
+    } else if (std::holds_alternative<typename OT::vpq_f16_owning>(ovar)) {
+      index_->update_dataset(res,
+                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
+                               std::addressof(std::get<typename OT::vpq_f16_owning>(ovar)))));
+    }
   }
 
   bool has_source_indices = content_map & 0x2u;
@@ -311,10 +343,11 @@ void deserialize(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-void deserialize(raft::resources const& res,
-                 const std::string& filename,
-                 index<T, IdxT>* index_,
-                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr)
+void deserialize(
+  raft::resources const& res,
+  const std::string& filename,
+  index<T, IdxT>* index_,
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 

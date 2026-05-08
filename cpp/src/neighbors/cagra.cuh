@@ -27,6 +27,8 @@
 #include <rmm/cuda_stream_view.hpp>
 
 #include <memory>
+#include <optional>
+#include <variant>
 
 namespace cuvs::neighbors::cagra {
 namespace detail {
@@ -60,56 +62,49 @@ cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_padded(
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 {
-  // After deserialize, the index may hold indirect_dataset_view<int64_t> pointing at the real
-  // dataset. search_main unwraps that; index::dataset() does not, and would return a null strided
-  // placeholder — the same coalesced_reduction invalid-configuration failure as a bad row pitch.
-  const cuvs::neighbors::dataset_view<int64_t>* vroot = dataset_.get();
-  const cuvs::neighbors::dataset<int64_t>* droot      = nullptr;
-  if (auto* ind = dynamic_cast<const cuvs::neighbors::indirect_dataset_view<int64_t>*>(vroot)) {
-    droot = ind->target();
-    vroot = nullptr;
+  // raft::linalg::reduce wants row-major with leading dim = row pitch in elements. Prefer padded
+  // storage's native row-major view; for strided non-owning rows use the mdspan stride, not only
+  // index::dataset()'s synthetic mdspan when avoidable. Skip norm precomputation for VPQ indirect
+  // targets (compressed codes); CosineExpanded with VPQ is handled (or rejected) on the search
+  // path.
+  namespace nb    = cuvs::neighbors;
+  bool skip_norms = false;
+  std::optional<raft::device_matrix_view<const T, int64_t, raft::row_major>> rm_dataset;
+
+  using VT       = nb::any_dataset_view_types<T, int64_t>;
+  auto const& va = dataset_->as_variant();
+  if (std::holds_alternative<typename VT::padded_view>(va)) {
+    rm_dataset = std::get<typename VT::padded_view>(va).view();
+  } else if (std::holds_alternative<typename VT::strided_view>(va)) {
+    auto const& v       = std::get<typename VT::strided_view>(va);
+    auto sv             = v.view();
+    const int64_t pitch = sv.stride(0) > 0 ? sv.stride(0) : static_cast<int64_t>(sv.extent(1));
+    rm_dataset          = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      sv.data_handle(), sv.extent(0), pitch);
+  } else if (std::holds_alternative<typename VT::indirect_view>(va)) {
+    auto const& v = std::get<typename VT::indirect_view>(va);
+    if (v.get_indirect_target_type() == nb::indirect_target_type::vpq_f16 ||
+        v.get_indirect_target_type() == nb::indirect_target_type::vpq_f32) {
+      skip_norms = true;
+    } else if (v.get_indirect_target_type() == nb::indirect_padded_type_for_element<T>()) {
+      auto* p_padded_own =
+        static_cast<const nb::device_padded_dataset<T, int64_t>*>(v.raw_target());
+      rm_dataset = p_padded_own->view();
+    }
   }
 
-  // raft::linalg::reduce wants row-major with leading dim = row pitch in elements.  Prefer the
-  // padded types' native row-major view; for strided_dataset use its stride() helper (same as
-  // strided_dataset::stride() in common.hpp), not index::dataset()'s synthetic mdspan alone.
-  raft::device_matrix_view<const T, int64_t, raft::row_major> rm_dataset;
-  if (droot != nullptr) {
-    if (auto* p_padded_own =
-          dynamic_cast<const cuvs::neighbors::device_padded_dataset<T, int64_t>*>(droot);
-        p_padded_own != nullptr) {
-      rm_dataset = p_padded_own->view();
-    } else if (auto* p_strided =
-                 dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(droot);
-               p_strided != nullptr) {
-      auto sv    = p_strided->view();
-      rm_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-        sv.data_handle(), sv.extent(0), static_cast<int64_t>(p_strided->stride()));
-    } else {
-      auto strided = this->dataset();
-      rm_dataset   = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-        strided.data_handle(), strided.extent(0), strided.stride(0));
-    }
-  } else if (auto* p_padded_view =
-               dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(vroot);
-             p_padded_view != nullptr) {
-    rm_dataset = p_padded_view->view();
-  } else if (auto* p_strided =
-               dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(vroot);
-             p_strided != nullptr) {
-    auto sv    = p_strided->view();
-    rm_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      sv.data_handle(), sv.extent(0), static_cast<int64_t>(p_strided->stride()));
-  } else {
+  if (skip_norms) { return; }
+
+  if (!rm_dataset.has_value()) {
     auto strided = this->dataset();
     rm_dataset   = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
       strided.data_handle(), strided.extent(0), strided.stride(0));
   }
 
   // Allocate norms vector if not already allocated
-  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != rm_dataset.extent(0)) {
+  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != rm_dataset->extent(0)) {
     dataset_norms_.reset();
-    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, rm_dataset.extent(0));
+    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, rm_dataset->extent(0));
   }
 
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
@@ -119,7 +114,7 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   auto scaled_sq_op = raft::compose_op(
     raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
   raft::linalg::reduce<raft::Apply::ALONG_ROWS>(res,
-                                                rm_dataset,
+                                                *rm_dataset,
                                                 dataset_norms_->view(),
                                                 (float)0,
                                                 false,
@@ -368,15 +363,16 @@ index<T, IdxT> build(
 }
 
 /**
- * @brief Build the index from a device `dataset_view<int64_t>`.
+ * @brief Build the index from a device `any_dataset_view` (strided, padded view, or indirect).
  *
- * Graph construction uses `detail::convert_dataset_view_to_padded_for_graph_build`. The index
+ * Graph construction uses
+ * `detail::convert_dataset_view_to_padded_for_graph_build`. The index
  * stores the original view when `attach_dataset_on_build` is true.
  */
 template <typename T, typename IdxT>
 build_result<T, IdxT> build(raft::resources const& res,
                             const index_params& params,
-                            cuvs::neighbors::dataset_view<int64_t> const& dataset)
+                            cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
 {
   return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(res, params, dataset);
 }

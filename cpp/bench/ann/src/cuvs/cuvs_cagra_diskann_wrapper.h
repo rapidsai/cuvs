@@ -11,6 +11,7 @@
 #include <chrono>
 #include <memory>
 #include <optional>
+#include <variant>
 
 #include "../common/ann_types.hpp"
 #include "../diskann/diskann_wrapper.h"
@@ -167,40 +168,40 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
 
   // try allocating a buffer for the dataset on host
   try {
-    const auto* ds_view = &cagra_build_.get_index()->data();
-    const auto* strided_dataset =
-      dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(ds_view);
-    const auto* padded_dataset_view =
-      dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(ds_view);
-
+    auto const* idx_ptr                                    = cagra_build_.get_index();
     std::optional<raft::host_matrix<T, int64_t>> h_dataset = std::nullopt;
-    if (strided_dataset != nullptr) {
-      auto n_rows      = strided_dataset->n_rows();
-      auto logical_dim = static_cast<uint32_t>(cagra_build_.get_index()->dim());
-      auto stride      = strided_dataset->stride();
+    namespace nb                                           = cuvs::neighbors;
+    using VT                                               = nb::any_dataset_view_types<T, int64_t>;
+    auto const& va                                         = idx_ptr->data().as_variant();
+    if (std::holds_alternative<typename VT::strided_view>(va)) {
+      auto const& v    = std::get<typename VT::strided_view>(va);
+      auto n_rows      = v.n_rows();
+      auto logical_dim = static_cast<uint32_t>(idx_ptr->dim());
+      auto stride      = v.stride();
       h_dataset.emplace(raft::make_host_matrix<T, int64_t>(n_rows, logical_dim));
       raft::copy_matrix(h_dataset->data_handle(),
                         logical_dim,
-                        strided_dataset->view().data_handle(),
+                        v.view().data_handle(),
                         stride,
                         logical_dim,
                         n_rows,
                         raft::resource::get_cuda_stream(handle_));
-    } else if (padded_dataset_view != nullptr) {
-      auto n_rows = padded_dataset_view->n_rows();
-      auto dim    = padded_dataset_view->dim();
-      auto stride = padded_dataset_view->stride();
+    } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+      auto const& v = std::get<typename VT::padded_view>(va);
+      auto n_rows   = v.n_rows();
+      auto dim      = v.dim();
+      auto stride   = v.stride();
       h_dataset.emplace(raft::make_host_matrix<T, int64_t>(n_rows, dim));
       raft::copy_matrix(h_dataset->data_handle(),
                         dim,
-                        padded_dataset_view->view().data_handle(),
+                        v.view().data_handle(),
                         stride,
                         dim,
                         n_rows,
                         raft::resource::get_cuda_stream(handle_));
     } else {
       RAFT_LOG_DEBUG(
-        "dataset serialization: neither strided_dataset nor device_padded_dataset_view");
+        "dataset serialization: neither strided dataset_view nor device_padded_dataset_view");
     }
 
     if (h_dataset.has_value()) {

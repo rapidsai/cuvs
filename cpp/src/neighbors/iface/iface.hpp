@@ -81,8 +81,7 @@ void cagra_from_host_padded(raft::resources const& h,
     auto build_r  = cuvs::neighbors::cagra::build(h, cagra_params, padded_r->as_dataset_view());
     RAFT_EXPECTS(!build_r.vpq.has_value(),
                  "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
-    interface.cagra_owned_dataset_ =
-      std::unique_ptr<cuvs::neighbors::dataset<int64_t>>(padded_r.release());
+    interface.cagra_owned_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(padded_r));
     interface.index_.emplace(std::move(build_r.idx));
   }
 }
@@ -260,7 +259,7 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
-    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+    std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> out_dataset;
     cagra::deserialize(handle, is, &idx, &out_dataset);
     if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);
@@ -290,7 +289,7 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
-    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+    std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> out_dataset;
     cagra::deserialize(handle, is, &idx, &out_dataset);
     if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);
