@@ -1,4 +1,4 @@
-# JIT LTO (Just-In-Time Link-Time Optimization) Guide
+# Link-time Optimization
 
 ## Background
 

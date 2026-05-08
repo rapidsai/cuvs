@@ -119,7 +119,7 @@ navigation:
         contents:
           - page: "ABI Stability"
             path: "./developer_guide/abi_stability.md"
-          - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
+          - page: "Link-time Optimization"
             path: "./pages/jit_lto_guide.md"
       - page: "Contributing"
         path: "./pages/contributing.md"

@@ -412,4 +412,4 @@ This approach ultimately enables:
 - **Reduced binary size**: Compile fragments once, combine many ways
 - **User Defined Functions**: Link UDFs in cuVS CUDA kernels
 
-For more information on JIT LTO, see [Advanced Topics](advanced_topics.md). For a complete guide on implementing JIT LTO kernels, including step-by-step examples, see the [JIT LTO Guide](jit_lto_guide.md).
+For more information on JIT LTO, see [Advanced Topics](advanced_topics.md). For a complete guide on implementing JIT LTO kernels, including step-by-step examples, see [Link-time Optimization](jit_lto_guide.md).
