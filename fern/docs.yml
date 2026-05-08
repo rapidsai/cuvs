@@ -60,7 +60,7 @@ navigation:
         path: "./pages/build.md"
   - section: "User Guide"
     contents:
-      - section: "Overview"
+      - section: "Introduction"
         path: "./pages/getting_started.md"
         contents:
           - page: "Comparing performance of vector indexes"
