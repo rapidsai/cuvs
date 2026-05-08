@@ -68,6 +68,8 @@ navigation:
     contents:
       - page: "Developer Guide"
         path: "./pages/developer_guide.md"
+      - page: "Contributing"
+        path: "./pages/contributing.md"
       - page: "Filtering vector indexes"
         path: "./pages/filtering.md"
       - section: "Working with ANN Indexes"
@@ -394,5 +396,3 @@ navigation:
     contents:
       - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
         path: "./pages/jit_lto_guide.md"
-  - page: "Contributing"
-    path: "./pages/contributing.md"
