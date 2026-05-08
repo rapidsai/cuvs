@@ -92,8 +92,6 @@ navigation:
       - page: "Interoperability"
         hidden: true
         path: "./pages/api_interoperability.md"
-      - page: "ABI Stability"
-        path: "./pages/user_guide/abi_stability.md"
       - page: "Integrations"
         path: "./pages/integrations.md"
       - section: "Benchmarking"
@@ -111,6 +109,8 @@ navigation:
           - page: "Wiki-all Dataset"
             hidden: true
             path: "./pages/cuvs_bench/wiki_all_dataset.md"
+      - page: "Compatibility"
+        path: "./pages/user_guide/abi_stability.md"
   - section: "Developer Guide"
     contents:
       - page: "Guidelines"
