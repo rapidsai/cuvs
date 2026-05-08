@@ -12,9 +12,9 @@ Index parameters control the recall and performance trade-off. The figure below 
 
 ## Fair comparisons
 
-Compare latency, throughput, and build time only at similar recall levels. If two indexes are measured at different recall, the comparison is mixing quality and speed into one number.
+Compare latency, throughput, and build time only at similar recall levels. If two indexes are measured at different recall, the comparison mixes quality and speed into one number.
 
-A practical approach is to group results into recall buckets and compare the best result inside each bucket:
+A practical approach is to group results into recall buckets:
 
 | Recall bucket | Typical use |
 | --- | --- |
@@ -29,7 +29,13 @@ This makes results easier to interpret. For example: "At 95% recall, model A bui
 
 <img alt="build benchmarks" src="/assets/images/build_benchmarks.png" />
 
-Within each recall bucket, compare each index against its best search-time result, such as highest throughput or lowest latency. These best-case points form a Pareto curve: configurations where improving one metric would make another metric worse. Finding those points usually requires a parameter sweep or another hyperparameter optimization method.
+### Pareto curves in simple terms
+
+Imagine every tuning run is a toy car. You want a car that is fast, but you also care how much work it took to build. If one car is both faster and easier to build than another car, the slower and harder-to-build car is not a useful choice. The cars that are not beaten this way form the Pareto curve.
+
+For vector indexes, each tuning run is a point with recall, build time, and search performance. A point is on the Pareto curve when no other run is better on the metric being compared without making another metric worse. Finding these points usually requires a parameter sweep or another hyperparameter optimization method.
+
+For each recall bucket, summarize build time by taking the points on the Pareto curve in that bucket and averaging their corresponding build times. This gives an expected build time for the recall window instead of forcing one run to represent the whole bucket.
 
 ## Large datasets
 
