@@ -6,6 +6,268 @@ CAGRA works well when you want strong recall, high GPU throughput, and fast grap
 
 [C API](/api-reference/c-api-neighbors-cagra) | [C++ API](/api-reference/cpp-api-neighbors-cagra) | [Python API](/api-reference/python-api-neighbors-cagra) | [Java API](/api-reference/java-api-com-nvidia-cuvs-cagraindex) | [Rust API](/api-reference/rust-api-cuvs-cagra) | [Go API](/api-reference/go-api-cagra)
 
+## Building an index
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/cagra.h>
+
+cuvsResources_t res;
+cuvsCagraIndexParams_t index_params;
+cuvsCagraIndex_t index;
+DLManagedTensor *dataset;
+
+// populate tensor with data
+load_dataset(dataset);
+
+cuvsResourcesCreate(&res);
+cuvsCagraIndexParamsCreate(&index_params);
+cuvsCagraIndexCreate(&index);
+
+cuvsCagraBuild(res, index_params, dataset, index);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+raft::device_matrix_view<float> dataset = load_dataset();
+cagra::index_params index_params;
+
+auto index = cagra::build(res, index_params, dataset);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import cagra
+
+dataset = load_data()
+index_params = cagra.IndexParams()
+
+index = cagra.build(index_params, dataset)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+try (CuVSResources resources = CuVSResources.create()) {
+  CagraIndexParams indexParams =
+      new CagraIndexParams.Builder()
+          .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+          .withMetric(CuvsDistanceType.L2Expanded)
+          .build();
+
+  CagraIndex index =
+      CagraIndex.newBuilder(resources)
+          .withDataset(vectors)
+          .withIndexParams(indexParams)
+          .build();
+}
+```
+
+</Tab>
+<Tab title="Rust">
+
+```rust
+use cuvs::cagra::{Index, IndexParams};
+use cuvs::{Resources, Result};
+
+fn build_cagra_index(dataset: &ndarray::Array2<f32>) -> Result<Index> {
+    let res = Resources::new()?;
+    let index_params = IndexParams::new()?;
+
+    Index::build(&res, &index_params, dataset)
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+package main
+
+import (
+	cuvs "github.com/rapidsai/cuvs/go"
+	"github.com/rapidsai/cuvs/go/cagra"
+)
+
+func buildCagraIndex(dataset cuvs.Tensor[float32]) (*cagra.CagraIndex, error) {
+	resource, err := cuvs.NewResource(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	indexParams, err := cagra.CreateIndexParams()
+	if err != nil {
+		return nil, err
+	}
+
+	index, err := cagra.CreateIndex()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = dataset.ToDevice(&resource)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cagra.BuildIndex(resource, indexParams, &dataset, index)
+	return index, err
+}
+```
+
+</Tab>
+</Tabs>
+
+## Searching an index
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/cagra.h>
+
+cuvsResources_t res;
+cuvsCagraSearchParams_t search_params;
+cuvsCagraIndex_t index;
+DLManagedTensor *queries;
+DLManagedTensor *neighbors;
+DLManagedTensor *distances;
+
+// populate tensor with data
+load_queries(queries);
+
+cuvsResourcesCreate(&res);
+cuvsCagraSearchParamsCreate(&search_params);
+
+// ... build or load index ...
+cuvsCagraSearch(res, search_params, index, queries, neighbors, distances);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+cagra::index index;
+raft::device_matrix_view<float> queries = load_queries();
+raft::device_matrix_view<uint32_t> neighbors = make_device_matrix_view<uint32_t>(n_queries, k);
+raft::device_matrix_view<float> distances = make_device_matrix_view<float>(n_queries, k);
+cagra::search_params search_params;
+
+// ... build or load index ...
+cagra::search(res, search_params, index, queries, neighbors, distances);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import cagra
+
+queries = load_queries()
+search_params = cagra.SearchParams()
+
+# ... build or load index ...
+neighbors, distances = cagra.search(search_params, index, queries, k)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+
+CagraQuery cuvsQuery =
+    new CagraQuery.Builder()
+        .withTopK(10)
+        .withSearchParams(searchParams)
+        .withQueryVectors(queries)
+        .build();
+
+// ... build or load index ...
+SearchResults results = index.search(cuvsQuery);
+```
+
+</Tab>
+<Tab title="Rust">
+
+```rust
+use cuvs::cagra::SearchParams;
+use cuvs::{ManagedTensor, Resources, Result};
+
+fn search_cagra_index(
+    res: &Resources,
+    index: &cuvs::cagra::Index,
+    queries: &ndarray::ArrayView2<f32>,
+    k: usize,
+) -> Result<()> {
+    let n_queries = queries.shape()[0];
+    let queries = ManagedTensor::from(queries).to_device(res)?;
+
+    let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
+    let neighbors = ManagedTensor::from(&neighbors_host).to_device(res)?;
+
+    let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+    let distances = ManagedTensor::from(&distances_host).to_device(res)?;
+
+    let search_params = SearchParams::new()?;
+    index.search(res, &search_params, &queries, &neighbors, &distances)?;
+
+    distances.to_host(res, &mut distances_host)?;
+    neighbors.to_host(res, &mut neighbors_host)?;
+
+    Ok(())
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+searchParams, err := cagra.CreateSearchParams()
+if err != nil {
+	return err
+}
+defer searchParams.Close()
+
+_, err = queries.ToDevice(&resource)
+if err != nil {
+	return err
+}
+
+err = cagra.SearchIndex(resource, searchParams, index, &queries, &neighbors, &distances, nil)
+if err != nil {
+	return err
+}
+
+_, err = neighbors.ToHost(&resource)
+if err != nil {
+	return err
+}
+
+_, err = distances.ToHost(&resource)
+return err
+```
+
+</Tab>
+</Tabs>
+
 ## How CAGRA works
 
 CAGRA builds and searches a nearest-neighbor graph.
