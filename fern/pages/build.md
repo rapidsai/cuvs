@@ -2,32 +2,6 @@
 
 The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. This guide outlines how to install the pre-compiled packages, build it from source, and use it in downstream applications.
 
-- [Installing pre-compiled packages](#installing-pre-compiled-packages)
-
-  * [C, C++, and Python through Conda](#c-c-and-python-through-conda)
-
-  * [Python through Pip](#python-through-pip)
-
-  * [Tarball](#tarball)
-
-- [Build from source](#build-from-source)
-
-  * [Prerequisites](#prerequisites)
-
-  * [Create a build environment](#create-a-build-environment)
-
-  * [C and C++ Libraries](#c-and-c-libraries)
-
-    * [Building the Googletests](#building-the-googletests)
-
-  * [Python Library](#python-library)
-
-  * [Rust Library](#rust-library)
-
-  * [Using CMake Directly](#using-cmake-directly)
-
-- [Build Documentation](#build-documentation)
-
 ## Installing Pre-compiled Packages
 
 **Note:** The cuVS pre-compiled packages are available for **Linux** only (x86_64 and aarch64 architectures). Native Windows support is not available at this time. On Windows, use **WSL2** with GPU passthrough. See the [RAPIDS WSL2 guide](https://rapids.ai/start.html#wsl2).
