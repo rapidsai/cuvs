@@ -62,14 +62,14 @@ navigation:
     contents:
       - page: "Overview"
         path: "./pages/getting_started.md"
-      - page: "Filtering vector indexes"
-        path: "./pages/filtering.md"
       - page: "Integrations"
         path: "./pages/integrations.md"
   - section: "Developer Guide"
     contents:
       - page: "Developer Guide"
         path: "./pages/developer_guide.md"
+      - page: "Filtering vector indexes"
+        path: "./pages/filtering.md"
       - section: "Working with ANN Indexes"
         path: "./pages/working_with_ann_indexes.md"
         contents:
