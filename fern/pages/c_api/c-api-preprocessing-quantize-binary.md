@@ -62,8 +62,6 @@ cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsbinaryquantizerparamsdestroy"></a>
 ### cuvsBinaryQuantizerParamsDestroy
 
@@ -82,8 +80,6 @@ cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsbinaryquantizer"></a>
 ### cuvsBinaryQuantizer
@@ -122,8 +118,6 @@ cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsbinaryquantizerdestroy"></a>
 ### cuvsBinaryQuantizerDestroy
 
@@ -142,8 +136,6 @@ cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsbinaryquantizertrain"></a>
 ### cuvsBinaryQuantizerTrain

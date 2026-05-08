@@ -70,8 +70,6 @@ cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvshnswaceparamsdestroy"></a>
 ### cuvsHnswAceParamsDestroy
 
@@ -90,8 +88,6 @@ cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvshnswindexparamscreate"></a>
 ### cuvsHnswIndexParamsCreate
@@ -112,8 +108,6 @@ cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvshnswindexparamsdestroy"></a>
 ### cuvsHnswIndexParamsDestroy
 
@@ -132,8 +126,6 @@ cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for hnswlib wrapper index
 
@@ -171,8 +163,6 @@ cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-HnswError_t
 
 <a id="cuvshnswindexdestroy"></a>
 ### cuvsHnswIndexDestroy
@@ -229,8 +219,6 @@ cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvshnswextendparamsdestroy"></a>
 ### cuvsHnswExtendParamsDestroy
 
@@ -249,8 +237,6 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Load CAGRA index as hnswlib index
 
@@ -283,8 +269,6 @@ NOTE: When hierarchy is:
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Build HNSW index using ACE algorithm
 
@@ -321,8 +305,6 @@ NOTE: This function requires CUDA to be available at runtime.
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## Extend HNSW index with additional vectors
 
 <a id="cuvshnswextend"></a>
@@ -351,8 +333,6 @@ NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when conve
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for hnswlib wrapper search params
 
@@ -391,8 +371,6 @@ cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvshnswsearchparamsdestroy"></a>
 ### cuvsHnswSearchParamsDestroy
 
@@ -411,8 +389,6 @@ cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -475,8 +451,6 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvshnswdeserialize"></a>
 ### cuvsHnswDeserialize

@@ -123,8 +123,6 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagraindexparamsdestroy"></a>
 ### cuvsCagraIndexParamsDestroy
 
@@ -143,8 +141,6 @@ cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvscagracompressionparamscreate"></a>
 ### cuvsCagraCompressionParamsCreate
@@ -165,8 +161,6 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagracompressionparamsdestroy"></a>
 ### cuvsCagraCompressionParamsDestroy
 
@@ -185,8 +179,6 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsaceparamscreate"></a>
 ### cuvsAceParamsCreate
@@ -207,8 +199,6 @@ cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsaceparamsdestroy"></a>
 ### cuvsAceParamsDestroy
 
@@ -227,8 +217,6 @@ cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvscagraindexparamsfromhnswparams"></a>
 ### cuvsCagraIndexParamsFromHnswParams
@@ -262,8 +250,6 @@ This factory function creates CAGRA parameters that yield a graph compatible wit
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -301,8 +287,6 @@ cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagraextendparamsdestroy"></a>
 ### cuvsCagraExtendParamsDestroy
 
@@ -321,8 +305,6 @@ cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvscagraextend"></a>
 ### cuvsCagraExtend
@@ -355,8 +337,6 @@ cuvsCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -444,8 +424,6 @@ cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagrasearchparamsdestroy"></a>
 ### cuvsCagraSearchParamsDestroy
 
@@ -464,8 +442,6 @@ cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -503,8 +479,6 @@ cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cagraError_t
 
 <a id="cuvscagraindexdestroy"></a>
 ### cuvsCagraIndexDestroy
@@ -545,8 +519,6 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagraindexgetsize"></a>
 ### cuvsCagraIndexGetSize
 
@@ -567,8 +539,6 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagraindexgetgraphdegree"></a>
 ### cuvsCagraIndexGetGraphDegree
 
@@ -588,8 +558,6 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvscagraindexgetdataset"></a>
 ### cuvsCagraIndexGetDataset
@@ -615,8 +583,6 @@ Note that the DLManagedTensor dataset returned will have an associated 'deleter'
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvscagraindexgetgraph"></a>
 ### cuvsCagraIndexGetGraph
 
@@ -640,8 +606,6 @@ Note that the DLManagedTensor graph returned will have an associated 'deleter' f
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
@@ -676,8 +640,6 @@ cuvsCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 

@@ -50,8 +50,6 @@ cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsvamanaindexparamsdestroy"></a>
 ### cuvsVamanaIndexParamsDestroy
 
@@ -70,8 +68,6 @@ cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Vamana index
 
@@ -110,8 +106,6 @@ cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsvamanaindexdestroy"></a>
 ### cuvsVamanaIndexDestroy
 
@@ -130,8 +124,6 @@ cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsvamanaindexgetdims"></a>
 ### cuvsVamanaIndexGetDims
@@ -152,8 +144,6 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Vamana index build
 
@@ -192,8 +182,6 @@ Usage example:
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## Vamana index serialize
 
 <a id="cuvsvamanaserialize"></a>
@@ -224,5 +212,3 @@ Serialized Index is to be used by the DiskANN open-source repository for graph s
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t

@@ -692,9 +692,7 @@ def render_native_function(
                 rendered_return_type,
             ]
         )
-        if entry.returns and (
-            language != "cpp" or "](" not in rendered_return_type
-        ):
+        if entry.returns and "](" not in rendered_return_type:
             lines.extend(["", escape_text(entry.returns)])
         lines.append("")
 

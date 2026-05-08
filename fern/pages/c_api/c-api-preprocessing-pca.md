@@ -63,8 +63,6 @@ cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvspcaparamsdestroy"></a>
 ### cuvsPcaParamsDestroy
 
@@ -83,8 +81,6 @@ cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvspcafit"></a>
 ### cuvsPcaFit
@@ -124,8 +120,6 @@ Computes the principal components, explained variances, singular values, and col
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvspcafittransform"></a>
 ### cuvsPcaFitTransform
@@ -168,8 +162,6 @@ Computes the principal components and transforms the input data into the eigensp
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvspcatransform"></a>
 ### cuvsPcaTransform
 
@@ -203,8 +195,6 @@ Transforms the input data into the eigenspace using previously computed principa
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvspcainversetransform"></a>
 ### cuvsPcaInverseTransform
 
@@ -237,5 +227,3 @@ Transforms data from the eigenspace back to the original space.
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t

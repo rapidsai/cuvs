@@ -45,8 +45,6 @@ cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(cuvsMultiGpuCagraIndexParams_t* i
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsmultigpucagraindexparamsdestroy"></a>
 ### cuvsMultiGpuCagraIndexParamsDestroy
 
@@ -65,8 +63,6 @@ cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(cuvsMultiGpuCagraIndexParams_t i
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Multi-GPU CAGRA index search parameters
 
@@ -109,8 +105,6 @@ cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSearchParams_t*
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsmultigpucagrasearchparamsdestroy"></a>
 ### cuvsMultiGpuCagraSearchParamsDestroy
 
@@ -129,8 +123,6 @@ cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSearchParams_t
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Multi-GPU CAGRA index
 
@@ -171,8 +163,6 @@ cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsmultigpucagraindexdestroy"></a>
 ### cuvsMultiGpuCagraIndexDestroy
 
@@ -191,8 +181,6 @@ cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Multi-GPU CAGRA index build
 
@@ -220,8 +208,6 @@ cuvsMultiGpuCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Multi-GPU CAGRA index search
 
@@ -254,8 +240,6 @@ DLManagedTensor* distances_tensor);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## Multi-GPU CAGRA index extend
 
 <a id="cuvsmultigpucagraextend"></a>
@@ -283,8 +267,6 @@ DLManagedTensor* new_indices_tensor);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## Multi-GPU CAGRA index serialize
 
 <a id="cuvsmultigpucagraserialize"></a>
@@ -309,8 +291,6 @@ const char* filename);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Multi-GPU CAGRA index deserialize
 
@@ -337,8 +317,6 @@ cuvsMultiGpuCagraIndex_t index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## Multi-GPU CAGRA index distribute
 
 <a id="cuvsmultigpucagradistribute"></a>
@@ -363,5 +341,3 @@ cuvsMultiGpuCagraIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t

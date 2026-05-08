@@ -43,8 +43,6 @@ cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsbruteforceindexdestroy"></a>
 ### cuvsBruteForceIndexDestroy
 
@@ -97,8 +95,6 @@ cuvsBruteForceIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Bruteforce index search
 

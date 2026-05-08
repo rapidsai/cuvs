@@ -36,8 +36,6 @@ cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params)
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsscalarquantizerparamsdestroy"></a>
 ### cuvsScalarQuantizerParamsDestroy
 
@@ -56,8 +54,6 @@ cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params)
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsscalarquantizer"></a>
 ### cuvsScalarQuantizer
@@ -96,8 +92,6 @@ cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsscalarquantizerdestroy"></a>
 ### cuvsScalarQuantizerDestroy
 
@@ -116,8 +110,6 @@ cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsscalarquantizertrain"></a>
 ### cuvsScalarQuantizerTrain

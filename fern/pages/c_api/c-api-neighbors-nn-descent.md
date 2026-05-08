@@ -68,8 +68,6 @@ cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_par
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsnndescentindexparamsdestroy"></a>
 ### cuvsNNDescentIndexParamsDestroy
 
@@ -88,8 +86,6 @@ cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_par
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## NN-Descent index
 
@@ -127,8 +123,6 @@ cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsnndescentindexdestroy"></a>
 ### cuvsNNDescentIndexDestroy
@@ -184,5 +178,3 @@ cuvsNNDescentIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t

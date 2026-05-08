@@ -145,8 +145,6 @@ cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsresourcesdestroy"></a>
 ### cuvsResourcesDestroy
 
@@ -165,8 +163,6 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsstreamset"></a>
 ### cuvsStreamSet
@@ -190,8 +186,6 @@ that accept a cuvsResources_t handle
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsstreamget"></a>
 ### cuvsStreamGet
 
@@ -212,8 +206,6 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsstreamsync"></a>
 ### cuvsStreamSync
 
@@ -232,8 +224,6 @@ cuvsError_t cuvsStreamSync(cuvsResources_t res);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsdeviceidget"></a>
 ### cuvsDeviceIdGet
@@ -255,8 +245,6 @@ cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsmultigpuresourcescreate"></a>
 ### cuvsMultiGpuResourcesCreate
 
@@ -277,8 +265,6 @@ for multi-GPU operations
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsmultigpuresourcescreatewithdeviceids"></a>
 ### cuvsMultiGpuResourcesCreateWithDeviceIds
@@ -303,8 +289,6 @@ for multi-GPU operations with specific device IDs
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsmultigpuresourcesdestroy"></a>
 ### cuvsMultiGpuResourcesDestroy
 
@@ -323,8 +307,6 @@ cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsmultigpuresourcessetmemorypool"></a>
 ### cuvsMultiGpuResourcesSetMemoryPool
@@ -345,8 +327,6 @@ cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## cuVS Memory Allocation
 
@@ -371,8 +351,6 @@ cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsrmmfree"></a>
 ### cuvsRMMFree
 
@@ -393,8 +371,6 @@ cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsrmmpoolmemoryresourceenable"></a>
 ### cuvsRMMPoolMemoryResourceEnable
@@ -423,8 +399,6 @@ available memory available memory
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsrmmmemoryresourcereset"></a>
 ### cuvsRMMMemoryResourceReset
 
@@ -437,8 +411,6 @@ cuvsError_t cuvsRMMMemoryResourceReset();
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsrmmhostalloc"></a>
 ### cuvsRMMHostAlloc
@@ -460,8 +432,6 @@ cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsrmmhostfree"></a>
 ### cuvsRMMHostFree
 
@@ -481,8 +451,6 @@ cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsversionget"></a>
 ### cuvsVersionGet
@@ -504,8 +472,6 @@ cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsmatrixcopy"></a>
 ### cuvsMatrixCopy

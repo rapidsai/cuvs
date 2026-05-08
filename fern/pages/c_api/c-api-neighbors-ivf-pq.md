@@ -86,8 +86,6 @@ cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* index_params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsivfpqindexparamsdestroy"></a>
 ### cuvsIvfPqIndexParamsDestroy
 
@@ -106,8 +104,6 @@ cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index_params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## IVF-PQ index search parameters
 
@@ -150,8 +146,6 @@ cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsivfpqsearchparamsdestroy"></a>
 ### cuvsIvfPqSearchParamsDestroy
 
@@ -170,8 +164,6 @@ cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## IVF-PQ index
 
@@ -209,8 +201,6 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsivfpqindexdestroy"></a>
 ### cuvsIvfPqIndexDestroy
@@ -373,8 +363,6 @@ cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* ce
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsivfpqindexgetcenterspadded"></a>
 ### cuvsIvfPqIndexGetCentersPadded
 
@@ -399,8 +387,6 @@ This returns the full padded centers as a contiguous array, suitable for use wit
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsivfpqindexgetpqcenters"></a>
 ### cuvsIvfPqIndexGetPqCenters
 
@@ -424,8 +410,6 @@ cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* 
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsivfpqindexgetcentersrot"></a>
 ### cuvsIvfPqIndexGetCentersRot
 
@@ -447,8 +431,6 @@ where rot_dim = pq_len * pq_dim
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsivfpqindexgetrotationmatrix"></a>
 ### cuvsIvfPqIndexGetRotationMatrix
@@ -475,8 +457,6 @@ data
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsivfpqindexgetlistsizes"></a>
 ### cuvsIvfPqIndexGetListSizes
 
@@ -496,8 +476,6 @@ cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index, DLManagedTensor* 
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsivfpqindexunpackcontiguouslistdata"></a>
 ### cuvsIvfPqIndexUnpackContiguousListData
@@ -551,8 +529,6 @@ DLManagedTensor* out_labels);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## IVF-PQ index build
 
 <a id="cuvsivfpqbuild"></a>
@@ -586,8 +562,6 @@ cuvsIvfPqIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsivfpqbuildprecomputed"></a>
 ### cuvsIvfPqBuildPrecomputed
@@ -631,8 +605,6 @@ matrices) dim]
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## IVF-PQ index search
 
@@ -746,8 +718,6 @@ cuvsIvfPqIndex_t index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## IVF-PQ index transform
 
 <a id="cuvsivfpqtransform"></a>
@@ -776,5 +746,3 @@ DLManagedTensor* output_dataset);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t

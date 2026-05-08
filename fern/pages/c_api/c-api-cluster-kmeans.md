@@ -71,8 +71,6 @@ cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvskmeansparamsdestroy"></a>
 ### cuvsKMeansParamsDestroy
 
@@ -91,8 +89,6 @@ cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvskmeanstype"></a>
 ### cuvsKMeansType

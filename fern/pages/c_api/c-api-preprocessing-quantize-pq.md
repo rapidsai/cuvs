@@ -50,8 +50,6 @@ cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerParams_t* param
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsproductquantizerparamsdestroy"></a>
 ### cuvsProductQuantizerParamsDestroy
 
@@ -70,8 +68,6 @@ cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t param
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsproductquantizer"></a>
 ### cuvsProductQuantizer
@@ -110,8 +106,6 @@ cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quantizer);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvsproductquantizerdestroy"></a>
 ### cuvsProductQuantizerDestroy
 
@@ -130,8 +124,6 @@ cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quantizer);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 <a id="cuvsproductquantizerbuild"></a>
 ### cuvsProductQuantizerBuild

@@ -65,8 +65,6 @@ cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvstieredindexdestroy"></a>
 ### cuvsTieredIndexDestroy
 
@@ -128,8 +126,6 @@ cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* index_params);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 <a id="cuvstieredindexparamsdestroy"></a>
 ### cuvsTieredIndexParamsDestroy
 
@@ -148,8 +144,6 @@ cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Tiered index build
 
@@ -182,8 +176,6 @@ cuvsTieredIndex_t index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
 
 ## Tiered index search
 
@@ -245,8 +237,6 @@ cuvsTieredIndex_t index);
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-cuvsError_t
-
 ## Tiered index merge
 
 <a id="cuvstieredindexmerge"></a>
@@ -275,5 +265,3 @@ cuvsTieredIndex_t output_index);
 **Returns**
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-cuvsError_t
