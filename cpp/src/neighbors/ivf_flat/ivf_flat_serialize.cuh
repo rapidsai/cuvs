@@ -108,7 +108,9 @@ template <typename T, typename IdxT>
 auto deserialize(raft::resources const& handle, std::istream& is) -> index<T, IdxT>
 {
   char dtype_string[4];
-  is.read(dtype_string, 4);
+  RAFT_EXPECTS(is.read(dtype_string, 4), "ivf_flat::deserialize: failed to read dtype prefix");
+  RAFT_EXPECTS(cuvs::util::validate_serialized_dtype<T>(dtype_string, sizeof(dtype_string)),
+               "ivf_flat::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
   if (ver != serialization_version) {

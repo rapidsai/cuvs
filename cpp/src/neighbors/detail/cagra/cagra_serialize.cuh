@@ -269,7 +269,9 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
   char dtype_string[4];
-  is.read(dtype_string, 4);
+  RAFT_EXPECTS(is.read(dtype_string, 4), "cagra::deserialize: failed to read dtype prefix");
+  RAFT_EXPECTS(cuvs::util::validate_serialized_dtype<T>(dtype_string, sizeof(dtype_string)),
+               "cagra::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(res, is);
   if (ver != serialization_version) {

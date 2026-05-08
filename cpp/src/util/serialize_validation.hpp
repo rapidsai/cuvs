@@ -7,11 +7,14 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
+#include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/error.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <type_traits>
 
 namespace cuvs::util {
@@ -34,6 +37,17 @@ inline bool is_mul_no_overflow(T a, T b, Rest... rest)
   } else {
     return is_mul_no_overflow<T>(a * b, rest...);
   }
+}
+
+template <typename T>
+inline bool validate_serialized_dtype(const char* dtype_prefix, std::size_t dtype_prefix_size)
+{
+  if (dtype_prefix == nullptr || dtype_prefix_size != 4) { return false; }
+
+  auto expected_dtype = raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+  expected_dtype.resize(dtype_prefix_size, '\0');
+
+  return std::equal(dtype_prefix, dtype_prefix + dtype_prefix_size, expected_dtype.begin());
 }
 
 inline bool is_valid_distance_type(cuvs::distance::DistanceType m)

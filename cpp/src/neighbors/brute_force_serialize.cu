@@ -82,8 +82,10 @@ void serialize(raft::resources const& handle,
 template <typename T, typename DistT>
 auto deserialize(raft::resources const& handle, std::istream& is)
 {
-  auto dtype_string = std::array<char, 4>{};
-  is.read(dtype_string.data(), 4);
+  char dtype_string[4];
+  RAFT_EXPECTS(is.read(dtype_string, 4), "brute_force::deserialize: failed to read dtype prefix");
+  RAFT_EXPECTS(cuvs::util::validate_serialized_dtype<T>(dtype_string, sizeof(dtype_string)),
+               "brute_force::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
   if (ver != serialization_version) {
