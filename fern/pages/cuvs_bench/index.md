@@ -1,20 +1,8 @@
 # cuVS Bench
 
-cuVS bench provides a reproducible benchmarking tool for various ANN search implementations. It's especially suitable for comparing GPU implementations as well as comparing GPU against CPU. One of the primary goals of cuVS is to capture ideal index configurations for a variety of important usage patterns so the results can be reproduced easily on different hardware environments, such as on-prem and cloud.
+cuVS Bench is a reproducible benchmarking tool for ANN search implementations. It is designed for GPU-to-GPU and GPU-to-CPU comparisons, and for capturing useful index configurations that can be reproduced across on-prem and cloud hardware.
 
-This tool offers several benefits, including
-
-1. Making fair comparisons of index build times
-
-1. Making fair comparisons of index search throughput and/or latency
-
-1. Finding the optimal parameter settings for a range of recall buckets
-
-1. Easily generating consistently styled plots for index build and search
-
-1. Profiling blind spots and potential for algorithm optimization
-
-1. Investigating the relationship between different parameter settings, index build times, and search performance.
+Use it to compare build times, search throughput, latency, and recall; find good parameter settings for recall buckets; generate consistent plots; and identify optimization opportunities across index parameters, build time, and search performance.
 
 For dataset file formats, conversion utilities, and ground-truth generation, see [cuVS Bench Datasets](datasets.md).
 
@@ -24,8 +12,8 @@ For custom benchmark execution paths and backend integrations, see [Pluggable Ba
 
 There are two main ways pre-compiled benchmarks are distributed:
 
-- [Conda](#conda) For users not using containers but want an easy to install and use Python package. Pip wheels are planned to be added as an alternative for users that cannot use conda and prefer to not use containers.
-- [Docker](#docker) Only needs docker and [NVIDIA docker](https://github.com/NVIDIA/nvidia-docker) to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
+- [Conda](#conda): best when you want a Python package without containers. Pip wheels are planned for users who cannot use conda.
+- [Docker](#docker): best when you want a containerized workflow. It needs Docker and, for GPU runs, [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker).
 
 ### Conda
 
@@ -40,18 +28,18 @@ conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> cuda-versio
 conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
 ```
 
-The channel `rapidsai` can easily be substituted with `rapidsai-nightly` if nightly benchmarks are desired. The CPU package currently allows to run the HNSW benchmarks.
+Use `rapidsai-nightly` instead of `rapidsai` for nightly benchmarks. The CPU package currently supports HNSW benchmarks.
 
 Please see the [build instructions](build.md) to build the benchmarks from source.
 
 ### Docker
 
-We provide images for GPU enabled systems, as well as systems without a GPU. The following images are available:
+Images are available for GPU and CPU-only systems:
 
-- `cuvs-bench`: Contains GPU and CPU benchmarks, can run all algorithms supported. Will download million-scale datasets as required. Best suited for users that prefer a smaller container size for GPU based systems. Requires the NVIDIA Container Toolkit to run GPU algorithms, can run CPU algorithms without it.
-- `cuvs-bench-cpu`: Contains only CPU benchmarks with minimal size. Best suited for users that want the smallest containers to reproduce benchmarks on systems without a GPU.
+- `cuvs-bench`: includes GPU and CPU benchmarks, supports all algorithms, downloads million-scale datasets as needed, and requires the NVIDIA Container Toolkit for GPU algorithms.
+- `cuvs-bench-cpu`: includes only CPU benchmarks and is the smallest image for systems without GPUs.
 
-Nightly images are located in [dockerhub](https://hub.docker.com/r/rapidsai/cuvs-bench/tags).
+Nightly images are located on [Docker Hub](https://hub.docker.com/r/rapidsai/cuvs-bench/tags).
 
 The following command pulls the nightly container for Python version 3.13, CUDA version 12.9, and cuVS version 26.06:
 
@@ -59,21 +47,21 @@ The following command pulls the nightly container for Python version 3.13, CUDA 
 docker pull rapidsai/cuvs-bench:26.06a-cuda12-py3.13 # substitute cuvs-bench for the exact desired container.
 ```
 
-The CUDA and python versions can be changed for the supported values:
+CUDA and Python versions can be changed to supported values:
 - Supported CUDA versions: 12, 13
-- Supported Python versions: 3.11, 3.11, 3.13, and 3.14
+- Supported Python versions: 3.11, 3.13, and 3.14
 
-You can see the exact versions as well in the dockerhub site:
+Exact tags are listed on Docker Hub:
 - [cuVS bench images](https://hub.docker.com/r/rapidsai/cuvs-bench/tags)
 - [cuVS bench CPU only images](https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags)
 
-**Note:** GPU containers use the CUDA toolkit from inside the container, the only requirement is a driver installed on the host machine that supports that version. So, for example, CUDA 12 containers can run in systems with a CUDA 13.x capable driver. Please also note that the Nvidia-Docker runtime from the [Nvidia Container Toolkit](https://github.com/NVIDIA/nvidia-docker) is required to use GPUs inside docker containers.
+**Note:** GPU containers use the CUDA toolkit inside the container. The host only needs a compatible driver, so CUDA 12 containers can run on systems with CUDA 13.x-capable drivers. GPU access also requires the NVIDIA Docker runtime from the [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-docker).
 
 ## Running the benchmarks
 
 ### End-to-end: smaller-scale benchmarks (&lt;1M to 10M)
 
-The steps below demonstrate how to download, install, and run benchmarks on a subset of 10M vectors from the Yandex Deep-1B dataset. By default the datasets will be stored and used from the folder indicated by the `RAPIDS_DATASET_ROOT_DIR` environment variable if defined, otherwise a datasets sub-folder from where the script is being called.
+This example downloads, installs, and runs benchmarks on a 10M-vector subset of Yandex Deep-1B. Datasets are stored under `RAPIDS_DATASET_ROOT_DIR` when set, otherwise under a local `datasets` subdirectory.
 
 ```bash
 # (1) Prepare dataset.
@@ -113,18 +101,17 @@ python -m cuvs_bench.plot --dataset deep-image-96-inner
 | `nytimes-256-angular` | 290K | 256 | 10K | Angular |
 | `sift-128-euclidean` | 1M | 128 | 10K | Euclidean |
 
-All of the datasets above contain ground test datasets with 100 neighbors. Thus `k` for these datasets must be  less than or equal to 100.
+These datasets include ground-truth test sets with 100 neighbors, so `k` must be less than or equal to 100.
 
 ### End-to-end: large-scale benchmarks (>10M vectors)
 
-`cuvs_bench.get_dataset` cannot be used to download the billion-scale datasets due to their size. You should instead use our billion-scale datasets guide to download and prepare them.
-All other python commands mentioned below work as intended once the billion-scale dataset has been downloaded.
+`cuvs_bench.get_dataset` does not download billion-scale datasets. Use the billion-scale dataset guide to prepare them; after that, the Python commands below work the same way.
 
 To download billion-scale datasets, visit [big-ann-benchmarks](http://big-ann-benchmarks.com/neurips21.html)
 
-We also provide a new dataset called `wiki-all` containing 88 million 768-dimensional vectors. This dataset is meant for benchmarking a realistic retrieval-augmented generation (RAG)/LLM embedding size at scale. It also contains 1M and 10M vector subsets for smaller-scale experiments. See our [Wiki-all Dataset Guide](wiki_all_dataset.md) for more information and to download the dataset.
+The `wiki-all` dataset contains 88M 768-dimensional vectors for realistic RAG/LLM-scale benchmarking, plus 1M and 10M subsets. See the [Wiki-all Dataset Guide](wiki_all_dataset.md) to download it.
 
-The steps below demonstrate how to download, install, and run benchmarks on a subset of 100M vectors from the Yandex Deep-1B dataset. Please note that datasets of this scale are recommended for GPUs with larger amounts of memory, such as the A100 or H100.
+The example below runs on a 100M-vector subset of Yandex Deep-1B. Datasets at this scale are best suited to large-memory GPUs such as A100 or H100.
 
 ```bash
 mkdir -p datasets/deep-1B
@@ -171,10 +158,9 @@ options:
 
 ### Testing on new datasets
 
-To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that dataset.
-Descriptors for several popular datasets are already available in [datasets.yaml](https://github.com/rapidsai/cuvs/blob/branch-25.04/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml).
+Each benchmark dataset needs a descriptor with file names and basic dataset properties. Descriptors for several common datasets are already available in [datasets.yaml](https://github.com/rapidsai/cuvs/blob/branch-25.04/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml).
 
-Let's consider how to test on a new dataset. First we create a descriptor `mydataset.yaml`
+For a new dataset, create a descriptor such as `mydataset.yaml`:
 
 ```yaml
 - name: mydata-1M
@@ -186,10 +172,7 @@ Let's consider how to test on a new dataset. First we create a descriptor `mydat
   distance: euclidean
 ```
 
-Here `name` can be chosen arbitrarily. We pass `name` as the `--dataset` argument for the benchmark. The file names are relative to the path given by `--dataset-path` argument.
-The `subset_size` field is optional. This argument defines how many vectors to use from the dataset file, the first `subset_size` vectors will be used.
-This way you can define benchmarks on multiple subsets of the same dataset without duplicating the dataset vectors.
-Note that the ground truth vectors have to be generated for each subset separately.
+Choose any `name` and pass it as `--dataset`. File paths are relative to `--dataset-path`. The optional `subset_size` uses the first `subset_size` vectors, which lets you benchmark multiple subsets without duplicating vectors. Ground truth must be generated separately for each subset.
 
 To run the benchmark on the newly defined `mydata-1M` dataset, you can use the following command line:
 
@@ -199,13 +182,13 @@ python -m cuvs_bench.run --dataset mydata-1M --dataset-path=/path/to/data/folder
 
 ### Running with Docker containers
 
-Two methods are provided for running the benchmarks with the Docker containers.
+Docker supports end-to-end runs and manual execution inside the container.
 
 #### End-to-end run on GPU
 
-When no other entrypoint is provided, an end-to-end script will run through all the steps in [Running the benchmarks](#running-the-benchmarks) above.
+Without a custom entrypoint, the container runs the full workflow from [Running the benchmarks](#running-the-benchmarks).
 
-For GPU-enabled systems, the `DATA_FOLDER` variable should be a local folder where you want datasets stored in `$DATA_FOLDER/datasets` and results in `$DATA_FOLDER/result` (we highly recommend `$DATA_FOLDER` to be a dedicated folder for the datasets and results of the containers):
+For GPU systems, set `DATA_FOLDER` to a dedicated local folder. Datasets are stored in `$DATA_FOLDER/datasets` and results in `$DATA_FOLDER/result`.
 
 ```bash
 export DATA_FOLDER=path/to/store/datasets/and/results
@@ -232,9 +215,9 @@ Usage of the above command is as follows:
 
 #### End-to-end run on CPU
 
-The container arguments in the above section also be used for the CPU-only container, which can be used on systems that don't have a GPU installed.
+Use the same argument pattern with the CPU-only container on systems without a GPU.
 
-***Note:*** the image changes to `cuvs-bench-cpu` container and the `--gpus all` argument is no longer used:
+***Note:*** Use the `cuvs-bench-cpu` image and omit `--gpus all`:
 
 ```bash
 export DATA_FOLDER=path/to/store/datasets/and/results
@@ -249,7 +232,7 @@ docker run  --rm -it -u $(id -u)                  \
 
 #### Manually run the scripts inside the container
 
-All of the `cuvs-bench` images contain the Conda packages, so they can be used directly by logging directly into the container itself:
+All `cuvs-bench` images include the Conda packages, so you can open a shell and run commands directly:
 
 ```bash
 export DATA_FOLDER=path/to/store/datasets/and/results
@@ -260,17 +243,17 @@ docker run --gpus all --rm -it -u $(id -u)          \
     rapidsai/cuvs-bench:26.06a-cuda12-py3.13
 ```
 
-This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the [Running the benchmarks](#running-the-benchmarks) section above:
+This opens a container shell with the `cuvs-bench` Python package ready to use:
 
 ```bash
 (base) root@00b068fbb862:/data/benchmarks# python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
 ```
 
-Additionally, the containers can be run in detached mode without any issue.
+Containers can also run in detached mode.
 
 ### Evaluating the results
 
-The benchmarks capture several different measurements. The table below describes each of the measurements for index build benchmarks:
+Build benchmarks report these measurements:
 
 | Name | Description |
 | --- | --- |
@@ -278,10 +261,10 @@ The benchmarks capture several different measurements. The table below describes
 | Time | Wall-time spent training the index |
 | CPU | CPU time spent training the index |
 | Iterations | Number of iterations (this is usually 1) |
-| GPU | GU time spent building |
+| GPU | GPU time spent building |
 | index_size | Number of vectors used to train index |
 
-The table below describes each of the measurements for the index search benchmarks. The most important measurements `Latency`, `items_per_second`, `end_to_end`.
+Search benchmarks report these measurements. The most important fields are `Latency`, `items_per_second`, and `end_to_end`.
 
 | Name | Description |
 | --- | --- |
@@ -296,18 +279,18 @@ The table below describes each of the measurements for the index search benchmar
 | k | Number of neighbors being queried in each iteration |
 | end_to_end | Total time taken to run all batches for all iterations |
 | n_queries | Total number of query vectors in each batch |
-| total_queries | Total number of vectors queries across all iterations ( = `iterations` * `n_queries`) |
+| total_queries | Total number of vector queries across all iterations ( = `iterations` * `n_queries`) |
 
-Note the following:
-- A slightly different method is used to measure `Time` and `end_to_end`. That is why `end_to_end` = `Time` * `Iterations` holds only approximately.
-- The actual table displayed on the screen may differ slightly as the hyper-parameters will also be displayed for each different combination being benchmarked.
-- Recall calculation: the number of queries processed per test depends on the number of iterations. Because of this, recall can show slight fluctuations if less neighbors are processed then it is available for the benchmark.
+Notes:
+- `Time` and `end_to_end` are measured slightly differently, so `end_to_end = Time * Iterations` is only approximate.
+- Output tables may also include hyper-parameters for each benchmarked configuration.
+- Recall can fluctuate when fewer neighbors are processed than are available in the benchmark, because processed query count depends on iteration count.
 
 ## Creating and customizing dataset configurations
 
-A single configuration will often define a set of algorithms, with associated index and search parameters, that can be generalize across datasets. We use YAML to define dataset specific and algorithm specific configurations.
+A YAML configuration defines datasets, algorithms, and their build/search parameters. A single algorithm configuration can often be reused across datasets.
 
-A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
+The default `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml` includes several datasets. Example entry for `sift-128-euclidean`:
 
 ```yaml
 - name: sift-128-euclidean
@@ -318,7 +301,7 @@ A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench
   distance: euclidean
 ```
 
-Configuration files for ANN algorithms supported by `cuvs-bench` are provided in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/algos`. `cuvs_cagra` algorithm configuration looks like:
+Algorithm configuration files live in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/algos`. Example `cuvs_cagra` configuration:
 
 ```yaml
 name: cuvs_cagra
@@ -341,15 +324,15 @@ groups:
       itopk: [32, 64, 128]
 ```
 
-The default parameters for which the benchmarks are run can be overridden by creating a custom YAML file for algorithms with a `base` group.
+Override default benchmark parameters by creating a custom YAML file for algorithms with a `base` group.
 
-The config above has 3 fields:
+The config has three fields:
 
-1. `name` - The name of the algorithm for which the parameters are being specified.
-2. `constraints` - Optional. Python import paths to functions that validate build and search parameter combinations (e.g. `cuvs_bench.config.algos.constraints.cuvs_cagra_build`). Each function returns `True` if the parameters are valid, `False` otherwise; invalid combinations are skipped and not benchmarked.
-3. `groups` - Run groups, each with a set of parameters. Each group defines a cross-product of all hyper-parameter fields for `build` and `search`.
+1. `name`: algorithm name.
+2. `constraints`: optional Python import paths that validate build and search combinations, such as `cuvs_bench.config.algos.constraints.cuvs_cagra_build`. Invalid combinations are skipped.
+3. `groups`: run groups. Each group defines a cross-product of `build` and `search` hyper-parameters.
 
-The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The [ANN Algorithm Parameter Tuning Guide](param_tuning.md) contains detailed instructions on choosing build and search parameters for each supported algorithm.
+Supported algorithms are listed below. Each algorithm has its own `build` and `search` settings; see the [ANN Algorithm Parameter Tuning Guide](param_tuning.md) for parameter guidance.
 
 | Library | Algorithms |
 | --- | --- |
@@ -362,7 +345,7 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
 
 ### Multi-GPU benchmarks
 
-cuVS implements single node multi-GPU versions of IVF-Flat, IVF-PQ and CAGRA indexes.
+cuVS includes single-node multi-GPU versions of IVF-Flat, IVF-PQ, and CAGRA.
 
 | Index type | Multi-GPU algo name |
 | --- | --- |
@@ -374,9 +357,9 @@ cuVS implements single node multi-GPU versions of IVF-Flat, IVF-PQ and CAGRA ind
 
 ### Implementation and configuration
 
-Implementation of a new algorithm should be a C++ class that inherits `class ANN` (defined in `cpp/bench/ann/src/ann.h`) and implements all the pure virtual functions.
+New algorithms should be C++ classes that inherit `class ANN` from `cpp/bench/ann/src/ann.h` and implement all pure virtual functions.
 
-In addition, it should define two `struct`s for building and searching parameters. The searching parameter class should inherit `struct ANN&lt;T>::AnnSearchParam`. Take `class HnswLib` as an example, its definition is:
+Define separate build and search parameter structs. The search parameter struct should inherit `struct ANN&lt;T>::AnnSearchParam`. Example:
 
 ```c++
 template<typename T>
@@ -398,7 +381,7 @@ public:
 };
 ```
 
-The benchmark program uses JSON format natively in a configuration file to specify indexes to build, along with the build and search parameters. However the JSON config files are overly verbose and are not meant to be used directly. Instead, the Python scripts parse YAML and create these json files automatically. It's important to realize that these json objects align with the yaml objects for `build_param`, whose value is a JSON object, and `search_param`, whose value is an array of JSON objects. Take the json configuration for `HnswLib` as an example of the json after it's been parsed from yaml:
+The benchmark program consumes JSON configuration files for indexes, build parameters, and search parameters. These JSON files are verbose and are generated automatically from YAML. The JSON objects map to YAML `build_param` objects and `search_param` arrays. Example generated JSON for `HnswLib`:
 
 ```json
 {
@@ -415,9 +398,9 @@ The benchmark program uses JSON format natively in a configuration file to speci
 },
 ```
 
-The build and search params are ultimately passed to the C++ layer as json objects for each param configuration to benchmark. The code below shows how to parse these params for `Hnswlib`:
+Build and search params are passed to C++ as JSON objects. Parse them for `HnswLib` as follows:
 
-1. First, add two functions for parsing JSON object to `struct BuildParam` and `struct SearchParam`, respectively:
+1. Add functions that parse JSON into `struct BuildParam` and `struct SearchParam`:
 
 ```c++
 template<typename T>
@@ -440,7 +423,7 @@ void parse_search_param(const nlohmann::json& conf,
 }
 ```
 
-2. Next, add corresponding `if` case to functions `create_algo()` (in `cpp/bench/ann/) and `create_search_param()` by calling parsing functions. The string literal in `if` condition statement must be the same as the value of `algo` in configuration file. For example,
+2. Add matching `if` cases to `create_algo()` in `cpp/bench/ann/` and `create_search_param()`. The string literal must match the `algo` value in the configuration file:
 
 ```c++
 // JSON configuration file contains a line like:  "algo" : "hnswlib"
@@ -449,9 +432,9 @@ if (algo == "hnswlib") {
 }
 ```
 
-### Adding a Cmake target
+### Adding a CMake target
 
-In `cuvs/cpp/bench/ann/CMakeLists.txt`, we provide a `CMake` function to configure a new Benchmark target with the following signature:
+`cuvs/cpp/bench/ann/CMakeLists.txt` provides a CMake function for new benchmark targets:
 
 ```cmake
 ConfigureAnnBench(
@@ -463,7 +446,7 @@ ConfigureAnnBench(
 )
 ```
 
-To add a target for `HNSWLIB`, we would call the function as:
+Example target for `HNSWLIB`:
 
 ```cmake
 ConfigureAnnBench(
@@ -472,9 +455,9 @@ ConfigureAnnBench(
 )
 ```
 
-This will create an executable called `HNSWLIB_ANN_BENCH`, which can then be used to run `HNSWLIB` benchmarks.
+This creates `HNSWLIB_ANN_BENCH`, which runs `HNSWLIB` benchmarks.
 
-Add a new entry to `algos.yaml` to map the name of the algorithm to its binary executable and specify whether the algorithm requires GPU support.
+Add an `algos.yaml` entry that maps the algorithm name to its executable and declares GPU requirements:
 
 ```yaml
 cuvs_ivf_pq:
@@ -482,5 +465,5 @@ cuvs_ivf_pq:
   requires_gpu: true
 ```
 
-`executable` : specifies the name of the binary that will build/search the index. It is assumed to be available in `cuvs/cpp/build/`.
-`requires_gpu` : denotes whether an algorithm requires GPU to run.
+`executable` specifies the binary used to build/search the index and is assumed to be available in `cuvs/cpp/build/`.
+`requires_gpu` specifies whether the algorithm requires a GPU.
