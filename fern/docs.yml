@@ -59,7 +59,6 @@ navigation:
   - section: "Getting Started"
     contents:
       - section: "Introduction"
-        collapsed: "open-by-default"
         path: "./pages/getting_started.md"
         contents:
           - page: "Vector Search"
