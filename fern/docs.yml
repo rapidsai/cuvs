@@ -79,17 +79,8 @@ navigation:
     contents:
       - page: "Developer Guide"
         path: "./pages/developer_guide.md"
-  - section: "Integrations"
+  - page: "Integrations"
     path: "./pages/integrations.md"
-    contents:
-      - page: "Faiss"
-        path: "./pages/integrations/faiss.md"
-      - page: "Milvus"
-        path: "./pages/integrations/milvus.md"
-      - page: "Lucene"
-        path: "./pages/integrations/lucene.md"
-      - page: "Kinetica"
-        path: "./pages/integrations/kinetica.md"
   - section: "cuVS Bench"
     path: "./pages/cuvs_bench/index.md"
     contents:
