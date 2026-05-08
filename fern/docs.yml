@@ -58,8 +58,6 @@ navigation:
     contents:
       - page: "Installation"
         path: "./pages/build.md"
-  - section: "User Guide"
-    contents:
       - section: "Introduction"
         path: "./pages/getting_started.md"
         contents:
@@ -69,6 +67,8 @@ navigation:
             path: "./pages/vector_databases_vs_vector_search.md"
           - page: "Tuning Indexes"
             path: "./pages/tuning_guide.md"
+  - section: "User Guide"
+    contents:
       - section: "Using cuVS APIs"
         path: "./pages/working_with_ann_indexes.md"
         contents:
