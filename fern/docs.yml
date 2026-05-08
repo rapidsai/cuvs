@@ -65,7 +65,7 @@ navigation:
         contents:
           - page: "Vector Search"
             path: "./pages/choosing_and_configuring_indexes.md"
-          - page: "Vector search vs Vector DB"
+          - page: "Vector Database"
             path: "./pages/vector_databases_vs_vector_search.md"
           - page: "Index Tuning Guide"
             path: "./pages/tuning_guide.md"

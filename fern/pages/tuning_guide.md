@@ -2,7 +2,7 @@
 
 Tuning a vector search index means choosing parameters that meet your recall, latency, throughput, memory, and build-time goals. The best settings depend on the data distribution, index type, hardware, and production constraints.
 
-For background on index choices, see the [primer on vector search indexes](choosing_and_configuring_indexes.md). For the difference between an index and a vector database, see [Vector search vs Vector DB](vector_databases_vs_vector_search.md).
+For background on index choices, see the [primer on vector search indexes](choosing_and_configuring_indexes.md). For the difference between an index and a vector database, see [Vector Database](vector_databases_vs_vector_search.md).
 
 ## When to tune
 
