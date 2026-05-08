@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-mg-common
 
 # Multi-GPU Common
 
-_Source header: `c/include/cuvs/neighbors/mg_common.h`_
+_Source header: `cuvs/neighbors/mg_common.h`_
 
 ## Multi-GPU common types and enums
 

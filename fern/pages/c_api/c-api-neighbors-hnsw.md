@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-hnsw
 
 # HNSW
 
-_Source header: `c/include/cuvs/neighbors/hnsw.h`_
+_Source header: `cuvs/neighbors/hnsw.h`_
 
 ## C API for HNSW index params
 

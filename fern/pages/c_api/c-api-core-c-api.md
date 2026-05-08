@@ -4,7 +4,7 @@ slug: api-reference/c-api-core-c-api
 
 # C API
 
-_Source header: `c/include/cuvs/core/c_api.h`_
+_Source header: `cuvs/core/c_api.h`_
 
 ## cuVS Error Messages
 

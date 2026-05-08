@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-common
 
 # Common
 
-_Source header: `c/include/cuvs/neighbors/common.h`_
+_Source header: `cuvs/neighbors/common.h`_
 
 ## Filters APIs
 

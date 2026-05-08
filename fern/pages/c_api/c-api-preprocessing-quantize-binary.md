@@ -4,7 +4,7 @@ slug: api-reference/c-api-preprocessing-quantize-binary
 
 # Binary
 
-_Source header: `c/include/cuvs/preprocessing/quantize/binary.h`_
+_Source header: `cuvs/preprocessing/quantize/binary.h`_
 
 ## C API for Binary Quantizer
 

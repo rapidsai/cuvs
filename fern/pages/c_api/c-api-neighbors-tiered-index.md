@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-tiered-index
 
 # Tiered Index
 
-_Source header: `c/include/cuvs/neighbors/tiered_index.h`_
+_Source header: `cuvs/neighbors/tiered_index.h`_
 
 ## Types
 

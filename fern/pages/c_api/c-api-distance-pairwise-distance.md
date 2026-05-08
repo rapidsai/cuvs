@@ -4,7 +4,7 @@ slug: api-reference/c-api-distance-pairwise-distance
 
 # Pairwise Distance
 
-_Source header: `c/include/cuvs/distance/pairwise_distance.h`_
+_Source header: `cuvs/distance/pairwise_distance.h`_
 
 ## C pairwise distance
 

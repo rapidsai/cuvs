@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-ivf-flat
 
 # IVF Flat
 
-_Source header: `c/include/cuvs/neighbors/ivf_flat.h`_
+_Source header: `cuvs/neighbors/ivf_flat.h`_
 
 ## IVF-Flat index build parameters
 

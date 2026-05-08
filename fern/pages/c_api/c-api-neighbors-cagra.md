@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-cagra
 
 # Cagra
 
-_Source header: `c/include/cuvs/neighbors/cagra.h`_
+_Source header: `cuvs/neighbors/cagra.h`_
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 

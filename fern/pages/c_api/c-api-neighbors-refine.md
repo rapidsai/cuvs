@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-refine
 
 # Refine
 
-_Source header: `c/include/cuvs/neighbors/refine.h`_
+_Source header: `cuvs/neighbors/refine.h`_
 
 ## Approximate Nearest Neighbors Refinement C-API
 

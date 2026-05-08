@@ -4,7 +4,7 @@ slug: api-reference/c-api-preprocessing-pca
 
 # PCA
 
-_Source header: `c/include/cuvs/preprocessing/pca.h`_
+_Source header: `cuvs/preprocessing/pca.h`_
 
 ## C API for PCA (Principal Component Analysis)
 

@@ -483,6 +483,8 @@ def generate_native_api_pages(
 
 
 def display_source_header(source: str, api: str) -> str:
+    if api == "c":
+        return source.removeprefix("c/include/")
     if api == "cpp":
         return source.removeprefix("cpp/include/")
     return source

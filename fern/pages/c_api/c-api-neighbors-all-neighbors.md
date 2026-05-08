@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-all-neighbors
 
 # All Neighbors
 
-_Source header: `c/include/cuvs/neighbors/all_neighbors.h`_
+_Source header: `cuvs/neighbors/all_neighbors.h`_
 
 ## All-neighbors C-API build parameters
 

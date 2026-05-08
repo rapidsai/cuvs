@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-mg-cagra
 
 # Multi-GPU Cagra
 
-_Source header: `c/include/cuvs/neighbors/mg_cagra.h`_
+_Source header: `cuvs/neighbors/mg_cagra.h`_
 
 ## Multi-GPU CAGRA index build parameters
 

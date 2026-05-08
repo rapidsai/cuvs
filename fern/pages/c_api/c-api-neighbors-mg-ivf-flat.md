@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-mg-ivf-flat
 
 # Multi-GPU IVF Flat
 
-_Source header: `c/include/cuvs/neighbors/mg_ivf_flat.h`_
+_Source header: `cuvs/neighbors/mg_ivf_flat.h`_
 
 ## Multi-GPU IVF-Flat index build parameters
 

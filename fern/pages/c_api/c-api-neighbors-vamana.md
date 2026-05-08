@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-vamana
 
 # Vamana
 
-_Source header: `c/include/cuvs/neighbors/vamana.h`_
+_Source header: `cuvs/neighbors/vamana.h`_
 
 ## C API for Vamana index build
 

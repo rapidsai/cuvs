@@ -4,7 +4,7 @@ slug: api-reference/c-api-neighbors-nn-descent
 
 # NN Descent
 
-_Source header: `c/include/cuvs/neighbors/nn_descent.h`_
+_Source header: `cuvs/neighbors/nn_descent.h`_
 
 ## Types
 

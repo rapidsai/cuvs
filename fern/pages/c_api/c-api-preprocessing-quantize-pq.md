@@ -4,7 +4,7 @@ slug: api-reference/c-api-preprocessing-quantize-pq
 
 # PQ
 
-_Source header: `c/include/cuvs/preprocessing/quantize/pq.h`_
+_Source header: `cuvs/preprocessing/quantize/pq.h`_
 
 ## C API for Product Quantizer
 

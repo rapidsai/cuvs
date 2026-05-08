@@ -4,7 +4,7 @@ slug: api-reference/c-api-distance-distance
 
 # Distance
 
-_Source header: `c/include/cuvs/distance/distance.h`_
+_Source header: `cuvs/distance/distance.h`_
 
 ## Types
 

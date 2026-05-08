@@ -4,7 +4,7 @@ slug: api-reference/c-api-preprocessing-quantize-scalar
 
 # Scalar
 
-_Source header: `c/include/cuvs/preprocessing/quantize/scalar.h`_
+_Source header: `cuvs/preprocessing/quantize/scalar.h`_
 
 ## C API for Scalar Quantizer
 

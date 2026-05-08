@@ -4,7 +4,7 @@ slug: api-reference/c-api-cluster-kmeans
 
 # K-Means
 
-_Source header: `c/include/cuvs/cluster/kmeans.h`_
+_Source header: `cuvs/cluster/kmeans.h`_
 
 ## k-means hyperparameters
 
