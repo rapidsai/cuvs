@@ -102,4 +102,4 @@ Please refer to RAFT's [mdspan documentation](https://docs.rapids.ai/api/raft/st
 
 The Python APIs accept objects that expose the CUDA Array Interface, which enables interoperability with GPU array libraries such as CuPy, Numba, PyTorch, and TensorFlow without copying device memory when compatible layouts are used.
 
-See [Using APIs in Python](working_with_ann_indexes_python.md) for examples of building and searching cuVS indexes from Python arrays.
+See [Using APIs in Python](working_with_ann_indexes.md#python) for examples of building and searching cuVS indexes from Python arrays.
