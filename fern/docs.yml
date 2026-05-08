@@ -83,6 +83,7 @@ navigation:
           - page: "All-neighbors"
             path: "./pages/neighbors/all_neighbors.md"
       - page: "Using cuVS APIs"
+        hidden: true
         path: "./pages/working_with_ann_indexes.md"
   - section: "User Guide"
     contents:
