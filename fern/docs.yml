@@ -116,8 +116,6 @@ navigation:
         path: "./pages/developer_guide.md"
       - page: "Contributing"
         path: "./pages/contributing.md"
-      - page: "Filtering vector indexes"
-        path: "./pages/filtering.md"
       - section: "Using APIs"
         path: "./pages/working_with_ann_indexes.md"
         contents:
@@ -129,6 +127,8 @@ navigation:
             path: "./pages/working_with_ann_indexes_python.md"
           - page: "Using APIs in Rust"
             path: "./pages/working_with_ann_indexes_rust.md"
+          - page: "Filtering vector indexes"
+            path: "./pages/filtering.md"
       - section: "Advanced Topics"
         path: "./pages/advanced_topics.md"
         contents:
