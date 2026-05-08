@@ -20,36 +20,6 @@ For dataset file formats, conversion utilities, and ground-truth generation, see
 
 For custom benchmark execution paths and backend integrations, see [Pluggable Backend](pluggable_backend.md).
 
-- [Installing the benchmarks](#installing-the-benchmarks)
-
-  * [Conda](#conda)
-
-  * [Docker](#docker)
-
-- [Running the benchmarks](#running-the-benchmarks)
-
-  * [End-to-end: smaller-scale benchmarks (&lt;1M to 10M)](#end-to-end-smaller-scale-benchmarks-1m-to-10m)
-
-  * [End-to-end: large-scale benchmarks (>10M vectors)](#end-to-end-large-scale-benchmarks-10m-vectors)
-
-  * [Running with Docker containers](#running-with-docker-containers)
-
-    * [End-to-end run on GPU](#end-to-end-run-on-gpu)
-
-    * [Manually run the scripts inside the container](#manually-run-the-scripts-inside-the-container)
-
-  * [Evaluating the results](#evaluating-the-results)
-
-- [Creating and customizing dataset configurations](#creating-and-customizing-dataset-configurations)
-
-  * [Multi-GPU benchmarks](#multi-gpu-benchmarks)
-
-- [Adding a new index algorithm](#adding-a-new-index-algorithm)
-
-  * [Implementation and configuration](#implementation-and-configuration)
-
-  * [Adding a Cmake target](#adding-a-cmake-target)
-
 ## Installing the benchmarks
 
 There are two main ways pre-compiled benchmarks are distributed:
