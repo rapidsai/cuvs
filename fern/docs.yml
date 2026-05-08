@@ -95,10 +95,10 @@ navigation:
         path: "./pages/integrations.md"
       - section: "Benchmarking"
         contents:
+          - page: "Methologies"
+            path: "./pages/comparing_indexes.md"
           - page: "cuVS Bench Tool"
             path: "./pages/cuvs_bench/index.md"
-          - page: "Evaluating Performance"
-            path: "./pages/comparing_indexes.md"
           - page: "Build cuVS Bench From Source"
             hidden: true
             path: "./pages/cuvs_bench/build.md"

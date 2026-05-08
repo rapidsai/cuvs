@@ -8,7 +8,7 @@
 
   * [Tuning Indexes](tuning_guide.md)
 
-  * [Evaluating performance](comparing_indexes.md)
+  * [Methologies](comparing_indexes.md)
 
 - [Supported indexes](#supported-indexes)
 
@@ -54,7 +54,7 @@ When comparing the performance of vector search indexes, it is important that co
 1. Search quality
 1. Search performance
 
-Please see [Evaluating Performance](comparing_indexes.md) for more information on methodologies and how to make a fair apples-to-apples comparison during your evaluations.
+Please see [Methologies](comparing_indexes.md) for more information on methodologies and how to make a fair apples-to-apples comparison during your evaluations.
 
 ## Supported indexes
 
