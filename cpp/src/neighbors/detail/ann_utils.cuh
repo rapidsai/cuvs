@@ -418,7 +418,9 @@ inline auto get_prefetch_stream(raft::resources const& res)
  * Three orthogonal flags control behavior of the copy_device strategy:
  *   * `prefetch`: if true, allocate two device buffers and pipeline copies using
  *     `prefetch_next_batch()`. If false, copies happen synchronously at `operator*` and one buffer
- *     is allocated.
+ *     is allocated. As an optimization, when `n_iters_ <= 1` (i.e. `batch_size >=
+ *     input_view.extent(0)`) prefetching is internally downgraded to false and only one buffer is
+ *     allocated, since there is no "next batch" to overlap with.
  *   * `initialize`: if true, stage source rows H2D into the buffer before yielding the batch.
  *     If false, the buffer is handed out uninitialized (kernel produces the data from scratch).
  *   * `host_writeback`: if true, queue D2H of every advanced batch back to `input_view_`.
@@ -474,8 +476,7 @@ struct batch_load_iterator {
   static constexpr bool kPassthrough = accessor_type::is_device_accessible;
 
   // Type returned by `view()` for the passthrough strategy: a 2D submdspan of `input_view_` over a
-  // contiguous row range. Built without ever calling `data_handle()` on the input mdspan, so this
-  // stays valid even for future device mdspans whose accessor exposes no raw pointer.
+  // contiguous row range. Built without ever calling `data_handle()` on the input mdspan.
   // (Per the mdspan spec, slicing a `layout_right` with a `tuple{lo, hi}` over the leading dim
   // yields a `layout_stride` mdspan with the input's accessor preserved.)
   using passthrough_view_type =
@@ -599,9 +600,15 @@ struct batch_load_iterator {
         }
         buf_0_.resize(row_width_ * batch_size_, copy_stream);
         dev_ptr_ = reinterpret_cast<element_type*>(buf_0_.data());
-        if (prefetch_) {
+        // The second buffer is only useful when there is more than one batch to overlap. With
+        // n_iters_ <= 1, there is no "next batch" to stage while a kernel runs on the current
+        // one, so prefetching offers no benefit. Downgrade `prefetch_` to false to skip the
+        // buf_1_ allocation and have `prefetch()` / `load()` take the single-buffer fast path.
+        if (prefetch_ && n_iters_ > 1) {
           buf_1_.resize(row_width_ * batch_size_, copy_stream);
           prefetch_dev_ptr_ = reinterpret_cast<element_type*>(buf_1_.data());
+        } else {
+          prefetch_ = false;
         }
       }
     }

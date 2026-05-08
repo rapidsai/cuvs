@@ -378,7 +378,7 @@ __global__ void kern_merge_graph(
   const uint32_t batch_size,
   const uint32_t batch_id,
   bool guarantee_connectivity,
-  bool* check_num_protected_edges)
+  uint32_t* check_num_protected_edges)
 {
   // Check assumption we have at least one warp per row of the batch
   assert(blockDim.x == raft::WarpSize * num_warps);
@@ -442,7 +442,7 @@ __global__ void kern_merge_graph(
   const auto num_protected_edges = max(current_mst_graph_num_edges, output_graph_degree / 2);
 
   if (num_protected_edges > output_graph_degree) {
-    check_num_protected_edges[0] = false;
+    check_num_protected_edges[0] = 0u;
     return;
   }
   if (num_protected_edges == output_graph_degree) { return; }
@@ -706,13 +706,29 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
   }
 }
 
-template <typename IdxT>
-void log_incoming_edges_histogram(const IdxT* output_graph_ptr,
-                                  uint64_t graph_size,
-                                  uint64_t output_graph_degree)
+template <typename IdxT, typename AccessorOutputGraph>
+void log_incoming_edges_histogram(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>
+    output_graph)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/check_edges");
+  const uint64_t graph_size          = output_graph.extent(0);
+  const uint64_t output_graph_degree = output_graph.extent(1);
+
+  // copy to host if required
+  IdxT* output_graph_ptr = nullptr;
+  int64_t buffer_size    = AccessorOutputGraph::is_host_accessible ? graph_size : 0;
+  auto host_copy_output_graph =
+    raft::make_host_matrix<IdxT, int64_t>(buffer_size, output_graph_degree);
+  if constexpr (AccessorOutputGraph::is_host_accessible) {
+    output_graph_ptr = output_graph.data_handle();
+  } else {
+    raft::copy(res, host_copy_output_graph.view(), output_graph);
+    output_graph_ptr = host_copy_output_graph.data_handle();
+  }
+
   auto in_edge_count     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
   auto in_edge_count_ptr = in_edge_count.data_handle();
 #pragma omp parallel for
@@ -753,13 +769,30 @@ void log_incoming_edges_histogram(const IdxT* output_graph_ptr,
   }
 }
 
-template <typename IdxT>
-void check_duplicates_and_out_of_range(const IdxT* output_graph_ptr,
-                                       uint64_t graph_size,
-                                       uint64_t output_graph_degree)
+template <typename IdxT, typename AccessorOutputGraph>
+void check_duplicates_and_out_of_range(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>
+    output_graph)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/check_duplicates");
+
+  const uint64_t graph_size          = output_graph.extent(0);
+  const uint64_t output_graph_degree = output_graph.extent(1);
+
+  // copy to host if required
+  IdxT* output_graph_ptr = nullptr;
+  int64_t buffer_size    = AccessorOutputGraph::is_host_accessible ? graph_size : 0;
+  auto host_copy_output_graph =
+    raft::make_host_matrix<IdxT, int64_t>(buffer_size, output_graph_degree);
+  if constexpr (AccessorOutputGraph::is_host_accessible) {
+    output_graph_ptr = output_graph.data_handle();
+  } else {
+    raft::copy(res, host_copy_output_graph.view(), output_graph);
+    output_graph_ptr = host_copy_output_graph.data_handle();
+  }
+
   uint64_t num_dup = 0;
   uint64_t num_oor = 0;
 #pragma omp parallel for reduction(+ : num_dup) reduction(+ : num_oor)
@@ -807,8 +840,12 @@ void merge_graph_gpu(
 
   const double merge_graph_start = cur_time();
 
-  auto d_check_num_protected_edges = raft::make_device_scalar<bool>(res, true);
+  auto d_check_num_protected_edges = raft::make_device_scalar<uint32_t>(res, 1u);
 
+  // The batchsize is statically set to 256 * 1024 which corresponds to 256MB for a graph
+  // degree of 128 and 16byte index type. This is a trade-off between memory usage and performance.
+  // When choosing dynamically based on available memory, we would also need to modify the static
+  // size assumption in the cagra_build.cuh::optimize_workspace_size function.
   uint32_t batch_size      = static_cast<uint32_t>(std::min<uint64_t>(graph_size, 256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
@@ -871,11 +908,10 @@ void merge_graph_gpu(
     ++d_mst_graph_num_edges;
   }
 
-  bool check_num_protected_edges = true;
-  raft::copy(&check_num_protected_edges,
-             d_check_num_protected_edges.data_handle(),
-             1,
-             raft::resource::get_cuda_stream(res));
+  uint32_t check_num_protected_edges = 1u;
+  raft::copy(res,
+             raft::make_host_scalar_view(&check_num_protected_edges),
+             d_check_num_protected_edges.view());
   raft::resource::sync_stream(res);
   const auto merge_graph_end = cur_time();
   RAFT_EXPECTS(check_num_protected_edges,
@@ -907,7 +943,15 @@ void make_reverse_graph_gpu(
   raft::matrix::fill(res, d_rev_graph, IdxT(-1));
   raft::matrix::fill(res, d_rev_graph_count, uint32_t(0));
 
-  if constexpr (!AccessorOutputGraph::is_device_accessible) {
+  if constexpr (AccessorOutputGraph::is_device_accessible) {
+    // output graph is fully device accessible, so we need no copy to device
+    dim3 threads(256, 1, 1);
+    dim3 blocks(1024, 1, 1);
+    for (uint64_t k = 0; k < output_graph_degree; k++) {
+      kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+        output_graph, d_rev_graph, d_rev_graph_count, k);
+    }
+  } else {
     auto d_dest_nodes = raft::make_device_matrix<IdxT, int64_t>(res, graph_size, 1);
     auto dest_nodes   = raft::make_host_vector<IdxT, int64_t>(graph_size);
     for (uint64_t k = 0; k < output_graph_degree; k++) {
@@ -923,14 +967,6 @@ void make_reverse_graph_gpu(
         d_dest_nodes.view(), d_rev_graph, d_rev_graph_count, 0);
       raft::resource::sync_stream(res);
       RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
-    }
-  } else {
-    // output graph is fully device accessible, so we need no copy to device
-    dim3 threads(256, 1, 1);
-    dim3 blocks(1024, 1, 1);
-    for (uint64_t k = 0; k < output_graph_degree; k++) {
-      kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-        output_graph, d_rev_graph, d_rev_graph_count, k);
     }
   }
 }
@@ -1570,6 +1606,10 @@ void prune_graph_gpu(
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/prune");
 
+  // The batchsize is statically set to 256 * 1024 which corresponds to 256MB for a graph
+  // degree of 128 and 16byte index type. This is a trade-off between memory usage and performance.
+  // When choosing dynamically based on available memory, we would also need to modify the static
+  // size assumption in the cagra_build.cuh::optimize_workspace_size function.
   uint32_t batch_size      = static_cast<uint32_t>(std::min<uint64_t>(graph_size, 256 * 1024));
   const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
@@ -1577,10 +1617,10 @@ void prune_graph_gpu(
 
   const double prune_start = cur_time();
 
-  uint64_t num_keep __attribute__((unused)) = 0;
-  uint64_t num_full __attribute__((unused)) = 0;
-  auto dev_stats                            = raft::make_device_vector<uint64_t>(res, 2);
-  auto host_stats                           = raft::make_host_vector<uint64_t>(2);
+  [[maybe_unused]] uint64_t num_keep = 0;
+  [[maybe_unused]] uint64_t num_full = 0;
+  auto dev_stats                     = raft::make_device_vector<uint64_t>(res, 2);
+  auto host_stats                    = raft::make_host_vector<uint64_t>(2);
   raft::matrix::fill(res, dev_stats.view(), uint64_t(0));
 
   namespace bli                       = cuvs::spatial::knn::detail::utils;
@@ -1591,7 +1631,6 @@ void prune_graph_gpu(
   bli::batch_load_iterator<
     raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph>>
     d_input_graph(res, knn_graph, graph_size, copy_stream, workspace_mr);
-  d_input_graph.prefetch_next_batch();
   auto input_view = (*d_input_graph).view();
 
   bli::batch_load_iterator<
@@ -1683,6 +1722,12 @@ void optimize(
   // temporary memory for small arrays, e.g. everything <= O(batchsize * graph_degree)
   auto default_ws_mr = raft::resource::get_workspace_resource_ref(res);
 
+  // create a stream pool if not already present
+  if (!res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) ||
+      raft::resource::get_stream_pool_size(res) < 1) {
+    raft::resource::set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(1));
+  }
+
   RAFT_EXPECTS(knn_graph.extent(0) == new_graph.extent(0),
                "Each input array is expected to have the same number of rows");
   RAFT_EXPECTS(new_graph.extent(1) <= knn_graph.extent(1),
@@ -1703,10 +1748,6 @@ void optimize(
   auto mst_graph_num_edges = raft::make_host_vector<uint32_t, int64_t>(mst_graph_size);
 
   if (guarantee_connectivity) {
-#pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      mst_graph_num_edges(i) = 0;
-    }
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/check_connectivity");
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
@@ -1731,7 +1772,7 @@ void optimize(
   auto d_rev_graph = raft::make_device_mdarray<IdxT>(res, raft::make_extents<int64_t>(0, 0));
   try {
     d_rev_graph = raft::make_device_mdarray<IdxT>(
-      res, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+      res, default_ws_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
   } catch (const std::exception& e) {
     RAFT_LOG_DEBUG(
       "Failed to create device matrix for reverse graph, switching to large workspace resource");
@@ -1765,14 +1806,12 @@ void optimize(
 
   raft::resource::sync_stream(res);
 
-  if constexpr (AccessorOutputGraph::is_host_accessible) {
-    // following checks require host access
-    log_incoming_edges_histogram<IdxT>(new_graph.data_handle(), graph_size, output_graph_degree);
+  // These host-side checks are expensive (O(N*D^2)) and only used as debug
+  // diagnostics, so only run them when debug logging is active at runtime.
+  if (raft::default_logger().should_log(rapids_logger::level_enum::debug)) {
+    log_incoming_edges_histogram<IdxT, AccessorOutputGraph>(res, new_graph);
 
-    check_duplicates_and_out_of_range<IdxT>(
-      new_graph.data_handle(), graph_size, output_graph_degree);
-  } else {
-    RAFT_LOG_DEBUG("Output graph is on GPU, skipping checks");
+    check_duplicates_and_out_of_range<IdxT, AccessorOutputGraph>(res, new_graph);
   }
 }
 
