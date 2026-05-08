@@ -114,7 +114,7 @@ navigation:
         path: "./pages/developer_guide.md"
       - page: "Contributing"
         path: "./pages/contributing.md"
-      - section: "Using APIs"
+      - section: "Using cuVS APIs"
         path: "./pages/working_with_ann_indexes.md"
         contents:
           - page: "Using APIs in C"
