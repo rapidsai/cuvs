@@ -1,67 +1,44 @@
 # Primer on vector search indexes
 
-Vector search indexes often use approximations to trade-off accuracy of the results for speed, either through lowering latency (end-to-end single query speed) or by increasing throughput (the number of query vectors that can be satisfied in a short period of time). Vector search indexes, especially ones that use approximations, are very closely related to machine learning models but they are optimized for fast search and accuracy of results.
+Vector search indexes trade build time, search speed, memory use, and recall. Exact indexes compare every vector and return the true nearest neighbors, but they become expensive as datasets grow. Approximate indexes search a smaller candidate set, which is faster, but may miss some exact neighbors.
 
-When the number of vectors is very small, such as less than 100 thousand vectors, it could be fast enough to use a brute-force (also known as a flat index), which returns exact results but at the expense of exhaustively searching all possible neighbors
+In vector search, recall is the main quality metric. It measures how many of the exact nearest neighbors were returned by the approximate search. Higher recall usually costs more build time, more search time, more memory, or some combination of all three.
 
-## Objectives
+## Start with the workload
 
-This primer addresses the challenge of configuring vector search indexes, but its primary goal is to get a user up and running quickly with acceptable enough results for a good choice of index type and a small and manageable tuning knob, rather than providing a comprehensive guide to tuning each and every hyper-parameter.
+The best index depends mostly on dataset size, vector dimensionality, recall target, and whether build time or query performance matters more.
 
-For this reason, we focus on 4 primary data sizes:
+| Workload | Good starting point |
+| --- | --- |
+| Tiny datasets, under 100K vectors | Use brute-force or CPU HNSW. A GPU index may not provide enough benefit to justify the extra complexity. |
+| Small datasets, under 1M vectors | Use GPU brute-force when exact results are acceptable and the vectors fit comfortably in memory. Use HNSW or CAGRA when lower latency is more important than exact recall. |
+| Large datasets with fast ingest needs | Use IVF-Flat or IVF-PQ. These indexes build quickly and let you tune recall by searching more or fewer clusters. |
+| Large datasets with high recall needs | Use CAGRA on GPU or HNSW on CPU. Graph indexes usually provide strong search quality, but take longer to build than IVF indexes. |
 
-1. Tiny datasets where GPU is likely not needed (&lt; 100 thousand vectors)
-1. Small datasets where GPU might not be needed (&lt; 1 million vectors)
-1. Large datasets (> 1 million vectors), goal is fast index creation at the expense of search quality
-1. Large datasets where high quality is preferred at the expense of fast index creation
+## Common index choices
 
-Like other machine learning algorithms, vector search indexes generally have a training step – which means building the index – and an inference – or search step. The hyper-parameters also tend to be broken down into build and search parameters.
+Brute-force, also called a flat index, is exact and simple. It is often the right baseline, especially for small datasets or when maximum recall matters more than latency.
 
-While not always the case, a general trend is often observed where the search speed decreases as the quality increases. This also tends to be the case with the index build performance, though different algorithms have different relationships between build time, quality, and search time. It’s important to understand that there’s no free lunch so there will always be trade-offs for each index type.
+IVF-Flat partitions vectors into clusters. During search, only the closest clusters are scanned. This reduces distance computations and is useful when you want faster search or faster ingest with a manageable recall trade-off.
 
-## Definition of quality
+IVF-PQ adds lossy product quantization to IVF-Flat. It uses much less memory, which helps at larger scale, but the compression can reduce recall. A refinement step can recover some quality by re-ranking candidates with the original vectors.
 
-What do we mean when we say quality of an index? In machine learning terminology, we measure this using recall, which is sometimes used interchangeably to mean accuracy, even though the two are slightly different measures. Recall, when used in vector search, essentially means “out of all of my results, which results would have been included in the exact results?” In vector search, the objective is to find some number of vectors that are closest to a given query vector so recall tends to be more relaxed than accuracy, discriminating only on set inclusion, rather than on exact ordered list matching, which would be closer to an accuracy measure.
+HNSW and CAGRA are graph-based indexes. They usually offer strong recall and fast search, but graph construction can be more expensive. CAGRA builds and searches on the GPU; HNSW is commonly used on CPU. In some workflows, CAGRA can build a graph that is converted to HNSW for CPU search.
 
-## Choosing vector search indexes
+## Tuning
 
-Many vector search algorithms improve scalability while reducing the number of distances by partitioning the vector space into smaller pieces, often through the use of clustering, hashing, trees, and other techniques. Another popular technique is to reduce the width or dimensionality of the space in order to decrease the cost of computing each distance.
+Start with a representative subset of the data, compute exact ground truth with brute-force, and tune against that subset before scaling up. For many workloads, you can keep build parameters near their defaults and first adjust search-time parameters until recall and latency meet your target.
 
-### Tiny datasets (&lt; 100 thousand vectors)
+For IVF indexes, start with `n_lists = sqrt(n_vectors)` and try `n_probes` values such as 1%, 2%, 4%, 8%, and 16% of `n_lists`. Increasing `n_probes` usually improves recall and reduces throughput. For IVF-PQ, consider refinement when memory allows keeping the original vectors.
 
-These datasets are very small and it’s questionable whether or not the GPU would provide any value at all. If the dimensionality is also relatively small (&lt; 1024), you could just use brute-force or HNSW on the CPU and get great performance. If the dimensionality is relatively large (1536, 2048, 4096), you should consider using HNSW. If build time performance is critical, you should consider using CAGRA to build the graph and convert it to an HNSW graph for search (this capability exists today in the standalone cuVS/RAFT libraries and will soon be added to Milvus). An IVF flat index can also be a great candidate here, as it can improve the search performance over brute-force by partitioning the vector space and thus reducing the search space.
+For graph indexes, increasing graph quality usually improves recall but increases build time, memory use, or both. Tune the smallest configuration that reaches the recall target rather than simply maximizing every quality-related parameter.
 
-### Small datasets where GPU might not be needed (&lt; 1 million vectors)
+## Summary
 
-For smaller dimensionality, such as 1024 or below, you could consider using a brute-force (aka flat) index on GPU and get very good search performance with exact results. You could also use a graph-based index like HNSW on the CPU or CAGRA on the GPU. If build time is critical, you could even build a CAGRA graph on the GPU and convert it to HNSW graph on the CPU.
-
-For larger dimensionality (1536, 2048, 4096), you will start to see lower build-time performance with HNSW for higher quality search settings, and so it becomes more clear that building a CAGRA graph can be useful instead.
-
-### Large datasets (> 1 million vectors), goal is fast index creation at the expense of search quality
-
-For fast ingest where slightly lower search quality is acceptable (85% recall and above), the IVF (inverted file index) methods can be very useful, as they can be very fast to build and still have acceptable search performance. IVF-flat index will partition the vectors into some number of clusters (specified by the user as n_lists) and at search time, some number of closest clusters (defined by n_probes) will be searched with brute-force for each query vector.
-
-IVF-PQ is similar to IVF-flat with the major difference that the vectors are compressed using a lossy product quantized compression so the index can have a much smaller footprint on the GPU. In general, it’s advised to set n_lists = sqrt(n_vectors) and set n_probes to some percentage of n_lists (e.g. 1%, 2%, 4%, 8%, 16%). Because IVF-PQ is a lossy compression, a refinement step can be performed by initially increasing the number of neighbors (by some multiple factor) and using the raw vectors to compute the exact distances, ultimately reducing the neighborhoods down to size k. Even a refinement of 2x (which would query initially for k*2) can be quite effective in making up for recall lost by the PQ compression, but it does come at the expense of having to keep the raw vectors around (keeping in mind many databases store the raw vectors anyways).
-
-### Large datasets (> 1 million vectors), goal is high quality search at the expense of fast index creation
-
-By trading off index creation performance, an extremely high quality search model can be built. Generally, all of the vector search index types have hyperparameters that have a direct correlation with the search accuracy and so they can be cranked up to yield better recall. Unfortunately, this can also significantly increase the index build time and reduce the search throughput. The trick here is to find the fastest build time that can achieve the best recall with the lowest latency or highest throughput possible.
-
-As for suggested index types, graph-based algorithms like HNSW and CAGRA tend to scale very well to larger datasets while having superior search performance with respect to quality. The challenge is that graph-based indexes require learning a graph and so, as the subtitle of this section suggests, have a tendency to be slower to build than other options. Using the CAGRA algorithm on the GPU can reduce the build time significantly over HNSW, while also having a superior throughput (and lower latency) than searching on the CPU. Currently, the downside to using CAGRA on the GPU is that it requires both the graph and the raw vectors to fit into GPU memory. A middle-ground can be reached by building a CAGRA graph on the GPU and converting it to an HNSW for high quality (and moderately fast) search on the CPU.
-
-## Tuning and hyperparameter optimization
-
-Unfortunately, for large datasets, doing a hyper-parameter optimization on the whole dataset is not always feasible. It is possible, however, to perform a hyper-parameter optimization on the smaller subsets and find reasonably acceptable parameters that should generalize fairly well to the entire dataset. Generally this hyper-parameter optimization will require computing a ground truth on the subset with an exact method like brute-force and then using it to evaluate several searches on randomly sampled vectors.
-
-Full hyper-parameter optimization may also not always be necessary- for example, once you have built a ground truth dataset on a subset, many times you can start by building an index with the default build parameters and then playing around with different search parameters until you get the desired quality and search performance.  For massive indexes that might be multiple terabytes, you could also take this subsampling of, say, 10M vectors, train an index and then tune the search parameters from there. While there might be a small margin of error, the chosen build/search parameters should generalize fairly well for the databases that build locally partitioned indexes.
-
-## Summary of vector search index types
-
-| Name | Trade-offs | Best to use with... |
+| Index | Main trade-off | Use when |
 | --- | --- | --- |
-| Brute-force (aka flat) | Exact search but requires exhaustive distance computations | Tiny datasets (&lt; 100k vectors) |
-| IVF-Flat | Partitions the vector space to reduce distance computations for brute-force search at the expense of recall | Small datasets (&lt;1M vectors) or larger datasets (>1M vectors) where fast index build time is prioritized over quality. |
-| IVF-PQ | Adds product quantization to IVF-Flat to achieve scale at the expense of recall | Large datasets (>>1M vectors) where fast index build is prioritized over quality |
-| HNSW | Significantly reduces distance computations at the expense of longer build times | Small datasets (&lt;1M vectors) or large datasets (>1M vectors) where quality and speed of search are prioritized over index build times |
-| CAGRA | Significantly reduces distance computations at the expense of longer build times (though build times improve over HNSW) | Large datasets (>>1M vectors) where quality and speed of search are prioritized over index build times but index build times are still important. |
-| CAGRA build +HNSW search | (coming soon to Milvus) | Significantly reduces distance computations and improves build times at the expense of higher search latency / lower throughput.<br />Large datasets (>>1M vectors) where index build times and quality of search is important but GPU resources are limited and latency of search is not. |
+| Brute-force | Exact results, highest distance-computation cost | The dataset is small enough, or exact recall is required. |
+| IVF-Flat | Faster search and build, lower recall than exact search | You need a practical starting point for medium or large datasets. |
+| IVF-PQ | Much lower memory use, lower recall from compression | The dataset is large and GPU memory is the main constraint. |
+| HNSW | High recall and fast CPU search, slower build | You want strong search quality and can afford graph build time. |
+| CAGRA | High recall and fast GPU search, requires GPU memory | You want graph search performance on GPU and the index fits in memory. |
