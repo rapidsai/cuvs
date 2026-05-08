@@ -1,4 +1,3 @@
-````markdown
 # End-User Guide: cuVS ABI Stability
 
 ## What ABI Stability Means
@@ -378,4 +377,3 @@ Does not necessarily run with ABI 2.0
 ```
 
 When in doubt, use the cuVS runtime version recommended by your application vendor or package manager.
-````

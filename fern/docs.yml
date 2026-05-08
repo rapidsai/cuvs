@@ -92,6 +92,8 @@ navigation:
       - page: "Interoperability"
         hidden: true
         path: "./pages/api_interoperability.md"
+      - page: "ABI Stability"
+        path: "./pages/user_guide/abi_stability.md"
       - page: "Integrations"
         path: "./pages/integrations.md"
       - section: "Benchmarking"
