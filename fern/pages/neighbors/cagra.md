@@ -77,20 +77,27 @@ If the final graph quality is still too low, increase `intermediate_graph_degree
 
 CAGRA memory has two main parts: the dataset and the graph. During build, the dataset must be in GPU memory. After build, the dataset can be detached if it is not needed for search, for example when immediately converting the graph to HNSW.
 
-To keep the formulas readable, this section uses the following symbols:
+To keep the formulas readable, this section uses short symbols. All estimates are in bytes. The examples convert bytes to MiB by dividing by `1024 * 1024`.
 
-| Symbol | Meaning |
-| --- | --- |
-| `N` | Number of vectors |
-| `D` | Vector dimension |
-| `B` | Bytes per vector dimension |
-| `G` | `graph_degree` |
-| `I` | `intermediate_graph_degree` |
-| `C` | `n_clusters` |
-| `R` | `train_set_ratio` |
-| `Q` | `batch_size` |
-| `K` | `topk` |
-| `S_idx` | `sizeof(IdxT)` |
+- `N`: Number of database vectors, or rows in the dataset being indexed.
+- `D`: Vector dimension, or number of values in each vector.
+- `B`: Bytes stored for each vector value. Use `4` for fp32, `2` for fp16, or the byte width of the attached dataset representation.
+- `G`: Final graph degree. This is the `graph_degree` build parameter, and each vector keeps `G` neighbor IDs after pruning.
+- `I`: Intermediate graph degree. This is the `intermediate_graph_degree` build parameter, and CAGRA uses this larger graph before pruning down to `G`.
+- `C`: Number of IVF-PQ coarse clusters/lists. This is the IVF-PQ `n_lists` value used by the graph build parameters.
+- `R`: IVF-PQ training-set ratio. This is `train_set_ratio`; `R = 10` means training uses roughly `N / 10` vectors.
+- `Q`: Query batch size, or number of query vectors processed together.
+- `K`: Search result count, or the requested `k`/`topk` nearest neighbors per query.
+- `S_idx`: Bytes per graph neighbor ID. This is `sizeof(IdxT)`, usually `4` for `int32_t` or `uint32_t`.
+
+The named terms in the formulas are also memory sizes:
+
+- `dataset_size`: Device memory used by the attached dataset vectors.
+- `graph_size`: Host memory used by the CAGRA graph neighbor IDs.
+- `*_peak`: Temporary peak memory for one build phase. Sequential phases are not added together.
+- `query_size`: Device memory for the current query batch.
+- `result_size`: Device memory for neighbor IDs and distances returned for the current query batch.
+- `workspace_size`: Query and result memory used during search.
 
 ### Baseline memory after build
 
@@ -129,6 +136,8 @@ IVF-PQ builds the initial graph in two stages. First, it trains cluster centroid
 
 **IVF-PQ build peak:**
 
+Here, `N / R` is the IVF-PQ training sample size. The `4` byte factors are fp32 values for training vectors and cluster centroids. The `uint32_t` term stores one 32-bit ID per training vector.
+
 $$
 \begin{aligned}
 \text{IVFPQ\_build\_peak}
@@ -142,6 +151,8 @@ $$
 **Example** (`N = 1e6`, `D = 1024`, `C = 1024`, `R = 10`): 395.01 MB
 
 **IVF-PQ search peak:**
+
+Here, `Q` is the number of vectors in one search batch and `I` is the number of candidates kept per query while building the intermediate graph. The three terms estimate query vectors, candidate IDs, and candidate distances.
 
 $$
 \begin{aligned}
@@ -158,6 +169,8 @@ $$
 ### Initial graph build using NN-Descent
 
 **Peak device memory:**
+
+The constants in the NN-Descent formulas are per-vector workspace estimates from the implementation. They are added to the vector storage terms before multiplying by `N`.
 
 $$
 \begin{aligned}
@@ -188,6 +201,8 @@ $$
 ### Optimize phase
 
 The optimize phase prunes and reorders the intermediate graph. Its peak memory scales linearly with the intermediate degree:
+
+In this formula, the `4` byte term is per-vector bookkeeping. The `(S_idx + 1) * I` term stores `I` candidate neighbor IDs plus one byte of pruning state per candidate.
 
 $$
 \begin{aligned}
@@ -255,6 +270,8 @@ $$
 $$
 
 The workspace contains query vectors and result storage:
+
+In the query formula, `sizeof(float)` is `4` bytes because CAGRA search uses fp32 query storage here. In the result formula, each returned neighbor stores one graph ID of size `S_idx` and one fp32 distance.
 
 $$
 \begin{aligned}
