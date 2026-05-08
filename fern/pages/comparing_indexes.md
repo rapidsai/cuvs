@@ -14,7 +14,7 @@ Recall is a measure of model quality. Imagine for a particular vector, we know t
 
 Parameter settings dictate the quality of an index. The graph below shows eight indexes from the same data but with different tuning parameters. Generally speaking, the indexes with higher average recall took longer to build. Which index is fair to report?
 
-![index recalls](images/index_recalls.png)
+<img alt="index recalls" src="/assets/images/index_recalls.png" />
 
 ## How do I compare models or indexing algorithms?
 
@@ -31,11 +31,11 @@ We suggest averaging performance within a range of recall. For general guidance,
 1. 95% - 99%
 1. >99%
 
-![recall buckets](images/recall_buckets.png)
+<img alt="recall buckets" src="/assets/images/recall_buckets.png" />
 
 This allows us to make observations such as “at 95% recall level, model A can be built 3x faster than model B, but model B has 2x lower latency than model A”
 
-![build benchmarks](images/build_benchmarks.png)
+<img alt="build benchmarks" src="/assets/images/build_benchmarks.png" />
 
 Another important detail is that we compare these models against their best-case search performance within each recall window. This means that we aim to find models that not only have great recall quality but also have either the highest throughput or lowest latency within the window of interest. These best-cases are most often computed by doing a parameter sweep in a grid search (or other types of search optimizers) and looking at the best cases for each level of recall.
 
