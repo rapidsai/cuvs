@@ -10,6 +10,8 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
+#include <cuvs/core/export.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -211,7 +213,7 @@ typedef struct cuvsKMeansParams_v2* cuvsKMeansParams_v2_t;
  * @param[in] params cuvsKMeansParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 
 /**
  * @brief De-allocate KMeans params
@@ -222,7 +224,7 @@ cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
+CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 
 /**
  * @brief Allocate KMeans params
@@ -290,7 +292,7 @@ typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
  *                              closest cluster center.
  * @param[out]    n_iter        Number of iterations run.
  */
-cuvsError_t cuvsKMeansFit(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                           cuvsKMeansParams_t params,
                           DLManagedTensor* X,
                           DLManagedTensor* sample_weight,
@@ -353,7 +355,7 @@ cuvsError_t cuvsKMeansFit_v2(cuvsResources_t res,
  * @param[out]    inertia          Sum of squared distances of samples to
  *                                 their closest cluster center.
  */
-cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
                               cuvsKMeansParams_t params,
                               DLManagedTensor* X,
                               DLManagedTensor* sample_weight,
@@ -406,7 +408,7 @@ cuvsError_t cuvsKMeansPredict_v2(cuvsResources_t res,
  * @param[out] cost           Resulting cluster cost
  *
  */
-cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
                                   DLManagedTensor* X,
                                   DLManagedTensor* centroids,
                                   double* cost);
