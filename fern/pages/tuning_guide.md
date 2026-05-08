@@ -1,49 +1,48 @@
-# Automated tuning Guide
+# Index Tuning Guide
 
-## Introduction
+Tuning a vector search index means choosing parameters that meet your recall, latency, throughput, memory, and build-time goals. The best settings depend on the data distribution, index type, hardware, and production constraints.
 
-A Method for tuning and evaluating Vector Search Indexes At Scale in Locally Indexed Vector Databases. For more information on the differences between locally and globally indexed vector databases, please see [this guide](vector_databases_vs_vector_search.md). The goal of this guide is to give users a scalable and effective approach for tuning a vector search index, no matter how large.  Evaluation of a vector search index “model” that measures recall in proportion to build time so that it penalizes the recall when the build time is really high (should ultimately optimize for finding a lower build time and higher recall).
+For background on index choices, see the [primer on vector search indexes](choosing_and_configuring_indexes.md). For the difference between an index and a vector database, see [Vector search vs Vector DB](vector_databases_vs_vector_search.md).
 
-For more information on the various different types of vector search indexes, please see our [guide to choosing vector search indexes](choosing_and_configuring_indexes.md)
+## When to tune
 
-## Why automated tuning?
+Start with the default parameters for a first test. Tune when you need higher recall, lower latency, more throughput, lower memory usage, faster builds, or a better balance across those goals.
 
-As much as 75% of users have told us they will not be able to tune a vector database beyond one or two simple knobs and we suggest that an ideal “knob” would be to balance training time and search time with search quality. The more time, the higher the quality, and the more needed to find an acceptable search performance. Even the 25% of users that want to tune are still asking for simple tools for doing so. These users also ask for some simple guidelines for setting tuning parameters, like [this guide](neighbors/neighbors.md).
+Vector search indexes are closer to machine learning models than traditional database indexes: parameters affect quality and performance, and the best values are often workload-specific. Hyperparameter optimization tools such as [Ray Tune](https://medium.com/rapids-ai/30x-faster-hyperparameter-search-with-raytune-and-rapids-403013fbefc5) and [Optuna](https://docs.rapids.ai/deployment/stable/examples/rapids-optuna-hpo/notebook/) can help search the parameter space automatically.
 
-Since vector search indexes are more closely related to machine learning models than traditional databases indexes, one option for easing the parameter tuning burden is to use hyper-parameter optimization tools like [Ray Tune](https://medium.com/rapids-ai/30x-faster-hyperparameter-search-with-raytune-and-rapids-403013fbefc5) and [Optuna](https://docs.rapids.ai/deployment/stable/examples/rapids-optuna-hpo/notebook/). to verify this.
+## Use a representative sample
 
-## How to tune?
+For very large datasets, tune on a sample that looks like one production shard or sub-index. Many vector databases split data into smaller local indexes, apply one parameter set to each local index, and merge results at query time. If your tuning sample matches that local index size and distribution, the selected parameters are more likely to transfer to production.
 
-But how would this work when we have an index that's massively large- like 1TB?
+Use random sampling when possible. Split the sample into training vectors, test queries, and held-out evaluation queries. Compute exact brute-force neighbors for the query sets so recall can be measured against ground truth.
 
-One benefit to locally indexed vector databases is that they often scale by breaking the larger set of vectors down into a smaller set by uniformly random subsampling and training smaller vector search index models on the sub-samples. Most often, the same set of tuning parameters are applied to all of the smaller sub-index models, rather than trying to set them individually for each one. During search, the query vectors are often sent to all of the sub-indexes and the resulting neighbors list reduced down to `k` based on the closest distances (or similarities).
+## Workflow
 
-Because many databases use this sub-sampling trick, it's possible to perform an automated parameter tuning on the larger index just by randomly sampling some number of vectors from it, splitting them into disjoint train/test/eval datasets, computing ground truth with brute-force, and then performing a hyper-parameter optimization on it. This procedure can also be repeated multiple times to simulate a monte-carlo cross validation.
+1. Define the target constraints: minimum recall, maximum latency, throughput goal, memory budget, and acceptable build time.
 
-GPUs are naturally great at performing massively parallel tasks, especially when they are largely independent tasks, such as training and evaluating models with different hyper-parameter settings in parallel. Hyper-parameter optimization also lends itself well to distributed processing, such as multi-node multi-GPU operation.
+1. Choose candidate index types and parameter ranges. Keep the search space focused on settings that could realistically satisfy the target constraints.
 
-## Steps to achieve automated tuning
+1. Randomly sample training vectors from the full dataset. A good starting point is the number of vectors expected in one production shard or local index.
 
-More formally, an automated parameter tuning workflow with monte-carlo cross-validation looks something like this:
+1. Randomly sample test and evaluation query sets. These are often 1-10% of the training sample size.
 
-1. Ingest a large dataset into the vector database of your choice
+1. Compute exact ground truth for the test and evaluation queries against the training vectors.
 
-1. Choose an index size based on number of vectors. This should usually align with the average number of vectors the database will end up putting in a single ANN sub-index model.
+1. Run the tuning search. Optimize for recall and the performance metric that matters most for the workload, such as latency, throughput, memory, or build time.
 
-1. Uniformly random sample the number of vectors specified above from the database for a training set. This is often accomplished by generating some number of random (unique) numbers up to the dataset size.
+1. Validate the best candidates on the held-out evaluation queries. Prefer parameters that satisfy the target constraints and generalize beyond the test queries used during tuning.
 
-1. Uniformly sample some number of vectors for a test set and do this again for an evaluation set. 1-10% of the vectors in the training set.
+1. Repeat the process on several random samples when you need more confidence. Compare the selected parameters across runs and choose stable settings.
 
-1. Use the test set to compute ground truth on the vectors from prior step against all vectors in the training set.
+1. Build the production index with the selected parameters and verify recall and performance on production-like traffic.
 
-1. Start the HPO tuning process for the training set, using the test vectors for the query set. It's important to make sure your HPO is multi-objective and optimizes for: a) low build time, b) high throughput or low latency search (depending on needs), and c) acceptable recall.
+## Practical tips
 
-1. Use the evaluation dataset to test that the optimal hyper-parameters generalize to unseen points that were not used in the optimization process.
+- Treat tuning as a multi-objective problem. The highest-recall configuration is not always the best choice if it is too slow, too large, or too expensive to build.
+- Tune parameter ranges before fine-tuning individual values. Broad sweeps usually reveal the useful region of the search space faster.
+- Re-tune after major changes to the dataset, embedding model, index type, hardware, or query pattern.
+- For distributed databases, prefer parameters that work well across representative shards instead of overfitting one sample.
 
-1. Optionally, the above steps multiple times on different uniform sub-samplings. Optimal parameters can then be combined over the multiple monte-carlo optimization iterations. For example, many hyper-parameters can simply be averaged but care might need to be taken for other parameters.
+## Summary
 
-1. Create a new index in the database using the ideal params from above that meet the target constraints (e.g. build vs search vs quality)
-
-## Conclusion
-
-By the end of this process, you should have a set of parameters that meet your target constraints while demonstrating how well the optimal hyper-parameters generalize across the dataset. The major benefit to this approach is that it breaks a potentially unbounded dataset size down into manageable chunks and accelerates tuning on those chunks. We see this process as a major value add for vector search on the GPU.
+This workflow reduces a large tuning problem to a repeatable experiment on representative samples. It helps identify index parameters that meet quality and performance targets before building the full production index.
