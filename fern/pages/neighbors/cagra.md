@@ -12,7 +12,7 @@ I-force could be used to construct the initial kNN graph. This would yield the m
 we find that in practice the kNN graph does not need to be very accurate since the pruning step helps to boost the overall recall of
 the index. cuVS provides IVF-PQ and NN-Descent strategies for building the initial kNN graph and these can be selected in index params object during index construction.
 
-[C API](/api-reference/c-api-neighbors-cagra) | [C++ API](/api-reference/cpp-api-neighbors-cagra) | [Python API](/api-reference/python-api-neighbors-cagra) | [Rust API](/api-reference/rust-api-documentation)
+[C API](/api-reference/c-api-neighbors-cagra) | [C++ API](/api-reference/cpp-api-neighbors-cagra) | [Python API](/api-reference/python-api-neighbors-cagra) | [Java API](/api-reference/java-api-com-nvidia-cuvs-cagraindex) | [Rust API](/api-reference/rust-api-cuvs-cagra) | [Go API](/api-reference/go-api-cagra)
 
 ## Interoperability with HNSW
 
