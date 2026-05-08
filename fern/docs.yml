@@ -143,6 +143,11 @@ navigation:
             path: "./pages/working_with_ann_indexes_python.md"
           - page: "Working with ANN Indexes in Rust"
             path: "./pages/working_with_ann_indexes_rust.md"
+      - section: "Advanced Topics"
+        path: "./pages/advanced_topics.md"
+        contents:
+          - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
+            path: "./pages/jit_lto_guide.md"
   - section: "API Reference"
     path: "./pages/api_docs.md"
     contents:
@@ -444,8 +449,3 @@ navigation:
             path: "./pages/go_api/go-api-ivf-flat.md"
           - page: "IVF PQ"
             path: "./pages/go_api/go-api-ivf-pq.md"
-  - section: "Advanced Topics"
-    path: "./pages/advanced_topics.md"
-    contents:
-      - page: "JIT LTO (Just-In-Time Link-Time Optimization) Guide"
-        path: "./pages/jit_lto_guide.md"
