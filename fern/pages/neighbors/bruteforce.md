@@ -438,13 +438,12 @@ SearchResults results = index.search(query);
 | --- | --- | --- |
 | `metric` | `L2Expanded` / `sqeuclidean` | Distance metric used for search. |
 | `metric_arg` | `2.0` | Extra argument for metrics that need one, such as Minkowski distance. |
-| `numWriterThreads` | `2` | Java build option for the number of writer threads. |
 
 ### Search parameters
 
-| Name | Default | Description |
-| --- | --- | --- |
-| `prefilter` | None | Optional bitmap or bitset filter that restricts which vectors can be returned. |
+The C++ `brute_force::search_params` struct currently has no tunable fields.
+
+Filters are passed as search function arguments in bindings that expose filtered search, not as fields in `brute_force::search_params`.
 
 ## Tuning Considerations
 

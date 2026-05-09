@@ -448,16 +448,18 @@ distances, neighbors = ivf_flat.search(
 | `n_lists` | `1024` | Number of coarse clusters, or inverted lists. More lists make each list smaller, but may require more probes to maintain recall. |
 | `kmeans_n_iters` | `20` | Maximum number of k-means iterations used to train the list centers. |
 | `kmeans_trainset_fraction` | `0.5` | Fraction of the dataset used for k-means training. Reducing this can speed up build on very large datasets. |
-| `add_data_on_build` | `True` | Adds vectors to the index during build. Set to `False` to train the centers first and add vectors later with `extend`. |
 | `adaptive_centers` | `False` | Updates centers when new vectors are added. This can help when appended data shifts distribution, but center values then depend on insertion order. |
 | `conservative_memory_allocation` | `False` | Uses tighter per-list allocations. The default overallocates lists to reduce reallocations during repeated `extend` calls. |
+| `add_data_on_build` | `True` | Adds vectors to the index during build. Set to `False` to train the centers first and add vectors later with `extend`. |
 
 ### Search parameters
 
 | Name | Default | Description |
 | --- | --- | --- |
 | `n_probes` | `20` | Number of closest lists to scan for each query. This is the main recall and latency knob. |
-| `filter` | None | Optional bitset filter for bindings that expose filtered IVF-Flat search. |
+| `metric_udf` | None | Optional custom metric UDF code used by the C++ search path. |
+
+Filters are passed as search function arguments in bindings that expose filtered search, not as fields in `ivf_flat::search_params`.
 
 ## Tuning
 

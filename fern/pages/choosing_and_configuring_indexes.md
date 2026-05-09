@@ -26,7 +26,7 @@ The best index depends mostly on dataset size, vector dimensionality, recall tar
 | [IVF-Flat](neighbors/ivfflat.md) | Medium | Fast when probing a subset of partitions; exact within scanned partitions | Partitions the dataset into coarse clusters, allowing the index to scale to larger datasets by searching only relevant partitions. Stores full-precision vectors. |
 | IVF-SQ | Medium | Often faster than IVF-Flat due to lower memory bandwidth | IVF with scalar quantization. Vectors are compressed to reduce memory use and improve throughput with some recall tradeoff. |
 | [IVF-PQ](neighbors/ivfpq.md) | Medium-high | Very memory-efficient; search speed depends on compression, probing, and refinement | IVF with product quantization. Splits vectors into subvectors and stores compact codes, enabling much smaller indexes with a larger accuracy tradeoff than IVF-SQ. |
-| ScaNN | Medium-high | Strong recall and speed tradeoff | Combines partitioning, quantization, and reranking to prune the search space while preserving result quality. |
+| [ScaNN](neighbors/scann.md) | Medium-high | Strong recall and speed tradeoff | Combines partitioning, quantization, and reranking to prune the search space while preserving result quality. |
 | [Vamana/DiskANN](neighbors/vamana.md) | High | Excellent at very large scale, including SSD-backed search | Builds a graph designed for large or disk-backed indexes, especially when the full dataset cannot fit comfortably in memory. |
 
 ## Quantization
@@ -47,7 +47,7 @@ This is especially useful with quantized indexes. Quantization makes search fast
 
 For example, an IVF-SQ or [IVF-PQ](neighbors/ivfpq.md) index may use compressed vectors to scan selected partitions quickly. After it finds the best candidate IDs, a refinement step can load the original vectors for those candidates and compute exact distances. This usually improves recall while keeping most of the speed and memory benefits of quantized search.
 
-ScaNN also relies heavily on this idea: it prunes the dataset quickly using partitioning and quantization, then reranks a smaller candidate set to improve final result quality.
+[ScaNN](neighbors/scann.md) also relies heavily on this idea: it prunes the dataset quickly using partitioning and quantization, then reranks a smaller candidate set to improve final result quality.
 
 ## IVF vs. graph-based indexes
 
@@ -67,7 +67,7 @@ For quantized indexes, tune compression together with refinement. Stronger compr
 
 For graph-based indexes, tune search breadth before increasing build complexity. If search-time tuning cannot reach the recall target within the latency budget, then increase graph quality, graph degree, or construction breadth.
 
-For multi-stage indexes such as ScaNN, tune candidate count and reranking together. The goal is to keep the first stage broad enough to preserve recall and the reranking stage small enough to stay fast.
+For multi-stage indexes such as [ScaNN](neighbors/scann.md), tune candidate count and reranking together. The goal is to keep the first stage broad enough to preserve recall and the reranking stage small enough to stay fast.
 
 ## When to use each
 
@@ -83,6 +83,6 @@ Use HNSW for high-quality CPU search when the index fits in memory.
 
 Use [CAGRA](neighbors/cagra.md) for high-throughput GPU search, fast GPU index construction, or hybrid workflows where a GPU-built graph is converted to HNSW for CPU search.
 
-Use ScaNN when you want a tuned combination of partitioning, quantization, and reranking.
+Use [ScaNN](neighbors/scann.md) when you want a tuned combination of partitioning, quantization, and reranking.
 
 Use [Vamana/DiskANN](neighbors/vamana.md) for very large datasets, especially when SSD-backed search is important, or hybrid workflows where a GPU-built graph is converted to CPU for DiskANN search.

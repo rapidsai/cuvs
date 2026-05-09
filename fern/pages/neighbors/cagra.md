@@ -706,24 +706,36 @@ if err != nil {
 
 | Name | Default | Description |
 | --- | --- | --- |
-| `compression` | None | Compresses the raw vectors with product quantization so larger datasets can fit on device. This can lower recall, so refinement reranking may be needed after search. |
-| `graph_build_algo` | `IVF_PQ` | Algorithm used to build the initial kNN graph. |
-| `graph_build_params` | None | Explicit build parameters for the selected graph build algorithm. |
-| `graph_degree` | 32 | Number of neighbors kept for each vertex in the final graph. Larger values can improve recall, but use more memory and search work. |
-| `intermediate_graph_degree` | 64 | Number of neighbors kept in the initial graph before pruning. Larger values can improve the final graph, but increase build time and memory use. |
-| `guarantee_connectivity` | False | Uses a degree-constrained minimum spanning tree to guarantee the initial kNN graph is connected. This can improve recall on some datasets. |
-| `attach_data_on_build` | True | Keeps the dataset attached to the index after build. Set to `False` when serializing or converting to HNSW right after build. |
+| `metric` | `L2Expanded` / `sqeuclidean` | Distance metric used to build and search the graph. |
+| `metric_arg` | `2.0` | Extra argument for metrics that need one, such as Minkowski distance. |
+| `intermediate_graph_degree` | `128` | Number of neighbors kept in the initial graph before pruning. Larger values can improve the final graph, but increase build time and memory use. |
+| `graph_degree` | `64` | Number of neighbors kept for each vertex in the final graph. Larger values can improve recall, but use more memory and search work. |
+| `compression` | None | Optional vector product quantization parameters. When set, the compressed dataset is attached to the index and `attach_dataset_on_build` is effectively enabled. |
+| `graph_build_params` | `std::monostate` | Parameters for the initial graph builder. The default lets cuVS choose a heuristic; explicit options include IVF-PQ, NN-Descent, ACE, and iterative-search graph build parameters. |
+| `guarantee_connectivity` | `False` | Uses a degree-constrained minimum spanning tree to guarantee the initial kNN graph is connected. This can improve recall on some datasets. |
+| `attach_dataset_on_build` | `True` | Keeps the dataset attached to the index after build. Set to `False` when serializing or converting to another graph format right after build. |
 
 ### Search parameters
 
 | Name | Default | Description |
 | --- | --- | --- |
+| `max_queries` | `0` | Maximum number of queries searched concurrently. `0` lets cuVS choose automatically. |
 | `itopk_size` | 64 | Number of intermediate search results kept during search. This must be at least `k` and is the main search tuning knob. |
 | `max_iterations` | 0 | Maximum number of search iterations. `0` lets cuVS choose automatically. |
-| `max_queries` | 0 | Maximum number of queries searched concurrently. `0` lets cuVS choose automatically. |
+| `algo` | `AUTO` | Search implementation. Options include `SINGLE_CTA`, `MULTI_CTA`, `MULTI_KERNEL`, and `AUTO`. |
 | `team_size` | 0 | Number of CUDA threads used to calculate each distance. Valid values are 4, 8, 16, or 32. `0` lets cuVS choose automatically. |
 | `search_width` | 1 | Number of vertices selected as starting points for each search iteration. |
 | `min_iterations` | 0 | Minimum number of search iterations. |
+| `thread_block_size` | `0` | CUDA thread block size. Supported values include 64, 128, 256, 512, and 1024. `0` lets cuVS choose automatically. |
+| `hashmap_mode` | `AUTO` | Hash map implementation used during search. Options include `HASH`, `SMALL`, and `AUTO`. |
+| `hashmap_min_bitlen` | `0` | Lower limit for the hash map bit length. `0` lets cuVS choose automatically. |
+| `hashmap_max_fill_rate` | `0.5` | Maximum hash map fill rate. Valid values are greater than 0.1 and less than 0.9. |
+| `num_random_samplings` | `1` | Number of initial random seed-node selection iterations. |
+| `rand_xor_mask` | `0x128394` | Bit mask used for initial random seed-node selection. |
+| `persistent` | `False` | Uses the persistent search kernel where supported. Currently this applies only to `SINGLE_CTA`. |
+| `persistent_lifetime` | `2.0` | Seconds before a persistent kernel stops when no requests are received. |
+| `persistent_device_usage` | `1.0` | Fraction of the maximum grid size used by the persistent kernel. Lower values can leave GPU capacity for other work. |
+| `filtering_rate` | `-1.0` | Expected fraction of nodes filtered out during filtered search. Negative values let cuVS estimate it automatically. |
 
 ## Tuning
 
