@@ -35,16 +35,64 @@
   ],
   "_mxdim_team": [
     {
+      "dim": "64",
+      "team_size": "4",
+      "pq_len": "2"
+    },
+    {
       "dim": "128",
-      "team_size": "8"
+      "team_size": "8",
+      "pq_len": "2"
     },
     {
       "dim": "256",
-      "team_size": "16"
+      "team_size": "16",
+      "pq_len": "2"
     },
     {
       "dim": "512",
-      "team_size": "32"
+      "team_size": "32",
+      "pq_len": "2"
+    },
+    {
+      "dim": "64",
+      "team_size": "4",
+      "pq_len": "4"
+    },
+    {
+      "dim": "128",
+      "team_size": "8",
+      "pq_len": "4"
+    },
+    {
+      "dim": "256",
+      "team_size": "16",
+      "pq_len": "4"
+    },
+    {
+      "dim": "512",
+      "team_size": "32",
+      "pq_len": "4"
+    },
+    {
+      "dim": "128",
+      "team_size": "4",
+      "pq_len": "8"
+    },
+    {
+      "dim": "256",
+      "team_size": "8",
+      "pq_len": "8"
+    },
+    {
+      "dim": "512",
+      "team_size": "16",
+      "pq_len": "8"
+    },
+    {
+      "dim": "1024",
+      "team_size": "32",
+      "pq_len": "8"
     }
   ],
   "_codebook": [
@@ -54,6 +102,6 @@
     }
   ],
   "pq_bits": ["8"],
-  "pq_len": ["2", "4"],
-  "metric": ["L2Expanded"]
+  "metric": ["L2Expanded"],
+  "enable_fp8": ["true", "false"]
 }
