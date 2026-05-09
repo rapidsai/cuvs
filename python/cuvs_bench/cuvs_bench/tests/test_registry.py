@@ -55,7 +55,7 @@ class DummyBackend(BenchmarkBackend):
         if not indexes:
             raise ValueError("indexes must not be empty")
         n_queries = dataset.n_queries
-        neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
+        neighbors = np.random.randint(0, dataset.n_training, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
         first = indexes[0]
 
@@ -105,7 +105,7 @@ class AnotherDummyBackend(BenchmarkBackend):
         if not indexes:
             raise ValueError("indexes must not be empty")
         n_queries = dataset.n_queries
-        neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
+        neighbors = np.random.randint(0, dataset.n_training, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
         first = indexes[0]
 
@@ -132,7 +132,7 @@ class TestDataset:
 
         dataset = Dataset(
             name="test_dataset",
-            base_vectors=base,
+            training_vectors=base,
             query_vectors=queries,
             groundtruth_neighbors=gt_neighbors,
             distance_metric="euclidean",
@@ -140,7 +140,7 @@ class TestDataset:
 
         assert dataset.name == "test_dataset"
         assert dataset.dims == 128
-        assert dataset.n_base == 1000
+        assert dataset.n_training == 1000
         assert dataset.n_queries == 100
         assert dataset.distance_metric == "euclidean"
 
@@ -150,7 +150,7 @@ class TestDataset:
         queries = np.random.rand(50, 64).astype(np.float32)
 
         dataset = Dataset(
-            name="test_dataset_no_gt", base_vectors=base, query_vectors=queries
+            name="test_dataset_no_gt", training_vectors=base, query_vectors=queries
         )
 
         assert dataset.groundtruth_neighbors is None
@@ -343,7 +343,7 @@ class TestBackendIntegration:
         base = np.random.rand(1000, 128).astype(np.float32)
         queries = np.random.rand(100, 128).astype(np.float32)
         dataset = Dataset(
-            name="test", base_vectors=base, query_vectors=queries
+            name="test", training_vectors=base, query_vectors=queries
         )
 
         indexes = [
@@ -371,7 +371,7 @@ class TestBackendIntegration:
         base = np.random.rand(1000, 128).astype(np.float32)
         queries = np.random.rand(100, 128).astype(np.float32)
         dataset = Dataset(
-            name="test", base_vectors=base, query_vectors=queries
+            name="test", training_vectors=base, query_vectors=queries
         )
 
         indexes = [

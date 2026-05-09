@@ -616,7 +616,7 @@ class BenchmarkOrchestrator:
         return Dataset(
             name=dataset_config.name,
             # C++ backend loads vectors from files; other backends may need actual arrays
-            base_vectors=np.empty((0, 0)),
+            training_vectors=np.empty((0, 0)),
             query_vectors=np.empty((0, 0)),
             # Ground truth arrays - used by Python-native backends for recall calculation
             groundtruth_neighbors=None,

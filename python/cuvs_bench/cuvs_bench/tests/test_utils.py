@@ -182,14 +182,14 @@ class TestLoadVectors:
 class TestDatasetLazyLoading:
     """Tests for Dataset transparent vector loading."""
 
-    def test_lazy_load_base_vectors(self, tmp_path):
+    def test_lazy_load_training_vectors(self, tmp_path):
         """Test that base vectors are loaded from file on first access."""
         data = np.random.rand(50, 32).astype(np.float32)
         path = str(tmp_path / "base.fbin")
         _write_test_bin(path, data)
 
         dataset = Dataset(name="test", base_file=path)
-        np.testing.assert_array_equal(dataset.base_vectors, data)
+        np.testing.assert_array_equal(dataset.training_vectors, data)
 
     def test_lazy_load_query_vectors(self, tmp_path):
         """Test that query vectors are loaded from file on first access."""
@@ -216,16 +216,16 @@ class TestDatasetLazyLoading:
 
         dataset = Dataset(
             name="test",
-            base_vectors=base,
+            training_vectors=base,
             query_vectors=query,
         )
-        np.testing.assert_array_equal(dataset.base_vectors, base)
+        np.testing.assert_array_equal(dataset.training_vectors, base)
         np.testing.assert_array_equal(dataset.query_vectors, query)
 
     def test_no_file_returns_empty(self):
         """Test that Dataset without files returns empty arrays."""
         dataset = Dataset(name="test")
-        assert dataset.base_vectors.size == 0
+        assert dataset.training_vectors.size == 0
         assert dataset.query_vectors.size == 0
         assert dataset.groundtruth_neighbors is None
 
@@ -240,8 +240,8 @@ class TestDatasetLazyLoading:
             base_file=path,
             metadata={"subset_size": 10},
         )
-        assert dataset.base_vectors.shape == (10, 32)
-        np.testing.assert_array_equal(dataset.base_vectors, data[:10])
+        assert dataset.training_vectors.shape == (10, 32)
+        np.testing.assert_array_equal(dataset.training_vectors, data[:10])
 
     def test_file_path_still_accessible(self):
         """Test that file paths are accessible without triggering loading."""
@@ -266,10 +266,10 @@ class TestDatasetLazyLoading:
         _ = dataset.name
         _ = dataset.distance_metric
 
-        assert dataset._base_vectors.size == 0
+        assert dataset._training_vectors.size == 0
 
     def test_dims_and_counts(self, tmp_path):
-        """Test dims, n_base, and n_queries properties."""
+        """Test dims, n_training, and n_queries properties."""
         data = np.random.rand(50, 32).astype(np.float32)
         path = str(tmp_path / "base.fbin")
         _write_test_bin(path, data)
@@ -280,7 +280,7 @@ class TestDatasetLazyLoading:
 
         dataset = Dataset(name="test", base_file=path, query_file=qpath)
         assert dataset.dims == 32
-        assert dataset.n_base == 50
+        assert dataset.n_training == 50
         assert dataset.n_queries == 10
 
     def test_caching(self, tmp_path):
@@ -290,8 +290,8 @@ class TestDatasetLazyLoading:
         _write_test_bin(path, data)
 
         dataset = Dataset(name="test", base_file=path)
-        first_access = dataset.base_vectors
-        second_access = dataset.base_vectors
+        first_access = dataset.training_vectors
+        second_access = dataset.training_vectors
         assert first_access is second_access
 
 

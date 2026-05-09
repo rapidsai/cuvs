@@ -29,7 +29,7 @@ class Dataset:
        etc. Vectors are never loaded into Python.
 
     2. Array based (Python-native backends like OpenSearch, Elasticsearch):
-       Backends access ``base_vectors``, ``query_vectors``, etc. If vectors
+       Backends access ``training_vectors``, ``query_vectors``, etc. If vectors
        were not provided directly but a file path exists, they are loaded
        lazily on first access. This keeps file I/O invisible to backends.
 
@@ -37,8 +37,8 @@ class Dataset:
     ----------
     name : str
         Dataset name (e.g., "glove-100-inner")
-    base_vectors : Optional[np.ndarray]
-        Base vectors for index building, shape (n_vectors, dims)
+    training_vectors : Optional[np.ndarray]
+        Training vectors for index building, shape (n_vectors, dims)
     query_vectors : Optional[np.ndarray]
         Query vectors for search, shape (n_queries, dims)
     groundtruth_neighbors : Optional[np.ndarray]
@@ -60,7 +60,7 @@ class Dataset:
     def __init__(
         self,
         name: str,
-        base_vectors: Optional[np.ndarray] = None,
+        training_vectors: Optional[np.ndarray] = None,
         query_vectors: Optional[np.ndarray] = None,
         groundtruth_neighbors: Optional[np.ndarray] = None,
         groundtruth_distances: Optional[np.ndarray] = None,
@@ -76,10 +76,12 @@ class Dataset:
         # If empty and a file path is provided, the corresponding property
         # loads vectors from the file on first access. This keeps the
         # loading logic invisible to backends: they just access
-        # dataset.base_vectors and get a numpy array regardless of whether
-        # it was passed in or loaded from disk.
-        self._base_vectors = (
-            base_vectors if base_vectors is not None else np.empty((0, 0))
+        # dataset.training_vectors and get a numpy array regardless of
+        # whether it was passed in or loaded from disk.
+        self._training_vectors = (
+            training_vectors
+            if training_vectors is not None
+            else np.empty((0, 0))
         )
         self._query_vectors = (
             query_vectors if query_vectors is not None else np.empty((0, 0))
@@ -93,23 +95,25 @@ class Dataset:
         self.metadata = metadata or {}
 
     @property
-    def base_vectors(self) -> np.ndarray:
-        """Base vectors for index building.
+    def training_vectors(self) -> np.ndarray:
+        """Training vectors for index building.
 
         Loaded from base_file on first access if not provided directly.
         """
-        if self._base_vectors.size == 0 and self.base_file:
+        if self._training_vectors.size == 0 and self.base_file:
             from .utils import load_vectors
 
-            self._base_vectors = load_vectors(
+            self._training_vectors = load_vectors(
                 self.base_file, self.metadata.get("subset_size")
             )
-        return self._base_vectors
+        return self._training_vectors
 
-    @base_vectors.setter
-    def base_vectors(self, value: Optional[np.ndarray]) -> None:
-        """Set base vectors directly."""
-        self._base_vectors = value if value is not None else np.empty((0, 0))
+    @training_vectors.setter
+    def training_vectors(self, value: Optional[np.ndarray]) -> None:
+        """Set training vectors directly."""
+        self._training_vectors = (
+            value if value is not None else np.empty((0, 0))
+        )
 
     @property
     def query_vectors(self) -> np.ndarray:
@@ -154,14 +158,14 @@ class Dataset:
     @property
     def dims(self) -> int:
         """Vector dimensionality."""
-        if self.base_vectors.size == 0:
+        if self.training_vectors.size == 0:
             return 0
-        return self.base_vectors.shape[1]
+        return self.training_vectors.shape[1]
 
     @property
-    def n_base(self) -> int:
-        """Number of base vectors."""
-        return self.base_vectors.shape[0]
+    def n_training(self) -> int:
+        """Number of training vectors."""
+        return self.training_vectors.shape[0]
 
     @property
     def n_queries(self) -> int:
