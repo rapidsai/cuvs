@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -138,6 +138,9 @@ final class JDKProvider implements CuVSProvider {
   private final cuvsRMMMemoryResourceReset cuvsRMMMemoryResourceResetInvoker =
       cuvsRMMMemoryResourceReset.makeInvoker();
 
+  private final cuvsRMMAsyncMemoryResourceEnable cuvsRMMAsyncMemoryResourceEnableInvoker =
+      cuvsRMMAsyncMemoryResourceEnable.makeInvoker();
+
   private final cuvsGetLogLevel GET_LOG_LEVEL_INVOKER = cuvsGetLogLevel.makeInvoker();
 
   private JDKProvider() {}
@@ -255,8 +258,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
-      throws Throwable {
+  public HnswIndex hnswIndexBuild(
+      CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset) throws Throwable {
     return HnswIndexImpl.build(resources, hnswParams, dataset);
   }
 
@@ -437,6 +440,12 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public void enableRMMAsyncMemory() {
+    checkCuVSError(
+        cuvsRMMAsyncMemoryResourceEnableInvoker.apply(), "cuvsRMMAsyncMemoryResourceEnable");
+  }
+
+  @Override
   public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
     checkCuVSError(
         cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, false),
@@ -595,6 +604,15 @@ final class JDKProvider implements CuVSProvider {
     }
 
     public void addVector(int[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
+
+    public void addVector(short[] vector) {
       if (vector.length != columns) {
         throw new IllegalArgumentException(
             String.format(

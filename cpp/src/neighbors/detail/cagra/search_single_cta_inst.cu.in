@@ -20,5 +20,9 @@ instantiate_kernel_selection(data_t,
                              float,
                              cuvs::neighbors::filtering::none_sample_filter);
 instantiate_kernel_selection(data_t, uint32_t, float, bitset_filter_t);
+instantiate_kernel_selection_ms(data_t,
+                                uint32_t,
+                                float,
+                                cuvs::neighbors::filtering::none_sample_filter);
 
 }  // namespace cuvs::neighbors::cagra::detail::single_cta_search

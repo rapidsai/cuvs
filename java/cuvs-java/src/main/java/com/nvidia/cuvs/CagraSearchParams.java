@@ -25,6 +25,9 @@ public class CagraSearchParams {
   private long randXORMask;
   private SearchAlgo searchAlgo;
   private HashMapMode hashMapMode;
+  private boolean persistent;
+  private float persistentLifetime;
+  private float persistentDeviceUsage;
 
   /**
    * Enum to denote algorithm used to search CAGRA Index.
@@ -120,7 +123,10 @@ public class CagraSearchParams {
       int hashmapMinBitlen,
       float hashmapMaxFillRate,
       int numRandomSamplings,
-      long randXORMask) {
+      long randXORMask,
+      boolean persistent,
+      float persistentLifetime,
+      float persistentDeviceUsage) {
     this.maxQueries = maxQueries;
     this.iTopKSize = iTopKSize;
     this.maxIterations = maxIterations;
@@ -134,6 +140,9 @@ public class CagraSearchParams {
     this.hashMapMaxFillRate = hashmapMaxFillRate;
     this.numRandomSamplings = numRandomSamplings;
     this.randXORMask = randXORMask;
+    this.persistent = persistent;
+    this.persistentLifetime = persistentLifetime;
+    this.persistentDeviceUsage = persistentDeviceUsage;
   }
 
   /**
@@ -254,6 +263,33 @@ public class CagraSearchParams {
     return hashMapMode;
   }
 
+  /**
+   * Gets whether the persistent kernel is enabled.
+   *
+   * @return true if the persistent kernel is enabled
+   */
+  public boolean isPersistent() {
+    return persistent;
+  }
+
+  /**
+   * Gets the persistent kernel lifetime in seconds.
+   *
+   * @return the lifetime in seconds
+   */
+  public float getPersistentLifetime() {
+    return persistentLifetime;
+  }
+
+  /**
+   * Gets the fraction of maximum grid size used by the persistent kernel.
+   *
+   * @return the device usage fraction (0.0, 1.0]
+   */
+  public float getPersistentDeviceUsage() {
+    return persistentDeviceUsage;
+  }
+
   @Override
   public String toString() {
     return "CagraSearchParams [maxQueries="
@@ -301,8 +337,11 @@ public class CagraSearchParams {
     private int numRandomSamplings = 1;
     private float hashMapMaxFillRate = 0.5f;
     private long randXORMask = 0x128394;
-    private SearchAlgo searchAlgo;
-    private HashMapMode hashMapMode;
+    private SearchAlgo searchAlgo = SearchAlgo.AUTO;
+    private HashMapMode hashMapMode = HashMapMode.AUTO_HASH;
+    private boolean persistent = false;
+    private float persistentLifetime = 2.0f;
+    private float persistentDeviceUsage = 1.0f;
 
     /**
      * Default constructor.
@@ -461,6 +500,43 @@ public class CagraSearchParams {
     }
 
     /**
+     * Enables or disables the persistent kernel.
+     *
+     * <p>When enabled, the CAGRA SINGLE_CTA kernel stays resident on the GPU and serves search
+     * jobs via system-scope atomics. The kernel is shared across all indexes.
+     *
+     * @param persistent true to enable the persistent kernel
+     * @return an instance of this Builder
+     */
+    public Builder withPersistent(boolean persistent) {
+      this.persistent = persistent;
+      return this;
+    }
+
+    /**
+     * Sets the time in seconds before an idle persistent kernel exits.
+     *
+     * @param persistentLifetime lifetime in seconds (default 2.0)
+     * @return an instance of this Builder
+     */
+    public Builder withPersistentLifetime(float persistentLifetime) {
+      this.persistentLifetime = persistentLifetime;
+      return this;
+    }
+
+    /**
+     * Sets the fraction of maximum grid size used by the persistent kernel.
+     * Must be greater than 0.0 and not greater than 1.0.
+     *
+     * @param persistentDeviceUsage device usage fraction (default 1.0)
+     * @return an instance of this Builder
+     */
+    public Builder withPersistentDeviceUsage(float persistentDeviceUsage) {
+      this.persistentDeviceUsage = persistentDeviceUsage;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link CagraSearchParams} with passed search
      * parameters.
      *
@@ -480,7 +556,10 @@ public class CagraSearchParams {
           hashMapMinBitlen,
           hashMapMaxFillRate,
           numRandomSamplings,
-          randXORMask);
+          randXORMask,
+          persistent,
+          persistentLifetime,
+          persistentDeviceUsage);
     }
   }
 }
