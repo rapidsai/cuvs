@@ -105,7 +105,7 @@ class Dataset:
         Loaded from base_file on first access if not provided directly.
         """
         if self._training_vectors.size == 0 and self.base_file:
-            from .utils import load_vectors
+            from ._utils import load_vectors
 
             self._training_vectors = load_vectors(
                 self.base_file, self.metadata.get("subset_size")
@@ -126,7 +126,7 @@ class Dataset:
         Loaded from query_file on first access if not provided directly.
         """
         if self._query_vectors.size == 0 and self.query_file:
-            from .utils import load_vectors
+            from ._utils import load_vectors
 
             self._query_vectors = load_vectors(self.query_file)
         return self._query_vectors
@@ -147,7 +147,7 @@ class Dataset:
             self._groundtruth_neighbors is None
             and self.groundtruth_neighbors_file
         ):
-            from .utils import load_vectors
+            from ._utils import load_vectors
 
             self._groundtruth_neighbors = load_vectors(
                 self.groundtruth_neighbors_file
@@ -170,7 +170,7 @@ class Dataset:
             self._groundtruth_distances is None
             and self.groundtruth_distances_file
         ):
-            from .utils import load_vectors
+            from ._utils import load_vectors
 
             self._groundtruth_distances = load_vectors(
                 self.groundtruth_distances_file

@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from ..backends.utils import expand_param_grid
+from ..backends._utils import expand_param_grid
 
 
 @dataclass

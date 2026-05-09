@@ -20,7 +20,7 @@ from ..backends.registry import (
     get_config_loader,
     list_backends,
 )
-from ..backends.utils import compute_recall
+from ..backends._utils import compute_recall
 from .config_loaders import DatasetConfig
 
 

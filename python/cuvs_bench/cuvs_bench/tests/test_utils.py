@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from cuvs_bench.backends import Dataset
-from cuvs_bench.backends.utils import (
+from cuvs_bench.backends._utils import (
     compute_recall,
     dtype_from_filename,
     expand_param_grid,
