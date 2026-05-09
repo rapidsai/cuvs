@@ -935,6 +935,8 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
+               CXX_VISIBILITY_PRESET hidden
+               VISIBILITY_INLINES_HIDDEN ON
   )
   target_compile_options(
     cuvs_objs
@@ -1027,21 +1029,16 @@ if(NOT BUILD_CPU_ONLY)
 
     target_link_libraries(
       cuvs
-      INTERFACE $<COMPILE_ONLY:rmm::rmm>
-      PUBLIC raft::raft
+      PUBLIC rmm::rmm
+             raft::raft
              cuvs::cuvs_cpp_headers
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE rmm::rmm
-              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<COMPILE_ONLY:nvidia::cutlass::cutlass>
-              $<COMPILE_ONLY:cuco::cuco>
-              CUDA::nvJitLink
-              CUDA::nvrtc
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco> CUDA::nvJitLink CUDA::nvrtc
     )
-    set_property(TARGET cuvs PROPERTY NO_CUDART_DEP ON)
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     file(
@@ -1089,21 +1086,19 @@ SECTIONS
 
     target_link_libraries(
       cuvs_static
-      INTERFACE $<COMPILE_ONLY:rmm::rmm>
-      PUBLIC raft::raft
+      PUBLIC rmm::rmm
+             raft::raft
              cuvs::cuvs_cpp_headers
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
-      PRIVATE rmm::rmm
-              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               CUDA::nvJitLink
               CUDA::nvrtc
               $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
               $<COMPILE_ONLY:nvidia::cutlass::cutlass>
               $<COMPILE_ONLY:cuco::cuco>
     )
-    set_property(TARGET cuvs_static PROPERTY NO_CUDART_DEP ON)
   endif()
 
   # ################################################################################################
