@@ -150,7 +150,9 @@ class TestDataset:
         queries = np.random.rand(50, 64).astype(np.float32)
 
         dataset = Dataset(
-            name="test_dataset_no_gt", training_vectors=base, query_vectors=queries
+            name="test_dataset_no_gt",
+            training_vectors=base,
+            query_vectors=queries,
         )
 
         assert dataset.groundtruth_neighbors is None
