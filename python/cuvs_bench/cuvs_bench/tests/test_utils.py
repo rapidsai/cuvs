@@ -209,6 +209,15 @@ class TestDatasetLazyLoading:
         dataset = Dataset(name="test", groundtruth_neighbors_file=path)
         np.testing.assert_array_equal(dataset.groundtruth_neighbors, data)
 
+    def test_lazy_load_groundtruth_distances(self, tmp_path):
+        """Test that ground truth distances are loaded from file on first access."""
+        data = np.random.rand(10, 5).astype(np.float32)
+        path = str(tmp_path / "gt_dist.fbin")
+        _write_test_bin(path, data)
+
+        dataset = Dataset(name="test", groundtruth_distances_file=path)
+        np.testing.assert_array_equal(dataset.groundtruth_distances, data)
+
     def test_preloaded_vectors_returned_directly(self):
         """Test that pre-loaded vectors are returned without file access."""
         base = np.random.rand(20, 16).astype(np.float32)

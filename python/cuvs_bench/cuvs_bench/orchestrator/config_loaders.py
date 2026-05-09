@@ -119,6 +119,7 @@ class DatasetConfig:
     base_file: Optional[str] = None
     query_file: Optional[str] = None
     groundtruth_neighbors_file: Optional[str] = None
+    groundtruth_distances_file: Optional[str] = None
     distance: str = "euclidean"
     dims: Optional[int] = None
     subset_size: Optional[int] = None
@@ -265,6 +266,9 @@ class ConfigLoader(ABC):
             query_file=_resolve(dataset_conf.get("query_file")),
             groundtruth_neighbors_file=_resolve(
                 dataset_conf.get("groundtruth_neighbors_file")
+            ),
+            groundtruth_distances_file=_resolve(
+                dataset_conf.get("groundtruth_distances_file")
             ),
             distance=dataset_conf.get("distance", "euclidean"),
             dims=dataset_conf.get("dims"),

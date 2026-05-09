@@ -625,6 +625,7 @@ class BenchmarkOrchestrator:
             base_file=dataset_config.base_file,
             query_file=dataset_config.query_file,
             groundtruth_neighbors_file=dataset_config.groundtruth_neighbors_file,
+            groundtruth_distances_file=dataset_config.groundtruth_distances_file,
             distance_metric=dataset_config.distance,
             metadata={"subset_size": dataset_config.subset_size},
         )

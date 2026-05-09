@@ -53,6 +53,8 @@ class Dataset:
         Path to query vectors file
     groundtruth_neighbors_file : Optional[str]
         Path to ground truth neighbors file
+    groundtruth_distances_file : Optional[str]
+        Path to ground truth distances file
     metadata : Optional[Dict[str, Any]]
         Additional dataset metadata like {"subset_size": 10000}
     """
@@ -68,6 +70,7 @@ class Dataset:
         base_file: Optional[str] = None,
         query_file: Optional[str] = None,
         groundtruth_neighbors_file: Optional[str] = None,
+        groundtruth_distances_file: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
         self.name = name
@@ -87,11 +90,12 @@ class Dataset:
             query_vectors if query_vectors is not None else np.empty((0, 0))
         )
         self._groundtruth_neighbors = groundtruth_neighbors
-        self.groundtruth_distances = groundtruth_distances
+        self._groundtruth_distances = groundtruth_distances
         self.distance_metric = distance_metric
         self.base_file = base_file
         self.query_file = query_file
         self.groundtruth_neighbors_file = groundtruth_neighbors_file
+        self.groundtruth_distances_file = groundtruth_distances_file
         self.metadata = metadata or {}
 
     @property
@@ -154,6 +158,29 @@ class Dataset:
     def groundtruth_neighbors(self, value: Optional[np.ndarray]) -> None:
         """Set ground truth neighbors directly."""
         self._groundtruth_neighbors = value
+
+    @property
+    def groundtruth_distances(self) -> Optional[np.ndarray]:
+        """Ground truth distances.
+
+        Loaded from groundtruth_distances_file on first access if not
+        provided directly.
+        """
+        if (
+            self._groundtruth_distances is None
+            and self.groundtruth_distances_file
+        ):
+            from .utils import load_vectors
+
+            self._groundtruth_distances = load_vectors(
+                self.groundtruth_distances_file
+            )
+        return self._groundtruth_distances
+
+    @groundtruth_distances.setter
+    def groundtruth_distances(self, value: Optional[np.ndarray]) -> None:
+        """Set ground truth distances directly."""
+        self._groundtruth_distances = value
 
     @property
     def dims(self) -> int:
