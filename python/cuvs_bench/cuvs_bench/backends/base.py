@@ -163,8 +163,8 @@ class Dataset:
         return self.training_vectors.shape[1]
 
     @property
-    def n_training(self) -> int:
-        """Number of training vectors."""
+    def n_base(self) -> int:
+        """Number of base vectors."""
         return self.training_vectors.shape[0]
 
     @property

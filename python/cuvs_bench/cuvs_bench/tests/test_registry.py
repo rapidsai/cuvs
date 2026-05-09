@@ -55,7 +55,7 @@ class DummyBackend(BenchmarkBackend):
         if not indexes:
             raise ValueError("indexes must not be empty")
         n_queries = dataset.n_queries
-        neighbors = np.random.randint(0, dataset.n_training, size=(n_queries, k))
+        neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
         first = indexes[0]
 
@@ -105,7 +105,7 @@ class AnotherDummyBackend(BenchmarkBackend):
         if not indexes:
             raise ValueError("indexes must not be empty")
         n_queries = dataset.n_queries
-        neighbors = np.random.randint(0, dataset.n_training, size=(n_queries, k))
+        neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
         first = indexes[0]
 
@@ -140,7 +140,7 @@ class TestDataset:
 
         assert dataset.name == "test_dataset"
         assert dataset.dims == 128
-        assert dataset.n_training == 1000
+        assert dataset.n_base == 1000
         assert dataset.n_queries == 100
         assert dataset.distance_metric == "euclidean"
 

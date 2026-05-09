@@ -269,7 +269,7 @@ class TestDatasetLazyLoading:
         assert dataset._training_vectors.size == 0
 
     def test_dims_and_counts(self, tmp_path):
-        """Test dims, n_training, and n_queries properties."""
+        """Test dims, n_base, and n_queries properties."""
         data = np.random.rand(50, 32).astype(np.float32)
         path = str(tmp_path / "base.fbin")
         _write_test_bin(path, data)
@@ -280,7 +280,7 @@ class TestDatasetLazyLoading:
 
         dataset = Dataset(name="test", base_file=path, query_file=qpath)
         assert dataset.dims == 32
-        assert dataset.n_training == 50
+        assert dataset.n_base == 50
         assert dataset.n_queries == 10
 
     def test_caching(self, tmp_path):
