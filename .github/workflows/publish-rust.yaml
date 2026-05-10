@@ -2,6 +2,9 @@ name: publish
 
 on:
   workflow_call:
+    secrets:
+      GPUTESTER_CRATES_TOKEN:
+        required: false
 
 defaults:
   run:
@@ -14,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
+          - '13.1.1'
     container:
       image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
     steps:
@@ -45,10 +48,6 @@ jobs:
           set +eu
           conda activate rust
           set -eu
-
-          LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
-          export LIBCLANG_PATH
-          echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 
           # Publish sys crate first
           pushd ./rust/cuvs-sys
