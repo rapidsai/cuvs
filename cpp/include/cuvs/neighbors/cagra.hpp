@@ -447,7 +447,7 @@ struct index : cuvs::neighbors::index {
     return dataset_fd_.has_value() ? graph_degree_ : graph_view_.extent(1);
   }
 
-  [[nodiscard]] inline auto dataset() const noexcept
+  [[nodiscard]] inline auto dataset() const
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
   {
     namespace nb   = cuvs::neighbors;
