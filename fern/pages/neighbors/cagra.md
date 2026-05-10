@@ -29,6 +29,10 @@ cuvsCagraIndexParamsCreate(&index_params);
 cuvsCagraIndexCreate(&index);
 
 cuvsCagraBuild(res, index_params, dataset, index);
+
+cuvsCagraIndexDestroy(index);
+cuvsCagraIndexParamsDestroy(index_params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>
@@ -155,6 +159,9 @@ cuvsCagraSearchParamsCreate(&search_params);
 
 // ... build or load index ...
 cuvsCagraSearch(res, search_params, index, queries, neighbors, distances);
+
+cuvsCagraSearchParamsDestroy(search_params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>

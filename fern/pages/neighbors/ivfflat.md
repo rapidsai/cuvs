@@ -34,6 +34,10 @@ index_params->n_lists = 1024;
 index_params->kmeans_trainset_fraction = 0.5;
 
 cuvsIvfFlatBuild(res, index_params, dataset, index);
+
+cuvsIvfFlatIndexDestroy(index);
+cuvsIvfFlatIndexParamsDestroy(index_params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>
@@ -164,6 +168,9 @@ cuvsIvfFlatSearch(
     neighbors,
     distances,
     filter);
+
+cuvsIvfFlatSearchParamsDestroy(search_params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>

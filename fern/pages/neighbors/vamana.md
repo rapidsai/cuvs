@@ -39,6 +39,10 @@ index_params->visited_size = 128;
 index_params->queue_size = 255;
 
 cuvsVamanaBuild(res, index_params, dataset, index);
+
+cuvsVamanaIndexDestroy(index);
+cuvsVamanaIndexParamsDestroy(index_params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>

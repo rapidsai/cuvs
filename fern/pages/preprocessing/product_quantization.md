@@ -36,6 +36,10 @@ params->use_subspaces = true;
 params->use_vq = false;
 
 cuvsProductQuantizerBuild(res, params, dataset, quantizer);
+
+cuvsProductQuantizerDestroy(quantizer);
+cuvsProductQuantizerParamsDestroy(params);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>

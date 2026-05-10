@@ -55,6 +55,7 @@ cuvsAllNeighborsBuild(
     NULL,
     1.0f);
 
+// This also destroys params->nn_descent_params when it is set.
 cuvsAllNeighborsIndexParamsDestroy(params);
 cuvsResourcesDestroy(res);
 ```

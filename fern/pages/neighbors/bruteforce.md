@@ -26,6 +26,9 @@ cuvsResourcesCreate(&res);
 cuvsBruteForceIndexCreate(&index);
 
 cuvsBruteForceBuild(res, dataset, L2Expanded, 0.0f, index);
+
+cuvsBruteForceIndexDestroy(index);
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>
@@ -146,6 +149,8 @@ cuvsResourcesCreate(&res);
 // ... build or load index ...
 cuvsFilter prefilter = {0, NO_FILTER};
 cuvsBruteForceSearch(res, index, queries, neighbors, distances, prefilter);
+
+cuvsResourcesDestroy(res);
 ```
 
 </Tab>
