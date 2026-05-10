@@ -494,7 +494,7 @@ struct dataset_view<indirect_dataset_container, void, IdxT, true, false> {
   }
   [[nodiscard]] void const* raw_target() const noexcept { return target_ptr_; }
 
-  [[nodiscard]] index_type n_rows() const noexcept
+  [[nodiscard]] index_type n_rows() const
   {
     switch (indirect_target_type_) {
       case indirect_target_type::empty_v:
@@ -511,11 +511,11 @@ struct dataset_view<indirect_dataset_container, void, IdxT, true, false> {
         return static_cast<vpq_dataset<float, IdxT> const*>(target_ptr_)->n_rows();
       case indirect_target_type::vpq_f16:
         return static_cast<vpq_dataset<half, IdxT> const*>(target_ptr_)->n_rows();
-      default: RAFT_FAIL("indirect_dataset_view: invalid indirect_target_type"); return 0;
+      default: RAFT_FAIL("indirect_dataset_view: invalid indirect_target_type");
     }
   }
 
-  [[nodiscard]] uint32_t dim() const noexcept
+  [[nodiscard]] uint32_t dim() const
   {
     switch (indirect_target_type_) {
       case indirect_target_type::empty_v:
@@ -532,7 +532,7 @@ struct dataset_view<indirect_dataset_container, void, IdxT, true, false> {
         return static_cast<vpq_dataset<float, IdxT> const*>(target_ptr_)->dim();
       case indirect_target_type::vpq_f16:
         return static_cast<vpq_dataset<half, IdxT> const*>(target_ptr_)->dim();
-      default: RAFT_FAIL("indirect_dataset_view: invalid indirect_target_type"); return 0;
+      default: RAFT_FAIL("indirect_dataset_view: invalid indirect_target_type");
     }
   }
 
