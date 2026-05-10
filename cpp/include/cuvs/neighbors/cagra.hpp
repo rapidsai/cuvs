@@ -28,9 +28,9 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <memory>
 #include <numeric>
-#include <cuvs/core/export.hpp>
 #include <optional>
 #include <string>
 #include <variant>
