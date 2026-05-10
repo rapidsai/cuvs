@@ -20,35 +20,35 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim) : handle_(handle)
+RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
+  : D(raft::round_up_safe<uint32_t>(dim, 64u)),
+    rotation_matrix_(raft::make_device_matrix<float, int64_t, raft::row_major>(handle, D, D))
 {
-  // Compute padded dimension (round up to multiple of 64)
-  D = raft::round_up_safe<uint32_t>(dim, 64u);
-  // Create a random matrix (size D x D)
-  rotation_matrix_ = raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, D, D);
   raft::random::RngState rng(7ULL);
   raft::random::normal(handle, rng, rotation_matrix_.data_handle(), D * D, 0.0f, 1.0f);
-  // Compute the random rotation matrix in-place
-  raft::linalg::detail::qrGetQ_inplace(handle, rotation_matrix_.data_handle(), D, D, stream_);
+  raft::linalg::detail::qrGetQ_inplace(
+    handle, rotation_matrix_.data_handle(), D, D, raft::resource::get_cuda_stream(handle));
 }
 
 size_t RotatorGPU::size() const { return D; }
 
-void RotatorGPU::load(std::ifstream& input)
+void RotatorGPU::load(raft::resources const& handle, std::ifstream& input)
 {
+  auto stream   = raft::resource::get_cuda_stream(handle);
   auto host_buf = raft::make_host_vector<float, int64_t>(D * D);
   for (size_t i = 0; i < D * D; ++i) {
     input.read(reinterpret_cast<char*>(&host_buf(i)), sizeof(float));
   }
-  raft::copy(rotation_matrix_.data_handle(), host_buf.data_handle(), D * D, stream_);
-  raft::resource::sync_stream(handle_);
+  raft::copy(rotation_matrix_.data_handle(), host_buf.data_handle(), D * D, stream);
+  raft::resource::sync_stream(handle);
 }
 
-void RotatorGPU::save(std::ofstream& output) const
+void RotatorGPU::save(raft::resources const& handle, std::ofstream& output) const
 {
+  auto stream   = raft::resource::get_cuda_stream(handle);
   auto host_buf = raft::make_host_vector<float, int64_t>(D * D);
-  raft::copy(host_buf.data_handle(), rotation_matrix_.data_handle(), D * D, stream_);
-  raft::resource::sync_stream(handle_);
+  raft::copy(host_buf.data_handle(), rotation_matrix_.data_handle(), D * D, stream);
+  raft::resource::sync_stream(handle);
   for (size_t i = 0; i < D * D; ++i) {
     output.write(reinterpret_cast<char*>(&host_buf(i)), sizeof(float));
   }
@@ -58,9 +58,11 @@ void RotatorGPU::save(std::ofstream& output) const
 // A and RAND_A are assumed to be stored in row-major order.
 // A is of size N x D and P is of size D x D, so the result is N x D.
 // This function uses cuBLAS to perform the matrix multiplication.
-void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const
+void RotatorGPU::rotate(raft::resources const& handle,
+                        const float* d_A,
+                        float* d_RAND_A,
+                        size_t N) const
 {
-  //    cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH);
   // cuBLAS assumes column-major storage by default. Since our matrices are in row-major order,
   // we can perform the multiplication as:
   //   RAND_A^T = P^T * A^T
@@ -68,7 +70,7 @@ void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const
   // Note that in Cublas it is RAND_A^T in column major, which is what we want in row-major
   // Here, we use the RAFT wrapper for gemm.
   raft::linalg::gemm(
-    handle_,
+    handle,
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(
       const_cast<float*>(rotation_matrix_.data_handle()), D, D),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_A), D, N),

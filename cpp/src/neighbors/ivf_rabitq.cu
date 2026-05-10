@@ -197,7 +197,8 @@ void search(raft::resources const& handle,
   auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
   if (padded_dim == dim) {
     // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
-    idx.rabitq_index().rotator().rotate(queries.data_handle(), rotated_queries.data_handle(), NQ);
+    idx.rabitq_index().rotator().rotate(
+      handle, queries.data_handle(), rotated_queries.data_handle(), NQ);
   } else {
     auto padded_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
     RAFT_CUDA_TRY(
@@ -212,7 +213,7 @@ void search(raft::resources const& handle,
                                     stream));
     // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
     idx.rabitq_index().rotator().rotate(
-      padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
+      handle, padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
   }
 
   auto search_mode_to_string = [](search_mode mode) -> std::string {

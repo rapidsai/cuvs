@@ -51,6 +51,8 @@ class SearcherGPU {
 
   // Getter methods
   std::string const& get_mode() { return mode_; }
+  raft::resources const& get_handle() const { return handle_; }
+  rmm::cuda_stream_view get_stream() const { return stream_; }
   float* get_centroid_distances() { return centroid_distances_.data_handle(); }
   float* get_c_norms() { return c_norms_.data_handle(); }
   float* get_q_norms() { return q_norms_.data_handle(); }

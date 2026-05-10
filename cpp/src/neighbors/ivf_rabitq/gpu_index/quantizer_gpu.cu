@@ -46,6 +46,7 @@ void data_transformation_batch_opt(const float* d_data,
                                    float* d_X_and_C_pad,
                                    size_t DIM,
                                    size_t D,
+                                   raft::resources const& handle,
                                    rmm::cuda_stream_view stream);
 
 void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
@@ -59,6 +60,7 @@ void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
                                               float* d_X_and_C_pad,
                                               size_t DIM,
                                               size_t D,
+                                              raft::resources const& handle,
                                               rmm::cuda_stream_view stream);
 
 void rabitq_codes_and_factors_fused(const float* d_rotated_c,
@@ -515,6 +517,7 @@ void data_transformation_batch_opt(const float* d_data,
                                    float* d_X_and_C_pad,
                                    size_t DIM,
                                    size_t D,
+                                   raft::resources const& handle,
                                    rmm::cuda_stream_view stream)
 {
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
@@ -532,7 +535,7 @@ void data_transformation_batch_opt(const float* d_data,
 
   // 4. Perform a single, combined rotation.
   // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
-  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
+  rotator.rotate(handle, d_X_and_C_pad, d_XP_and_CP, num_points + 1);
 
   // Create pointers to the specific results within the combined buffer.
   float* d_XP = d_XP_and_CP;
@@ -653,6 +656,7 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                 d_X_and_C_pad.data_handle(),
                                 DIM,
                                 D,
+                                handle_,
                                 stream_);
 
   rabitq_codes_and_factors_fused(d_rotated_c,
@@ -751,6 +755,7 @@ void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
                                               float* d_X_and_C_pad,
                                               size_t DIM,
                                               size_t D,
+                                              raft::resources const& handle,
                                               rmm::cuda_stream_view stream)
 {
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
@@ -768,7 +773,7 @@ void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
 
   // 4. Perform a single, combined rotation.
   // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
-  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
+  rotator.rotate(handle, d_X_and_C_pad, d_XP_and_CP, num_points + 1);
 
   // Create pointers to the specific results within the combined buffer.
   float* d_XP = d_XP_and_CP;
@@ -818,6 +823,7 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                            d_X_and_C_pad.data_handle(),
                                            DIM,
                                            D,
+                                           handle_,
                                            stream_);
 
   rabitq_codes_and_factors_fused(d_rotated_c,

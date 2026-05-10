@@ -49,7 +49,7 @@ class RotatorGPU {
    * The function reads the D×D matrix from the file, transposes it into column-major order,
    * and copies it into device memory.
    */
-  void load(std::ifstream& input);
+  void load(raft::resources const& handle, std::ifstream& input);
 
   /**
    * @brief Save the rotation matrix to a file.
@@ -59,20 +59,16 @@ class RotatorGPU {
    * The function copies the rotation matrix from device memory, transposes it from column-major to
    * row-major, and writes it to the file.
    */
-  void save(std::ofstream& output) const;
+  void save(raft::resources const& handle, std::ofstream& output) const;
 
   // Rotate matrix A and store the result in RAND_A.
   // A and RAND_A are device pointers representing matrices of size N x D.
   // This function computes: RAND_A = A * P using cuBLAS.
-  void rotate(const float* d_A, float* d_RAND_A, size_t N) const;
+  void rotate(raft::resources const& handle, const float* d_A, float* d_RAND_A, size_t N) const;
 
  private:
-  raft::resources const& handle_;  // reusable resource handle
-  rmm::cuda_stream_view stream_ =
-    raft::resource::get_cuda_stream(handle_);  // CUDA stream obtained from handle_
-  size_t D;                                    // Padded dimension
-  raft::device_matrix<float, int64_t, raft::row_major> rotation_matrix_ =
-    raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, 0, 0);  // Rotation matrix P
+  size_t D;  // Padded dimension
+  raft::device_matrix<float, int64_t, raft::row_major> rotation_matrix_;
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
