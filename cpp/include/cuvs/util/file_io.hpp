@@ -285,9 +285,16 @@ class buffered_ofstream {
 
   void write(const char* input, size_t size)
   {
-    if (pos_ + size > buffer_.size()) { flush(); }
-    std::copy(input, input + size, &buffer_[pos_]);
-    pos_ += size;
+    if (size >= buffer_.size()) {
+      flush();
+      os_->write(input, static_cast<std::streamsize>(size));
+      if (!os_->good()) { RAFT_FAIL("Error writing HNSW file!"); }
+      return;
+    } else {
+      if (size > buffer_.size() - pos_) { flush(); }
+      std::memcpy(buffer_.data() + pos_, input, size);
+      pos_ += size;
+    }
   }
 
  private:
