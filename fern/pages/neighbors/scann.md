@@ -71,6 +71,10 @@ Serialization writes the files needed by OSS ScaNN, including partition centers,
 
 cuVS does not currently provide a SCaNN search API or SCaNN search parameters. To search a SCaNN index, serialize it with cuVS and load the generated files with OSS ScaNN.
 
+### Loading a serialized index
+
+cuVS does not currently expose a SCaNN deserialization API. The serialized directory is intended to be loaded by OSS ScaNN or another consumer that understands the OSS ScaNN file layout.
+
 ## How ScaNN works
 
 SCaNN first partitions the dataset into leaves. A query only needs to consider promising leaves instead of the full dataset.
@@ -127,17 +131,6 @@ cuVS SCaNN does not expose a search API, so it does not expose cuVS filtering co
 | `reordering_bf16` | `false` | Stores a bfloat16 copy of the dataset for OSS ScaNN candidate reranking. |
 | `reordering_noise_shaping_threshold` | `NaN` | Optional threshold for bfloat16 AVQ noise shaping. `NaN` disables the adjustment. |
 
-### Search parameters
-
-cuVS SCaNN does not currently define `search_params`. Search-time knobs come from OSS ScaNN after the index is serialized.
-
-### Serialization parameters
-
-| Name | Description |
-| --- | --- |
-| `file_prefix` | Directory where the SCaNN assets are written. |
-| `index` | Built SCaNN index to serialize. |
-
 ## Tuning
 
 Start with the defaults, then tune one part of the pipeline at a time.
@@ -178,6 +171,58 @@ The named terms in the formulas are also memory sizes:
 - `residual_codes_size`: Host memory for normal and SOAR residual PQ codes.
 - `bf16_dataset_size`: Optional host memory for bfloat16 reranking data.
 - `*_peak`: Temporary peak memory for one build phase. Sequential phases are not added together.
+
+### Scratch and maximum vectors
+
+The formulas below include the largest visible build phases, but additional scratch can come from k-means, PQ training, SOAR workspace, allocator padding, CUDA library workspaces, and memory held by the active memory resource. Use `H = 0.25` for SCaNN build planning. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+For fixed `D`, `L`, `P`, `pq_bits`, and batch settings, most SCaNN storage terms are linear in `N`, while capped training terms can become fixed. Solve the full build formula or rewrite the dominant phase as:
+
+$$
+\text{peak\_without\_scratch}(N)
+  = N \cdot B_{\text{per\_vector}} + B_{\text{fixed}}
+$$
+
+and estimate:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_vector}}}
+  \right\rfloor
+$$
+
+Check device and host memory separately because SCaNN keeps residual codes and optional bfloat16 reranking data on host.
 
 ### Baseline memory after build
 

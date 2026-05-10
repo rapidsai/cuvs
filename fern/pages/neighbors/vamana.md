@@ -181,6 +181,10 @@ fn build_and_save_vamana_index(dataset: &ndarray::Array2<f32>) -> Result<()> {
 </Tab>
 </Tabs>
 
+### Loading a serialized index
+
+cuVS Vamana writes DiskANN-compatible files but does not currently expose a Vamana deserialization or search API. Load the serialized output with DiskANN or another DiskANN-compatible search layer.
+
 ## How Vamana works
 
 Vamana builds a directed graph over the dataset. Each vector keeps up to `graph_degree` outgoing edges to other vectors.
@@ -250,18 +254,6 @@ vamana::serialize(
 | `reverse_batchsize` | `1000000` | Maximum reverse-edge processing batch size. Lower values can reduce temporary memory during reverse-edge processing. |
 | `codebooks` | None | Optional C++ PQ codebook parameters loaded with `deserialize_codebooks` for DiskANN-compatible quantized output workflows. |
 
-### Serialization parameters
-
-| Name | Default | Description |
-| --- | --- | --- |
-| `file_prefix` / `filename` | Required | Path prefix for the DiskANN-compatible serialized index files. |
-| `include_dataset` | `True` | Includes the dataset in the serialized output. Disable this when the downstream workflow already has the dataset or uses externally prepared quantized data. |
-| `sector_aligned` | `False` | C++ option to align output files to 4096-byte disk sectors. This is useful for DiskANN SSD-oriented workflows. |
-
-### Search parameters
-
-Vamana does not expose a cuVS C++ `search_params` struct. cuVS currently builds and serializes the Vamana graph, and search is performed by loading the serialized index with DiskANN.
-
 ## Tuning
 
 Tune `graph_degree` first. Larger values give each vector more outgoing edges, which can improve downstream DiskANN recall but increases graph memory, build time, and serialized index size.
@@ -298,6 +290,52 @@ The named terms in the formulas are also memory sizes:
 - `reverse_scratch_size`: Temporary memory used while processing reverse edges.
 - `build_peak`: Approximate peak device memory during build.
 - `host_serialize_size`: Host memory used while serializing.
+- `metadata_size`: Small fixed index metadata. It is usually negligible compared with the dataset and graph, but include a measured value if exact accounting is required.
+
+### Scratch and maximum vectors
+
+The formulas below include the major insertion and reverse-edge scratch buffers. Additional scratch comes from allocator padding, graph update temporaries, CUDA library workspaces, and memory held by the active memory resource. Use `H = 0.25` for build estimates. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+For fixed `D`, `G`, `V`, `Q_c`, `F`, and `R_b`, the build peak is mostly linear in `N` until `reverse_batch_size` reaches `R_b`. Solve the full `max(...)` expression or use the linear shortcut in the active region:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_vector}}}
+  \right\rfloor
+$$
+
+If `reverse_batch_size = min(N, R_b)` is capped, treat the reverse scratch term as fixed after `N >= R_b`.
 
 ### Baseline memory after build
 
@@ -323,7 +361,7 @@ $$
 &\approx
   \text{dataset\_size} \\
 &\quad + \text{graph\_size} \\
-&\quad + \text{small metadata}
+&\quad + \text{metadata\_size}
 \end{aligned}
 $$
 

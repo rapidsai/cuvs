@@ -209,6 +209,10 @@ indices, distances = all_neighbors.build(
 
 Device-resident datasets require `n_clusters = 1`. Put the dataset in host memory when using `n_clusters > 1`.
 
+### Saving graph outputs
+
+All-neighbors does not expose cuVS index serialization or deserialization APIs because the graph arrays are the output. Persist `indices`, `distances`, and `core_distances` if used with your application's tensor, array, or table storage format, then load those arrays into the downstream graph-processing workflow.
+
 ### Mutual-reachability distances
 
 All-neighbors can compute mutual-reachability distances for workflows such as robust single linkage or HDBSCAN-style graph construction. Provide both `distances` and `core_distances`; `alpha` controls the mutual-reachability scaling.
@@ -291,21 +295,6 @@ All-neighbors does not expose filtered search because it does not search new que
 | `n_clusters` | `1` | Number of clusters or batches. `1` disables batching. Values greater than `1` require host-resident data. |
 | `metric` | `L2Expanded` | Distance metric used for graph construction. IVF-PQ supports only `L2Expanded` in all-neighbors. |
 
-### Build function arguments
-
-The following values are passed to `all_neighbors::build`, but they are not fields in the C++ `all_neighbors_params` struct.
-
-| Name | Default | Description |
-| --- | --- | --- |
-| `indices` | Required in C/C++, optional in Python | Device output matrix of shape `[N, K]` with `int64` neighbor IDs. |
-| `distances` | Optional | Device output matrix of shape `[N, K]` with `float32` neighbor distances. Required when `core_distances` is provided. |
-| `core_distances` | Optional | Device output vector of shape `[N]`. When provided, all-neighbors computes mutual-reachability distances. |
-| `alpha` | `1.0` | Mutual-reachability scaling parameter used only when `core_distances` is provided. |
-
-### Search parameters
-
-All-neighbors does not define search parameters because it does not search new query vectors.
-
 ## Tuning
 
 Start with the local graph builder. Brute-force gives the clearest baseline, NN-Descent is usually the fastest approximate graph builder, and IVF-PQ can be useful for larger local batches when L2 distance is sufficient.
@@ -342,6 +331,52 @@ The named terms in the formulas are also memory sizes:
 - `distances_size`: Device memory for output distances.
 - `core_distances_size`: Device memory for mutual-reachability core distances.
 - `local_builder_peak`: Peak temporary memory for the chosen local graph builder on at most `M` rows.
+
+### Scratch and maximum vectors
+
+The formulas below include output buffers, batching metadata, and local builder peaks. Additional scratch comes from allocator padding, local graph-builder workspaces, CUDA library workspaces, and memory held by the active memory resource. Use `H = 0.25` for all-neighbors builds, then add the scratch/headroom recommended by the chosen local builder. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+With `n_clusters = 1`, solve the single-cluster formula using the local builder peak for `N` rows. With batched builds, substitute `M = ceil(N * O / C)` and solve:
+
+$$
+\text{peak\_without\_scratch}(N)
+  =
+  N \cdot B_{\text{global\_per\_vector}}
+  + M(N) \cdot B_{\text{local\_per\_vector}}
+  + B_{\text{fixed}}
+$$
+
+In this formula, `M(N) = ceil(N * O / C)` is the estimated largest local cluster size for a candidate dataset size `N`. `B_global_per_vector` is the per-vector memory for global outputs and merge metadata. `B_local_per_vector` is the per-vector memory used by the selected local builder when it processes one local cluster. Use the local builder's own memory formula to estimate `B_local_per_vector`.
+
+Then try increasing `N` until `peak_without_scratch(N) <= M_usable` no longer holds. The largest feasible dataset is the smaller value from device memory and host/managed-memory limits.
 
 ### Baseline output memory
 

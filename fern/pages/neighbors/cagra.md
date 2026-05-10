@@ -270,6 +270,109 @@ return err
 </Tab>
 </Tabs>
 
+### Saving and loading an index
+
+Serialize a CAGRA index when you want to reuse the graph without rebuilding it. Include the dataset when the loaded index should be searchable immediately; omit it only when your workflow will attach or provide the dataset separately.
+
+Go does not currently expose CAGRA save/load wrappers.
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/cagra.h>
+
+cuvsResources_t res;
+cuvsCagraIndex_t index;
+cuvsCagraIndex_t loaded_index;
+
+cuvsResourcesCreate(&res);
+cuvsCagraIndexCreate(&index);
+cuvsCagraIndexCreate(&loaded_index);
+
+// ... build index ...
+cuvsCagraSerialize(res, "/tmp/cuvs-cagra.bin", index, true);
+cuvsCagraDeserialize(res, "/tmp/cuvs-cagra.bin", loaded_index);
+
+cuvsCagraIndexDestroy(loaded_index);
+cuvsCagraIndexDestroy(index);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+auto dataset = load_dataset();
+auto index = cagra::build(res, cagra::index_params{}, dataset);
+
+cagra::serialize(res, "/tmp/cuvs-cagra.bin", index, true);
+
+cagra::index<float, uint32_t> loaded_index(res);
+cagra::deserialize(res, "/tmp/cuvs-cagra.bin", &loaded_index);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import cagra
+
+dataset = load_data()
+index = cagra.build(cagra.IndexParams(), dataset)
+
+cagra.save("/tmp/cuvs-cagra.bin", index, include_dataset=True)
+loaded_index = cagra.load("/tmp/cuvs-cagra.bin")
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+try (CuVSResources resources = CuVSResources.create()) {
+  CagraIndex index =
+      CagraIndex.newBuilder(resources)
+          .withDataset(vectors)
+          .build();
+
+  try (FileOutputStream output = new FileOutputStream("/tmp/cuvs-cagra.bin")) {
+    index.serialize(output);
+  }
+
+  try (FileInputStream input = new FileInputStream("/tmp/cuvs-cagra.bin")) {
+    CagraIndex loadedIndex =
+        CagraIndex.newBuilder(resources)
+            .from(input)
+            .build();
+  }
+}
+```
+
+</Tab>
+<Tab title="Rust">
+
+```rust
+use cuvs::cagra::{Index, IndexParams};
+use cuvs::{Resources, Result};
+
+fn save_and_load_cagra(dataset: &ndarray::Array2<f32>) -> Result<Index> {
+    let res = Resources::new()?;
+    let index_params = IndexParams::new()?;
+    let index = Index::build(&res, &index_params, dataset)?;
+
+    index.serialize(&res, "/tmp/cuvs-cagra.bin", true)?;
+    Index::deserialize(&res, "/tmp/cuvs-cagra.bin")
+}
+```
+
+</Tab>
+</Tabs>
+
 ## How CAGRA works
 
 CAGRA builds and searches a nearest-neighbor graph.
@@ -773,6 +876,58 @@ The named terms in the formulas are also memory sizes:
 - `result_size`: Device memory for neighbor IDs and distances returned for the current query batch.
 - `workspace_size`: Query and result memory used during search.
 
+### Scratch and maximum vectors
+
+Most CAGRA formulas below are linear in `N` once build parameters are fixed. The named temporary peaks are the main scratch terms for build phases, but real runs can also include allocator padding, CUDA library workspaces, memory-resource pools, and small implementation buffers. Reserve a headroom factor `H = 0.20` for IVF-PQ graph builds and `H = 0.30` for NN-Descent or iterative-search graph builds. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+Choose the build or search formula that matches the operation, remove the explicit `scratch`/headroom from it, and rewrite it as:
+
+$$
+\text{peak\_without\_scratch}(N)
+  = N \cdot B_{\text{per\_vector}} + B_{\text{fixed}}
+$$
+
+Then estimate:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_vector}}}
+  \right\rfloor
+$$
+
+For out-of-core IVF-PQ graph build, `Q`, `C`, and `R` can make several terms fixed or sublinear for a fixed configuration. Solve the full `max(...)` expression if the largest phase changes as `N` changes.
+
 ### Baseline memory after build
 
 The baseline memory footprint after index construction is:
@@ -802,7 +957,7 @@ The dataset must be in GPU memory during index build, but can be detached afterw
 
 Index build has two phases: construct an initial kNN graph, then optimize it by pruning redundant paths. These steps run sequentially, so their peak memory use is not additive. The overall peak depends on the configured RMM memory resource.
 
-The initial graph can be built with IVF-PQ or NN-Descent. IVF-PQ can build in batches, which allows CAGRA to train on datasets larger than available GPU memory.
+The initial graph can be built with IVF-PQ, NN-Descent, or the experimental iterative CAGRA-search builder. IVF-PQ can build in batches, which allows CAGRA to train on datasets larger than available GPU memory. The iterative builder requires the aligned dataset to fit in GPU memory because it repeatedly searches the partially built CAGRA graph.
 
 ### Initial graph build using IVF-PQ
 
@@ -872,6 +1027,107 @@ $$
 - Graph update buffer with degree 32: 256 bytes per vector.
 - Edge counters: 16 bytes per vector.
 
+### Initial graph build using iterative CAGRA search
+
+The iterative builder starts with a small connected graph, then repeatedly uses CAGRA search to find neighbors for a larger prefix of the dataset. After each search pass, it optimizes the graph and doubles the active graph size until all rows are included.
+
+This path is useful when the metric or data type is better served by CAGRA search itself, but it is not an out-of-core builder. The dataset is copied or aligned into GPU memory before the first iteration.
+
+Variables used only in this subsection:
+
+- `D_align`: Aligned device stride used by CAGRA search. Use `D` when no padding is required.
+- `Q_iter`: Maximum query chunk size used by the iterative builder. The implementation currently uses `min(N, 8192)`.
+- `K_iter`: Number of temporary neighbors kept per query during the last pass. Use `I + 1`.
+- `G_iter`: Largest graph degree used by the temporary searchable graph. Use `G`; early iterations use a smaller degree and the final iterations use `G`.
+- `D_iter`: Aligned device dataset memory.
+- `G_tmp`: Largest temporary device graph memory.
+- `Q_tile`: Query tile memory for one search chunk.
+- `R_tile`: Result tile memory for one search chunk.
+- `W_iter`: Temporary device workspace used by one iterative search pass.
+- `H_iter`: Host neighbors-list capacity in bytes after rounding up to a 2 MiB boundary. One MiB is `1024 * 1024` bytes.
+
+The aligned device dataset is:
+
+$$
+\begin{aligned}
+D_{\text{iter}}
+&= N \times D_{\text{align}} \times B
+\end{aligned}
+$$
+
+The largest temporary device graph used during the search pass is:
+
+$$
+\begin{aligned}
+G_{\text{tmp}}
+&= N \times G_{\text{iter}} \times S_{\text{idx}}
+\end{aligned}
+$$
+
+Each search chunk needs query storage plus temporary neighbor IDs and distances:
+
+$$
+\begin{aligned}
+Q_{\text{tile}}
+&= Q_{\text{iter}} \times D_{\text{align}} \times B \\
+R_{\text{tile}}
+&= Q_{\text{iter}} \times K_{\text{iter}}
+   \times (S_{\text{idx}} + 4)
+\end{aligned}
+$$
+
+The host neighbors list stores the temporary neighbor candidates for all rows:
+
+$$
+\begin{aligned}
+H_{\text{iter}}
+&=
+\operatorname{round\_up}
+\big(
+  N \times K_{\text{iter}} \times S_{\text{idx}},
+  2\ \text{MiB}
+\big)
+\end{aligned}
+$$
+
+The temporary device workspace for one search pass is:
+
+$$
+\begin{aligned}
+W_{\text{iter}}
+&= G_{\text{tmp}} \\
+&\quad + Q_{\text{tile}} \\
+&\quad + R_{\text{tile}}
+\end{aligned}
+$$
+
+The practical device peak for the iterative graph build is:
+
+$$
+\begin{aligned}
+\text{iterative\_device\_peak}
+&\approx
+  D_{\text{iter}} \\
+&\quad + \max\!\big(
+  W_{\text{iter}},
+  \text{optimize\_peak}
+  \big)
+\end{aligned}
+$$
+
+The practical host peak is:
+
+$$
+\begin{aligned}
+\text{iterative\_host\_peak}
+&\approx
+  H_{\text{iter}}
+  + N \times G \times S_{\text{idx}}
+\end{aligned}
+$$
+
+The final `N * G * S_idx` term is the host graph that remains after build. Check device and host memory separately. The usable `N` is the smaller value allowed by `iterative_device_peak` and `iterative_host_peak`.
+
 ### Optimize phase
 
 The optimize phase prunes and reorders the intermediate graph. Its peak memory scales linearly with the intermediate degree:
@@ -927,6 +1183,10 @@ $$
 $$
 
 `dataset_size*` applies only when the user passes data that is already in device memory. NN-Descent internally copies the dataset to the device as fp16, so host-memory inputs do not add this term.
+
+**Using iterative CAGRA search:**
+
+Use `iterative_device_peak` for device memory and `iterative_host_peak` for host memory. These estimates already include the aligned dataset, temporary search chunks, temporary graph storage, optimization workspace, and final host graph.
 
 ## Search peak memory usage
 

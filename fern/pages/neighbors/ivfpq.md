@@ -314,6 +314,70 @@ if err != nil {
 </Tab>
 </Tabs>
 
+### Saving and loading an index
+
+Serialize an IVF-PQ index when you want to reuse trained coarse clusters, PQ codebooks, and compressed lists without rebuilding the index.
+
+Java currently exposes IVF-PQ parameter classes for CAGRA graph construction, not a standalone IVF-PQ index/search binding. Rust and Go currently expose IVF-PQ build/search wrappers, but not IVF-PQ save/load wrappers.
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/ivf_pq.h>
+
+cuvsResources_t res;
+cuvsIvfPqIndex_t index;
+cuvsIvfPqIndex_t loaded_index;
+
+cuvsResourcesCreate(&res);
+cuvsIvfPqIndexCreate(&index);
+cuvsIvfPqIndexCreate(&loaded_index);
+
+// ... build index ...
+cuvsIvfPqSerialize(res, "/tmp/cuvs-ivf-pq.bin", index);
+cuvsIvfPqDeserialize(res, "/tmp/cuvs-ivf-pq.bin", loaded_index);
+
+cuvsIvfPqIndexDestroy(loaded_index);
+cuvsIvfPqIndexDestroy(index);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/ivf_pq.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+auto dataset = load_dataset();
+ivf_pq::index_params index_params;
+auto index = ivf_pq::build(res, index_params, dataset);
+
+ivf_pq::serialize(res, "/tmp/cuvs-ivf-pq.bin", index);
+
+ivf_pq::index<int64_t> loaded_index(res);
+ivf_pq::deserialize(res, "/tmp/cuvs-ivf-pq.bin", &loaded_index);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import ivf_pq
+
+dataset = load_data()
+index = ivf_pq.build(ivf_pq.IndexParams(), dataset)
+
+ivf_pq.save("/tmp/cuvs-ivf-pq.bin", index, include_dataset=True)
+loaded_index = ivf_pq.load("/tmp/cuvs-ivf-pq.bin")
+```
+
+</Tab>
+</Tabs>
+
 ## How IVF-PQ works
 
 IVF-PQ combines two ideas:
@@ -581,6 +645,60 @@ The named terms in the formulas are also memory sizes:
 - `result_size`: Device memory for neighbor IDs and distances returned for the current query batch.
 - `workspace_size`: Temporary search workspace.
 - `refinement_dataset_size`: Memory needed for original vectors when refinement reranks candidates.
+
+### Scratch and maximum vectors
+
+The formulas below show the major persistent buffers and search workspaces. Additional scratch comes from k-means training, PQ training, list allocation padding, allocator fragmentation, CUDA library workspaces, and memory held by the active memory resource. Use `H = 0.20` for build estimates and `H = 0.10` for search estimates. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+IVF-PQ capacity depends on list padding and the selected code layout. Estimate `N_cap` first for the default interleaved layout. Then solve the selected peak formula:
+
+$$
+\begin{aligned}
+\text{peak\_without\_scratch}(N)
+  =&\ \text{encoded\_data\_size}(N_{\text{cap}}) \\
+  &+ N \cdot B_{\text{per\_input\_vector}}
+   + B_{\text{fixed}}
+\end{aligned}
+$$
+
+For a rough maximum-vector estimate, try increasing `N` values until `peak_without_scratch(N) <= M_usable` no longer holds. If using the `flat` layout and no refinement dataset, most terms are linear in `N`, so the shortcut is:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_vector}}}
+  \right\rfloor
+$$
 
 ### List capacity
 

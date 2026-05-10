@@ -163,6 +163,10 @@ Distances are available only when `return_distances` is enabled during build. If
 
 NN-Descent builds a graph over the input dataset. It does not expose a cuVS search API for new query vectors. Use CAGRA, IVF-Flat, IVF-PQ, brute-force, or Vamana when you need query-time search.
 
+### Saving graph outputs
+
+NN-Descent does not expose cuVS index serialization or deserialization APIs because its output is a graph, not a query-time search index. Persist the returned graph and optional distances with your application's tensor, array, or table storage format, then load those arrays into the downstream workflow that consumes the graph.
+
 ## How NN-Descent works
 
 NN-Descent starts with a random neighbor graph. Each vector has a list of candidate neighbors, but those candidates are only a first guess.
@@ -251,10 +255,6 @@ NN-Descent does not expose filtered search because it does not expose search. Ap
 | `return_distances` | `true` | Stores distances for the returned graph. Disable this to reduce memory when only neighbor IDs are needed. |
 | `dist_comp_dtype` | `AUTO` / `"auto"` | Distance-computation dtype. `AUTO` chooses from the dataset shape, `FP32` favors precision, and `FP16` favors speed and memory use. |
 
-### Search parameters
-
-NN-Descent does not define search parameters because it does not search new query vectors.
-
 ## Tuning
 
 Start with `graph_degree`. It controls the size of the final graph and should match the number of neighbors your downstream workflow needs.
@@ -292,6 +292,58 @@ The named terms in the formulas are also memory sizes:
 - `distances_size`: Device memory for returned distances when requested.
 - `compute_dataset_size`: Device memory for the converted build dataset.
 - `*_peak`: Temporary peak memory for build workspaces.
+
+### Scratch and maximum vectors
+
+The formulas below already include the major NN-Descent workspaces. Additional scratch comes from allocator padding, CUDA library workspaces, memory-resource pools, and small implementation buffers. Use `H = 0.30` for build estimates. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+For fixed `D`, `G`, `I`, and dtype settings, the device and host peaks are linear in `N`. Rewrite the selected peak as:
+
+$$
+\text{peak\_without\_scratch}(N)
+  = N \cdot B_{\text{per\_vector}} + B_{\text{fixed}}
+$$
+
+and solve:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_vector}}}
+  \right\rfloor
+$$
+
+Check device and host memory separately. The usable `N` is the smaller of the device-memory limit and the host/pinned-memory limit.
 
 ### Baseline memory after build
 

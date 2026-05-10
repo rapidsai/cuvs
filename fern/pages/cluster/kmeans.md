@@ -304,16 +304,6 @@ Balanced K-Means encourages more even cluster sizes. It is useful when clusters 
 | `hierarchical` | `false` | Enables hierarchical, balanced K-Means in C and Python. |
 | `hierarchical_n_iters` | implementation default | Number of training iterations for hierarchical K-Means. |
 
-### Prediction parameters
-
-| Parameter | Description |
-| --- | --- |
-| `X` | Rows to assign to clusters. Shape is `n_samples x n_features`. |
-| `centroids` | Centroids returned by `fit` or provided by the user. Shape is `n_clusters x n_features`. |
-| `sample_weight` | Optional per-row weights. Must reside in the same memory space as `X`. |
-| `labels` | Output vector with one cluster ID per row. |
-| `normalize_weight` | Whether sample weights should be normalized during prediction. |
-
 ## Tuning
 
 Start with `n_clusters`. More clusters reduce average within-cluster distance, but they increase memory and the work per iteration. If clusters become too small or unstable, reduce `n_clusters` or increase the amount of data used for fitting.
@@ -343,6 +333,58 @@ Variables:
 - `B_x`: Bytes per input element.
 - `B_c`: Bytes per centroid element.
 - `B_l`: Bytes per output label.
+
+### Scratch and maximum rows
+
+The `scratch` term covers temporary buffers that are not part of the persistent inputs or outputs: reduction buffers, assignment buffers, allocator padding, CUDA library workspaces, and memory held by the active memory resource. For a first capacity estimate, reserve a scratch headroom factor `H`. Use `H = 0.20` for K-Means fit and `H = 0.10` for prediction. If you can measure a representative run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+To estimate the largest usable row count, rewrite the selected peak formula as:
+
+$$
+\text{peak\_without\_scratch}(N)
+  = N \cdot B_{\text{per\_row}} + B_{\text{fixed}}
+$$
+
+and solve:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_row}}}
+  \right\rfloor
+$$
+
+For host streaming fit, solve for `S` first. `S` controls the active GPU batch size even when the full dataset has more than `S` rows.
 
 ### Device-resident fit
 

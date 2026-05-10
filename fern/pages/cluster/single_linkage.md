@@ -120,6 +120,66 @@ Variables:
 - `B_d`: Bytes per distance value.
 - `B_i`: Bytes per index value.
 
+### Scratch and maximum rows
+
+The formulas below show the large persistent arrays and graph buffers. `scratch` covers temporary graph-construction buffers, sort or merge workspace, allocator padding, CUDA library workspaces, and memory held by the active memory resource. For planning, reserve a headroom factor `H = 0.30` for single-linkage builds. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+For KNN graph mode, substitute `k` and rewrite the peak as a linear function of `N`:
+
+$$
+\text{peak\_without\_scratch}(N)
+  = N \cdot B_{\text{per\_row}} + B_{\text{fixed}}
+$$
+
+Then estimate:
+
+$$
+N_{\max}
+  =
+  \left\lfloor
+    \frac{M_{\text{usable}} - B_{\text{fixed}}}
+         {B_{\text{per\_row}}}
+  \right\rfloor
+$$
+
+For pairwise mode, the dense distance matrix is quadratic. If both inputs have `N` rows, solve:
+
+$$
+N_{\max}
+  \approx
+  \left\lfloor
+    \sqrt{\frac{M_{\text{usable}} - B_{\text{fixed}}}{B_d}}
+  \right\rfloor
+$$
+
 ### Pairwise mode
 
 The pairwise path can require a dense distance matrix:

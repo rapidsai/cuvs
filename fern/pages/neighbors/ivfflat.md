@@ -276,6 +276,70 @@ return err
 </Tab>
 </Tabs>
 
+### Saving and loading an index
+
+Serialize an IVF-Flat index when you want to reuse trained lists and stored vectors without rebuilding the index.
+
+Java does not currently expose a standalone IVF-Flat binding. Rust and Go currently expose build/search wrappers, but not IVF-Flat save/load wrappers.
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/ivf_flat.h>
+
+cuvsResources_t res;
+cuvsIvfFlatIndex_t index;
+cuvsIvfFlatIndex_t loaded_index;
+
+cuvsResourcesCreate(&res);
+cuvsIvfFlatIndexCreate(&index);
+cuvsIvfFlatIndexCreate(&loaded_index);
+
+// ... build index ...
+cuvsIvfFlatSerialize(res, "/tmp/cuvs-ivf-flat.bin", index);
+cuvsIvfFlatDeserialize(res, "/tmp/cuvs-ivf-flat.bin", loaded_index);
+
+cuvsIvfFlatIndexDestroy(loaded_index);
+cuvsIvfFlatIndexDestroy(index);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+auto dataset = load_dataset();
+ivf_flat::index_params index_params;
+auto index = ivf_flat::build(res, index_params, dataset);
+
+ivf_flat::serialize(res, "/tmp/cuvs-ivf-flat.bin", index);
+
+ivf_flat::index<float, int64_t> loaded_index(res);
+ivf_flat::deserialize(res, "/tmp/cuvs-ivf-flat.bin", &loaded_index);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import ivf_flat
+
+dataset = load_data()
+index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+
+ivf_flat.save("/tmp/cuvs-ivf-flat.bin", index, include_dataset=True)
+loaded_index = ivf_flat.load("/tmp/cuvs-ivf-flat.bin")
+```
+
+</Tab>
+</Tabs>
+
 ## How IVF-Flat works
 
 IVF-Flat has two main steps.
@@ -497,6 +561,49 @@ The named terms in the formulas are also memory sizes:
 - `query_size`: Device memory for the current query batch.
 - `result_size`: Device memory for neighbor IDs and distances returned for the current query batch.
 - `workspace_size`: Temporary search workspace.
+
+### Scratch and maximum vectors
+
+The formulas below show the major persistent and temporary buffers. Additional scratch comes from k-means workspaces, list allocation padding, allocator fragmentation, CUDA library workspaces, and memory held by the active memory resource. Use `H = 0.20` for build estimates and `H = 0.10` for search estimates. If you can measure a representative smaller run, use:
+
+$$
+H_{\text{measured}}
+  =
+  \frac{\text{observed\_peak} - \text{formula\_without\_scratch}}
+       {\text{formula\_without\_scratch}}
+$$
+
+Then set:
+
+$$
+M_{\text{usable}}
+  = (M_{\text{free}} - M_{\text{other}}) \cdot (1 - H)
+$$
+
+The capacity variables in this subsection are:
+
+- `M_free`: Free memory in the relevant memory space before the operation starts. Use device memory for GPU-resident formulas and host memory for formulas explicitly marked as host memory.
+- `M_other`: Memory reserved for arrays, memory pools, concurrent work, or application buffers that are not included in the formula.
+- `H`: Scratch headroom fraction reserved for temporary buffers and allocator overhead.
+- `M_usable`: Memory budget left for the formula after subtracting `M_other` and reserving headroom.
+- `observed_peak`: Peak memory observed during a smaller representative run.
+- `formula_without_scratch`: Value of the selected peak formula with explicit `scratch` terms removed and without applying headroom.
+- `peak_without_scratch(count)`: The selected peak formula rewritten as a function of the count being estimated, excluding scratch and headroom. The count is usually `N` for rows or vectors and `B` for K-selection batch rows.
+- `B_per_row` / `B_per_vector`: Bytes added by one more row or vector in the selected formula. For linear formulas, add the coefficients of the count being estimated after fixed values such as `D`, `K`, `Q`, and `L` are substituted.
+- `B_fixed`: Bytes in the selected formula that do not change with the estimated count, such as codebooks, centroids, fixed query batches, capped training buffers, or metadata.
+- `N_max` / `B_max`: Estimated largest row, vector, or batch-row count that fits in `M_usable`.
+
+
+IVF-Flat uses padded list capacity, so estimate `N_cap` first. With balanced lists, substitute the approximation for `N_cap`; with measured list sizes, use the exact sum. Then solve the selected peak formula:
+
+$$
+\text{peak\_without\_scratch}(N)
+  = N_{\text{cap}}(N) \cdot B_{\text{per\_stored\_vector}}
+    + N \cdot B_{\text{per\_input\_vector}}
+    + B_{\text{fixed}}
+$$
+
+Because `N_cap(N)` is stepwise, the most reliable capacity estimate is to try increasing `N` values until `peak_without_scratch(N) <= M_usable` no longer holds. For rough planning, use `N_cap ≈ N` plus 5-10% padding when lists are balanced, or more if many lists are small.
 
 ### List capacity
 
