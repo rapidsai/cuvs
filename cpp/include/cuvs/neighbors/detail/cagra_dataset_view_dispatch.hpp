@@ -10,6 +10,7 @@
 #include <raft/core/error.hpp>
 
 #include <memory>
+#include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -61,71 +62,60 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
     return any_dataset_view<T, IdxT>(
       typename nb::any_dataset_view_types<T, IdxT>::empty_view(e.dim()));
   }
-  if (std::holds_alternative<typename OT::padded_f32_owning>(store)) {
-    RAFT_EXPECTS((std::is_same_v<T, float>),
-                 "cagra::index: element type float required for this owning dataset (f32 padded).");
-    return any_dataset_view<T, IdxT>(
-      std::get<typename OT::padded_f32_owning>(store).as_dataset_view());
+
+  if constexpr (std::is_same_v<T, float>) {
+    if (std::holds_alternative<typename OT::padded_f32_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        std::get<typename OT::padded_f32_owning>(store).as_dataset_view());
+    }
+    if (std::holds_alternative<typename OT::strided_f32_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f32_owning>(store).view()));
+    }
+    if (std::holds_alternative<typename OT::vpq_f32_owning>(store)) {
+      auto& vpq = std::get<typename OT::vpq_f32_owning>(store);
+      return any_dataset_view<T, IdxT>(nb::make_indirect_dataset_view(&vpq));
+    }
+  } else if constexpr (std::is_same_v<T, half>) {
+    if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        std::get<typename OT::padded_f16_owning>(store).as_dataset_view());
+    }
+    if (std::holds_alternative<typename OT::strided_f16_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f16_owning>(store).view()));
+    }
+    if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
+      auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
+      return any_dataset_view<T, IdxT>(nb::make_indirect_dataset_view(&vpq));
+    }
+  } else if constexpr (std::is_same_v<T, int8_t>) {
+    if (std::holds_alternative<typename OT::padded_i8_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        std::get<typename OT::padded_i8_owning>(store).as_dataset_view());
+    }
+    if (std::holds_alternative<typename OT::strided_i8_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_i8_owning>(store).view()));
+    }
+  } else if constexpr (std::is_same_v<T, uint8_t>) {
+    if (std::holds_alternative<typename OT::padded_u8_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        std::get<typename OT::padded_u8_owning>(store).as_dataset_view());
+    }
+    if (std::holds_alternative<typename OT::strided_u8_owning>(store)) {
+      return any_dataset_view<T, IdxT>(
+        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_u8_owning>(store).view()));
+    }
+  } else {
+    RAFT_FAIL(
+      "cagra::index: any_owning_dataset_to_index_view: unsupported index element type T (expected "
+      "float, half, int8_t, or uint8_t).");
   }
-  if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
-    RAFT_EXPECTS((std::is_same_v<T, half>),
-                 "cagra::index: element type half required for this owning dataset (f16 padded).");
-    return any_dataset_view<T, IdxT>(
-      std::get<typename OT::padded_f16_owning>(store).as_dataset_view());
-  }
-  if (std::holds_alternative<typename OT::padded_i8_owning>(store)) {
-    RAFT_EXPECTS((std::is_same_v<T, int8_t>),
-                 "cagra::index: element type int8_t required for this owning dataset (i8 padded).");
-    return any_dataset_view<T, IdxT>(
-      std::get<typename OT::padded_i8_owning>(store).as_dataset_view());
-  }
-  if (std::holds_alternative<typename OT::padded_u8_owning>(store)) {
-    RAFT_EXPECTS(
-      (std::is_same_v<T, uint8_t>),
-      "cagra::index: element type uint8_t required for this owning dataset (u8 padded).");
-    return any_dataset_view<T, IdxT>(
-      std::get<typename OT::padded_u8_owning>(store).as_dataset_view());
-  }
-  if (std::holds_alternative<typename OT::strided_f32_owning>(store)) {
-    RAFT_EXPECTS(
-      (std::is_same_v<T, float>),
-      "cagra::index: element type float required for this owning dataset (f32 strided).");
-    return any_dataset_view<T, IdxT>(
-      nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f32_owning>(store).view()));
-  }
-  if (std::holds_alternative<typename OT::strided_f16_owning>(store)) {
-    RAFT_EXPECTS((std::is_same_v<T, half>),
-                 "cagra::index: element type half required for this owning dataset (f16 strided).");
-    return any_dataset_view<T, IdxT>(
-      nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f16_owning>(store).view()));
-  }
-  if (std::holds_alternative<typename OT::strided_i8_owning>(store)) {
-    RAFT_EXPECTS(
-      (std::is_same_v<T, int8_t>),
-      "cagra::index: element type int8_t required for this owning dataset (i8 strided).");
-    return any_dataset_view<T, IdxT>(
-      nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_i8_owning>(store).view()));
-  }
-  if (std::holds_alternative<typename OT::strided_u8_owning>(store)) {
-    RAFT_EXPECTS(
-      (std::is_same_v<T, uint8_t>),
-      "cagra::index: element type uint8_t required for this owning dataset (u8 strided).");
-    return any_dataset_view<T, IdxT>(
-      nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_u8_owning>(store).view()));
-  }
-  if (std::holds_alternative<typename OT::vpq_f32_owning>(store)) {
-    RAFT_EXPECTS((std::is_same_v<T, float>),
-                 "cagra::index: element type float required for this owning dataset (f32 VPQ).");
-    auto& vpq = std::get<typename OT::vpq_f32_owning>(store);
-    return any_dataset_view<T, IdxT>(nb::make_indirect_dataset_view(&vpq));
-  }
-  if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
-    RAFT_EXPECTS((std::is_same_v<T, half>),
-                 "cagra::index: element type half required for this owning dataset (f16 VPQ).");
-    auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
-    return any_dataset_view<T, IdxT>(nb::make_indirect_dataset_view(&vpq));
-  }
-  RAFT_FAIL("cagra::index: unsupported any_owning_dataset alternative.");
+
+  RAFT_FAIL(
+    "cagra::index: any_owning_dataset variant does not match index element type T, or unsupported "
+    "alternative.");
 }
 
 /**
