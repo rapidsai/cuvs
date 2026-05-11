@@ -501,7 +501,7 @@ void mnmg_fit(const raft::resources& handle,
       // shadow into pinned host. Consumed at top of next iteration.
       cuvs::cluster::kmeans::detail::compute_centroid_shift<T, IdxT>(
         dev_res,
-        raft::make_const_mdspan(rank_centroids.view()),
+        rank_centroids_const,
         raft::make_const_mdspan(new_centroids.view()),
         sqrd_norm_error_dev.view());
 
@@ -605,6 +605,7 @@ void mnmg_fit(const raft::resources& handle,
       centroids.data_handle(), rank_centroids.data_handle(), n_clusters * n_features, stream);
     inertia[0] = local_inertia;
     n_iter[0]  = local_n_iter;
+    raft::resource::sync_stream(dev_res);
   }
 }
 
