@@ -27,6 +27,7 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.BitSet;
+import java.util.logging.Logger;
 
 public class Util {
 
@@ -34,6 +35,42 @@ public class Util {
   public static final int CUDA_SUCCESS = 0;
 
   private Util() {}
+
+  private static final Logger log = Logger.getLogger(Util.class.getName());
+
+  static {
+    if (!tryLoadCudart()) {
+      log.warning(
+          "Could not load libcudart from java.library.path, LD_LIBRARY_PATH, or"
+              + " /usr/local/cuda/lib64. If libcuvs_c.so was built with static CUDA,"
+              + " initialization will fail. Set -Djava.library.path to your CUDA lib64"
+              + " directory.");
+    }
+  }
+
+  private static boolean tryLoadCudart() {
+    try {
+      System.loadLibrary("cudart");
+      return true;
+    } catch (UnsatisfiedLinkError ignored) {
+    }
+    String ldLibPath = System.getenv("LD_LIBRARY_PATH");
+    if (ldLibPath != null) {
+      for (String dir : ldLibPath.split(":")) {
+        try {
+          System.load(dir + "/" + System.mapLibraryName("cudart"));
+          return true;
+        } catch (UnsatisfiedLinkError ignored) {
+        }
+      }
+    }
+    try {
+      System.load("/usr/local/cuda/lib64/" + System.mapLibraryName("cudart"));
+      return true;
+    } catch (UnsatisfiedLinkError ignored) {
+    }
+    return false;
+  }
 
   private static final Linker LINKER = Linker.nativeLinker();
 
