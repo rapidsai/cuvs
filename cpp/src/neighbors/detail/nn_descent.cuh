@@ -6,7 +6,7 @@
 #pragma once
 
 #include "ann_utils.cuh"
-#include "cagra/device_common.hpp"
+#include "neighbors_device_intrinsics.cuh"
 #include "nn_descent_gnnd.hpp"
 
 #include "../../core/omp_wrapper.hpp"
@@ -1700,7 +1700,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
       uint64_t idx;
       bool dup = false;
       do {
-        rnd = cuvs::neighbors::cagra::detail::device::xorshift64(rnd);
+        rnd = cuvs::neighbors::detail::device::xorshift64(rnd);
         idx = rnd % nrow_;
         dup = false;
         for (size_t exi_j = 0; exi_j < j; exi_j++) {

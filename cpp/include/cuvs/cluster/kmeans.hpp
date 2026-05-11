@@ -11,9 +11,12 @@
 #include <raft/random/rng_state.hpp>
 #include <rapids_logger/logger.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 
-namespace cuvs::cluster::kmeans {
+namespace CUVS_EXPORT cuvs {
+namespace cluster {
+namespace kmeans {
 
 /** Base structure for parameters that are common to all k-means algorithms */
 struct base_params {
@@ -113,9 +116,18 @@ struct params : base_params {
   int batch_centroids = 0;
 
   /**
-   * If true, check inertia during iterations for early convergence.
+   * Number of samples to randomly draw for the KMeansPlusPlus initialization
+   * step. A random subset of this size is used for centroid seeding.
+   *
+   * Only applies when dataset is on host; for device data the full dataset
+   * is always used for seeding and this parameter is ignored.
+   *
+   * When set to 0 (default) with host data uses `min(3 * n_clusters, n_samples)`
+   * as a default.
+   *
+   * Default: 0.
    */
-  bool inertia_check = false;
+  int64_t init_size = 0;
 
   /**
    * Number of samples to process per GPU batch when fitting with host data.
@@ -1630,4 +1642,6 @@ void find_k(raft::resources const& handle,
  */
 }  // namespace helpers
 
-}  // namespace  cuvs::cluster::kmeans
+}  // namespace kmeans
+}  // namespace cluster
+}  // namespace CUVS_EXPORT cuvs
