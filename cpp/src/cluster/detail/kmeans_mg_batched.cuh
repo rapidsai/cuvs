@@ -291,7 +291,9 @@ void mnmg_fit(
       raft::linalg::add(d_wt.data_handle(), d_wt.data_handle(), d_part_wt.data_handle(), 1, stream);
     }
 
+    MNMG_GROUP_START();
     MNMG_ALLREDUCE(d_wt.data_handle(), d_wt.data_handle(), 1);
+    MNMG_GROUP_END();
 
     T global_wt{};
     raft::copy(&global_wt, d_wt.data_handle(), 1, stream);
