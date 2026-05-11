@@ -7,19 +7,13 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-// Tag types for data types
-struct tag_f {};
-struct tag_h {};
-struct tag_i8 {};
-struct tag_u8 {};
-
 // Tag types for accumulator types
 struct tag_acc_f {};
 struct tag_acc_h {};
 struct tag_acc_i32 {};
 struct tag_acc_u32 {};
 
-// Tag types for distance metrics with full template info
+// Tag types for distance metrics
 struct tag_metric_euclidean {};
 struct tag_metric_inner_product {};
 struct tag_metric_custom_udf {};

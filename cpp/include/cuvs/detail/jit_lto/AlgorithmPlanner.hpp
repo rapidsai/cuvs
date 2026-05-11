@@ -44,6 +44,12 @@ struct AlgorithmPlanner {
     add_fragment(std::make_unique<StaticFatbinFragmentEntry<FragmentTag>>());
   }
 
+ protected:
+  /** Extra link-time option strings passed to nvJitLink. Base build()
+   *  always passes "-lto" and "-arch=sm_XX" first; derived planners may append here in their
+   *  constructor body. */
+  std::vector<std::string> linktime_extra_options;
+
  private:
   std::string get_fragments_key() const;
   std::shared_ptr<AlgorithmLauncher> build();
