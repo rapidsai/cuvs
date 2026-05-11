@@ -195,22 +195,21 @@ struct index : cuvs::neighbors::index {
   {
     RAFT_EXPECTS(dataset.extent(0) == vamana_graph.extent(0),
                  "Dataset and vamana_graph must have equal number of rows");
+    using aligned_owning_t = std::unique_ptr<cuvs::neighbors::strided_owning_dataset<T, int64_t>>;
+    using aligned_view_t   = cuvs::neighbors::strided_dataset_view<T, int64_t>;
+
     auto aligned = make_aligned_dataset(res, dataset, 16);
-    switch (aligned.index()) {
-      case 0: {
-        auto up = std::get<0>(std::move(aligned));
-        cuvs::neighbors::strided_dataset_view<T, int64_t> ds_view(up->view());
-        full_precision_storage_ = std::move(up);
-        dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
-        break;
-      }
-      case 1: {
-        cuvs::neighbors::strided_dataset_view<T, int64_t> view = std::get<1>(std::move(aligned));
-        dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(view);
-        full_precision_storage_ = std::move(view);
-        break;
-      }
-      default: RAFT_FAIL("vamana::index: unexpected make_aligned_dataset return index");
+    if (std::holds_alternative<aligned_owning_t>(aligned)) {
+      auto up = std::get<aligned_owning_t>(std::move(aligned));
+      aligned_view_t ds_view(up->view());
+      full_precision_storage_ = std::move(up);
+      dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
+    } else if (std::holds_alternative<aligned_view_t>(aligned)) {
+      aligned_view_t view = std::get<aligned_view_t>(std::move(aligned));
+      dataset_            = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(view);
+      full_precision_storage_ = std::move(view);
+    } else {
+      RAFT_FAIL("vamana::index: unexpected make_aligned_dataset result type");
     }
     update_graph(res, vamana_graph);
 
