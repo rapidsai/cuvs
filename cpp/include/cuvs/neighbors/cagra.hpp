@@ -613,8 +613,11 @@ struct index : cuvs::neighbors::index {
     raft::resource::sync_stream(res);
   }
 
-  /** @overload Binds the same behavior as the `any_dataset_view` constructor; kept for API
-   *  stability and overload resolution when passing `device_padded_dataset_view`. */
+  /**
+   * @overload
+   * @brief Same as the `any_dataset_view` constructor; overload for `device_padded_dataset_view`
+   *        (call-site convenience / overload resolution).
+   */
   template <typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
@@ -628,7 +631,10 @@ struct index : cuvs::neighbors::index {
   {
   }
 
-  /** @overload See primary constructor; accepts `indirect_dataset_view` (e.g. VPQ handle). */
+  /**
+   * @overload
+   * @brief See primary constructor; accepts `indirect_dataset_view` (e.g. VPQ handle).
+   */
   template <typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
@@ -659,7 +665,10 @@ struct index : cuvs::neighbors::index {
     }
   }
 
-  /** @overload Forwards to `update_dataset(res, any_dataset_view<T, int64_t>{...})`. */
+  /**
+   * @overload
+   * @brief Forwards to `update_dataset(res, any_dataset_view<T, int64_t>{...})`.
+   */
   void update_dataset(
     raft::resources const& res,
     cuvs::neighbors::device_padded_dataset_view<T, dataset_index_type> const& dataset)
@@ -667,7 +676,10 @@ struct index : cuvs::neighbors::index {
     update_dataset(res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(dataset));
   }
 
-  /** @overload Indirect (e.g. VPQ) dataset binding. */
+  /**
+   * @overload
+   * @brief Indirect (e.g. VPQ) dataset binding.
+   */
   void update_dataset(raft::resources const& res,
                       cuvs::neighbors::indirect_dataset_view<dataset_index_type> const& dataset)
   {
