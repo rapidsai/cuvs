@@ -677,6 +677,38 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
+   * Replace the dataset with an owning type-erased dataset (transfers ownership into the index).
+   *
+   * Storage is kept in `host_owning_dataset_` (same member used by host-matrix `update_dataset`) so
+   * the stored `any_dataset_view` remains valid for the lifetime of the index. The owning variant
+   * must hold element type `T` (e.g. f32 padded storage when `T` is `float`).
+   */
+  void update_dataset(raft::resources const& res,
+                      cuvs::neighbors::any_owning_dataset<dataset_index_type>&& dataset)
+  {
+    host_owning_dataset_ =
+      std::make_unique<cuvs::neighbors::any_owning_dataset<dataset_index_type>>(std::move(dataset));
+    auto view =
+      detail::any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    update_dataset(res, view);
+  }
+
+  /**
+   * @overload
+   * @brief Same as the `any_owning_dataset&&` overload; transfers ownership from a `unique_ptr`.
+   */
+  void update_dataset(
+    raft::resources const& res,
+    std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>>&& dataset)
+  {
+    RAFT_EXPECTS(dataset != nullptr, "update_dataset: null any_owning_dataset");
+    host_owning_dataset_ = std::move(dataset);
+    auto view =
+      detail::any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    update_dataset(res, view);
+  }
+
+  /**
    * @overload
    * @brief Indirect (e.g. VPQ) dataset binding.
    */
@@ -730,15 +762,16 @@ struct index : cuvs::neighbors::index {
 
   /**
    * Replace the dataset by copying a host-resident matrix to a padded device buffer owned by the
-   * index (`host_build_padded_owner_`).
+   * index (`host_owning_dataset_`).
    */
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
-    update_dataset(
-      res, cuvs::neighbors::any_dataset_view<T, dataset_index_type>(own->as_dataset_view()));
-    host_build_padded_owner_ = std::move(own);
+    auto own             = cuvs::neighbors::make_padded_dataset(res, dataset);
+    host_owning_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(own));
+    auto view =
+      detail::any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    update_dataset(res, view);
   }
 
   /**
@@ -947,10 +980,10 @@ struct index : cuvs::neighbors::index {
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
   /**
-   * Owning storage for the host-`build` (non-ACE) path: `make_padded_dataset` is moved here so the
-   * public API can return only `cagra::index` with a non-owning dataset view.
+   * Owning type-erased device storage when the index must hold the buffer: host `build` /
+   * `update_dataset(host_matrix)`, or `update_dataset` overloads that take `any_owning_dataset`.
    */
-  std::unique_ptr<device_padded_dataset<T, int64_t>> host_build_padded_owner_{};
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>> host_owning_dataset_{};
   /**
    * Optional ACE device row storage when `detail::build_ace` materializes a padded copy for
    * `attach_dataset_on_build` (lives for the same lifetime as the index in the public `build` API).

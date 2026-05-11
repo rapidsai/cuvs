@@ -37,7 +37,7 @@ template <typename T, typename IdxT>
 cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&& r)
 {
   r.idx.host_build_ace_device_store_ = std::move(r.dataset);
-  r.idx.host_build_padded_owner_.reset();
+  r.idx.host_owning_dataset_.reset();
   return std::move(r.idx);
 }
 
@@ -52,7 +52,9 @@ cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_padded(
       "cagra::build_result. The host mdspan / host_matrixView build that returns cagra::index does "
       "not retain VPQ storage in one object.");
   }
-  br.idx.host_build_padded_owner_ = std::move(own);
+  RAFT_EXPECTS(own != nullptr,
+               "finalize_index_from_padded: null deferred padded dataset unique_ptr");
+  br.idx.host_owning_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(own));
   br.idx.host_build_ace_device_store_.reset();
   return std::move(br.idx);
 }
