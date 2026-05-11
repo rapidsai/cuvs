@@ -1,146 +1,139 @@
 # Developer Guide
 
-## General
-Please start by reading the [Contributor Guide](contributing.md).
+This page collects the engineering conventions that keep cuVS APIs stable, predictable, and easy to maintain. Start with the [Contributor Guide](contributing.md), then use this page when designing public APIs, writing CUDA/C++ implementation code, or preparing a change for review.
 
 ## Performance
-1. In performance critical sections of the code, favor `cudaDeviceGetAttribute` over `cudaDeviceGetProperties`. See corresponding CUDA devblog [here](https://devblogs.nvidia.com/cuda-pro-tip-the-fast-way-to-query-device-properties/) to know more.
-2. If an algo requires you to launch GPU work in multiple cuda streams, do not create multiple `raft::resources` objects, one for each such work stream. Instead, use the stream pool configured on the given `raft::resources` instance's `raft::resources::get_stream_from_stream_pool()` to pick up the right cuda stream. Refer to the section on [CUDA Resources](#resource-management) and the section on [Threading](#threading-model) for more details. TIP: use `raft::resources::get_stream_pool_size()` to know how many such streams are available at your disposal.
+
+Prefer small, explicit choices that avoid hidden overhead:
+
+1. Use `cudaDeviceGetAttribute` instead of `cudaDeviceGetProperties` in performance-critical code. See the CUDA developer blog post on [fast device property queries](https://devblogs.nvidia.com/cuda-pro-tip-the-fast-way-to-query-device-properties/).
+2. Reuse the stream pool on the provided `raft::resources` object instead of creating one `raft::resources` object per stream. See [Threading Model](#threading-model) and [Resource Management](#resource-management).
+3. Keep CPU work around GPU launches light. If host threads are used, they should coordinate CUDA streams, not perform heavy CPU computation.
 
 ## Local Development
 
-Developing features and fixing bugs for the RAFT library itself is straightforward and only requires building and installing the relevant RAFT artifacts.
+Most cuVS changes can be developed directly in this repository. Cross-project CUDA/C++ work may also require a local RAFT build or temporary downstream pin.
 
-The process for working on a CUDA/C++ feature which might span RAFT and one or more consuming libraries can vary slightly depending on whether the consuming project relies on a source build (as outlined in the [build docs](build.md#using-cmake-directly)). In such a case, the option `CPM_raft_SOURCE=/path/to/raft/source` can be passed to the cmake of the consuming project in order to build the local RAFT from source. The PR with relevant changes to the consuming project can also pin the RAFT version temporarily by explicitly changing the `FORK` and `PINNED_TAG` arguments to the RAFT branch containing their changes when invoking `find_and_configure_raft`.  The pin should be reverted after the change is merged to the RAFT project and before it is merged to the dependent project(s) downstream.
+If a consuming project supports source builds, pass `CPM_raft_SOURCE=/path/to/raft/source` to its CMake configuration. If the downstream project must pin a RAFT branch while related changes are under review, update the `FORK` and `PINNED_TAG` arguments to `find_and_configure_raft`, then revert that pin before the downstream change merges.
 
-If building a feature which spans projects and not using the source build in cmake, the RAFT changes (both C++ and Python) will need to be installed into the environment of the consuming project before they can be used. The ideal integration of RAFT into consuming projects will enable both the source build in the consuming project only for this case but also rely on a more stable packaging (such as conda packaging) otherwise.
+If source builds are not being used, install the local RAFT C++ and Python artifacts into the consuming project's environment before testing the downstream change.
 
 ## Threading Model
 
-With the exception of the `raft::resources`, RAFT algorithms should maintain thread-safety and are, in general,
-assumed to be single threaded. This means they should be able to be called from multiple host threads so
-long as different instances of `raft::resources` are used.
+cuVS algorithms should be safe to call from multiple host threads when each thread uses its own `raft::resources` instance. Treat `raft::resources` as the boundary for CUDA streams, memory resources, communication handles, and library handles.
 
-Exceptions are made for algorithms that can take advantage of multiple CUDA streams within multiple host threads
-in order to oversubscribe or increase occupancy on a single GPU. In these cases, the use of multiple host
-threads within RAFT algorithms should be used only to maintain concurrency of the underlying CUDA streams.
-Multiple host threads should be used sparingly, be bounded, and should steer clear of performing CPU-intensive
-computations.
-
-A good example of an acceptable use of host threads within a RAFT algorithm might look like the following
+Inside an algorithm, host threads are acceptable only when they help keep CUDA streams busy. Keep them bounded, prefer OpenMP, and make sure the algorithm still works when OpenMP is disabled.
 
 ```cpp
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
-raft::resources res;
+#include <raft/core/resources.hpp>
 
-...
+void run_batches(raft::resources const& res, int n_batches)
+{
+  auto main_stream = raft::resource::get_cuda_stream(res);
+  raft::resource::sync_stream(res, main_stream);
 
-sync_stream(res);
+#pragma omp parallel for
+  for (int i = 0; i < n_batches; ++i) {
+    auto stream = raft::resource::get_stream_from_stream_pool(res);
 
-...
+    // Keep host work here light. The thread exists to drive GPU work.
+    preprocess_batch(i);
+    my_kernel<<<blocks, threads, 0, stream>>>(i);
+    postprocess_batch(i);
+  }
 
-int n_streams = get_stream_pool_size(res);
-
-#pragma omp parallel for num_threads(n_threads)
-for(int i = 0; i < n; i++) {
-    int thread_num = omp_get_thread_num() % n_threads;
-    cudaStream_t s = get_stream_from_stream_pool(res, thread_num);
-    ... possible light cpu pre-processing ...
-    my_kernel1<<<b, tpb, 0, s>>>(...);
-    ...
-    ... some possible async d2h / h2d copies ...
-    my_kernel2<<<b, tpb, 0, s>>>(...);
-    ...
-    sync_stream(res, s);
-    ... possible light cpu post-processing ...
+  raft::resource::sync_stream_pool(res);
 }
 ```
 
-In the example above, if there is no CPU pre-processing at the beginning of the for-loop, an event can be registered in
-each of the streams within the for-loop to make them wait on the stream from the handle. If there is no CPU post-processing
-at the end of each for-loop iteration, `sync_stream(res, s)` can be replaced with a single `sync_stream_pool(res)`
-after the for-loop.
-
-To avoid compatibility issues between different threading models, the only threading programming allowed in RAFT is OpenMP.
-Though RAFT's build enables OpenMP by default, RAFT algorithms should still function properly even when OpenMP has been
-disabled. If the CPU pre- and post-processing were not needed in the example above, OpenMP would not be needed.
-
-The use of threads in third-party libraries is allowed, though they should still avoid depending on a specific OpenMP runtime.
+If there is no CPU work before the first kernel, make the internal streams wait on the main stream with CUDA events. If there is no CPU work after each batch, synchronize the stream pool once after the loop instead of synchronizing inside every iteration.
 
 ## Public Interface
 
-### General guidelines
-Functions exposed via the C++ API must be stateless. Things that are OK to be exposed on the interface:
-1. Any [POD](https://en.wikipedia.org/wiki/Passive_data_structure) - see [std::is_pod](https://en.cppreference.com/w/cpp/types/is_pod) as a reference for C++11  POD types.
-2. `raft::resources` - since it stores resource-related state which has nothing to do with model/algo state.
-3. Avoid using pointers to POD types (explicitly putting it out, even though it can be considered as a POD) and pass the structures by reference instead.
-   Internal to the C++ API, these stateless functions are free to use their own temporary classes, as long as they are not exposed on the interface.
-4. Accept single- (`raft::span`) and multi-dimensional views (`raft::mdspan`) and validate their metadata wherever possible.
-5. Prefer `std::optional` for any optional arguments (e.g. do not accept `nullptr`)
-6. All public APIs should be lightweight wrappers around calls to private APIs inside the `detail` namespace.
+### General Guidelines
 
-### API stability
+Public C++ APIs should be stateless wrappers around implementation code in a private `detail` namespace.
 
-Since RAFT is a core library with multiple consumers, it's important that the public APIs maintain stability across versions and any changes to them are done with caution, adding new functions and deprecating the old functions over a couple releases as necessary.
+Expose only lightweight, predictable types:
+
+1. Plain data structs used for parameters or metadata.
+2. `raft::resources`, because it owns execution resources rather than algorithm state.
+3. `raft::span` and `raft::mdspan` views for single- and multi-dimensional data.
+4. `std::optional` for optional values instead of sentinel pointers.
+
+Prefer references for required inputs. Reserve pointers for established output patterns and avoid exposing temporary implementation classes in public headers.
+
+### API Stability
+
+Public APIs are consumed by multiple projects and should change carefully. Add new APIs before removing old ones, deprecate old entry points over a few releases, and avoid changing behavior in ways that downstream users cannot detect at compile time.
 
 ### Stateless C++ APIs
 
-Using the IVF-PQ algorithm as an example, the following way of exposing its API would be wrong according to the guidelines in this section, since it exposes a non-POD C++ class object in the C++ API:
+Avoid public APIs that store algorithm state in non-POD wrapper objects:
+
 ```cpp
-template <typename value_t, typename idx_t>
-class ivf_pq {
-  ivf_pq_params params_;
+class ivf_pq_float {
+  ivf_pq::index_params params_;
   raft::resources const& res_;
 
-public:
-  ivf_pq(raft::resources const& res);
-  void train(raft::device_matrix<value_t, idx_t, raft::row_major> dataset);
-  void search(raft::device_matrix<value_t, idx_t, raft::row_major> queries,
-              raft::device_matrix<value_t, idx_t, raft::row_major> out_inds,
-              raft::device_matrix<value_t, idx_t, raft::row_major> out_dists);
+ public:
+  ivf_pq_float(raft::resources const& res);
+
+  void train(raft::device_matrix_view<const float, int64_t, raft::row_major> dataset);
+
+  void search(raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+              raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 };
 ```
 
-An alternative correct way to expose this could be:
+Prefer stateless, instantiated overloads for the supported type combinations. Template implementations can still live in `detail`, but public entry points should be concrete:
+
 ```cpp
-namespace raft::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
-template<typename value_t, typename value_idx>
-void ivf_pq_train(raft::resources const& res, const raft::ivf_pq_params &params, raft::ivf_pq_index &index,
-raft::device_matrix<value_t, idx_t, raft::row_major> dataset);
+auto build(raft::resources const& res,
+           index_params const& params,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> index<int64_t>;
 
-template<typename value_t, typename value_idx>
-void ivf_pq_search(raft::resources const& res, raft::ivf_pq_params const&params, raft::ivf_pq_index const & index,
-raft::device_matrix<value_t, idx_t, raft::row_major> queries,
-raft::device_matrix<value_t, idx_t, raft::row_major> out_inds,
-raft::device_matrix<value_t, idx_t, raft::row_major> out_dists);
+void build(raft::resources const& res,
+           index_params const& params,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           index<int64_t>* idx);
+
+void search(raft::resources const& res,
+            search_params const& params,
+            index<int64_t> const& idx,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+// Add supported variants, such as half or int8_t, as separate overloads.
 }
 ```
 
-### Other functions on state
+### Functions On State
 
-These guidelines also mean that it is the responsibility of C++ API to expose methods to load and store (aka marshalling) such a data structure. Further continuing the IVF-PQ example,  the following methods could achieve this:
+When an API creates an index or model object, also expose stateless functions for persistence and transfer. Keep those functions in the same public namespace as the owning algorithm:
+
 ```cpp
-namespace raft::ivf_pq {
-   void save(raft::ivf_pq_index const& model, std::ostream &os);
-   void load(raft::ivf_pq_index& model, std::istream &is);
-}
+namespace cuvs::neighbors::ivf_pq {
+
+void serialize(raft::resources const& res, std::ostream& os, index<int64_t> const& index);
+
+void deserialize(raft::resources const& res, std::istream& is, index<int64_t>* index);
+
+}  // namespace cuvs::neighbors::ivf_pq
 ```
 
-## Coding style
+## Coding Style
 
-### Code Formatting
+### Formatting
 
-#### Using pre-commit hooks
-
-RAFT uses [pre-commit](https://pre-commit.com/) to execute all code linters and formatters. These
-tools ensure a consistent code format throughout the project. Using pre-commit ensures that linter
-versions and options are aligned for all developers. Additionally, there is a CI check in place to
-enforce that committed code follows our standards.
-
-To use `pre-commit`, install via `conda` or `pip`:
+cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda or pip:
 
 ```bash
 conda install -c conda-forge pre-commit
@@ -150,266 +143,179 @@ conda install -c conda-forge pre-commit
 pip install pre-commit
 ```
 
-Then run pre-commit hooks before committing code:
+Run checks before committing:
 
 ```bash
 pre-commit run
 ```
 
-By default, pre-commit runs on staged files (only changes and additions that will be committed).
-To run pre-commit checks on all files, execute:
+Run the full suite across the repository when needed:
 
 ```bash
 pre-commit run --all-files
 ```
 
-Optionally, you may set up the pre-commit hooks to run automatically when you make a git commit. This can be done by running:
+You can also install the git hook:
 
 ```bash
 pre-commit install
 ```
 
-Now code linters and formatters will be run each time you commit changes.
+### Core Hooks
 
-You can skip these checks with `git commit --no-verify` or with the short version `git commit -n`.
+C++ and CUDA code are formatted with [clang-format](https://clang.llvm.org/docs/ClangFormat.html). cuVS follows the Google C++ style with a few local adjustments documented in [cpp/.clang-format](https://github.com/rapidsai/cuvs/blob/main/cpp/.clang-format):
 
-#### Summary of pre-commit hooks
+1. Empty functions, records, and namespaces are not split.
+2. Indentation is two spaces, including line continuations.
+3. Comments are not reflowed automatically.
 
-The following section describes some of the core pre-commit hooks used by the repository.
-See `.pre-commit-config.yaml` for a full list.
-
-C++/CUDA is formatted with [clang-format](https://clang.llvm.org/docs/ClangFormat.html).
-
-RAFT relies on `clang-format` to enforce code style across all C++ and CUDA source code. The coding style is based on the [Google style guide](https://google.github.io/styleguide/cppguide.html#Formatting). The only digressions from this style are the following.
-1. Do not split empty functions/records/namespaces.
-2. Two-space indentation everywhere, including the line continuations.
-3. Disable reflowing of comments.
-   The reasons behind these deviations from the Google style guide are given in comments [here](https://github.com/rapidsai/cuvs/blob/main/cpp/.clang-format).
-
-[doxygen](https://doxygen.nl/) is used as documentation generator and also as a documentation linter.
-In order to run doxygen as a linter on C++/CUDA code, run
+[Doxygen](https://doxygen.nl/) checks C++ and CUDA API documentation:
 
 ```bash
 ./ci/checks/doxygen.sh
 ```
 
-Python code runs several linters including [Black](https://black.readthedocs.io/en/stable/),
-[isort](https://pycqa.github.io/isort/), and [flake8](https://flake8.pycqa.org/en/latest/).
+Python code is checked with tools such as [Black](https://black.readthedocs.io/en/stable/), [isort](https://pycqa.github.io/isort/), and [flake8](https://flake8.pycqa.org/en/latest/).
 
-RAFT also uses [codespell](https://github.com/codespell-project/codespell) to find spelling
-mistakes, and this check is run as a pre-commit hook. To apply the suggested spelling fixes,
-you can run  `codespell -i 3 -w .` from the repository root directory.
-This will bring up an interactive prompt to select which spelling fixes to apply.
+[codespell](https://github.com/codespell-project/codespell) catches spelling issues. To apply suggested fixes interactively, run:
 
-### #include style
-[include_checker.py](https://github.com/rapidsai/cuvs/blob/main/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
-1. `#include "..."` should be used for referencing local files only. It is acceptable to be used for referencing files in a sub-folder/parent-folder of the same algorithm, but should never be used to include files in other algorithms or between algorithms and the primitives or other dependencies.
-2. `#include <...>` should be used for referencing everything else
-
-Manually, run the following to bulk-fix include style issues:
 ```bash
-python ./cpp/scripts/include_checker.py --inplace [cpp/include cpp/tests ... list of folders which you want to fix]
+codespell -i 3 -w .
 ```
 
-### Copyright header
-RAPIDS [pre-commit-hooks](https://github.com/rapidsai/pre-commit-hooks) checks the Copyright
-header for all git-modified files.
+### Include Style
 
-Manually, you can run the following to bulk-fix the header on all files in the repository:
+Use `#include "..."` only for local files in the same algorithm or nearby directory. Use `#include <...>` for dependencies, primitives, and headers from other algorithms.
+
+To bulk-fix include style issues, run:
+
+```bash
+python ./cpp/scripts/include_checker.py --inplace cpp/include cpp/tests
+```
+
+### Copyright
+
+RAPIDS pre-commit hooks check copyright headers on modified tracked files. To run that check manually:
+
 ```bash
 pre-commit run -a verify-copyright
 ```
-Keep in mind that this only applies to files tracked by git that have been modified.
 
-## Error handling
-Call CUDA APIs via the provided helper macros `RAFT_CUDA_TRY`, `RAFT_CUBLAS_TRY` and `RAFT_CUSOLVER_TRY`. These macros take care of checking the return values of the used API calls and generate an exception when the command is not successful. If you need to avoid an exception, e.g. inside a destructor, use `RAFT_CUDA_TRY_NO_THROW`, `RAFT_CUBLAS_TRY_NO_THROW ` and `RAFT_CUSOLVER_TRY_NO_THROW`. These macros log the error but do not throw an exception.
+## Error Handling
+
+Call CUDA and library APIs through the RAFT helper macros, such as `RAFT_CUDA_TRY`, `RAFT_CUBLAS_TRY`, and `RAFT_CUSOLVER_TRY`. They check return values and throw on failure.
+
+Use the `_NO_THROW` variants only where throwing is unsafe, such as destructors. Those variants log errors without throwing.
 
 ## Common Design Considerations
 
-1. Use the `hpp` extension for files which can be compiled with `gcc` against the CUDA-runtime. Use the `cuh` extension for files which require `nvcc` to be compiled. `hpp` can also be used for functions marked `__host__ __device__` only if proper checks are in place to remove the `__device__` designation when not compiling with `nvcc`.
-
-2. When additional classes, structs, or general POCO types are needed to be used for representing data in the public API, place them in a new file called `&lt;primitive_name>_types.hpp`. This tells users they are safe to expose these types on their own public APIs without bringing in device code. At a minimum, the definitions for these types, at least, should not require `nvcc`. In general, these classes should only store very simple state and should not perform their own computations. Instead, new functions should be exposed on the public API which accept these objects, reading or updating their state as necessary.
-
-3. Documentation for public APIs should be well documented, easy to use, and it is highly preferred that they include usage instructions.
-
-4. Before creating a new primitive, check to see if one exists already. If one exists but the API isn't flexible enough to include your use-case, consider first refactoring the existing primitive. If that is not possible without an extreme number of changes, consider how the public API could be made more flexible. If the new primitive is different enough from all existing primitives, consider whether an existing public API could invoke the new primitive as an option or argument. If the new primitive is different enough from what exists already, add a header for the new public API function to the appropriate subdirectory and namespace.
+1. Use `.hpp` for headers that can be compiled by `gcc` against the CUDA runtime. Use `.cuh` when a header requires `nvcc`.
+2. Put public parameter structs and lightweight public types in `<primitive_name>_types.hpp`. These files should not require `nvcc`.
+3. Keep public types simple. They should store state, not perform computation.
+4. Document every public API with a clear summary, parameter descriptions, and a short usage example when helpful.
+5. Before adding a primitive, check whether an existing primitive can be extended cleanly. Add a new public API only when the behavior is genuinely distinct.
 
 ## Testing
 
-It's important for RAFT to maintain a high test coverage of the public APIs in order to minimize the potential for downstream projects to encounter unexpected build or runtime behavior as a result of changes.
-
-A well-defined public API can help maintain compile-time stability but means more focus should be placed on testing the functional requirements and verifying execution on the various edge cases within RAFT itself. Ideally, bug fixes and new features should be able to be made to RAFT independently of the consuming projects.
+Public APIs need direct test coverage because downstream projects rely on their compile-time and runtime behavior. Prefer tests that exercise the public entry point, cover edge cases, and make the expected behavior visible without requiring downstream projects to catch regressions first.
 
 ## Documentation
 
-Public APIs always require documentation since those will be exposed directly to users. For C++, we use [doxygen](http://www.doxygen.nl) and for Python/cython we use [pydoc](https://docs.python.org/3/library/pydoc.html). In addition to summarizing the purpose of each class / function in the public API, the arguments (and relevant templates) should be documented along with brief usage examples.
+Public APIs require user-facing documentation. C++ and CUDA APIs use [Doxygen](https://doxygen.nl/). Python and Cython APIs use [pydoc](https://docs.python.org/3/library/pydoc.html). Document the purpose, parameters, return values, relevant template or overload behavior, and any constraints that affect correct use.
 
-## Asynchronous operations and stream ordering
-All RAFT algorithms should be as asynchronous as possible avoiding the use of the default stream (aka as NULL or `0` stream). Implementations that require only one CUDA Stream should use the stream from `raft::resources`:
+## Asynchronous Operations And Stream Ordering
+
+cuVS algorithms should be asynchronous whenever possible and should avoid the default CUDA stream. For single-stream work, use the stream on `raft::resources`:
 
 ```cpp
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-
-void foo(const raft::resources& res, ...)
-{
-    cudaStream_t stream = get_cuda_stream(res);
-}
-```
-When multiple streams are needed, e.g. to manage a pipeline, use the internal streams available in `raft::resources` (see [CUDA Resources](#cuda-resources)). If multiple streams are used all operations still must be ordered according to `raft::resource::get_cuda_stream()` (from `raft/core/resource/cuda_stream.hpp`). Before any operation in any of the internal CUDA streams is started, all previous work in `raft::resource::get_cuda_stream()` must have completed. Any work enqueued in `raft::resource::get_cuda_stream()` after a RAFT function returns should not start before all work enqueued in the internal streams has completed. E.g. if a RAFT algorithm is called like this:
-```cpp
 #include <raft/core/resources.hpp>
-#include <raft/core/resource/cuda_stream.hpp>
-void foo(const double* srcdata, double* result)
+
+void foo(raft::resources const& res)
 {
-    cudaStream_t stream;
-    CUDA_RT_CALL( cudaStreamCreate( &stream ) );
-    raft::resources res;
-    set_cuda_stream(res, stream);
-
-    ...
-
-    RAFT_CUDA_TRY( cudaMemcpyAsync( srcdata, h_srcdata.data(), n*sizeof(double), cudaMemcpyHostToDevice, stream ) );
-
-    raft::algo(raft::resources, dopredict, srcdata, result, ... );
-
-    RAFT_CUDA_TRY( cudaMemcpyAsync( h_result.data(), result, m*sizeof(int), cudaMemcpyDeviceToHost, stream ) );
-
-    ...
+  cudaStream_t stream = raft::resource::get_cuda_stream(res);
 }
 ```
-No work in any stream should start in `raft::algo` before the `cudaMemcpyAsync` in `stream` launched before the call to `raft::algo` is done. And all work in all streams used in `raft::algo` should be done before the `cudaMemcpyAsync` in `stream` launched after the call to `raft::algo` starts.
 
-This can be ensured by introducing interstream dependencies with CUDA events and `cudaStreamWaitEvent`. For convenience, the header `raft/core/device_resources.hpp` provides the class `raft::stream_syncer` which lets all `raft::resources` internal CUDA streams wait on `raft::resource::get_cuda_stream()` in its constructor and in its destructor and lets `raft::resource::get_cuda_stream()` wait on all work enqueued in the `raft::resources` internal CUDA streams. The intended use would be to create a `raft::stream_syncer` object as the first thing in an entry function of the public RAFT API:
+When an algorithm uses internal streams, preserve ordering with the caller's stream:
 
-```cpp
-namespace raft {
-   void algo(const raft::resources& res, ...)
-   {
-       raft::streamSyncer _(res);
-   }
-}
-```
-This ensures the stream ordering behavior described above.
+1. Work already queued on `raft::resource::get_cuda_stream(res)` must complete before internal stream work starts.
+2. Work queued by the caller after the API returns must wait until all internal stream work is complete.
+
+Use CUDA events and `cudaStreamWaitEvent` to create those dependencies. This lets users compose cuVS operations with their own asynchronous copies and kernels without accidental races.
 
 ### Using Thrust
-To ensure that thrust algorithms are executed in the intended stream the `thrust::cuda::par` execution policy should be used. To ensure that thrust algorithms allocate temporary memory via the provided device memory allocator, use the `rmm::exec_policy` available in `raft/core/resource/thrust_policy.hpp`, which can be used through `raft::resources`:
+
+Run Thrust algorithms on the intended stream and memory resource by using the execution policy from `raft::resources`:
+
 ```cpp
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
-void foo(const raft::resources& res, ...)
+#include <raft/core/resources.hpp>
+
+void foo(raft::resources const& res)
 {
-    auto execution_policy = get_thrust_policy(res);
-    thrust::for_each(execution_policy, ... );
+  auto policy = raft::resource::get_thrust_policy(res);
+  thrust::for_each(policy, first, last, op);
 }
 ```
 
 ## Resource Management
 
-Do not create reusable CUDA resources directly in implementations of RAFT algorithms. Instead, use the existing resources in `raft::resources` to avoid constant creation and deletion of reusable resources such as CUDA streams, CUDA events or library handles. Please file a feature request if a resource handle is missing in `raft::resources`.
-The resources can be obtained like this
+Do not create reusable CUDA resources directly inside algorithm implementations. Reuse the handles, streams, events, allocators, and library resources attached to `raft::resources`. If a reusable resource is missing, file an issue or feature request instead of creating a local long-lived resource.
+
 ```cpp
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/cublas_handle.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
-void foo(const raft::resources& h, ...)
+#include <raft/core/resources.hpp>
+
+void foo(raft::resources const& res)
 {
-    cublasHandle_t cublasHandle = get_cublas_handle(h);
-    const int num_streams       = get_stream_pool_size(h);
-    const int stream_idx        = ...
-    cudaStream_t stream         = get_stream_from_stream_pool(stream_idx);
-    ...
+  cublasHandle_t cublas_handle = raft::resource::get_cublas_handle(res);
+  auto stream                  = raft::resource::get_stream_from_stream_pool(res);
 }
 ```
 
-The example below shows one way to create `n_stream` number of internal cuda streams with an `rmm::stream_pool` which can later be used by the algos inside RAFT.
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/resource/cuda_stream_pool.hpp>
-#include <rmm/cuda_stream_pool.hpp>
-int main(int argc, char** argv)
-{
-    int n_streams = argc > 1 ? atoi(argv[1]) : 0;
-    raft::resources res;
-    set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(n_streams));
+Users can configure the stream pool once and pass the same `raft::resources` object through the API:
 
-    foo(res, ...);
+```cpp
+#include <raft/core/resource/cuda_stream_pool.hpp>
+#include <raft/core/resources.hpp>
+#include <rmm/cuda_stream_pool.hpp>
+
+int main()
+{
+  raft::resources res;
+  raft::resource::set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(4));
+
+  foo(res);
 }
 ```
 
 ## Multi-GPU
 
-The multi-GPU paradigm of RAFT is **O**ne **P**rocess per **G**PU (OPG). Each algorithm should be implemented in a way that it can run with a single GPU without any specific dependencies to a particular communication library. A multi-GPU implementation should use the methods offered by the class `raft::comms::comms_t` from [raft/core/comms.hpp] for inter-rank/GPU communication. It is the responsibility of the user of cuML to create an initialized instance of `raft::comms::comms_t`.
+cuVS uses a one-process-per-GPU model. Single-GPU algorithms should not depend on a communication library. Multi-GPU algorithms should communicate through `raft::comms::comms_t`, which users provide through `raft::resources`.
 
-E.g. with a CUDA-aware MPI, a RAFT user could use code like this to inject an initialized instance of `raft::comms::mpi_comms` into a `raft::resources`:
+Developers can assume:
 
-```cpp
-#include <mpi.h>
-#include <raft/core/resources.hpp>
-#include <raft/comms/mpi_comms.hpp>
-#include <raft/algo.hpp>
-...
-int main(int argc, char * argv[])
-{
-    MPI_Init(&argc, &argv);
-    int rank = -1;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+1. `raft::comms::comms_t` has been initialized correctly.
+2. All participating ranks call the multi-GPU algorithm cooperatively.
 
-    int local_rank = -1;
-    {
-        MPI_Comm local_comm;
-        MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &local_comm);
-
-        MPI_Comm_rank(local_comm, &local_rank);
-
-        MPI_Comm_free(&local_comm);
-    }
-
-    cudaSetDevice(local_rank);
-
-    mpi_comms raft_mpi_comms;
-    MPI_Comm_dup(MPI_COMM_WORLD, &raft_mpi_comms);
-
-    {
-        raft::resources res;
-        initialize_mpi_comms(res, raft_mpi_comms);
-
-        ...
-
-        raft::algo(res, ... );
-    }
-
-    MPI_Comm_free(&raft_mpi_comms);
-
-    MPI_Finalize();
-    return 0;
-}
-```
-
-A RAFT developer can assume the following:
-* An instance of `raft::comms::comms_t` was correctly initialized.
-* All processes that are part of `raft::comms::comms_t` call into the RAFT algorithm cooperatively.
-
-The initialized instance of `raft::comms::comms_t` can be accessed from the `raft::resources` instance:
+Access the communicator through `raft::resources`:
 
 ```cpp
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/comms.hpp>
-void foo(const raft::resources& res, ...)
+#include <raft/core/resources.hpp>
+
+void foo(raft::resources const& res)
 {
-    const raft::comms_t& communicator = get_comms(res);
-    const int rank = communicator.get_rank();
-    const int size = communicator.get_size();
-    ...
+  auto const& comm = raft::resource::get_comms(res);
+  int rank         = comm.get_rank();
+  int size         = comm.get_size();
 }
 ```
 
 ## Using Just-in-Time Link-Time Optimization
 
-cuVS is moving to using link-time optimization for new kernels, and this requires some changes to the way kernels are written. Instead of compiling all kernel variants at build time (which leads to binary size explosion), JIT LTO compiles kernel fragments separately and links them together at runtime based on the specific configuration needed.
+cuVS is moving new kernels toward JIT link-time optimization. Instead of compiling every kernel variant into the binary, JIT LTO compiles fragments and links the needed combination at runtime.
 
-This approach ultimately enables:
-- **Reduced binary size**: Compile fragments once, combine many ways
-- **User Defined Functions**: Link UDFs in cuVS CUDA kernels
-
-For more information on JIT LTO, see [Advanced Topics](advanced_topics.md). For a complete guide on implementing JIT LTO kernels, including step-by-step examples, see [Link-time Optimization](jit_lto_guide.md).
+This helps reduce binary size and enables user-defined functions in cuVS CUDA kernels. For background, see [Advanced Topics](advanced_topics.md). For implementation guidance, see [Link-time Optimization](jit_lto_guide.md).

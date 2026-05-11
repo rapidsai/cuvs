@@ -132,19 +132,25 @@ navigation:
                 path: "./pages/other/select_k.md"
       - section: "Benchmarking Guide"
         contents:
-          - page: "Methologies"
+          - page: "Methodologies"
             path: "./pages/comparing_indexes.md"
-          - page: "cuVS Bench Tool"
+          - section: "cuVS Bench Tool"
             path: "./pages/cuvs_bench/index.md"
-          - page: "Build cuVS Bench From Source"
-            hidden: true
-            path: "./pages/cuvs_bench/build.md"
-          - page: "cuVS Bench Parameter Tuning Guide"
-            hidden: true
-            path: "./pages/cuvs_bench/param_tuning.md"
-          - page: "Wiki-all Dataset"
-            hidden: true
-            path: "./pages/cuvs_bench/wiki_all_dataset.md"
+            contents:
+              - page: "Installation"
+                path: "./pages/cuvs_bench/install.md"
+              - page: "Usage"
+                path: "./pages/cuvs_bench/running.md"
+              - page: "Datasets"
+                path: "./pages/cuvs_bench/datasets.md"
+              - page: "Backends"
+                path: "./pages/cuvs_bench/pluggable_backend.md"
+              - page: "cuVS Bench Parameter Tuning Guide"
+                hidden: true
+                path: "./pages/cuvs_bench/param_tuning.md"
+              - page: "Wiki-all Dataset"
+                hidden: true
+                path: "./pages/cuvs_bench/wiki_all_dataset.md"
       - page: "Compatibility"
         path: "./pages/user_guide/abi_stability.md"
       - page: "Integration Patterns"

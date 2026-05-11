@@ -1,6 +1,16 @@
-# Methologies
+# Methodologies
 
 Vector search indexes should be compared by both search quality and performance. A fast index is not useful if it misses too many neighbors, and a high-recall index may not be practical if it is too slow to build or query. For index selection guidance, see [Vector Database](vector_databases_vs_vector_search.md).
+
+This page describes how to make benchmark results comparable by using recall buckets, Pareto curves, and consistent reporting for build and search metrics. It also explains how these ideas apply to large datasets and points to cuVS Bench for reproducible benchmark runs.
+
+## Pareto curves
+
+Imagine every tuning run is a toy car. You want a car that is fast, but you also care how much work it took to build. If one car is both faster and easier to build than another car, the slower and harder-to-build car is not a useful choice. The cars that are not beaten this way form the Pareto curve.
+
+For vector indexes, each tuning run is a point with [quality](#recall), build time, and search performance. A point is on the Pareto curve when no other run is better on the metric being compared without making another metric worse. Finding these points usually requires a parameter sweep or another hyperparameter optimization method.
+
+For each quality bucket, summarize build time by taking the points on the Pareto curve in that bucket and averaging their corresponding build times. This gives an expected build time for the quality window instead of forcing one run to represent the whole bucket.
 
 ## Recall
 
@@ -12,7 +22,7 @@ Index parameters control the recall and performance trade-off. The figure below 
 
 ## Fair comparisons
 
-Compare latency, throughput, and build time only at similar recall levels. If two indexes are measured at different recall, the comparison mixes quality and speed into one number.
+Compare latency, throughput, and build time only at similar recall levels. If two indexes are measured at different recall, the comparison mixes quality and speed into one number, and this is not a fair comparison.
 
 A practical approach is to group results into recall buckets:
 
@@ -29,22 +39,18 @@ This makes results easier to interpret. For example: "At 95% recall, model A bui
 
 <img alt="build benchmarks" src="/assets/images/build_benchmarks.png" />
 
-### Pareto curves in simple terms
-
-Imagine every tuning run is a toy car. You want a car that is fast, but you also care how much work it took to build. If one car is both faster and easier to build than another car, the slower and harder-to-build car is not a useful choice. The cars that are not beaten this way form the Pareto curve.
-
-For vector indexes, each tuning run is a point with recall, build time, and search performance. A point is on the Pareto curve when no other run is better on the metric being compared without making another metric worse. Finding these points usually requires a parameter sweep or another hyperparameter optimization method.
-
-For each recall bucket, summarize build time by taking the points on the Pareto curve in that bucket and averaging their corresponding build times. This gives an expected build time for the recall window instead of forcing one run to represent the whole bucket.
-
 ## Large datasets
 
-Use representative-sample tuning only when the database is hash partitioned, also called blind sharded.
+For database architecture terms, see the [Vector Database](vector_databases_vs_vector_search.md) guide. This page focuses on how to benchmark once the evaluation scope is clear: a standalone index, one local partition, a globally partitioned index, or the full database system.
 
-Think of mixing a big bag of marbles and pouring them into many small buckets without looking. Each bucket should have about the same mix as the big bag. In that case, you can tune on one bucket-sized sample and use those settings for the other buckets.
-
-That is how blind sharding works: each local index receives a roughly uniform slice of the full dataset. Keep the local partition size in mind. If each blind shard is capped at 10M vectors, tune with a sample that resembles a 10M-vector shard instead of tuning against the full database size.
-
-Do not use this shortcut for inverted file indexes or other content-based partitioning. Those systems group vectors by where they live in vector space. That is more like putting red marbles in one bucket and blue marbles in another: one bucket no longer represents the whole bag, and a random sample does not describe how each IVF list or partition behaves.
+Representative-sample tuning is appropriate when the benchmarked sample matches the unit that will actually be searched in production. For locally partitioned systems, that usually means tuning against the expected partition or segment size, not the full database size. For globally partitioned systems, tuning is more dependent on the full data distribution, so random samples need to be used carefully.
 
 For a step-by-step workflow, see the [tuning guide](tuning_guide.md).
+
+## Methodology summary
+
+- Define the scope, dataset, distance metric, `k`, batch size, filters, hardware, and concurrency before comparing results.
+- Generate exact ground truth, sweep or tune build and search parameters, group results into recall buckets, and compare Pareto points within each bucket.
+- Report recall, latency, throughput, build time, and memory (if needed) together so quality and performance are not separated from the cost of achieving them.
+
+cuVS provides [cuVS Bench](cuvs_bench/index.md) for reproducible benchmarks that follow these methodologies and produce comparable outputs across datasets, algorithms, and hardware.

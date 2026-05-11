@@ -283,6 +283,19 @@ index<T, IdxT> build(
   return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }
 
+template <typename T,
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset) -> size_t
+{
+  return cuvs::neighbors::cagra::detail::estimate_build_memory_usage<T, IdxT, Accessor>(
+    res, params, dataset);
+}
+
 /**
  * @brief Search ANN using the constructed index with the given sample filter.
  *

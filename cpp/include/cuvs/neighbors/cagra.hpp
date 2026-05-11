@@ -1209,6 +1209,123 @@ auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * The returned value is an estimate, in bytes, of the major host and device allocations used by
+ * `cagra::build` for the same inputs. The estimate includes graph-build workspaces, graph buffers,
+ * and index-owned output buffers. It does not include memory already owned by caller-provided
+ * device views, allocator pool growth, CUDA library workspaces, or small implementation overheads.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const float, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const half, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset) -> size_t;
 /**
  * @}
  */
