@@ -71,48 +71,48 @@ inline ncclDataType_t nccl_dtype<int64_t>()
 // Comm macros: dispatch to raw NCCL or RAFT comms based on `use_nccl`.
 // Local to this TU, undef'd at the bottom.
 
-#define SNMG_ALLREDUCE(sendbuf, recvbuf, count)                                           \
+#define MNMG_ALLREDUCE(sendbuf, recvbuf, count)                                           \
   do {                                                                                    \
-    using _snmg_val_t = std::remove_pointer_t<decltype(sendbuf)>;                         \
+    using _mnmg_val_t = std::remove_pointer_t<decltype(sendbuf)>;                         \
     if (use_nccl) {                                                                       \
       RAFT_NCCL_TRY(ncclAllReduce(                                                        \
-        sendbuf, recvbuf, count, nccl_dtype<_snmg_val_t>(), ncclSum, nccl_comm, stream)); \
+        sendbuf, recvbuf, count, nccl_dtype<_mnmg_val_t>(), ncclSum, nccl_comm, stream)); \
     } else {                                                                              \
-      const auto& _snmg_comm = raft::resource::get_comms(dev_res);                        \
-      _snmg_comm.allreduce(sendbuf, recvbuf, count, raft::comms::op_t::SUM, stream);      \
+      const auto& _mnmg_comm = raft::resource::get_comms(dev_res);                        \
+      _mnmg_comm.allreduce(sendbuf, recvbuf, count, raft::comms::op_t::SUM, stream);      \
     }                                                                                     \
   } while (0)
 
-#define SNMG_BCAST(buf, count, root)                                                           \
+#define MNMG_BCAST(buf, count, root)                                                           \
   do {                                                                                         \
-    using _snmg_bcast_t = std::remove_pointer_t<decltype(buf)>;                                \
+    using _mnmg_bcast_t = std::remove_pointer_t<decltype(buf)>;                                \
     if (use_nccl) {                                                                            \
       RAFT_NCCL_TRY(                                                                           \
-        ncclBroadcast(buf, buf, count, nccl_dtype<_snmg_bcast_t>(), root, nccl_comm, stream)); \
+        ncclBroadcast(buf, buf, count, nccl_dtype<_mnmg_bcast_t>(), root, nccl_comm, stream)); \
     } else {                                                                                   \
-      const auto& _snmg_comm = raft::resource::get_comms(dev_res);                             \
-      _snmg_comm.bcast(buf, count, root, stream);                                              \
+      const auto& _mnmg_comm = raft::resource::get_comms(dev_res);                             \
+      _mnmg_comm.bcast(buf, count, root, stream);                                              \
     }                                                                                          \
   } while (0)
 
-#define SNMG_ALLGATHER(sendbuf, recvbuf, count)                                                   \
+#define MNMG_ALLGATHER(sendbuf, recvbuf, count)                                                   \
   do {                                                                                            \
-    using _snmg_gather_t = std::remove_pointer_t<decltype(sendbuf)>;                              \
+    using _mnmg_gather_t = std::remove_pointer_t<decltype(sendbuf)>;                              \
     if (use_nccl) {                                                                               \
       RAFT_NCCL_TRY(                                                                              \
-        ncclAllGather(sendbuf, recvbuf, count, nccl_dtype<_snmg_gather_t>(), nccl_comm, stream)); \
+        ncclAllGather(sendbuf, recvbuf, count, nccl_dtype<_mnmg_gather_t>(), nccl_comm, stream)); \
     } else {                                                                                      \
-      const auto& _snmg_comm = raft::resource::get_comms(dev_res);                                \
-      _snmg_comm.allgather(sendbuf, recvbuf, count, stream);                                      \
+      const auto& _mnmg_comm = raft::resource::get_comms(dev_res);                                \
+      _mnmg_comm.allgather(sendbuf, recvbuf, count, stream);                                      \
     }                                                                                             \
   } while (0)
 
-#define SNMG_GROUP_START()                             \
+#define MNMG_GROUP_START()                             \
   do {                                                 \
     if (use_nccl) { RAFT_NCCL_TRY(ncclGroupStart()); } \
   } while (0)
 
-#define SNMG_GROUP_END()                             \
+#define MNMG_GROUP_END()                             \
   do {                                               \
     if (use_nccl) { RAFT_NCCL_TRY(ncclGroupEnd()); } \
   } while (0)
@@ -198,7 +198,7 @@ void mnmg_fit(const raft::resources& handle,
   RAFT_EXPECTS(centroids.extent(1) == n_features, "centroids.extent(1) must equal n_features");
   RAFT_EXPECTS(num_ranks > 0, "num_ranks must be positive");
 
-  RAFT_LOG_DEBUG("SNMG KMeans fit: rank=%d/%d, n_local=%zu, n_features=%zu, n_clusters=%d",
+  RAFT_LOG_DEBUG("MNMG KMeans fit: rank=%d/%d, n_local=%zu, n_features=%zu, n_clusters=%d",
                  rank,
                  num_ranks,
                  static_cast<size_t>(n_local),
@@ -238,10 +238,10 @@ void mnmg_fit(const raft::resources& handle,
       cuvs::cluster::kmeans::detail::weightSum(dev_res, sample_weight.value(), d_wt.view());
     }
 
-    SNMG_GROUP_START();
-    SNMG_ALLREDUCE(d_n_local.data_handle(), d_n_local.data_handle(), 1);
-    SNMG_ALLREDUCE(d_wt.data_handle(), d_wt.data_handle(), 1);
-    SNMG_GROUP_END();
+    MNMG_GROUP_START();
+    MNMG_ALLREDUCE(d_n_local.data_handle(), d_n_local.data_handle(), 1);
+    MNMG_ALLREDUCE(d_wt.data_handle(), d_wt.data_handle(), 1);
+    MNMG_GROUP_END();
 
     IdxT global_n{};
     T global_wt{};
@@ -321,13 +321,13 @@ void mnmg_fit(const raft::resources& handle,
     raft::make_pinned_vector<T, IdxT>(dev_res, (need_compute_norms && has_data) ? n_local : 0);
   bool norms_cached = false;
 
-  auto snmg_allreduce = [&](auto* sendbuf, auto* recvbuf, size_t count) {
-    SNMG_ALLREDUCE(sendbuf, recvbuf, count);
+  auto mnmg_allreduce = [&](auto* sendbuf, auto* recvbuf, size_t count) {
+    MNMG_ALLREDUCE(sendbuf, recvbuf, count);
   };
-  auto snmg_allgather = [&](auto* sendbuf, auto* recvbuf, size_t count) {
-    SNMG_ALLGATHER(sendbuf, recvbuf, count);
+  auto mnmg_allgather = [&](auto* sendbuf, auto* recvbuf, size_t count) {
+    MNMG_ALLGATHER(sendbuf, recvbuf, count);
   };
-  auto snmg_bcast = [&](auto* buf, size_t count, int root) { SNMG_BCAST(buf, count, root); };
+  auto mnmg_bcast = [&](auto* buf, size_t count, int root) { MNMG_BCAST(buf, count, root); };
 
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = params;
@@ -346,10 +346,10 @@ void mnmg_fit(const raft::resources& handle,
                                            workspace,
                                            rank,
                                            num_ranks,
-                                           snmg_allreduce,
-                                           snmg_allgather,
-                                           snmg_bcast);
-    SNMG_BCAST(rank_centroids.data_handle(), n_clusters * n_features, 0);
+                                           mnmg_allreduce,
+                                           mnmg_allgather,
+                                           mnmg_bcast);
+    MNMG_BCAST(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
     if (has_data && !sample_weight.has_value()) {
       raft::matrix::fill(dev_res, batch_weights.view(), T{1});
@@ -365,14 +365,14 @@ void mnmg_fit(const raft::resources& handle,
         raft::resource::sync_stream(dev_res);
         if (*h_done_flag.data_handle()) {
           --local_n_iter;
-          RAFT_LOG_DEBUG("SNMG KMeans: threshold triggered after %d iterations on rank %d",
+          RAFT_LOG_DEBUG("MNMG KMeans: threshold triggered after %d iterations on rank %d",
                          static_cast<int>(local_n_iter),
                          rank);
           break;
         }
       }
 
-      RAFT_LOG_DEBUG("SNMG KMeans: iteration %d on rank %d", local_n_iter, rank);
+      RAFT_LOG_DEBUG("MNMG KMeans: iteration %d on rank %d", local_n_iter, rank);
 
       raft::matrix::fill(dev_res, centroid_sums.view(), T{0});
       raft::matrix::fill(dev_res, weight_per_cluster.view(), T{0});
@@ -448,13 +448,13 @@ void mnmg_fit(const raft::resources& handle,
       }
 
       // Phase 2: grouped allreduce
-      SNMG_GROUP_START();
-      SNMG_ALLREDUCE(
+      MNMG_GROUP_START();
+      MNMG_ALLREDUCE(
         centroid_sums.data_handle(), centroid_sums.data_handle(), n_clusters * n_features);
-      SNMG_ALLREDUCE(
+      MNMG_ALLREDUCE(
         weight_per_cluster.data_handle(), weight_per_cluster.data_handle(), n_clusters);
-      SNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
-      SNMG_GROUP_END();
+      MNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
+      MNMG_GROUP_END();
 
       // Phase 3: finalize centroids
       auto centroid_sums_const = raft::make_device_matrix_view<const T, IdxT>(
@@ -496,7 +496,7 @@ void mnmg_fit(const raft::resources& handle,
           return *d_done_view.data_handle();
         });
 
-      SNMG_ALLREDUCE(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
+      MNMG_ALLREDUCE(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
 
       raft::copy(dev_res,
                  raft::make_pinned_scalar_view(h_done_flag.data_handle()),
@@ -541,11 +541,11 @@ void mnmg_fit(const raft::resources& handle,
                           clustering_cost.view());
       }
     }
-    SNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
+    MNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
     raft::copy(&local_inertia, clustering_cost.data_handle(), 1, stream);
     raft::resource::sync_stream(dev_res);
 
-    RAFT_LOG_DEBUG("SNMG KMeans: n_init %d/%d completed, inertia=%f, n_iter=%d on rank %d",
+    RAFT_LOG_DEBUG("MNMG KMeans: n_init %d/%d completed, inertia=%f, n_iter=%d on rank %d",
                    seed_iter + 1,
                    n_init,
                    static_cast<double>(local_inertia),
@@ -631,10 +631,10 @@ void batched_fit_omp(const raft::resources& clique,
 }
 
 // Undef local macros
-#undef SNMG_ALLREDUCE
-#undef SNMG_BCAST
-#undef SNMG_ALLGATHER
-#undef SNMG_GROUP_START
-#undef SNMG_GROUP_END
+#undef MNMG_ALLREDUCE
+#undef MNMG_BCAST
+#undef MNMG_ALLGATHER
+#undef MNMG_GROUP_START
+#undef MNMG_GROUP_END
 
 }  // namespace cuvs::cluster::kmeans::mg::detail
