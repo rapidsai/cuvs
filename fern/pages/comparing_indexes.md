@@ -18,10 +18,10 @@ A practical approach is to group results into recall buckets:
 
 | Recall bucket | Typical use |
 | --- | --- |
-| 85% - 89% | Fast exploratory search |
+| 80% - 89% | Fast exploratory search |
 | 90% - 94% | Lower-latency approximate search |
-| 95% - 99% | High-quality approximate search |
-| &gt;99% | Near-exact search |
+| 95% - 98% | High-quality approximate search |
+| 99%+ | Near-exact search |
 
 <img alt="recall buckets" src="/assets/images/recall_buckets.png" />
 

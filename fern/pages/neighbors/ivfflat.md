@@ -369,6 +369,12 @@ Use brute-force instead when exact results are required or the dataset is small 
 
 Use IVF-PQ instead when the full-precision IVF-Flat index is too large for device memory and some compression loss is acceptable.
 
+## IVF-SQ and scalar quantization
+
+IVF-SQ follows the same partition-first search pattern as IVF-Flat, but stores scalar-quantized vector values inside each partition. cuVS exposes scalar quantization as a preprocessing API rather than a separate standalone IVF-SQ index API.
+
+Use this pattern when full-precision IVF-Flat storage is too large, but you want simpler compression than IVF-PQ. Scalar quantization reduces memory bandwidth and index size while usually requiring less tuning than product quantization.
+
 ## Using Filters
 
 IVF-Flat supports filtered search, but filtering happens only inside the lists selected by `n_probes`.

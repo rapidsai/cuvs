@@ -1496,6 +1496,10 @@ def normalize_doxygen_math(text: str) -> str:
 
 
 def clean_latex_math(math: str) -> str:
+    def escape_latex_text_command(match: re.Match[str]) -> str:
+        inner = re.sub(r"(?<!\\)_", r"\\_", match.group(2))
+        return f"{match.group(1)}{inner}{match.group(3)}"
+
     math = math.strip()
     math = re.sub(
         r"<\s*([^<>]*?)\s*>",
@@ -1509,11 +1513,7 @@ def clean_latex_math(math: str) -> str:
     )
     math = re.sub(
         r"(\\(?:mathrm|operatorname|text)\{)([^{}]*)(\})",
-        lambda match: (
-            f"{match.group(1)}"
-            f"{re.sub(r'(?<!\\\\)_', r'\\\\_', match.group(2))}"
-            f"{match.group(3)}"
-        ),
+        escape_latex_text_command,
         math,
     )
     return math
