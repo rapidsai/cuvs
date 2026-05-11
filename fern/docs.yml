@@ -147,6 +147,8 @@ navigation:
             path: "./pages/cuvs_bench/wiki_all_dataset.md"
       - page: "Compatibility"
         path: "./pages/user_guide/abi_stability.md"
+      - page: "Integration Patterns"
+        path: "./pages/user_guide/integration_patterns.md"
   - section: "Developer Guide"
     contents:
       - page: "Guidelines"
