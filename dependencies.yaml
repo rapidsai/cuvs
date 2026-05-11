@@ -90,8 +90,6 @@ files:
       cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
-      # clang/libclang only needed for bindgen support
-      - clang
       - cuda
       - cuda_version
       - rapids_build
