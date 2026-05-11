@@ -192,6 +192,9 @@ void mnmg_fit(const raft::resources& handle,
   auto n_clusters = static_cast<IdxT>(params.n_clusters);
   auto metric     = params.metric;
 
+  RAFT_EXPECTS(metric == cuvs::distance::DistanceType::L2Expanded ||
+                 metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
   RAFT_EXPECTS(static_cast<IdxT>(centroids.extent(0)) == n_clusters,
                "centroids.extent(0) must equal n_clusters");
@@ -591,6 +594,10 @@ void batched_fit_omp(const raft::resources& clique,
                      raft::host_scalar_view<T> inertia,
                      raft::host_scalar_view<IdxT> n_iter)
 {
+  RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                 params.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
+               "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
+
   raft::resource::get_nccl_comms(clique);
   int num_ranks   = raft::resource::get_num_ranks(clique);
   IdxT n_samples  = X.extent(0);
