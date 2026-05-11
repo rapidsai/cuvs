@@ -7,6 +7,8 @@
 //!
 //! This crate provides Rust bindings for cuVS, allowing you to run
 //! approximate nearest neighbors search on the GPU.
+extern crate cuvs_sys as ffi;
+
 pub mod brute_force;
 pub mod cagra;
 pub mod cluster;
