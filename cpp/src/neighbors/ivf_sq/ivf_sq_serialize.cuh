@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../util/serialize_validation.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 #include <cuvs/neighbors/common.hpp>
@@ -87,7 +88,9 @@ template <typename CodeT>
 auto deserialize(raft::resources const& handle, std::istream& is) -> index<CodeT>
 {
   char dtype_string[4];
-  is.read(dtype_string, 4);
+  RAFT_EXPECTS(is.read(dtype_string, 4), "ivf_sq::deserialize: failed to read dtype prefix");
+  RAFT_EXPECTS(cuvs::util::validate_serialized_dtype<CodeT>(dtype_string, sizeof(dtype_string)),
+               "ivf_sq::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
   if (ver != serialization_version) {
@@ -98,6 +101,23 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<CodeT
   auto n_lists = raft::deserialize_scalar<uint32_t>(handle, is);
   auto metric  = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
   bool cma     = raft::deserialize_scalar<bool>(handle, is);
+
+  RAFT_EXPECTS(cuvs::util::is_valid_distance_type(metric),
+               "ivf_sq::deserialize: invalid metric value %d",
+               static_cast<int>(metric));
+  RAFT_EXPECTS(n_lists <= cuvs::util::kMaxIvfNLists,
+               "ivf_sq::deserialize: n_lists=%u exceeds maximum %u",
+               n_lists,
+               cuvs::util::kMaxIvfNLists);
+  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(
+                 static_cast<std::size_t>(n_lists), static_cast<std::size_t>(dim), sizeof(float)),
+               "ivf_sq::deserialize: integer overflow in n_lists*dim*sizeof(float) "
+               "(n_lists=%u, dim=%u)",
+               n_lists,
+               dim);
+  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(static_cast<std::size_t>(dim), sizeof(float)),
+               "ivf_sq::deserialize: integer overflow in dim*sizeof(float) (dim=%u)",
+               dim);
 
   index<CodeT> index_ = index<CodeT>(handle, metric, n_lists, dim, cma);
 
