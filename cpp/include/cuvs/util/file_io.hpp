@@ -19,11 +19,13 @@
 #include <utility>
 #include <vector>
 
+#include <cuvs/core/export.hpp>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace cuvs::util {
+namespace CUVS_EXPORT cuvs {
+namespace util {
 /**
  * @brief Streambuf that reads from a POSIX file descriptor
  */
@@ -283,9 +285,16 @@ class buffered_ofstream {
 
   void write(const char* input, size_t size)
   {
-    if (pos_ + size > buffer_.size()) { flush(); }
-    std::copy(input, input + size, &buffer_[pos_]);
-    pos_ += size;
+    if (size >= buffer_.size()) {
+      flush();
+      os_->write(input, static_cast<std::streamsize>(size));
+      if (!os_->good()) { RAFT_FAIL("Error writing HNSW file!"); }
+      return;
+    } else {
+      if (size > buffer_.size() - pos_) { flush(); }
+      std::memcpy(buffer_.data() + pos_, input, size);
+      pos_ += size;
+    }
   }
 
  private:
@@ -294,4 +303,5 @@ class buffered_ofstream {
   size_t pos_;
 };
 
-}  // namespace cuvs::util
+}  // namespace util
+}  // namespace CUVS_EXPORT cuvs
