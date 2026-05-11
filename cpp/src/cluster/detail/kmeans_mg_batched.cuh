@@ -6,6 +6,7 @@
 
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
+#include "kmeans_mg_batched_init.cuh"
 
 #include "../../core/omp_wrapper.hpp"
 #include "../../neighbors/detail/ann_utils.cuh"
@@ -44,59 +45,6 @@
 #include <limits>
 #include <random>
 #include <type_traits>
-
-namespace cuvs::cluster::kmeans::detail {
-
-/**
- * @brief Initialize centroids from a host data matrix.
- *
- * Random samples directly into @p centroids. KMeans++ first copies a subsample
- * of host rows to the device, then seeds centroids from that subsample.
- *
- * @param streaming_batch_size  Upper bound on the KMeans++ subsample size
- *                              (0 disables the cap).
- */
-template <typename DataT, typename IndexT>
-void init_centroids_from_host_sample(raft::resources const& handle,
-                                     const cuvs::cluster::kmeans::params& params,
-                                     IndexT streaming_batch_size,
-                                     raft::host_matrix_view<const DataT, IndexT> X,
-                                     raft::device_matrix_view<DataT, IndexT> centroids,
-                                     rmm::device_uvector<char>& workspace)
-{
-  auto n_samples  = X.extent(0);
-  auto n_features = X.extent(1);
-  auto n_clusters = static_cast<IndexT>(params.n_clusters);
-  raft::random::RngState rng(params.rng_state.seed);
-
-  if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-    raft::matrix::sample_rows(handle, rng, X, centroids);
-  } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-    IndexT default_init_size =
-      std::min(static_cast<IndexT>(std::int64_t{3} * n_clusters), n_samples);
-    IndexT init_sample_size = params.init_size > 0
-                                ? std::min(static_cast<IndexT>(params.init_size), n_samples)
-                                : default_init_size;
-    if (streaming_batch_size > 0) {
-      init_sample_size = std::min(init_sample_size, streaming_batch_size);
-    }
-    init_sample_size = std::max(init_sample_size, std::min(n_clusters, n_samples));
-
-    auto init_sample =
-      raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
-    raft::matrix::sample_rows(handle, rng, X, init_sample.view());
-    auto init_view = raft::make_const_mdspan(init_sample.view());
-    if (params.oversampling_factor == 0) {
-      kmeansPlusPlus<DataT, IndexT>(handle, params, init_view, centroids, workspace);
-    } else {
-      initScalableKMeansPlusPlus<DataT, IndexT>(handle, params, init_view, centroids, workspace);
-    }
-  } else {
-    THROW("unknown initialization method to select initial centers");
-  }
-}
-
-}  // namespace cuvs::cluster::kmeans::detail
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
@@ -145,6 +93,18 @@ inline ncclDataType_t nccl_dtype<int64_t>()
       const auto& _snmg_comm = raft::resource::get_comms(dev_res);                             \
       _snmg_comm.bcast(buf, count, root, stream);                                              \
     }                                                                                          \
+  } while (0)
+
+#define SNMG_ALLGATHER(sendbuf, recvbuf, count)                                                   \
+  do {                                                                                            \
+    using _snmg_gather_t = std::remove_pointer_t<decltype(sendbuf)>;                              \
+    if (use_nccl) {                                                                               \
+      RAFT_NCCL_TRY(                                                                              \
+        ncclAllGather(sendbuf, recvbuf, count, nccl_dtype<_snmg_gather_t>(), nccl_comm, stream)); \
+    } else {                                                                                      \
+      const auto& _snmg_comm = raft::resource::get_comms(dev_res);                                \
+      _snmg_comm.allgather(sendbuf, recvbuf, count, stream);                                      \
+    }                                                                                             \
   } while (0)
 
 #define SNMG_GROUP_START()                             \
@@ -361,22 +321,34 @@ void mnmg_fit(const raft::resources& handle,
     raft::make_pinned_vector<T, IdxT>(dev_res, (need_compute_norms && has_data) ? n_local : 0);
   bool norms_cached = false;
 
+  auto snmg_allreduce = [&](auto* sendbuf, auto* recvbuf, size_t count) {
+    SNMG_ALLREDUCE(sendbuf, recvbuf, count);
+  };
+  auto snmg_allgather = [&](auto* sendbuf, auto* recvbuf, size_t count) {
+    SNMG_ALLGATHER(sendbuf, recvbuf, count);
+  };
+  auto snmg_bcast = [&](auto* buf, size_t count, int root) { SNMG_BCAST(buf, count, root); };
+
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = params;
     iter_params.rng_state.seed                = gen();
 
-    // Centroid init: rank 0 produces, then broadcast to all ranks
-    if (iter_params.init != cuvs::cluster::kmeans::params::InitMethod::Array) {
-      if (rank == 0) {
-        cuvs::cluster::kmeans::detail::init_centroids_from_host_sample<T, IdxT>(
-          dev_res, iter_params, streaming_batch_size, X_local, rank_centroids.view(), workspace);
-      }
-    } else {
-      if (rank == 0) {
-        raft::copy(
-          rank_centroids.data_handle(), centroids.data_handle(), n_clusters * n_features, stream);
-      }
-    }
+    // Centroid init: selected strategy produces rank 0's centroids, then
+    // broadcast to keep all ranks in lockstep.
+    auto input_centroids_const =
+      raft::make_device_matrix_view<const T, IdxT>(centroids.data_handle(), n_clusters, n_features);
+    init_centroids_for_mg_batched<T, IdxT>(dev_res,
+                                           iter_params,
+                                           streaming_batch_size,
+                                           X_local,
+                                           input_centroids_const,
+                                           rank_centroids.view(),
+                                           workspace,
+                                           rank,
+                                           num_ranks,
+                                           snmg_allreduce,
+                                           snmg_allgather,
+                                           snmg_bcast);
     SNMG_BCAST(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
     if (has_data && !sample_weight.has_value()) {
@@ -661,6 +633,7 @@ void batched_fit_omp(const raft::resources& clique,
 // Undef local macros
 #undef SNMG_ALLREDUCE
 #undef SNMG_BCAST
+#undef SNMG_ALLGATHER
 #undef SNMG_GROUP_START
 #undef SNMG_GROUP_END
 
