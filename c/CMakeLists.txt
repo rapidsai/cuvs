@@ -115,6 +115,8 @@ set_target_properties(
              POSITION_INDEPENDENT_CODE ON
              INTERFACE_POSITION_INDEPENDENT_CODE ON
              EXPORT_NAME c_api
+             CXX_VISIBILITY_PRESET hidden
+             VISIBILITY_INLINES_HIDDEN ON
 )
 
 # Setup the VERSION and SOVERSION of our library

@@ -26,11 +26,14 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 #include <string>
 #include <variant>
 
-namespace cuvs::neighbors::graph_build_params {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
 using iterative_search_params = cuvs::neighbors::search_params;
 
 /** Specialized parameters for ACE (Augmented Core Extraction) graph build */
@@ -95,9 +98,12 @@ struct ace_params {
   ace_params() = default;
 };
 
-}  // namespace cuvs::neighbors::graph_build_params
-
-namespace cuvs::neighbors::cagra {
+}  // namespace graph_build_params
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
 // For re-exporting into cagra namespace
 namespace graph_build_params = cuvs::neighbors::graph_build_params;
 /**
@@ -1203,6 +1209,123 @@ auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * The returned value is an estimate, in bytes, of the major host and device allocations used by
+ * `cagra::build` for the same inputs. The estimate includes graph-build workspaces, graph buffers,
+ * and index-owned output buffers. It does not include memory already owned by caller-provided
+ * device views, allocator pool growth, CUDA library workspaces, or small implementation overheads.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const float, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const half, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset) -> size_t;
+
+/**
+ * @brief Estimate peak memory usage for `cagra::build`.
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return estimated peak memory usage in bytes
+ */
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset) -> size_t;
 /**
  * @}
  */
@@ -3227,9 +3350,13 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
-}  // namespace cuvs::neighbors::cagra
-
-namespace cuvs::neighbors::cagra::helpers {
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
+namespace helpers {
 
 /**
  * @brief Optimize a KNN graph into a CAGRA graph.
@@ -3254,4 +3381,7 @@ void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
 
-}  // namespace cuvs::neighbors::cagra::helpers
+}  // namespace helpers
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

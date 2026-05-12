@@ -8,7 +8,7 @@ When you run benchmarks with `BenchmarkOrchestrator.run_benchmark()`, you can ch
 
 **Sweep mode (default)**
 
-Pass `mode="sweep"` or omit `mode`. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see [Creating and customizing dataset configurations](index.md)). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
+Pass `mode="sweep"` or omit `mode`. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see [Creating and customizing algorithm configurations](running.md#creating-and-customizing-algorithm-configurations)). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
 
 **Tune mode**
 

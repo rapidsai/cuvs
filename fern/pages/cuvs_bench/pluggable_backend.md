@@ -1,8 +1,15 @@
-# Pluggable Backend
+# cuVS Bench Backends
 
-cuVS Bench uses a pluggable API so that benchmarks can be run through different execution paths. The default path runs C++ benchmark executables; other backends (e.g. Elasticsearch, Milvus) can be added by implementing the same interface and registering them. Two pieces work together: a **config loader** turns the user's arguments (dataset, algorithms, k, batch_size, and the like) into a structured configuration; a **backend** takes that configuration and runs build and search. Both are registered under a backend type name (e.g. `cpp_gbench`). When `BenchmarkOrchestrator(backend_type="cpp_gbench").run_benchmark(...)` is called, the orchestrator uses the config loader for that type to produce the configuration, then passes it to the backend for that type.
+This page explains how cuVS Bench separates benchmark orchestration from the system that actually builds and searches an index. Use it when you want to understand the built-in C++ benchmark backend, add a new backend for another product or service, or add a new indexing algorithm to the existing C++ backend.
 
-The following shows how the default backend is used:
+cuVS Bench uses two pieces for each backend:
+
+| Piece | Purpose |
+| --- | --- |
+| Config loader | Reads user inputs and configuration files, expands parameter sweeps, and returns the datasets and index configurations to run. |
+| Backend | Uses those configurations to build indexes, run searches, and return benchmark results. |
+
+Both pieces are registered under the same backend type name. The default backend type is `cpp_gbench`, which runs the C++ Google Benchmark executables.
 
 ```python
 from cuvs_bench.orchestrator import BenchmarkOrchestrator
@@ -18,31 +25,36 @@ results = orchestrator.run_benchmark(
 )
 ```
 
-## How a run flows
+## How a benchmark run works
 
-1. The user calls `orchestrator.run_benchmark(backend_type="...", dataset=..., algorithms=..., count=..., **kwargs)`.
+1. The user calls `BenchmarkOrchestrator(...).run_benchmark(...)`.
+2. The orchestrator finds the config loader registered for the requested backend type.
+3. The config loader returns a `DatasetConfig` and one or more `BenchmarkConfig` objects.
+4. The orchestrator creates the backend registered for the same backend type.
+5. The backend runs `build(...)` and `search(...)`, then returns `BuildResult` and `SearchResult` objects.
 
-2. The orchestrator looks up the **config loader** for that `backend_type` and calls its **load()** method. The loader reads YAML (or other sources), expands parameter combinations, applies constraints, and returns a **DatasetConfig** and a list of **BenchmarkConfig** (each describing one or more index configs: algorithm, build params, search params).
+The config loader decides what to run. The backend decides how to run it.
 
-3. The orchestrator obtains the **backend** for that `backend_type` from the **BackendRegistry** (instantiating it with the config it needs, e.g. executable path, host/port).
+## Configuration contract
 
-4. The orchestrator calls the backend's **build(dataset, indexes, ...)** then **search(dataset, indexes, k, batch_size, ...)**. The backend uses the same config shape that its loader produced.
+A config loader receives the arguments passed to `run_benchmark()`, such as `dataset`, `dataset_path`, `algorithms`, `count`, `batch_size`, `groups`, and backend-specific options. It returns:
 
-5. The backend returns **BuildResult** and **SearchResult**; the orchestrator aggregates and returns them.
+| Return value | Purpose |
+| --- | --- |
+| `DatasetConfig` | Dataset metadata, including vector files, ground-truth files, distance metric, dimensions, and optional subset size. |
+| `List[BenchmarkConfig]` | One or more benchmark configurations. Each contains index configurations and backend-specific options. |
 
-The config loader and the backend are thus a pair: the loader defines what to run (which algorithms and parameters); the backend defines how it runs (C++ subprocess, HTTP to a service, and so on).
+Each `IndexConfig` describes one index to benchmark:
 
-## What the config loader produces
+| Field | Purpose |
+| --- | --- |
+| `name` | Human-readable index name, usually including parameter values. |
+| `algo` | Algorithm name. |
+| `build_param` | Build parameters for the index. |
+| `search_params` | Search parameter combinations to benchmark. |
+| `file` | Path or identifier where the backend stores the index. |
 
-The orchestrator calls the config loader's **load()** method with the same arguments passed to `run_benchmark()` (e.g. `dataset`, `dataset_path`, `algorithms`, `count`, `batch_size`, `groups`, `algo_groups`, and backend-specific options). The loader must return two things:
-
-- **DatasetConfig** – Dataset metadata: `name`, `base_file`, `query_file`, `groundtruth_neighbors_file`, `distance` (e.g. `"euclidean"`), `dims`, and optional `subset_size`. These are used by the orchestrator to build the in-memory `Dataset` and by the backend if it needs file paths.
-
-- **List[BenchmarkConfig]** – Each **BenchmarkConfig** has:
-  - **indexes**: a list of **IndexConfig**. Each **IndexConfig** has `name` (e.g. `"my_algo.param1value"`), `algo` (algorithm name), `build_param` (dict of build parameters), `search_params` (list of dicts, one per search parameter combination to benchmark), and `file` (path or identifier where the index is stored).
-  - **backend_config**: a dict passed to the backend constructor (e.g. `executable_path` for C++, or `host`, `port`, `index_name` for a network backend). The backend receives this as its `config[in](#in)_init__`.
-
-The following shows how to construct a minimal `DatasetConfig` and one `BenchmarkConfig` (one index, one search param set) so the backend runs a single build and search configuration:
+The following minimal loader creates one dataset, one index, and one search configuration:
 
 ```python
 from cuvs_bench.orchestrator.config_loaders import (
@@ -58,15 +70,11 @@ class MyConfigLoader(ConfigLoader):
         return "my_backend"
 
     def load(self, dataset, dataset_path, algorithms, count=10, batch_size=10000, **kwargs):
-        path_to_base = ...  # path to base vectors file
-        path_to_queries = ...  # path to query file
-        path_to_groundtruth = ...  # path to groundtruth neighbors file
-        path_to_index = ...  # path or id where the index is stored
         dataset_config = DatasetConfig(
             name=dataset,
-            base_file=path_to_base,
-            query_file=path_to_queries,
-            groundtruth_neighbors_file=path_to_groundtruth,
+            base_file=...,
+            query_file=...,
+            groundtruth_neighbors_file=...,
             distance="euclidean",
             dims=128,
         )
@@ -75,30 +83,27 @@ class MyConfigLoader(ConfigLoader):
             algo=algorithms,
             build_param={"nlist": 1024},
             search_params=[{"nprobe": 10}],
-            file=path_to_index,
+            file=...,
         )
         benchmark_config = BenchmarkConfig(
             indexes=[index],
             backend_config={
-                "host": ...,  # backend host
-                "port": ...,  # backend port
-                "index_name": ...,  # name of the index on the backend
+                "host": ...,
+                "port": ...,
+                "index_name": ...,
             },
         )
         return dataset_config, [benchmark_config]
 ```
 
-## Adding a new backend
+## Adding a backend
 
-To add a new execution path (e.g. Elasticsearch):
+Add a new backend when cuVS Bench needs to drive a different execution path, such as a vector database, remote service, or custom benchmark runner.
 
-1. Implement a **config loader**. Subclass **ConfigLoader** (from `cuvs_bench.orchestrator.config_loaders`). Implement **load()** to accept the kwargs the orchestrator passes (dataset, dataset_path, algorithms, count, batch_size, and the like) and return `(DatasetConfig, List[BenchmarkConfig])`. Populate **DatasetConfig** with dataset paths and metadata; for each run you want, add an **IndexConfig** (name, algo, build_param, search_params, file) and a **BenchmarkConfig** (indexes, backend_config). The **backend_config** dict is passed to your backend's constructor. Register the loader with **register_config_loader("my_backend", MyConfigLoader)**.
-
-2. Implement the **backend**. Subclass **BenchmarkBackend** (from `cuvs_bench.backends.base`). In **__init__(self, config)**, store the config (this is the **backend_config** produced by the loader). Implement **build(dataset, indexes, force=False, dry_run=False)** to return a **BuildResult** (index_path, build_time_seconds, index_size_bytes, algorithm, build_params, metadata, success). Implement **search(dataset, indexes, k, batch_size, mode=..., ...)** to return a **SearchResult** (neighbors, distances, search_time_ms, queries_per_second, recall, algorithm, search_params, success). Implement the **algo** property (e.g. from `self.config["algo"]`). Set **requires_gpu** or **requires_network** in config if the backend needs them. Register the class with **get_registry().register("my_backend", MyBackend)**.
-
-3. Use the new backend by calling `BenchmarkOrchestrator(backend_type="my_backend").run_benchmark(dataset=..., dataset_path=..., algorithms=..., **kwargs)`. The orchestrator will use your loader to build the configuration and your backend to run build and search.
-
-After implementing your loader and backend, register them as follows:
+1. Implement a config loader by subclassing `ConfigLoader` from `cuvs_bench.orchestrator.config_loaders`. Its `load()` method should return `(DatasetConfig, List[BenchmarkConfig])`.
+2. Implement a backend by subclassing `BenchmarkBackend` from `cuvs_bench.backends.base`. Its `build()` method should return `BuildResult`; its `search()` method should return `SearchResult`.
+3. Register both pieces with the same backend type name.
+4. Run benchmarks with `BenchmarkOrchestrator(backend_type="my_backend")`.
 
 ```python
 from cuvs_bench.orchestrator import register_config_loader
@@ -108,11 +113,9 @@ register_config_loader("my_backend", MyConfigLoader)
 get_registry().register("my_backend", MyBackend)
 ```
 
-## Example: adding an Elasticsearch backend
+## Example: Elasticsearch backend
 
-The following example shows a minimal Elasticsearch-style backend. The config loader builds one dataset config and one benchmark config with a single index; the backend stubs build and search and returns the result types the orchestrator expects. In practice you would replace the stub logic with real Elasticsearch API calls.
-
-Config loader: the **load()** method receives `dataset`, `dataset_path`, `algorithms`, `count`, `batch_size`, and optional kwargs. It returns a **DatasetConfig** (filled from dataset path and name) and a list of one **BenchmarkConfig** containing one **IndexConfig** and a **backend_config** with `host`, `port`, and `index_name` for the backend to use.
+This example shows the shape of a network backend. The loader creates the dataset and benchmark configs. The backend uses `backend_config` to connect to the service, build the index, run search, and return cuVS Bench result objects.
 
 ```python
 from cuvs_bench.orchestrator.config_loaders import (
@@ -128,15 +131,11 @@ class ElasticsearchConfigLoader(ConfigLoader):
         return "elasticsearch"
 
     def load(self, dataset, dataset_path, algorithms, count=10, batch_size=10000, **kwargs):
-        path_to_base = ...  # path to base vectors (e.g. from dataset_path/dataset)
-        path_to_queries = ...  # path to query vectors
-        path_to_groundtruth = ...  # path to groundtruth file
-        path_to_index = ...  # path or id for the index
         dataset_config = DatasetConfig(
             name=dataset,
-            base_file=path_to_base,
-            query_file=path_to_queries,
-            groundtruth_neighbors_file=path_to_groundtruth,
+            base_file=...,
+            query_file=...,
+            groundtruth_neighbors_file=...,
             distance="euclidean",
             dims=kwargs.get("dims", 128),
         )
@@ -145,31 +144,27 @@ class ElasticsearchConfigLoader(ConfigLoader):
             algo=algorithms,
             build_param={},
             search_params=[{"ef_search": 100}],
-            file=path_to_index,
+            file=...,
         )
         benchmark_config = BenchmarkConfig(
             indexes=[index],
             backend_config={
-                "host": ...,  # Elasticsearch host
-                "port": ...,  # Elasticsearch port
-                "index_name": ...,  # name of the vector index
+                "host": ...,
+                "port": ...,
+                "index_name": ...,
                 "algo": algorithms,
             },
         )
         return dataset_config, [benchmark_config]
 ```
 
-Backend: the backend is constructed with **backend_config** (host, port, index_name, algo). **build()** and **search()** return **BuildResult** and **SearchResult** with the required fields; here they are stubbed with minimal values. Replace the stub body with actual Elasticsearch index creation and search calls.
-
 ```python
 import numpy as np
 from cuvs_bench.backends.base import (
     BenchmarkBackend,
-    Dataset,
     BuildResult,
     SearchResult,
 )
-from cuvs_bench.orchestrator.config_loaders import IndexConfig
 
 class ElasticsearchBackend(BenchmarkBackend):
     @property
@@ -177,7 +172,6 @@ class ElasticsearchBackend(BenchmarkBackend):
         return self.config.get("algo", "elasticsearch")
 
     def build(self, dataset, indexes, force=False, dry_run=False):
-        # Stub: in practice, create ES index and bulk-index dataset.base_vectors
         return BuildResult(
             index_path=indexes[0].file if indexes else "",
             build_time_seconds=0.0,
@@ -188,8 +182,17 @@ class ElasticsearchBackend(BenchmarkBackend):
             success=True,
         )
 
-    def search(self, dataset, indexes, k, batch_size=10000, mode="latency", force=False, search_threads=None, dry_run=False):
-        # Stub: in practice, run ES kNN search and compute recall
+    def search(
+        self,
+        dataset,
+        indexes,
+        k,
+        batch_size=10000,
+        mode="latency",
+        force=False,
+        search_threads=None,
+        dry_run=False,
+    ):
         n_queries = dataset.n_queries
         return SearchResult(
             neighbors=np.zeros((n_queries, k), dtype=np.int64),
@@ -203,8 +206,6 @@ class ElasticsearchBackend(BenchmarkBackend):
         )
 ```
 
-Registration:
-
 ```python
 from cuvs_bench.orchestrator import register_config_loader
 from cuvs_bench.backends import get_registry
@@ -213,12 +214,129 @@ register_config_loader("elasticsearch", ElasticsearchConfigLoader)
 get_registry().register("elasticsearch", ElasticsearchBackend)
 ```
 
-The built-in **CppGoogleBenchmarkBackend** (`backend_type="cpp_gbench"`) is one such pair: **CppGBenchConfigLoader** reads the YAML under `config/datasets` and `config/algos`, expands the Cartesian product, and validates with the constraint functions; the backend runs the C++ benchmark executables and merges results. Adding a new C++ algorithm (see [index](index.md)) only adds another executable and config for this backend; it does not add a new backend.
-
 ## Components at a glance
 
 | Component | Description |
 | --- | --- |
-| ConfigLoader | Abstract. **load(**kwargs)** returns `(DatasetConfig, List[BenchmarkConfig])`. Register with **register_config_loader(backend_type, loader_class)**. |
-| BenchmarkBackend | Abstract. **build(dataset, indexes, force, dry_run)** returns `BuildResult`; **search(dataset, indexes, k, batch_size, mode, ...)** returns `SearchResult`. Optional **initialize()** and **cleanup()**. Properties: **algo**, **requires_gpu**, **requires_network** (from config). Register with **BackendRegistry.register(name, backend_class)**; get an instance with **get_backend(name, config)**. |
-| BackendRegistry | **get_registry()** returns the singleton. **register(name, backend_class)** and **get_backend(name, config)** tie a backend type name to the class and to instances. |
+| `ConfigLoader` | Abstract class whose `load(**kwargs)` method returns `(DatasetConfig, List[BenchmarkConfig])`. Register with `register_config_loader(backend_type, loader_class)`. |
+| `BenchmarkBackend` | Abstract class whose `build(...)` method returns `BuildResult` and whose `search(...)` method returns `SearchResult`. Register with `BackendRegistry.register(name, backend_class)`. |
+| `BackendRegistry` | Singleton registry returned by `get_registry()`. It maps backend type names to backend classes. |
+
+## C++ Backend
+
+The built-in `CppGoogleBenchmarkBackend` uses `backend_type="cpp_gbench"`. Its config loader reads YAML under `config/datasets` and `config/algos`, expands parameter combinations, and validates constraints. Its backend runs the C++ benchmark executables and merges their results.
+
+Adding a new C++ algorithm usually means adding another executable and YAML config for this backend. It does not require a new backend type.
+
+### Implementation and configuration
+
+New algorithms should be C++ classes that inherit `class ANN` from `cpp/bench/ann/src/ann.h` and implement all pure virtual functions.
+
+Define separate build and search parameter structs. The search parameter struct should inherit `struct ANN<T>::AnnSearchParam`.
+
+```c++
+template<typename T>
+class HnswLib : public ANN<T> {
+public:
+  struct BuildParam {
+    int M;
+    int ef_construction;
+    int num_threads;
+  };
+
+  using typename ANN<T>::AnnSearchParam;
+  struct SearchParam : public AnnSearchParam {
+    int ef;
+    int num_threads;
+  };
+
+  // ...
+};
+```
+
+The benchmark program consumes generated JSON files for indexes, build parameters, and search parameters. The JSON objects map to YAML `build_param` objects and `search_param` arrays.
+
+```json
+{
+  "name": "hnswlib.M12.ef500.th32",
+  "algo": "hnswlib",
+  "build_param": {"M": 12, "efConstruction": 500, "numThreads": 32},
+  "file": "/path/to/file",
+  "search_params": [
+    {"ef": 10, "numThreads": 1},
+    {"ef": 20, "numThreads": 1},
+    {"ef": 40, "numThreads": 1}
+  ],
+  "search_result_file": "/path/to/file"
+}
+```
+
+Parse build and search parameters from JSON:
+
+```c++
+template<typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuann::HnswLib<T>::BuildParam& param) {
+  param.ef_construction = conf.at("efConstruction");
+  param.M = conf.at("M");
+  if (conf.contains("numThreads")) {
+    param.num_threads = conf.at("numThreads");
+  }
+}
+
+template<typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuann::HnswLib<T>::SearchParam& param) {
+  param.ef = conf.at("ef");
+  if (conf.contains("numThreads")) {
+    param.num_threads = conf.at("numThreads");
+  }
+}
+```
+
+Add matching `if` cases to `create_algo()` and `create_search_param()` in `cpp/bench/ann/`. The string literal must match the `algo` value in the configuration file.
+
+```c++
+if (algo == "hnswlib") {
+   // ...
+}
+```
+
+### Adding a CMake target
+
+`cuvs/cpp/bench/ann/CMakeLists.txt` provides a CMake helper for new benchmark targets:
+
+```cmake
+ConfigureAnnBench(
+  NAME <algo_name>
+  PATH </path/to/algo/benchmark/source/file>
+  INCLUDES <additional_include_directories>
+  CXXFLAGS <additional_cxx_flags>
+  LINKS <additional_link_library_targets>
+)
+```
+
+Example target for `HNSWLIB`:
+
+```cmake
+ConfigureAnnBench(
+  NAME HNSWLIB PATH bench/ann/src/hnswlib/hnswlib_benchmark.cpp INCLUDES
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/hnswlib-src/hnswlib CXXFLAGS "${HNSW_CXX_FLAGS}"
+)
+```
+
+This creates `HNSWLIB_ANN_BENCH`, which runs `HNSWLIB` benchmarks.
+
+Add an `algos.yaml` entry that maps the algorithm name to its executable and declares whether the algorithm requires a GPU:
+
+```yaml
+cuvs_ivf_pq:
+  executable: CUVS_IVF_PQ_ANN_BENCH
+  requires_gpu: true
+```
+
+`executable` specifies the binary used to build and search the index. cuVS Bench expects it to be available in `cuvs/cpp/build/`. `requires_gpu` tells cuVS Bench whether the algorithm must run on a GPU node.
+
+## Summary
+
+cuVS Bench backends let the same benchmark workflow run against different execution targets. A config loader describes the dataset and parameter combinations, while a backend performs the build and search work. Use a new backend type for a new execution environment, and use the existing C++ backend when you are only adding another C++ ANN benchmark executable.
