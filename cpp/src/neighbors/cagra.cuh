@@ -368,7 +368,7 @@ index<T, IdxT> build(
  * @brief Build the index from a device `any_dataset_view` (strided, padded view, or indirect).
  *
  * Graph construction uses
- * `detail::convert_dataset_view_to_padded_for_graph_build`. The index
+ * `convert_dataset_view_to_padded_for_graph_build`. The index
  * stores the original view when `attach_dataset_on_build` is true.
  */
 template <typename T, typename IdxT>

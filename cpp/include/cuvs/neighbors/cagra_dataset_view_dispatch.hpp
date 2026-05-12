@@ -5,6 +5,15 @@
 
 #pragma once
 
+/**
+ * @file cagra_dataset_view_dispatch.hpp
+ *
+ * Template helpers shared by `cagra::index` and CAGRA build (`src/`). Lives next to `cagra.hpp`
+ * under `include/cuvs/neighbors/` (not under `include/.../detail/`). Declared in namespace
+ * `cuvs::neighbors::cagra` (same as `cagra::index`) so public headers do not call `cagra::detail`
+ * helpers — that namespace stays for build/search internals defined in translation units.
+ */
+
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -12,7 +21,7 @@
 #include <memory>
 #include <type_traits>
 
-namespace cuvs::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra {
 
 /**
  * CAGRA row width (in elements) must match `cagra_required_row_width` for the logical feature
@@ -159,4 +168,4 @@ auto convert_dataset_view_to_padded_for_graph_build(any_dataset_view<T, int64_t>
   RAFT_FAIL("cagra::build: unsupported dataset view for graph construction.");
 }
 
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra

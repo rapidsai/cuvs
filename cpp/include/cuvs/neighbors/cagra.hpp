@@ -5,10 +5,9 @@
 
 #pragma once
 
-#include <cuda_fp16.h>
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra_dataset_view_dispatch.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/detail/cagra_dataset_view_dispatch.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
@@ -560,7 +559,7 @@ struct index : cuvs::neighbors::index {
 
   /** Construct an index from a `dataset_view` and knn_graph.
    *
-   * `detail::clone_any_dataset_view_for_cagra_index` stores a shallow copy of the view variant.
+   * `clone_any_dataset_view_for_cagra_index` stores a shallow copy of the view variant.
    * Supported:
    * `empty_dataset_view`, `indirect_dataset_view`, `device_padded_dataset_view`,
    * `strided_dataset_view<T, int64_t>`. The index stores only a **non-owning** view; the
@@ -599,7 +598,7 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
-      dataset_(detail::clone_any_dataset_view_for_cagra_index<T, dataset_index_type>(dataset)),
+      dataset_(clone_any_dataset_view_for_cagra_index<T, dataset_index_type>(dataset)),
       dataset_norms_(std::nullopt)
   {
     RAFT_EXPECTS(dataset.n_rows() == static_cast<int64_t>(knn_graph.extent(0)),
@@ -650,7 +649,7 @@ struct index : cuvs::neighbors::index {
 
   /**
    * Replace the dataset with a new `dataset_view` (stored via
-   * `detail::clone_any_dataset_view_for_cagra_index`).
+   * `clone_any_dataset_view_for_cagra_index`).
    *
    * The index owns a heap copy of the view handle only (not the vector storage). The caller must
    * keep the underlying device data (and any indirect target) alive. Clears precomputed norms.
@@ -658,7 +657,7 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       cuvs::neighbors::any_dataset_view<T, dataset_index_type> const& dataset)
   {
-    dataset_ = detail::clone_any_dataset_view_for_cagra_index<T, dataset_index_type>(dataset);
+    dataset_ = clone_any_dataset_view_for_cagra_index<T, dataset_index_type>(dataset);
     dataset_norms_.reset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
       if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
@@ -688,8 +687,7 @@ struct index : cuvs::neighbors::index {
   {
     host_owning_dataset_ =
       std::make_unique<cuvs::neighbors::any_owning_dataset<dataset_index_type>>(std::move(dataset));
-    auto view =
-      detail::any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    auto view = any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
     update_dataset(res, view);
   }
 
@@ -703,8 +701,7 @@ struct index : cuvs::neighbors::index {
   {
     RAFT_EXPECTS(dataset != nullptr, "update_dataset: null any_owning_dataset");
     host_owning_dataset_ = std::move(dataset);
-    auto view =
-      detail::any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    auto view = any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
     update_dataset(res, view);
   }
 
@@ -769,8 +766,7 @@ struct index : cuvs::neighbors::index {
   {
     auto own             = cuvs::neighbors::make_padded_dataset(res, dataset);
     host_owning_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(own));
-    auto view =
-      detail::any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    auto view = any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
     update_dataset(res, view);
   }
 
@@ -1464,7 +1460,7 @@ auto build_ace(raft::resources const& res,
 /**
  * @brief Build the index from a device `dataset_view` (non-owning).
  *
- * Graph construction uses `detail::convert_dataset_view_to_padded_for_graph_build`. The index
+ * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The index
  * stores a copy of the original view when `attach_dataset_on_build` is true. When VPQ compression
  * is used, returns `build_result` with `.vpq` that the caller must keep alive.
  * See `build(res, params, device_matrix_view)` for full documentation.
