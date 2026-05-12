@@ -47,6 +47,9 @@ extern "C" cuvsError_t cuvsResourcesCreateWithMemoryTracking(cuvsResources_t* re
     if (csv_path == nullptr || csv_path[0] == '\0') {
       throw std::invalid_argument("csv_path must be a non-empty string");
     }
+    if (sample_interval_ms < 0) {
+      throw std::invalid_argument("sample_interval_ms must be >= 0");
+    }
     auto res_ptr = new raft::memory_tracking_resources{
       std::string{csv_path}, std::chrono::milliseconds{sample_interval_ms}};
     *res = reinterpret_cast<uintptr_t>(res_ptr);
