@@ -24,7 +24,7 @@ This lets you pass matrices in device or host memory into cuvs.
 | --- | --- |
 | `as_ptr` | `rust/cuvs/src/dlpack.rs:21` |
 | `to_device` | `rust/cuvs/src/dlpack.rs:27` |
-| `to_host` | `rust/cuvs/src/dlpack.rs:53` |
+| `to_host` | `rust/cuvs/src/dlpack.rs:47` |
 
 ### as_ptr
 
@@ -61,7 +61,7 @@ arr: &mut ndarray::ArrayBase<S, D>,
 
 Copies data from device memory into host memory
 
-_Source: `rust/cuvs/src/dlpack.rs:53`_
+_Source: `rust/cuvs/src/dlpack.rs:47`_
 
 _Source: `rust/cuvs/src/dlpack.rs:14`_
 

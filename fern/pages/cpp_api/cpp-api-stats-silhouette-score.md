@@ -8,8 +8,8 @@ _Source header: `cuvs/stats/silhouette_score.hpp`_
 
 ## Silhouette Score
 
-<a id="cuvs-stats-silhouette-score"></a>
-### cuvs::stats::silhouette_score
+<a id="stats-silhouette-score"></a>
+### stats::silhouette_score
 
 main function that returns the average silhouette score for a given set of data and its
 
@@ -34,7 +34,7 @@ clusterings nRows) for every sample (length: nRows)
 | `labels` | in | `raft::device_vector_view<const int, int64_t>` | : the pointer to the array containing labels for every data sample (length: |
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | : optional array populated with the silhouette score |
 | `n_unique_labels` | in | `int64_t` | : number of unique labels in the labels array |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | : Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | : Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -42,8 +42,8 @@ clusterings nRows) for every sample (length: nRows)
 
 : The silhouette score.
 
-<a id="cuvs-stats-silhouette-score-batched"></a>
-### cuvs::stats::silhouette_score_batched
+<a id="stats-silhouette-score-batched"></a>
+### stats::silhouette_score_batched
 
 function that returns the average silhouette score for a given set of data and its
 
@@ -70,7 +70,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | : optional array populated with the silhouette score |
 | `n_unique_labels` | in | `int64_t` | : number of unique labels in the labels array |
 | `batch_size` | in | `int64_t` | : number of samples per batch |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | : the numerical value that maps to the type of distance metric to be used in Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | : the numerical value that maps to the type of distance metric to be used in Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -78,7 +78,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 
 : The silhouette score.
 
-**Additional overload:** `cuvs::stats::silhouette_score`
+**Additional overload:** `stats::silhouette_score`
 
 main function that returns the average silhouette score for a given set of data and its
 
@@ -103,7 +103,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 | `labels` | in | `raft::device_vector_view<const int, int64_t>` | : the pointer to the array containing labels for every data sample (length: |
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<double, int64_t>>` | : optional array populated with the silhouette score |
 | `n_unique_labels` | in | `int64_t` | : number of unique labels in the labels array |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | : the numerical value that maps to the type of distance metric to be used in Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | : the numerical value that maps to the type of distance metric to be used in Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -111,7 +111,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 
 : The silhouette score.
 
-**Additional overload:** `cuvs::stats::silhouette_score_batched`
+**Additional overload:** `stats::silhouette_score_batched`
 
 function that returns the average silhouette score for a given set of data and its
 
@@ -138,7 +138,7 @@ clusterings nRows) for every sample (length: nRows) the calculations
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<double, int64_t>>` | : optional array populated with the silhouette score |
 | `n_unique_labels` | in | `int64_t` | : number of unique labels in the labels array |
 | `batch_size` | in | `int64_t` | : number of samples per batch |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | : the numerical value that maps to the type of distance metric to be used in Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | : the numerical value that maps to the type of distance metric to be used in Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 

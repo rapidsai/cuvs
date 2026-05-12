@@ -14,7 +14,7 @@ _Source header: `cuvs/distance/pairwise_distance.h`_
 Compute pairwise distances for two matrices
 
 ```c
-cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
 DLManagedTensor* x,
 DLManagedTensor* y,
 DLManagedTensor* dist,
@@ -37,4 +37,4 @@ Usage example:
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

@@ -19,7 +19,7 @@ approximate nearest neighbors search on the GPU.
 pub mod brute_force;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:10`_
+_Source: `rust/cuvs/src/lib.rs:12`_
 
 ## cagra
 
@@ -27,7 +27,7 @@ _Source: `rust/cuvs/src/lib.rs:10`_
 pub mod cagra;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:11`_
+_Source: `rust/cuvs/src/lib.rs:13`_
 
 ## cluster
 
@@ -35,7 +35,7 @@ _Source: `rust/cuvs/src/lib.rs:11`_
 pub mod cluster;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:12`_
+_Source: `rust/cuvs/src/lib.rs:14`_
 
 ## distance
 
@@ -43,7 +43,7 @@ _Source: `rust/cuvs/src/lib.rs:12`_
 pub mod distance;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:13`_
+_Source: `rust/cuvs/src/lib.rs:15`_
 
 ## distance_type
 
@@ -51,7 +51,7 @@ _Source: `rust/cuvs/src/lib.rs:13`_
 pub mod distance_type;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:14`_
+_Source: `rust/cuvs/src/lib.rs:16`_
 
 ## ivf_flat
 
@@ -59,7 +59,7 @@ _Source: `rust/cuvs/src/lib.rs:14`_
 pub mod ivf_flat;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:17`_
+_Source: `rust/cuvs/src/lib.rs:19`_
 
 ## ivf_pq
 
@@ -67,7 +67,7 @@ _Source: `rust/cuvs/src/lib.rs:17`_
 pub mod ivf_pq;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:18`_
+_Source: `rust/cuvs/src/lib.rs:20`_
 
 ## vamana
 
@@ -75,7 +75,7 @@ _Source: `rust/cuvs/src/lib.rs:18`_
 pub mod vamana;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:20`_
+_Source: `rust/cuvs/src/lib.rs:22`_
 
 ## dlpack::ManagedTensor
 
@@ -83,7 +83,7 @@ _Source: `rust/cuvs/src/lib.rs:20`_
 pub use dlpack::ManagedTensor;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:22`_
+_Source: `rust/cuvs/src/lib.rs:24`_
 
 ## error:: \{ ... \}
 
@@ -91,7 +91,7 @@ _Source: `rust/cuvs/src/lib.rs:22`_
 pub use error:: { ... }
 ```
 
-_Source: `rust/cuvs/src/lib.rs:23`_
+_Source: `rust/cuvs/src/lib.rs:25`_
 
 ## resources::Resources
 
@@ -99,4 +99,4 @@ _Source: `rust/cuvs/src/lib.rs:23`_
 pub use resources::Resources;
 ```
 
-_Source: `rust/cuvs/src/lib.rs:24`_
+_Source: `rust/cuvs/src/lib.rs:26`_

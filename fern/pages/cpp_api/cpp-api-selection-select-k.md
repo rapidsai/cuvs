@@ -8,8 +8,8 @@ _Source header: `cuvs/selection/select_k.hpp`_
 
 ## Batched-select k smallest or largest key/values
 
-<a id="cuvs-selection-select-k"></a>
-### cuvs::selection::select_k
+<a id="selection-select-k"></a>
+### selection::select_k
 
 Select k smallest or largest key/values from each row in the input data.
 
@@ -48,7 +48,7 @@ Example usage
 
 `void`
 
-**Additional overload:** `cuvs::selection::select_k`
+**Additional overload:** `selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
 
@@ -87,7 +87,7 @@ Example usage
 
 `void`
 
-**Additional overload:** `cuvs::selection::select_k`
+**Additional overload:** `selection::select_k`
 
 Select k smallest or largest key/values from each row in the input data.
 

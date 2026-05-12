@@ -8,8 +8,8 @@ _Source header: `cuvs/preprocessing/quantize/scalar.hpp`_
 
 ## Scalar quantizer utilities
 
-<a id="cuvs-preprocessing-quantize-scalar-params"></a>
-### cuvs::preprocessing::quantize::scalar::params
+<a id="preprocessing-quantize-scalar-params"></a>
+### preprocessing::quantize::scalar::params
 
 quantizer parameters.
 
@@ -23,8 +23,8 @@ struct params { ... };
 | --- | --- | --- |
 | `quantile` | `float` | Specifies how many outliers at top & bottom will be ignored. Needs to be within range of (0, 1]. |
 
-<a id="cuvs-preprocessing-quantize-scalar-quantizer"></a>
-### cuvs::preprocessing::quantize::scalar::quantizer
+<a id="preprocessing-quantize-scalar-quantizer"></a>
+### preprocessing::quantize::scalar::quantizer
 
 Defines and stores scalar for quantisation upon training
 
@@ -42,8 +42,8 @@ struct quantizer { ... };
 | `min_` | `T` | Minimum value of the quantization range. |
 | `max_` | `T` | Maximum value of the quantization range. |
 
-<a id="cuvs-preprocessing-quantize-scalar-train"></a>
-### cuvs::preprocessing::quantize::scalar::train
+<a id="preprocessing-quantize-scalar-train"></a>
+### preprocessing::quantize::scalar::train
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -60,14 +60,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::device_matrix_view<const double, int64_t>` | a row-major matrix view on device |
 
 **Returns**
 
-[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
+[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
+**Additional overload:** `preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -84,15 +84,15 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::host_matrix_view<const double, int64_t>` | a row-major matrix view on host |
 
 **Returns**
 
-[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
+[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer)
 
-<a id="cuvs-preprocessing-quantize-scalar-transform"></a>
-### cuvs::preprocessing::quantize::scalar::transform
+<a id="preprocessing-quantize-scalar-transform"></a>
+### preprocessing::quantize::scalar::transform
 
 Applies quantization transform to given dataset
 
@@ -110,7 +110,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::device_matrix_view<const double, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<int8_t, int64_t>` | a row-major matrix view on device |
 
@@ -118,7 +118,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
+**Additional overload:** `preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -136,7 +136,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::host_matrix_view<const double, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<int8_t, int64_t>` | a row-major matrix view on host |
 
@@ -144,8 +144,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-preprocessing-quantize-scalar-inverse-transform"></a>
-### cuvs::preprocessing::quantize::scalar::inverse_transform
+<a id="preprocessing-quantize-scalar-inverse-transform"></a>
+### preprocessing::quantize::scalar::inverse_transform
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -165,7 +165,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::device_matrix_view<const int8_t, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<double, int64_t>` | a row-major matrix view on device |
 
@@ -173,7 +173,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
+**Additional overload:** `preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -193,7 +193,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::host_matrix_view<const int8_t, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<double, int64_t>` | a row-major matrix view on host |
 
@@ -201,7 +201,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
+**Additional overload:** `preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -218,14 +218,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device |
 
 **Returns**
 
-[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
+[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
+**Additional overload:** `preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -242,14 +242,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t>` | a row-major matrix view on host |
 
 **Returns**
 
-[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
+[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
+**Additional overload:** `preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -267,7 +267,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<int8_t, int64_t>` | a row-major matrix view on device |
 
@@ -275,7 +275,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
+**Additional overload:** `preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -293,7 +293,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<int8_t, int64_t>` | a row-major matrix view on host |
 
@@ -301,7 +301,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
+**Additional overload:** `preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -321,7 +321,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::device_matrix_view<const int8_t, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<float, int64_t>` | a row-major matrix view on device |
 
@@ -329,7 +329,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
+**Additional overload:** `preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -349,7 +349,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::host_matrix_view<const int8_t, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<float, int64_t>` | a row-major matrix view on host |
 
@@ -357,7 +357,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
+**Additional overload:** `preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -374,14 +374,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t>` | a row-major matrix view on device |
 
 **Returns**
 
-[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
+[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::train`
+**Additional overload:** `preprocessing::quantize::scalar::train`
 
 Initializes a scalar quantizer to be used later for quantizing the dataset.
 
@@ -398,14 +398,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-params) | configure scalar quantizer, e.g. quantile |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t>` | a row-major matrix view on host |
 
 **Returns**
 
-[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer)
+[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
+**Additional overload:** `preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -423,7 +423,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<int8_t, int64_t>` | a row-major matrix view on device |
 
@@ -431,7 +431,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::transform`
+**Additional overload:** `preprocessing::quantize::scalar::transform`
 
 Applies quantization transform to given dataset
 
@@ -449,7 +449,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<int8_t, int64_t>` | a row-major matrix view on host |
 
@@ -457,7 +457,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
+**Additional overload:** `preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -477,7 +477,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::device_matrix_view<const int8_t, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<half, int64_t>` | a row-major matrix view on device |
 
@@ -485,7 +485,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::scalar::inverse_transform`
+**Additional overload:** `preprocessing::quantize::scalar::inverse_transform`
 
 Perform inverse quantization step on previously quantized dataset
 
@@ -505,7 +505,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#cuvs-preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
+| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) | a scalar quantizer |
 | `dataset` | in | `raft::host_matrix_view<const int8_t, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<half, int64_t>` | a row-major matrix view on host |
 

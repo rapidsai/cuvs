@@ -199,11 +199,12 @@ cuVS has the following configurable cmake flags available:
 
 ### Preview documentation
 
-The cuVS documentation is a Fern project in the repository's `fern` directory. Install the Fern CLI, then run the local preview from the repository root:
+The cuVS documentation is a Fern project in the repository's `fern` directory. Fern requires Node.js 18 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
+
+Run the local preview from the repository root:
 
 ```bash
-npm install -g fern-api
-fern docs dev
+fern/build_docs.sh dev
 ```
 
 Fern serves the preview at [http://localhost:3000](http://localhost:3000) by default.
@@ -211,6 +212,5 @@ Fern serves the preview at [http://localhost:3000](http://localhost:3000) by def
 Run the Fern checks before publishing documentation changes:
 
 ```bash
-fern check --warnings --strict-broken-links
-fern docs md check
+fern/build_docs.sh check
 ```

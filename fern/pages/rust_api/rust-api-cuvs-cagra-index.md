@@ -22,12 +22,12 @@ CAGRA ANN Index
 | Name | Source |
 | --- | --- |
 | `build` | `rust/cuvs/src/cagra/index.rs:38` |
-| `new` | `rust/cuvs/src/cagra/index.rs:57` |
-| `search` | `rust/cuvs/src/cagra/index.rs:74` |
-| `search_with_filter` | `rust/cuvs/src/cagra/index.rs:115` |
-| `serialize` | `rust/cuvs/src/cagra/index.rs:151` |
-| `serialize_to_hnswlib` | `rust/cuvs/src/cagra/index.rs:179` |
-| `deserialize` | `rust/cuvs/src/cagra/index.rs:198` |
+| `new` | `rust/cuvs/src/cagra/index.rs:52` |
+| `search` | `rust/cuvs/src/cagra/index.rs:69` |
+| `search_with_filter` | `rust/cuvs/src/cagra/index.rs:107` |
+| `serialize` | `rust/cuvs/src/cagra/index.rs:143` |
+| `serialize_to_hnswlib` | `rust/cuvs/src/cagra/index.rs:166` |
+| `deserialize` | `rust/cuvs/src/cagra/index.rs:179` |
 
 ### build
 
@@ -57,7 +57,7 @@ pub fn new() -> Result<Index> { ... }
 
 Creates a new empty index
 
-_Source: `rust/cuvs/src/cagra/index.rs:57`_
+_Source: `rust/cuvs/src/cagra/index.rs:52`_
 
 ### search
 
@@ -82,7 +82,7 @@ Perform a Approximate Nearest Neighbors search on the Index
 * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
 * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
 
-_Source: `rust/cuvs/src/cagra/index.rs:74`_
+_Source: `rust/cuvs/src/cagra/index.rs:69`_
 
 ### search_with_filter
 
@@ -114,7 +114,7 @@ giving better recall than post-filtering.
 * `bitset` - A 1-D `uint32` device tensor with `ceil(n_rows / 32)` elements.
 Each bit corresponds to a dataset row: bit 1 = include, bit 0 = exclude.
 
-_Source: `rust/cuvs/src/cagra/index.rs:115`_
+_Source: `rust/cuvs/src/cagra/index.rs:107`_
 
 ### serialize
 
@@ -137,7 +137,7 @@ Experimental, both the API and the serialization format are subject to change.
 * `filename` - The file path for saving the index
 * `include_dataset` - Whether to write out the dataset to the file
 
-_Source: `rust/cuvs/src/cagra/index.rs:151`_
+_Source: `rust/cuvs/src/cagra/index.rs:143`_
 
 ### serialize_to_hnswlib
 
@@ -157,7 +157,7 @@ Experimental, both the API and the serialization format are subject to change.
 * `res` - Resources to use
 * `filename` - The file path for saving the index
 
-_Source: `rust/cuvs/src/cagra/index.rs:179`_
+_Source: `rust/cuvs/src/cagra/index.rs:166`_
 
 ### deserialize
 
@@ -174,6 +174,6 @@ Experimental, both the API and the serialization format are subject to change.
 * `res` - Resources to use
 * `filename` - The path of the file that stores the index
 
-_Source: `rust/cuvs/src/cagra/index.rs:198`_
+_Source: `rust/cuvs/src/cagra/index.rs:179`_
 
 _Source: `rust/cuvs/src/cagra/index.rs:17`_

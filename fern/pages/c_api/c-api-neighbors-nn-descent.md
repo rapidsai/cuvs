@@ -55,7 +55,7 @@ struct cuvsNNDescentIndexParams { ... };
 Allocate NN-Descent Index params, and populate with default values
 
 ```c
-cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -66,7 +66,7 @@ cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_par
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsnndescentindexparamsdestroy"></a>
 ### cuvsNNDescentIndexParamsDestroy
@@ -74,7 +74,7 @@ cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* index_par
 De-allocate NN-Descent Index params
 
 ```c
-cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_params);
+CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -85,7 +85,7 @@ cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t index_par
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## NN-Descent index
 
@@ -111,7 +111,7 @@ typedef struct { ... } cuvsNNDescentIndex;
 Allocate NN-Descent index
 
 ```c
-cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
+CUVS_EXPORT cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
 ```
 
 **Parameters**
@@ -122,7 +122,7 @@ cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsnndescentindexdestroy"></a>
 ### cuvsNNDescentIndexDestroy
@@ -130,7 +130,7 @@ cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index);
 De-allocate NN-Descent index
 
 ```c
-cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 ```
 
 **Parameters**
@@ -141,7 +141,7 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## NN-Descent index build
 
@@ -151,7 +151,7 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 Build a NN-Descent index with a `DLManagedTensor` which has underlying
 
 ```c
-cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
 cuvsNNDescentIndexParams_t index_params,
 DLManagedTensor* dataset,
 DLManagedTensor* graph,
@@ -177,4 +177,4 @@ cuvsNNDescentIndex_t index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

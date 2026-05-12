@@ -8,8 +8,8 @@ _Source header: `cuvs/preprocessing/pca.hpp`_
 
 ## Types
 
-<a id="cuvs-preprocessing-pca-params"></a>
-### cuvs::preprocessing::pca::params
+<a id="preprocessing-pca-params"></a>
+### preprocessing::pca::params
 
 Parameters for PCA decomposition. Ref:
 
@@ -32,8 +32,8 @@ struct params { ... };
 
 ## PCA (Principal Component Analysis)
 
-<a id="cuvs-preprocessing-pca-fit"></a>
-### cuvs::preprocessing::pca::fit
+<a id="preprocessing-pca-fit"></a>
+### preprocessing::pca::fit
 
 Perform PCA fit operation.
 
@@ -57,7 +57,7 @@ Computes the principal components, explained variances, singular values, and col
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#preprocessing-pca-params) | PCA parameters |
 | `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | input data [n_rows x n_cols] (col-major). Modified temporarily. |
 | `components` | out | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `explained_var` | out | `raft::device_vector_view<float, int64_t>` | explained variances [n_components] |
@@ -71,8 +71,8 @@ Computes the principal components, explained variances, singular values, and col
 
 `void`
 
-<a id="cuvs-preprocessing-pca-fit-transform"></a>
-### cuvs::preprocessing::pca::fit_transform
+<a id="preprocessing-pca-fit-transform"></a>
+### preprocessing::pca::fit_transform
 
 Perform PCA fit and transform operations.
 
@@ -97,7 +97,7 @@ Computes the principal components and transforms the input data into the eigensp
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#preprocessing-pca-params) | PCA parameters |
 | `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | input data [n_rows x n_cols] (col-major). Modified temporarily. |
 | `trans_input` | out | `raft::device_matrix_view<float, int64_t, raft::col_major>` | transformed data [n_rows x n_components] (col-major) |
 | `components` | out | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
@@ -112,8 +112,8 @@ Computes the principal components and transforms the input data into the eigensp
 
 `void`
 
-<a id="cuvs-preprocessing-pca-transform"></a>
-### cuvs::preprocessing::pca::transform
+<a id="preprocessing-pca-transform"></a>
+### preprocessing::pca::transform
 
 Perform PCA transform operation.
 
@@ -136,7 +136,7 @@ Transforms the input data into the eigenspace using previously computed principa
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#preprocessing-pca-params) | PCA parameters |
 | `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | data to transform [n_rows x n_cols] (col-major). Modified temporarily |
 | `components` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `singular_vals` | in | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |
@@ -147,8 +147,8 @@ Transforms the input data into the eigenspace using previously computed principa
 
 `void`
 
-<a id="cuvs-preprocessing-pca-inverse-transform"></a>
-### cuvs::preprocessing::pca::inverse_transform
+<a id="preprocessing-pca-inverse-transform"></a>
+### preprocessing::pca::inverse_transform
 
 Perform PCA inverse transform operation.
 
@@ -169,7 +169,7 @@ Transforms data from the eigenspace back to the original space.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
-| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#cuvs-preprocessing-pca-params) | PCA parameters |
+| `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#preprocessing-pca-params) | PCA parameters |
 | `trans_input` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | transformed data [n_rows x n_components] (col-major) |
 | `components` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `singular_vals` | in | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |

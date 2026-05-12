@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/scann.hpp`_
 
 ## ScaNN index build parameters
 
-<a id="cuvs-neighbors-experimental-scann-index-params"></a>
-### cuvs::neighbors::experimental::scann::index_params
+<a id="neighbors-experimental-scann-index-params"></a>
+### neighbors::experimental::scann::index_params
 
 ANN parameters used by ScaNN to build index
 
@@ -35,8 +35,8 @@ struct index_params : cuvs::neighbors::index_params { ... };
 
 ## ScaNN index type
 
-<a id="cuvs-neighbors-experimental-scann-index"></a>
-### cuvs::neighbors::experimental::scann::index
+<a id="neighbors-experimental-scann-index"></a>
+### neighbors::experimental::scann::index
 
 ScaNN index.
 
@@ -47,8 +47,8 @@ template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-<a id="cuvs-neighbors-experimental-scann-index-metric"></a>
-### cuvs::neighbors::experimental::scann::index::metric
+<a id="neighbors-experimental-scann-index-metric"></a>
+### neighbors::experimental::scann::index::metric
 
 Distance metric used for clustering.
 
@@ -58,10 +58,10 @@ Distance metric used for clustering.
 
 **Returns**
 
-[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype)
 
-<a id="cuvs-neighbors-experimental-scann-index-size"></a>
-### cuvs::neighbors::experimental::scann::index::size
+<a id="neighbors-experimental-scann-index-size"></a>
+### neighbors::experimental::scann::index::size
 
 Total length of the index (number of vectors).
 
@@ -73,8 +73,8 @@ IdxT size() const noexcept;
 
 `IdxT`
 
-<a id="cuvs-neighbors-experimental-scann-index-dim"></a>
-### cuvs::neighbors::experimental::scann::index::dim
+<a id="neighbors-experimental-scann-index-dim"></a>
+### neighbors::experimental::scann::index::dim
 
 Dimensionality of the data.
 
@@ -88,8 +88,8 @@ Dimensionality of the data.
 
 ## ScaNN index build functions
 
-<a id="cuvs-neighbors-experimental-scann-build"></a>
-### cuvs::neighbors::experimental::scann::build
+<a id="neighbors-experimental-scann-build"></a>
+### neighbors::experimental::scann::build
 
 Build the index from the dataset for efficient search.
 
@@ -105,15 +105,15 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
-| `params` |  | [`const cuvs::neighbors::experimental::scann::index_params&`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index-params) |  |
+| `params` |  | [`const cuvs::neighbors::experimental::scann::index_params&`](/api-reference/cpp-api-neighbors-scann#neighbors-experimental-scann-index-params) |  |
 | `dataset` |  | `raft::device_matrix_view<const float, int64_t, raft::row_major>` |  |
 
 **Returns**
 
-[`cuvs::neighbors::experimental::scann::index<float, int64_t>`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index)
+[`cuvs::neighbors::experimental::scann::index<float, int64_t>`](/api-reference/cpp-api-neighbors-scann#neighbors-experimental-scann-index)
 
-<a id="cuvs-neighbors-experimental-scann-serialize"></a>
-### cuvs::neighbors::experimental::scann::serialize
+<a id="neighbors-experimental-scann-serialize"></a>
+### neighbors::experimental::scann::serialize
 
 Save the index to files in a directory
 
@@ -133,7 +133,7 @@ NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not 
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `file_prefix` |  | `const std::string&` |  |
-| `index` |  | [`const cuvs::neighbors::experimental::scann::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index) |  |
+| `index` |  | [`const cuvs::neighbors::experimental::scann::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-scann#neighbors-experimental-scann-index) |  |
 
 **Returns**
 
@@ -141,7 +141,7 @@ NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not 
 
 ## ScaNN serialize functions
 
-**Additional overload:** `cuvs::neighbors::experimental::scann::serialize`
+**Additional overload:** `neighbors::experimental::scann::serialize`
 
 Save the index to files in a directory
 
@@ -161,7 +161,7 @@ NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not 
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
 | `file_prefix` |  | `const std::string&` |  |
-| `index` |  | [`const cuvs::neighbors::experimental::scann::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-scann#cuvs-neighbors-experimental-scann-index) |  |
+| `index` |  | [`const cuvs::neighbors::experimental::scann::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-scann#neighbors-experimental-scann-index) |  |
 
 **Returns**
 

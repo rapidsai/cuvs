@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/ball_cover.hpp`_
 
 ## Types
 
-<a id="cuvs-neighbors-ball-cover-index"></a>
-### cuvs::neighbors::ball_cover::index
+<a id="neighbors-ball-cover-index"></a>
+### neighbors::ball_cover::index
 
 Stores raw index data points, sampled landmarks, the 1-nns of index points
 
@@ -29,12 +29,12 @@ struct index : cuvs::neighbors::index { ... };
 | `n` | `int64_t` |  |
 | `n_landmarks` | `int64_t` |  |
 | `X` | `raft::device_matrix_view<const float, idx_t, raft::row_major>` |  |
-| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) |  |
+| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) |  |
 
 ## Random Ball Cover algorithm
 
-<a id="cuvs-neighbors-ball-cover-build"></a>
-### cuvs::neighbors::ball_cover::build
+<a id="neighbors-ball-cover-build"></a>
+### neighbors::ball_cover::build
 
 Builds and populates a previously unbuilt cuvs::neighbors::ball_cover::index
 
@@ -51,7 +51,7 @@ cuvs::neighbors::ball_cover::index
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | library resource management handle |
-| `index` | inout | [`index<int64_t, float>&`](/api-reference/cpp-api-neighbors-ball-cover#cuvs-neighbors-ball-cover-index) | an empty (and not previous built) instance of |
+| `index` | inout | [`index<int64_t, float>&`](/api-reference/cpp-api-neighbors-ball-cover#neighbors-ball-cover-index) | an empty (and not previous built) instance of |
 
 **Returns**
 

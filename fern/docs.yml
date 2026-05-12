@@ -2,7 +2,7 @@
 
 title: "cuVS"
 instances:
-   - url: "nvidia-cuvs.docs.buildwithfern.com/cuvs"
+  - url: "nvidia-cuvs.docs.buildwithfern.com/cuvs"
     custom-domain: docs/nvidia.com/cuvs
 footer: "./theme/nvidia/components/CustomFooter.tsx"
 logo:
@@ -159,8 +159,12 @@ navigation:
         path: "./pages/user_guide/integration_patterns.md"
   - section: "Developer Guide"
     contents:
-      - page: "Guidelines"
-        path: "./pages/developer_guide.md"
+      - section: "Guidelines"
+        contents:
+          - page: "C++ Guidelines"
+            path: "./pages/cpp_guidelines.md"
+          - page: "Python Guidelines"
+            path: "./pages/python_guidelines.md"
       - section: "Advanced Topics"
         path: "./pages/advanced_topics.md"
         contents:

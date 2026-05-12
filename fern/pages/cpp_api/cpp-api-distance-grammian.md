@@ -8,8 +8,8 @@ _Source header: `cuvs/distance/grammian.hpp`_
 
 ## Types
 
-<a id="cuvs-distance-kernels-grammatrixbase"></a>
-### cuvs::distance::kernels::GramMatrixBase
+<a id="distance-kernels-grammatrixbase"></a>
+### distance::kernels::GramMatrixBase
 
 Base class for general Gram matrices
 
@@ -25,8 +25,8 @@ template <typename math_t>
 class GramMatrixBase { ... };
 ```
 
-<a id="cuvs-distance-kernels-polynomialkernel"></a>
-### cuvs::distance::kernels::PolynomialKernel
+<a id="distance-kernels-polynomialkernel"></a>
+### distance::kernels::PolynomialKernel
 
 Create a kernel matrix using polynomial kernel function.
 
@@ -35,8 +35,8 @@ template <typename math_t, typename exp_t>
 class PolynomialKernel : public GramMatrixBase<math_t> { ... };
 ```
 
-<a id="cuvs-distance-kernels-tanhkernel"></a>
-### cuvs::distance::kernels::TanhKernel
+<a id="distance-kernels-tanhkernel"></a>
+### distance::kernels::TanhKernel
 
 Create a kernel matrix using tanh kernel function.
 
@@ -45,8 +45,8 @@ template <typename math_t>
 class TanhKernel : public GramMatrixBase<math_t> { ... };
 ```
 
-<a id="cuvs-distance-kernels-rbfkernel"></a>
-### cuvs::distance::kernels::RBFKernel
+<a id="distance-kernels-rbfkernel"></a>
+### distance::kernels::RBFKernel
 
 Create a kernel matrix using RBF kernel function.
 

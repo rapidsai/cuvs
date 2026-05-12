@@ -22,8 +22,8 @@ Ivf-Pq ANN Index
 | Name | Source |
 | --- | --- |
 | `build` | `rust/cuvs/src/ivf_pq/index.rs:25` |
-| `new` | `rust/cuvs/src/ivf_pq/index.rs:44` |
-| `search` | `rust/cuvs/src/ivf_pq/index.rs:61` |
+| `new` | `rust/cuvs/src/ivf_pq/index.rs:39` |
+| `search` | `rust/cuvs/src/ivf_pq/index.rs:56` |
 
 ### build
 
@@ -53,7 +53,7 @@ pub fn new() -> Result<Index> { ... }
 
 Creates a new empty index
 
-_Source: `rust/cuvs/src/ivf_pq/index.rs:44`_
+_Source: `rust/cuvs/src/ivf_pq/index.rs:39`_
 
 ### search
 
@@ -78,6 +78,6 @@ Perform a Approximate Nearest Neighbors search on the Index
 * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
 * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
 
-_Source: `rust/cuvs/src/ivf_pq/index.rs:61`_
+_Source: `rust/cuvs/src/ivf_pq/index.rs:56`_
 
 _Source: `rust/cuvs/src/ivf_pq/index.rs:15`_

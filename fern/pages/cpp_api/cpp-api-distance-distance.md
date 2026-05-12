@@ -8,8 +8,8 @@ _Source header: `cuvs/distance/distance.hpp`_
 
 ## Types
 
-<a id="cuvs-distance-distancetype"></a>
-### cuvs::distance::DistanceType
+<a id="distance-distancetype"></a>
+### distance::DistanceType
 
 enum to tell how to compute distance
 
@@ -43,8 +43,8 @@ enum class DistanceType : int { ... };
 | `Precomputed` | `100` |
 | `CustomUDF` | `101` |
 
-<a id="cuvs-distance-densitykerneltype"></a>
-### cuvs::distance::DensityKernelType
+<a id="distance-densitykerneltype"></a>
+### distance::DensityKernelType
 
 Density kernel type for Kernel Density Estimation.
 
@@ -65,8 +65,8 @@ enum class DensityKernelType : int { ... };
 | `Linear` | `4` |
 | `Cosine` | `5` |
 
-<a id="cuvs-distance-kernels-kernelparams"></a>
-### cuvs::distance::kernels::KernelParams
+<a id="distance-kernels-kernelparams"></a>
+### distance::kernels::KernelParams
 
 Parameters for kernel matrices.
 
@@ -92,8 +92,8 @@ struct KernelParams { ... };
 
 ## Pairwise Distances API
 
-<a id="cuvs-distance-pairwise-distance"></a>
-### cuvs::distance::pairwise_distance
+<a id="distance-pairwise-distance"></a>
+### distance::pairwise_distance
 
 Compute pairwise distances for two matrices
 
@@ -119,14 +119,14 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -152,14 +152,14 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -185,14 +185,14 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -218,14 +218,14 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -251,14 +251,14 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `double` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute pairwise distances for two matrices
 
@@ -284,14 +284,14 @@ Usage example:
 | `x` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const` | first set of points (size n*k) |
 | `y` | in | `raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const` | second set of points (size m*k) |
 | `dist` | out | `raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous>` | output distance matrix (size n*m) |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance to evaluate |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance to evaluate |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute sparse pairwise distances between x and y, using the provided
 
@@ -314,14 +314,14 @@ input configuration and distance function.
 | `x` | in | `raft::device_csr_matrix_view<const float, int, int, int>` | raft::device_csr_matrix_view |
 | `y` | in | `raft::device_csr_matrix_view<const float, int, int, int>` | raft::device_csr_matrix_view |
 | `dist` | out | `raft::device_matrix_view<float, int, raft::row_major>` | raft::device_matrix_view dense matrix |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::distance::pairwise_distance`
+**Additional overload:** `distance::pairwise_distance`
 
 Compute sparse pairwise distances between x and y, using the provided
 
@@ -344,7 +344,7 @@ input configuration and distance function.
 | `x` | in | `raft::device_csr_matrix_view<const double, int, int, int>` | raft::device_csr_matrix_view |
 | `y` | in | `raft::device_csr_matrix_view<const double, int, int, int>` | raft::device_csr_matrix_view |
 | `dist` | out | `raft::device_matrix_view<double, int, raft::row_major>` | raft::device_matrix_view dense matrix |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to use |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use |
 | `metric_arg` | in | `float` | metric argument (used for Minkowski distance) Default: `2.0f`. |
 
 **Returns**

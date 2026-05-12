@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/tiered_index.hpp`_
 
 ## Types
 
-<a id="cuvs-neighbors-tiered-index-index"></a>
-### cuvs::neighbors::tiered_index::index
+<a id="neighbors-tiered-index-index"></a>
+### neighbors::tiered_index::index
 
 Tiered Index class
 

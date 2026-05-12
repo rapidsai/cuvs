@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/common.hpp`_
 
 ## Approximate Nearest Neighbors Types
 
-<a id="cuvs-neighbors-index"></a>
-### cuvs::neighbors::index
+<a id="neighbors-index"></a>
+### neighbors::index
 
 The base for approximate KNN index structures.
 
@@ -17,8 +17,8 @@ The base for approximate KNN index structures.
 struct index { ... };
 ```
 
-<a id="cuvs-neighbors-index-params"></a>
-### cuvs::neighbors::index_params
+<a id="neighbors-index-params"></a>
+### neighbors::index_params
 
 The base for KNN index parameters.
 
@@ -30,11 +30,11 @@ struct index_params { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Distance type. |
+| `metric` | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance type. |
 | `metric_arg` | `float` | The argument used by some distance metrics. |
 
-<a id="cuvs-neighbors-mergestrategy"></a>
-### cuvs::neighbors::MergeStrategy
+<a id="neighbors-mergestrategy"></a>
+### neighbors::MergeStrategy
 
 Strategy for merging indices.
 
@@ -53,8 +53,8 @@ enum class MergeStrategy { ... };
 
 ## Types
 
-<a id="cuvs-neighbors-dataset"></a>
-### cuvs::neighbors::dataset
+<a id="neighbors-dataset"></a>
+### neighbors::dataset
 
 Two-dimensional dataset; maybe owning, maybe compressed, maybe strided.
 
@@ -63,8 +63,8 @@ template <typename IdxT>
 struct dataset { ... };
 ```
 
-<a id="cuvs-neighbors-vpq-dataset"></a>
-### cuvs::neighbors::vpq_dataset
+<a id="neighbors-vpq-dataset"></a>
+### neighbors::vpq_dataset
 
 VPQ compressed dataset.
 
@@ -86,8 +86,8 @@ struct vpq_dataset : public dataset<IdxT> { ... };
 | `pq_code_book` | `raft::device_matrix<math_type, uint32_t, raft::row_major>` | Product Quantization codebook - "fine cluster centers". |
 | `data` | `raft::device_matrix<uint8_t, index_type, raft::row_major>` | Compressed dataset. |
 
-<a id="cuvs-neighbors-ivf-list-base"></a>
-### cuvs::neighbors::ivf::list_base
+<a id="neighbors-ivf-list-base"></a>
+### neighbors::ivf::list_base
 
 Abstract base class for IVF list data.
 
@@ -100,8 +100,8 @@ template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
 struct list_base { ... };
 ```
 
-<a id="cuvs-neighbors-ivf-list"></a>
-### cuvs::neighbors::ivf::list
+<a id="neighbors-ivf-list"></a>
+### neighbors::ivf::list
 
 The data for a single IVF list.
 
@@ -124,8 +124,8 @@ SizeT> { ... };
 
 ## Filtering for ANN Types
 
-<a id="cuvs-neighbors-filtering-filtertype"></a>
-### cuvs::neighbors::filtering::FilterType
+<a id="neighbors-filtering-filtertype"></a>
+### neighbors::filtering::FilterType
 
 Filtering for ANN Types
 
@@ -141,8 +141,8 @@ enum class FilterType { ... };
 | `Bitmap` | `` |
 | `Bitset` | `` |
 
-<a id="cuvs-neighbors-filtering-none-sample-filter-operator"></a>
-### cuvs::neighbors::filtering::none_sample_filter::operator
+<a id="neighbors-filtering-none-sample-filter-operator"></a>
+### neighbors::filtering::none_sample_filter::operator
 
 ```cpp
 constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
@@ -158,8 +158,8 @@ const uint32_t sample_ix) const;
 
 `constexpr __forceinline__ _RAFT_HOST_DEVICE bool`
 
-<a id="cuvs-neighbors-filtering-none-sample-filter-get-filter-type"></a>
-### cuvs::neighbors::filtering::none_sample_filter::get_filter_type
+<a id="neighbors-filtering-none-sample-filter-get-filter-type"></a>
+### neighbors::filtering::none_sample_filter::get_filter_type
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -167,10 +167,10 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-[`FilterType`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-filtering-filtertype)
+[`FilterType`](/api-reference/cpp-api-neighbors-common#neighbors-filtering-filtertype)
 
-<a id="cuvs-neighbors-filtering-ivf-to-sample-filter"></a>
-### cuvs::neighbors::filtering::ivf_to_sample_filter
+<a id="neighbors-filtering-ivf-to-sample-filter"></a>
+### neighbors::filtering::ivf_to_sample_filter
 
 Filter used to convert the cluster index and sample index
 
@@ -188,8 +188,8 @@ struct ivf_to_sample_filter : public base_filter { ... };
 | `inds_ptrs_` | `const index_t* const*` |  |
 | `next_filter_` | `const filter_t` |  |
 
-<a id="cuvs-neighbors-filtering-ivf-to-sample-filter-operator"></a>
-### cuvs::neighbors::filtering::ivf_to_sample_filter::operator
+<a id="neighbors-filtering-ivf-to-sample-filter-operator"></a>
+### neighbors::filtering::ivf_to_sample_filter::operator
 
 If the original filter takes three arguments, then don't modify the arguments.
 
@@ -209,8 +209,8 @@ If the original filter takes two arguments, then we are using `inds_ptr_` to obt
 
 `inline _RAFT_HOST_DEVICE bool`
 
-<a id="cuvs-neighbors-filtering-bitmap-filter"></a>
-### cuvs::neighbors::filtering::bitmap_filter
+<a id="neighbors-filtering-bitmap-filter"></a>
+### neighbors::filtering::bitmap_filter
 
 Filter an index with a bitmap
 
@@ -225,8 +225,8 @@ struct bitmap_filter : public base_filter { ... };
 | --- | --- | --- |
 | `bitmap_view_` | `const view_t` |  |
 
-<a id="cuvs-neighbors-filtering-bitmap-filter-operator"></a>
-### cuvs::neighbors::filtering::bitmap_filter::operator
+<a id="neighbors-filtering-bitmap-filter-operator"></a>
+### neighbors::filtering::bitmap_filter::operator
 
 ```cpp
 inline _RAFT_HOST_DEVICE bool operator()(
@@ -240,8 +240,8 @@ const uint32_t sample_ix) const;
 
 `inline _RAFT_HOST_DEVICE bool`
 
-<a id="cuvs-neighbors-filtering-bitmap-filter-get-filter-type"></a>
-### cuvs::neighbors::filtering::bitmap_filter::get_filter_type
+<a id="neighbors-filtering-bitmap-filter-get-filter-type"></a>
+### neighbors::filtering::bitmap_filter::get_filter_type
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -249,10 +249,10 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-[`FilterType`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-filtering-filtertype)
+[`FilterType`](/api-reference/cpp-api-neighbors-common#neighbors-filtering-filtertype)
 
-<a id="cuvs-neighbors-filtering-bitset-filter"></a>
-### cuvs::neighbors::filtering::bitset_filter
+<a id="neighbors-filtering-bitset-filter"></a>
+### neighbors::filtering::bitset_filter
 
 Filter an index with a bitset
 
@@ -267,8 +267,8 @@ struct bitset_filter : public base_filter { ... };
 | --- | --- | --- |
 | `bitset_view_` | `const view_t` |  |
 
-<a id="cuvs-neighbors-filtering-bitset-filter-bitset-filter"></a>
-### cuvs::neighbors::filtering::bitset_filter::bitset_filter
+<a id="neighbors-filtering-bitset-filter-bitset-filter"></a>
+### neighbors::filtering::bitset_filter::bitset_filter
 
 ```cpp
 _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
@@ -284,8 +284,8 @@ _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
 
 `_RAFT_HOST_DEVICE`
 
-<a id="cuvs-neighbors-filtering-bitset-filter-get-filter-type"></a>
-### cuvs::neighbors::filtering::bitset_filter::get_filter_type
+<a id="neighbors-filtering-bitset-filter-get-filter-type"></a>
+### neighbors::filtering::bitset_filter::get_filter_type
 
 ```cpp
 FilterType get_filter_type() const override;
@@ -293,19 +293,19 @@ FilterType get_filter_type() const override;
 
 **Returns**
 
-[`FilterType`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-filtering-filtertype)
+[`FilterType`](/api-reference/cpp-api-neighbors-common#neighbors-filtering-filtertype)
 
 ## ANN MG index build parameters
 
-<a id="cuvs-neighbors-distribution-mode"></a>
-### cuvs::neighbors::distribution_mode
+<a id="neighbors-distribution-mode"></a>
+### neighbors::distribution_mode
 
 ```cpp
 enum distribution_mode { ... };
 ```
 
-<a id="cuvs-neighbors-mg-index-params"></a>
-### cuvs::neighbors::mg_index_params
+<a id="neighbors-mg-index-params"></a>
+### neighbors::mg_index_params
 
 ```cpp
 template <typename Upstream>
@@ -316,12 +316,12 @@ struct mg_index_params : public Upstream { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `mode` | [`cuvs::neighbors::distribution_mode`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-distribution-mode) | Distribution mode |
+| `mode` | [`cuvs::neighbors::distribution_mode`](/api-reference/cpp-api-neighbors-common#neighbors-distribution-mode) | Distribution mode |
 
 ## ANN MG search parameters
 
-<a id="cuvs-neighbors-replicated-search-mode"></a>
-### cuvs::neighbors::replicated_search_mode
+<a id="neighbors-replicated-search-mode"></a>
+### neighbors::replicated_search_mode
 
 ```cpp
 enum replicated_search_mode { ... };
@@ -334,8 +334,8 @@ enum replicated_search_mode { ... };
 | `LOAD_BALANCER` | `` |
 | `ROUND_ROBIN` | `` |
 
-<a id="cuvs-neighbors-sharded-merge-mode"></a>
-### cuvs::neighbors::sharded_merge_mode
+<a id="neighbors-sharded-merge-mode"></a>
+### neighbors::sharded_merge_mode
 
 ```cpp
 enum sharded_merge_mode { ... };
@@ -348,8 +348,8 @@ enum sharded_merge_mode { ... };
 | `MERGE_ON_ROOT_RANK` | `` |
 | `TREE_MERGE` | `` |
 
-<a id="cuvs-neighbors-mg-search-params"></a>
-### cuvs::neighbors::mg_search_params
+<a id="neighbors-mg-search-params"></a>
+### neighbors::mg_search_params
 
 ```cpp
 template <typename Upstream>
@@ -360,6 +360,6 @@ struct mg_search_params : public Upstream { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `search_mode` | [`cuvs::neighbors::replicated_search_mode`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-replicated-search-mode) | Replicated search mode |
-| `merge_mode` | [`cuvs::neighbors::sharded_merge_mode`](/api-reference/cpp-api-neighbors-common#cuvs-neighbors-sharded-merge-mode) | Sharded merge mode |
+| `search_mode` | [`cuvs::neighbors::replicated_search_mode`](/api-reference/cpp-api-neighbors-common#neighbors-replicated-search-mode) | Replicated search mode |
+| `merge_mode` | [`cuvs::neighbors::sharded_merge_mode`](/api-reference/cpp-api-neighbors-common#neighbors-sharded-merge-mode) | Sharded merge mode |
 | `n_rows_per_batch` | `int64_t` | Number of rows per batch |

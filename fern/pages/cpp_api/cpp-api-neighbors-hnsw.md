@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/hnsw.hpp`_
 
 ## hnswlib index wrapper params
 
-<a id="cuvs-neighbors-hnsw-hnswhierarchy"></a>
-### cuvs::neighbors::hnsw::HnswHierarchy
+<a id="neighbors-hnsw-hnswhierarchy"></a>
+### neighbors::hnsw::HnswHierarchy
 
 Hierarchy for HNSW index when converting from CAGRA index
 
@@ -25,8 +25,8 @@ enum class HnswHierarchy { ... };
 | --- | --- |
 | `NONE` | `` |
 
-<a id="cuvs-neighbors-hnsw-deprecated"></a>
-### cuvs::neighbors::hnsw::[[deprecated
+<a id="neighbors-hnsw-deprecated"></a>
+### neighbors::hnsw::[[deprecated
 
 Create a CAGRA index parameters compatible with HNSW index
 
@@ -57,8 +57,8 @@ Usage example:
 
 ## hnswlib index wrapper
 
-<a id="cuvs-neighbors-hnsw-index"></a>
-### cuvs::neighbors::hnsw::index
+<a id="neighbors-hnsw-index"></a>
+### neighbors::hnsw::index
 
 hnswlib index wrapper
 
@@ -67,8 +67,8 @@ template <typename T>
 struct index : cuvs::neighbors::index { ... };
 ```
 
-<a id="cuvs-neighbors-hnsw-index-index"></a>
-### cuvs::neighbors::hnsw::index::index
+<a id="neighbors-hnsw-index-index"></a>
+### neighbors::hnsw::index::index
 
 load a base-layer-only hnswlib index originally saved from a built CAGRA index.
 
@@ -84,15 +84,15 @@ This is a virtual class and it cannot be used directly. To create an index, use 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `dim` | in | `int` | dimensions of the training dataset |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
-| `hierarchy` | in | [`HnswHierarchy`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-hnswhierarchy) | hierarchy used for upper HNSW layers Default: `HnswHierarchy::NONE`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
+| `hierarchy` | in | [`HnswHierarchy`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-hnswhierarchy) | hierarchy used for upper HNSW layers Default: `HnswHierarchy::NONE`. |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-hnsw-index-get-index"></a>
-### cuvs::neighbors::hnsw::index::get_index
+<a id="neighbors-hnsw-index-get-index"></a>
+### neighbors::hnsw::index::get_index
 
 Get underlying index
 
@@ -104,8 +104,8 @@ virtual void const* get_index() const = 0;
 
 `virtual void const*`
 
-<a id="cuvs-neighbors-hnsw-index-set-ef"></a>
-### cuvs::neighbors::hnsw::index::set_ef
+<a id="neighbors-hnsw-index-set-ef"></a>
+### neighbors::hnsw::index::set_ef
 
 Set ef for search
 
@@ -123,8 +123,8 @@ virtual void set_ef(int ef) const = 0;
 
 `virtual void`
 
-<a id="cuvs-neighbors-hnsw-index-file-path"></a>
-### cuvs::neighbors::hnsw::index::file_path
+<a id="neighbors-hnsw-index-file-path"></a>
+### neighbors::hnsw::index::file_path
 
 Get file path for disk-backed index
 
@@ -138,8 +138,8 @@ virtual std::string file_path() const;
 
 ## HNSW index extend parameters
 
-<a id="cuvs-neighbors-hnsw-extend-params"></a>
-### cuvs::neighbors::hnsw::extend_params
+<a id="neighbors-hnsw-extend-params"></a>
+### neighbors::hnsw::extend_params
 
 HNSW index extend parameters
 
@@ -155,8 +155,8 @@ struct extend_params { ... };
 
 ## Build HNSW index on the GPU
 
-<a id="cuvs-neighbors-hnsw-build"></a>
-### cuvs::neighbors::hnsw::build
+<a id="neighbors-hnsw-build"></a>
+### neighbors::hnsw::build
 
 Build an HNSW index on the GPU
 
@@ -185,9 +185,9 @@ Usage example:
 
 **Returns**
 
-[`std::unique_ptr<index<float>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<float>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
-**Additional overload:** `cuvs::neighbors::hnsw::build`
+**Additional overload:** `neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
 
@@ -216,9 +216,9 @@ Usage example:
 
 **Returns**
 
-[`std::unique_ptr<index<half>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<half>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
-**Additional overload:** `cuvs::neighbors::hnsw::build`
+**Additional overload:** `neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
 
@@ -247,9 +247,9 @@ Usage example:
 
 **Returns**
 
-[`std::unique_ptr<index<uint8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<uint8_t>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
-**Additional overload:** `cuvs::neighbors::hnsw::build`
+**Additional overload:** `neighbors::hnsw::build`
 
 Build an HNSW index on the GPU
 
@@ -278,12 +278,12 @@ Usage example:
 
 **Returns**
 
-[`std::unique_ptr<index<int8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<int8_t>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
 ## Load CAGRA index as hnswlib index
 
-<a id="cuvs-neighbors-hnsw-from-cagra"></a>
-### cuvs::neighbors::hnsw::from_cagra
+<a id="neighbors-hnsw-from-cagra"></a>
+### neighbors::hnsw::from_cagra
 
 Construct an hnswlib index from a CAGRA index
 
@@ -309,14 +309,14 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
-| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index) | cagra index |
+| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
 | `dataset` | in | `std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
 
 **Returns**
 
-[`std::unique_ptr<index<float>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<float>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
-**Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
+**Additional overload:** `neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
 
@@ -342,14 +342,14 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
-| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<half, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index) | cagra index |
+| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<half, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
 | `dataset` | in | `std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
 
 **Returns**
 
-[`std::unique_ptr<index<half>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<half>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
-**Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
+**Additional overload:** `neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
 
@@ -375,14 +375,14 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
-| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index) | cagra index |
+| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
 | `dataset` | in | `std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
 
 **Returns**
 
-[`std::unique_ptr<index<uint8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<uint8_t>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
-**Additional overload:** `cuvs::neighbors::hnsw::from_cagra`
+**Additional overload:** `neighbors::hnsw::from_cagra`
 
 Construct an hnswlib index from a CAGRA index
 
@@ -408,17 +408,17 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
-| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#cuvs-neighbors-cagra-index) | cagra index |
+| `cagra_index` | in | [`const cuvs::neighbors::cagra::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
 | `dataset` | in | `std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
 
 **Returns**
 
-[`std::unique_ptr<index<int8_t>>`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index)
+[`std::unique_ptr<index<int8_t>>`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index)
 
 ## Extend HNSW index with additional vectors
 
-<a id="cuvs-neighbors-hnsw-extend"></a>
-### cuvs::neighbors::hnsw::extend
+<a id="neighbors-hnsw-extend"></a>
+### neighbors::hnsw::extend
 
 Add new vectors to an HNSW index
 
@@ -438,15 +438,15 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-extend-params) | configure the extend |
+| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-extend-params) | configure the extend |
 | `additional_dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, index-&gt;dim()] |
-| `idx` | inout | [`index<float>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | HNSW index to extend |
+| `idx` | inout | [`index<float>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | HNSW index to extend |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::extend`
+**Additional overload:** `neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
 
@@ -466,15 +466,15 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-extend-params) | configure the extend |
+| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-extend-params) | configure the extend |
 | `additional_dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, index-&gt;dim()] |
-| `idx` | inout | [`index<half>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | HNSW index to extend |
+| `idx` | inout | [`index<half>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | HNSW index to extend |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::extend`
+**Additional overload:** `neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
 
@@ -494,15 +494,15 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-extend-params) | configure the extend |
+| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-extend-params) | configure the extend |
 | `additional_dataset` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, index-&gt;dim()] |
-| `idx` | inout | [`index<uint8_t>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | HNSW index to extend |
+| `idx` | inout | [`index<uint8_t>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | HNSW index to extend |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::extend`
+**Additional overload:** `neighbors::hnsw::extend`
 
 Add new vectors to an HNSW index
 
@@ -522,9 +522,9 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-extend-params) | configure the extend |
+| `params` | in | [`const extend_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-extend-params) | configure the extend |
 | `additional_dataset` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, index-&gt;dim()] |
-| `idx` | inout | [`index<int8_t>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | HNSW index to extend |
+| `idx` | inout | [`index<int8_t>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | HNSW index to extend |
 
 **Returns**
 
@@ -532,8 +532,8 @@ Usage example:
 
 ## Build CAGRA index and search with hnswlib
 
-<a id="cuvs-neighbors-hnsw-search-params"></a>
-### cuvs::neighbors::hnsw::search_params
+<a id="neighbors-hnsw-search-params"></a>
+### neighbors::hnsw::search_params
 
 Build CAGRA index and search with hnswlib
 
@@ -550,8 +550,8 @@ struct search_params : cuvs::neighbors::search_params { ... };
 
 ## Search hnswlib index
 
-<a id="cuvs-neighbors-hnsw-search"></a>
-### cuvs::neighbors::hnsw::search
+<a id="neighbors-hnsw-search"></a>
+### neighbors::hnsw::search
 
 Search HNSW index constructed from a CAGRA index
 
@@ -575,8 +575,8 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-search-params) | configure the search |
-| `idx` | in | [`const index<float>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-search-params) | configure the search |
+| `idx` | in | [`const index<float>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 | `queries` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_queries, index-&gt;dim()] |
 | `neighbors` | out | `raft::host_matrix_view<uint64_t, int64_t, raft::row_major>` | a host matrix view to the indices of the neighbors in the source dataset |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | a host matrix view to the distances to the selected neighbors [n_queries, |
@@ -585,7 +585,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::search`
+**Additional overload:** `neighbors::hnsw::search`
 
 Search HNSW index constructed from a CAGRA index
 
@@ -609,8 +609,8 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-search-params) | configure the search |
-| `idx` | in | [`const index<half>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-search-params) | configure the search |
+| `idx` | in | [`const index<half>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 | `queries` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_queries, index-&gt;dim()] |
 | `neighbors` | out | `raft::host_matrix_view<uint64_t, int64_t, raft::row_major>` | a host matrix view to the indices of the neighbors in the source dataset |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | a host matrix view to the distances to the selected neighbors [n_queries, |
@@ -619,7 +619,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::search`
+**Additional overload:** `neighbors::hnsw::search`
 
 Search HNSWindex constructed from a CAGRA index
 
@@ -643,8 +643,8 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-search-params) | configure the search |
-| `idx` | in | [`const index<uint8_t>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-search-params) | configure the search |
+| `idx` | in | [`const index<uint8_t>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 | `queries` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_queries, index-&gt;dim()] |
 | `neighbors` | out | `raft::host_matrix_view<uint64_t, int64_t, raft::row_major>` | a host matrix view to the indices of the neighbors in the source dataset |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | a host matrix view to the distances to the selected neighbors [n_queries, |
@@ -653,7 +653,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::search`
+**Additional overload:** `neighbors::hnsw::search`
 
 Search HNSW index constructed from a CAGRA index
 
@@ -677,8 +677,8 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
-| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-search-params) | configure the search |
-| `idx` | in | [`const index<int8_t>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `params` | in | [`const search_params&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-search-params) | configure the search |
+| `idx` | in | [`const index<int8_t>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 | `queries` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_queries, index-&gt;dim()] |
 | `neighbors` | out | `raft::host_matrix_view<uint64_t, int64_t, raft::row_major>` | a host matrix view to the indices of the neighbors in the source dataset |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | a host matrix view to the distances to the selected neighbors [n_queries, |
@@ -689,8 +689,8 @@ Usage example:
 
 ## Deserialize CAGRA index as hnswlib index
 
-<a id="cuvs-neighbors-hnsw-serialize"></a>
-### cuvs::neighbors::hnsw::serialize
+<a id="neighbors-hnsw-serialize"></a>
+### neighbors::hnsw::serialize
 
 Serialize the HNSW index to file
 
@@ -708,13 +708,13 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `filename` | in | `const std::string&` | path to the file to save the serialized CAGRA index |
-| `idx` | in | [`const index<float>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `idx` | in | [`const index<float>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::serialize`
+**Additional overload:** `neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
 
@@ -732,13 +732,13 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `filename` | in | `const std::string&` | path to the file to save the serialized CAGRA index |
-| `idx` | in | [`const index<half>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `idx` | in | [`const index<half>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::serialize`
+**Additional overload:** `neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
 
@@ -756,13 +756,13 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `filename` | in | `const std::string&` | path to the file to save the serialized CAGRA index |
-| `idx` | in | [`const index<uint8_t>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `idx` | in | [`const index<uint8_t>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::serialize`
+**Additional overload:** `neighbors::hnsw::serialize`
 
 Serialize the HNSW index to file
 
@@ -780,14 +780,14 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resources |
 | `filename` | in | `const std::string&` | path to the file to save the serialized CAGRA index |
-| `idx` | in | [`const index<int8_t>&`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | cagra index |
+| `idx` | in | [`const index<int8_t>&`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | cagra index |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-hnsw-deserialize"></a>
-### cuvs::neighbors::hnsw::deserialize
+<a id="neighbors-hnsw-deserialize"></a>
+### neighbors::hnsw::deserialize
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 
@@ -812,14 +812,14 @@ Usage example:
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `filename` | in | `const std::string&` | path to the file containing the serialized CAGRA index |
 | `dim` | in | `int` | dimensions of the training dataset |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
-| `index` | out | [`index<float>**`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | hnsw index |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
+| `index` | out | [`index<float>**`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | hnsw index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::deserialize`
+**Additional overload:** `neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 
@@ -844,14 +844,14 @@ Usage example:
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `filename` | in | `const std::string&` | path to the file containing the serialized CAGRA index |
 | `dim` | in | `int` | dimensions of the training dataset |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
-| `index` | out | [`index<half>**`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | hnsw index |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
+| `index` | out | [`index<half>**`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | hnsw index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::deserialize`
+**Additional overload:** `neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 
@@ -876,14 +876,14 @@ Usage example:
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `filename` | in | `const std::string&` | path to the file containing the serialized CAGRA index |
 | `dim` | in | `int` | dimensions of the training dataset |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
-| `index` | out | [`index<uint8_t>**`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | hnsw index |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
+| `index` | out | [`index<uint8_t>**`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | hnsw index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::hnsw::deserialize`
+**Additional overload:** `neighbors::hnsw::deserialize`
 
 De-serialize a CAGRA index saved to a file as an hnswlib index
 
@@ -908,8 +908,8 @@ Usage example:
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `filename` | in | `const std::string&` | path to the file containing the serialized CAGRA index |
 | `dim` | in | `int` | dimensions of the training dataset |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
-| `index` | out | [`index<int8_t>**`](/api-reference/cpp-api-neighbors-hnsw#cuvs-neighbors-hnsw-index) | hnsw index |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
+| `index` | out | [`index<int8_t>**`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-index) | hnsw index |
 
 **Returns**
 

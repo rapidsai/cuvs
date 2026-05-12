@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/composite/index.hpp`_
 
 ## Types
 
-<a id="cuvs-neighbors-composite-composite-index"></a>
-### cuvs::neighbors::composite::composite_index
+<a id="neighbors-composite-composite-index"></a>
+### neighbors::composite::composite_index
 
 Composite index that searches multiple CAGRA sub-indices and merges results.
 

@@ -22,8 +22,8 @@ Vamana ANN Index
 | Name | Source |
 | --- | --- |
 | `build` | `rust/cuvs/src/vamana/index.rs:33` |
-| `new` | `rust/cuvs/src/vamana/index.rs:52` |
-| `serialize` | `rust/cuvs/src/vamana/index.rs:71` |
+| `new` | `rust/cuvs/src/vamana/index.rs:47` |
+| `serialize` | `rust/cuvs/src/vamana/index.rs:66` |
 
 ### build
 
@@ -60,7 +60,7 @@ pub fn new() -> Result<Index> { ... }
 
 Creates a new empty index
 
-_Source: `rust/cuvs/src/vamana/index.rs:52`_
+_Source: `rust/cuvs/src/vamana/index.rs:47`_
 
 ### serialize
 
@@ -80,6 +80,6 @@ Serialized Index is to be used by the DiskANN open-source repository for graph s
 * `filename` - The file prefix for where the index is sazved
 * `include_dataset` - whether to include the dataset in the serialized index
 
-_Source: `rust/cuvs/src/vamana/index.rs:71`_
+_Source: `rust/cuvs/src/vamana/index.rs:66`_
 
 _Source: `rust/cuvs/src/vamana/index.rs:16`_

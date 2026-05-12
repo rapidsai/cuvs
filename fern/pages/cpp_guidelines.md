@@ -1,4 +1,4 @@
-# Developer Guide
+# C++ Guidelines
 
 This page collects the engineering conventions that keep cuVS APIs stable, predictable, and easy to maintain. Start with the [Contributor Guide](contributing.md), then use this page when designing public APIs, writing CUDA/C++ implementation code, or preparing a change for review.
 
@@ -16,7 +16,7 @@ Most cuVS changes can be developed directly in this repository. Cross-project CU
 
 If a consuming project supports source builds, pass `CPM_raft_SOURCE=/path/to/raft/source` to its CMake configuration. If the downstream project must pin a RAFT branch while related changes are under review, update the `FORK` and `PINNED_TAG` arguments to `find_and_configure_raft`, then revert that pin before the downstream change merges.
 
-If source builds are not being used, install the local RAFT C++ and Python artifacts into the consuming project's environment before testing the downstream change.
+If source builds are not being used, install the local RAFT C++ artifacts into the consuming project's environment before testing the downstream change.
 
 ## Threading Model
 
@@ -133,14 +133,10 @@ void deserialize(raft::resources const& res, std::istream& is, index<int64_t>* i
 
 ### Formatting
 
-cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda or pip:
+cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
 
 ```bash
 conda install -c conda-forge pre-commit
-```
-
-```bash
-pip install pre-commit
 ```
 
 Run checks before committing:
@@ -174,8 +170,6 @@ C++ and CUDA code are formatted with [clang-format](https://clang.llvm.org/docs/
 ```bash
 ./ci/checks/doxygen.sh
 ```
-
-Python code is checked with tools such as [Black](https://black.readthedocs.io/en/stable/), [isort](https://pycqa.github.io/isort/), and [flake8](https://flake8.pycqa.org/en/latest/).
 
 [codespell](https://github.com/codespell-project/codespell) catches spelling issues. To apply suggested fixes interactively, run:
 
@@ -221,7 +215,7 @@ Public APIs need direct test coverage because downstream projects rely on their 
 
 ## Documentation
 
-Public APIs require user-facing documentation. C++ and CUDA APIs use [Doxygen](https://doxygen.nl/). Python and Cython APIs use [pydoc](https://docs.python.org/3/library/pydoc.html). Document the purpose, parameters, return values, relevant template or overload behavior, and any constraints that affect correct use.
+Public C++ and CUDA APIs require user-facing [Doxygen](https://doxygen.nl/) documentation. Document the purpose, parameters, return values, relevant template or overload behavior, and any constraints that affect correct use.
 
 ## Asynchronous Operations And Stream Ordering
 

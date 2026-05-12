@@ -8,8 +8,8 @@ _Source header: `cuvs/util/cutlass_utils.hpp`_
 
 ## Types
 
-<a id="cuvs-cutlass-error"></a>
-### cuvs::cutlass_error
+<a id="cutlass-error"></a>
+### cutlass_error
 
 Exception thrown when a CUTLASS error is encountered.
 

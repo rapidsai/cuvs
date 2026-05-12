@@ -8,8 +8,8 @@ _Source header: `cuvs/preprocessing/quantize/binary.hpp`_
 
 ## Binary quantizer utilities
 
-<a id="cuvs-preprocessing-quantize-binary-bit-threshold"></a>
-### cuvs::preprocessing::quantize::binary::bit_threshold
+<a id="preprocessing-quantize-binary-bit-threshold"></a>
+### preprocessing::quantize::binary::bit_threshold
 
 quantizer algorithms. The mean and sampling_median thresholds are calculated separately
 
@@ -27,8 +27,8 @@ enum class bit_threshold { ... };
 | `mean` | `` |
 | `sampling_median` | `` |
 
-<a id="cuvs-preprocessing-quantize-binary-params"></a>
-### cuvs::preprocessing::quantize::binary::params
+<a id="preprocessing-quantize-binary-params"></a>
+### preprocessing::quantize::binary::params
 
 quantizer parameters.
 
@@ -40,11 +40,11 @@ struct params { ... };
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `threshold` | [`bit_threshold`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-bit-threshold) | Threshold method for binarization. |
+| `threshold` | [`bit_threshold`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-bit-threshold) | Threshold method for binarization. |
 | `sampling_ratio` | `float` | Specifies the sampling ratio. |
 
-<a id="cuvs-preprocessing-quantize-binary-quantizer"></a>
-### cuvs::preprocessing::quantize::binary::quantizer
+<a id="preprocessing-quantize-binary-quantizer"></a>
+### preprocessing::quantize::binary::quantizer
 
 Store the threshold vector for quantization. In the binary::transform function, a bit is
 
@@ -61,8 +61,8 @@ struct quantizer { ... };
 | --- | --- | --- |
 | `threshold` | `raft::device_vector<T, int64_t>` | Threshold vector used for binarization. |
 
-<a id="cuvs-preprocessing-quantize-binary-quantizer-quantizer"></a>
-### cuvs::preprocessing::quantize::binary::quantizer::quantizer
+<a id="preprocessing-quantize-binary-quantizer-quantizer"></a>
+### preprocessing::quantize::binary::quantizer::quantizer
 
 Construct a quantizer with an empty threshold vector.
 
@@ -80,8 +80,8 @@ quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, in
 
 `void`
 
-<a id="cuvs-preprocessing-quantize-binary-train"></a>
-### cuvs::preprocessing::quantize::binary::train
+<a id="preprocessing-quantize-binary-train"></a>
+### preprocessing::quantize::binary::train
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -98,14 +98,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::device_matrix_view<const double, int64_t>` | a row-major matrix view on device |
 
 **Returns**
 
-[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
+[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
+**Additional overload:** `preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -122,15 +122,15 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::host_matrix_view<const double, int64_t>` | a row-major matrix view on host |
 
 **Returns**
 
-[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
+[`quantizer<double>`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer)
 
-<a id="cuvs-preprocessing-quantize-binary-transform"></a>
-### cuvs::preprocessing::quantize::binary::transform
+<a id="preprocessing-quantize-binary-transform"></a>
+### preprocessing::quantize::binary::transform
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -150,7 +150,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) | a binary quantizer |
+| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) | a binary quantizer |
 | `dataset` | in | `raft::device_matrix_view<const double, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a row-major matrix view on device |
 
@@ -158,7 +158,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
+**Additional overload:** `preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -178,7 +178,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) | a binary quantizer |
+| `quantizer` | in | [`const quantizer<double>&`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) | a binary quantizer |
 | `dataset` | in | `raft::host_matrix_view<const double, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<uint8_t, int64_t>` | a row-major matrix view on host |
 
@@ -186,7 +186,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
+**Additional overload:** `preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -203,14 +203,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device |
 
 **Returns**
 
-[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
+[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
+**Additional overload:** `preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -227,14 +227,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t>` | a row-major matrix view on host |
 
 **Returns**
 
-[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
+[`quantizer<float>`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
+**Additional overload:** `preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -254,7 +254,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) | a binary quantizer |
+| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) | a binary quantizer |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a row-major matrix view on device |
 
@@ -262,7 +262,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
+**Additional overload:** `preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset. If a dataset element is positive,
 
@@ -282,7 +282,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) | a binary quantizer |
+| `quantizer` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) | a binary quantizer |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<uint8_t, int64_t>` | a row-major matrix view on host |
 
@@ -290,7 +290,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
+**Additional overload:** `preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -307,14 +307,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t>` | a row-major matrix view on device |
 
 **Returns**
 
-[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
+[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::train`
+**Additional overload:** `preprocessing::quantize::binary::train`
 
 Initializes a binary quantizer to be used later for quantizing the dataset.
 
@@ -331,14 +331,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
+| `params` | in | [`const params`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-params) | configure binary quantizer, e.g. threshold |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t>` | a row-major matrix view on host |
 
 **Returns**
 
-[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer)
+[`quantizer<half>`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer)
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
+**Additional overload:** `preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset.
 
@@ -356,7 +356,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) | a binary quantizer |
+| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) | a binary quantizer |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t>` | a row-major matrix view on device |
 | `out` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a row-major matrix view on device |
 
@@ -364,7 +364,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::transform`
+**Additional overload:** `preprocessing::quantize::binary::transform`
 
 Applies binary quantization transform to given dataset.
 
@@ -382,7 +382,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) | a binary quantizer |
+| `quantizer` | in | [`const quantizer<half>&`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) | a binary quantizer |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t>` | a row-major matrix view on host |
 | `out` | out | `raft::host_matrix_view<uint8_t, int64_t>` | a row-major matrix view on host |
 
@@ -390,8 +390,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-preprocessing-quantize-binary-deprecated"></a>
-### cuvs::preprocessing::quantize::binary::[[deprecated
+<a id="preprocessing-quantize-binary-deprecated"></a>
+### preprocessing::quantize::binary::[[deprecated
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -408,13 +408,13 @@ is positive, set the corresponding bit to 1.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) |  |
+| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
+**Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -431,13 +431,13 @@ is positive, set the corresponding bit to 1.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) |  |
+| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
+**Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -454,13 +454,13 @@ is positive, set the corresponding bit to 1.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) |  |
+| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
+**Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -477,13 +477,13 @@ is positive, set the corresponding bit to 1.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) |  |
+| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
+**Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -500,13 +500,13 @@ is positive, set the corresponding bit to 1.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) |  |
+| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::preprocessing::quantize::binary::[[deprecated`
+**Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
 [deprecated] Applies binary quantization transform to given dataset. If a dataset element
 
@@ -523,7 +523,7 @@ is positive, set the corresponding bit to 1.
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#cuvs-preprocessing-quantize-binary-quantizer) |  |
+| `arg1` |  | [`"please create and specify a quantizer"`](/api-reference/cpp-api-preprocessing-quantize-binary#preprocessing-quantize-binary-quantizer) |  |
 
 **Returns**
 

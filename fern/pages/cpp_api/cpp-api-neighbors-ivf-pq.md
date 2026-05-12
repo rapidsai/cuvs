@@ -8,8 +8,8 @@ _Source header: `cuvs/neighbors/ivf_pq.hpp`_
 
 ## IVF-PQ index build parameters
 
-<a id="cuvs-neighbors-ivf-pq-codebook-gen"></a>
-### cuvs::neighbors::ivf_pq::codebook_gen
+<a id="neighbors-ivf-pq-codebook-gen"></a>
+### neighbors::ivf_pq::codebook_gen
 
 A type for specifying how PQ codebooks are created.
 
@@ -17,8 +17,8 @@ A type for specifying how PQ codebooks are created.
 enum class codebook_gen { ... };
 ```
 
-<a id="cuvs-neighbors-ivf-pq-list-layout"></a>
-### cuvs::neighbors::ivf_pq::list_layout
+<a id="neighbors-ivf-pq-list-layout"></a>
+### neighbors::ivf_pq::list_layout
 
 A type for specifying the memory layout of PQ codes in IVF lists.
 
@@ -26,8 +26,8 @@ A type for specifying the memory layout of PQ codes in IVF lists.
 enum class list_layout { ... };
 ```
 
-<a id="cuvs-neighbors-ivf-pq-index-params-from-dataset"></a>
-### cuvs::neighbors::ivf_pq::index_params::from_dataset
+<a id="neighbors-ivf-pq-index-params-from-dataset"></a>
+### neighbors::ivf_pq::index_params::from_dataset
 
 Creates index_params based on shape of the input dataset.
 
@@ -44,7 +44,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `dataset` |  | `raft::matrix_extent<int64_t>` |  |
-| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Default: `cuvs::distance::DistanceType::L2Expanded`. |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Default: `cuvs::distance::DistanceType::L2Expanded`. |
 
 **Returns**
 
@@ -52,8 +52,8 @@ Usage example:
 
 ## IVF-PQ index search parameters
 
-<a id="cuvs-neighbors-ivf-pq-search-params"></a>
-### cuvs::neighbors::ivf_pq::search_params
+<a id="neighbors-ivf-pq-search-params"></a>
+### neighbors::ivf_pq::search_params
 
 IVF-PQ index search parameters
 
@@ -84,8 +84,8 @@ using list_extents = raft::
 extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
 ```
 
-<a id="cuvs-neighbors-ivf-pq-list-spec-flat"></a>
-### cuvs::neighbors::ivf_pq::list_spec_flat
+<a id="neighbors-ivf-pq-list-spec-flat"></a>
+### neighbors::ivf_pq::list_spec_flat
 
 Flat (non-interleaved) storage specification for PQ-encoded data.
 
@@ -105,8 +105,8 @@ struct list_spec_flat { ... };
 | `pq_bits` | `uint32_t` |  |
 | `pq_dim` | `uint32_t` |  |
 
-<a id="cuvs-neighbors-graph-build-params-ivf-pq-params"></a>
-### cuvs::neighbors::graph_build_params::ivf_pq_params
+<a id="neighbors-graph-build-params-ivf-pq-params"></a>
+### neighbors::graph_build_params::ivf_pq_params
 
 Specialized parameters utilizing IVF-PQ to build knn graph
 
@@ -124,8 +124,8 @@ struct ivf_pq_params { ... };
 
 ## IVF-PQ index
 
-<a id="cuvs-neighbors-ivf-pq-index"></a>
-### cuvs::neighbors::ivf_pq::index
+<a id="neighbors-ivf-pq-index"></a>
+### neighbors::ivf_pq::index
 
 IVF-PQ index.
 
@@ -158,8 +158,8 @@ template <typename IdxT>
 class index : public index_iface<IdxT>, cuvs::neighbors::index { ... };
 ```
 
-<a id="cuvs-neighbors-ivf-pq-index-index"></a>
-### cuvs::neighbors::ivf_pq::index::index
+<a id="neighbors-ivf-pq-index-index"></a>
+### neighbors::ivf_pq::index::index
 
 Construct an empty index.
 
@@ -179,7 +179,7 @@ Constructs an empty index. This index will either need to be trained with `build
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::index::index`
+**Additional overload:** `neighbors::ivf_pq::index::index`
 
 Construct an index with specified parameters.
 
@@ -201,8 +201,8 @@ This constructor creates an owning index with the given parameters.
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` | RAFT resources handle |
-| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype) | Distance metric for clustering |
-| `codebook_kind` |  | [`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-codebook-gen) | How PQ codebooks are created |
+| `metric` |  | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance metric for clustering |
+| `codebook_kind` |  | [`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-codebook-gen) | How PQ codebooks are created |
 | `n_lists` |  | `uint32_t` | Number of inverted lists (clusters) |
 | `dim` |  | `uint32_t` | Dimensionality of the input data |
 | `pq_bits` |  | `uint32_t` | Bit length of vector elements after PQ compression Default: `8`. |
@@ -213,7 +213,7 @@ This constructor creates an owning index with the given parameters.
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::index::index`
+**Additional overload:** `neighbors::ivf_pq::index::index`
 
 Construct an index from index parameters.
 
@@ -233,8 +233,8 @@ index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-index-size"></a>
-### cuvs::neighbors::ivf_pq::index::size
+<a id="neighbors-ivf-pq-index-size"></a>
+### neighbors::ivf_pq::index::size
 
 Total length of the index.
 
@@ -246,8 +246,8 @@ IdxT size() const noexcept override;
 
 `IdxT`
 
-<a id="cuvs-neighbors-ivf-pq-index-dim"></a>
-### cuvs::neighbors::ivf_pq::index::dim
+<a id="neighbors-ivf-pq-index-dim"></a>
+### neighbors::ivf_pq::index::dim
 
 Dimensionality of the input data.
 
@@ -259,8 +259,8 @@ uint32_t dim() const noexcept override;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-dim-ext"></a>
-### cuvs::neighbors::ivf_pq::index::dim_ext
+<a id="neighbors-ivf-pq-index-dim-ext"></a>
+### neighbors::ivf_pq::index::dim_ext
 
 Dimensionality of the cluster centers:
 
@@ -274,8 +274,8 @@ input data dim extended with vector norms and padded to 8 elems.
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-rot-dim"></a>
-### cuvs::neighbors::ivf_pq::index::rot_dim
+<a id="neighbors-ivf-pq-index-rot-dim"></a>
+### neighbors::ivf_pq::index::rot_dim
 
 Dimensionality of the data after transforming it for PQ processing
 
@@ -289,8 +289,8 @@ uint32_t rot_dim() const noexcept;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-pq-bits"></a>
-### cuvs::neighbors::ivf_pq::index::pq_bits
+<a id="neighbors-ivf-pq-index-pq-bits"></a>
+### neighbors::ivf_pq::index::pq_bits
 
 The bit length of an encoded vector element after compression by PQ.
 
@@ -302,8 +302,8 @@ uint32_t pq_bits() const noexcept override;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-pq-dim"></a>
-### cuvs::neighbors::ivf_pq::index::pq_dim
+<a id="neighbors-ivf-pq-index-pq-dim"></a>
+### neighbors::ivf_pq::index::pq_dim
 
 The dimensionality of an encoded vector after compression by PQ.
 
@@ -315,8 +315,8 @@ uint32_t pq_dim() const noexcept override;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-pq-len"></a>
-### cuvs::neighbors::ivf_pq::index::pq_len
+<a id="neighbors-ivf-pq-index-pq-len"></a>
+### neighbors::ivf_pq::index::pq_len
 
 Dimensionality of a subspace, i.e. the number of vector components mapped to a subspace
 
@@ -328,8 +328,8 @@ uint32_t pq_len() const noexcept;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-pq-book-size"></a>
-### cuvs::neighbors::ivf_pq::index::pq_book_size
+<a id="neighbors-ivf-pq-index-pq-book-size"></a>
+### neighbors::ivf_pq::index::pq_book_size
 
 The number of vectors in a PQ codebook (`1 &lt;&lt; pq_bits`).
 
@@ -341,8 +341,8 @@ uint32_t pq_book_size() const noexcept;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-metric"></a>
-### cuvs::neighbors::ivf_pq::index::metric
+<a id="neighbors-ivf-pq-index-metric"></a>
+### neighbors::ivf_pq::index::metric
 
 Distance metric used for clustering.
 
@@ -352,10 +352,10 @@ cuvs::distance::DistanceType metric() const noexcept override;
 
 **Returns**
 
-[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#cuvs-distance-distancetype)
+[`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype)
 
-<a id="cuvs-neighbors-ivf-pq-index-codebook-kind"></a>
-### cuvs::neighbors::ivf_pq::index::codebook_kind
+<a id="neighbors-ivf-pq-index-codebook-kind"></a>
+### neighbors::ivf_pq::index::codebook_kind
 
 How PQ codebooks are created.
 
@@ -365,10 +365,10 @@ codebook_gen codebook_kind() const noexcept override;
 
 **Returns**
 
-[`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-codebook-gen)
+[`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-codebook-gen)
 
-<a id="cuvs-neighbors-ivf-pq-index-codes-layout"></a>
-### cuvs::neighbors::ivf_pq::index::codes_layout
+<a id="neighbors-ivf-pq-index-codes-layout"></a>
+### neighbors::ivf_pq::index::codes_layout
 
 Memory layout of PQ codes in IVF lists.
 
@@ -378,10 +378,10 @@ list_layout codes_layout() const noexcept override;
 
 **Returns**
 
-[`list_layout`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-list-layout)
+[`list_layout`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-list-layout)
 
-<a id="cuvs-neighbors-ivf-pq-index-n-lists"></a>
-### cuvs::neighbors::ivf_pq::index::n_lists
+<a id="neighbors-ivf-pq-index-n-lists"></a>
+### neighbors::ivf_pq::index::n_lists
 
 Number of clusters/inverted lists (first level quantization).
 
@@ -393,8 +393,8 @@ uint32_t n_lists() const noexcept;
 
 `uint32_t`
 
-<a id="cuvs-neighbors-ivf-pq-index-conservative-memory-allocation"></a>
-### cuvs::neighbors::ivf_pq::index::conservative_memory_allocation
+<a id="neighbors-ivf-pq-index-conservative-memory-allocation"></a>
+### neighbors::ivf_pq::index::conservative_memory_allocation
 
 Whether to use conservative memory allocation when extending the list (cluster) data
 
@@ -408,8 +408,8 @@ bool conservative_memory_allocation() const noexcept override;
 
 `bool`
 
-<a id="cuvs-neighbors-ivf-pq-index-pq-centers"></a>
-### cuvs::neighbors::ivf_pq::index::pq_centers
+<a id="neighbors-ivf-pq-index-pq-centers"></a>
+### neighbors::ivf_pq::index::pq_centers
 
 PQ cluster centers
 
@@ -425,8 +425,8 @@ const noexcept override;
 
 `raft::device_mdspan<const float, pq_centers_extents, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-lists"></a>
-### cuvs::neighbors::ivf_pq::index::lists
+<a id="neighbors-ivf-pq-index-lists"></a>
+### neighbors::ivf_pq::index::lists
 
 Lists' data and indices (polymorphic, works for both FLAT and INTERLEAVED layouts).
 
@@ -438,8 +438,8 @@ std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
 
 `std::vector<std::shared_ptr<list_data_base<IdxT>>>&`
 
-<a id="cuvs-neighbors-ivf-pq-index-data-ptrs"></a>
-### cuvs::neighbors::ivf_pq::index::data_ptrs
+<a id="neighbors-ivf-pq-index-data-ptrs"></a>
+### neighbors::ivf_pq::index::data_ptrs
 
 Pointers to the inverted lists (clusters) data  [n_lists].
 
@@ -451,8 +451,8 @@ raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexce
 
 `raft::device_vector_view<uint8_t*, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-inds-ptrs"></a>
-### cuvs::neighbors::ivf_pq::index::inds_ptrs
+<a id="neighbors-ivf-pq-index-inds-ptrs"></a>
+### neighbors::ivf_pq::index::inds_ptrs
 
 Pointers to the inverted lists (clusters) indices  [n_lists].
 
@@ -464,8 +464,8 @@ raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept 
 
 `raft::device_vector_view<IdxT*, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-rotation-matrix"></a>
-### cuvs::neighbors::ivf_pq::index::rotation_matrix
+<a id="neighbors-ivf-pq-index-rotation-matrix"></a>
+### neighbors::ivf_pq::index::rotation_matrix
 
 The transform matrix (original space -&gt; rotated padded space) [rot_dim, dim]
 
@@ -478,8 +478,8 @@ const noexcept override;
 
 `raft::device_matrix_view<const float, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-accum-sorted-sizes"></a>
-### cuvs::neighbors::ivf_pq::index::accum_sorted_sizes
+<a id="neighbors-ivf-pq-index-accum-sorted-sizes"></a>
+### neighbors::ivf_pq::index::accum_sorted_sizes
 
 Accumulated list sizes, sorted in descending order [n_lists + 1].
 
@@ -497,8 +497,8 @@ This span is used during search to estimate the maximum size of the workspace.
 
 `raft::host_vector_view<IdxT, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-list-sizes"></a>
-### cuvs::neighbors::ivf_pq::index::list_sizes
+<a id="neighbors-ivf-pq-index-list-sizes"></a>
+### neighbors::ivf_pq::index::list_sizes
 
 Sizes of the lists [n_lists].
 
@@ -510,8 +510,8 @@ raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexc
 
 `raft::device_vector_view<uint32_t, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-centers"></a>
-### cuvs::neighbors::ivf_pq::index::centers
+<a id="neighbors-ivf-pq-index-centers"></a>
+### neighbors::ivf_pq::index::centers
 
 Cluster centers corresponding to the lists in the original space [n_lists, dim_ext]
 
@@ -524,8 +524,8 @@ const noexcept override;
 
 `raft::device_matrix_view<const float, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-centers-rot"></a>
-### cuvs::neighbors::ivf_pq::index::centers_rot
+<a id="neighbors-ivf-pq-index-centers-rot"></a>
+### neighbors::ivf_pq::index::centers_rot
 
 Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim]
 
@@ -538,8 +538,8 @@ const noexcept override;
 
 `raft::device_matrix_view<const float, uint32_t, raft::row_major>`
 
-<a id="cuvs-neighbors-ivf-pq-index-get-list-size-in-bytes"></a>
-### cuvs::neighbors::ivf_pq::index::get_list_size_in_bytes
+<a id="neighbors-ivf-pq-index-get-list-size-in-bytes"></a>
+### neighbors::ivf_pq::index::get_list_size_in_bytes
 
 fetch size of a particular IVF list in bytes using the list extents.
 
@@ -559,7 +559,7 @@ Usage example:
 
 `uint32_t`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::index::index`
+**Additional overload:** `neighbors::ivf_pq::index::index`
 
 Construct index from implementation pointer.
 
@@ -581,8 +581,8 @@ This constructor is used internally by build/extend/deserialize functions.
 
 ## IVF-PQ index build
 
-<a id="cuvs-neighbors-ivf-pq-build"></a>
-### cuvs::neighbors::ivf_pq::build
+<a id="neighbors-ivf-pq-build"></a>
+### neighbors::ivf_pq::build
 
 Build the index from the dataset for efficient search.
 
@@ -605,9 +605,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -634,13 +634,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -663,9 +663,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -692,13 +692,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -721,9 +721,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -750,13 +750,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -779,9 +779,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -808,13 +808,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -839,9 +839,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -870,13 +870,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -901,9 +901,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -930,13 +930,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -959,9 +959,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -990,13 +990,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -1021,9 +1021,9 @@ Usage example:
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -1052,13 +1052,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `index_params` | in | `const cuvs::neighbors::ivf_pq::index_params&` | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, dim] |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | reference to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | reference to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build a view-type IVF-PQ index from device memory centroids and codebook.
 
@@ -1097,9 +1097,9 @@ dim]
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from device memory centroids and codebook.
 
@@ -1135,13 +1135,13 @@ dim]
 | `centers` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Cluster centers in the original space [n_lists, dim_ext] where dim_ext = round_up(dim + 1, 8) |
 | `centers_rot` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Rotated cluster centers [n_lists, rot_dim] where rot_dim = pq_len * pq_dim |
 | `rotation_matrix` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | pointer to ivf_pq::index |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | pointer to ivf_pq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from host memory centroids and codebook (in-place).
 
@@ -1171,9 +1171,9 @@ std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> ro
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::build`
+**Additional overload:** `neighbors::ivf_pq::build`
 
 Build an IVF-PQ index from host memory centroids and codebook (in-place).
 
@@ -1200,7 +1200,7 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 | `centers` | in | `raft::host_matrix_view<const float, uint32_t, raft::row_major>` | Cluster centers on host memory |
 | `centers_rot` | in | `std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>` | Optional rotated cluster centers on host |
 | `rotation_matrix` | in | `std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>` | Optional rotation matrix on host |
-| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | pointer to IVF-PQ index to be built |
+| `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | pointer to IVF-PQ index to be built |
 
 **Returns**
 
@@ -1208,8 +1208,8 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 ## IVF-PQ index extend
 
-<a id="cuvs-neighbors-ivf-pq-extend"></a>
-### cuvs::neighbors::ivf_pq::extend
+<a id="neighbors-ivf-pq-extend"></a>
+### neighbors::ivf_pq::extend
 
 Extend the index with the new data.
 
@@ -1230,13 +1230,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1256,13 +1256,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1283,13 +1283,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1309,13 +1309,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1336,13 +1336,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1362,13 +1362,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1389,13 +1389,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1415,13 +1415,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1444,13 +1444,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1472,13 +1472,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1501,13 +1501,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1529,13 +1529,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1558,13 +1558,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1586,13 +1586,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1615,13 +1615,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index)
+[`cuvs::neighbors::ivf_pq::index<int64_t>`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::extend`
+**Additional overload:** `neighbors::ivf_pq::extend`
 
 Extend the index with the new data.
 
@@ -1643,7 +1643,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `idx` | inout | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 
 **Returns**
 
@@ -1651,8 +1651,8 @@ Usage example:
 
 ## IVF-PQ index transform
 
-<a id="cuvs-neighbors-ivf-pq-transform"></a>
-### cuvs::neighbors::ivf_pq::transform
+<a id="neighbors-ivf-pq-transform"></a>
+### neighbors::ivf_pq::transform
 
 Transform a dataset by applying pq-encoding to each vector
 
@@ -1671,7 +1671,7 @@ cluster ids (labels) for each vector in the input dataset index.pq_bits(), 8)]] 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | ivf-pq constructed index |
+| `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | ivf-pq constructed index |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, index.dim()] |
 | `output_labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | a device vector view [n_rows] that will get populaterd with the |
 | `output_dataset` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a device matrix view [n_rows, ceildiv(index.pq_dim() * |
@@ -1680,7 +1680,7 @@ cluster ids (labels) for each vector in the input dataset index.pq_bits(), 8)]] 
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::transform`
+**Additional overload:** `neighbors::ivf_pq::transform`
 
 ```cpp
 void transform(raft::resources const& handle,
@@ -1695,7 +1695,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
-| `index` |  | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` |  | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `dataset` |  | `raft::device_matrix_view<const half, int64_t, raft::row_major>` |  |
 | `output_labels` |  | `raft::device_vector_view<uint32_t, int64_t>` |  |
 | `output_dataset` |  | `raft::device_matrix_view<uint8_t, int64_t>` |  |
@@ -1704,7 +1704,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::transform`
+**Additional overload:** `neighbors::ivf_pq::transform`
 
 ```cpp
 void transform(raft::resources const& handle,
@@ -1719,7 +1719,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
-| `index` |  | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` |  | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `dataset` |  | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` |  |
 | `output_labels` |  | `raft::device_vector_view<uint32_t, int64_t>` |  |
 | `output_dataset` |  | `raft::device_matrix_view<uint8_t, int64_t>` |  |
@@ -1728,7 +1728,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::transform`
+**Additional overload:** `neighbors::ivf_pq::transform`
 
 ```cpp
 void transform(raft::resources const& handle,
@@ -1743,7 +1743,7 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` |  | `raft::resources const&` |  |
-| `index` |  | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` |  | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `dataset` |  | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` |  |
 | `output_labels` |  | `raft::device_vector_view<uint32_t, int64_t>` |  |
 | `output_dataset` |  | `raft::device_matrix_view<uint8_t, int64_t>` |  |
@@ -1754,8 +1754,8 @@ raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 
 ## IVF-PQ index serialize
 
-<a id="cuvs-neighbors-ivf-pq-serialize"></a>
-### cuvs::neighbors::ivf_pq::serialize
+<a id="neighbors-ivf-pq-serialize"></a>
+### neighbors::ivf_pq::serialize
 
 Write the index to an output stream
 
@@ -1771,13 +1771,13 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
-| `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index |
+| `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::serialize`
+**Additional overload:** `neighbors::ivf_pq::serialize`
 
 Save the index to file.
 
@@ -1793,14 +1793,14 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
-| `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index |
+| `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-deserialize"></a>
-### cuvs::neighbors::ivf_pq::deserialize
+<a id="neighbors-ivf-pq-deserialize"></a>
+### neighbors::ivf_pq::deserialize
 
 Load index from input stream
 
@@ -1816,13 +1816,13 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `str` | in | `std::istream&` | the name of the file that stores the index |
-| `index` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index |
+| `index` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::deserialize`
+**Additional overload:** `neighbors::ivf_pq::deserialize`
 
 Load index from file.
 
@@ -1838,7 +1838,7 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the name of the file that stores the index |
-| `index` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index |
+| `index` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index |
 
 **Returns**
 
@@ -1846,8 +1846,8 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 
 ## IVF-PQ helper methods
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack
+<a id="neighbors-ivf-pq-helpers-codepacker-unpack"></a>
+### neighbors::ivf_pq::helpers::codepacker::unpack
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -1881,8 +1881,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-contiguous"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous
+<a id="neighbors-ivf-pq-helpers-codepacker-unpack-contiguous"></a>
+### neighbors::ivf_pq::helpers::codepacker::unpack_contiguous
 
 Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
 
@@ -1918,8 +1918,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::pack
+<a id="neighbors-ivf-pq-helpers-codepacker-pack"></a>
+### neighbors::ivf_pq::helpers::codepacker::pack
 
 Write flat PQ codes into an existing list by the given offset.
 
@@ -1951,8 +1951,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-contiguous"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_contiguous
+<a id="neighbors-ivf-pq-helpers-codepacker-pack-contiguous"></a>
+### neighbors::ivf_pq::helpers::codepacker::pack_contiguous
 
 Write flat PQ codes into an existing list by the given offset. The input codes of a single vector
 
@@ -1990,8 +1990,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-list-data"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_list_data
+<a id="neighbors-ivf-pq-helpers-codepacker-pack-list-data"></a>
+### neighbors::ivf_pq::helpers::codepacker::pack_list_data
 
 Write flat PQ codes into an existing list by the given offset.
 
@@ -2014,7 +2014,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index. |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index. |
 | `codes` | in | `raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major>` | flat PQ codes, one code per byte [n_rows, pq_dim] |
 | `label` | in | `uint32_t` | The id of the list (cluster) into which we write. |
 | `offset` | in | `uint32_t` | how many records to skip before writing the data into the list |
@@ -2023,8 +2023,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-pack-contiguous-list-data"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::pack_contiguous_list_data
+<a id="neighbors-ivf-pq-helpers-codepacker-pack-contiguous-list-data"></a>
+### neighbors::ivf_pq::helpers::codepacker::pack_contiguous_list_data
 
 Write flat PQ codes into an existing list by the given offset. Use this when the input
 
@@ -2050,7 +2050,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | pointer to IVF-PQ index |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | pointer to IVF-PQ index |
 | `codes` | in | `uint8_t*` | flat contiguous PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)] |
 | `n_rows` | in | `uint32_t` | how many records to pack |
 | `label` | in | `uint32_t` | The id of the list (cluster) into which we write. |
@@ -2060,8 +2060,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-list-data"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_list_data
+<a id="neighbors-ivf-pq-helpers-codepacker-unpack-list-data"></a>
+### neighbors::ivf_pq::helpers::codepacker::unpack_list_data
 
 Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2082,7 +2082,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `out_codes` | out | `raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.pq_dim()]. The length `n_take` defines how many records to unpack, it must be smaller than the list size. |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
@@ -2091,7 +2091,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_list_data`
+**Additional overload:** `neighbors::ivf_pq::helpers::codepacker::unpack_list_data`
 
 Unpack a series of records of a single list (cluster) in the compressed index
 
@@ -2112,7 +2112,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index (passed by reference) |
+| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index (passed by reference) |
 | `in_cluster_indices` | in | `raft::device_vector_view<const uint32_t>` | The offsets of the selected indices within the cluster. |
 | `out_codes` | out | `raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.pq_dim()]. The length `n_take` defines how many records to unpack, it must be smaller than the list size. |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
@@ -2121,8 +2121,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-unpack-contiguous-list-data"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data
+<a id="neighbors-ivf-pq-helpers-codepacker-unpack-contiguous-list-data"></a>
+### neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data
 
 Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
 
@@ -2144,7 +2144,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index (passed by reference) |
+| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index (passed by reference) |
 | `out_codes` | out | `uint8_t*` | the destination buffer [n_rows, ceildiv(index.pq_dim() * index.pq_bits(), 8)]. The length `n_rows` defines how many records to unpack, offset + n_rows must be smaller than or equal to the list size. |
 | `n_rows` | in | `uint32_t` | how many codes to unpack |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
@@ -2154,8 +2154,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-reconstruct-list-data"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data
+<a id="neighbors-ivf-pq-helpers-codepacker-reconstruct-list-data"></a>
+### neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data
 
 Decode `n_take` consecutive records of a single list (cluster) in the compressed index
 
@@ -2176,7 +2176,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `out_vectors` | out | `raft::device_matrix_view<float, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to reconstruct, it must be smaller than the list size. |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
@@ -2185,7 +2185,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data`
+**Additional overload:** `neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data`
 
 Decode a series of records of a single list (cluster) in the compressed index
 
@@ -2206,7 +2206,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `in_cluster_indices` | in | `raft::device_vector_view<const uint32_t>` | The offsets of the selected indices within the cluster. |
 | `out_vectors` | out | `raft::device_matrix_view<float, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to reconstruct, it must be smaller than the list size. |
 | `label` | in | `uint32_t` | The id of the list (cluster) to decode. |
@@ -2215,8 +2215,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list-with-codes"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list_with_codes
+<a id="neighbors-ivf-pq-helpers-codepacker-extend-list-with-codes"></a>
+### neighbors::ivf_pq::helpers::codepacker::extend_list_with_codes
 
 Extend one list of the index in-place, by the list label, skipping the classification and
 
@@ -2238,7 +2238,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `new_codes` | in | `raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major>` | flat PQ codes, one code per byte [n_rows, index.pq_dim()] |
 | `new_indices` | in | `raft::device_vector_view<const int64_t, uint32_t, raft::row_major>` | source indices [n_rows] |
 | `label` | in | `uint32_t` | the id of the target list (cluster). |
@@ -2247,8 +2247,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list-with-contiguous-codes"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes
+<a id="neighbors-ivf-pq-helpers-codepacker-extend-list-with-contiguous-codes"></a>
+### neighbors::ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes
 
 Extend one list of the index in-place, by the list label, skipping the classification and
 
@@ -2272,7 +2272,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `new_codes` | in | `raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major>` | flat contiguous PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)] |
 | `new_indices` | in | `raft::device_vector_view<const int64_t, uint32_t, raft::row_major>` | source indices [n_rows] |
 | `label` | in | `uint32_t` | the id of the target list (cluster). |
@@ -2281,8 +2281,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-codepacker-extend-list"></a>
-### cuvs::neighbors::ivf_pq::helpers::codepacker::extend_list
+<a id="neighbors-ivf-pq-helpers-codepacker-extend-list"></a>
+### neighbors::ivf_pq::helpers::codepacker::extend_list
 
 Extend one list of the index in-place, by the list label, skipping the classification
 
@@ -2303,7 +2303,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `new_vectors` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | data to encode [n_rows, index.dim()] |
 | `new_indices` | in | `raft::device_vector_view<const int64_t, uint32_t, raft::row_major>` | source indices [n_rows] |
 | `label` | in | `uint32_t` | the id of the target list (cluster). |
@@ -2312,8 +2312,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-erase-list"></a>
-### cuvs::neighbors::ivf_pq::helpers::erase_list
+<a id="neighbors-ivf-pq-helpers-erase-list"></a>
+### neighbors::ivf_pq::helpers::erase_list
 
 Remove all data from a single list (cluster) in the index.
 
@@ -2328,15 +2328,15 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` |  |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `label` | in | `uint32_t` | the id of the target list (cluster). |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-reset-index"></a>
-### cuvs::neighbors::ivf_pq::helpers::reset_index
+<a id="neighbors-ivf-pq-helpers-reset-index"></a>
+### neighbors::ivf_pq::helpers::reset_index
 
 Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
 
@@ -2353,14 +2353,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | pointer to IVF-PQ index |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | pointer to IVF-PQ index |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-pad-centers-with-norms"></a>
-### cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms
+<a id="neighbors-ivf-pq-helpers-pad-centers-with-norms"></a>
+### neighbors::ivf_pq::helpers::pad_centers_with_norms
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
 
@@ -2385,7 +2385,7 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms`
+**Additional overload:** `neighbors::ivf_pq::helpers::pad_centers_with_norms`
 
 Pad cluster centers with their L2 norms for efficient GEMM operations.
 
@@ -2410,8 +2410,8 @@ This function takes cluster centers and pads them with their L2 norms to create 
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-rotate-padded-centers"></a>
-### cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers
+<a id="neighbors-ivf-pq-helpers-rotate-padded-centers"></a>
+### neighbors::ivf_pq::helpers::rotate_padded_centers
 
 Rotate padded centers with the rotation matrix.
 
@@ -2436,8 +2436,8 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers);
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-extract-centers"></a>
-### cuvs::neighbors::ivf_pq::helpers::extract_centers
+<a id="neighbors-ivf-pq-helpers-extract-centers"></a>
+### neighbors::ivf_pq::helpers::extract_centers
 
 Public helper API for fetching a trained index's IVF centroids
 
@@ -2454,14 +2454,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
-| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | IVF-PQ index (passed by reference) |
+| `index` | in | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | IVF-PQ index (passed by reference) |
 | `cluster_centers` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | IVF cluster centers [index.n_lists(), index.dim] |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::extract_centers`
+**Additional overload:** `neighbors::ivf_pq::helpers::extract_centers`
 
 ```cpp
 void extract_centers(raft::resources const& res,
@@ -2474,15 +2474,15 @@ raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` |  | `raft::resources const&` |  |
-| `index` |  | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) |  |
+| `index` |  | [`const index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) |  |
 | `cluster_centers` |  | `raft::host_matrix_view<float, uint32_t, raft::row_major>` |  |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-recompute-internal-state"></a>
-### cuvs::neighbors::ivf_pq::helpers::recompute_internal_state
+<a id="neighbors-ivf-pq-helpers-recompute-internal-state"></a>
+### neighbors::ivf_pq::helpers::recompute_internal_state
 
 Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
 
@@ -2499,14 +2499,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | `const raft::resources&` | raft resource |
-| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-index) | pointer to IVF-PQ index |
+| `index` | inout | [`index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | pointer to IVF-PQ index |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-make-rotation-matrix"></a>
-### cuvs::neighbors::ivf_pq::helpers::make_rotation_matrix
+<a id="neighbors-ivf-pq-helpers-make-rotation-matrix"></a>
+### neighbors::ivf_pq::helpers::make_rotation_matrix
 
 Generate a rotation matrix into user-provided buffer (standalone version).
 
@@ -2533,8 +2533,8 @@ Usage example:
 
 `void`
 
-<a id="cuvs-neighbors-ivf-pq-helpers-resize-list"></a>
-### cuvs::neighbors::ivf_pq::helpers::resize_list
+<a id="neighbors-ivf-pq-helpers-resize-list"></a>
+### neighbors::ivf_pq::helpers::resize_list
 
 Resize an IVF-PQ list with flat layout.
 
@@ -2556,7 +2556,7 @@ Usage example:
 | --- | --- | --- | --- |
 | `res` | in | `raft::resources const&` | raft resource |
 | `orig_list` | inout | `std::shared_ptr<list_data_base<int64_t, uint32_t>>&` | the list to resize (may be replaced with a new allocation) |
-| `spec` | in | [`const list_spec_flat<uint32_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#cuvs-neighbors-ivf-pq-list-spec-flat) | the list specification containing pq_bits, pq_dim, and allocation settings |
+| `spec` | in | [`const list_spec_flat<uint32_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-list-spec-flat) | the list specification containing pq_bits, pq_dim, and allocation settings |
 | `new_used_size` | in | `uint32_t` | the new size of the list (number of vectors) |
 | `old_used_size` | in | `uint32_t` | the current size of the list (data up to this size is preserved) |
 
@@ -2564,7 +2564,7 @@ Usage example:
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_pq::helpers::resize_list`
+**Additional overload:** `neighbors::ivf_pq::helpers::resize_list`
 
 Resize an IVF-PQ list with interleaved layout.
 

@@ -49,7 +49,7 @@ struct cuvsBinaryQuantizerParams { ... };
 Allocate Binary Quantizer params, and populate with default values
 
 ```c
-cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params);
 ```
 
 **Parameters**
@@ -60,7 +60,7 @@ cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbinaryquantizerparamsdestroy"></a>
 ### cuvsBinaryQuantizerParamsDestroy
@@ -68,7 +68,7 @@ cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
 De-allocate Binary Quantizer params
 
 ```c
-cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params);
 ```
 
 **Parameters**
@@ -79,7 +79,7 @@ cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbinaryquantizer"></a>
 ### cuvsBinaryQuantizer
@@ -105,7 +105,7 @@ typedef struct { ... } cuvsBinaryQuantizer;
 Allocate Binary Quantizer and populate with default values
 
 ```c
-cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 ```
 
 **Parameters**
@@ -116,7 +116,7 @@ cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbinaryquantizerdestroy"></a>
 ### cuvsBinaryQuantizerDestroy
@@ -124,7 +124,7 @@ cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 De-allocate Binary Quantizer
 
 ```c
-cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 ```
 
 **Parameters**
@@ -135,7 +135,7 @@ cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbinaryquantizertrain"></a>
 ### cuvsBinaryQuantizerTrain
@@ -143,7 +143,7 @@ cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 Trains a binary quantizer to be used later for quantizing the dataset.
 
 ```c
-cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
 cuvsBinaryQuantizerParams_t params,
 DLManagedTensor* dataset,
 cuvsBinaryQuantizer_t quantizer);
@@ -160,7 +160,7 @@ cuvsBinaryQuantizer_t quantizer);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbinaryquantizertransform"></a>
 ### cuvsBinaryQuantizerTransform
@@ -168,7 +168,7 @@ cuvsBinaryQuantizer_t quantizer);
 Applies binary quantization transform to the given dataset
 
 ```c
-cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
 DLManagedTensor* dataset,
 DLManagedTensor* out);
 ```
@@ -185,7 +185,7 @@ This applies binary quantization to a dataset, changing any positive values to a
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbinaryquantizertransformwithparams"></a>
 ### cuvsBinaryQuantizerTransformWithParams
@@ -193,7 +193,7 @@ This applies binary quantization to a dataset, changing any positive values to a
 Applies binary quantization transform to the given dataset
 
 ```c
-cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
 cuvsBinaryQuantizer_t quantizer,
 DLManagedTensor* dataset,
 DLManagedTensor* out);
@@ -212,4 +212,4 @@ This applies binary quantization to a dataset, changing any values that are larg
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

@@ -51,7 +51,7 @@ struct cuvsAllNeighborsIndexParams { ... };
 Create a default all-neighbors index parameters struct.
 
 ```c
-cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -62,7 +62,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsallneighborsindexparamsdestroy"></a>
 ### cuvsAllNeighborsIndexParamsDestroy
@@ -70,7 +70,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
 Destroy an all-neighbors index parameters struct.
 
 ```c
-cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -81,7 +81,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t ind
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## All-neighbors C-API build
 
@@ -91,7 +91,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t ind
 Build an all-neighbors k-NN graph automatically detecting host vs device dataset.
 
 ```c
-cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
 cuvsAllNeighborsIndexParams_t params,
 DLManagedTensor* dataset,
 DLManagedTensor* indices,
@@ -116,4 +116,4 @@ resources The function automatically detects whether the dataset is host-residen
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

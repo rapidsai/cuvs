@@ -32,7 +32,7 @@ struct cuvsMultiGpuIvfPqIndexParams { ... };
 Allocate Multi-GPU IVF-PQ Index params, and populate with default values
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(cuvsMultiGpuIvfPqIndexParams_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(cuvsMultiGpuIvfPqIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -43,7 +43,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(cuvsMultiGpuIvfPqIndexParams_t* i
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuivfpqindexparamsdestroy"></a>
 ### cuvsMultiGpuIvfPqIndexParamsDestroy
@@ -51,7 +51,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(cuvsMultiGpuIvfPqIndexParams_t* i
 De-allocate Multi-GPU IVF-PQ Index params
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(cuvsMultiGpuIvfPqIndexParams_t index_params);
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(cuvsMultiGpuIvfPqIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -62,7 +62,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(cuvsMultiGpuIvfPqIndexParams_t i
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index search parameters
 
@@ -92,7 +92,7 @@ struct cuvsMultiGpuIvfPqSearchParams { ... };
 Allocate Multi-GPU IVF-PQ search params, and populate with default values
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t* params);
 ```
 
 **Parameters**
@@ -103,7 +103,7 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t*
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuivfpqsearchparamsdestroy"></a>
 ### cuvsMultiGpuIvfPqSearchParamsDestroy
@@ -111,7 +111,7 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t*
 De-allocate Multi-GPU IVF-PQ search params
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t params);
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t params);
 ```
 
 **Parameters**
@@ -122,7 +122,7 @@ cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index
 
@@ -150,7 +150,7 @@ typedef struct { ... } cuvsMultiGpuIvfPqIndex;
 Allocate Multi-GPU IVF-PQ index
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index);
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index);
 ```
 
 **Parameters**
@@ -161,7 +161,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuivfpqindexdestroy"></a>
 ### cuvsMultiGpuIvfPqIndexDestroy
@@ -169,7 +169,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index);
 De-allocate Multi-GPU IVF-PQ index
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index);
 ```
 
 **Parameters**
@@ -180,7 +180,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index build
 
@@ -190,7 +190,7 @@ cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index);
 Build a Multi-GPU IVF-PQ index
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqBuild(cuvsResources_t res,
 cuvsMultiGpuIvfPqIndexParams_t params,
 DLManagedTensor* dataset_tensor,
 cuvsMultiGpuIvfPqIndex_t index);
@@ -207,7 +207,7 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index search
 
@@ -217,7 +217,7 @@ cuvsMultiGpuIvfPqIndex_t index);
 Search a Multi-GPU IVF-PQ index
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqSearch(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqSearch(cuvsResources_t res,
 cuvsMultiGpuIvfPqSearchParams_t params,
 cuvsMultiGpuIvfPqIndex_t index,
 DLManagedTensor* queries_tensor,
@@ -238,7 +238,7 @@ DLManagedTensor* distances_tensor);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index extend
 
@@ -248,7 +248,7 @@ DLManagedTensor* distances_tensor);
 Extend a Multi-GPU IVF-PQ index
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqExtend(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqExtend(cuvsResources_t res,
 cuvsMultiGpuIvfPqIndex_t index,
 DLManagedTensor* new_vectors_tensor,
 DLManagedTensor* new_indices_tensor);
@@ -265,7 +265,7 @@ DLManagedTensor* new_indices_tensor);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index serialize
 
@@ -275,7 +275,7 @@ DLManagedTensor* new_indices_tensor);
 Serialize a Multi-GPU IVF-PQ index to file
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqSerialize(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqSerialize(cuvsResources_t res,
 cuvsMultiGpuIvfPqIndex_t index,
 const char* filename);
 ```
@@ -290,7 +290,7 @@ const char* filename);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index deserialize
 
@@ -300,7 +300,7 @@ const char* filename);
 Deserialize a Multi-GPU IVF-PQ index from file
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqDeserialize(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqDeserialize(cuvsResources_t res,
 const char* filename,
 cuvsMultiGpuIvfPqIndex_t index);
 ```
@@ -315,7 +315,7 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-PQ index distribute
 
@@ -325,7 +325,7 @@ cuvsMultiGpuIvfPqIndex_t index);
 Distribute a local IVF-PQ index to create a Multi-GPU index
 
 ```c
-cuvsError_t cuvsMultiGpuIvfPqDistribute(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqDistribute(cuvsResources_t res,
 const char* filename,
 cuvsMultiGpuIvfPqIndex_t index);
 ```
@@ -340,4 +340,4 @@ cuvsMultiGpuIvfPqIndex_t index);
 
 **Returns**
 
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
