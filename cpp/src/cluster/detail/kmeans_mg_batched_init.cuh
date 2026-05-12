@@ -232,6 +232,8 @@ void init_centroids_for_mg_batched(raft::resources const& handle,
       handle, params, X_local, init_sample_size, rank, root, rank_counts, allreduce, bcast);
 
     if (rank == root) {
+      // KMeans++ seeding runs on root, so root must have enough device memory
+      // for the full initialization sample plus the seeding workspace.
       auto init_view = raft::make_const_mdspan(init_sample.view());
       if (params.oversampling_factor == 0) {
         cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(

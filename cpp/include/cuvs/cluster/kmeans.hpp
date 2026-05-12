@@ -125,6 +125,10 @@ struct params : base_params {
    * When set to 0 (default) with host data uses `min(3 * n_clusters, n_samples)`
    * as a default.
    *
+   * In Batched multi-GPU host-data fits, the effective KMeansPlusPlus initialization
+   * sample is materialized on device and seeding is run on rank 0. Rank 0
+   * must have enough GPU memory for this sample and the seeding workspace.
+   *
    * Default: 0.
    */
   int64_t init_size = 0;
@@ -185,6 +189,10 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *   - If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as
  *     this worker's partition, and RAFT communicators are used for collectives.
  *   - Otherwise: single-GPU batched k-means.
+ *
+ * With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the
+ * effective initialization sample must fit in rank 0 GPU memory because
+ * seeding is run on rank 0 before centroids are broadcast.
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>

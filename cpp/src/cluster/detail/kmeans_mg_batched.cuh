@@ -318,10 +318,7 @@ void mnmg_fit(const raft::resources& handle,
                              true);
   }
 
-  bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
-                            metric == cuvs::distance::DistanceType::L2SqrtExpanded;
-  auto h_norm_cache =
-    raft::make_pinned_vector<T, IdxT>(dev_res, (need_compute_norms && has_data) ? n_local : 0);
+  auto h_norm_cache = raft::make_pinned_vector<T, IdxT>(dev_res, has_data ? n_local : 0);
   bool norms_cached = false;
 
   auto mnmg_allreduce = [&](auto* sendbuf, auto* recvbuf, size_t count) {
@@ -407,21 +404,19 @@ void mnmg_fit(const raft::resources& handle,
           auto L2NormBatch_view =
             raft::make_device_vector_view<T, IdxT>(L2NormBatch.data_handle(), current_batch_size);
 
-          if (need_compute_norms) {
-            auto batch_offset = static_cast<IdxT>(data_batch.offset());
-            if (!norms_cached) {
-              raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-                dev_res, batch_data_view, L2NormBatch_view);
-              raft::copy(h_norm_cache.data_handle() + batch_offset,
-                         L2NormBatch.data_handle(),
-                         current_batch_size,
-                         stream);
-            } else {
-              raft::copy(L2NormBatch.data_handle(),
-                         h_norm_cache.data_handle() + batch_offset,
-                         current_batch_size,
-                         stream);
-            }
+          auto batch_offset = static_cast<IdxT>(data_batch.offset());
+          if (!norms_cached) {
+            raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+              dev_res, batch_data_view, L2NormBatch_view);
+            raft::copy(h_norm_cache.data_handle() + batch_offset,
+                       L2NormBatch.data_handle(),
+                       current_batch_size,
+                       stream);
+          } else {
+            raft::copy(L2NormBatch.data_handle(),
+                       h_norm_cache.data_handle() + batch_offset,
+                       current_batch_size,
+                       stream);
           }
 
           auto L2NormBatch_const = raft::make_const_mdspan(L2NormBatch_view);
@@ -447,7 +442,7 @@ void mnmg_fit(const raft::resources& handle,
             raft::make_device_scalar_view(clustering_cost.data_handle()),
             batch_workspace);
         }
-        if (need_compute_norms) { norms_cached = true; }
+        norms_cached = true;
       }
 
       // Phase 2: grouped allreduce
