@@ -24,9 +24,8 @@ Requirements and tips
 
 * Include ``<cuvs/neighbors/ivf_flat.hpp>`` and define a metric with ``CUVS_METRIC(MyName, { ... })``.
   Set ``search_params.metric_udf`` to the string returned by ``MyName_udf()``.
-* Prefer the helpers documented next to the macro (``squared_diff``, ``abs_diff``, ``dot_product``,
-  ``point`` element access, and so on) so the same definition works across ``float``, ``int8_t`` /
-  ``uint8_t`` packed lanes, and related accumulator types.
+* Prefer :ref:`udf-metric-helpers` when combining lanes so one body works for scalar and packed
+  ``int8_t`` / ``uint8_t`` as well as wider element types.
 * Custom UDF is **not supported for fp16** (``__half`` / ``half``) indices at this time; the headers
   enforce this with a static assertion when applicable.
 * The scan assumes **ascending** distance order for top-*k* selection; metrics that do not behave
@@ -61,8 +60,38 @@ Example
      ivf::search(res, params, index, queries, neighbors, distances);
    }
 
-For more examples (L2 via ``squared_diff``, raw string fragments, and so on), see
-``cpp/tests/neighbors/ann_ivf_flat/test_udf.cu`` in the cuVS repository.
+.. _udf-metric-helpers:
+
+Helpers in ``CUVS_METRIC`` bodies
+---------------------------------
+
+Inside ``CUVS_METRIC(MyName, { ... })`` you write the body of ``operator()(AccT& acc, point_type x,
+point_type y)``. In scope: ``acc``, ``x``, ``y``, template parameters ``T``, ``AccT``, ``Veclen``,
+and the helpers below. The macro’s full argument list and notes live beside ``CUVS_METRIC`` in
+``<cuvs/neighbors/ivf_flat.hpp>``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Helper
+     - Role
+   * - ``point`` (``x``, ``y``)
+     - Element view: ``raw()``, ``operator[](i)``, ``size()``, ``is_packed()``.
+   * - ``squared_diff(x, y)``
+     - Squared difference; typical building block for L2-style energy.
+   * - ``abs_diff(x, y)``
+     - Absolute difference per lane.
+   * - ``dot_product(x, y)``
+     - Dot product / packed-byte dot where applicable.
+   * - ``product(x, y)``
+     - Element-wise product.
+   * - ``sum(x, y)``
+     - Element-wise sum.
+   * - ``max_elem(x, y)``
+     - Element-wise maximum.
+
+More examples: ``cpp/tests/neighbors/ann_ivf_flat/test_udf.cu``.
 
 Further reading
 ---------------

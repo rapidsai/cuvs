@@ -605,6 +605,7 @@ struct SearchPlanner : AlgorithmPlanner {
     add_static_fragment<fragment_tag_filter<FilterTag, IndexTag>>();
   }
 
+  // Same as add_fragment(std::move(fragment)); distinct names are for readability at call sites.
   void add_metric_udf_fragment(std::unique_ptr<UDFFatbinFragment> fragment)
   {
     add_fragment(std::move(fragment));
@@ -657,12 +658,20 @@ constexpr auto get_out_type_tag() {
 
 template <DistanceType Metric>
 constexpr auto get_metric_tag() {
-  if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
+  if constexpr (Metric == DistanceType::Euclidean) {
+    return tag_metric_euclidean{};
+  } else {
+    static_assert(!sizeof(Metric*), "extend get_metric_tag when adding DistanceType enumerators");
+  }
 }
 
 template <FilterType Filter>
 constexpr auto get_filter_tag() {
-  if constexpr (Filter == FilterType::None) return tag_filter_none{};
+  if constexpr (Filter == FilterType::None) {
+    return tag_filter_none{};
+  } else {
+    static_assert(!sizeof(Filter*), "extend get_filter_tag when adding FilterType enumerators");
+  }
 }
 
 template <typename T, typename OutT, typename IdxT, DistanceType Metric, FilterType Filter, bool Optimized, int Veclen>
@@ -718,9 +727,32 @@ void search_jit(
 
 ### Step 7b: Example — NVRTC UDFs for `compute_distance` and `apply_filter`
 
-Same entry kernel as Steps 1–7, but `compute_distance` / `apply_filter` are **not** linked from static matrix fatbins: one NVRTC TU per hook (or compile twice) and register each through the planner’s **UDF-specific** APIs (see below—not the same calls as static matrix fragments). Both are **templates** in this example, so each TU must include a **forwarding definition** of the hook plus an **explicit instantiation** for every concrete specialization the entry fatbin calls (e.g. `compute_distance<float>` and `apply_filter<uint32_t>`).
+**What you’re building.** The same search kernel as Steps 1–7 still calls `compute_distance` / `apply_filter`, but for a UDF build those symbols are **not** taken from prebuilt matrix fatbins: you compile a small NVRTC program per hook at runtime and register it with the planner so LTO links it next to the entry fragment.
 
-**1. Entry / shared header — declarations only**
+**How the pieces connect.**
+
+```mermaid
+flowchart LR
+  subgraph entry["Entry fatbin"]
+    K["Kernel calls templates"]
+    H["Header: declare only"]
+  end
+  subgraph nvrtc["Per-hook NVRTC TU"]
+    M["Macro: device body + string factory"]
+    G["Host glue: forwarding + explicit inst"]
+  end
+  subgraph plan["Planner"]
+    R["add_*_udf_fragment(fatbin)"]
+  end
+  K --> H
+  H --> M
+  M --> G
+  G --> R
+```
+
+**1. Shared header — forward declarations**
+
+The entry TU matches Step 1–7: templates are declared here and defined elsewhere at link time.
 
 ```cpp
 namespace example::detail {
@@ -734,15 +766,11 @@ __device__ bool apply_filter(uint32_t query_id, IdxT node_id, void* filter_data)
 }  // namespace example::detail
 ```
 
-Register each NVRTC fatbin through your planner’s **UDF** hooks (the snippet below uses `add_metric_udf_fragment` / `add_filter_udf_fragment`), not through the static-matrix helpers from Step 6 (`add_compute_distance_function` / `add_filter_function` on `SearchPlanner`). Those paths select different embedded fatbins; using both for the same hook would duplicate device definitions.
+**2. NVRTC source — macros and string factories**
 
-If you only declare `template ... compute_distance` / `apply_filter` in the entry TU, the NVRTC program must define them **and** emit matching `template __device__ ...` **explicit instantiations** for the concrete types the entry calls. For `IdxT`-dependent hooks, do not bake `IdxT` into a macro string: append those lines from a small host helper (`instantiate_apply_filter_udf` below) that takes the same NVRTC spelling `type_name<IdxT>()` returns, analogous to `instantiate_compute_distance_udf` for `T`.
+Use **function-like macros** so you edit only the `{ ... }` body; the preprocessor still emits a real `__device__` template for NVCC, and `NAME_udf()` / `NAME_filter_udf()` build the CUDA text NVRTC compiles. The distance macro also emits `compute_distance_udf_impl` calling `NAME_distance`; host-side `instantiate_compute_distance_udf` only appends the forwarding `compute_distance` plus its explicit instantiation (same idea as `instantiate_apply_filter_udf` for `apply_filter<IdxT>`).
 
-**2. Write the body first, then a `#define` turns it into NVRTC source**
-
-The hooks are **function-like macros** (`#define EXAMPLE_UDF_DISTANCE(NAME, BODY) ...`). You only edit the braced **body** argument. The preprocessor emits (1) a real `__device__` function template so NVCC checks `T`, `q`, `d`, etc., and (2) a `NAME_udf()` / `NAME_filter_udf()` factory that concatenates boilerplate with `std::string(#BODY)` so NVRTC compiles the **same** tokens NVCC already parsed. If the body needs raw `"` characters, splice that part with raw-string concatenation instead of relying on `#BODY` alone. For distance here, the NVRTC text also defines `compute_distance_udf_impl`, which forwards to `NAME_distance`.
-
-**Macro definitions** (typically a shared header included before the invocations):
+**Macro definitions** (shared header; include before the invocations):
 
 ```cpp
 #include <sstream>
@@ -827,7 +855,7 @@ inline std::string instantiate_apply_filter_udf(char const* idx_type)
 }
 ```
 
-**Invocations** (same CUDA source or header — each line is a **function-like macro call** that expands into a device template plus a `std::string` factory; no extra `#define` is required unless you want a named alias):
+**Invocations** (file scope — each call expands the macro once):
 
 ```cpp
 EXAMPLE_UDF_DISTANCE(my_l2, {
@@ -843,13 +871,11 @@ EXAMPLE_UDF_FILTER(my_pass, {
 })
 ```
 
-`#BODY` follows the usual preprocessor rules (avoid raw `"` inside the body unless you splice that section with raw-string literals around `#BODY`).
+Avoid raw `"` inside `#BODY` unless you splice that part with raw-string concatenation around `#BODY`.
 
-**3. Host — one NVRTC compile per UDF fragment**
+**3. Host — `type_name`, glue, compile, register**
 
-Assemble the full CUDA program for each hook, compile it once, and register the fatbin through the planner’s UDF entry point (e.g. `add_metric_udf_fragment`). Do not merge unrelated UDFs into a single compile / fragment.
-
-Step 7b’s toy kernel uses `compute_distance<float>` and `apply_filter<uint32_t>` (explicit lines come from `instantiate_compute_distance_udf` / `instantiate_apply_filter_udf`, not from hard-coded types inside the macros). A matching `type_name` only has to spell those concrete types; each return must be the **exact** token NVRTC will parse (same characters as in the generated CUDA). Strip cv/ref first, then add `if constexpr` branches as you support more index and element types.
+Each full NVRTC program is one string: `*_udf()` plus `instantiate_*` output. `type_name<U>()` must return the **exact** token the entry TU uses (e.g. `float`, `uint32_t`).
 
 ```cpp
 #include <type_traits>
@@ -863,19 +889,19 @@ constexpr const char* type_name()
   } else if constexpr (std::is_same_v<T, uint32_t>) {
     return "uint32_t";
   } else {
-    static_assert(std::is_same_v<T, void>, "add a branch for each T / AccT / IdxT the entry uses");
+    static_assert(std::is_same_v<T, void>, "add a branch for each concrete T / IdxT you use");
     return "";
   }
 }
 ```
 
-Call `instantiate_compute_distance_udf` / `instantiate_apply_filter_udf` to append forwarding templates and explicit instantiations, using the same `type_name<...>()` tokens the entry TU will use. Concatenate that glue onto each `*_udf()` string, then compile and register.
+**4. Planner — extend Step 7 for UDF vs static**
 
-**4. Extend `search_jit.cuh` (Step 7) for UDF vs static**
-
-Step 7 only registered static matrix fragments. To add NVRTC UDFs without breaking the Euclidean / no-filter path, add `#include <string>`, replace the single-value `DistanceType` / `FilterType` enums and the `get_metric_tag` / `get_filter_tag` templates with the extended versions below, add the empty UDF tag structs, and keep the UDF glue (`my_l2_udf`, `instantiate_*`, `type_name`, `nvrtc_compiler`) in the same translation unit. Then **replace** the two unconditional `add_compute_distance_device_function` / `add_filter_device_function` lines with the `if constexpr` planner block (second snippet).
+Step 7 used only static fragments. Add `#include <string>`, extend enums/tags/`get_*_tag` as below, keep UDF glue in the same TU as `search_jit`, then swap the two unconditional `add_compute_distance_device_function` / `add_filter_device_function` calls for this block:
 
 ```cpp
+// Widen config: static Euclidean vs NVRTC metric, static none vs NVRTC filter.
+// Extend the DistanceType / FilterType enums from Step 7:
 enum class DistanceType { Euclidean, MetricUdf };
 enum class FilterType { None, FilterUdf };
 
@@ -884,14 +910,24 @@ struct tag_filter_custom_udf {};
 
 template <DistanceType Metric>
 constexpr auto get_metric_tag() {
-  if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
-  else if constexpr (Metric == DistanceType::MetricUdf) return tag_metric_custom_udf{};
+  if constexpr (Metric == DistanceType::Euclidean) {
+    return tag_metric_euclidean{};
+  } else if constexpr (Metric == DistanceType::MetricUdf) {
+    return tag_metric_custom_udf{};
+  } else {
+    static_assert(!sizeof(Metric*), "extend get_metric_tag when adding DistanceType enumerators");
+  }
 }
 
 template <FilterType Filter>
 constexpr auto get_filter_tag() {
-  if constexpr (Filter == FilterType::None) return tag_filter_none{};
-  else if constexpr (Filter == FilterType::FilterUdf) return tag_filter_custom_udf{};
+  if constexpr (Filter == FilterType::None) {
+    return tag_filter_none{};
+  } else if constexpr (Filter == FilterType::FilterUdf) {
+    return tag_filter_custom_udf{};
+  } else {
+    static_assert(!sizeof(Filter*), "extend get_filter_tag when adding FilterType enumerators");
+  }
 }
 ```
 
@@ -899,6 +935,7 @@ constexpr auto get_filter_tag() {
 SearchPlanner planner;
 planner.add_search_function<data_tag, out_tag, idx_tag, Optimized, Veclen>();
 
+// Metric: NVRTC TU vs prebuilt matrix fragment (Step 6 helpers).
 if constexpr (std::is_same_v<metric_tag, tag_metric_custom_udf>) {
   std::string metric_udf_code = my_l2_udf();
   metric_udf_code += instantiate_compute_distance_udf(type_name<T>());
@@ -918,7 +955,13 @@ if constexpr (std::is_same_v<filter_tag, tag_filter_custom_udf>) {
 auto launcher = planner.get_launcher();
 ```
 
-Instantiate `search_jit` with `DistanceType::MetricUdf` and/or `FilterType::FilterUdf` only when you intend the NVRTC branches; `Euclidean` and `FilterType::None` keep the original static behavior.
+Use `DistanceType::MetricUdf` / `FilterType::FilterUdf` only when you want the NVRTC branches; otherwise keep `Euclidean` / `None` for the original static path.
+
+> **Pitfalls and constraints**
+>
+> * **Do not** register the same hook through both UDF APIs (`add_metric_udf_fragment` / `add_filter_udf_fragment`) and the Step 6 static helpers (`add_compute_distance_function` / `add_filter_function`): they pull different fatbins and you will duplicate device definitions.
+> * The NVRTC program must **define** every template the entry calls **and** emit matching **`template __device__ ...` explicit instantiations** for each concrete specialization (e.g. `compute_distance<float>`, `apply_filter<uint32_t>`). Prefer small host helpers (`instantiate_*` + `type_name`) for type spellings instead of hard-coding index types inside macro strings.
+> * One NVRTC compile per logical TU; do not concatenate unrelated UDFs into one program string.
 
 ## Key Concepts
 
