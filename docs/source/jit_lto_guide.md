@@ -676,9 +676,9 @@ void search_jit(
 
 **What you’re building.** The same search kernel as Steps 1–7 still calls `compute_distance` / `apply_filter`, but for a UDF build those symbols are **not** taken from prebuilt matrix fatbins: you compile a small NVRTC program per hook at runtime and register it with the planner so LTO links it next to the entry fragment.
 
-**How the pieces connect.**
+**How the pieces connect** (arrows read left to right):
 
-```mermaid
+```text
 flowchart LR
   subgraph entry["Entry fatbin"]
     K["Kernel calls templates"]
