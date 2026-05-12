@@ -67,7 +67,7 @@ cuVS is built on top of the RAPIDS RAFT library of high performance machine lear
 - [Installation](build.md)
 - [Getting Started](getting_started.md)
 - [Integrations](integrations.md)
-- [cuVS Bench](cuvs_bench/index.md)
+- [cuVS Bench](cuvs_bench/introduction.md)
 - [Advanced Topics](advanced_topics.md)
 - [Contributing](contributing.md)
 - [Guidelines](developer_guide.md)

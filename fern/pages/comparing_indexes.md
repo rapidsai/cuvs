@@ -53,4 +53,4 @@ For a step-by-step workflow, see the [tuning guide](tuning_guide.md).
 - Generate exact ground truth, sweep or tune build and search parameters, group results into recall buckets, and compare Pareto points within each bucket.
 - Report recall, latency, throughput, build time, and memory (if needed) together so quality and performance are not separated from the cost of achieving them.
 
-cuVS provides [cuVS Bench](cuvs_bench/index.md) for reproducible benchmarks that follow these methodologies and produce comparable outputs across datasets, algorithms, and hardware.
+cuVS provides [cuVS Bench](cuvs_bench/introduction.md) for reproducible benchmarks that follow these methodologies and produce comparable outputs across datasets, algorithms, and hardware.

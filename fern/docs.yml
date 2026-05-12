@@ -94,7 +94,6 @@ navigation:
               - page: "Spectral Clustering"
                 path: "./pages/cluster/spectral.md"
           - section: "Indexing Guide"
-            path: "./pages/neighbors/neighbors.md"
             contents:
               - page: "Brute-force"
                 path: "./pages/neighbors/bruteforce.md"
@@ -135,8 +134,9 @@ navigation:
           - page: "Methodologies"
             path: "./pages/comparing_indexes.md"
           - section: "cuVS Bench Tool"
-            path: "./pages/cuvs_bench/index.md"
             contents:
+              - page: "Introduction"
+                path: "./pages/cuvs_bench/introduction.md"
               - page: "Installation"
                 path: "./pages/cuvs_bench/install.md"
               - page: "Usage"
