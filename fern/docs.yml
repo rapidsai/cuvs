@@ -3,7 +3,7 @@
 title: "cuVS"
 instances:
   - url: "nvidia-cuvs.docs.buildwithfern.com/cuvs"
-    custom-domain: docs/nvidia.com/cuvs
+    custom-domain: docs.nvidia.com/cuvs
 footer: "./theme/nvidia/components/CustomFooter.tsx"
 logo:
   light: "./theme/nvidia/assets/NVIDIA_light.svg"
@@ -51,7 +51,7 @@ navbar-links:
     text: "GitHub"
     url: "https://github.com/rapidsai/cuvs"
   - type: "secondary"
-    text: "CUDA_X"
+    text: "CUDA-X"
     url: "https://www.nvidia.com/en-us/technologies/cuda-x/"
 navigation:
   - page: "Home"
@@ -474,6 +474,3 @@ navigation:
             path: "./pages/go_api/go-api-ivf-flat.md"
           - page: "IVF PQ"
             path: "./pages/go_api/go-api-ivf-pq.md"
-js:
-  - url: https://assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js
-    strategy: beforeInteractive
