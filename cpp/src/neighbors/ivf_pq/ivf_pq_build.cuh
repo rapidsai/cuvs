@@ -67,6 +67,14 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
 
+inline cuvs::distance::DistanceType coarse_clustering_metric(
+  cuvs::distance::DistanceType metric) noexcept
+{
+  return metric == cuvs::distance::DistanceType::InnerProduct
+           ? cuvs::distance::DistanceType::L2Expanded
+           : metric;
+}
+
 /**
  * @brief Compute residual vectors from the source dataset given by selected indices.
  *
@@ -1106,7 +1114,7 @@ void extend(raft::resources const& handle,
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
-      kmeans_params.metric = index->metric();
+      kmeans_params.metric = coarse_clustering_metric(index->metric());
       cuvs::cluster::kmeans::predict(
         handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
       vec_batches.prefetch_next_batch();
@@ -1317,7 +1325,7 @@ auto build(raft::resources const& handle,
       cluster_centers, impl->n_lists(), impl->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    kmeans_params.metric  = coarse_clustering_metric(impl->metric());
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
