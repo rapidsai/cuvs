@@ -1673,10 +1673,8 @@ void prune_graph_gpu(
   RAFT_LOG_DEBUG("\n");
 
   uint32_t invalid_neighbor_list = 0;
-  raft::copy(&invalid_neighbor_list,
-             d_invalid_neighbor_list.data_handle(),
-             1,
-             raft::resource::get_cuda_stream(res));
+  raft::copy(
+    res, raft::make_host_scalar_view(&invalid_neighbor_list), d_invalid_neighbor_list.view());
   raft::copy(res, host_stats.view(), raft::make_const_mdspan(dev_stats.view()));
   raft::resource::sync_stream(res);
 
