@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+# SPDX-License-Identifier: Apache-2.0
 #
 # NVIDIA Fern theme config — merge into your docs.yml
 # Replace <projname>, <ProductName>, and <github-url> with your values.
