@@ -16,7 +16,7 @@ Use the following commands, depending on your CUDA version, to install cuVS pack
 
 ```bash
 # CUDA 13
-conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.1
+conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.2
 
 # CUDA 12
 conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
@@ -26,7 +26,7 @@ conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
 
 ```bash
 # CUDA 13
-conda install -c rapidsai -c conda-forge cuvs cuda-version=13.1
+conda install -c rapidsai -c conda-forge cuvs cuda-version=13.2
 
 # CUDA 12
 conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
@@ -88,7 +88,7 @@ The core cuVS source code is written in C++ and wrapped through a C API. The C A
 Conda environment scripts are provided for installing the necessary dependencies to build cuVS from source. It is preferred to use `mamba`, as it provides significant speedup over `conda`:
 
 ```bash
-conda env create --name cuvs -f conda/environments/all_cuda-131_arch-$(uname -m).yaml
+conda env create --name cuvs -f conda/environments/all_cuda-132_arch-$(uname -m).yaml
 conda activate cuvs
 ```
 

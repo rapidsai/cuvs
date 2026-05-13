@@ -14,7 +14,7 @@ conda create --name cuvs_benchmarks
 conda activate cuvs_benchmarks
 
 # to install GPU package:
-conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> cuda-version=13.1*
+conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> 'cuda-version=13.2.*'
 
 # to install CPU package for usage in CPU-only systems:
 conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
@@ -55,7 +55,7 @@ Build cuVS Bench from source when you need local benchmark executables that matc
 
 ### Dependencies
 
-CUDA 12 and a GPU with Volta architecture or later are required to run the benchmarks.
+CUDA 12+ and a GPU with Volta architecture or later are required to run the benchmarks.
 
 Please refer to the  [installation docs](../build.md) for the base requirements to build cuVS.
 
@@ -73,7 +73,7 @@ In addition to the base requirements for building cuVS, additional dependencies 
 The easiest and most reproducible way to install the dependencies needed to build the ANN benchmarks is to use the conda environment file located in the `conda/environments` directory of the cuVS repository. The following command will use `mamba` to build and activate a new environment for compiling the benchmarks:
 
 ```bash
-conda env create --name cuvs_benchmarks -f conda/environments/bench_ann_cuda-131_arch-$(uname -m).yaml
+conda env create --name cuvs_benchmarks -f conda/environments/bench_ann_cuda-132_arch-$(uname -m).yaml
 conda activate cuvs_benchmarks
 ```
 
