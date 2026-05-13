@@ -1904,7 +1904,8 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = false)
+  const bool guarantee_connectivity           = false,
+  const double variable_graph_degree_fraction = 1.0)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -1921,8 +1922,12 @@ void optimize(
       knn_graph.extent(0),
       knn_graph.extent(1));
 
-  cagra::detail::graph::optimize(
-    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
+  cagra::detail::graph::optimize(res,
+                                 knn_graph_internal,
+                                 new_graph_internal,
+                                 guarantee_connectivity,
+                                 true,
+                                 variable_graph_degree_fraction);
 }
 
 // RAII wrapper for allocating memory with Transparent HugePage
@@ -2141,8 +2146,11 @@ auto iterative_build_graph(
     auto next_graph_size = curr_query_size;
     cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
     cagra_graph = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
-    optimize<IdxT>(
-      res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+    optimize<IdxT>(res,
+                   neighbors_view,
+                   cagra_graph.view(),
+                   flag_last ? params.guarantee_connectivity : false,
+                   flag_last ? params.variable_graph_degree_fraction : 1.0);
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -2262,7 +2270,11 @@ index<T, IdxT> build(
     cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
 
     RAFT_LOG_TRACE("optimizing graph");
-    optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
+    optimize<IdxT>(res,
+                   knn_graph->view(),
+                   cagra_graph.view(),
+                   params.guarantee_connectivity,
+                   params.variable_graph_degree_fraction);
 
     // free intermediate graph before trying to create the index
     knn_graph.reset();
