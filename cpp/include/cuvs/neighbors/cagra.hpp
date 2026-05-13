@@ -447,38 +447,7 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] inline auto dataset() const
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
   {
-    namespace nb   = cuvs::neighbors;
-    using VT       = nb::any_dataset_view_types<T, int64_t>;
-    auto const& va = dataset_->as_variant();
-    if (std::holds_alternative<typename VT::strided_view>(va)) {
-      return std::get<typename VT::strided_view>(va).view();
-    }
-    if (std::holds_alternative<typename VT::padded_view>(va)) {
-      auto const& v = std::get<typename VT::padded_view>(va);
-      return raft::make_device_strided_matrix_view<const T, int64_t>(
-        v.view().data_handle(), v.n_rows(), v.dim(), v.stride());
-    }
-    if (std::holds_alternative<typename VT::indirect_view>(va)) {
-      auto const& v = std::get<typename VT::indirect_view>(va);
-      if (v.get_indirect_target_type() == nb::indirect_target_type::vpq_f16 ||
-          v.get_indirect_target_type() == nb::indirect_target_type::vpq_f32) {
-        auto d = v.dim();
-        return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
-      }
-      RAFT_EXPECTS(v.get_indirect_target_type() == nb::indirect_padded_type_for_element<T>(),
-                   "dataset(): indirect target must be padded rows matching T or VPQ storage");
-      auto* dp = static_cast<const device_padded_dataset<T, int64_t>*>(v.raw_target());
-      auto pdv = dp->as_dataset_view();
-      return raft::make_device_strided_matrix_view<const T, int64_t>(
-        pdv.view().data_handle(), pdv.n_rows(), pdv.dim(), pdv.stride());
-    }
-    if (std::holds_alternative<typename VT::empty_view>(va)) {
-      auto const& v = std::get<typename VT::empty_view>(va);
-      auto d        = v.dim();
-      return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
-    }
-    RAFT_FAIL("dataset(): unsupported stored dataset view");
-    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, 0, 0);
+    return any_dataset_view_to_strided_device_matrix<T>(*dataset_);
   }
 
   /** Non-owning dataset binding stored by the index (typed variant view). */
@@ -994,6 +963,7 @@ struct index : cuvs::neighbors::index {
   size_t dim_          = 0;
   size_t graph_degree_ = 0;
 };
+
 /**
  * @}
  */
