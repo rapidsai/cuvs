@@ -8,8 +8,12 @@ homepage.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+doc-only = ["cuvs-sys/doc-only"]
+
 [dependencies]
-ffi = { package = "cuvs-sys", path = "../cuvs-sys", version = "26.6.0" }
+cuvs-sys = { workspace = true }
 ndarray = "0.15"
 
 [dev-dependencies]
@@ -25,3 +29,6 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 [[example]]
 name = "vamana"
 required-features = []
+
+[package.metadata.docs.rs]
+features = ["doc-only"]
