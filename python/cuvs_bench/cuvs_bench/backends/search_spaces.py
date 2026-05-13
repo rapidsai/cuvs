@@ -158,6 +158,46 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "ef": {"type": "int", "min": 10, "max": 1000},
         },
     },
+    # =========================================================================
+    # Elasticsearch GPU HNSW (hnsw, int8_hnsw, int4_hnsw, bbq_hnsw)
+    # Per ES-GPU-API-REFERENCE.md: index_options (m, ef_construction), knn (num_candidates)
+    # =========================================================================
+    "elastic_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 8, "max": 64},
+            "ef_construction": {"type": "int", "min": 50, "max": 500},
+        },
+        "search": {
+            "num_candidates": {"type": "int", "min": 50, "max": 500},
+        },
+    },
+    "elastic_int8_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 8, "max": 64},
+            "ef_construction": {"type": "int", "min": 50, "max": 500},
+        },
+        "search": {
+            "num_candidates": {"type": "int", "min": 50, "max": 500},
+        },
+    },
+    "elastic_int4_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 8, "max": 64},
+            "ef_construction": {"type": "int", "min": 50, "max": 500},
+        },
+        "search": {
+            "num_candidates": {"type": "int", "min": 50, "max": 500},
+        },
+    },
+    "elastic_bbq_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 8, "max": 64},
+            "ef_construction": {"type": "int", "min": 50, "max": 500},
+        },
+        "search": {
+            "num_candidates": {"type": "int", "min": 50, "max": 500},
+        },
+    },
 }
 
 
