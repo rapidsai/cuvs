@@ -1542,8 +1542,13 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
         res, build_config_.max_dataset_size, build_config_.dataset_dim));
     }
     size_t batch_size = 100000;
-    cuvs::spatial::knn::detail::utils::batch_load_iterator vec_batches{
-      data, static_cast<size_t>(nrow_), build_config_.dataset_dim, batch_size, stream};
+    auto vec_batches  = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<Data_t>(
+      res,
+      data,
+      static_cast<int64_t>(nrow_),
+      static_cast<int64_t>(build_config_.dataset_dim),
+      batch_size,
+      stream);
     constexpr int TPB = 256;
     for (auto const& batch : vec_batches) {
       size_t n_elems    = batch.size() * build_config_.dataset_dim;
