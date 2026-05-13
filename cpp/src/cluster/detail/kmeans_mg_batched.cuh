@@ -6,6 +6,7 @@
 
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
+#include "kmeans_mg_batched_comms.cuh"
 #include "kmeans_mg_batched_init.cuh"
 
 #include "../../core/omp_wrapper.hpp"
@@ -36,8 +37,6 @@
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-#include <nccl.h>
-
 #include <raft/core/resource/comms.hpp>
 
 #include <algorithm>
@@ -45,78 +44,8 @@
 #include <cstdint>
 #include <limits>
 #include <random>
-#include <type_traits>
 
 namespace cuvs::cluster::kmeans::mg::detail {
-
-// NCCL data-type helper
-template <typename T>
-ncclDataType_t nccl_dtype();
-
-template <>
-inline ncclDataType_t nccl_dtype<float>()
-{
-  return ncclFloat;
-}
-template <>
-inline ncclDataType_t nccl_dtype<double>()
-{
-  return ncclDouble;
-}
-template <>
-inline ncclDataType_t nccl_dtype<int64_t>()
-{
-  return ncclInt64;
-}
-
-// Comm macros: dispatch to raw NCCL or RAFT comms based on `use_nccl`.
-// Local to this TU, undef'd at the bottom.
-
-#define MNMG_ALLREDUCE(sendbuf, recvbuf, count)                                           \
-  do {                                                                                    \
-    using _mnmg_val_t = std::remove_pointer_t<decltype(sendbuf)>;                         \
-    if (use_nccl) {                                                                       \
-      RAFT_NCCL_TRY(ncclAllReduce(                                                        \
-        sendbuf, recvbuf, count, nccl_dtype<_mnmg_val_t>(), ncclSum, nccl_comm, stream)); \
-    } else {                                                                              \
-      const auto& _mnmg_comm = raft::resource::get_comms(dev_res);                        \
-      _mnmg_comm.allreduce(sendbuf, recvbuf, count, raft::comms::op_t::SUM, stream);      \
-    }                                                                                     \
-  } while (0)
-
-#define MNMG_BCAST(buf, count, root)                                                           \
-  do {                                                                                         \
-    using _mnmg_bcast_t = std::remove_pointer_t<decltype(buf)>;                                \
-    if (use_nccl) {                                                                            \
-      RAFT_NCCL_TRY(                                                                           \
-        ncclBroadcast(buf, buf, count, nccl_dtype<_mnmg_bcast_t>(), root, nccl_comm, stream)); \
-    } else {                                                                                   \
-      const auto& _mnmg_comm = raft::resource::get_comms(dev_res);                             \
-      _mnmg_comm.bcast(buf, count, root, stream);                                              \
-    }                                                                                          \
-  } while (0)
-
-#define MNMG_ALLGATHER(sendbuf, recvbuf, count)                                                   \
-  do {                                                                                            \
-    using _mnmg_gather_t = std::remove_pointer_t<decltype(sendbuf)>;                              \
-    if (use_nccl) {                                                                               \
-      RAFT_NCCL_TRY(                                                                              \
-        ncclAllGather(sendbuf, recvbuf, count, nccl_dtype<_mnmg_gather_t>(), nccl_comm, stream)); \
-    } else {                                                                                      \
-      const auto& _mnmg_comm = raft::resource::get_comms(dev_res);                                \
-      _mnmg_comm.allgather(sendbuf, recvbuf, count, stream);                                      \
-    }                                                                                             \
-  } while (0)
-
-#define MNMG_GROUP_START()                             \
-  do {                                                 \
-    if (use_nccl) { RAFT_NCCL_TRY(ncclGroupStart()); } \
-  } while (0)
-
-#define MNMG_GROUP_END()                             \
-  do {                                               \
-    if (use_nccl) { RAFT_NCCL_TRY(ncclGroupEnd()); } \
-  } while (0)
 
 /**
  * @brief Shared multi-GPU k-means fit core, called per rank.
@@ -179,7 +108,9 @@ void mnmg_fit(const raft::resources& handle,
   const raft::resources& dev_res =
     use_nccl ? raft::resource::set_current_device_to_rank(handle, rank) : handle;
 
-  auto stream     = raft::resource::get_cuda_stream(dev_res);
+  mnmg_comms comms{dev_res, use_nccl, nccl_comm};
+
+  auto stream     = comms.stream();
   auto n_local    = X_local.extent(0);
   auto n_features = X_local.extent(1);
   auto n_clusters = static_cast<IdxT>(params.n_clusters);
@@ -243,10 +174,10 @@ void mnmg_fit(const raft::resources& handle,
         dev_res, raft::make_const_mdspan(scaled_weights->view()), d_global_wt->view());
     }
 
-    MNMG_GROUP_START();
-    MNMG_ALLREDUCE(d_global_n->data_handle(), d_global_n->data_handle(), 1);
-    MNMG_ALLREDUCE(d_global_wt->data_handle(), d_global_wt->data_handle(), 1);
-    MNMG_GROUP_END();
+    comms.group_start();
+    comms.allreduce(d_global_n->data_handle(), d_global_n->data_handle(), 1);
+    comms.allreduce(d_global_wt->data_handle(), d_global_wt->data_handle(), 1);
+    comms.group_end();
 
     if (has_data) {
       const IdxT* d_global_n_ptr = d_global_n->data_handle();
@@ -304,14 +235,6 @@ void mnmg_fit(const raft::resources& handle,
   auto h_norm_cache = raft::make_pinned_vector<T, IdxT>(dev_res, has_data ? n_local : 0);
   bool norms_cached = false;
 
-  auto mnmg_allreduce = [&](auto* sendbuf, auto* recvbuf, size_t count) {
-    MNMG_ALLREDUCE(sendbuf, recvbuf, count);
-  };
-  auto mnmg_allgather = [&](auto* sendbuf, auto* recvbuf, size_t count) {
-    MNMG_ALLGATHER(sendbuf, recvbuf, count);
-  };
-  auto mnmg_bcast = [&](auto* buf, size_t count, int root) { MNMG_BCAST(buf, count, root); };
-
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = params;
     iter_params.rng_state.seed                = gen();
@@ -329,10 +252,8 @@ void mnmg_fit(const raft::resources& handle,
                                            workspace,
                                            rank,
                                            num_ranks,
-                                           mnmg_allreduce,
-                                           mnmg_allgather,
-                                           mnmg_bcast);
-    MNMG_BCAST(rank_centroids.data_handle(), n_clusters * n_features, 0);
+                                           comms);
+    comms.bcast(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
     if (has_data && !sample_weight.has_value()) {
       raft::matrix::fill(dev_res, batch_weights.view(), T{1});
@@ -426,13 +347,13 @@ void mnmg_fit(const raft::resources& handle,
       }
 
       // Phase 2: grouped allreduce
-      MNMG_GROUP_START();
-      MNMG_ALLREDUCE(
+      comms.group_start();
+      comms.allreduce(
         centroid_sums.data_handle(), centroid_sums.data_handle(), n_clusters * n_features);
-      MNMG_ALLREDUCE(
+      comms.allreduce(
         weight_per_cluster.data_handle(), weight_per_cluster.data_handle(), n_clusters);
-      MNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
-      MNMG_GROUP_END();
+      comms.allreduce(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
+      comms.group_end();
 
       // Phase 3: finalize centroids
       auto centroid_sums_const = raft::make_device_matrix_view<const T, IdxT>(
@@ -474,7 +395,7 @@ void mnmg_fit(const raft::resources& handle,
           return *d_done_view.data_handle();
         });
 
-      MNMG_ALLREDUCE(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
+      comms.allreduce(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
 
       raft::copy(dev_res,
                  raft::make_pinned_scalar_view(h_done_flag.data_handle()),
@@ -516,7 +437,7 @@ void mnmg_fit(const raft::resources& handle,
                           clustering_cost.view());
       }
     }
-    MNMG_ALLREDUCE(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
+    comms.allreduce(clustering_cost.data_handle(), clustering_cost.data_handle(), 1);
     raft::copy(&local_inertia, clustering_cost.data_handle(), 1, stream);
     raft::resource::sync_stream(dev_res);
 
@@ -597,12 +518,5 @@ void batched_fit_omp(const raft::resources& clique,
     mnmg_fit<T, IdxT>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
   }
 }
-
-// Undef local macros
-#undef MNMG_ALLREDUCE
-#undef MNMG_BCAST
-#undef MNMG_ALLGATHER
-#undef MNMG_GROUP_START
-#undef MNMG_GROUP_END
 
 }  // namespace cuvs::cluster::kmeans::mg::detail
