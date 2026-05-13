@@ -39,4 +39,22 @@ auto build(raft::resources const& handle,
   return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
 }
 
+auto estimate_build_memory_usage(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset) -> size_t
+{
+  return cuvs::neighbors::cagra::estimate_build_memory_usage<data_t, index_t>(
+    handle, params, dataset);
+}
+
+auto estimate_build_memory_usage(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const data_t, int64_t, raft::row_major> dataset) -> size_t
+{
+  return cuvs::neighbors::cagra::estimate_build_memory_usage<data_t, index_t>(
+    handle, params, dataset);
+}
+
 }  // namespace cuvs::neighbors::cagra

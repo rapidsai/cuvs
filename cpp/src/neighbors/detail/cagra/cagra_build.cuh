@@ -33,9 +33,13 @@
 
 #include <rmm/resource_ref.hpp>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <limits>
+#include <numeric>
 #include <omp.h>
 #include <type_traits>
 #include <unordered_set>
@@ -1976,6 +1980,517 @@ struct mmap_owner {
   void* ptr_;
   size_t size_;
 };
+
+struct build_memory_estimate {
+  size_t host   = 0;
+  size_t device = 0;
+
+  [[nodiscard]] auto total() const noexcept -> size_t;
+};
+
+inline auto add_saturate(size_t a, size_t b) noexcept -> size_t
+{
+  const auto max_size = std::numeric_limits<size_t>::max();
+  return max_size - a < b ? max_size : a + b;
+}
+
+inline auto multiply_saturate(size_t a, size_t b) noexcept -> size_t
+{
+  const auto max_size = std::numeric_limits<size_t>::max();
+  return (a != 0 && b > max_size / a) ? max_size : a * b;
+}
+
+template <typename... Args>
+inline auto product_bytes(Args... args) noexcept -> size_t
+{
+  size_t result = 1;
+  ((result = multiply_saturate(result, static_cast<size_t>(args))), ...);
+  return result;
+}
+
+template <typename... Args>
+inline auto sum_bytes(Args... args) noexcept -> size_t
+{
+  size_t result = 0;
+  ((result = add_saturate(result, static_cast<size_t>(args))), ...);
+  return result;
+}
+
+inline auto build_memory_estimate::total() const noexcept -> size_t
+{
+  return sum_bytes(host, device);
+}
+
+inline auto round_up_bytes(size_t value, size_t alignment) noexcept -> size_t
+{
+  if (alignment == 0) { return value; }
+  const auto remainder = value % alignment;
+  return remainder == 0 ? value : add_saturate(value, alignment - remainder);
+}
+
+template <typename T>
+inline auto aligned_dataset_bytes(size_t n_rows, size_t dim, size_t align_bytes = 16) noexcept
+  -> size_t
+{
+  const auto element_size = sizeof(T);
+  const auto row_bytes    = product_bytes(dim, element_size);
+  const auto alignment    = std::lcm(align_bytes, element_size);
+  return product_bytes(n_rows, round_up_bytes(row_bytes, alignment));
+}
+
+template <typename T, typename Accessor>
+inline auto owned_dataset_bytes(
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset) noexcept
+  -> size_t
+{
+  const auto dim          = static_cast<size_t>(dataset.extent(1));
+  const auto aligned_size = aligned_dataset_bytes<T>(static_cast<size_t>(dataset.extent(0)), dim);
+  if constexpr (raft::is_host_mdspan_v<decltype(dataset)>) {
+    return aligned_size;
+  } else {
+    const auto required_stride =
+      round_up_bytes(product_bytes(dim, sizeof(T)), std::lcm(size_t{16}, sizeof(T))) / sizeof(T);
+    const auto source_stride =
+      static_cast<size_t>(dataset.stride(0) > 0 ? dataset.stride(0) : dataset.extent(1));
+    return source_stride == required_stride ? 0 : aligned_size;
+  }
+}
+
+inline auto graph_bytes(size_t n_rows, size_t degree, size_t index_size) noexcept -> size_t
+{
+  return product_bytes(n_rows, degree, index_size);
+}
+
+inline auto estimate_nn_descent_device_memory(size_t n_rows,
+                                              size_t dim,
+                                              size_t index_size,
+                                              cuvs::distance::DistanceType metric,
+                                              bool use_float_data) noexcept -> size_t
+{
+  constexpr size_t degree_on_device = 32;
+  auto data_size =
+    use_float_data ? product_bytes(n_rows, dim, sizeof(float)) : product_bytes(n_rows, dim, 2);
+  auto l2_norms_size = (metric == cuvs::distance::DistanceType::L2Expanded ||
+                        metric == cuvs::distance::DistanceType::L2SqrtExpanded)
+                         ? product_bytes(n_rows, sizeof(float))
+                         : 0;
+  // This mirrors the allocation used by nn_descent::has_enough_device_memory().
+  auto graph_buffer_size   = product_bytes(n_rows, index_size, degree_on_device, sizeof(uint32_t));
+  auto dists_buffer_size   = product_bytes(n_rows, degree_on_device, sizeof(float));
+  auto locks_size          = product_bytes(n_rows, sizeof(int));
+  auto list_sizes_new_size = product_bytes(n_rows, sizeof(int2));
+  auto list_sizes_old_size = product_bytes(n_rows, sizeof(int2));
+  return sum_bytes(data_size,
+                   l2_norms_size,
+                   graph_buffer_size,
+                   dists_buffer_size,
+                   locks_size,
+                   list_sizes_new_size,
+                   list_sizes_old_size);
+}
+
+inline auto estimate_nn_descent_host_memory(size_t n_rows,
+                                            size_t graph_degree,
+                                            size_t intermediate_degree,
+                                            size_t output_graph_degree,
+                                            size_t index_size) noexcept -> size_t
+{
+  constexpr size_t degree_on_device = 32;
+  constexpr size_t num_samples      = 32;
+  const auto aligned_graph_degree =
+    round_up_bytes(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)), 32);
+  const auto aligned_intermediate_degree = round_up_bytes(
+    static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)), 32);
+  const auto num_segments = std::max<size_t>(1, aligned_intermediate_degree / 32);
+
+  // GNND keeps the caller-provided output graph plus several pinned and host-side sample buffers.
+  auto output_graph_size = graph_bytes(n_rows, output_graph_degree, index_size);
+  auto int_graph_size    = graph_bytes(n_rows, aligned_graph_degree, sizeof(int));
+  auto h_dists_size      = graph_bytes(n_rows, aligned_graph_degree, sizeof(float));
+  auto sample_graphs_size =
+    product_bytes(n_rows, num_samples, sizeof(int), 2);  // h_graph_new + h_graph_old
+  auto sample_sizes_size      = product_bytes(n_rows, sizeof(int2), 2);
+  auto rev_graphs_size        = product_bytes(n_rows, num_samples, index_size, 3);
+  auto graph_host_buffer_size = product_bytes(n_rows, degree_on_device, sizeof(int));
+  auto dists_host_buffer_size = product_bytes(n_rows, degree_on_device, sizeof(float));
+  auto bloom_filter_size      = product_bytes(n_rows, 64, num_segments);
+
+  return sum_bytes(output_graph_size,
+                   int_graph_size,
+                   h_dists_size,
+                   sample_graphs_size,
+                   sample_sizes_size,
+                   rev_graphs_size,
+                   graph_host_buffer_size,
+                   dists_host_buffer_size,
+                   bloom_filter_size);
+}
+
+inline auto estimate_ivf_pq_index_memory(size_t n_rows,
+                                         size_t dim,
+                                         const cuvs::neighbors::ivf_pq::index_params& params)
+  -> size_t
+{
+  RAFT_EXPECTS(dim <= std::numeric_limits<uint32_t>::max(),
+               "IVF-PQ graph build expects dataset dimensionality to fit in uint32_t.");
+  const auto dim32  = static_cast<uint32_t>(dim);
+  auto pq_dim       = params.pq_dim == 0
+                        ? cuvs::neighbors::ivf_pq::index<int64_t>::calculate_pq_dim(dim32)
+                        : params.pq_dim;
+  auto pq_len       = raft::div_rounding_up_safe<size_t>(dim, pq_dim);
+  auto pq_book_size = size_t{1} << params.pq_bits;
+  auto code_size    = raft::div_rounding_up_safe<size_t>(pq_dim * params.pq_bits, 8);
+
+  auto list_data_size = product_bytes(n_rows, code_size);
+  auto list_index_size =
+    product_bytes(n_rows, sizeof(int64_t));  // CAGRA graph build uses int64 IVF-PQ indices.
+  auto list_metadata_size = product_bytes(params.n_lists, sizeof(uint32_t) * 4 + sizeof(void*) * 2);
+  auto centers_size       = product_bytes(params.n_lists, dim, sizeof(float));
+  auto centers_rot_size   = product_bytes(params.n_lists, pq_len, pq_dim, sizeof(float));
+  auto rotation_size      = product_bytes(pq_len, pq_dim, dim, sizeof(float));
+  auto pq_centers_size =
+    params.codebook_kind == cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER
+      ? product_bytes(params.n_lists, pq_dim, pq_book_size, pq_len, sizeof(float))
+      : product_bytes(pq_dim, pq_book_size, pq_len, sizeof(float));
+
+  return sum_bytes(list_data_size,
+                   list_index_size,
+                   list_metadata_size,
+                   centers_size,
+                   centers_rot_size,
+                   rotation_size,
+                   pq_centers_size);
+}
+
+template <typename T, typename Accessor>
+inline auto estimate_ivf_pq_graph_build_memory(
+  raft::resources const& res,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  size_t intermediate_degree,
+  const cuvs::neighbors::cagra::graph_build_params::ivf_pq_params& params) -> build_memory_estimate
+{
+  const auto n_rows = static_cast<size_t>(dataset.extent(0));
+  const auto dim    = static_cast<size_t>(dataset.extent(1));
+  auto pq           = params;
+
+  const auto top_k = intermediate_degree + 1;
+  auto gpu_top_k   = static_cast<size_t>(intermediate_degree * pq.refinement_rate);
+  gpu_top_k        = std::min(std::max(gpu_top_k, top_k), n_rows);
+  auto queries     = static_cast<size_t>(pq.search_params.max_internal_batch_size);
+
+  auto trainset_target = static_cast<size_t>(pq.build_params.kmeans_trainset_fraction * n_rows);
+  trainset_target      = std::max(trainset_target, static_cast<size_t>(pq.build_params.n_lists));
+  auto trainset_ratio  = std::max<size_t>(1, n_rows / std::max<size_t>(1, trainset_target));
+  auto train_rows      = n_rows / trainset_ratio;
+
+  auto trainset_size = product_bytes(train_rows, dim, sizeof(float));
+  if constexpr (!std::is_same_v<T, float>) {
+    trainset_size = sum_bytes(trainset_size, product_bytes(train_rows, dim, sizeof(T)));
+  }
+  auto training_size     = sum_bytes(trainset_size,
+                                 product_bytes(pq.build_params.n_lists, dim, sizeof(float)),
+                                 product_bytes(train_rows, sizeof(uint32_t)));
+  auto ivf_pq_index_size = estimate_ivf_pq_index_memory(n_rows, dim, pq.build_params);
+
+  auto search_per_query               = sum_bytes(product_bytes(dim, sizeof(T)),
+                                    product_bytes(gpu_top_k, sizeof(float)),
+                                    product_bytes(gpu_top_k, sizeof(int64_t)),
+                                    product_bytes(top_k, sizeof(float)),
+                                    product_bytes(top_k, sizeof(int64_t)));
+  constexpr size_t kMinWorkspaceRatio = 5;
+  constexpr size_t kMinLargeBatchSize = 512;
+  auto desired_workspace_size         = product_bytes(queries, search_per_query);
+  if (desired_workspace_size > 0) {
+    auto free_space_ratio = raft::resource::get_workspace_free_bytes(res) / desired_workspace_size;
+    if (free_space_ratio < kMinWorkspaceRatio) {
+      auto adjusted_queries = static_cast<size_t>(queries * free_space_ratio / kMinWorkspaceRatio);
+      if (adjusted_queries >= kMinLargeBatchSize) { queries = adjusted_queries; }
+    }
+  }
+
+  auto search_device_size = product_bytes(queries, search_per_query);
+  auto search_host_size   = product_bytes(queries,
+                                        sum_bytes(product_bytes(gpu_top_k, sizeof(int64_t)),
+                                                  product_bytes(dim, sizeof(T)),
+                                                  product_bytes(top_k, sizeof(int64_t)),
+                                                  product_bytes(top_k, sizeof(float))));
+
+  return build_memory_estimate{
+    search_host_size, sum_bytes(ivf_pq_index_size, std::max(training_size, search_device_size))};
+}
+
+inline auto estimate_vpq_dataset_memory(size_t n_rows,
+                                        size_t dim,
+                                        const cuvs::neighbors::vpq_params& params) -> size_t
+{
+  auto ps = params;
+  if (ps.pq_dim == 0) { ps.pq_dim = raft::div_rounding_up_safe(dim, size_t{4}); }
+  if (ps.pq_bits == 0) { ps.pq_bits = 8; }
+  if (ps.vq_n_centers == 0) {
+    ps.vq_n_centers = static_cast<uint32_t>(
+      round_up_bytes(static_cast<size_t>(std::sqrt(static_cast<double>(n_rows))), 8));
+  }
+
+  const auto pq_n_centers = size_t{1} << ps.pq_bits;
+  const auto pq_len       = raft::div_rounding_up_safe<size_t>(dim, ps.pq_dim);
+  const auto code_size    = sizeof(uint32_t) * (1 + raft::div_rounding_up_safe<size_t>(
+                                                   ps.pq_dim * ps.pq_bits, 8 * sizeof(uint32_t)));
+
+  auto vq_codebook_size = product_bytes(ps.vq_n_centers, dim, sizeof(half));
+  auto pq_codebook_size = product_bytes(ps.pq_dim, pq_n_centers, pq_len, sizeof(half));
+  auto codes_size       = product_bytes(n_rows, code_size);
+
+  return sum_bytes(vq_codebook_size, pq_codebook_size, codes_size);
+}
+
+template <typename T, typename Accessor>
+inline auto estimate_final_index_memory(
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  const index_params& params,
+  size_t graph_degree) -> size_t
+{
+  const auto n_rows      = static_cast<size_t>(dataset.extent(0));
+  const auto dim         = static_cast<size_t>(dataset.extent(1));
+  auto device_graph_size = graph_bytes(n_rows, graph_degree, sizeof(uint32_t));
+
+  if (params.compression.has_value()) {
+    return sum_bytes(device_graph_size,
+                     estimate_vpq_dataset_memory(n_rows, dim, params.compression.value()));
+  }
+
+  auto dataset_size = params.attach_dataset_on_build ? owned_dataset_bytes(dataset) : 0;
+  auto norms_size   = (params.attach_dataset_on_build &&
+                     params.metric == cuvs::distance::DistanceType::CosineExpanded)
+                        ? product_bytes(n_rows, sizeof(float))
+                        : 0;
+  return sum_bytes(device_graph_size, dataset_size, norms_size);
+}
+
+template <typename T, typename IdxT, typename Accessor>
+auto estimate_iterative_build_memory_usage(
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  const index_params& params,
+  size_t intermediate_degree,
+  size_t graph_degree) -> size_t
+{
+  const auto n_rows = static_cast<size_t>(dataset.extent(0));
+  const auto dim    = static_cast<size_t>(dataset.extent(1));
+
+  constexpr size_t max_chunk_size = 8192;
+  constexpr size_t thp_size       = 2 * 1024 * 1024;
+  const auto aligned_data_size    = aligned_dataset_bytes<T>(n_rows, dim);
+  const auto query_chunk          = std::min(n_rows, max_chunk_size);
+  const auto top_k                = intermediate_degree + 1;
+  const auto host_neighbors = round_up_bytes(product_bytes(n_rows, top_k, sizeof(IdxT)), thp_size);
+  const auto host_graph     = graph_bytes(n_rows, graph_degree, sizeof(IdxT));
+
+  const auto device_graph = graph_bytes(n_rows, graph_degree, sizeof(uint32_t));
+  const auto query_tile   = aligned_dataset_bytes<T>(query_chunk, dim);
+  const auto result_tile =
+    product_bytes(query_chunk, top_k, sum_bytes(sizeof(IdxT), sizeof(float)));
+  auto [opt_host, opt_device] = optimize_workspace_size(
+    n_rows, graph_degree, intermediate_degree, sizeof(IdxT), params.guarantee_connectivity);
+
+  auto iterative_phase = build_memory_estimate{
+    sum_bytes(host_neighbors, host_graph, opt_host),
+    sum_bytes(aligned_data_size,
+              std::max(sum_bytes(device_graph, query_tile, result_tile), opt_device))};
+  auto final_phase =
+    build_memory_estimate{host_graph, estimate_final_index_memory(dataset, params, graph_degree)};
+  return std::max(iterative_phase.total(), final_phase.total());
+}
+
+template <typename T, typename IdxT>
+auto estimate_ace_build_memory_usage(raft::resources const& res,
+                                     const index_params& params,
+                                     raft::host_matrix_view<const T, int64_t, row_major> dataset,
+                                     size_t intermediate_degree,
+                                     size_t graph_degree) -> size_t
+{
+  (void)res;
+  auto ace_params    = std::get<cagra::graph_build_params::ace_params>(params.graph_build_params);
+  const auto n_rows  = static_cast<size_t>(dataset.extent(0));
+  const auto dim     = static_cast<size_t>(dataset.extent(1));
+  auto n_partitions  = ace_params.npartitions == 0 ? size_t{2} : ace_params.npartitions;
+  auto min_partition = size_t{1000};
+  if (n_partitions > n_rows / min_partition) {
+    n_partitions = std::max<size_t>(2, n_rows / min_partition);
+  }
+
+  ace_memory_requirements mem{};
+  mem.available_host_memory = ace_params.max_host_memory_gb > 0
+                                ? static_cast<size_t>(ace_params.max_host_memory_gb * (1ULL << 30))
+                                : cuvs::util::get_free_host_memory();
+  mem.available_gpu_memory  = ace_params.max_gpu_memory_gb > 0
+                                ? static_cast<size_t>(ace_params.max_gpu_memory_gb * (1ULL << 30))
+                                : rmm::available_device_memory().second;
+
+  auto update_ace_memory = [&]() {
+    auto partition_rows = static_cast<size_t>(
+      imbalance_factor * 2 * raft::div_rounding_up_safe<size_t>(n_rows, n_partitions));
+    mem.partition_labels_size = product_bytes(2, n_rows, sizeof(IdxT));
+    mem.id_mapping_size       = product_bytes(2, n_rows, sizeof(IdxT));
+    mem.sub_dataset_size      = product_bytes(partition_rows, dim, sizeof(T));
+    mem.sub_graph_size =
+      product_bytes(partition_rows, intermediate_degree + graph_degree, sizeof(IdxT));
+    mem.cagra_graph_size = graph_bytes(n_rows, graph_degree, sizeof(IdxT));
+    mem.total_size       = sum_bytes(mem.partition_labels_size,
+                               mem.id_mapping_size,
+                               mem.sub_dataset_size,
+                               mem.sub_graph_size,
+                               mem.cagra_graph_size);
+  };
+  update_ace_memory();
+
+  const bool host_memory_limited =
+    static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) < mem.total_size;
+  const bool gpu_memory_limited =
+    static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
+    std::max(mem.sub_graph_size, mem.sub_dataset_size);
+  const bool use_disk_mode = ace_params.use_disk || host_memory_limited || gpu_memory_limited;
+
+  const auto partition_rows = static_cast<size_t>(
+    imbalance_factor * 2 * raft::div_rounding_up_safe<size_t>(n_rows, n_partitions));
+  auto [opt_host, opt_device] = optimize_workspace_size(
+    partition_rows, graph_degree, intermediate_degree, sizeof(IdxT), params.guarantee_connectivity);
+  auto recursive_partition_peak =
+    sum_bytes(aligned_dataset_bytes<T>(partition_rows, dim),
+              graph_bytes(partition_rows, intermediate_degree, sizeof(IdxT)),
+              graph_bytes(partition_rows, graph_degree, sizeof(IdxT)),
+              opt_host,
+              opt_device);
+
+  if (use_disk_mode) {
+    auto host   = sum_bytes(mem.partition_labels_size,
+                          mem.id_mapping_size,
+                          mem.sub_dataset_size,
+                          mem.sub_graph_size,
+                          opt_host);
+    auto device = sum_bytes(mem.sub_dataset_size, mem.sub_graph_size, opt_device);
+    return std::max(sum_bytes(host, device), recursive_partition_peak);
+  }
+
+  auto host   = sum_bytes(mem.partition_labels_size,
+                        mem.id_mapping_size,
+                        mem.sub_dataset_size,
+                        mem.sub_graph_size,
+                        mem.cagra_graph_size,
+                        opt_host);
+  auto device = sum_bytes(mem.sub_dataset_size,
+                          mem.sub_graph_size,
+                          opt_device,
+                          params.attach_dataset_on_build ? owned_dataset_bytes(dataset) : 0,
+                          graph_bytes(n_rows, graph_degree, sizeof(uint32_t)));
+  return std::max(sum_bytes(host, device), recursive_partition_peak);
+}
+
+template <typename T, typename IdxT, typename Accessor>
+auto estimate_build_memory_usage(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset) -> size_t
+{
+  RAFT_EXPECTS(dataset.extent(0) > 0 && dataset.extent(1) > 0, "empty dataset");
+
+  auto intermediate_degree = params.intermediate_graph_degree;
+  auto graph_degree        = params.graph_degree;
+  check_graph_degree<T, IdxT>(intermediate_degree, graph_degree, dataset.extent(0));
+
+  if (std::holds_alternative<cagra::graph_build_params::ace_params>(params.graph_build_params)) {
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
+    auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    return estimate_ace_build_memory_usage<T, IdxT>(
+      res, params, dataset_view, intermediate_degree, graph_degree);
+  }
+
+  const auto n_rows     = static_cast<size_t>(dataset.extent(0));
+  const auto dim        = static_cast<size_t>(dataset.extent(1));
+  auto knn_build_params = params.graph_build_params;
+  if (std::holds_alternative<std::monostate>(knn_build_params)) {
+    const auto nn_descent_check_memory =
+      estimate_nn_descent_device_memory(n_rows,
+                                        dim,
+                                        sizeof(IdxT),
+                                        cuvs::distance::DistanceType::L2Expanded,
+                                        false /* use_float_data */);
+    if (nn_descent_check_memory <= rmm::available_device_memory().second) {
+      knn_build_params =
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+    } else {
+      knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), params.metric);
+    }
+  }
+  RAFT_EXPECTS(
+    params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
+      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+        knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
+    "use nn-descent or the iterative CAGRA search build.");
+  RAFT_EXPECTS(
+    params.metric != cuvs::distance::DistanceType::CosineExpanded ||
+      std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "CosineExpanded distance is not supported for iterative CAGRA graph build.");
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
+                 (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>),
+               "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
+               "Current data type is not supported.");
+
+  if (std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+        knn_build_params)) {
+    return estimate_iterative_build_memory_usage<T, IdxT>(
+      dataset, params, intermediate_degree, graph_degree);
+  }
+
+  auto intermediate_graph_size = graph_bytes(n_rows, intermediate_degree, sizeof(IdxT));
+  auto cagra_graph_size        = graph_bytes(n_rows, graph_degree, sizeof(IdxT));
+  auto [opt_host, opt_device]  = optimize_workspace_size(
+    n_rows, graph_degree, intermediate_degree, sizeof(IdxT), params.guarantee_connectivity);
+
+  build_memory_estimate initial_graph_phase{intermediate_graph_size, 0};
+  if (std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params)) {
+    auto ivf_pq_params = std::get<cagra::graph_build_params::ivf_pq_params>(knn_build_params);
+    if (ivf_pq_params.build_params.metric != params.metric) {
+      ivf_pq_params.build_params.metric = params.metric;
+    }
+    auto ivf_pq_estimate =
+      estimate_ivf_pq_graph_build_memory(res, dataset, intermediate_degree, ivf_pq_params);
+    initial_graph_phase.host   = sum_bytes(initial_graph_phase.host, ivf_pq_estimate.host);
+    initial_graph_phase.device = ivf_pq_estimate.device;
+  } else {
+    auto nn_descent_params =
+      std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);
+    if (nn_descent_params.metric != params.metric) { nn_descent_params.metric = params.metric; }
+    if (nn_descent_params.graph_degree != intermediate_degree) {
+      nn_descent_params =
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+    }
+    const bool use_float_data =
+      std::is_same_v<T, float> &&
+      (nn_descent_params.dist_comp_dtype == cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::FP32 ||
+       (nn_descent_params.dist_comp_dtype == cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO &&
+        dim <= 16));
+    initial_graph_phase.host =
+      sum_bytes(initial_graph_phase.host,
+                estimate_nn_descent_host_memory(n_rows,
+                                                nn_descent_params.graph_degree,
+                                                nn_descent_params.intermediate_graph_degree,
+                                                intermediate_degree,
+                                                sizeof(IdxT)));
+    initial_graph_phase.device =
+      estimate_nn_descent_device_memory(n_rows, dim, sizeof(IdxT), params.metric, use_float_data);
+  }
+
+  build_memory_estimate optimize_phase{
+    sum_bytes(intermediate_graph_size, cagra_graph_size, opt_host), opt_device};
+  build_memory_estimate final_index_phase{
+    cagra_graph_size, estimate_final_index_memory(dataset, params, graph_degree)};
+
+  return std::max({initial_graph_phase.total(), optimize_phase.total(), final_index_phase.total()});
+}
 
 template <typename T,
           typename IdxT = uint32_t,
