@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -188,3 +188,52 @@ def test_cagra_ace_hierarchy(hierarchy):
         use_disk=True,
         hierarchy=hierarchy,
     )
+
+
+def test_cagra_ace_tiny_memory_limit_triggers_disk_mode():
+    """Test that setting tiny memory limits triggers disk mode automatically."""
+    n_rows = 5000
+    n_cols = 64
+    dtype = np.float32
+    metric = "sqeuclidean"
+
+    dataset = generate_data((n_rows, n_cols), dtype)
+
+    # Create a temporary directory for ACE build
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Set ACE parameters with tiny memory limits (0.001 GiB = ~1 MB)
+        # This should force disk mode even though we didn't explicitly set use_disk=True
+        ace_params = cagra.AceParams(
+            npartitions=2,
+            ef_construction=100,
+            build_dir=temp_dir,
+            use_disk=False,  # Not explicitly requesting disk mode
+            max_host_memory_gb=0.001,  # Tiny limit to force disk mode
+            max_gpu_memory_gb=0.001,  # Tiny limit to force disk mode
+        )
+
+        # Build parameters
+        build_params = cagra.IndexParams(
+            metric=metric,
+            intermediate_graph_degree=128,
+            graph_degree=64,
+            build_algo="ace",
+            ace_params=ace_params,
+        )
+
+        # Build the index with ACE - should automatically use disk mode
+        index = cagra.build(build_params, dataset)
+
+        assert index.trained
+
+        # In disk mode, the graph should be stored in the build directory
+        # Check that the graph file was created
+        graph_file = os.path.join(temp_dir, "cagra_graph.npy")
+        reordered_file = os.path.join(temp_dir, "reordered_dataset.npy")
+
+        assert os.path.exists(graph_file), (
+            "Graph file should exist when disk mode is triggered"
+        )
+        assert os.path.exists(reordered_file), (
+            "Reordered dataset file should exist when disk mode is triggered"
+        )

@@ -77,40 +77,7 @@ cuVS is built on top of the RAPIDS RAFT library of high performance machine lear
 
 ## Installing cuVS
 
-cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python) and [pip](https://pip.pypa.io/en/stable/). Different packages are available for the different languages supported by cuVS:
-
-| Python | C/C++     |
-|--------|-----------|
-| `cuvs` | `libcuvs` |
-
-### Stable release
-
-It is recommended to use [mamba](https://conda.github.io/conda-libmamba-solver/user-guide/) to install the desired packages. The following command will install the Python package. You can substitute `cuvs` for any of the packages in the table above:
-
-```bash
-conda install -c rapidsai -c conda-forge cuvs
-```
-
-The cuVS Python package can also be installed through [pip](https://docs.rapids.ai/install#pip>).
-
-```bash
-# CUDA 13
-pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
-
-# CUDA 12
-pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
-```
-
-### Nightlies
-If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
-
-```bash
-# CUDA 13
-conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=13.0
-
-# CUDA 12
-conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=12.9
-```
+cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python) and [pip](https://pip.pypa.io/en/stable/) or [tarball](https://developer.nvidia.com/cuvs-downloads). Different packages are available for the different languages supported by cuVS.
 
 > [!NOTE]
 > If compiled binary size is a concern, please note that the cuVS builds for CUDA 13 are roughly half the size of CUDA 12 builds. This is a result of improved compression rates in the newer supported CUDA drivers. We will be adopting the newer drivers for CUDA 12 builds in Spring of 2026, which will ultimately bring them down to roughly the size of the CUDA 13 builds. In the meantime, the NVIDIA cuVS team is continuing to shave down the binary sizes for all supported CUDA versions. If binary size is an issue for you, please consider linking to cuVS statically either by building from source or using pre-built `libcuvs-static` conda package.
@@ -249,3 +216,4 @@ For the interested reader, many of the accelerated implementations in cuVS are a
 - [Fast K-NN Graph Construction by GPU Based NN-Descent](https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>)
 - [cuSLINK: Single-linkage Agglomerative Clustering on the GPU](https://arxiv.org/abs/2306.16354)
 - [GPU Semiring Primitives for Sparse Neighborhood Methods](https://arxiv.org/abs/2104.06357)
+- [VecFlow: A High-Performance Vector Data Management System for Filtered-Search on GPUs](https://arxiv.org/abs/2506.00812)

@@ -1,14 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 use crate::distance_type::DistanceType;
-use crate::error::{check_cuvs, Result};
+use crate::error::{Result, check_cuvs};
 use std::fmt;
-use std::io::{stderr, Write};
+use std::io::{Write, stderr};
 
-pub use ffi::codebook_gen;
+pub use ffi::cuvsIvfPqCodebookGen;
+pub use ffi::cuvsIvfPqListLayout;
 
 pub struct IndexParams(pub ffi::cuvsIvfPqIndexParams_t);
 
@@ -88,9 +89,20 @@ impl IndexParams {
         self
     }
 
-    pub fn set_codebook_kind(self, codebook_kind: codebook_gen) -> IndexParams {
+    pub fn set_codebook_kind(self, codebook_kind: cuvsIvfPqCodebookGen) -> IndexParams {
         unsafe {
             (*self.0).codebook_kind = codebook_kind;
+        }
+        self
+    }
+
+    /// Memory layout of the IVF-PQ list data.
+    /// - FLAT: Codes are stored contiguously, one vector's codes after another.
+    /// - INTERLEAVED: Codes are interleaved for optimized search performance.
+    ///   This is the default and recommended for search workloads.
+    pub fn set_codes_layout(self, codes_layout: cuvsIvfPqListLayout) -> IndexParams {
+        unsafe {
+            (*self.0).codes_layout = codes_layout;
         }
         self
     }
@@ -148,12 +160,8 @@ impl fmt::Debug for IndexParams {
 impl Drop for IndexParams {
     fn drop(&mut self) {
         if let Err(e) = check_cuvs(unsafe { ffi::cuvsIvfPqIndexParamsDestroy(self.0) }) {
-            write!(
-                stderr(),
-                "failed to call cuvsIvfPqIndexParamsDestroy {:?}",
-                e
-            )
-            .expect("failed to write to stderr");
+            write!(stderr(), "failed to call cuvsIvfPqIndexParamsDestroy {:?}", e)
+                .expect("failed to write to stderr");
         }
     }
 }
@@ -164,10 +172,7 @@ mod tests {
 
     #[test]
     fn test_index_params() {
-        let params = IndexParams::new()
-            .unwrap()
-            .set_n_lists(128)
-            .set_add_data_on_build(false);
+        let params = IndexParams::new().unwrap().set_n_lists(128).set_add_data_on_build(false);
 
         unsafe {
             assert_eq!((*params.0).n_lists, 128);

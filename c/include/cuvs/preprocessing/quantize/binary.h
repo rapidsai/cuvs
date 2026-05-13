@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,10 +9,16 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
+#include <cuvs/core/export.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/**
+ * @defgroup preprocessing_c_binary C API for Binary Quantizer
+ * @{
+ */
 /**
  * @brief In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in
  * the dataset vector is greater than the corresponding element in the threshold vector. The mean
@@ -48,7 +54,7 @@ typedef struct cuvsBinaryQuantizerParams* cuvsBinaryQuantizerParams_t;
  * @param[in] params cuvsBinaryQuantizerParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params);
 
 /**
  * @brief De-allocate Binary Quantizer params
@@ -56,7 +62,7 @@ cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params);
 
 /**
  * @brief Defines and stores threshold for quantization upon training
@@ -77,7 +83,7 @@ typedef cuvsBinaryQuantizer* cuvsBinaryQuantizer_t;
  * @param[in] quantizer cuvsBinaryQuantizer_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 
 /**
  * @brief De-allocate Binary Quantizer
@@ -85,7 +91,7 @@ cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
  * @param[in] quantizer
  * @return cuvsError_t
  */
-cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 
 /**
  * @brief Trains a binary quantizer to be used later for quantizing the dataset.
@@ -95,7 +101,7 @@ cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
  * @param[in] dataset a row-major host or device matrix
  * @param[out] quantizer trained binary quantizer
  */
-cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
                                      cuvsBinaryQuantizerParams_t params,
                                      DLManagedTensor* dataset,
                                      cuvsBinaryQuantizer_t quantizer);
@@ -111,7 +117,7 @@ cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
  * @param[in] dataset a row-major host or device matrix to transform
  * @param[out] out a row-major host or device matrix to store transformed data
  */
-cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
                                          DLManagedTensor* dataset,
                                          DLManagedTensor* out);
 
@@ -127,10 +133,14 @@ cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
  * @param[in] dataset a row-major host or device matrix to transform
  * @param[out] out a row-major host or device matrix to store transformed data
  */
-cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
                                                    cuvsBinaryQuantizer_t quantizer,
                                                    DLManagedTensor* dataset,
                                                    DLManagedTensor* out);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

@@ -1,10 +1,10 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
-from libc.stdint cimport uintptr_t
+from libc.stdint cimport int64_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -18,6 +18,15 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         Random
         Array
 
+    ctypedef enum cuvsKMeansType:
+        CUVS_KMEANS_TYPE_KMEANS
+        CUVS_KMEANS_TYPE_KMEANS_BALANCED
+
+    # NOTE: The Python binding currently targets the unsuffixed cuvsKMeansParams
+    # ABI (which still carries the deprecated `inertia_check` field). In cuVS
+    # 26.08 this struct/entry-point set will be replaced by the contents of
+    # cuvsKMeansParams_v2 -- once that lands, the `inertia_check` field below
+    # should be deleted.
     ctypedef struct cuvsKMeansParams:
         cuvsDistanceType metric,
         int n_clusters,
@@ -30,7 +39,9 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         int batch_centroids,
         bool inertia_check,
         bool hierarchical,
-        int hierarchical_n_iters
+        int hierarchical_n_iters,
+        int64_t streaming_batch_size,
+        int64_t init_size
 
     ctypedef cuvsKMeansParams* cuvsKMeansParams_t
 

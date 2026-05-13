@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,12 +14,12 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rapids_logger/logger.hpp>
 #include <rmm/cuda_stream_view.hpp>
-#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/cuda_memory_resource.hpp>
 #include <rmm/mr/managed_memory_resource.hpp>
-#include <rmm/mr/owning_wrapper.hpp>
 #include <rmm/mr/per_device_resource.hpp>
-#include <rmm/mr/pool_memory_resource.hpp>
 #include <rmm/mr/pinned_host_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include "../core/exceptions.hpp"
 
@@ -132,8 +132,8 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    auto mr      = rmm::mr::get_current_device_resource();
-    *ptr         = mr->allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
+    auto mr      = rmm::mr::get_current_device_resource_ref();
+    *ptr         = mr.allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
   });
 }
 
@@ -141,53 +141,32 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    auto mr      = rmm::mr::get_current_device_resource();
-    mr->deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
+    auto mr      = rmm::mr::get_current_device_resource_ref();
+    mr.deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
   });
 }
-
-thread_local std::shared_ptr<
-  rmm::mr::owning_wrapper<rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>,
-                          rmm::mr::device_memory_resource>>
-  pool_mr;
 
 extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                                        int max_pool_size_percent,
                                                        bool managed)
 {
   return cuvs::core::translate_exceptions([=] {
-    // Upstream memory resource needs to be a cuda_memory_resource
-    auto cuda_mr         = rmm::mr::get_current_device_resource();
-    auto* cuda_mr_casted = dynamic_cast<rmm::mr::cuda_memory_resource*>(cuda_mr);
-    if (cuda_mr_casted == nullptr) {
-      throw std::runtime_error("Current memory resource is not a cuda_memory_resource");
-    }
-
     auto initial_size = rmm::percent_of_free_device_memory(initial_pool_size_percent);
     auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
 
-    auto mr = std::shared_ptr<rmm::mr::device_memory_resource>();
     if (managed) {
-      mr = std::static_pointer_cast<rmm::mr::device_memory_resource>(
-        std::make_shared<rmm::mr::managed_memory_resource>());
+      rmm::mr::set_current_device_resource(
+        rmm::mr::pool_memory_resource{rmm::mr::managed_memory_resource{}, initial_size, max_size});
     } else {
-      mr = std::static_pointer_cast<rmm::mr::device_memory_resource>(
-        std::make_shared<rmm::mr::cuda_memory_resource>());
+      rmm::mr::set_current_device_resource(
+        rmm::mr::pool_memory_resource{rmm::mr::cuda_memory_resource{}, initial_size, max_size});
     }
-
-    pool_mr =
-      rmm::mr::make_owning_wrapper<rmm::mr::pool_memory_resource>(mr, initial_size, max_size);
-
-    rmm::mr::set_current_device_resource(pool_mr.get());
   });
 }
 
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
-  return cuvs::core::translate_exceptions([=] {
-    rmm::mr::set_current_device_resource(rmm::mr::detail::initial_resource());
-    pool_mr.reset();
-  });
+  return cuvs::core::translate_exceptions([=] { rmm::mr::reset_current_device_resource(); });
 }
 
 thread_local std::unique_ptr<rmm::mr::pinned_host_memory_resource> pinned_mr;
@@ -263,18 +242,33 @@ void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTe
 {
   DLTensor& src = src_managed->dl_tensor;
   DLTensor& dst = dst_managed->dl_tensor;
+  auto res_ptr  = reinterpret_cast<raft::resources*>(res);
+  auto stream   = raft::resource::get_cuda_stream(*res_ptr);
 
-  int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
-  int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
-  auto res_ptr           = reinterpret_cast<raft::resources*>(res);
+  if (src.ndim == 2) {
+    // use raft::copy_matrix for 2D tensors - this will handle copying from strided to non-strided
+    // views well
+    int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
+    int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
 
-  raft::copy_matrix<T>(static_cast<T*>(dst.data),
-                       dst_row_stride,
-                       static_cast<const T*>(src.data),
-                       src_row_stride,
-                       src.shape[1],
-                       src.shape[0],
-                       raft::resource::get_cuda_stream(*res_ptr));
+    raft::copy_matrix<T>(static_cast<T*>(dst.data),
+                         dst_row_stride,
+                         static_cast<const T*>(src.data),
+                         src_row_stride,
+                         src.shape[1],
+                         src.shape[0],
+                         stream);
+  } else {
+    // Otherwise use cudaMemcpyAsync - and assert that we don't have strided data
+    RAFT_EXPECTS(src.strides == nullptr, "cuvsCopyMatrix only supports strides with 2D inputs");
+    RAFT_EXPECTS(dst.strides == nullptr, "cuvsCopyMatrix only supports strides with 2D inputs");
+
+    size_t elements = 1;
+    for (int64_t i = 0; i < src.ndim; ++i) {
+      elements *= src.shape[i];
+    }
+    raft::copy<T>(static_cast<T*>(dst.data), static_cast<const T*>(src.data), elements, stream);
+  }
 }
 }  // namespace
 
@@ -286,8 +280,7 @@ extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
 
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
-    RAFT_EXPECTS(dst.ndim == 2, "dst should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim == dst.ndim, "src and dst tensors should have the same dimensions");
 
     for (int64_t i = 0; i < src.ndim; ++i) {
       RAFT_EXPECTS(src.shape[i] == dst.shape[i], "shape mismatch between src and dst tensors");
@@ -350,21 +343,26 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
 
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim <= 2, "src should be a 1 or 2 dimensional tensor");
     RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
 
     dst.dtype    = src.dtype;
     dst.device   = src.device;
-    dst.ndim     = 2;
-    dst.shape    = new int64_t[2];
+    dst.ndim     = src.ndim;
+    dst.shape    = new int64_t[dst.ndim];
     dst.shape[0] = end - start;
-    dst.shape[1] = src.shape[1];
 
-    int64_t row_strides = dst.shape[1];
-    if (src.strides) {
-      dst.strides = new int64_t[2];
-      row_strides = dst.strides[0] = src.strides[0];
-      dst.strides[1]               = src.strides[1];
+    int64_t row_strides = 1;
+
+    if (dst.ndim == 2) {
+      dst.shape[1] = src.shape[1];
+      row_strides = dst.shape[1];
+
+      if (src.strides) {
+        dst.strides = new int64_t[2];
+        row_strides = dst.strides[0] = src.strides[0];
+        dst.strides[1]               = src.strides[1];
+      }
     }
 
     dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);

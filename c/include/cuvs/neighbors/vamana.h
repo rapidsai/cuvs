@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,6 +11,8 @@
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+#include <cuvs/core/export.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,7 +68,7 @@ typedef struct cuvsVamanaIndexParams* cuvsVamanaIndexParams_t;
  * @param[in] params cuvsVamanaIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
 
 /**
  * @brief De-allocate Vamana Index params
@@ -74,7 +76,7 @@ cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
  * @param[in] params cuvsVamanaIndexParams_t to de-allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
+CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
 
 /**
  * @}
@@ -103,7 +105,7 @@ typedef cuvsVamanaIndex* cuvsVamanaIndex_t;
  * @param[in] index cuvsVamanaIndex_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
+CUVS_EXPORT cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 
 /**
  * @brief De-allocate Vamana index
@@ -111,7 +113,7 @@ cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
  * @param[in] index cuvsVamanaIndex_t to de-allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 
 /**
  * @brief Get the dimension of the index
@@ -120,7 +122,7 @@ cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
  * @param[out] dim pointer to dimension to set
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
+CUVS_EXPORT cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
 
 /**
  * @}
@@ -136,7 +138,7 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
  *
  * Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build uses the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively inserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -166,7 +168,7 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
  * @param[out] index cuvsVamanaIndex_t Vamana index
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
                             cuvsVamanaIndexParams_t params,
                             DLManagedTensor* dataset,
                             cuvsVamanaIndex_t index);
@@ -202,7 +204,7 @@ cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
  * @param[in] include_dataset whether to include the dataset in the serialized index
  * @return cuvsError_t
  */
-cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
                                 const char* filename,
                                 cuvsVamanaIndex_t index,
                                 bool include_dataset);

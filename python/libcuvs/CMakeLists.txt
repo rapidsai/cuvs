@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -31,7 +31,6 @@ endif()
 unset(cuvs_FOUND)
 
 # --- CUDA --- #
-set(CUDA_STATIC_RUNTIME ON)
 set(CUDA_STATIC_MATH_LIBRARIES OFF)
 
 # --- RAFT ---#

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,6 +12,8 @@
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+#include <cuvs/core/export.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +38,74 @@ enum cuvsHnswHierarchy {
   GPU = 2
 };
 
+/**
+ * Parameters for ACE (Augmented Core Extraction) graph build for HNSW.
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
+ * 1. Partitioning the dataset in core and augmented partitions using balanced k-means
+ * 2. Building sub-indexes for each partition independently
+ * 3. Concatenating sub-graphs into a final unified index
+ */
+struct cuvsHnswAceParams {
+  /**
+   * Number of partitions for ACE partitioned build.
+   *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. The partition size is on average 2 * (n_rows /
+   * npartitions) * dim * sizeof(T). 2 is because of the core and augmented
+   * vectors. Please account for imbalance in the partition sizes (up to 3x in
+   * our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
+   */
+  size_t npartitions;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Used when `use_disk` is true or when the graph does not fit in memory.
+   */
+  const char* build_dir;
+  /**
+   * Whether to use disk-based storage for ACE build.
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk;
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   * When set to 0 (default), uses available host memory.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   * When set to 0 (default), uses available GPU memory.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb;
+};
+
+typedef struct cuvsHnswAceParams* cuvsHnswAceParams_t;
+
+/**
+ * @brief Allocate HNSW ACE params, and populate with default values
+ *
+ * @param[in] params cuvsHnswAceParams_t to allocate
+ * @return cuvsError_t
+ */
+CUVS_EXPORT cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
+
+/**
+ * @brief De-allocate HNSW ACE params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+CUVS_EXPORT cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
+
 struct cuvsHnswIndexParams {
   /* hierarchy of the hnsw index */
   enum cuvsHnswHierarchy hierarchy;
@@ -49,6 +119,17 @@ struct cuvsHnswIndexParams {
       is parallelized with the help of CPU threads.
   */
   int num_threads;
+  /** HNSW M parameter: number of bi-directional links per node (used when building with ACE).
+   *  graph_degree = m * 2, intermediate_graph_degree = m * 3.
+   */
+  size_t M;
+  /** Distance type for the index. */
+  cuvsDistanceType metric;
+  /**
+   * Optional: specify ACE parameters for building HNSW index using ACE algorithm.
+   * Set to nullptr for default behavior (from_cagra conversion).
+   */
+  cuvsHnswAceParams_t ace_params;
 };
 
 typedef struct cuvsHnswIndexParams* cuvsHnswIndexParams_t;
@@ -59,7 +140,7 @@ typedef struct cuvsHnswIndexParams* cuvsHnswIndexParams_t;
  * @param[in] params cuvsHnswIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
 
 /**
  * @brief De-allocate HNSW Index params
@@ -67,7 +148,7 @@ cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
+CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
 
 /**
  * @}
@@ -96,14 +177,14 @@ typedef cuvsHnswIndex* cuvsHnswIndex_t;
  * @param[in] index cuvsHnswIndex_t to allocate
  * @return HnswError_t
  */
-cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
+CUVS_EXPORT cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 
 /**
  * @brief De-allocate HNSW index
  *
  * @param[in] index cuvsHnswIndex_t to de-allocate
  */
-cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 
 /**
  * @}
@@ -127,7 +208,7 @@ typedef struct cuvsHnswExtendParams* cuvsHnswExtendParams_t;
  * @param[in] params cuvsHnswExtendParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
 
 /**
  * @brief De-allocate HNSW extend params
@@ -136,7 +217,7 @@ cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
  * @return cuvsError_t
  */
 
-cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
+CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
 
 /**
  * @}
@@ -188,16 +269,87 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  */
-cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
                               cuvsHnswIndexParams_t params,
                               cuvsCagraIndex_t cagra_index,
                               cuvsHnswIndex_t hnsw_index);
 
-cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
                                          cuvsHnswIndexParams_t params,
                                          cuvsCagraIndex_t cagra_index,
                                          cuvsHnswIndex_t hnsw_index,
                                          DLManagedTensor* dataset_tensor);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup hnsw_c_index_build Build HNSW index using ACE algorithm
+ * @{
+ */
+
+/**
+ * @brief Build an HNSW index using ACE (Augmented Core Extraction) algorithm.
+ *
+ * ACE enables building HNSW indexes for datasets too large to fit in GPU memory by:
+ * 1. Partitioning the dataset using balanced k-means into core and augmented partitions
+ * 2. Building sub-indexes for each partition independently
+ * 3. Concatenating sub-graphs into a final unified index
+ *
+ * NOTE: This function requires CUDA to be available at runtime.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsHnswIndexParams_t with ACE parameters configured
+ * @param[in] dataset DLManagedTensor* host dataset to build index from
+ * @param[out] index cuvsHnswIndex_t to return the built HNSW index
+ *
+ * @return cuvsError_t
+ *
+ * @code{.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/hnsw.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsResourcesCreate(&res);
+ *
+ * // Create ACE parameters
+ * cuvsHnswAceParams_t ace_params;
+ * cuvsHnswAceParamsCreate(&ace_params);
+ * ace_params->npartitions = 4;
+ * ace_params->use_disk = true;
+ * ace_params->build_dir = "/tmp/hnsw_ace_build";
+ *
+ * // Create index parameters
+ * cuvsHnswIndexParams_t params;
+ * cuvsHnswIndexParamsCreate(&params);
+ * params->hierarchy = GPU;
+ * params->ace_params = ace_params;
+ * params->M = 32;
+ * params->ef_construction = 120;
+ *
+ * // Create HNSW index
+ * cuvsHnswIndex_t hnsw_index;
+ * cuvsHnswIndexCreate(&hnsw_index);
+ *
+ * // Assume dataset is a populated DLManagedTensor with host data
+ * DLManagedTensor dataset;
+ *
+ * // Build the index
+ * cuvsHnswBuild(res, params, &dataset, hnsw_index);
+ *
+ * // Clean up
+ * cuvsHnswAceParamsDestroy(ace_params);
+ * cuvsHnswIndexParamsDestroy(params);
+ * cuvsHnswIndexDestroy(hnsw_index);
+ * cuvsResourcesDestroy(res);
+ * @endcode
+ */
+CUVS_EXPORT cuvsError_t cuvsHnswBuild(cuvsResources_t res,
+                          cuvsHnswIndexParams_t params,
+                          DLManagedTensor* dataset,
+                          cuvsHnswIndex_t index);
 
 /**
  * @}
@@ -252,7 +404,7 @@ cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
   * @endcode
   */
 
-cuvsError_t cuvsHnswExtend(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsHnswExtend(cuvsResources_t res,
                            cuvsHnswExtendParams_t params,
                            DLManagedTensor* additional_dataset,
                            cuvsHnswIndex_t index);
@@ -279,7 +431,7 @@ typedef struct cuvsHnswSearchParams* cuvsHnswSearchParams_t;
  * @param[in] params cuvsHnswSearchParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
 
 /**
  * @brief De-allocate HNSW search params
@@ -287,7 +439,7 @@ cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
  * @param[in] params cuvsHnswSearchParams_t to de-allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
+CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
 
 /**
  * @}
@@ -346,7 +498,7 @@ cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
-cuvsError_t cuvsHnswSearch(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsHnswSearch(cuvsResources_t res,
                            cuvsHnswSearchParams_t params,
                            cuvsHnswIndex_t index,
                            DLManagedTensor* queries,
@@ -401,7 +553,7 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  */
-cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHnswIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHnswIndex_t index);
 
 /**
  * Load hnswlib index from file which was serialized from a HNSW index.
@@ -439,7 +591,7 @@ cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHns
  * @param[in] metric the distance metric used to build the index
  * @param[out] index HNSW index loaded disk
  */
-cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
                                 cuvsHnswIndexParams_t params,
                                 const char* filename,
                                 int dim,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,6 +7,8 @@
 //!
 //! This crate provides Rust bindings for cuVS, allowing you to run
 //! approximate nearest neighbors search on the GPU.
+extern crate cuvs_sys as ffi;
+
 pub mod brute_force;
 pub mod cagra;
 pub mod cluster;
@@ -17,6 +19,7 @@ mod error;
 pub mod ivf_flat;
 pub mod ivf_pq;
 mod resources;
+pub mod vamana;
 
 pub use dlpack::ManagedTensor;
 pub use error::{Error, Result};

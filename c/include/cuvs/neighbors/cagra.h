@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,6 +12,8 @@
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+#include <cuvs/core/export.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -127,23 +129,30 @@ typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
 /**
  * Parameters for ACE (Augmented Core Extraction) graph build.
- * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
  * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
  * partitions using balanced k-means.
- * 2. Building sub-indices for each partition independently
+ * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
  */
 struct cuvsAceParams {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
    *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. Partitions should not be too small to prevent issues
-   * in KNN graph construction. 100k - 5M vectors per partition is recommended
-   * depending on the available host and GPU memory. The partition size is on
-   * average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the
-   * core and augmented vectors. Please account for imbalance in the partition
-   * sizes (up to 3x in our tests).
+   * in KNN graph construction. The partition size is on average 2 * (n_rows /
+   * npartitions) * dim * sizeof(T). 2 is because of the core and augmented
+   * vectors. Please account for imbalance in the partition sizes (up to 3x in
+   * our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
    */
   size_t npartitions;
   /**
@@ -167,6 +176,22 @@ struct cuvsAceParams {
    * When true, enables disk-based operations for memory-efficient graph construction.
    */
   bool use_disk;
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available host memory.
+   * When set to a positive value, limits host memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * When set to a positive value, limits GPU memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb;
 };
 
 typedef struct cuvsAceParams* cuvsAceParams_t;
@@ -209,7 +234,7 @@ typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
  * @param[in] params cuvsCagraIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
 
 /**
  * @brief De-allocate CAGRA Index params
@@ -217,7 +242,7 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
 
 /**
  * @brief Allocate CAGRA Compression params, and populate with default values
@@ -225,7 +250,7 @@ cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
  * @param[in] params cuvsCagraCompressionParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params);
 
 /**
  * @brief De-allocate CAGRA Compression params
@@ -233,7 +258,7 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
+CUVS_EXPORT cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
 
 /**
  * @brief Allocate ACE params, and populate with default values
@@ -241,7 +266,7 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
  * @param[in] params cuvsAceParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
 
 /**
  * @brief De-allocate ACE params
@@ -249,23 +274,7 @@ cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
-
-/**
- * @brief Allocate ACE params, and populate with default values
- *
- * @param[in] params cuvsAceParams_t to allocate
- * @return cuvsError_t
- */
-cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
-
-/**
- * @brief De-allocate ACE params
- *
- * @param[in] params
- * @return cuvsError_t
- */
-cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
+CUVS_EXPORT cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 /**
  * @brief Create CAGRA index parameters similar to an HNSW index
@@ -282,7 +291,7 @@ cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
  * @param[in] metric Distance metric to use
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
+CUVS_EXPORT cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
                                                 int64_t n_rows,
                                                 int64_t dim,
                                                 int M,
@@ -319,7 +328,7 @@ typedef struct cuvsCagraExtendParams* cuvsCagraExtendParams_t;
  * @param[in] params cuvsCagraExtendParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
 
 /**
  * @brief De-allocate CAGRA Extend params
@@ -327,7 +336,7 @@ cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
+CUVS_EXPORT cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
 
 /**
  * @}
@@ -437,7 +446,7 @@ typedef struct cuvsCagraSearchParams* cuvsCagraSearchParams_t;
  * @param[in] params cuvsCagraSearchParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
 
 /**
  * @brief De-allocate CAGRA search params
@@ -445,7 +454,7 @@ cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
+CUVS_EXPORT cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 
 /**
  * @}
@@ -474,14 +483,14 @@ typedef cuvsCagraIndex* cuvsCagraIndex_t;
  * @param[in] index cuvsCagraIndex_t to allocate
  * @return cagraError_t
  */
-cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 
 /**
  * @brief De-allocate CAGRA index
  *
  * @param[in] index cuvsCagraIndex_t to de-allocate
  */
-cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 
 /**
  * @brief Get dimension of the CAGRA index
@@ -490,7 +499,7 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
  * @param[out] dim return dimension of the index
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
 
 /**
  * @brief Get size of the CAGRA index
@@ -499,7 +508,7 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
  * @param[out] size return number of vectors in the index
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 
 /**
  * @brief Get graph degree of the CAGRA index
@@ -508,7 +517,7 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
  * @param[out] graph_degree return graph degree
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
 
 /**
  * @brief Returns a view of the CAGRA dataset
@@ -529,7 +538,7 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
  * @param[out] dataset the dataset used in cagra
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
 
 /**
  * @brief Returns a view of the CAGRA graph
@@ -550,34 +559,7 @@ cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* da
  * @param[out] graph the output knn graph.
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph);
-
-/**
- * @}
- */
-
-/**
- * @defgroup cagra_c_merge_params C API for CUDA ANN Graph-based nearest neighbor search
- * @{
- */
-
-/**
- * @brief Supplemental parameters to merge CAGRA index
- *
- */
-
-struct cuvsCagraMergeParams {
-  cuvsCagraIndexParams_t output_index_params;
-  cuvsMergeStrategy strategy;
-};
-
-typedef struct cuvsCagraMergeParams* cuvsCagraMergeParams_t;
-
-/** Allocate CAGRA merge params with default values */
-cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params);
-
-/** De-allocate CAGRA merge params */
-cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph);
 
 /**
  * @}
@@ -632,7 +614,7 @@ cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
  *                                      created with cuvsCagraIndexCreate.
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            cuvsCagraIndexParams_t params,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
@@ -661,7 +643,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in,out] index cuvsCagraIndex_t CAGRA index
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsCagraExtend(cuvsResources_t res,
                             cuvsCagraExtendParams_t params,
                             DLManagedTensor* additional_dataset,
                             cuvsCagraIndex_t index);
@@ -724,7 +706,7 @@ cuvsError_t cuvsCagraExtend(cuvsResources_t res,
  * @param[in] filter cuvsFilter input filter that can be used
               to filter queries and neighbors based on the given bitset.
  */
-cuvsError_t cuvsCagraSearch(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsCagraSearchParams_t params,
                             cuvsCagraIndex_t index,
                             DLManagedTensor* queries,
@@ -762,7 +744,7 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  * @param[in] include_dataset Whether or not to write out the dataset to the file.
  *
  */
-cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                const char* filename,
                                cuvsCagraIndex_t index,
                                bool include_dataset);
@@ -791,7 +773,7 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
  * @param[in] index CAGRA index
  *
  */
-cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
                                         const char* filename,
                                         cuvsCagraIndex_t index);
 
@@ -805,7 +787,7 @@ cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
  * @param[inout] index cuvsCagraIndex_t CAGRA index loaded from disk. This index needs to be already
  *                                      created with cuvsCagraIndexCreate.
  */
-cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
 
 /**
  * Load index from a dataset and graph
@@ -841,18 +823,27 @@ cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvs
  *
  * @endcode
  */
-cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
                                    cuvsDistanceType metric,
                                    DLManagedTensor* graph,
                                    DLManagedTensor* dataset,
                                    cuvsCagraIndex_t index);
 
 /**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_index_merge CAGRA C-API merge functions
+ * @{
+ */
+
+/**
  * @brief Merge multiple CAGRA indices into a single CAGRA index.
  *
  * All input indices must have been built with the same data type (`index.dtype`) and
  * have the same dimensionality (`index.dims`). The merged index uses the output
- * parameters specified in `cuvsCagraMergeParams`.
+ * parameters specified in `cuvsCagraIndexParams`.
  *
  * Input indices must have:
  *  - `index.dtype.code` and `index.dtype.bits` matching across all indices.
@@ -879,29 +870,31 @@ cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  *
  * // Assume index1 and index2 have been built using cuvsCagraBuild
  *
- * cuvsCagraMergeParams_t merge_params;
- * cuvsError_t params_create_status = cuvsCagraMergeParamsCreate(&merge_params);
+ * cuvsCagraIndexParams_t merge_params;
+ * cuvsError_t params_create_status = cuvsCagraIndexParamsCreate(&merge_params);
  *
  * cuvsError_t merge_status = cuvsCagraMerge(res, merge_params, (cuvsCagraIndex_t[]){index1,
  * index2}, 2, merged_index);
  *
  * // Use merged_index for search operations
  *
- * cuvsError_t params_destroy_status = cuvsCagraMergeParamsDestroy(merge_params);
+ * cuvsError_t params_destroy_status = cuvsCagraIndexParamsDestroy(merge_params);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsCagraMergeParams_t parameters controlling merge behavior
+ * @param[in] params cuvsCagraIndexParams_t parameters controlling merge behavior
  * @param[in] indices Array of input cuvsCagraIndex_t handles to merge
  * @param[in] num_indices Number of input indices
+ * @param[in] filter Filter that can be used to filter out vectors from the merged index
  * @param[out] output_index Output handle that will store the merged index.
  *                          Must be initialized using `cuvsCagraIndexCreate` before use.
  */
-cuvsError_t cuvsCagraMerge(cuvsResources_t res,
-                           cuvsCagraMergeParams_t params,
+CUVS_EXPORT cuvsError_t cuvsCagraMerge(cuvsResources_t res,
+                           cuvsCagraIndexParams_t params,
                            cuvsCagraIndex_t* indices,
                            size_t num_indices,
+                           cuvsFilter filter,
                            cuvsCagraIndex_t output_index);
 
 /**

@@ -9,6 +9,8 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
 
   * `Python through Pip`_
 
+  * `Tarball`_
+
 - `Build from source`_
 
   * `Prerequisites`_
@@ -46,7 +48,7 @@ C/C++ Package
 .. code-block:: bash
 
    # CUDA 13
-   conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.0
+   conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.2
 
    # CUDA 12
    conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
@@ -57,7 +59,7 @@ Python Package
 .. code-block:: bash
 
    # CUDA 13
-   conda install -c rapidsai -c conda-forge cuvs cuda-version=13.0
+   conda install -c rapidsai -c conda-forge cuvs cuda-version=13.2
 
    # CUDA 12
    conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
@@ -77,11 +79,41 @@ The cuVS Python package can also be `installed through pip <https://docs.rapids.
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
 
+Tarball
+^^^^^^^
+
+Install Dependencies
+~~~~~~~~~~~~~~~~~~~~
+
+1. `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>`_
+2. `libopenmp`
+3. CUDA Toolkit Runtime 12.2+
+4. Ampere architecture or better (compute capability >= 8.0)
+
+Download & Extract
+~~~~~~~~~~~~~~~~~~
+
+Download the pre-built tarball for your CPU architecture and CUDA version from
+`https://developer.nvidia.com/cuvs-downloads <https://developer.nvidia.com/cuvs-downloads>`_
+
+Untar the tarball into a directory.
+
+.. code-block:: bash
+
+    tar -xzvf libcuvs-linux-sbsa-26.02.00.189485_cuda12-archive.tar.xz -C /path/to/folder
+
+
+Add cuVS to your system library load path. This should be done in the appropriate profile configuration (for e.g. `.bashrc`, `.bash_profile`) to maintain the setting across sessions.
+
+.. code-block:: bash
+
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/folder
+
+
 Build from source
 -----------------
 
 The core cuVS source code is written in C++ and wrapped through a C API. The C API is wrapped around the C++ APIs and the other supported languages are built around the C API.
-
 
 Prerequisites
 ^^^^^^^^^^^^^
@@ -98,7 +130,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-130_arch-$(uname -m).yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-132_arch-$(uname -m).yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
@@ -173,7 +205,7 @@ After building the C and C++ libraries, the Golang library can be built with the
 
     export CUDA_HOME="/usr/local/cuda" # or wherever your CUDA installation is.
     export CGO_CFLAGS="-I${CONDA_PREFIX}/include -I${CUDA_HOME}/include"
-    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
+    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcuvs -lcuvs_c"
     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
     export CC=clang
 
@@ -226,11 +258,6 @@ cuVS has the following configurable cmake flags available:
    - ON, OFF
    - OFF
    - Enable the `-lineinfo` option for nvcc
-
- * - CUDA_STATIC_RUNTIME
-   - ON, OFF
-   - OFF
-   - Statically link the CUDA runtime
 
  * - CUDA_STATIC_MATH_LIBRARIES
    - ON, OFF
