@@ -238,6 +238,6 @@ void index<CodeT>::check_consistency()
                static_cast<uint32_t>(centers_.extent(1)));
 }
 
-template struct index<uint8_t>;
+template struct CUVS_EXPORT index<uint8_t>;
 
 }  // namespace cuvs::neighbors::ivf_sq
