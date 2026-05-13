@@ -834,29 +834,34 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
     mst_host += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
   }
 
+  // batchsize for both prune and combine stages
+  size_t batch_size = std::min(static_cast<size_t>(256 * 1024), n_rows);
+
   // Prune stage memory
   // We neglect 8 bytes (both on host and device) for stats
-  size_t prune_host = n_rows * intermediate_degree * sizeof(uint8_t);  // detour count
-
-  size_t prune_dev = n_rows * intermediate_degree * 1;     // detour count (uint8_t)
-  prune_dev += n_rows * sizeof(uint32_t);                  // d_num_detour_edges
-  prune_dev += n_rows * intermediate_degree * index_size;  // d_input_graph
+  size_t prune_dev = batch_size * intermediate_degree * 1;  // detour count (uint8_t)
+  prune_dev += batch_size * sizeof(uint32_t);               // d_num_detour_edges
+  prune_dev += n_rows * intermediate_degree * index_size;   // d_input_graph
+  prune_dev += 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
 
   // Reverse graph stage memory
-  size_t rev_host = n_rows * graph_degree * index_size;  // rev_graph
-  rev_host += n_rows * sizeof(uint32_t);                 // rev_graph_count
-  rev_host += n_rows * index_size;                       // dest_nodes
-
   size_t rev_dev = n_rows * graph_degree * index_size;  // d_rev_graph
   rev_dev += n_rows * sizeof(uint32_t);                 // d_rev_graph_count
-  rev_dev += n_rows * sizeof(uint32_t);                 // d_dest_nodes
+  rev_dev += n_rows * index_size;                       // d_dest_nodes
 
-  // Memory for merging graphs (host only)
+  // Memory for merging graphs (host only optional)
   size_t combine_host =
     n_rows * sizeof(uint32_t) + graph_degree * sizeof(uint32_t);  // in_edge_count + hist
 
-  size_t total_host = mst_host + std::max({prune_host, rev_host, combine_host});
-  size_t total_dev  = std::max(prune_dev, rev_dev);
+  // additional memory for combine stage on device (3 batches)
+  size_t combine_dev = 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
+  if (mst_optimize) {
+    combine_dev += 2 * batch_size * graph_degree * index_size;  // d_mst_graph(2*batch)
+    combine_dev += 2 * batch_size * sizeof(uint32_t);           // d_mst_graph_num_edges(2*batch)
+  }
+
+  size_t total_host = mst_host + combine_host;
+  size_t total_dev  = std::max(prune_dev, rev_dev + combine_dev);
 
   return std::make_pair(total_host, total_dev);
 }
@@ -1749,11 +1754,12 @@ void build_knn_graph(
   bool first                    = true;
   const auto start_clock        = std::chrono::system_clock::now();
 
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
+  auto vec_batches = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<DataT>(
+    res,
     dataset.data_handle(),
-    dataset.extent(0),
-    dataset.extent(1),
-    static_cast<int64_t>(max_queries),
+    static_cast<int64_t>(dataset.extent(0)),
+    static_cast<int64_t>(dataset.extent(1)),
+    static_cast<size_t>(max_queries),
     raft::resource::get_cuda_stream(res),
     workspace_mr);
 
@@ -2126,10 +2132,11 @@ auto iterative_build_graph(raft::resources const& res,
 
     // Search.
     // Since there are many queries, divide them into batches and search them.
-    cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
+    auto query_batch = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<T>(
+      res,
       dev_query_view.data_handle(),
-      curr_query_size,
-      dev_query_view.extent(1),
+      static_cast<int64_t>(curr_query_size),
+      static_cast<int64_t>(dev_query_view.extent(1)),
       max_chunk_size,
       raft::resource::get_cuda_stream(res),
       raft::resource::get_workspace_resource_ref(res));

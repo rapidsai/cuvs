@@ -84,10 +84,11 @@ void add_node_core(
   auto host_neighbor_indices =
     raft::make_host_matrix<IdxT, std::int64_t>(max_search_batch_size, base_degree);
 
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<T> additional_dataset_batch(
+  auto additional_dataset_batch = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<T>(
+    handle,
     additional_dataset_view.data_handle(),
-    num_add,
-    additional_dataset_view.stride(0),
+    static_cast<std::int64_t>(num_add),
+    static_cast<std::int64_t>(additional_dataset_view.stride(0)),
     max_search_batch_size,
     raft::resource::get_cuda_stream(handle),
     mr);
