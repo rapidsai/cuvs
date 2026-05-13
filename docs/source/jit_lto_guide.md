@@ -475,86 +475,37 @@ extern "C" __global__ void search_kernel(
 
 **Note**: The kernel uses generic function templates (`compute_distance<T>` and `apply_filter<IdxT>`) that are resolved at link time. The specific implementations (euclidean vs inner_product, filter_none vs filter_bitset) are provided by the fragments that get linked together.
 
-### Step 5: Create `.cpp.in` Template Files for Embedding
+### Step 5: Create Fragment Tags for Embedding
 
-The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime. Fragment tags are used to help the
-linker find and include the relevant fatbins at build time.
+Fragment tags register the compiled fatbins so they can be loaded at runtime. They are used to help the linker find and include the relevant fatbins at build time. When calling `generate_jit_lto_kernels()`, we pass a `FRAGMENT_TAG_FORMAT` argument, which constructs the tag type from the given placeholders, and a `FRAGMENT_TAG_HEADER_FILES` argument, which specifies one or more header files that the fragment tags come from. The JIT+LTO system will then automatically generate and compile a `.cpp` file that registers the fragment using the provided tag.
 
-**Important**: In the `.cpp.in` files (which become `.cpp` files), we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `StaticFatbinFragmentEntry` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
+**Important**: When requesting fragments from the `AlgorithmPlanner`, we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `add_static_fragment` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
 
-#### `compute_distance_embedded.cpp.in`
+**`registration_tags.hpp`**
 
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
+```cpp
+#pragma once
 
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
+struct tag_h{};
+struct tag_f{};
+struct tag_d{};
+struct tag_ui{};
+struct tag_l{};
 
-namespace example::detail {
+struct tag_metric_euclidean {};
+struct tag_metric_inner_product {};
 
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_compute_distance<tag_@distance_name@, tag_@type_abbrev@>>;
+struct tag_filter_none {};
+struct tag_filter_bitset {};
 
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+template <typename DataTag, typename OutTag, typename IdxTag, bool Optimized, int Veclen>
+struct fragment_tag_search {};
 
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
+template <typename DistanceTag, typename DataTag>
+struct fragment_tag_compute_distance {};
 
-}
-```
-
-#### `filter_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_filter<tag_@filter_name@, tag_@idx_abbrev@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
-```
-
-#### `search_kernel_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_search<tag_@type_abbrev@, tag_@out_abbrev@, tag_@idx_abbrev@, @optimized@, @veclen@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
+template <typename FilterTag, typename IndexTag>
+struct fragment_tag_filter {};
 ```
 
 ### Step 6: Create the Planner
@@ -565,7 +516,7 @@ The planner is responsible for:
 3. Requesting the fragments from the fragment database
 4. Linking them together to create a launchable kernel
 
-**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `.cpp.in` registration files. Any mismatch will result in runtime linking failures.
+**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `FRAGMENT_TAG_FORMAT` argument. Any mismatch will result in runtime linking failures.
 
 **`search_planner.hpp`**:
 
@@ -578,8 +529,10 @@ The planner is responsible for:
 #include <string>
 
 struct SearchPlanner : AlgorithmPlanner {
+  inline static LauncherJitCache launcher_jit_cache{};
+
   SearchPlanner()
-    : AlgorithmPlanner("search_kernel")
+    : AlgorithmPlanner("search_kernel", launcher_jit_cache)
   {
   }
 
@@ -640,11 +593,13 @@ constexpr auto get_out_type_tag() {
 template <DistanceType Metric>
 constexpr auto get_metric_tag() {
   if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
+  if constexpr (Metric == DistanceType::InnerProduct) return tag_metric_inner_product{};
 }
 
 template <FilterType Filter>
 constexpr auto get_filter_tag() {
   if constexpr (Filter == FilterType::None) return tag_filter_none{};
+  if constexpr (Filter == FilterType::Bitset) return tag_filter_bitset{};
 }
 
 template <typename T, typename OutT, typename IdxT, DistanceType Metric, FilterType Filter, bool Optimized, int Veclen>
@@ -753,8 +708,6 @@ struct tag_l {};  // int64_t
 
 These tags are used in `registerAlgorithm<>()` to create a hierarchical organization of fragments.
 
-**Why Tags Instead of Real Types?**: Using tags instead of real types (like `float`, `__half`) in the `.cpp.in` files avoids including heavy headers that define those types. This significantly improves compilation times since the generated `.cpp` files don't need to pull in CUDA headers, type definitions, or other dependencies. Tags are lightweight compile-time identifiers that don't require any runtime overhead or additional includes.
-
 ### AlgorithmLauncher
 
 The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
@@ -768,11 +721,11 @@ The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
 
 2. **Fragment Granularity**: Balance between too many small fragments (overhead) and too few large fragments (less reuse). Device functions that are reused across multiple kernels are good candidates for separate fragments.
 
-3. **Naming Consistency**: Ensure fragment keys match exactly between registration and lookup. Use helper functions to construct keys consistently.
+3. **Naming Consistency**: Ensure fragment tags match exactly between registration and lookup. Use helper functions to construct tags consistently.
 
 4. **Type Safety**: Use registration tags to provide compile-time type safety and avoid runtime string mismatches.
 
-5. **Caching**: The `AlgorithmPlanner::get_launcher()` method caches linked kernels, so repeated calls with the same configuration are efficient.
+5. **Caching**: Each planner type should hold a static `LauncherJitCache` and pass it to `AlgorithmPlanner`; `get_launcher()` then reuses linked kernels for the same fragment key within that cache.
 
 ## Example: IVF Flat
 
@@ -792,7 +745,8 @@ The `generate_jit_lto_kernels()` function (defined in `cmake/modules/generate_ji
 - `NAME_FORMAT`: Format string for generated kernel names (using `@variable@` syntax)
 - `MATRIX_JSON_FILE`: Path to the JSON matrix file
 - `KERNEL_INPUT_FILE`: Path to the `.cu.in` template
-- `EMBEDDED_INPUT_FILE`: Path to the `.cpp.in` template
+- `FRAGMENT_TAG_FORMAT`: Format string for fragment tag type (using `@variable@` syntax)
+- `FRAGMENT_TAG_HEADER_FILES`: List of header files that provide the fragment tag types (can be enclosed in `<`/`>` or `"`/`"`, automatically enclosed in quotes if quotes and brackets are not provided)
 - `OUTPUT_DIRECTORY`: Where generated files are placed
 - `KERNEL_LINK_LIBRARIES`: Interface library with compilation settings
 
@@ -812,7 +766,224 @@ The process involves:
 1. Separating device functions into fragment headers
 2. Creating JSON matrices defining parameter combinations
 3. Creating `.cu.in` templates for explicit instantiations
-4. Creating `.cpp.in` templates for fatbin registration
+4. Creating fragment tag types for fatbin registration
 5. Creating a planner to manage fragment dependencies
 6. Integrating the planner into the code path to launch kernels
 7. **Adding CMake integration** to generate and compile all fragment variants
+
+## Fragment Architecture
+
+JIT LTO kernels are split into _fragments_, which are fatbins containing individual pieces of code that can be strung together
+rather than instantiating the whole kernel at once. Each fragment only needs to be multiplied out over the dimensions (template
+parameters) that the fragment itself contains rather than the kernel as a whole. At runtime, these fragments are combined together
+by nvjitlink into the final program.
+
+In JIT LTO, there are two kinds of code: _algorithms_ and _adapters_. Algorithms are, roughly speaking, code that actually "does
+stuff" - searching, sorting, even as simple as initializing variables. Adapters don't do anything by themselves, but are merely
+thin wrappers around algorithms that exist only for reducing the number of template parameters that the caller needs to know about.
+It should generally be assumed that algorithm code is expensive to multiply over a matrix, and thus such multiplication should be
+minimized, while adapter code is cheap to multiply.
+
+An algorithm function is a function that contains real code for the algorithm, and an adapter function merely calls an algorithm
+function with more template parameters than the adapter function itself has. An algorithm file contains algorithm code, and an
+adapter file contains adapter code.
+
+Here is an example of an algorithm file that contains an algorithm function:
+
+```c++
+template <typename T, T Divisor>
+__device__ bool is_divisible_impl(T value)
+{
+  return value % Divisor == 0;
+}
+```
+
+Here is an example of an adapter file that contains an adapter function:
+
+```
+#include "device_functions.cuh"  // is_divisible
+#include "is_divisible_impl.cuh" // is_divisible_impl
+
+namespace {
+
+using data_t             = @data_type@;
+constexpr data_t divisor = @divisor@;
+
+}  // namespace
+
+template <>
+__device__ bool is_divisible<data_t>(data_t value)
+{
+  return is_divisible_impl<data_t, divisor>(value);
+}
+```
+
+This is the most common pattern that you will see in cuVS's JIT LTO code. Note that any code that calls `is_divisible()` does not
+need to know the value of `Divisor`, which allows the caller to be multiplied over fewer dimensions, thus reducing the amount of code
+generated.
+
+Note that in the above adapter file, `@data_type@` and `@divisor@` are build-time substitutions performed by CMake. These
+substitutions will be filled in with values from the matrix product. Note that they are all grouped together in a single `namespace`,
+making it easy to find all substitutions. This should be preferred to sprinkling the substitutions throughout the code.
+
+Here is an example with two algorithm files:
+
+```c++
+// greater_than_impl.cuh
+#include "device_impl_functions.cuh" // filter
+
+template <typename T, T Comparand>
+__device__ bool filter(T value)
+{
+  return value > Comparand;
+}
+```
+
+```c++
+// less_than_impl.cuh
+#include "device_impl_functions.cuh" // filter
+
+template <typename T, T Comparand>
+__device__ bool filter(T value)
+{
+  return value < Comparand;
+}
+```
+
+And here is the accompanying adapter file:
+
+```
+#include "@op_name@_impl.cuh" // filter
+
+namespace {
+
+using data_t = @data_type@;
+
+}
+
+template __device__ bool filter<data_t>(data_t value);
+```
+
+This is another common pattern that you will see in cuVS JIT LTO. Note that the adapter file does not contain any adapter functions,
+but merely instantiates a different algorithm function based on which algorithm file is included based on the CMake substitution.
+
+When a piece of algorithm code is used in multiple kernels, it should be split into its own shared fragment. At this point, it
+becomes important to also distinguish algorithm fragments and adapter fragments. An algorithm fragment contains an algorithm function
+that exposes all of the relevant template parameters, and this fragment is shared between multiple kernels. An adapter fragment
+is specific to a kernel. If a kernel wishes to invoke the same shared algorithm multiple times in the same run with
+different template parameters, it can employ multiple adapter fragments to accomplish this. Consider the following header file:
+
+```c++
+// filter.cuh
+
+template <typename T, T Comparand>
+__device__ bool filter_less_than(T value);
+
+template <typename T, T Comparand>
+__device__ bool filter_greater_than(T value);
+```
+
+And the following adapter files:
+
+```
+#include "device_functions.cuh" // filter_first_pass
+#include "filter.cuh"           // filter
+
+namespace {
+
+using data_t               = @data_type@;
+constexpr data_t comparand = @comparand@;
+
+}
+
+template <>
+__device__ bool filter_first_pass<data_t>(data_t value)
+{
+  return filter_@op_name@<data_t, comparand>(value);
+}
+```
+
+```
+#include "device_functions.cuh" // filter_second_pass
+#include "filter.cuh"           // filter
+
+namespace {
+
+using data_t               = @data_type@;
+constexpr data_t comparand = @comparand@;
+}
+
+template <>
+__device__ bool filter_second_pass<data_t>(data_t value)
+{
+  return filter_@op_name@<data_t, comparand>(value);
+}
+```
+
+And the following algorithm file:
+
+```c++
+#include "device_functions.cuh" // filter_first_pass, filter_second_pass
+
+template <typename T>
+__device__ bool filter_all_passes(T value)
+{
+  return filter_first_pass<T>(value) && filter_second_pass<T>(value);
+}
+```
+
+Note that `filter_first_pass` and `filter_second_pass` both invoke one of the `filter` functions, but which one they invoke is
+decided independently for each. Also note that neither of the adapter fragments contains the underlying algorithm code, but rather
+links against the corresponding shared algorithm fragments.
+
+The key to minimizing code generation is to minimize the number of dimensions that any given fragment needs to be multiplied out
+over. If a section of algorithm code uses lots of template parameters, try to separate out sections that use only a subset of
+these parameters, put them into their own fragment, and remove the corresponding template parameters from the caller. Make judicious
+use of adapter code to accomplish this. An adapter function should only have the template parameters that appear in its signature,
+whereas an algorithm function should have all of the template parameters that appear in its signature or its implementation.
+
+Unoptimized algorithm:
+
+```c++
+#include "filter_less_than.cuh"
+
+template <typename T, T Comparand>
+__device__ size_t find_first(T* values, size_t count)
+{
+  for (size_t i = 0; i < count; i++) {
+    if (filter_less_than_impl<T, Comparand>(values[i])) {
+      return i;
+    }
+  }
+
+  // Could not find any
+  return count;
+}
+```
+
+Note that the algorithm includes the `Comparand` template parameter, which means the entire algorithm has to be multiplied out over
+all the possible values of this parameter.
+
+Optimized algorithm:
+
+```c++
+#include "device_functions.cuh"
+
+template <typename T>
+__device__ size_t find_first(T* values, size_t count)
+{
+  for (size_t i = 0; i < count; i++) {
+    if (filter_less_than<T>(values[i])) {
+      return i;
+    }
+  }
+
+  // Could not find any
+  return count;
+}
+```
+
+We are now using an adapter function (possibly inside an adapter fragment) called `filter_less_than` to invoke
+`filter_less_than_impl` (which may be inside a shared algorithm fragment). This allows us to hide the `Comparand` parameter
+from `find_first`, which means we no longer need to multiply the entire algorithm over all possible values of `Comparand`, only the
+`filter_less_than` adapter and algorithm.

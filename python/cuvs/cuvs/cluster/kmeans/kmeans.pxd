@@ -22,6 +22,11 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         CUVS_KMEANS_TYPE_KMEANS
         CUVS_KMEANS_TYPE_KMEANS_BALANCED
 
+    # NOTE: The Python binding currently targets the unsuffixed cuvsKMeansParams
+    # ABI (which still carries the deprecated `inertia_check` field). In cuVS
+    # 26.08 this struct/entry-point set will be replaced by the contents of
+    # cuvsKMeansParams_v2 -- once that lands, the `inertia_check` field below
+    # should be deleted.
     ctypedef struct cuvsKMeansParams:
         cuvsDistanceType metric,
         int n_clusters,
@@ -33,9 +38,10 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         int batch_samples,
         int batch_centroids,
         bool inertia_check,
-        int64_t streaming_batch_size,
         bool hierarchical,
-        int hierarchical_n_iters
+        int hierarchical_n_iters,
+        int64_t streaming_batch_size,
+        int64_t init_size
 
     ctypedef cuvsKMeansParams* cuvsKMeansParams_t
 

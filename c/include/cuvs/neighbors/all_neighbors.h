@@ -12,6 +12,8 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
+#include <cuvs/core/export.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -68,7 +70,7 @@ typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
  *
  * @return cuvsError_t
  */
-cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
 
 /**
  * @brief Destroy an all-neighbors index parameters struct.
@@ -77,7 +79,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
  *
  * @return cuvsError_t
  */
-cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
 
 /** @} */
 
@@ -104,7 +106,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t ind
  * datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored.
  * Outputs can be on host memory (numpy arrays) or device memory (CUDA arrays).
  */
-cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
                                   cuvsAllNeighborsIndexParams_t params,
                                   DLManagedTensor* dataset,
                                   DLManagedTensor* indices,
