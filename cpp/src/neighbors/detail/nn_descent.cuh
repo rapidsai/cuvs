@@ -1479,6 +1479,7 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
                                                                build_config_.metric,
                                                                dist_epilogue);
     }
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   };
 
   if (d_data_half_.has_value()) {
@@ -1564,9 +1565,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                                     raft::warp_size(),
                                   stream>>>(
           batch.data(), build_config_.dataset_dim, l2_norms_.data_handle() + batch.offset());
+        RAFT_CUDA_TRY(cudaPeekAtLastError());
       }
       convert_copy_kernel<<<num_blocks, TPB, 0, stream>>>(
         batch.data(), d_data_half_.value().data_handle() + dst_offset, n_elems);
+      RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
     d_data_ptr_ = d_data_half_.value().data_handle();
   } else {
@@ -1592,6 +1595,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                                 raft::warp_size(),
                               stream>>>(
       static_cast<const input_t*>(d_data_ptr_), build_config_.dataset_dim, l2_norms_.data_handle());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
     raft::resource::sync_stream(res);
   }
 

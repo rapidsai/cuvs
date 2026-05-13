@@ -280,6 +280,10 @@ inline BuildConfig get_build_config(raft::resources const& res,
   RAFT_EXPECTS(
     metric == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");
+  RAFT_EXPECTS(
+    params.internal_distance_dtype == CUDA_R_32F || params.internal_distance_dtype == CUDA_R_16F,
+    "nn_descent::index_params::internal_distance_dtype must be CUDA_R_32F or "
+    "CUDA_R_16F");
   size_t intermediate_degree = params.intermediate_graph_degree;
   graph_degree               = params.graph_degree;
 

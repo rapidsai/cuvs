@@ -25,8 +25,8 @@ extern "C" {
  * performance and memory usage.
  * - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
  *
- * @deprecated To be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with internal_distance_dtype
- * instead.
+ * @deprecated Deprecated in 26.06; to be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with
+ * internal_distance_dtype instead.
  */
 typedef enum {
   NND_DIST_COMP_AUTO = 0,
@@ -54,13 +54,12 @@ typedef enum {
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * `return_distances`: Boolean to decide whether to return distances array
- * `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which
- * automatically determines the best dtype for distance computation based on the dataset dimensions.
- * Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This
- * option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and
- * memory usage at the cost of precision.
+ * `dist_comp_dtype`: dtype to use for distance computation. Note: as of 26.06, both
+ * `NND_DIST_COMP_AUTO` and `NND_DIST_COMP_FP32` map to fp32 distance computation (the new default).
+ * Use `NND_DIST_COMP_FP16` to opt into fp16 distance computation. This behavior differs from
+ * earlier releases where `NND_DIST_COMP_AUTO` selected fp16 for higher-dimensional fp32 inputs.
  *
- * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentIndexParams_v6.
+ * @deprecated Deprecated in 26.06; to be removed in 26.08. Replaced by cuvsNNDescentIndexParams_v6.
  */
 struct cuvsNNDescentIndexParams {
   cuvsDistanceType metric;
@@ -115,7 +114,8 @@ typedef struct cuvsNNDescentIndexParams_v6* cuvsNNDescentIndexParams_v6_t;
 /**
  * @brief Allocate NN-Descent Index params, and populate with default values
  *
- * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentIndexParamsCreate_v6.
+ * @deprecated Deprecated in 26.06; to be removed in 26.08. Replaced by
+ * cuvsNNDescentIndexParamsCreate_v6.
  *
  * @param[in] index_params cuvsNNDescentIndexParams_t to allocate
  * @return cuvsError_t
@@ -130,12 +130,14 @@ CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_
  * @param[in] index_params cuvsNNDescentIndexParams_v6_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsNNDescentIndexParamsCreate_v6(cuvsNNDescentIndexParams_v6_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsCreate_v6(
+  cuvsNNDescentIndexParams_v6_t* index_params);
 
 /**
  * @brief De-allocate NN-Descent Index params
  *
- * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentIndexParamsDestroy_v6.
+ * @deprecated Deprecated in 26.06; to be removed in 26.08. Replaced by
+ * cuvsNNDescentIndexParamsDestroy_v6.
  *
  * @param[in] index_params
  * @return cuvsError_t
@@ -150,7 +152,8 @@ CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams
  * @param[in] index_params
  * @return cuvsError_t
  */
-cuvsError_t cuvsNNDescentIndexParamsDestroy_v6(cuvsNNDescentIndexParams_v6_t index_params);
+CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsDestroy_v6(
+  cuvsNNDescentIndexParams_v6_t index_params);
 
 /**
  * @}
@@ -230,7 +233,7 @@ CUVS_EXPORT cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
- * @deprecated To be removed in 26.08 and replaced by cuvsNNDescentBuild_v6.
+ * @deprecated Deprecated in 26.06; to be removed in 26.08. Replaced by cuvsNNDescentBuild_v6.
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index_params cuvsNNDescentIndexParams_t used to build NN-Descent index
@@ -291,11 +294,11 @@ CUVS_EXPORT cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
  * @param[out] index cuvsNNDescentIndex_t Newly built NN-Descent index
  * @return cuvsError_t
  */
-cuvsError_t cuvsNNDescentBuild_v6(cuvsResources_t res,
-                                  cuvsNNDescentIndexParams_v6_t index_params,
-                                  DLManagedTensor* dataset,
-                                  DLManagedTensor* graph,
-                                  cuvsNNDescentIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsNNDescentBuild_v6(cuvsResources_t res,
+                                              cuvsNNDescentIndexParams_v6_t index_params,
+                                              DLManagedTensor* dataset,
+                                              DLManagedTensor* graph,
+                                              cuvsNNDescentIndex_t index);
 /**
  * @}
  */
