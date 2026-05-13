@@ -19,6 +19,16 @@ ndarray = "0.15"
 [dev-dependencies]
 ndarray-rand = "0.14"
 mark-flaky-tests = "1"
+# Used only by the `vamana` example to load and search a cuVS-serialized
+# Vamana index via Microsoft DiskANN's Rust API.
+diskann = "0.51"
+diskann-providers = "0.51"
+diskann-vector = "0.51"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[[example]]
+name = "vamana"
+required-features = []
 
 [package.metadata.docs.rs]
 features = ["doc-only"]
