@@ -140,13 +140,14 @@ void transform(raft::resources const& res,
   constexpr size_t max_batch_size              = 65536;
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource_ref(res);
 
-  utils::batch_load_iterator<T> vec_batches(dataset.data_handle(),
-                                            n_rows,
-                                            index.dim(),
-                                            max_batch_size,
-                                            copy_stream,
-                                            device_memory,
-                                            enable_prefetch);
+  auto vec_batches = utils::make_batch_load_iterator<T>(res,
+                                                        dataset.data_handle(),
+                                                        n_rows,
+                                                        IdxT{index.dim()},
+                                                        max_batch_size,
+                                                        copy_stream,
+                                                        device_memory,
+                                                        enable_prefetch);
 
   vec_batches.prefetch_next_batch();
   for (const auto& batch : vec_batches) {

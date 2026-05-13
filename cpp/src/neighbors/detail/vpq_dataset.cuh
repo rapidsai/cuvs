@@ -507,13 +507,15 @@ void process_and_fill_codes(
     return;
   }
 
-  for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator(
-         dataset.data_handle(),
-         n_rows,
-         dim,
-         max_batch_size,
-         stream,
-         rmm::mr::get_current_device_resource_ref())) {
+  auto _vpq_batches_codes = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<data_t>(
+    res,
+    dataset.data_handle(),
+    static_cast<ix_t>(n_rows),
+    static_cast<ix_t>(dim),
+    static_cast<size_t>(max_batch_size),
+    stream,
+    rmm::mr::get_current_device_resource_ref());
+  for (const auto& batch : _vpq_batches_codes) {
     auto batch_view        = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
     auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(nullptr, 0);
     if (inline_vq_labels) {
@@ -900,11 +902,12 @@ void process_and_fill_codes_subspaces(
     enable_prefetch_stream = true;
     copy_stream            = raft::resource::get_stream_from_stream_pool(res);
   }
-  auto vec_batches = cuvs::spatial::knn::detail::utils::batch_load_iterator(
+  auto vec_batches = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<data_t>(
+    res,
     dataset.data_handle(),
-    n_rows,
-    dim,
-    max_batch_size,
+    static_cast<ix_t>(n_rows),
+    static_cast<ix_t>(dim),
+    static_cast<size_t>(max_batch_size),
     copy_stream,
     raft::resource::get_workspace_resource_ref(res),
     enable_prefetch_stream);

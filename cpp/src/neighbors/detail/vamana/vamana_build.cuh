@@ -652,13 +652,15 @@ index<T, IdxT> build(
     // TODO: with scaling workspace we could choose the batch size dynamically
     constexpr uint32_t kReasonableMaxBatchSize = 65536;
     const uint32_t max_batch_size              = std::min(n_rows, kReasonableMaxBatchSize);
-    for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator<T>(
-           dataset.data_handle(),
-           n_rows,
-           dim,
-           max_batch_size,
-           raft::resource::get_cuda_stream(res),
-           raft::resource::get_workspace_resource_ref(res))) {
+    auto _vamana_batches = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<T>(
+      res,
+      dataset.data_handle(),
+      static_cast<int64_t>(n_rows),
+      static_cast<int64_t>(dim),
+      static_cast<size_t>(max_batch_size),
+      raft::resource::get_cuda_stream(res),
+      raft::resource::get_workspace_resource_ref(res));
+    for (const auto& batch : _vamana_batches) {
       // perform rotation
       auto dataset_rotated = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
       if constexpr (std::is_same_v<T, float>) {
