@@ -8,7 +8,6 @@
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
@@ -27,11 +26,84 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 #include <string>
 #include <variant>
 
-namespace cuvs::neighbors::cagra {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
+using iterative_search_params = cuvs::neighbors::search_params;
+
+/** Specialized parameters for ACE (Augmented Core Extraction) graph build */
+struct ace_params {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim *
+   * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the
+   * partition sizes (up to 3x in our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
+   */
+  size_t npartitions = 0;
+  /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer improve
+   * the quality.
+   */
+  size_t ef_construction = 120;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   *
+   * Used when `use_disk` is true or when the graph does not fit in host and GPU
+   * memory. This should be the fastest disk in the system and hold enough space
+   * for twice the dataset, final graph, and label mapping.
+   */
+  std::string build_dir = "/tmp/ace_build";
+  /**
+   * Whether to use disk-based storage for ACE build.
+   *
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk = false;
+
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available host memory.
+   * When set to a positive value, limits host memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb = 0;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * When set to a positive value, limits GPU memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb = 0;
+
+  ace_params() = default;
+};
+
+}  // namespace graph_build_params
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
 // For re-exporting into cagra namespace
 namespace graph_build_params = cuvs::neighbors::graph_build_params;
 /**
@@ -831,6 +903,7 @@ struct index : cuvs::neighbors::index {
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -869,6 +942,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -907,6 +981,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -944,6 +1019,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -981,6 +1057,9 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1019,6 +1098,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1057,6 +1139,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1095,6 +1180,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -3145,9 +3233,13 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
-}  // namespace cuvs::neighbors::cagra
-
-namespace cuvs::neighbors::cagra::helpers {
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
+namespace helpers {
 
 /**
  * @brief Optimize a KNN graph into a CAGRA graph.
@@ -3172,6 +3264,7 @@ void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
 
-}  // namespace cuvs::neighbors::cagra::helpers
-
-#include <cuvs/neighbors/cagra_index_wrapper.hpp>
+}  // namespace helpers
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
