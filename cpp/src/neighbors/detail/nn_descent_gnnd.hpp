@@ -64,7 +64,7 @@ struct BuildConfig {
   float termination_threshold{0.0001};
   size_t output_graph_degree{32};
   cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
-  bool compress_to_fp16{false};
+  bool use_fp16_dist_comp{false};
 };
 
 template <typename Index_t>
@@ -229,8 +229,8 @@ class GNND {
 
   using input_t = std::remove_const_t<Data_t>;
 
-  // d_data_half_ is used for a special case when input data is fp32 on host and compress_to_fp16
-  // flag is True
+  // d_data_half_ is used for a special case when input data is fp32 on host and
+  // use_fp16_dist_comp flag is True
   std::optional<raft::device_matrix<half, size_t, raft::row_major>> d_data_half_;
   // d_data_direct_ is used when input data is on host, and we need to copy it to device
   std::optional<raft::device_matrix<input_t, size_t, raft::row_major>> d_data_direct_;
@@ -314,7 +314,7 @@ inline BuildConfig get_build_config(raft::resources const& res,
                            .termination_threshold = params.termination_threshold,
                            .output_graph_degree   = params.graph_degree,
                            .metric                = params.metric,
-                           .compress_to_fp16      = params.compress_to_fp16};
+                           .use_fp16_dist_comp    = params.use_fp16_dist_comp};
   return build_config;
 }
 

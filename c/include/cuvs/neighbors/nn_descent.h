@@ -25,7 +25,7 @@ extern "C" {
  * performance and memory usage.
  * - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
  *
- * @deprecated To be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with compress_to_fp16
+ * @deprecated To be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with use_fp16_dist_comp
  * instead.
  */
 typedef enum {
@@ -91,9 +91,10 @@ typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * `return_distances`: Boolean to decide whether to return distances array
- * `compress_to_fp16`: When true and the input data is fp32, distance computation is done in
- * fp16 for better performance and lower memory usage at the cost of precision. Has no effect on
- * non-fp32 input types.
+ * `use_fp16_dist_comp`: When true and the input data is fp32, distance computation is performed
+ * in fp16 for better performance and lower memory usage at the cost of precision. This requires
+ * copying the fp32 input to an internal fp16 buffer on the device. Has no effect on non-fp32
+ * input types (fp16, int8, uint8) which always use fp16 distance computation.
  *
  * @since 26.06
  */
@@ -105,7 +106,7 @@ struct cuvsNNDescentIndexParams_v6 {
   size_t max_iterations;
   float termination_threshold;
   bool return_distances;
-  bool compress_to_fp16;
+  bool use_fp16_dist_comp;
 };
 
 typedef struct cuvsNNDescentIndexParams_v6* cuvsNNDescentIndexParams_v6_t;

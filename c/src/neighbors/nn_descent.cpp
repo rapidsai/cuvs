@@ -64,7 +64,7 @@ cuvs::neighbors::nn_descent::index_params convert_params(cuvsNNDescentIndexParam
   build_params.max_iterations            = params.max_iterations;
   build_params.termination_threshold     = params.termination_threshold;
   build_params.return_distances          = params.return_distances;
-  build_params.compress_to_fp16          = (params.dist_comp_dtype == NND_DIST_COMP_FP16);
+  build_params.use_fp16_dist_comp        = (params.dist_comp_dtype == NND_DIST_COMP_FP16);
   return build_params;
 }
 
@@ -79,7 +79,7 @@ cuvs::neighbors::nn_descent::index_params convert_params_v6(
   build_params.max_iterations            = params.max_iterations;
   build_params.termination_threshold     = params.termination_threshold;
   build_params.return_distances          = params.return_distances;
-  build_params.compress_to_fp16          = params.compress_to_fp16;
+  build_params.use_fp16_dist_comp        = params.use_fp16_dist_comp;
   return build_params;
 }
 
@@ -219,8 +219,8 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
       .max_iterations            = cpp_params.max_iterations,
       .termination_threshold     = cpp_params.termination_threshold,
       .return_distances          = cpp_params.return_distances,
-      .dist_comp_dtype           = cpp_params.compress_to_fp16 ? NND_DIST_COMP_FP16
-                                                               : NND_DIST_COMP_AUTO};
+      .dist_comp_dtype           = cpp_params.use_fp16_dist_comp ? NND_DIST_COMP_FP16
+                                                                 : NND_DIST_COMP_AUTO};
   });
 }
 
@@ -238,7 +238,7 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate_v6(cuvsNNDescentIndexParam
       .max_iterations            = cpp_params.max_iterations,
       .termination_threshold     = cpp_params.termination_threshold,
       .return_distances          = cpp_params.return_distances,
-      .compress_to_fp16          = cpp_params.compress_to_fp16};
+      .use_fp16_dist_comp        = cpp_params.use_fp16_dist_comp};
   });
 }
 

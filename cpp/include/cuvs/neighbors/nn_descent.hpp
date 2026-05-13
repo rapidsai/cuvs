@@ -40,9 +40,10 @@ namespace nn_descent {
  * the graph for. More iterations produce a better quality graph at cost of performance
  * - `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * - `return_distances`: Boolean to decide whether to return distances array
- * - `compress_to_fp16`: When true and the input data is fp32, distance computation is done in
- * fp16 for better performance and lower memory usage at the cost of precision. Has no effect on
- * non-fp32 input types (fp16, int8, uint8) which always use fp16 distance computation.
+ * - `use_fp16_dist_comp`: When true and the input data is fp32, distance computation is
+ * performed in fp16 for better performance and lower memory usage at the cost of precision.
+ * This requires copying the fp32 input to an internal fp16 buffer on the device. Has no effect
+ * on non-fp32 input types (fp16, int8, uint8) which always use fp16 distance computation.
  */
 struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree              = 64;
@@ -50,7 +51,7 @@ struct index_params : cuvs::neighbors::index_params {
   size_t max_iterations            = 20;
   float termination_threshold      = 0.0001;
   bool return_distances            = true;
-  bool compress_to_fp16            = false;
+  bool use_fp16_dist_comp          = false;
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *

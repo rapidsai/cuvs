@@ -63,10 +63,12 @@ cdef class IndexParams:
         The delta at which nn-descent will terminate its iterations
     return_distances : bool
         Whether to return distances array
-    compress_to_fp16 : bool, default = False
-        When True and the input data is fp32, distance computation is done in
-        fp16 for better performance and lower memory usage at the cost of
-        precision. Has no effect on non-fp32 input types.
+    use_fp16_dist_comp : bool, default = False
+        When True and the input data is fp32, distance computation is performed
+        in fp16 for better performance and lower memory usage at the cost of
+        precision. This requires copying the fp32 input to an internal fp16
+        buffer on the device. Has no effect on non-fp32 input types (fp16,
+        int8, uint8) which always use fp16 distance computation.
     """
 
     cdef cuvsNNDescentIndexParams_v6* params
@@ -86,7 +88,7 @@ cdef class IndexParams:
                  max_iterations=None,
                  termination_threshold=None,
                  return_distances=None,
-                 compress_to_fp16=None
+                 use_fp16_dist_comp=None
                  ):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -100,8 +102,8 @@ cdef class IndexParams:
             self.params.termination_threshold = termination_threshold
         if return_distances is not None:
             self.params.return_distances = return_distances
-        if compress_to_fp16 is not None:
-            self.params.compress_to_fp16 = compress_to_fp16
+        if use_fp16_dist_comp is not None:
+            self.params.use_fp16_dist_comp = use_fp16_dist_comp
 
     @property
     def metric(self):

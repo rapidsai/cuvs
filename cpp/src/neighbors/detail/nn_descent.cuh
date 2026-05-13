@@ -1373,11 +1373,11 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
   static_assert(NUM_SAMPLES <= 32);
 
   using input_t = typename std::remove_const<Data_t>::type;
-  if (build_config.compress_to_fp16 && build_config.dataset_dim <= 16 &&
+  if (build_config.use_fp16_dist_comp && build_config.dataset_dim <= 16 &&
       std::is_same_v<input_t, float>) {
     RAFT_LOG_WARN(
       "Using fp16 for distance computation for data in fp32 with small dimensions (%zu) <= 16 may "
-      "result in low quality results. Consider setting compress_to_fp16 = false.",
+      "result in low quality results. Consider setting use_fp16_dist_comp = false.",
       build_config.dataset_dim);
   }
 
@@ -1431,13 +1431,13 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   // Kernel dispatch logic:
-  // fp32 data can have an effective type of fp32 OR fp16 (when compress_to_fp16 flag = True for
+  // fp32 data can have an effective type of fp32 OR fp16 (when use_fp16_dist_comp flag = True for
   // wmma usage) Based on EFFECTIVE dtype:
   //   fp32 data || L1 distance  -> SIMT: internally converted to fp32 for distance computation
   //   on-the-fly dypte <= fp16 && non-L1 metrics  -> WMMA (tensor-core accelerated dot product):
   //   internally converted to fp16 for distance computation on-the-fly
 
-  bool use_simt = (std::is_same_v<input_t, float> && !build_config_.compress_to_fp16) ||
+  bool use_simt = (std::is_same_v<input_t, float> && !build_config_.use_fp16_dist_comp) ||
                   build_config_.metric == cuvs::distance::DistanceType::L1;
 
   auto launch_kernel = [&](auto* typed_ptr) {
@@ -1479,7 +1479,7 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
   };
 
   if (d_data_half_.has_value()) {
-    // Host fp32 input compressed to fp16 via compress_to_fp16.
+    // Host fp32 input compressed to fp16 via use_fp16_dist_comp.
     launch_kernel(static_cast<const half*>(d_data_ptr_));
   } else {
     // Data stored as input_t: device data used directly, or host data copied as-is.
@@ -1522,17 +1522,16 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                         build_config_.metric == cuvs::distance::DistanceType::CosineExpanded;
 
   bool compress_host_data =
-    !data_on_device && std::is_same_v<input_t, float> && build_config_.compress_to_fp16;
+    !data_on_device && std::is_same_v<input_t, float> && build_config_.use_fp16_dist_comp;
 
   if (data_on_device) {
     // When user-given data is on device, we use it directly. This can be any type (fp32, fp16,
     // int8, uint8)
     d_data_ptr_ = data;
-    std::cout << "data is on device. using user-given data directly" << std::endl;
   } else if (compress_host_data) {
-    // When user-given data is fp32 host data, and compress_to_fp16 is true, we allocate fp16 buffer
-    // to copy the data. This allows the wmma kernel to be used for distance computation instead of
-    // simt kernel.
+    // When user-given data is fp32 host data, and use_fp16_dist_comp is true, we allocate fp16
+    // buffer to copy the data. This allows the wmma kernel to be used for distance computation
+    // instead of simt kernel.
     if (!d_data_half_.has_value()) {
       d_data_half_.emplace(raft::make_device_matrix<half, size_t, raft::row_major>(
         res, build_config_.max_dataset_size, build_config_.dataset_dim));
@@ -1560,7 +1559,6 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
         batch.data(), d_data_half_.value().data_handle() + dst_offset, n_elems);
     }
     d_data_ptr_ = d_data_half_.value().data_handle();
-    std::cout << "data is on host and fp32 and user decided to compress" << std::endl;
   } else {
     // In other cases where user-given data is not device-accessible, we allocate a device buffer to
     // copy the data. The input type is kept as-is (fp32, fp16, int8, uint8).
@@ -1573,7 +1571,6 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                static_cast<size_t>(nrow_) * build_config_.dataset_dim,
                stream);
     d_data_ptr_ = d_data_direct_.value().data_handle();
-    std::cout << "keeping data dtype and copying to device" << std::endl;
   }
 
   if (needs_l2_norms && !compress_host_data) {
