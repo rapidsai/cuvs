@@ -10,7 +10,7 @@
 #include "common.hpp"
 
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 
 #include "cagra.hpp"
 #include <raft/core/host_mdspan.hpp>
@@ -18,11 +18,14 @@
 #include <sys/types.h>
 
 #include <cstdint>
+#include <cuvs/core/export.hpp>
 #include <memory>
 #include <type_traits>
 #include <variant>
 
-namespace cuvs::neighbors::hnsw {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace hnsw {
 
 // Re-export graph_build_params into hnsw namespace for convenience
 namespace graph_build_params = cuvs::neighbors::graph_build_params;
@@ -45,7 +48,7 @@ enum class HnswHierarchy {
 
 struct index_params : cuvs::neighbors::index_params {
   /** Hierarchy build type for HNSW index when converting from CAGRA index */
-  HnswHierarchy hierarchy = HnswHierarchy::NONE;
+  HnswHierarchy hierarchy = HnswHierarchy::GPU;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction = 200;
   /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` or `GPU`.
@@ -161,7 +164,7 @@ struct index : cuvs::neighbors::index {
   /**
   @brief Set ef for search
   */
-  virtual void set_ef(int ef) const;
+  virtual void set_ef(int ef) const = 0;
 
   /**
   @brief Get file path for disk-backed index
@@ -1231,8 +1234,9 @@ void deserialize(raft::resources const& res,
  * @}
  */
 
-}  // namespace cuvs::neighbors::hnsw
-
+}  // namespace hnsw
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
 #else
 #error "This header is only available if cuVS CMake option `BUILD_CAGRA_HNSWLIB=ON"
 #endif

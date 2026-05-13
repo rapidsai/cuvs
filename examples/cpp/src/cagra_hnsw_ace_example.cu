@@ -14,7 +14,6 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 
-#include <rmm/mr/device_memory_resource.hpp>
 #include <rmm/mr/pool_memory_resource.hpp>
 
 #include "common.cuh"
@@ -80,7 +79,8 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // descriptor For in-memory indices: creates HNSW index in memory
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
-  auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
+  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index);
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
@@ -156,9 +156,9 @@ int main()
   raft::device_resources dev_resources;
 
   // Set pool memory resource with 1 GiB initial pool size. All allocations use the same pool.
-  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  rmm::mr::set_current_device_resource(&pool_mr);
+  rmm::mr::pool_memory_resource pool_mr(rmm::mr::get_current_device_resource_ref(),
+                                        1024 * 1024 * 1024ull);
+  rmm::mr::set_current_device_resource(pool_mr);
 
   // Alternatively, one could define a pool allocator for temporary arrays (used within RAFT
   // algorithms). In that case only the internal arrays would use the pool, any other allocation

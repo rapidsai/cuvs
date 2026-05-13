@@ -10,6 +10,7 @@ import static org.junit.Assert.*;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.HnswIndexParams.HnswHierarchy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -186,7 +187,7 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
         // Convert CAGRA index to HNSW using fromCagra
         // This automatically handles disk-based indices
         HnswIndexParams hnswIndexParams =
-            new HnswIndexParams.Builder().withVectorDimension(2).build();
+            new HnswIndexParams.Builder().withVectorDimension(2).withHierarchy(HnswHierarchy.GPU).build();
 
         try (var hnswIndexSerialized = HnswIndex.fromCagra(hnswIndexParams, index)) {
           var hnswIndexSerializedPath = buildDir.resolve("hnsw_index.bin");
