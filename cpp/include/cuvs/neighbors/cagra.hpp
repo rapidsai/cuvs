@@ -26,11 +26,14 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 #include <string>
 #include <variant>
 
-namespace cuvs::neighbors::graph_build_params {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
 using iterative_search_params = cuvs::neighbors::search_params;
 
 /** Specialized parameters for ACE (Augmented Core Extraction) graph build */
@@ -95,9 +98,12 @@ struct ace_params {
   ace_params() = default;
 };
 
-}  // namespace cuvs::neighbors::graph_build_params
-
-namespace cuvs::neighbors::cagra {
+}  // namespace graph_build_params
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
 // For re-exporting into cagra namespace
 namespace graph_build_params = cuvs::neighbors::graph_build_params;
 /**
@@ -897,6 +903,7 @@ struct index : cuvs::neighbors::index {
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -935,6 +942,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -973,6 +981,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -1010,6 +1019,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -1047,6 +1057,9 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1085,6 +1098,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1123,6 +1139,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1161,6 +1180,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -3211,9 +3233,13 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
-}  // namespace cuvs::neighbors::cagra
-
-namespace cuvs::neighbors::cagra::helpers {
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
+namespace helpers {
 
 /**
  * @brief Optimize a KNN graph into a CAGRA graph.
@@ -3238,4 +3264,7 @@ void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
 
-}  // namespace cuvs::neighbors::cagra::helpers
+}  // namespace helpers
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

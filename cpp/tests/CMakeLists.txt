@@ -105,7 +105,7 @@ endfunction()
 ConfigureTest(
   NAME NEIGHBORS_TEST
   PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu neighbors/sparse_brute_force.cu
-       neighbors/refine.cu
+       neighbors/refine.cu neighbors/distance_nn.cu
   GPUS 1
   PERCENT 100
 )
@@ -129,6 +129,13 @@ ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_FLAT_TEST
   PATH neighbors/ann_ivf_flat/test_float_int64_t.cu neighbors/ann_ivf_flat/test_half_int64_t.cu
        neighbors/ann_ivf_flat/test_int8_t_int64_t.cu neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_IVF_FLAT_UDF_TEST
+  PATH neighbors/ann_ivf_flat/test_udf.cu
   GPUS 1
   PERCENT 100
 )
@@ -159,6 +166,7 @@ ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
   PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
        neighbors/ann_cagra/bug_multi_cta_crash.cu
+       neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
        neighbors/ann_cagra/bug_iterative_cagra_build.cu
        neighbors/ann_cagra/bug_issue_93_reproducer.cu
   GPUS 1
@@ -174,7 +182,7 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_HELPERS_TEST
-  PATH neighbors/ann_cagra/test_optimize_uint32_t.cu
+  PATH neighbors/ann_cagra/test_optimize_uint32_t.cu neighbors/ann_cagra/test_batch_load_iterator.cu
   GPUS 1
   PERCENT 100
 )
@@ -329,6 +337,7 @@ ConfigureTest(
        distance/dist_lp_unexp.cu
        distance/dist_russell_rao.cu
        distance/gram.cu
+       distance/kde.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
        sparse/gram.cu
@@ -339,8 +348,11 @@ ConfigureTest(
 
 ConfigureTest(
   NAME PREPROCESSING_TEST
-  PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu preprocessing/product_quantization.cu
+  PATH preprocessing/scalar_quantization.cu
+       preprocessing/binary_quantization.cu
+       preprocessing/spectral_embedding.cu
+       preprocessing/product_quantization.cu
+       preprocessing/pca.cu
   GPUS 1
   PERCENT 100
 )

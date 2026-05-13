@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,10 +17,13 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 #include <variant>
 
-namespace cuvs::neighbors::vamana {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace vamana {
 
 /**
  * @defgroup vamana_cpp_index_params Vamana index build parameters
@@ -42,7 +45,7 @@ struct codebook_params {
 /**
  * @brief Parameters used to build DiskANN index
  *
- * `graph_degree`: Maximum degree of graph; correspods to the R parameter of
+ * `graph_degree`: Maximum degree of graph; corresponds to the R parameter of
  * Vamana algorithm in the literature.
  * `visited_size`: Maximum number of visited nodes per search during Vamana algorithm.
  * Loosely corresponds to the L parameter in the literature.
@@ -615,4 +618,6 @@ auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)
  * @}
  */
 
-}  // namespace cuvs::neighbors::vamana
+}  // namespace vamana
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

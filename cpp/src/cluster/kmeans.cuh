@@ -325,39 +325,6 @@ void cluster_cost(raft::resources const& handle,
 }
 
 /**
- * @brief Update centroids given current centroids and number of points assigned to each centroid.
- *  This function also produces a vector of RAFT key/value pairs containing the cluster assignment
- *  for each point and its distance.
- *
- * @tparam DataT
- * @tparam IndexT
- * @param[in] handle: Raft handle to use for managing library resources
- * @param[in] X: input matrix (size n_samples, n_features)
- * @param[in] sample_weights: number of samples currently assigned to each centroid (size n_samples)
- * @param[in] centroids: matrix of current centroids (size n_clusters, n_features)
- * @param[in] labels: Iterator of labels (can also be a raw pointer)
- * @param[out] weight_per_cluster: sum of sample weights per cluster (size n_clusters)
- * @param[out] new_centroids: output matrix of updated centroids (size n_clusters, n_features)
- */
-template <typename DataT, typename IndexT, typename LabelsIterator>
-void update_centroids(raft::resources const& handle,
-                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> X,
-                      raft::device_vector_view<const DataT, IndexT> sample_weights,
-                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> centroids,
-                      LabelsIterator labels,
-                      raft::device_vector_view<DataT, IndexT> weight_per_cluster,
-                      raft::device_matrix_view<DataT, IndexT, raft::row_major> new_centroids)
-{
-  // TODO: Passing these into the algorithm doesn't really present much of a benefit
-  // because they are being resized anyways.
-  // ref https://github.com/rapidsai/raft/issues/930
-  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
-
-  cuvs::cluster::kmeans::detail::update_centroids<DataT, IndexT>(
-    handle, X, sample_weights, centroids, labels, weight_per_cluster, new_centroids, workspace);
-}
-
-/**
  * @brief Compute distance for every sample to it's nearest centroid
  *
  * @tparam DataT the type of data used for weights, distances.
@@ -404,14 +371,27 @@ void min_cluster_distance(raft::resources const& handle,
                                                                           workspace);
 }
 
+/**
+ * @brief Compute (optionally weighted) cluster cost (inertia).
+ *
+ * @tparam DataT  float or double
+ * @tparam IndexT Index type
+ *
+ * @param[in]  handle         The raft handle
+ * @param[in]  X              Input data [n_samples x n_features]
+ * @param[in]  centroids      Cluster centroids [n_clusters x n_features]
+ * @param[out] cost           Sum of squared distances to nearest centroid
+ * @param[in]  sample_weight  Optional per-sample weights [n_samples]
+ */
 template <typename DataT, typename IndexT>
-void cluster_cost(raft::resources const& handle,
-                  raft::device_matrix_view<const DataT, IndexT> X,
-                  raft::device_matrix_view<const DataT, IndexT> centroids,
-                  raft::host_scalar_view<DataT> cost)
+void cluster_cost(
+  raft::resources const& handle,
+  raft::device_matrix_view<const DataT, IndexT> X,
+  raft::device_matrix_view<const DataT, IndexT> centroids,
+  raft::host_scalar_view<DataT> cost,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight = std::nullopt)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
-
+  auto stream     = raft::resource::get_cuda_stream(handle);
   auto n_clusters = centroids.extent(0);
   auto n_samples  = X.extent(0);
   auto n_features = X.extent(1);
@@ -439,6 +419,15 @@ void cluster_cost(raft::resources const& handle,
     n_samples,
     n_clusters,
     workspace);
+
+  // Apply sample weights if provided
+  if (sample_weight.has_value()) {
+    raft::linalg::map(handle,
+                      min_cluster_distance.view(),
+                      raft::mul_op{},
+                      raft::make_const_mdspan(min_cluster_distance.view()),
+                      sample_weight.value());
+  }
 
   auto device_cost = raft::make_device_scalar<DataT>(handle, DataT(0));
 
