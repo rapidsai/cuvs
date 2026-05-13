@@ -143,7 +143,7 @@ struct dtype_traits<__half> {
 
 template <>
 struct dtype_traits<uint8_t> {
-  static constexpr int APAD           = 4;  // 1 byte padding to avoid bank conflict
+  static constexpr int APAD           = 4;
   static constexpr int BPAD           = 4;
   static constexpr int TILE_COL_WIDTH = 128;
   static __device__ __forceinline__ float to_float(uint8_t v) { return static_cast<float>(v); }
@@ -151,7 +151,7 @@ struct dtype_traits<uint8_t> {
 
 template <>
 struct dtype_traits<int8_t> {
-  static constexpr int APAD           = 4;  // 1 byte padding to avoid bank conflict
+  static constexpr int APAD           = 4;
   static constexpr int BPAD           = 4;
   static constexpr int TILE_COL_WIDTH = 128;
   static __device__ __forceinline__ float to_float(int8_t v) { return static_cast<float>(v); }
