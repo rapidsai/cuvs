@@ -13,8 +13,10 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include "../../../core/nvtx.hpp"
+#include "../../../util/serialize_validation.hpp"
 #include "../dataset_serialize.hpp"
 
 #include <cstddef>
@@ -169,14 +171,13 @@ void serialize_to_hnswlib(
                  static_cast<size_t>(dataset.extent(0)),
                  static_cast<size_t>(dataset.extent(1)));
     host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    dataset.data_handle(),
-                                    sizeof(T) * dataset.stride(0),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    dataset.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(host_dataset.data_handle(),
+                      host_dataset.extent(1),
+                      dataset.data_handle(),
+                      dataset.stride(0),
+                      host_dataset.extent(1),
+                      dataset.extent(0),
+                      raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = raft::make_const_mdspan(host_dataset.view());
   }
@@ -268,7 +269,9 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
   char dtype_string[4];
-  is.read(dtype_string, 4);
+  RAFT_EXPECTS(is.read(dtype_string, 4), "cagra::deserialize: failed to read dtype prefix");
+  RAFT_EXPECTS(cuvs::util::validate_serialized_dtype<T>(dtype_string, sizeof(dtype_string)),
+               "cagra::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(res, is);
   if (ver != serialization_version) {
@@ -278,6 +281,22 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
   auto dim          = raft::deserialize_scalar<std::uint32_t>(res, is);
   auto graph_degree = raft::deserialize_scalar<std::uint32_t>(res, is);
   auto metric       = raft::deserialize_scalar<cuvs::distance::DistanceType>(res, is);
+
+  RAFT_EXPECTS(cuvs::util::is_valid_distance_type(metric),
+               "cagra::deserialize: invalid metric value %d",
+               static_cast<int>(metric));
+  RAFT_EXPECTS(graph_degree <= cuvs::util::kMaxGraphDegree,
+               "cagra::deserialize: graph_degree=%u exceeds maximum %u",
+               graph_degree,
+               cuvs::util::kMaxGraphDegree);
+  RAFT_EXPECTS(
+    cuvs::util::is_mul_no_overflow(
+      static_cast<std::size_t>(n_rows), static_cast<std::size_t>(graph_degree), sizeof(IdxT)),
+    "cagra::deserialize: integer overflow in n_rows*graph_degree*sizeof(IdxT) "
+    "(n_rows=%lld, graph_degree=%u, sizeof(IdxT)=%zu)",
+    static_cast<long long>(n_rows),
+    graph_degree,
+    sizeof(IdxT));
 
   auto graph = raft::make_host_matrix<IdxT, int64_t>(n_rows, graph_degree);
   deserialize_mdspan(res, is, graph.view());
