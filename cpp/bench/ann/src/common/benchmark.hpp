@@ -171,7 +171,11 @@ void bench_build(::benchmark::State& state,
 
   if (state.skipped()) { return; }
   make_sure_parent_dir_exists(index.file);
-  algo->save(index.file);
+  try {
+    algo->save(index.file);
+  } catch (const std::exception& e) {
+    state.SkipWithError("Failed to save an index: " + std::string(e.what()));
+  }
 }
 
 template <typename T>

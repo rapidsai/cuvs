@@ -67,6 +67,25 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 f"C++ benchmark executable not found: {self.executable_path}"
             )
 
+    @staticmethod
+    def _gbench_error_message(
+        benchmarks: List[Dict[str, Any]],
+        phase: str,
+        output_path: Optional[Path] = None,
+    ) -> Optional[str]:
+        """Return a compact message if Google Benchmark reported row errors."""
+        errors = [b for b in benchmarks if b.get("error_occurred")]
+        if not errors:
+            return None
+
+        location = f" in {output_path}" if output_path else ""
+        details = []
+        for bench in errors:
+            name = bench.get("name", "<unknown benchmark>")
+            message = bench.get("error_message", "<missing error_message>")
+            details.append(f"{name}: {message}")
+        return f"{phase} benchmark error(s){location}: " + "; ".join(details)
+
     def build(
         self,
         dataset: Dataset,
@@ -253,6 +272,12 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 raise ValueError(
                     "No benchmarks found in Google Benchmark output"
                 )
+
+            error_message = self._gbench_error_message(
+                benchmarks, "Build", benchmark_out
+            )
+            if error_message:
+                raise RuntimeError(error_message)
 
             # Return aggregated result
             total_build_time = sum(b.get("real_time", 0) for b in benchmarks)
@@ -527,6 +552,12 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 raise ValueError(
                     "No benchmarks found in Google Benchmark output"
                 )
+
+            error_message = self._gbench_error_message(
+                benchmarks, "Search", output_json
+            )
+            if error_message:
+                raise RuntimeError(error_message)
 
             # Aggregate metrics across all benchmarks
             total_search_time = sum(b.get("real_time", 0) for b in benchmarks)
