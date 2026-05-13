@@ -27,9 +27,11 @@
 
 #ifdef __cpp_lib_bitops
 #include <bit>
+#include <cuvs/core/export.hpp>
 #endif
 
-namespace cuvs::neighbors {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
 /**
  * @addtogroup cagra_cpp_index_params
  * @{
@@ -883,4 +885,5 @@ struct mg_index {
   std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
 };
 
-}  // namespace cuvs::neighbors
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
