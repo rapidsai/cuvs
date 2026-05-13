@@ -7,11 +7,13 @@
 
 #include <cstdint>
 #include <cuda_fp16.h>
+#include <cuvs/core/export.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::distance {
+namespace CUVS_EXPORT cuvs {
+namespace distance {
 
 /** enum to tell how to compute distance */
 enum class DistanceType : int {
@@ -465,4 +467,5 @@ void pairwise_distance(raft::resources const& handle,
 
 /** @} */  // end group pairwise_distance_runtime
 
-};  // namespace cuvs::distance
+}  // namespace distance
+}  // namespace CUVS_EXPORT cuvs
