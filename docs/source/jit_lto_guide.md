@@ -475,86 +475,37 @@ extern "C" __global__ void search_kernel(
 
 **Note**: The kernel uses generic function templates (`compute_distance<T>` and `apply_filter<IdxT>`) that are resolved at link time. The specific implementations (euclidean vs inner_product, filter_none vs filter_bitset) are provided by the fragments that get linked together.
 
-### Step 5: Create `.cpp.in` Template Files for Embedding
+### Step 5: Create Fragment Tags for Embedding
 
-The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime. Fragment tags are used to help the
-linker find and include the relevant fatbins at build time.
+Fragment tags register the compiled fatbins so they can be loaded at runtime. They are used to help the linker find and include the relevant fatbins at build time. When calling `generate_jit_lto_kernels()`, we pass a `FRAGMENT_TAG_FORMAT` argument, which constructs the tag type from the given placeholders, and a `FRAGMENT_TAG_HEADER_FILES` argument, which specifies one or more header files that the fragment tags come from. The JIT+LTO system will then automatically generate and compile a `.cpp` file that registers the fragment using the provided tag.
 
-**Important**: In the `.cpp.in` files (which become `.cpp` files), we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `StaticFatbinFragmentEntry` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
+**Important**: When requesting fragments from the `AlgorithmPlanner`, we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `add_static_fragment` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
 
-#### `compute_distance_embedded.cpp.in`
+**`registration_tags.hpp`**
 
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
+```cpp
+#pragma once
 
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
+struct tag_h{};
+struct tag_f{};
+struct tag_d{};
+struct tag_ui{};
+struct tag_l{};
 
-namespace example::detail {
+struct tag_metric_euclidean {};
+struct tag_metric_inner_product {};
 
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_compute_distance<tag_@distance_name@, tag_@type_abbrev@>>;
+struct tag_filter_none {};
+struct tag_filter_bitset {};
 
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+template <typename DataTag, typename OutTag, typename IdxTag, bool Optimized, int Veclen>
+struct fragment_tag_search {};
 
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
+template <typename DistanceTag, typename DataTag>
+struct fragment_tag_compute_distance {};
 
-}
-```
-
-#### `filter_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_filter<tag_@filter_name@, tag_@idx_abbrev@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
-```
-
-#### `search_kernel_embedded.cpp.in`
-
-```text
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "@embedded_header_file@"
-
-namespace example::detail {
-
-using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_search<tag_@type_abbrev@, tag_@out_abbrev@, tag_@idx_abbrev@, @optimized@, @veclen@>>;
-
-template <>
-const uint8_t* const _FragmentEntry::data = embedded_fatbin;
-
-template <>
-const size_t _FragmentEntry::length = embedded_fatbin;
-
-}
+template <typename FilterTag, typename IndexTag>
+struct fragment_tag_filter {};
 ```
 
 ### Step 6: Create the Planner
@@ -565,7 +516,7 @@ The planner is responsible for:
 3. Requesting the fragments from the fragment database
 4. Linking them together to create a launchable kernel
 
-**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `.cpp.in` registration files. Any mismatch will result in runtime linking failures.
+**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `FRAGMENT_TAG_FORMAT` argument. Any mismatch will result in runtime linking failures.
 
 **`search_planner.hpp`**:
 
@@ -578,8 +529,10 @@ The planner is responsible for:
 #include <string>
 
 struct SearchPlanner : AlgorithmPlanner {
+  inline static LauncherJitCache launcher_jit_cache{};
+
   SearchPlanner()
-    : AlgorithmPlanner("search_kernel")
+    : AlgorithmPlanner("search_kernel", launcher_jit_cache)
   {
   }
 
@@ -640,11 +593,13 @@ constexpr auto get_out_type_tag() {
 template <DistanceType Metric>
 constexpr auto get_metric_tag() {
   if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
+  if constexpr (Metric == DistanceType::InnerProduct) return tag_metric_inner_product{};
 }
 
 template <FilterType Filter>
 constexpr auto get_filter_tag() {
   if constexpr (Filter == FilterType::None) return tag_filter_none{};
+  if constexpr (Filter == FilterType::Bitset) return tag_filter_bitset{};
 }
 
 template <typename T, typename OutT, typename IdxT, DistanceType Metric, FilterType Filter, bool Optimized, int Veclen>
@@ -753,8 +708,6 @@ struct tag_l {};  // int64_t
 
 These tags are used in `registerAlgorithm<>()` to create a hierarchical organization of fragments.
 
-**Why Tags Instead of Real Types?**: Using tags instead of real types (like `float`, `__half`) in the `.cpp.in` files avoids including heavy headers that define those types. This significantly improves compilation times since the generated `.cpp` files don't need to pull in CUDA headers, type definitions, or other dependencies. Tags are lightweight compile-time identifiers that don't require any runtime overhead or additional includes.
-
 ### AlgorithmLauncher
 
 The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
@@ -768,11 +721,11 @@ The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
 
 2. **Fragment Granularity**: Balance between too many small fragments (overhead) and too few large fragments (less reuse). Device functions that are reused across multiple kernels are good candidates for separate fragments.
 
-3. **Naming Consistency**: Ensure fragment keys match exactly between registration and lookup. Use helper functions to construct keys consistently.
+3. **Naming Consistency**: Ensure fragment tags match exactly between registration and lookup. Use helper functions to construct tags consistently.
 
 4. **Type Safety**: Use registration tags to provide compile-time type safety and avoid runtime string mismatches.
 
-5. **Caching**: The `AlgorithmPlanner::get_launcher()` method caches linked kernels, so repeated calls with the same configuration are efficient.
+5. **Caching**: Each planner type should hold a static `LauncherJitCache` and pass it to `AlgorithmPlanner`; `get_launcher()` then reuses linked kernels for the same fragment key within that cache.
 
 ## Example: IVF Flat
 
@@ -792,7 +745,8 @@ The `generate_jit_lto_kernels()` function (defined in `cmake/modules/generate_ji
 - `NAME_FORMAT`: Format string for generated kernel names (using `@variable@` syntax)
 - `MATRIX_JSON_FILE`: Path to the JSON matrix file
 - `KERNEL_INPUT_FILE`: Path to the `.cu.in` template
-- `EMBEDDED_INPUT_FILE`: Path to the `.cpp.in` template
+- `FRAGMENT_TAG_FORMAT`: Format string for fragment tag type (using `@variable@` syntax)
+- `FRAGMENT_TAG_HEADER_FILES`: List of header files that provide the fragment tag types (can be enclosed in `<`/`>` or `"`/`"`, automatically enclosed in quotes if quotes and brackets are not provided)
 - `OUTPUT_DIRECTORY`: Where generated files are placed
 - `KERNEL_LINK_LIBRARIES`: Interface library with compilation settings
 
@@ -812,7 +766,7 @@ The process involves:
 1. Separating device functions into fragment headers
 2. Creating JSON matrices defining parameter combinations
 3. Creating `.cu.in` templates for explicit instantiations
-4. Creating `.cpp.in` templates for fatbin registration
+4. Creating fragment tag types for fatbin registration
 5. Creating a planner to manage fragment dependencies
 6. Integrating the planner into the code path to launch kernels
 7. **Adding CMake integration** to generate and compile all fragment variants
