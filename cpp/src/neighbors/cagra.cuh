@@ -31,7 +31,6 @@
 #include <variant>
 
 namespace cuvs::neighbors::cagra {
-namespace detail {
 
 template <typename T, typename IdxT>
 cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&& r)
@@ -58,7 +57,6 @@ cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_padded(
   br.idx.host_build_ace_device_store_.reset();
   return std::move(br.idx);
 }
-}  // namespace detail
 
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
@@ -344,7 +342,7 @@ index<T, IdxT> build(
                  "ACE: Dataset must be on host for ACE build");
     auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-    return detail::finalize_index_from_ace(
+    return finalize_index_from_ace(
       cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view));
   }
   RAFT_EXPECTS(
@@ -355,7 +353,7 @@ index<T, IdxT> build(
     dataset.data_handle(), dataset.extent(0), dataset.extent(1));
   auto bres = detail::build_from_host_matrix<T, IdxT>(res, params, hview);
   if (auto own = std::move(bres.deferred_host_dataset)) {
-    return detail::finalize_index_from_padded<T, IdxT>(std::move(bres), std::move(own));
+    return finalize_index_from_padded<T, IdxT>(std::move(bres), std::move(own));
   }
   RAFT_EXPECTS(
     !bres.vpq.has_value(),

@@ -385,13 +385,11 @@ struct build_result;
 template <typename T, typename IdxT>
 struct ace_build_result;
 
-namespace detail {
 template <typename T, typename IdxT>
 index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&&);
 template <typename T, typename IdxT>
 index<T, IdxT> finalize_index_from_padded(
   build_result<T, IdxT>&&, std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>);
-}  // namespace detail
 
 /**
  * @defgroup cagra_cpp_index CAGRA index type
@@ -962,10 +960,10 @@ struct index : cuvs::neighbors::index {
 
  private:
   template <typename T2, typename I2>
-  friend index<T2, I2> detail::finalize_index_from_ace(ace_build_result<T2, I2>&&);
+  friend index<T2, I2> finalize_index_from_ace(ace_build_result<T2, I2>&&);
   template <typename T2, typename I2>
-  friend index<T2, I2> detail::finalize_index_from_padded(
-    build_result<T2, I2>&&, std::unique_ptr<device_padded_dataset<T2, int64_t>>);
+  friend index<T2, I2> finalize_index_from_padded(
+    build_result<T2, I2>&&, std::unique_ptr<cuvs::neighbors::device_padded_dataset<T2, int64_t>>);
 
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;

@@ -52,14 +52,13 @@ auto build(raft::resources const& handle,
   if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
     RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
                  "ACE: Dataset must be on host for ACE build");
-    return ::cuvs::neighbors::cagra::detail::finalize_index_from_ace(
+    return ::cuvs::neighbors::cagra::finalize_index_from_ace(
       ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset));
   }
   auto bres = ::cuvs::neighbors::cagra::detail::build_from_host_matrix<data_t, index_t>(
     handle, params, dataset);
   if (auto own = std::move(bres.deferred_host_dataset)) {
-    return ::cuvs::neighbors::cagra::detail::finalize_index_from_padded(std::move(bres),
-                                                                        std::move(own));
+    return ::cuvs::neighbors::cagra::finalize_index_from_padded(std::move(bres), std::move(own));
   }
   RAFT_EXPECTS(
     !bres.vpq.has_value(),
