@@ -27,13 +27,18 @@
 
 #ifdef __cpp_lib_bitops
 #include <bit>
+#include <cuvs/core/export.hpp>
 #endif
 
-namespace cuvs::neighbors {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
 /**
  * @addtogroup cagra_cpp_index_params
  * @{
  */
+
+/* Graph build algo used in cagra and all_neighbors */
+enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2, ACE = 3 };
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
@@ -124,13 +129,6 @@ enum class MergeStrategy {
   MERGE_STRATEGY_PHYSICAL = 0,
   /** Merge indices logically by creating a composite wrapper */
   MERGE_STRATEGY_LOGICAL = 1
-};
-
-/** Base merge parameters with polymorphic interface. */
-struct merge_params {
-  virtual ~merge_params() = default;
-
-  virtual MergeStrategy strategy() const = 0;
 };
 
 /** @} */  // end group neighbors_index
@@ -228,7 +226,7 @@ template <typename DatasetT>
 inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
 
 /**
- * @brief Contstruct a strided matrix from any mdarray or mdspan.
+ * @brief Construct a strided matrix from any mdarray or mdspan.
  *
  * This function constructs a non-owning view if the input satisfied two conditions:
  *
@@ -290,20 +288,19 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
                                 0,
                                 out_array.size() * sizeof(value_type),
                                 raft::resource::get_cuda_stream(res)));
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(out_array.data_handle(),
-                                  sizeof(value_type) * required_stride,
-                                  src.data_handle(),
-                                  sizeof(value_type) * src_stride,
-                                  sizeof(value_type) * src.extent(1),
-                                  src.extent(0),
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(out_array.data_handle(),
+                    required_stride,
+                    src.data_handle(),
+                    src_stride,
+                    src.extent(1),
+                    src.extent(0),
+                    raft::resource::get_cuda_stream(res));
 
   return std::make_unique<out_owning_type>(std::move(out_array), out_layout);
 }
 
 /**
- * @brief Contstruct a strided matrix from any mdarray.
+ * @brief Construct a strided matrix from any mdarray.
  *
  * This function constructs an owning device matrix and copies the data.
  * When the data is copied, padding elements are filled with zeroes.
@@ -361,20 +358,19 @@ auto make_strided_dataset(
                                 0,
                                 out_array.size() * sizeof(value_type),
                                 raft::resource::get_cuda_stream(res)));
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(out_array.data_handle(),
-                                  sizeof(value_type) * required_stride,
-                                  src.data_handle(),
-                                  sizeof(value_type) * src_stride,
-                                  sizeof(value_type) * src.extent(1),
-                                  src.extent(0),
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(out_array.data_handle(),
+                    required_stride,
+                    src.data_handle(),
+                    src_stride,
+                    src.extent(1),
+                    src.extent(0),
+                    raft::resource::get_cuda_stream(res));
 
   return std::make_unique<out_owning_type>(std::move(out_array), out_layout);
 }
 
 /**
- * @brief Contstruct a strided matrix from any mdarray or mdspan.
+ * @brief Construct a strided matrix from any mdarray or mdspan.
  *
  * A variant `make_strided_dataset` that allows specifying the byte alignment instead of the
  * explicit stride length.
@@ -919,7 +915,7 @@ enum distribution_mode {
 /** Search mode when using a replicated index */
 /// \ingroup mg_cpp_search_params
 enum replicated_search_mode {
-  /** Search queries are splited to maintain equal load on GPUs */
+  /** Search queries are split to maintain equal load on GPUs */
   LOAD_BALANCER,
   /** Each search query is processed by a single GPU in a round-robin fashion */
   ROUND_ROBIN
@@ -983,4 +979,5 @@ struct mg_index {
   std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
 };
 
-}  // namespace cuvs::neighbors
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

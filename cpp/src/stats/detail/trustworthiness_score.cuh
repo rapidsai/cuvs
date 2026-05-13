@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/col_wise_sort.cuh>
+#include <raft/matrix/init.cuh>
 
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
@@ -181,7 +182,7 @@ double trustworthiness_score(const raft::resources& h,
     build_lookup_table<<<n_blocks, N_THREADS, 0, stream>>>(
       lookup_table.data(), X_ind.data(), n, work);
 
-    RAFT_CUDA_TRY(cudaMemsetAsync(t_dbuf.data(), 0, sizeof(double), stream));
+    raft::matrix::fill(h, raft::make_device_scalar_view(t_dbuf.data()), double(0));
 
     work     = curBatchSize * (n_neighbors + 1);
     n_blocks = raft::ceildiv(work, N_THREADS);

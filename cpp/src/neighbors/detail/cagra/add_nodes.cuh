@@ -1,15 +1,18 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
 #include <cuvs/neighbors/cagra.hpp>
+#include <raft/core/copy.cuh>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/stats/histogram.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_buffer.hpp>
 
@@ -37,10 +40,7 @@ void add_node_core(
   // Step 0: Calculate the number of incoming edges for each node
   auto dev_num_incoming_edges = raft::make_device_vector<int, std::uint64_t>(handle, new_size);
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(dev_num_incoming_edges.data_handle(),
-                                0,
-                                sizeof(int) * new_size,
-                                raft::resource::get_cuda_stream(handle)));
+  raft::matrix::fill(handle, dev_num_incoming_edges.view(), int(0));
   raft::stats::histogram<IdxT, std::int64_t>(raft::stats::HistTypeAuto,
                                              dev_num_incoming_edges.data_handle(),
                                              old_size,
@@ -50,10 +50,7 @@ void add_node_core(
                                              raft::resource::get_cuda_stream(handle));
 
   auto host_num_incoming_edges = raft::make_host_vector<int, std::uint64_t>(new_size);
-  raft::copy(host_num_incoming_edges.data_handle(),
-             dev_num_incoming_edges.data_handle(),
-             new_size,
-             raft::resource::get_cuda_stream(handle));
+  raft::copy(handle, host_num_incoming_edges.view(), dev_num_incoming_edges.view());
 
   std::size_t data_size_per_vector =
     sizeof(IdxT) * base_degree + sizeof(DistanceT) * base_degree + sizeof(T) * dim;
@@ -73,7 +70,7 @@ void add_node_core(
   params.itopk_size = std::max(base_degree * 2lu, 256lu);
 
   // Memory space for rank-based neighbor list
-  auto mr = raft::resource::get_workspace_resource(handle);
+  auto mr = raft::resource::get_workspace_resource_ref(handle);
 
   auto neighbor_indices = raft::make_device_mdarray<IdxT, std::int64_t>(
     handle, mr, raft::make_extents<std::int64_t>(max_search_batch_size, base_degree));
@@ -87,24 +84,24 @@ void add_node_core(
   auto host_neighbor_indices =
     raft::make_host_matrix<IdxT, std::int64_t>(max_search_batch_size, base_degree);
 
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<T> additional_dataset_batch(
+  auto additional_dataset_batch = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<T>(
+    handle,
     additional_dataset_view.data_handle(),
-    num_add,
-    additional_dataset_view.stride(0),
+    static_cast<std::int64_t>(num_add),
+    static_cast<std::int64_t>(additional_dataset_view.stride(0)),
     max_search_batch_size,
     raft::resource::get_cuda_stream(handle),
     mr);
   for (const auto& batch : additional_dataset_batch) {
     // Step 1: Obtain K (=base_degree) nearest neighbors of the new vectors by CAGRA search
     // Create queries
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(queries.data_handle(),
-                                    sizeof(T) * dim,
-                                    batch.data(),
-                                    sizeof(T) * additional_dataset_view.stride(0),
-                                    sizeof(T) * dim,
-                                    batch.size(),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(handle)));
+    raft::copy_matrix(queries.data_handle(),
+                      dim,
+                      batch.data(),
+                      additional_dataset_view.stride(0),
+                      dim,
+                      batch.size(),
+                      raft::resource::get_cuda_stream(handle));
 
     const auto queries_view = raft::make_device_matrix_view<const T, std::int64_t>(
       queries.data_handle(), batch.size(), dim);
@@ -117,10 +114,10 @@ void add_node_core(
     neighbors::cagra::search(
       handle, params, idx, queries_view, neighbor_indices_view, neighbor_distances_view);
 
-    raft::copy(host_neighbor_indices.data_handle(),
-               neighbor_indices.data_handle(),
-               batch.size() * base_degree,
-               raft::resource::get_cuda_stream(handle));
+    raft::copy(
+      handle,
+      raft::make_host_vector_view(host_neighbor_indices.data_handle(), batch.size() * base_degree),
+      raft::make_device_vector_view(neighbor_indices.data_handle(), batch.size() * base_degree));
     raft::resource::sync_stream(handle);
 
     // Check search results
@@ -300,10 +297,9 @@ void add_graph_nodes(
   const std::size_t max_chunk_size_ =
     params.max_chunk_size == 0 ? new_dataset_size : params.max_chunk_size;
 
-  raft::copy(updated_graph_view.data_handle(),
-             index.graph().data_handle(),
-             index.graph().size(),
-             raft::resource::get_cuda_stream(handle));
+  raft::copy(handle,
+             raft::make_device_vector_view(updated_graph_view.data_handle(), index.graph().size()),
+             raft::make_device_vector_view(index.graph().data_handle(), index.graph().size()));
 
   neighbors::cagra::index<T, IdxT> internal_index(
     handle,
@@ -412,23 +408,20 @@ void extend_core(
     // The padding area must be filled with zeros.!!!!!!!!!!!!!!!!!!!
     memset(host_updated_dataset.data_handle(), 0, sizeof(T) * host_updated_dataset.size());
 
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_updated_dataset.data_handle(),
-                                    sizeof(T) * stride,
-                                    strided_dset->view().data_handle(),
-                                    sizeof(T) * stride,
-                                    sizeof(T) * dim,
-                                    initial_dataset_size,
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(handle)));
-    RAFT_CUDA_TRY(
-      cudaMemcpy2DAsync(host_updated_dataset.data_handle() + initial_dataset_size * stride,
-                        sizeof(T) * stride,
-                        additional_dataset.data_handle(),
-                        sizeof(T) * additional_dataset.stride(0),
-                        sizeof(T) * dim,
-                        num_new_nodes,
-                        cudaMemcpyDefault,
-                        raft::resource::get_cuda_stream(handle)));
+    raft::copy_matrix(host_updated_dataset.data_handle(),
+                      stride,
+                      strided_dset->view().data_handle(),
+                      stride,
+                      dim,
+                      initial_dataset_size,
+                      raft::resource::get_cuda_stream(handle));
+    raft::copy_matrix(host_updated_dataset.data_handle() + initial_dataset_size * stride,
+                      stride,
+                      additional_dataset.data_handle(),
+                      additional_dataset.stride(0),
+                      dim,
+                      num_new_nodes,
+                      raft::resource::get_cuda_stream(handle));
 
     if (new_dataset_buffer_view.has_value()) {
       updated_dataset_view = new_dataset_buffer_view.value();
@@ -444,10 +437,10 @@ void extend_core(
     }
 
     // Copy updated dataset on host memory to device memory
-    raft::copy(updated_dataset_view.data_handle(),
-               host_updated_dataset.data_handle(),
-               new_dataset_size * stride,
-               raft::resource::get_cuda_stream(handle));
+    raft::copy(
+      handle,
+      raft::make_device_vector_view(updated_dataset_view.data_handle(), new_dataset_size * stride),
+      raft::make_host_vector_view(host_updated_dataset.data_handle(), new_dataset_size * stride));
 
     // Add graph nodes
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(
@@ -471,10 +464,10 @@ void extend_core(
     // Update index graph
     if (new_graph_buffer_view.has_value()) {
       auto device_graph_view = new_graph_buffer_view.value();
-      raft::copy(device_graph_view.data_handle(),
-                 updated_graph.data_handle(),
-                 updated_graph.size(),
-                 raft::resource::get_cuda_stream(handle));
+      raft::copy(
+        handle,
+        raft::make_device_vector_view(device_graph_view.data_handle(), updated_graph.size()),
+        raft::make_host_vector_view(updated_graph.data_handle(), updated_graph.size()));
       index.update_graph(handle, raft::make_const_mdspan(device_graph_view));
     } else {
       index.update_graph(handle, raft::make_const_mdspan(updated_graph.view()));

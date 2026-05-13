@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,8 +17,11 @@
 #include <cuvs/distance/distance.hpp>
 
 #include <cuda_fp16.h>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::nn_descent {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace nn_descent {
 /**
  * @defgroup nn_descent_cpp_index_params The nn-descent algorithm parameters.
  * @{
@@ -101,7 +104,7 @@ struct index : cuvs::neighbors::index {
    * The type of the knn-graph is a dense raft::host_matrix and dimensions are
    * (n_rows, n_cols).
    *
-   * @param res raft::resources is an object mangaging resources
+   * @param res raft::resources is an object managing resources
    * @param n_rows number of rows in knn-graph
    * @param n_cols number of cols in knn-graph
    * @param return_distances whether to return distances
@@ -132,7 +135,7 @@ struct index : cuvs::neighbors::index {
    * The type of the knn-graph is a dense raft::host_matrix and dimensions are
    * (n_rows, n_cols).
    *
-   * @param res raft::resources is an object mangaging resources
+   * @param res raft::resources is an object managing resources
    * @param graph_view raft::host_matrix_view<IdxT, int64_t, raft::row_major> for storing knn-graph
    * @param distances_view optional raft::device_matrix_view<float, int64_t, row_major> for storing
    * distances
@@ -218,6 +221,7 @@ struct index : cuvs::neighbors::index {
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  *
  * Usage example:
  * @code{.cpp}
@@ -231,7 +235,7 @@ struct index : cuvs::neighbors::index {
  *   // dataset
  * @endcode
  *
- * @param[in] res raft::resources is an object mangaging resources
+ * @param[in] res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
@@ -254,6 +258,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  *
  * Usage example:
  * @code{.cpp}
@@ -269,7 +274,7 @@ auto build(raft::resources const& res,
  *
  * @tparam T data-type of the input dataset
  * @tparam IdxT data-type for the output index
- * @param res raft::resources is an object mangaging resources
+ * @param res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
@@ -292,6 +297,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  *
  * Usage example:
  * @code{.cpp}
@@ -305,7 +311,7 @@ auto build(raft::resources const& res,
  *   // dataset
  * @endcode
  *
- * @param[in] res raft::resources is an object mangaging resources
+ * @param[in] res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
@@ -328,6 +334,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  *
  * Usage example:
  * @code{.cpp}
@@ -343,7 +350,7 @@ auto build(raft::resources const& res,
  *
  * @tparam T data-type of the input dataset
  * @tparam IdxT data-type for the output index
- * @param res raft::resources is an object mangaging resources
+ * @param res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
@@ -366,6 +373,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  * - BitwiseHamming
  *
  * Usage example:
@@ -380,7 +388,7 @@ auto build(raft::resources const& res,
  *   // dataset
  * @endcode
  *
- * @param[in] res raft::resources is an object mangaging resources
+ * @param[in] res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
@@ -403,6 +411,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  * - BitwiseHamming
  *
  * Usage example:
@@ -419,7 +428,7 @@ auto build(raft::resources const& res,
  *
  * @tparam T data-type of the input dataset
  * @tparam IdxT data-type for the output index
- * @param res raft::resources is an object mangaging resources
+ * @param res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
@@ -442,6 +451,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  * - BitwiseHamming
  *
  * Usage example:
@@ -456,7 +466,7 @@ auto build(raft::resources const& res,
  *   // dataset
  * @endcode
  *
- * @param[in] res raft::resources is an object mangaging resources
+ * @param[in] res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
@@ -479,6 +489,7 @@ auto build(raft::resources const& res,
  * - L2SqrtExpanded
  * - CosineExpanded
  * - InnerProduct
+ * - L1
  * - BitwiseHamming
  *
  * Usage example:
@@ -495,7 +506,7 @@ auto build(raft::resources const& res,
  *
  * @tparam T data-type of the input dataset
  * @tparam IdxT data-type for the output index
- * @param res raft::resources is an object mangaging resources
+ * @param res raft::resources is an object managing resources
  * @param[in] params an instance of nn_descent::index_params that are parameters
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
@@ -524,4 +535,13 @@ bool has_enough_device_memory(raft::resources const& res,
                               raft::matrix_extent<int64_t> dataset,
                               size_t idx_size = 4);
 
-}  // namespace cuvs::neighbors::nn_descent
+}  // namespace nn_descent
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
+using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+}
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
