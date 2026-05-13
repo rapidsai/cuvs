@@ -235,7 +235,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
  * @param[in] params cuvsKMeansParams_v2_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsKMeansParamsCreate_v2(cuvsKMeansParams_v2_t* params);
+CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate_v2(cuvsKMeansParams_v2_t* params);
 
 /**
  * @brief De-allocate KMeans params allocated by cuvsKMeansParamsCreate_v2.
@@ -243,7 +243,7 @@ cuvsError_t cuvsKMeansParamsCreate_v2(cuvsKMeansParams_v2_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params);
+CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params);
 
 /**
  * @brief Type of k-means algorithm.
@@ -325,7 +325,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansFit(cuvsResources_t res,
  *                              closest cluster center.
  * @param[out]    n_iter        Number of iterations run.
  */
-cuvsError_t cuvsKMeansFit_v2(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsKMeansFit_v2(cuvsResources_t res,
                              cuvsKMeansParams_v2_t params,
                              DLManagedTensor* X,
                              DLManagedTensor* sample_weight,
@@ -386,7 +386,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
  * @param[out]    inertia          Sum of squared distances of samples to
  *                                 their closest cluster center.
  */
-cuvsError_t cuvsKMeansPredict_v2(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsKMeansPredict_v2(cuvsResources_t res,
                                  cuvsKMeansParams_v2_t params,
                                  DLManagedTensor* X,
                                  DLManagedTensor* sample_weight,
