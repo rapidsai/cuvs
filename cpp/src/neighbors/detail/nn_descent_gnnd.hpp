@@ -64,7 +64,7 @@ struct BuildConfig {
   float termination_threshold{0.0001};
   size_t output_graph_degree{32};
   cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
-  bool use_fp16_dist_comp{false};
+  cudaDataType_t internal_distance_dtype{CUDA_R_32F};
 };
 
 template <typename Index_t>
@@ -230,7 +230,8 @@ class GNND {
   using input_t = std::remove_const_t<Data_t>;
 
   // d_data_half_ is used for a special case when input data is fp32 on host and
-  // use_fp16_dist_comp flag is True
+  // internal_distance_dtype is CUDA_R_16F: we store the dataset on device as fp16 (instead of
+  // fp32) to halve the device memory footprint and WMMA kernel read bandwidth.
   std::optional<raft::device_matrix<half, size_t, raft::row_major>> d_data_half_;
   // d_data_direct_ is used when input data is on host, and we need to copy it to device
   std::optional<raft::device_matrix<input_t, size_t, raft::row_major>> d_data_direct_;
@@ -306,15 +307,15 @@ inline BuildConfig get_build_config(raft::resources const& res,
   size_t extended_intermediate_degree =
     roundUp32(static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
-  BuildConfig build_config{.max_dataset_size      = num_rows,
-                           .dataset_dim           = num_cols,
-                           .node_degree           = extended_graph_degree,
-                           .internal_node_degree  = extended_intermediate_degree,
-                           .max_iterations        = params.max_iterations,
-                           .termination_threshold = params.termination_threshold,
-                           .output_graph_degree   = params.graph_degree,
-                           .metric                = params.metric,
-                           .use_fp16_dist_comp    = params.use_fp16_dist_comp};
+  BuildConfig build_config{.max_dataset_size        = num_rows,
+                           .dataset_dim             = num_cols,
+                           .node_degree             = extended_graph_degree,
+                           .internal_node_degree    = extended_intermediate_degree,
+                           .max_iterations          = params.max_iterations,
+                           .termination_threshold   = params.termination_threshold,
+                           .output_graph_degree     = params.graph_degree,
+                           .metric                  = params.metric,
+                           .internal_distance_dtype = params.internal_distance_dtype};
   return build_config;
 }
 

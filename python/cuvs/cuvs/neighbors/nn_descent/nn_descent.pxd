@@ -12,6 +12,12 @@ from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
 
 
+cdef extern from "library_types.h":
+    ctypedef enum cudaDataType_t:
+        CUDA_R_32F "CUDA_R_32F"  # float
+        CUDA_R_16F "CUDA_R_16F"  # half
+
+
 cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
     # Deprecated — to be removed in 26.08 and replaced by cuvsNNDescentIndexParams_v6.
     ctypedef enum cuvsNNDescentDistCompDtype:
@@ -39,7 +45,7 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
         size_t max_iterations
         float termination_threshold
         bool return_distances
-        bool use_fp16_dist_comp
+        cudaDataType_t internal_distance_dtype
 
     ctypedef cuvsNNDescentIndexParams_v6* cuvsNNDescentIndexParams_v6_t
 

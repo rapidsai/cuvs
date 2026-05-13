@@ -40,18 +40,19 @@ namespace nn_descent {
  * the graph for. More iterations produce a better quality graph at cost of performance
  * - `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * - `return_distances`: Boolean to decide whether to return distances array
- * - `use_fp16_dist_comp`: When true and the input data is fp32, distance computation is
- * performed in fp16 for better performance and lower memory usage at the cost of precision.
- * This requires copying the fp32 input to an internal fp16 buffer on the device. Has no effect
- * on non-fp32 input types (fp16, int8, uint8) which always use fp16 distance computation.
+ * - `internal_distance_dtype`: Only applicable for fp32 input. Controls the precision used to
+ * compute distances. Possible values: [CUDA_R_32F, CUDA_R_16F]. Defaults to CUDA_R_32F. Set to
+ * CUDA_R_16F to compute distances in fp16 (faster, uses less device memory; not recommended for
+ * dim <= 16 due to precision loss). Has no effect on non-fp32 input types (fp16, int8, uint8)
+ * which always compute distances in fp16.
  */
 struct index_params : cuvs::neighbors::index_params {
-  size_t graph_degree              = 64;
-  size_t intermediate_graph_degree = 128;
-  size_t max_iterations            = 20;
-  float termination_threshold      = 0.0001;
-  bool return_distances            = true;
-  bool use_fp16_dist_comp          = false;
+  size_t graph_degree                    = 64;
+  size_t intermediate_graph_degree       = 128;
+  size_t max_iterations                  = 20;
+  float termination_threshold            = 0.0001;
+  bool return_distances                  = true;
+  cudaDataType_t internal_distance_dtype = CUDA_R_32F;
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *

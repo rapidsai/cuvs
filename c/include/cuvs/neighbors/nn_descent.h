@@ -25,7 +25,7 @@ extern "C" {
  * performance and memory usage.
  * - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
  *
- * @deprecated To be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with use_fp16_dist_comp
+ * @deprecated To be removed in 26.08. Use cuvsNNDescentIndexParams_v6 with internal_distance_dtype
  * instead.
  */
 typedef enum {
@@ -91,10 +91,11 @@ typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * `return_distances`: Boolean to decide whether to return distances array
- * `use_fp16_dist_comp`: When true and the input data is fp32, distance computation is performed
- * in fp16 for better performance and lower memory usage at the cost of precision. This requires
- * copying the fp32 input to an internal fp16 buffer on the device. Has no effect on non-fp32
- * input types (fp16, int8, uint8) which always use fp16 distance computation.
+ * `internal_distance_dtype`: Only applicable for fp32 input. Controls the precision used to
+ * compute distances. Possible values: [CUDA_R_32F, CUDA_R_16F]. Defaults to CUDA_R_32F. Set to
+ * CUDA_R_16F to compute distances in fp16 (faster, uses less device memory; not recommended for
+ * dim <= 16 due to precision loss). Has no effect on non-fp32 input types (fp16, int8, uint8)
+ * which always compute distances in fp16.
  *
  * @since 26.06
  */
@@ -106,7 +107,7 @@ struct cuvsNNDescentIndexParams_v6 {
   size_t max_iterations;
   float termination_threshold;
   bool return_distances;
-  bool use_fp16_dist_comp;
+  cudaDataType_t internal_distance_dtype;
 };
 
 typedef struct cuvsNNDescentIndexParams_v6* cuvsNNDescentIndexParams_v6_t;

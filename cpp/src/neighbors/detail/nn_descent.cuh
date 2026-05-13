@@ -859,7 +859,7 @@ __launch_bounds__(BLOCK_SIZE)
 // MAX_RESIDENT_THREAD_PER_SM = BLOCK_SIZE * BLOCKS_PER_SM = 2048
 // For architectures 750 and 860 (890), the values for MAX_RESIDENT_THREAD_PER_SM
 // is 1024 and 1536 respectively, which means the bounds don't work anymore
-// Used for fp32 data compressed to fp16, and all types using non-L1 distance metric.
+// Used for fp32 data downcast to fp16, and all types using non-L1 distance metric.
 template <typename Data_t,
           typename Index_t,
           typename ID_t = InternalID_t<Index_t>,
@@ -1373,11 +1373,11 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
   static_assert(NUM_SAMPLES <= 32);
 
   using input_t = typename std::remove_const<Data_t>::type;
-  if (build_config.use_fp16_dist_comp && build_config.dataset_dim <= 16 &&
+  if (build_config.internal_distance_dtype == CUDA_R_16F && build_config.dataset_dim <= 16 &&
       std::is_same_v<input_t, float>) {
     RAFT_LOG_WARN(
       "Using fp16 for distance computation for data in fp32 with small dimensions (%zu) <= 16 may "
-      "result in low quality results. Consider setting use_fp16_dist_comp = false.",
+      "result in low quality results. Consider setting internal_distance_dtype = CUDA_R_32F.",
       build_config.dataset_dim);
   }
 
@@ -1431,14 +1431,17 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   // Kernel dispatch logic:
-  // fp32 data can have an effective type of fp32 OR fp16 (when use_fp16_dist_comp flag = True for
-  // wmma usage) Based on EFFECTIVE dtype:
+  // fp32 data can have an effective type of fp32 OR fp16 (when internal_distance_dtype is
+  // CUDA_R_16F, fp32 host data is downcast into a device-side fp16 buffer at copy-in time so the
+  // WMMA kernel reads it in fp16). Based on EFFECTIVE dtype:
   //   fp32 data || L1 distance  -> SIMT: internally converted to fp32 for distance computation
-  //   on-the-fly dypte <= fp16 && non-L1 metrics  -> WMMA (tensor-core accelerated dot product):
-  //   internally converted to fp16 for distance computation on-the-fly
+  //     on-the-fly
+  //   dtype <= fp16 && non-L1 metrics  -> WMMA (tensor-core accelerated dot product):
+  //     internally converted to fp16 for distance computation on-the-fly
 
-  bool use_simt = (std::is_same_v<input_t, float> && !build_config_.use_fp16_dist_comp) ||
-                  build_config_.metric == cuvs::distance::DistanceType::L1;
+  bool use_simt =
+    (std::is_same_v<input_t, float> && build_config_.internal_distance_dtype != CUDA_R_16F) ||
+    build_config_.metric == cuvs::distance::DistanceType::L1;
 
   auto launch_kernel = [&](auto* typed_ptr) {
     if (use_simt) {
@@ -1479,7 +1482,8 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
   };
 
   if (d_data_half_.has_value()) {
-    // Host fp32 input compressed to fp16 via use_fp16_dist_comp.
+    // Host fp32 input was downcast to a device-side fp16 buffer via internal_distance_dtype =
+    // CUDA_R_16F.
     launch_kernel(static_cast<const half*>(d_data_ptr_));
   } else {
     // Data stored as input_t: device data used directly, or host data copied as-is.
@@ -1521,17 +1525,18 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                         build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                         build_config_.metric == cuvs::distance::DistanceType::CosineExpanded;
 
-  bool compress_host_data =
-    !data_on_device && std::is_same_v<input_t, float> && build_config_.use_fp16_dist_comp;
+  bool downcast_host_data = !data_on_device && std::is_same_v<input_t, float> &&
+                            build_config_.internal_distance_dtype == CUDA_R_16F;
 
   if (data_on_device) {
     // When user-given data is on device, we use it directly. This can be any type (fp32, fp16,
     // int8, uint8)
     d_data_ptr_ = data;
-  } else if (compress_host_data) {
-    // When user-given data is fp32 host data, and use_fp16_dist_comp is true, we allocate fp16
-    // buffer to copy the data. This allows the wmma kernel to be used for distance computation
-    // instead of simt kernel.
+  } else if (downcast_host_data) {
+    // When user-given data is fp32 host data, and internal_distance_dtype is CUDA_R_16F, we
+    // allocate an fp16 device buffer and downcast at copy-in time. Storing the dataset on device
+    // in fp16 (instead of fp32) for this path halves both the device memory footprint and the
+    // per-iteration read bandwidth of the WMMA kernel.
     if (!d_data_half_.has_value()) {
       d_data_half_.emplace(raft::make_device_matrix<half, size_t, raft::row_major>(
         res, build_config_.max_dataset_size, build_config_.dataset_dim));
@@ -1545,7 +1550,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
       int num_blocks    = raft::ceildiv(n_elems, static_cast<size_t>(TPB));
       size_t dst_offset = batch.offset() * build_config_.dataset_dim;
       if (needs_l2_norms) {
-        // we compute l2 norms on the fp32 data directly.
+        // Compute l2 norms on the fp32 batches before they're downcast to fp16.
         compute_l2_norms_kernel<<<batch.size(),
                                   raft::warp_size(),
                                   sizeof(float) *
@@ -1560,8 +1565,8 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     }
     d_data_ptr_ = d_data_half_.value().data_handle();
   } else {
-    // In other cases where user-given data is not device-accessible, we allocate a device buffer to
-    // copy the data. The input type is kept as-is (fp32, fp16, int8, uint8).
+    // Other cases: user-given data is not device-accessible, but we don't need a precision
+    // conversion. Allocate a device buffer in input_t and copy as-is.
     if (!d_data_direct_.has_value()) {
       d_data_direct_.emplace(raft::make_device_matrix<input_t, size_t, raft::row_major>(
         res, build_config_.max_dataset_size, build_config_.dataset_dim));
@@ -1573,7 +1578,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     d_data_ptr_ = d_data_direct_.value().data_handle();
   }
 
-  if (needs_l2_norms && !compress_host_data) {
+  if (needs_l2_norms && !downcast_host_data) {
     compute_l2_norms_kernel<<<
       nrow_,
       raft::warp_size(),

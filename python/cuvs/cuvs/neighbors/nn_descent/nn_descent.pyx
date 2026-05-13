@@ -36,6 +36,14 @@ from libc.stdint cimport (
 from cuvs.common.exceptions import check_cuvs
 
 
+cdef _map_dtype_np_to_cuda(dtype):
+    mapping = {np.float32: cudaDataType_t.CUDA_R_32F,
+               np.float16: cudaDataType_t.CUDA_R_16F}
+    if dtype not in mapping:
+        raise TypeError("Type %s is not supported" % str(dtype))
+    return mapping[dtype]
+
+
 cdef class IndexParams:
     """
     Parameters to build NN-Descent Index
@@ -63,12 +71,13 @@ cdef class IndexParams:
         The delta at which nn-descent will terminate its iterations
     return_distances : bool
         Whether to return distances array
-    use_fp16_dist_comp : bool, default = False
-        When True and the input data is fp32, distance computation is performed
-        in fp16 for better performance and lower memory usage at the cost of
-        precision. This requires copying the fp32 input to an internal fp16
-        buffer on the device. Has no effect on non-fp32 input types (fp16,
-        int8, uint8) which always use fp16 distance computation.
+    internal_distance_dtype : numpy dtype, default = np.float32
+        Only applicable for fp32 input. Controls the precision used to compute
+        distances. Possible values: [np.float32, np.float16]. Set to np.float16
+        to compute distances in fp16 (faster, uses less device memory; not
+        recommended for dim <= 16 due to precision loss). Has no effect on
+        non-fp32 input types (fp16, int8, uint8) which always compute distances
+        in fp16.
     """
 
     cdef cuvsNNDescentIndexParams_v6* params
@@ -88,7 +97,7 @@ cdef class IndexParams:
                  max_iterations=None,
                  termination_threshold=None,
                  return_distances=None,
-                 use_fp16_dist_comp=None
+                 internal_distance_dtype=None
                  ):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -102,8 +111,9 @@ cdef class IndexParams:
             self.params.termination_threshold = termination_threshold
         if return_distances is not None:
             self.params.return_distances = return_distances
-        if use_fp16_dist_comp is not None:
-            self.params.use_fp16_dist_comp = use_fp16_dist_comp
+        if internal_distance_dtype is not None:
+            self.params.internal_distance_dtype = \
+                _map_dtype_np_to_cuda(internal_distance_dtype)
 
     @property
     def metric(self):
