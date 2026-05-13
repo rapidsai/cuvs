@@ -13,8 +13,11 @@
 #include <raft/core/host_mdspan.hpp>
 
 #include <cuda_fp16.h>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::neighbors::brute_force {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace brute_force {
 
 struct index_params : cuvs::neighbors::index_params {};
 
@@ -925,12 +928,17 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
-}  // namespace cuvs::neighbors::brute_force
-
+}  // namespace brute_force
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
 /** Specialized parameters utilizing brute force to build knn graph */
-namespace cuvs::neighbors::graph_build_params {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
 struct brute_force_params {
   cuvs::neighbors::brute_force::index_params build_params;
   cuvs::neighbors::brute_force::search_params search_params;
 };
-}  // namespace cuvs::neighbors::graph_build_params
+}  // namespace graph_build_params
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

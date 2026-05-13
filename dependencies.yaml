@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["12.9", "13.1"]
+      cuda: ["12.9", "13.2"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -30,7 +30,7 @@ files:
   bench_ann:
     output: conda
     matrix:
-      cuda: ["12.9", "13.1"]
+      cuda: ["12.9", "13.2"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -87,11 +87,9 @@ files:
   rust:
     output: conda
     matrix:
-      cuda: ["12.9", "13.1"]
+      cuda: ["12.9", "13.2"]
       arch: [x86_64, aarch64]
     includes:
-      # clang/libclang only needed for bindgen support
-      - clang
       - cuda
       - cuda_version
       - rapids_build
@@ -103,7 +101,7 @@ files:
   go:
     output: conda
     matrix:
-      cuda: ["12.9", "13.1"]
+      cuda: ["12.9", "13.2"]
       arch: [x86_64, aarch64]
     includes:
       - clang
@@ -285,9 +283,9 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - clang==20.1.4
-          - clang-tools==20.1.4
-          - libclang==20.1.4
+          - clang==20.1.8
+          - clang-tools==20.1.8
+          - libclang==20.1.8
   # 'cuda_version' intentionally does not contain fallback entries... we want
   # a loud error if an unsupported 'cuda' value is passed
   cuda_version:
@@ -318,6 +316,10 @@ dependencies:
               cuda: "13.1"
             packages:
               - cuda-version=13.1
+          - matrix:
+              cuda: "13.2"
+            packages:
+              - cuda-version=13.2
       - output_types: requirements
         matrices:
           # if use_cuda_wheels=false is provided, do not add dependencies on any CUDA wheels
@@ -363,10 +365,16 @@ dependencies:
               use_cuda_wheels: "true"
             packages:
               - cuda-toolkit==13.1.*
+          - matrix:
+              cuda: "13.2"
+              use_cuda_wheels: "true"
+            packages:
+              - cuda-toolkit==13.2.*
   cuda:
     common:
       - output_types: [conda]
         packages:
+          - cuda-nvrtc-dev
           - cuda-nvtx-dev
           - cuda-profiler-api
           - libcublas-dev
@@ -396,13 +404,13 @@ dependencies:
               cuda: "12.9"
               use_cuda_wheels: "true"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.*
+              - cuda-toolkit[cublas,curand,cusolver,cusparse,nvrtc]==12.*
               - nvidia-nvjitlink-cu12>=12.9,<13
           - matrix:
               cuda: "13.*"
               use_cuda_wheels: "true"
             packages:
-              - &ctk_cu13 cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*
+              - &ctk_cu13 cuda-toolkit[cublas,curand,cusolver,cusparse,nvrtc]==13.*
               - &nvjitlink_cu13 nvidia-nvjitlink>=13.0,<14
           # if no matching matrix selectors passed, list the CUDA 13 requirement
           # (just as a source of documentation, as this populates pyproject.toml in source control)

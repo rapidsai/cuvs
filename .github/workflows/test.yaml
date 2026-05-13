@@ -22,10 +22,17 @@ on:
         type: string
         default: nightly
 
+permissions: {}
+
 jobs:
   conda-cpp-checks:
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@main
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@cuda-13.2.0
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -33,8 +40,14 @@ jobs:
       sha: ${{ inputs.sha }}
       symbol_exclusions: (void (thrust::|cub::))
   conda-cpp-tests:
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@main
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@cuda-13.2.0
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -42,8 +55,14 @@ jobs:
       script: ci/test_cpp.sh
       sha: ${{ inputs.sha }}
   conda-python-tests:
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@main
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@cuda-13.2.0
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -51,8 +70,14 @@ jobs:
       script: ci/test_python.sh
       sha: ${{ inputs.sha }}
   conda-java-tests:
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cuda-13.2.0
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -60,7 +85,7 @@ jobs:
       matrix:
         cuda_version:
           - '12.9.1'
-          - '13.1.1'
+          - '13.2.0'
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -71,8 +96,14 @@ jobs:
       container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/test_java.sh"
   wheel-tests-cuvs:
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@main
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@cuda-13.2.0
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
