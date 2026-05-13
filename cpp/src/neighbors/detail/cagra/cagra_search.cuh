@@ -230,36 +230,28 @@ void search_main(raft::resources const& res,
   if (std::holds_alternative<typename VT::empty_view>(va)) {
     RAFT_FAIL(
       "Attempted to search without a dataset. Please call index.update_dataset(...) first.");
-  }
-  if (std::holds_alternative<typename VT::indirect_view>(va)) {
-    auto const& vroot = std::get<typename VT::indirect_view>(va);
-    if (vroot.get_indirect_target_type() == indirect_target_type::vpq_f32) {
-      RAFT_FAIL("FP32 VPQ dataset support is coming soon");
-    } else if (vroot.get_indirect_target_type() == indirect_target_type::vpq_f16) {
-      auto* vpq_dset = static_cast<const vpq_dataset<half, ds_idx_type>*>(vroot.raw_target());
-      auto desc      = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-        res, params, *vpq_dset, index.metric(), nullptr);
-      search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
-        res,
-        params,
-        desc,
-        index.graph(),
-        index.source_indices(),
-        queries,
-        neighbors,
-        distances,
-        sample_filter);
-    } else {
-      RAFT_EXPECTS(vroot.get_indirect_target_type() == indirect_padded_type_for_element<T>(),
-                   "search: indirect target must be padded rows matching T or VPQ storage");
-      auto* padded_own =
-        static_cast<const device_padded_dataset<T, ds_idx_type>*>(vroot.raw_target());
-      run_strided_like(*padded_own);
-    }
+  } else if (std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+    RAFT_FAIL("FP32 VPQ dataset support is coming soon");
+  } else if (std::holds_alternative<typename VT::vpq_f16_view>(va)) {
+    auto const& vv = std::get<typename VT::vpq_f16_view>(va);
+    auto desc      = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+      res, params, vv.dset(), index.metric(), nullptr);
+    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+      res,
+      params,
+      desc,
+      index.graph(),
+      index.source_indices(),
+      queries,
+      neighbors,
+      distances,
+      sample_filter);
   } else if (std::holds_alternative<typename VT::padded_view>(va)) {
     run_strided_like(std::get<typename VT::padded_view>(va));
   } else if (std::holds_alternative<typename VT::strided_view>(va)) {
     run_strided_like(std::get<typename VT::strided_view>(va));
+  } else {
+    RAFT_FAIL("search: unsupported dataset view variant");
   }
 
   static_assert(std::is_same_v<DistanceT, float>,

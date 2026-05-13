@@ -38,7 +38,7 @@ namespace {
  */
 template <typename T>
 struct cuvs_cagra_c_api_lifetime_holder {
-  /** VPQ compressed storage; index may hold an indirect view into this. Must outlive idx — declared
+  /** VPQ compressed storage; index may hold a VPQ view into this. Must outlive idx — declared
    * first so idx is destroyed first (reverse member destruction order). */
   std::unique_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq_owner{nullptr};
   /** Non-ACE host build / deserialize: owns padded (or other) device dataset backing the index. */
@@ -106,7 +106,7 @@ static void destroy_cagra_c_api_box(uintptr_t addr)
 }
 
 /**
- * build() returns an index whose indirect_dataset_view points at the vpq object inside
+ * build() returns an index whose VPQ view points at the vpq object inside
  * build_res. After moving that vpq into stable storage, the view must be rebound to the new
  * address.
  */
@@ -116,7 +116,7 @@ void rebind_vpq_index(raft::resources* res,
                       cuvs::neighbors::vpq_dataset<half, int64_t>* vpq_ptr)
 {
   RAFT_EXPECTS(vpq_ptr != nullptr, "rebind_vpq_index: null VPQ pointer");
-  idx.update_dataset(*res, cuvs::neighbors::make_indirect_dataset_view(vpq_ptr));
+  idx.update_dataset(*res, vpq_ptr->as_dataset_view());
 }
 
 static void _set_graph_build_params(

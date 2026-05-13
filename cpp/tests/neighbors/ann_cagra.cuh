@@ -80,13 +80,12 @@ void cagra_build_into_index(
   RAFT_EXPECTS(
     vpq_keep != nullptr || !br.vpq.has_value(),
     "cagra_build_into_index: build returned VPQ; pass a non-null vpq_keep to own storage for the "
-    "indirect index view");
+    "VPQ index view");
   if (br.vpq.has_value()) {
     *vpq_keep = std::move(*br.vpq);
     // build() wired the index to &*br.vpq; moving VPQ into *vpq_keep leaves that pointer stale.
-    index.update_dataset(res,
-                         cuvs::neighbors::any_dataset_view<DataT, int64_t>(
-                           cuvs::neighbors::make_indirect_dataset_view(&vpq_keep->value())));
+    index.update_dataset(
+      res, cuvs::neighbors::any_dataset_view<DataT, int64_t>(vpq_keep->value().as_dataset_view()));
   }
 }
 

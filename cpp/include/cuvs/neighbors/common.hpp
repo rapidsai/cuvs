@@ -147,7 +147,6 @@ struct empty_dataset_container {};
 struct padded_dataset_container {};
 struct vpq_dataset_container {};
 struct strided_dataset_container {};
-struct indirect_dataset_container {};
 /**
  * Tag for owning dataset unions (`any_owning_dataset<IdxT>`).
  *
@@ -273,8 +272,15 @@ struct dataset_view<padded_dataset_container, DataT, IdxT, true, false> {
 };
 
 // -----------------------------------------------------------------------------
-// VPQ compressed owning dataset
+// VPQ compressed owning dataset (+ non-owning view below)
 // -----------------------------------------------------------------------------
+//
+// Owning block is first for file organization. `dataset_view<vpq_dataset_container, …>` is
+// forward-declared so `as_dataset_view()` can be declared here; its definition (and the view’s
+// constructor body that wraps `this`) come after the full view specialization.
+
+template <typename DataT, typename IdxT>
+struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
 
 template <typename DataT, typename IdxT>
 struct dataset<vpq_dataset_container, DataT, IdxT, true, false> {
@@ -331,7 +337,44 @@ struct dataset<vpq_dataset_container, DataT, IdxT, true, false> {
   {
     return pq_code_book.extent(0);
   }
+
+  /** Non-owning view for storing in `any_dataset_view` (same role as
+   * `padded_dataset::as_dataset_view`). */
+  [[nodiscard]] auto as_dataset_view() const noexcept
+    -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
 };
+
+// -----------------------------------------------------------------------------
+// VPQ non-owning device view (pointer to `vpq_dataset`; same `vpq_dataset_container` tag as
+// owning).
+// -----------------------------------------------------------------------------
+
+template <typename DataT, typename IdxT>
+struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false> {
+  using index_type  = IdxT;
+  using target_type = dataset<vpq_dataset_container, DataT, IdxT, true, false>;
+
+  target_type const* target_{};
+
+  dataset_view() = default;
+
+  explicit dataset_view(target_type const* ptr) noexcept : target_(ptr)
+  {
+    RAFT_EXPECTS(ptr != nullptr, "vpq_dataset_view: null target");
+  }
+
+  [[nodiscard]] auto n_rows() const noexcept -> index_type { return target_->n_rows(); }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t { return target_->dim(); }
+  [[nodiscard]] target_type const& dset() const noexcept { return *target_; }
+};
+
+template <typename DataT, typename IdxT>
+[[nodiscard]] inline auto
+dataset<vpq_dataset_container, DataT, IdxT, true, false>::as_dataset_view() const noexcept
+  -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>
+{
+  return dataset_view<vpq_dataset_container, DataT, IdxT, true, false>(this);
+}
 
 // -----------------------------------------------------------------------------
 // Strided owning device storage (`layout_stride` mdarray)
@@ -404,10 +447,12 @@ struct dataset_view<strided_dataset_container, DataT, IdxT, true, false> {
  * specializations: the primary `dataset` / `dataset_view` templates are not defined for unknown
  * tags, and some bodies must spell `dataset_view<padded_dataset_container, …>` before
  * `padded_dataset_view` exists (see `dataset<padded_dataset_container>::as_dataset_view`).
+ * VPQ: `dataset_view<vpq_dataset_container, …>` is forward-declared, then owning `dataset`, then
+ * the full view specialization and `as_dataset_view()` out-of-line (constructor needs a complete
+ * view type).
  *
- * Variant member helpers (`any_dataset_view_types`, `any_owning_dataset_types`) sit after
- * `indirect_dataset_view` and `make_indirect_dataset_view`. Other type-erased typedefs follow their
- * specializations; see section comments there.
+ * Variant member helpers (`any_dataset_view_types`, `any_owning_dataset_types`) follow; see
+ * section comments there.
  */
 template <typename IdxT>
 using empty_dataset = dataset<empty_dataset_container, void, IdxT, false, false>;
@@ -430,171 +475,16 @@ using device_padded_dataset_view = padded_dataset_view<DataT, IdxT>;
 template <typename DataT, typename IdxT>
 using vpq_dataset = dataset<vpq_dataset_container, DataT, IdxT, true, false>;
 
+/** Non-owning view of a device `vpq_dataset` (codebooks + encoded rows). */
+template <typename DataT, typename IdxT>
+using vpq_dataset_view = dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
+
 template <typename DataT, typename IdxT>
 using strided_owning_dataset = dataset<strided_dataset_container, DataT, IdxT, true, false>;
 
 /** Non-owning strided device rows (`layout_stride`). */
 template <typename DataT, typename IdxT>
 using strided_dataset_view = dataset_view<strided_dataset_container, DataT, IdxT, true, false>;
-
-/** Which concrete `dataset<...>` layout `indirect_dataset_view::target_ptr_` points at
- * (type-erased). */
-enum class indirect_target_type : uint8_t {
-  empty_v,
-  padded_f32,
-  padded_f16,
-  padded_i8,
-  padded_u8,
-  vpq_f32,
-  vpq_f16,
-};
-
-template <typename DataT>
-constexpr auto indirect_padded_type_for_element() -> indirect_target_type
-{
-  if constexpr (std::is_same_v<DataT, float>) {
-    return indirect_target_type::padded_f32;
-  } else if constexpr (std::is_same_v<DataT, half>) {
-    return indirect_target_type::padded_f16;
-  } else if constexpr (std::is_same_v<DataT, int8_t>) {
-    return indirect_target_type::padded_i8;
-  } else if constexpr (std::is_same_v<DataT, uint8_t>) {
-    return indirect_target_type::padded_u8;
-  } else {
-    static_assert(!std::is_same_v<DataT, DataT>, "unsupported element type for indirect padded");
-    return indirect_target_type::empty_v;
-  }
-}
-
-template <typename DataT>
-constexpr auto indirect_vpq_type_for_element() -> indirect_target_type
-{
-  if constexpr (std::is_same_v<DataT, float>) {
-    return indirect_target_type::vpq_f32;
-  } else if constexpr (std::is_same_v<DataT, half>) {
-    return indirect_target_type::vpq_f16;
-  } else {
-    static_assert(!std::is_same_v<DataT, DataT>, "unsupported VPQ element type");
-    return indirect_target_type::vpq_f16;
-  }
-}
-
-template <typename IdxT>
-struct dataset_view<indirect_dataset_container, void, IdxT, true, false> {
-  using index_type = IdxT;
-
-  void const* target_ptr_{};
-  indirect_target_type indirect_target_type_{};
-
-  dataset_view() = default;
-
-  [[nodiscard]] indirect_target_type get_indirect_target_type() const noexcept
-  {
-    return indirect_target_type_;
-  }
-  [[nodiscard]] void const* raw_target() const noexcept { return target_ptr_; }
-
-  [[nodiscard]] index_type n_rows() const
-  {
-    switch (indirect_target_type_) {
-      case indirect_target_type::empty_v:
-        return static_cast<empty_dataset<IdxT> const*>(target_ptr_)->n_rows();
-      case indirect_target_type::padded_f32:
-        return static_cast<padded_dataset<float, IdxT> const*>(target_ptr_)->n_rows();
-      case indirect_target_type::padded_f16:
-        return static_cast<padded_dataset<half, IdxT> const*>(target_ptr_)->n_rows();
-      case indirect_target_type::padded_i8:
-        return static_cast<padded_dataset<int8_t, IdxT> const*>(target_ptr_)->n_rows();
-      case indirect_target_type::padded_u8:
-        return static_cast<padded_dataset<uint8_t, IdxT> const*>(target_ptr_)->n_rows();
-      case indirect_target_type::vpq_f32:
-        return static_cast<vpq_dataset<float, IdxT> const*>(target_ptr_)->n_rows();
-      case indirect_target_type::vpq_f16:
-        return static_cast<vpq_dataset<half, IdxT> const*>(target_ptr_)->n_rows();
-      default: RAFT_FAIL("indirect_dataset_view: invalid indirect_target_type");
-    }
-  }
-
-  [[nodiscard]] uint32_t dim() const
-  {
-    switch (indirect_target_type_) {
-      case indirect_target_type::empty_v:
-        return static_cast<empty_dataset<IdxT> const*>(target_ptr_)->dim();
-      case indirect_target_type::padded_f32:
-        return static_cast<padded_dataset<float, IdxT> const*>(target_ptr_)->dim();
-      case indirect_target_type::padded_f16:
-        return static_cast<padded_dataset<half, IdxT> const*>(target_ptr_)->dim();
-      case indirect_target_type::padded_i8:
-        return static_cast<padded_dataset<int8_t, IdxT> const*>(target_ptr_)->dim();
-      case indirect_target_type::padded_u8:
-        return static_cast<padded_dataset<uint8_t, IdxT> const*>(target_ptr_)->dim();
-      case indirect_target_type::vpq_f32:
-        return static_cast<vpq_dataset<float, IdxT> const*>(target_ptr_)->dim();
-      case indirect_target_type::vpq_f16:
-        return static_cast<vpq_dataset<half, IdxT> const*>(target_ptr_)->dim();
-      default: RAFT_FAIL("indirect_dataset_view: invalid indirect_target_type");
-    }
-  }
-
-  template <typename containertype,
-            typename DataT,
-            bool is_device_accessible,
-            bool is_host_accessible>
-  static auto wrap(
-    dataset<containertype, DataT, IdxT, is_device_accessible, is_host_accessible> const* p)
-    -> dataset_view
-  {
-    RAFT_EXPECTS(p != nullptr, "indirect_dataset_view: null target");
-    dataset_view out;
-    out.target_ptr_ = p;
-    if constexpr (std::is_same_v<containertype, empty_dataset_container>) {
-      out.indirect_target_type_ = indirect_target_type::empty_v;
-    } else if constexpr (std::is_same_v<containertype, padded_dataset_container>) {
-      if constexpr (std::is_same_v<DataT, float>) {
-        out.indirect_target_type_ = indirect_target_type::padded_f32;
-      } else if constexpr (std::is_same_v<DataT, half>) {
-        out.indirect_target_type_ = indirect_target_type::padded_f16;
-      } else if constexpr (std::is_same_v<DataT, int8_t>) {
-        out.indirect_target_type_ = indirect_target_type::padded_i8;
-      } else if constexpr (std::is_same_v<DataT, uint8_t>) {
-        out.indirect_target_type_ = indirect_target_type::padded_u8;
-      } else {
-        static_assert(!std::is_same_v<DataT, DataT>, "indirect: unsupported padded element type");
-      }
-    } else if constexpr (std::is_same_v<containertype, vpq_dataset_container>) {
-      if constexpr (std::is_same_v<DataT, float>) {
-        out.indirect_target_type_ = indirect_target_type::vpq_f32;
-      } else if constexpr (std::is_same_v<DataT, half>) {
-        out.indirect_target_type_ = indirect_target_type::vpq_f16;
-      } else {
-        static_assert(!std::is_same_v<DataT, DataT>, "indirect: unsupported VPQ DataT");
-      }
-    } else {
-      static_assert(!std::is_same_v<containertype, containertype>,
-                    "indirect: unsupported target containertype");
-    }
-    return out;
-  }
-};
-
-// -----------------------------------------------------------------------------
-// Type-erased / union aliases — indirect pointer-to-layout view
-// -----------------------------------------------------------------------------
-
-template <typename IdxT>
-using indirect_dataset_view = dataset_view<indirect_dataset_container, void, IdxT, true, false>;
-
-template <typename containertype,
-          typename DataT,
-          typename IdxT,
-          bool is_device_accessible,
-          bool is_host_accessible>
-auto make_indirect_dataset_view(
-  dataset<containertype, DataT, IdxT, is_device_accessible, is_host_accessible> const* p)
-  -> indirect_dataset_view<IdxT>
-{
-  return indirect_dataset_view<IdxT>::wrap(p);
-}
 
 /**
  * Concrete types held by `any_dataset_view<DataT, IdxT>`'s `std::variant`. Dispatch with
@@ -603,18 +493,21 @@ auto make_indirect_dataset_view(
  */
 template <typename DataT, typename IdxT>
 struct any_dataset_view_types {
-  using empty_view    = empty_dataset_view<IdxT>;
-  using indirect_view = indirect_dataset_view<IdxT>;
-  using padded_view   = padded_dataset_view<DataT, IdxT>;
-  using strided_view  = strided_dataset_view<DataT, IdxT>;
+  using empty_view   = empty_dataset_view<IdxT>;
+  using vpq_f16_view = vpq_dataset_view<half, IdxT>;
+  using vpq_f32_view = vpq_dataset_view<float, IdxT>;
+  using padded_view  = padded_dataset_view<DataT, IdxT>;
+  using strided_view = strided_dataset_view<DataT, IdxT>;
 };
 
 /**
  * Concrete types held by `any_owning_dataset<IdxT>`'s `std::variant`. Dispatch with
  * `std::holds_alternative<T>` / `std::get<T>` on `dataset.as_variant()`.
  *
- * Strided owning alternatives mirror element widths used for padded/VPQ paths; they are not
- * produced by deserialize / serialize today — see `wrap_any_owning`, `deserialize_dataset`.
+ * Strided owning alternatives mirror element widths used for padded/VPQ paths. Blobs tagged
+ * `kSerializeStridedDataset` deserialize into `strided_owning_dataset` (same row pitch `stride`
+ * as on save when present in the stream). `serialize(any_owning_dataset)` uses the same payload as
+ * non-owning `strided_dataset_view` for those variants.
  */
 template <typename IdxT>
 struct any_owning_dataset_types {
@@ -748,7 +641,8 @@ template <typename DataT, typename IdxT>
 struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
   using index_type   = IdxT;
   using variant_type = std::variant<typename any_dataset_view_types<DataT, IdxT>::empty_view,
-                                    typename any_dataset_view_types<DataT, IdxT>::indirect_view,
+                                    typename any_dataset_view_types<DataT, IdxT>::vpq_f16_view,
+                                    typename any_dataset_view_types<DataT, IdxT>::vpq_f32_view,
                                     typename any_dataset_view_types<DataT, IdxT>::padded_view,
                                     typename any_dataset_view_types<DataT, IdxT>::strided_view>;
 
@@ -756,12 +650,11 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
 
   dataset_view() = default;
 
-  /** Non-explicit conversions so legacy `device_padded_dataset_view` / indirect / strided / empty
-   *  views bind to APIs taking `any_dataset_view` without manual wrapping. */
+  /** Non-explicit conversions so `device_padded_dataset_view` / VPQ / strided / empty views bind to
+   *  APIs taking `any_dataset_view` without manual wrapping. */
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::empty_view const& v) : storage_(v) {}
-  dataset_view(typename any_dataset_view_types<DataT, IdxT>::indirect_view const& v) : storage_(v)
-  {
-  }
+  dataset_view(typename any_dataset_view_types<DataT, IdxT>::vpq_f16_view const& v) : storage_(v) {}
+  dataset_view(typename any_dataset_view_types<DataT, IdxT>::vpq_f32_view const& v) : storage_(v) {}
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::padded_view const& v) : storage_(v) {}
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::strided_view const& v) : storage_(v) {}
 
@@ -778,8 +671,11 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
     if (std::holds_alternative<typename VT::empty_view>(storage_)) {
       return std::get<typename VT::empty_view>(storage_).n_rows();
     }
-    if (std::holds_alternative<typename VT::indirect_view>(storage_)) {
-      return std::get<typename VT::indirect_view>(storage_).n_rows();
+    if (std::holds_alternative<typename VT::vpq_f16_view>(storage_)) {
+      return std::get<typename VT::vpq_f16_view>(storage_).n_rows();
+    }
+    if (std::holds_alternative<typename VT::vpq_f32_view>(storage_)) {
+      return std::get<typename VT::vpq_f32_view>(storage_).n_rows();
     }
     if (std::holds_alternative<typename VT::padded_view>(storage_)) {
       return std::get<typename VT::padded_view>(storage_).n_rows();
@@ -796,8 +692,11 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
     if (std::holds_alternative<typename VT::empty_view>(storage_)) {
       return std::get<typename VT::empty_view>(storage_).dim();
     }
-    if (std::holds_alternative<typename VT::indirect_view>(storage_)) {
-      return std::get<typename VT::indirect_view>(storage_).dim();
+    if (std::holds_alternative<typename VT::vpq_f16_view>(storage_)) {
+      return std::get<typename VT::vpq_f16_view>(storage_).dim();
+    }
+    if (std::holds_alternative<typename VT::vpq_f32_view>(storage_)) {
+      return std::get<typename VT::vpq_f32_view>(storage_).dim();
     }
     if (std::holds_alternative<typename VT::padded_view>(storage_)) {
       return std::get<typename VT::padded_view>(storage_).dim();

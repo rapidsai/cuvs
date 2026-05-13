@@ -152,7 +152,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>> index_;
   std::shared_ptr<raft::device_matrix<IdxT, int64_t, raft::row_major>> graph_;
   std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
-  /** Set when a physical merge produced a VPQ-compressed index; index holds an indirect view. */
+  /** Set when a physical merge produced a VPQ-compressed index; index holds a VPQ view. */
   std::shared_ptr<cuvs::neighbors::vpq_dataset<half, int64_t>> merge_vpq_{};
   std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
 
@@ -241,9 +241,8 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
         if (br.vpq.has_value()) {
           merge_vpq_ =
             std::make_shared<cuvs::neighbors::vpq_dataset<half, int64_t>>(std::move(*br.vpq));
-          index_->update_dataset(handle_,
-                                 cuvs::neighbors::any_dataset_view<T, int64_t>(
-                                   cuvs::neighbors::make_indirect_dataset_view(merge_vpq_.get())));
+          index_->update_dataset(
+            handle_, cuvs::neighbors::any_dataset_view<T, int64_t>(merge_vpq_->as_dataset_view()));
         }
       } else {
         auto padded = cuvs::neighbors::make_padded_dataset(handle_, mds);
@@ -254,9 +253,8 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
         if (br.vpq.has_value()) {
           merge_vpq_ =
             std::make_shared<cuvs::neighbors::vpq_dataset<half, int64_t>>(std::move(*br.vpq));
-          index_->update_dataset(handle_,
-                                 cuvs::neighbors::any_dataset_view<T, int64_t>(
-                                   cuvs::neighbors::make_indirect_dataset_view(merge_vpq_.get())));
+          index_->update_dataset(
+            handle_, cuvs::neighbors::any_dataset_view<T, int64_t>(merge_vpq_->as_dataset_view()));
         }
       }
     }
@@ -366,9 +364,8 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(merge_res.idx));
       if (merge_vpq_) {
-        index_->update_dataset(handle_,
-                               cuvs::neighbors::any_dataset_view<T, int64_t>(
-                                 cuvs::neighbors::make_indirect_dataset_view(merge_vpq_.get())));
+        index_->update_dataset(
+          handle_, cuvs::neighbors::any_dataset_view<T, int64_t>(merge_vpq_->as_dataset_view()));
       }
       *dataset_ = std::move(merge_res.dataset);
     }
@@ -512,11 +509,8 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
     const auto& root_view = index_->data();
     bool is_vpq           = false;
     using VT              = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
-    if (std::holds_alternative<typename VT::indirect_view>(root_view.as_variant())) {
-      auto const& v = std::get<typename VT::indirect_view>(root_view.as_variant());
-      is_vpq = (v.get_indirect_target_type() == cuvs::neighbors::indirect_target_type::vpq_f16 ||
-                v.get_indirect_target_type() == cuvs::neighbors::indirect_target_type::vpq_f32);
-    }
+    is_vpq = std::holds_alternative<typename VT::vpq_f16_view>(root_view.as_variant()) ||
+             std::holds_alternative<typename VT::vpq_f32_view>(root_view.as_variant());
     // It can happen that we are re-using a previous algo object which already has
     // the dataset set. Check if we need update.
     if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
@@ -545,11 +539,8 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
     const auto& root_view = index_->data();
     bool is_vpq           = false;
     using VT              = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
-    if (std::holds_alternative<typename VT::indirect_view>(root_view.as_variant())) {
-      auto const& v = std::get<typename VT::indirect_view>(root_view.as_variant());
-      is_vpq = (v.get_indirect_target_type() == cuvs::neighbors::indirect_target_type::vpq_f16 ||
-                v.get_indirect_target_type() == cuvs::neighbors::indirect_target_type::vpq_f32);
-    }
+    is_vpq = std::holds_alternative<typename VT::vpq_f16_view>(root_view.as_variant()) ||
+             std::holds_alternative<typename VT::vpq_f32_view>(root_view.as_variant());
     cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
   }
 }

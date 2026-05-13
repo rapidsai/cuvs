@@ -2427,9 +2427,8 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
       index<T, IdxT>(res, params.metric),
       std::make_optional(vpq_train_from_padded_view<T>(res, *params.compression, padded))};
     out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(res,
-                           cuvs::neighbors::any_dataset_view<T, int64_t>(
-                             cuvs::neighbors::make_indirect_dataset_view(&*out.vpq)));
+    out.idx.update_dataset(
+      res, cuvs::neighbors::any_dataset_view<T, int64_t>(out.vpq->as_dataset_view()));
     padded_own.reset();
     return out;
   }
@@ -2454,7 +2453,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
  * `convert_dataset_view_to_padded_for_graph_build`.
  *
  * Supported alternatives include `device_padded_dataset_view`,
- * `strided_dataset_view`, and `indirect`
+ * `strided_dataset_view`, and VPQ (`vpq_f16` / `vpq_f32` view arms in `any_dataset_view`).
  * to device padded storage matching \p T; this entry point does **not** accept host-backed bases
  * for graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
  */
@@ -2498,9 +2497,8 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
       index<T, IdxT>(res, params.metric),
       std::make_optional(vpq_train_from_padded_view<T>(res, *params.compression, padded))};
     out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(res,
-                           cuvs::neighbors::any_dataset_view<T, int64_t>(
-                             cuvs::neighbors::make_indirect_dataset_view(&*out.vpq)));
+    out.idx.update_dataset(
+      res, cuvs::neighbors::any_dataset_view<T, int64_t>(out.vpq->as_dataset_view()));
     return out;
   }
   if (params.attach_dataset_on_build) {

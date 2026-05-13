@@ -84,7 +84,7 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
     }
     if (std::holds_alternative<typename OT::vpq_f32_owning>(store)) {
       auto& vpq = std::get<typename OT::vpq_f32_owning>(store);
-      return any_dataset_view<T, IdxT>(nb::make_indirect_dataset_view(&vpq));
+      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
     }
   } else if constexpr (std::is_same_v<T, half>) {
     if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
@@ -97,7 +97,7 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
     }
     if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
       auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
-      return any_dataset_view<T, IdxT>(nb::make_indirect_dataset_view(&vpq));
+      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
     }
   } else if constexpr (std::is_same_v<T, int8_t>) {
     if (std::holds_alternative<typename OT::padded_i8_owning>(store)) {
@@ -142,15 +142,11 @@ auto convert_dataset_view_to_padded_for_graph_build(any_dataset_view<T, int64_t>
   if (std::holds_alternative<typename VT::empty_view>(va)) {
     RAFT_FAIL("cagra::build: empty dataset.");
   }
-  if (std::holds_alternative<typename VT::indirect_view>(va)) {
-    auto const& v = std::get<typename VT::indirect_view>(va);
-    RAFT_EXPECTS(
-      v.get_indirect_target_type() == nb::indirect_padded_type_for_element<T>(),
-      "cagra::build: indirect_dataset_view target must be device padded storage matching index "
-      "element type T for graph construction.");
-    auto* dp = static_cast<nb::padded_dataset<T, int64_t> const*>(v.raw_target());
-    expect_cagra_row_width_for_graph<T>(dp->dim(), static_cast<int64_t>(dp->stride()));
-    return dp->as_dataset_view();
+  if (std::holds_alternative<typename VT::vpq_f16_view>(va) ||
+      std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+    RAFT_FAIL(
+      "cagra::build: VPQ-compressed dataset cannot be converted to padded dense rows for graph "
+      "construction.");
   }
   if (std::holds_alternative<typename VT::padded_view>(va)) {
     auto const& v = std::get<typename VT::padded_view>(va);
@@ -191,19 +187,13 @@ auto any_dataset_view_to_strided_device_matrix(
     return raft::make_device_strided_matrix_view<const T, int64_t>(
       v.view().data_handle(), v.n_rows(), v.dim(), v.stride());
   }
-  if (std::holds_alternative<typename VT::indirect_view>(va)) {
-    auto const& v = std::get<typename VT::indirect_view>(va);
-    if (v.get_indirect_target_type() == nb::indirect_target_type::vpq_f16 ||
-        v.get_indirect_target_type() == nb::indirect_target_type::vpq_f32) {
-      auto d = v.dim();
-      return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
-    }
-    RAFT_EXPECTS(v.get_indirect_target_type() == nb::indirect_padded_type_for_element<T>(),
-                 "dataset(): indirect target must be padded rows matching T or VPQ storage");
-    auto* dp = static_cast<const nb::device_padded_dataset<T, int64_t>*>(v.raw_target());
-    auto pdv = dp->as_dataset_view();
-    return raft::make_device_strided_matrix_view<const T, int64_t>(
-      pdv.view().data_handle(), pdv.n_rows(), pdv.dim(), pdv.stride());
+  if (std::holds_alternative<typename VT::vpq_f16_view>(va)) {
+    auto d = std::get<typename VT::vpq_f16_view>(va).dim();
+    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
+  }
+  if (std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+    auto d = std::get<typename VT::vpq_f32_view>(va).dim();
+    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
   }
   if (std::holds_alternative<typename VT::empty_view>(va)) {
     auto const& v = std::get<typename VT::empty_view>(va);

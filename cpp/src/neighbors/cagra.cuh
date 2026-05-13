@@ -64,9 +64,8 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 {
   // raft::linalg::reduce wants row-major with leading dim = row pitch in elements. Prefer padded
   // storage's native row-major view; for strided non-owning rows use the mdspan stride, not only
-  // index::dataset()'s synthetic mdspan when avoidable. Skip norm precomputation for VPQ indirect
-  // targets (compressed codes); CosineExpanded with VPQ is handled (or rejected) on the search
-  // path.
+  // index::dataset()'s synthetic mdspan when avoidable. Skip norm precomputation for VPQ
+  // (compressed codes); CosineExpanded with VPQ is handled (or rejected) on the search path.
   namespace nb    = cuvs::neighbors;
   bool skip_norms = false;
   std::optional<raft::device_matrix_view<const T, int64_t, raft::row_major>> rm_dataset;
@@ -81,16 +80,9 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
     const int64_t pitch = sv.stride(0) > 0 ? sv.stride(0) : static_cast<int64_t>(sv.extent(1));
     rm_dataset          = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
       sv.data_handle(), sv.extent(0), pitch);
-  } else if (std::holds_alternative<typename VT::indirect_view>(va)) {
-    auto const& v = std::get<typename VT::indirect_view>(va);
-    if (v.get_indirect_target_type() == nb::indirect_target_type::vpq_f16 ||
-        v.get_indirect_target_type() == nb::indirect_target_type::vpq_f32) {
-      skip_norms = true;
-    } else if (v.get_indirect_target_type() == nb::indirect_padded_type_for_element<T>()) {
-      auto* p_padded_own =
-        static_cast<const nb::device_padded_dataset<T, int64_t>*>(v.raw_target());
-      rm_dataset = p_padded_own->view();
-    }
+  } else if (std::holds_alternative<typename VT::vpq_f16_view>(va) ||
+             std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+    skip_norms = true;
   }
 
   if (skip_norms) { return; }
@@ -363,7 +355,7 @@ index<T, IdxT> build(
 }
 
 /**
- * @brief Build the index from a device `any_dataset_view` (strided, padded view, or indirect).
+ * @brief Build the index from a device `any_dataset_view` (strided, padded, VPQ, or empty).
  *
  * Graph construction uses
  * `convert_dataset_view_to_padded_for_graph_build`. The index

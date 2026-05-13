@@ -317,38 +317,7 @@ void deserialize(
     *out_dataset = cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is);
     auto* box    = out_dataset->get();
     RAFT_EXPECTS(box != nullptr, "deserialize: out_dataset not set");
-    namespace nb     = cuvs::neighbors;
-    using OT         = nb::any_owning_dataset_types<int64_t>;
-    auto const& ovar = box->as_variant();
-    if (std::holds_alternative<typename OT::empty_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::empty_owning>(ovar)))));
-    } else if (std::holds_alternative<typename OT::padded_f32_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::padded_f32_owning>(ovar)))));
-    } else if (std::holds_alternative<typename OT::padded_f16_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::padded_f16_owning>(ovar)))));
-    } else if (std::holds_alternative<typename OT::padded_i8_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::padded_i8_owning>(ovar)))));
-    } else if (std::holds_alternative<typename OT::padded_u8_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::padded_u8_owning>(ovar)))));
-    } else if (std::holds_alternative<typename OT::vpq_f32_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::vpq_f32_owning>(ovar)))));
-    } else if (std::holds_alternative<typename OT::vpq_f16_owning>(ovar)) {
-      index_->update_dataset(res,
-                             nb::any_dataset_view<T, int64_t>(nb::make_indirect_dataset_view(
-                               std::addressof(std::get<typename OT::vpq_f16_owning>(ovar)))));
-    }
+    index_->update_dataset(res, any_owning_dataset_to_index_view<T, int64_t>(*box));
   }
 
   bool has_source_indices = content_map & 0x2u;
