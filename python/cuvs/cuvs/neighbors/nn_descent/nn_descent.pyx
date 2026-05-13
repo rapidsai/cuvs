@@ -84,10 +84,12 @@ cdef class IndexParams:
     cdef object _metric
 
     def __cinit__(self):
-        cuvsNNDescentIndexParamsCreate_v6(&self.params)
+        self.params = NULL
+        check_cuvs(cuvsNNDescentIndexParamsCreate_v6(&self.params))
 
     def __dealloc__(self):
-        check_cuvs(cuvsNNDescentIndexParamsDestroy_v6(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsNNDescentIndexParamsDestroy_v6(self.params))
 
     def __init__(self, *,
                  metric=None,

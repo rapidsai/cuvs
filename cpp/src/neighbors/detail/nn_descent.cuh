@@ -1554,8 +1554,8 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
         compute_l2_norms_kernel<<<batch.size(),
                                   raft::warp_size(),
                                   sizeof(float) *
-                                    ceildiv(build_config_.dataset_dim,
-                                            static_cast<size_t>(raft::warp_size())) *
+                                    raft::ceildiv(build_config_.dataset_dim,
+                                                  static_cast<size_t>(raft::warp_size())) *
                                     raft::warp_size(),
                                   stream>>>(
           batch.data(), build_config_.dataset_dim, l2_norms_.data_handle() + batch.offset());
@@ -1579,12 +1579,13 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   }
 
   if (needs_l2_norms && !downcast_host_data) {
-    compute_l2_norms_kernel<<<
-      nrow_,
-      raft::warp_size(),
-      sizeof(input_t) * ceildiv(build_config_.dataset_dim, static_cast<size_t>(raft::warp_size())) *
-        raft::warp_size(),
-      stream>>>(
+    compute_l2_norms_kernel<<<nrow_,
+                              raft::warp_size(),
+                              sizeof(input_t) *
+                                raft::ceildiv(build_config_.dataset_dim,
+                                              static_cast<size_t>(raft::warp_size())) *
+                                raft::warp_size(),
+                              stream>>>(
       static_cast<const input_t*>(d_data_ptr_), build_config_.dataset_dim, l2_norms_.data_handle());
     raft::resource::sync_stream(res);
   }
