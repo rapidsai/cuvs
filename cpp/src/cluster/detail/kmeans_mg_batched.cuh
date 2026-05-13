@@ -372,14 +372,6 @@ void mnmg_fit(
     raft::make_pinned_vector<T, IdxT>(dev_res, (need_compute_norms && has_data) ? n_local : 0);
   bool norms_cached = false;
 
-  auto mnmg_allreduce = [&](auto* sendbuf, auto* recvbuf, size_t count) {
-    MNMG_ALLREDUCE(sendbuf, recvbuf, count);
-  };
-  auto mnmg_allgather = [&](auto* sendbuf, auto* recvbuf, size_t count) {
-    MNMG_ALLGATHER(sendbuf, recvbuf, count);
-  };
-  auto mnmg_bcast = [&](auto* buf, size_t count, int root) { MNMG_BCAST(buf, count, root); };
-
   // Stage `batch_weights` for the current batch, either by H2D-copying the
   // pre-scaled cache slice (host weights) or by aliasing the device weights
   // into a contiguous device buffer with an in-place rescale.
