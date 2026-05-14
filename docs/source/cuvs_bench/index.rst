@@ -122,6 +122,22 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     # (4) Plot results.
     python -m cuvs_bench.plot --dataset deep-image-96-inner
 
+Alternatively, step (2) can be done programmatically using the Python API for more control (e.g., custom workflows, result inspection between runs, or notebook-based exploration):
+
+.. code-block:: python
+
+    from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
+    results = orchestrator.run_benchmark(
+        dataset="deep-image-96-inner",
+        algorithms="cuvs_cagra",
+        count=10,
+        batch_size=10,
+        build=True,
+        search=True,
+    )
+
 .. list-table::
 
  * - Dataset name
@@ -206,6 +222,22 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
 
     # (4) Plot results.
     python -m cuvs_bench.plot --dataset deep-1B
+
+Alternatively, step (2) can be done programmatically using the Python API:
+
+.. code-block:: python
+
+    from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
+    results = orchestrator.run_benchmark(
+        dataset="deep-1B",
+        algorithms="cuvs_cagra",
+        count=10,
+        batch_size=10,
+        build=True,
+        search=True,
+    )
 
 The usage of `python -m cuvs_bench.split_groundtruth` is:
 
