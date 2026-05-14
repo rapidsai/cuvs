@@ -246,11 +246,9 @@ void diskann_memory<T>::load(const std::string& index_file)
 
   bench_mode_ = (cuvs::bench::benchmark_n_threads > 1) ? Mode::kThroughput : Mode::kLatency;
 
-  initialize_index_(0);
-
   int load_threads = (bench_mode_ == Mode::kThroughput) ? cuvs::bench::benchmark_n_threads : 1;
   log_info(
-    "diskann_memory load start: prefix=%s dim=%d benchmark_threads=%d load_threads=%d "
+    "diskann_memory load enter: prefix=%s dim=%d benchmark_threads=%d load_threads=%d "
     "mode=%s build_threads=%d",
     index_path_prefix_.c_str(),
     this->dim_,
@@ -258,11 +256,32 @@ void diskann_memory<T>::load(const std::string& index_file)
     load_threads,
     bench_mode_ == Mode::kThroughput ? "throughput" : "latency",
     num_threads_);
+
+  try {
+    log_info("diskann_memory initialize_index start: prefix=%s max_points=0",
+             index_path_prefix_.c_str());
+    initialize_index_(0);
+    log_info("diskann_memory initialize_index finish: prefix=%s", index_path_prefix_.c_str());
+  } catch (const std::exception& e) {
+    log_warn("diskann_memory initialize_index failed: prefix=%s error=%s",
+             index_path_prefix_.c_str(),
+             e.what());
+    throw;
+  } catch (...) {
+    log_warn("diskann_memory initialize_index failed: prefix=%s unknown error",
+             index_path_prefix_.c_str());
+    throw;
+  }
+
+  log_info("diskann_memory load start: prefix=%s", index_path_prefix_.c_str());
   try {
     this->mem_index_->load(index_path_prefix_.c_str(), load_threads, 100);
   } catch (const std::exception& e) {
     log_warn(
       "diskann_memory load failed: prefix=%s error=%s", index_path_prefix_.c_str(), e.what());
+    throw;
+  } catch (...) {
+    log_warn("diskann_memory load failed: prefix=%s unknown error", index_path_prefix_.c_str());
     throw;
   }
   log_info("diskann_memory load finish: prefix=%s", index_path_prefix_.c_str());

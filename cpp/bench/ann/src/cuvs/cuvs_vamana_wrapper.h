@@ -190,7 +190,19 @@ void cuvs_vamana<T, IdxT>::load(const std::string& file)
     cuvs_vamana_artifact_exists(data_file) ? 1 : 0,
     static_cast<size_t>(data_bytes));
 
-  diskann_memory_search_->load(file);
+  try {
+    log_info("cuvs_vamana load delegating to diskann_memory: file=%s", file.c_str());
+    diskann_memory_search_->load(file);
+  } catch (const std::exception& e) {
+    log_warn("cuvs_vamana load failed while loading diskann_memory: file=%s error=%s",
+             file.c_str(),
+             e.what());
+    throw;
+  } catch (...) {
+    log_warn("cuvs_vamana load failed while loading diskann_memory: file=%s unknown error",
+             file.c_str());
+    throw;
+  }
   log_info("cuvs_vamana load finish: file=%s", file.c_str());
 }
 
