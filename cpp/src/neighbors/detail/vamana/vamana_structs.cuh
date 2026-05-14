@@ -34,6 +34,9 @@ namespace cuvs::neighbors::vamana::detail {
 
 #define FULL_BITMASK 0xFFFFFFFF
 
+// Warp stride for per-warp distance reduction (GreedySearch uses multiple warps per block).
+static constexpr int VAMANA_WARP_SIZE = 32;
+
 // Currently supported values for graph_degree.
 static const int DEGREE_SIZES[4] = {32, 64, 128, 256};
 
@@ -291,6 +294,204 @@ __host__ __device__ SUMTYPE
 dist(const T* src, const T* dest, int dim, cuvs::distance::DistanceType metric)
 {
   SUMTYPE d = l2<T, SUMTYPE>(src, dest, dim);
+  if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    return static_cast<SUMTYPE>(sqrtf(static_cast<float>(d)));
+  }
+  return d;
+}
+
+/*
+ * Warp-strided L2 / dist: each warp computes one distance using lanes 0..31 only.
+ * Required when blockDim.x > 32 but only one distance per warp is desired — plain l2() shards
+ * work across the whole block then reduces inside each warp only, which under-counts L2.
+ */
+template <typename T, typename SUMTYPE>
+__device__ SUMTYPE l2_SEQ_warp(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec, int lane)
+{
+  SUMTYPE partial_sum = 0;
+  for (int i = lane; i < src_vec->Dim; i += VAMANA_WARP_SIZE) {
+    partial_sum = fmaf((src_vec[0].coords[i] - dst_vec[0].coords[i]),
+                       (src_vec[0].coords[i] - dst_vec[0].coords[i]),
+                       partial_sum);
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
+template <typename T, typename SUMTYPE>
+__device__ SUMTYPE l2_ILP2_warp(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec, int lane)
+{
+  T temp_dst[2]          = {0, 0};
+  SUMTYPE partial_sum[2] = {0, 0};
+  for (int i = lane; i < src_vec->Dim; i += 2 * VAMANA_WARP_SIZE) {
+    temp_dst[0] = dst_vec->coords[i];
+    if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
+
+    partial_sum[0] = fmaf(
+      (src_vec[0].coords[i] - temp_dst[0]), (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
+    if (i + 32 < src_vec->Dim)
+      partial_sum[1] = fmaf((src_vec[0].coords[i + 32] - temp_dst[1]),
+                            (src_vec[0].coords[i + 32] - temp_dst[1]),
+                            partial_sum[1]);
+  }
+  partial_sum[0] += partial_sum[1];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename T, typename SUMTYPE>
+__device__ SUMTYPE l2_ILP4_warp(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec, int lane)
+{
+  T temp_dst[4]          = {0, 0, 0, 0};
+  SUMTYPE partial_sum[4] = {0, 0, 0, 0};
+  for (int i = lane; i < src_vec->Dim; i += 4 * VAMANA_WARP_SIZE) {
+    temp_dst[0] = dst_vec->coords[i];
+    if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
+    if (i + 64 < src_vec->Dim) temp_dst[2] = dst_vec->coords[i + 64];
+    if (i + 96 < src_vec->Dim) temp_dst[3] = dst_vec->coords[i + 96];
+
+    partial_sum[0] = fmaf(
+      (src_vec[0].coords[i] - temp_dst[0]), (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
+    if (i + 32 < src_vec->Dim)
+      partial_sum[1] = fmaf((src_vec[0].coords[i + 32] - temp_dst[1]),
+                            (src_vec[0].coords[i + 32] - temp_dst[1]),
+                            partial_sum[1]);
+    if (i + 64 < src_vec->Dim)
+      partial_sum[2] = fmaf((src_vec[0].coords[i + 64] - temp_dst[2]),
+                            (src_vec[0].coords[i + 64] - temp_dst[2]),
+                            partial_sum[2]);
+    if (i + 96 < src_vec->Dim)
+      partial_sum[3] = fmaf((src_vec[0].coords[i + 96] - temp_dst[3]),
+                            (src_vec[0].coords[i + 96] - temp_dst[3]),
+                            partial_sum[3]);
+  }
+  partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_SEQ_half_warp(Point<__half, SUMTYPE>* src_vec,
+                                    Point<__half, SUMTYPE>* dst_vec,
+                                    int lane)
+{
+  SUMTYPE partial_sum = 0;
+  for (int i = lane; i < src_vec->Dim; i += VAMANA_WARP_SIZE) {
+    float s = __half2float(src_vec[0].coords[i]);
+    float t = __half2float(dst_vec[0].coords[i]);
+    float d = s - t;
+    partial_sum = fmaf(d, d, partial_sum);
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP2_half_warp(Point<__half, SUMTYPE>* src_vec,
+                                     Point<__half, SUMTYPE>* dst_vec,
+                                     int lane)
+{
+  float partial_sum[2] = {0, 0};
+  for (int i = lane; i < src_vec->Dim; i += 2 * VAMANA_WARP_SIZE) {
+    float t0       = __half2float(dst_vec->coords[i]);
+    float s0       = __half2float(src_vec[0].coords[i]);
+    partial_sum[0] = fmaf(s0 - t0, s0 - t0, partial_sum[0]);
+
+    if (i + 32 < src_vec->Dim) {
+      float t1       = __half2float(dst_vec->coords[i + 32]);
+      float s1       = __half2float(src_vec[0].coords[i + 32]);
+      partial_sum[1] = fmaf(s1 - t1, s1 - t1, partial_sum[1]);
+    }
+  }
+  partial_sum[0] += partial_sum[1];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP4_half_warp(Point<__half, SUMTYPE>* src_vec,
+                                     Point<__half, SUMTYPE>* dst_vec,
+                                     int lane)
+{
+  float partial_sum[4] = {0, 0, 0, 0};
+  for (int i = lane; i < src_vec->Dim; i += 4 * VAMANA_WARP_SIZE) {
+    float t0       = __half2float(dst_vec->coords[i]);
+    float s0       = __half2float(src_vec[0].coords[i]);
+    partial_sum[0] = fmaf(s0 - t0, s0 - t0, partial_sum[0]);
+
+    if (i + 32 < src_vec->Dim) {
+      float t1       = __half2float(dst_vec->coords[i + 32]);
+      float s1       = __half2float(src_vec[0].coords[i + 32]);
+      partial_sum[1] = fmaf(s1 - t1, s1 - t1, partial_sum[1]);
+    }
+    if (i + 64 < src_vec->Dim) {
+      float t2       = __half2float(dst_vec->coords[i + 64]);
+      float s2       = __half2float(src_vec[0].coords[i + 64]);
+      partial_sum[2] = fmaf(s2 - t2, s2 - t2, partial_sum[2]);
+    }
+    if (i + 96 < src_vec->Dim) {
+      float t3       = __half2float(dst_vec->coords[i + 96]);
+      float s3       = __half2float(src_vec[0].coords[i + 96]);
+      partial_sum[3] = fmaf(s3 - t3, s3 - t3, partial_sum[3]);
+    }
+  }
+  partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename T, typename SUMTYPE>
+__forceinline__ __device__ SUMTYPE l2_warp(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec, int lane)
+{
+  if constexpr (std::is_same_v<std::remove_cv_t<T>, __half>) {
+    if (src_vec->Dim >= 128) {
+      return l2_ILP4_half_warp<SUMTYPE>(src_vec, dst_vec, lane);
+    } else if (src_vec->Dim >= 64) {
+      return l2_ILP2_half_warp<SUMTYPE>(src_vec, dst_vec, lane);
+    } else {
+      return l2_SEQ_half_warp<SUMTYPE>(src_vec, dst_vec, lane);
+    }
+  } else {
+    if (src_vec->Dim >= 128) {
+      return l2_ILP4_warp<T, SUMTYPE>(src_vec, dst_vec, lane);
+    } else if (src_vec->Dim >= 64) {
+      return l2_ILP2_warp<T, SUMTYPE>(src_vec, dst_vec, lane);
+    } else {
+      return l2_SEQ_warp<T, SUMTYPE>(src_vec, dst_vec, lane);
+    }
+  }
+}
+
+template <typename T, typename SUMTYPE>
+__forceinline__ __device__ SUMTYPE l2_warp(const T* src, const T* dest, int dim, int lane)
+{
+  Point<T, SUMTYPE> src_p;
+  src_p.coords = const_cast<T*>(src);
+  src_p.Dim    = dim;
+  Point<T, SUMTYPE> dest_p;
+  dest_p.coords = const_cast<T*>(dest);
+  dest_p.Dim    = dim;
+
+  return l2_warp<T, SUMTYPE>(&src_p, &dest_p, lane);
+}
+
+template <typename T, typename SUMTYPE>
+__forceinline__ __device__ SUMTYPE
+dist_warp(const T* src, const T* dest, int dim, cuvs::distance::DistanceType metric, int lane)
+{
+  SUMTYPE d = l2_warp<T, SUMTYPE>(src, dest, dim, lane);
   if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     return static_cast<SUMTYPE>(sqrtf(static_cast<float>(d)));
   }

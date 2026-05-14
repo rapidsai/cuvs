@@ -395,8 +395,11 @@ __forceinline__ __device__ void enqueue_all_neighbors_warp(int num_neighbors,
                                                           int laneId)
 {
   for (int i = 0; i < num_neighbors; i++) {
-    accT dist_out = dist<T, accT>(
-      query_vec->coords, &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)], dim, metric);
+    accT dist_out = dist_warp<T, accT>(query_vec->coords,
+                                       &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)],
+                                       dim,
+                                       metric,
+                                       laneId);
     if (laneId == 0) { heap_queue.insert_back(dist_out, neighbor_array[i]); }
   }
 }

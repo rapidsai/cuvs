@@ -165,8 +165,8 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
     Point<T, accT>* query_vec = &s_query;
     query_vec->Dim            = dim;
     query_vec->coords         = s_coords;
-    accT medoid_dist =
-      dist<T, accT>(query_vec->coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric);
+    accT medoid_dist = dist_warp<T, accT>(
+      query_vec->coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
 
     if (laneId == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
 
