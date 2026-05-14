@@ -154,9 +154,12 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Specify compression parameters if compression is desired. If set, overrides the
-   * attach_dataset_on_build (and the compressed dataset is always added to the index).
+   * @deprecated VPQ for this field is trained inside `cagra::build` when set; the resulting
+   * `vpq_dataset` is owned by the returned index (`update_dataset(any_owning_dataset&&)`).
+   * Prefer `cuvs::preprocessing::quantize::pq::make_vpq_dataset` plus `index::update_dataset` with
+   * a non-owning view while you hold the `vpq_dataset` externally.
    */
+  [[deprecated("Prefer make_vpq_dataset + update_dataset; compression trains VPQ inside build.")]]
   std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
   /** Parameters for graph building.
@@ -531,11 +534,10 @@ struct index : cuvs::neighbors::index {
    * `empty_dataset_view`, `vpq_dataset_view` (f16/f32 arms in `any_dataset_view`),
    * `device_padded_dataset_view`, `strided_dataset_view<T, int64_t>`. For non-owning VPQ from an
    * owning `vpq_dataset`, pass `dataset.as_dataset_view()` (implicitly converts to
-   * `any_dataset_view`). To attach VPQ **as owned** storage in the index, use
-   * `update_dataset(res, any_owning_dataset<…>(std::move(vpq)))` instead. The index stores only a
-   * **non-owning** view in the primary constructor path; the caller must keep underlying device
-   * storage (including any VPQ object referenced by a VPQ view) alive for the index lifetime unless
-   * the owning-`update_dataset` path was used.
+   * `any_dataset_view`). The index stores a **non-owning** view; the caller must keep underlying
+   * device storage (including any `vpq_dataset` referenced by a VPQ view) alive for the index
+   * lifetime. An optional `update_dataset(res, any_owning_dataset<…>(std::move(vpq)))` overload
+   * exists for convenience but is not required for VPQ.
    *
    * Example — **non-owning** `make_padded_dataset_view` (wraps an existing device matrix; that
    * matrix must outlive the index):
@@ -633,17 +635,20 @@ struct index : cuvs::neighbors::index {
   /**
    * Replace the dataset with an owning type-erased dataset (transfers ownership into the index).
    *
-   * Storage is kept in `host_owning_dataset_` (same member used by host-matrix `update_dataset`) so
-   * the stored `any_dataset_view` remains valid for the lifetime of the index. The active owning
-   * member must be handled by `any_owning_dataset_to_index_view<T, …>` (padded/strided with row
-   * type `T`, VPQ `vpq_f16_owning` / `vpq_f32_owning` when `T` is `half` / `float`, or empty).
+   * Bytes are stored in `index_owning_dataset_storage_` so this index is the owner (not the
+   * caller). Same member backs `update_dataset(host_matrix)` and deprecated
+   * `index_params::compression` VPQ attach. If the API moves to caller-owned buffers with views
+   * only, search for this field to find call sites to revisit. The active owning member must be
+   * handled by `any_owning_dataset_to_index_view<T, …>` (padded/strided with row type `T`, VPQ
+   * `vpq_f16_owning` / `vpq_f32_owning` when `T` is `half` / `float`, or empty).
    */
   void update_dataset(raft::resources const& res,
                       cuvs::neighbors::any_owning_dataset<dataset_index_type>&& dataset)
   {
-    host_owning_dataset_ =
+    index_owning_dataset_storage_ =
       std::make_unique<cuvs::neighbors::any_owning_dataset<dataset_index_type>>(std::move(dataset));
-    auto view = any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    auto view =
+      any_owning_dataset_to_index_view<T, dataset_index_type>(*index_owning_dataset_storage_);
     update_dataset(res, view);
   }
 
@@ -656,8 +661,9 @@ struct index : cuvs::neighbors::index {
     std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>>&& dataset)
   {
     RAFT_EXPECTS(dataset != nullptr, "update_dataset: null any_owning_dataset");
-    host_owning_dataset_ = std::move(dataset);
-    auto view = any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    index_owning_dataset_storage_ = std::move(dataset);
+    auto view =
+      any_owning_dataset_to_index_view<T, dataset_index_type>(*index_owning_dataset_storage_);
     update_dataset(res, view);
   }
 
@@ -704,15 +710,16 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Replace the dataset by copying a host-resident matrix to a padded device buffer owned by the
-   * index (`host_owning_dataset_`).
+   * Replace the dataset by copying a host-resident matrix to a padded device buffer owned by this
+   * index (`index_owning_dataset_storage_`).
    */
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    auto own             = cuvs::neighbors::make_padded_dataset(res, dataset);
-    host_owning_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(own));
-    auto view = any_owning_dataset_to_index_view<T, dataset_index_type>(*host_owning_dataset_);
+    auto own                      = cuvs::neighbors::make_padded_dataset(res, dataset);
+    index_owning_dataset_storage_ = cuvs::neighbors::wrap_any_owning(std::move(own));
+    auto view =
+      any_owning_dataset_to_index_view<T, dataset_index_type>(*index_owning_dataset_storage_);
     update_dataset(res, view);
   }
 
@@ -925,7 +932,8 @@ struct index : cuvs::neighbors::index {
    * Owning type-erased device storage when the index must hold the buffer: host `build` /
    * `update_dataset(host_matrix)`, or `update_dataset` overloads that take `any_owning_dataset`.
    */
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>> host_owning_dataset_{};
+  std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>>
+    index_owning_dataset_storage_{};
   /**
    * Optional ACE device row storage when `detail::build_ace` materializes a padded copy for
    * `attach_dataset_on_build` (lives for the same lifetime as the index in the public `build` API).
@@ -948,40 +956,44 @@ struct index : cuvs::neighbors::index {
  */
 
 /**
- * Result of building when VPQ compression is used. Caller must keep \p vpq alive for the
- * lifetime of \p idx (the index holds a `vpq_f16_view` / `vpq_f32_view` over it).
+ * Result of `cagra::build` when the implementation must return extra owning state alongside the
+ * index (e.g. deferred host padded GPU storage). When deprecated `index_params::compression` is
+ * set, VPQ is trained inside `build` and stored in the index (no `vpq_dataset` field here).
+ * Otherwise, for explicit VPQ, train with `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and
+ * attach via `index::update_dataset` with `vpq.as_dataset_view()` while keeping the `vpq_dataset`
+ * alive.
  */
 template <typename T, typename IdxT>
 struct build_result {
   cuvs::neighbors::cagra::index<T, IdxT> idx;
-  std::optional<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq;
   /**
    * Host-matrix build only: GPU padded dataset kept alive until `finalize_index_from_padded` moves
-   * it for indices that attach raw vectors on build; unset for VPQ-only or graph-only builds.
+   * it for indices that attach raw vectors on build; unset for graph-only builds.
    */
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> deferred_host_dataset{};
 
-  /** Implicit conversion to index when VPQ is not used (e.g. index idx = build(...)). */
+  /** Implicit conversion to index when there is no deferred host padded storage to finalize. */
   operator cuvs::neighbors::cagra::index<T, IdxT>() &&
   {
     RAFT_EXPECTS(
-      !vpq.has_value() && !deferred_host_dataset,
-      "When using VPQ compression or deferred host padded storage, keep the full build_result "
-      "alive and use finalize_index_from_padded when deferred_host_dataset is set.");
+      !deferred_host_dataset,
+      "When using deferred host padded storage, keep the full build_result alive and use "
+      "finalize_index_from_padded when deferred_host_dataset is set.");
     return std::move(idx);
   }
 };
 
 /**
  * Result of merging CAGRA indices. The index holds a view over \p dataset; caller must keep
- * \p dataset alive for the lifetime of \p idx. When VPQ compression is used, \p vpq is set and
- * must also be kept alive (the index holds a VPQ view over it), same as build_result.
+ * \p dataset alive for the lifetime of \p idx. If \p index_params passed to \p cagra::merge had
+ * deprecated \p index_params::compression set, the internal rebuild may train VPQ and own it on
+ * \p idx; otherwise attach VPQ with `make_vpq_dataset` on a padded view of \p dataset and
+ * `merged.idx.update_dataset(res, vpq.as_dataset_view())` while keeping the `vpq_dataset` alive.
  */
 template <typename T, typename IdxT>
 struct merge_result {
   cuvs::neighbors::cagra::index<T, IdxT> idx;
   raft::device_matrix<T, int64_t, raft::row_major> dataset;
-  std::optional<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq;
 };
 
 /**
@@ -1408,8 +1420,10 @@ auto build_ace(raft::resources const& res,
  * @brief Build the index from a device `dataset_view` (non-owning).
  *
  * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The index
- * stores a copy of the original view when `attach_dataset_on_build` is true. When VPQ compression
- * is used, returns `build_result` with `.vpq` that the caller must keep alive.
+ * stores a copy of the original view when `attach_dataset_on_build` is true. Deprecated
+ * `index_params::compression` trains VPQ inside `build` and stores it on the index. Otherwise use
+ * `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and `index::update_dataset(res,
+ * vpq.as_dataset_view())` while keeping the `vpq_dataset` alive.
  * See `build(res, params, device_matrix_view)` for full documentation.
  *
  * Strided device rows (`strided_dataset_view<T, int64_t>`) are
@@ -2739,8 +2753,7 @@ void serialize_to_hnswlib(
  * @param[in] row_filter an optional device filter function object that greenlights rows
  *    to include in the merged index  (none_sample_filter for no filtering)
  * @return merge_result with .idx (merged index holding a view over .dataset) and .dataset;
- *         caller must keep .dataset alive for the lifetime of .idx. If .vpq is set (VPQ
- *         compression), keep .vpq alive as well; the index holds a VPQ view over it.
+ *         caller must keep .dataset alive for the lifetime of .idx when the index still views it.
  */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,

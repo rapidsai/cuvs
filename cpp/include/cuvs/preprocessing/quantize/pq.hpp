@@ -243,6 +243,22 @@ void inverse_transform(
   raft::device_matrix_view<float, int64_t> out,
   std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt);
 
+/**
+ * @brief Train VPQ storage (codebooks + encoded rows) from a CAGRA-style padded device view.
+ *
+ * Call this when you want a `cuvs::neighbors::vpq_dataset` that you keep alive and attach with
+ * `cagra::index::update_dataset(res, vpq.as_dataset_view())`. When using deprecated
+ * `cagra::index_params::compression`, `cagra::build` trains VPQ internally and owns it on the index
+ * instead.
+ *
+ * @tparam T Source vector element type (`float`, `half`, `int8_t`, or `uint8_t`).
+ */
+template <typename T>
+[[nodiscard]] cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset(
+  raft::resources const& res,
+  cuvs::neighbors::vpq_params const& params,
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded);
+
 /** @} */  // end of group product
 
 }  // namespace pq

@@ -72,15 +72,11 @@ void cagra_from_host_padded(raft::resources const& h,
       devp, m.extent(0), m.extent(1), s_stride);
     auto padded  = cuvs::neighbors::make_padded_dataset_view(h, d_m);
     auto build_r = cuvs::neighbors::cagra::build(h, cagra_params, padded);
-    RAFT_EXPECTS(!build_r.vpq.has_value(),
-                 "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
     interface.cagra_owned_dataset_.reset();
     interface.index_.emplace(std::move(build_r.idx));
   } else {
     auto padded_r = cuvs::neighbors::make_padded_dataset(h, m);
     auto build_r  = cuvs::neighbors::cagra::build(h, cagra_params, padded_r->as_dataset_view());
-    RAFT_EXPECTS(!build_r.vpq.has_value(),
-                 "CAGRA VPQ build from host is not supported through neighbors::build for MG.");
     interface.cagra_owned_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(padded_r));
     interface.index_.emplace(std::move(build_r.idx));
   }

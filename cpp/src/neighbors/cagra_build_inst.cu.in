@@ -32,8 +32,7 @@ auto build(raft::resources const& handle,
            raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<data_t, index_t>
 {
-  // `build` on dataset_view returns build_result; convert to index (RAFT_EXPECTS in build_result
-  // if VPQ is set).
+  // `build` on dataset_view returns build_result; convert to index when no deferred padded owner.
   auto padded = cuvs::neighbors::make_padded_dataset_view(handle, dataset);
   cuvs::neighbors::cagra::index<data_t, index_t> out =
     cuvs::neighbors::cagra::build(handle, params, padded);
@@ -60,10 +59,6 @@ auto build(raft::resources const& handle,
   if (auto own = std::move(bres.deferred_host_dataset)) {
     return ::cuvs::neighbors::cagra::finalize_index_from_padded(std::move(bres), std::move(own));
   }
-  RAFT_EXPECTS(
-    !bres.vpq.has_value(),
-    "When using VPQ compression or deferred host padded storage, keep the full build_result "
-    "alive and use finalize_index_from_padded when deferred_host_dataset is set.");
   return std::move(bres.idx);
 }
 

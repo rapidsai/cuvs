@@ -5,9 +5,9 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../../../preprocessing/quantize/vpq_build-ext.cuh"
 #include "../vpq_dataset.cuh"
 #include "graph_core.cuh"
+#include <cuvs/preprocessing/quantize/pq.hpp>
 
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
@@ -2236,27 +2236,6 @@ inline void validate_cagra_knn_graph_build_constraints(index_params const& param
                "Current data type is not supported.");
 }
 
-template <typename T>
-[[nodiscard]] inline cuvs::neighbors::vpq_dataset<half, int64_t> vpq_train_from_padded_view(
-  raft::resources const& res,
-  cuvs::neighbors::vpq_params const& compression,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded)
-{
-  const auto n_r = static_cast<int64_t>(padded.n_rows());
-  const auto d   = static_cast<int64_t>(padded.dim());
-  const auto str = static_cast<int64_t>(padded.stride());
-  auto stream    = raft::resource::get_cuda_stream(res);
-  if (str != d) {
-    auto dense = raft::make_device_matrix<T, int64_t>(res, n_r, d);
-    raft::copy_matrix(dense.data_handle(), d, padded.view().data_handle(), str, d, n_r, stream);
-    auto dense_view = raft::make_device_matrix_view<const T, int64_t>(dense.data_handle(), n_r, d);
-    return cuvs::preprocessing::quantize::pq::vpq_build(res, compression, dense_view);
-  }
-  auto row_view =
-    raft::make_device_matrix_view<const T, int64_t>(padded.view().data_handle(), n_r, d);
-  return cuvs::preprocessing::quantize::pq::vpq_build(res, compression, row_view);
-}
-
 /**
  * Iterative / IVF-PQ / NN-descent KNN graph construction and `optimize` → final host CAGRA graph.
  *
@@ -2355,8 +2334,7 @@ auto try_attach_padded_dataset_on_build(
       index<T, IdxT>(res,
                      params.metric,
                      cuvs::neighbors::any_dataset_view<T, int64_t>(padded),
-                     raft::make_const_mdspan(cagra_graph_host)),
-      std::nullopt};
+                     raft::make_const_mdspan(cagra_graph_host))};
     if (deferred_host_dataset != nullptr) {
       out.deferred_host_dataset = std::move(*deferred_host_dataset);
     }
@@ -2371,6 +2349,41 @@ auto try_attach_padded_dataset_on_build(
       "be added to the index");
   }
   return std::nullopt;
+}
+
+/**
+ * Deprecated `index_params::compression`: train VPQ on the padded device rows and transfer
+ * ownership into the index via `update_dataset(any_owning_dataset&&)` so callers do not hold a
+ * separate `vpq_dataset`. Graph build ignores `compression` (no graph code reads it); VPQ runs
+ * afterward.
+ */
+template <typename T, typename IdxT>
+void attach_deprecated_compression_vpq_to_index_if_set(
+  raft::resources const& res,
+  std::optional<cuvs::neighbors::vpq_params> const& compression,
+  cuvs::distance::DistanceType metric,
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded,
+  cuvs::neighbors::cagra::index<T, IdxT>& idx)
+{
+  if (!compression.has_value()) { return; }
+  RAFT_EXPECTS(
+    metric == cuvs::distance::DistanceType::L2Expanded,
+    "cagra build (deprecated index_params::compression / VPQ): metric must be L2Expanded.");
+  auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset(res, *compression, padded);
+  idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
+}
+
+template <typename T, typename IdxT>
+void attach_deprecated_compression_vpq_to_build_result_if_set(
+  raft::resources const& res,
+  std::optional<cuvs::neighbors::vpq_params> const& compression,
+  cuvs::distance::DistanceType metric,
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded,
+  cuvs::neighbors::cagra::build_result<T, IdxT>& out)
+{
+  if (!compression.has_value()) { return; }
+  attach_deprecated_compression_vpq_to_index_if_set(res, compression, metric, padded, out.idx);
+  out.deferred_host_dataset.reset();
 }
 
 /**
@@ -2419,31 +2432,35 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  if (params.compression.has_value()) {
-    RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
-                 "VPQ compression is only supported with L2Expanded distance mertric");
-    auto padded = ensure_padded();
-    cuvs::neighbors::cagra::build_result<T, IdxT> out{
-      index<T, IdxT>(res, params.metric),
-      std::make_optional(vpq_train_from_padded_view<T>(res, *params.compression, padded))};
-    out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(
-      res, cuvs::neighbors::any_dataset_view<T, int64_t>(out.vpq->as_dataset_view()));
-    padded_own.reset();
-    return out;
-  }
   if (params.attach_dataset_on_build) {
     auto padded = ensure_padded();
     if (auto attached = try_attach_padded_dataset_on_build<T, IdxT>(
           res, params, padded, cagra_graph.view(), &padded_own)) {
-      return std::move(*attached);
+      auto out = std::move(*attached);
+      if (params.compression.has_value()) {
+        RAFT_EXPECTS(
+          out.deferred_host_dataset != nullptr,
+          "cagra::detail::build_from_host_matrix: internal error — deferred padded storage missing "
+          "after attach_dataset_on_build.");
+        attach_deprecated_compression_vpq_to_build_result_if_set(
+          res,
+          params.compression,
+          params.metric,
+          out.deferred_host_dataset->as_dataset_view(),
+          out);
+      }
+      return out;
     }
     padded_own.reset();
   }
 
-  cuvs::neighbors::cagra::build_result<T, IdxT> out{index<T, IdxT>(res, params.metric),
-                                                    std::nullopt};
+  cuvs::neighbors::cagra::build_result<T, IdxT> out{index<T, IdxT>(res, params.metric)};
   out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+  if (params.compression.has_value()) {
+    auto const padded_for_vpq = ensure_padded();
+    attach_deprecated_compression_vpq_to_index_if_set(
+      res, params.compression, params.metric, padded_for_vpq, out.idx);
+  }
   padded_own.reset();
   return out;
 }
@@ -2490,25 +2507,19 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  if (params.compression.has_value()) {
-    RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
-                 "VPQ compression is only supported with L2Expanded distance mertric");
-    cuvs::neighbors::cagra::build_result<T, IdxT> out{
-      index<T, IdxT>(res, params.metric),
-      std::make_optional(vpq_train_from_padded_view<T>(res, *params.compression, padded))};
-    out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    out.idx.update_dataset(
-      res, cuvs::neighbors::any_dataset_view<T, int64_t>(out.vpq->as_dataset_view()));
-    return out;
-  }
   if (params.attach_dataset_on_build) {
     if (auto attached = try_attach_padded_dataset_on_build<T, IdxT>(
           res, params, padded, cagra_graph.view(), nullptr)) {
-      return std::move(*attached);
+      auto out = std::move(*attached);
+      attach_deprecated_compression_vpq_to_build_result_if_set(
+        res, params.compression, params.metric, padded, out);
+      return out;
     }
   }
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-  return cuvs::neighbors::cagra::build_result<T, IdxT>{std::move(idx), std::nullopt};
+  attach_deprecated_compression_vpq_to_index_if_set(
+    res, params.compression, params.metric, padded, idx);
+  return cuvs::neighbors::cagra::build_result<T, IdxT>{std::move(idx)};
 }
 }  // namespace cuvs::neighbors::cagra::detail
