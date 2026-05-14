@@ -55,6 +55,8 @@ For example, an [IVF-SQ](/user-guide/api-guides/indexing-guide/ivf-flat#ivf-sq-a
 
 IVF indexes scale by partitioning the dataset. A query first selects a small number of relevant partitions, then searches only the vectors inside those partitions. This makes IVF a good fit for larger index sizes because search cost depends on the number of partitions probed, not the full dataset size.
 
+<img alt="A simple IVF-Flat index partitions input vectors into inverted lists, then searches only the lists nearest to the query." src="/assets/images/ivf_flat_index.png" />
+
 Graph-based indexes scale by connecting nearby vectors into a navigation structure. A query moves through the graph toward better candidates rather than scanning partitions. [HNSW](/user-guide/api-guides/indexing-guide/cagra#interoperability-with-hnsw) is a strong CPU graph index, [CAGRA](/user-guide/api-guides/indexing-guide/cagra) is optimized for GPU graph search and fast GPU graph construction, and [Vamana/DiskANN](/user-guide/api-guides/indexing-guide/vamana) is designed for very large or disk-backed graph search.
 
 The practical difference is that IVF narrows search by choosing partitions, while graph methods narrow search by walking neighbor links. IVF tends to have simpler scaling behavior and can be easier to distribute by partitions. Graph indexes often provide excellent recall and latency tradeoffs, but their build process and memory layout can be more complex.
