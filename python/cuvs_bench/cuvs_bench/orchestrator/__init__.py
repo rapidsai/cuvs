@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-from .orchestrator import BenchmarkOrchestrator, run_benchmark
+from .orchestrator import BenchmarkOrchestrator
 from .config_loaders import ConfigLoader, BenchmarkConfig, DatasetConfig, CppGBenchConfigLoader
 from ..backends.registry import (
     get_backend_class,
@@ -16,7 +16,6 @@ from ..backends.opensearch import OpenSearchConfigLoader
 __all__ = [
     # Main orchestrator
     "BenchmarkOrchestrator",
-    "run_benchmark",
     # Config loaders
     "ConfigLoader",
     "BenchmarkConfig",

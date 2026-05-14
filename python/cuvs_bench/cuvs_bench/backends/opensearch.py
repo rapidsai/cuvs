@@ -12,14 +12,13 @@ which offloads Faiss HNSW graph construction to a GPU-accelerated external servi
 https://docs.opensearch.org/latest/vector-search/remote-index-build/
 """
 
-import itertools
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-import yaml
 
+from ._utils import compute_recall, expand_param_grid
 from .base import BenchmarkBackend, BuildResult, Dataset, SearchResult
 from ..orchestrator.config_loaders import (
     ConfigLoader,
@@ -27,68 +26,6 @@ from ..orchestrator.config_loaders import (
     BenchmarkConfig,
     IndexConfig,
 )
-
-
-def _load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
-    """Read a binary vector file (.fbin, .ibin, .u8bin, ...).
-
-    The file format is: 4-byte uint32 n_rows, 4-byte uint32 n_cols,
-    followed by n_rows x n_cols elements of the matching dtype.
-    """
-    _DTYPE_FOR_EXT = {
-        ".fbin": np.float32,
-        ".f16bin": np.float16,
-        ".u8bin": np.uint8,
-        ".i8bin": np.int8,
-        ".ibin": np.int32,
-    }
-
-    ext = os.path.splitext(path)[1].lower()
-    dtype = _DTYPE_FOR_EXT.get(ext, np.float32)
-    with open(path, "rb") as f:
-        n_rows = int(np.frombuffer(f.read(4), dtype=np.uint32)[0])
-        n_cols = int(np.frombuffer(f.read(4), dtype=np.uint32)[0])
-        if subset_size is not None:
-            n_rows = min(n_rows, subset_size)
-        raw = f.read(n_rows * n_cols * np.dtype(dtype).itemsize)
-        data = np.frombuffer(raw, dtype=dtype)
-    return data.reshape(n_rows, n_cols)
-
-
-def _load_yaml(path: str) -> Any:
-    with open(path, "r") as fh:
-        return yaml.safe_load(fh)
-
-
-def _get_dataset_conf(dataset: str, all_confs: list) -> dict:
-    for d in all_confs:
-        if dataset == d["name"]:
-            return d
-    raise ValueError(
-        f"Could not find a dataset configuration for {dataset!r} in datasets.yaml"
-    )
-
-
-def _gather_algo_configs(
-    config_path: str, algorithm_configuration: Optional[str]
-) -> List[str]:
-    """Return file paths of opensearch-prefixed algo YAML files."""
-    algos_dir = os.path.join(config_path, "algos")
-    files: List[str] = [
-        os.path.join(algos_dir, f)
-        for f in os.listdir(algos_dir)
-        if f.startswith("opensearch") and f.endswith(".yaml")
-    ]
-    if algorithm_configuration:
-        if os.path.isdir(algorithm_configuration):
-            files += [
-                os.path.join(algorithm_configuration, f)
-                for f in os.listdir(algorithm_configuration)
-                if f.startswith("opensearch") and f.endswith(".yaml")
-            ]
-        elif os.path.isfile(algorithm_configuration):
-            files.append(algorithm_configuration)
-    return files
 
 
 class OpenSearchConfigLoader(ConfigLoader):
@@ -129,38 +66,33 @@ class OpenSearchConfigLoader(ConfigLoader):
     def backend_type(self) -> str:
         return "opensearch"
 
-    def load(
+    def _build_benchmark_configs(
         self,
+        dataset_config: DatasetConfig,
+        dataset_conf: dict,
         dataset: str,
         dataset_path: str,
-        algorithms: Optional[str] = None,
-        count: int = 10,
-        batch_size: int = 10000,
         **kwargs,
-    ) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
+    ) -> List[BenchmarkConfig]:
         """
-        Load OpenSearch benchmark configurations.
+        Build OpenSearch benchmark configurations.
 
         Parameters
         ----------
+        dataset_config : DatasetConfig
+            Already-constructed dataset configuration.
+        dataset_conf : dict
+            Raw dataset configuration from YAML.
         dataset : str
             Dataset name; must appear in ``datasets.yaml``.
         dataset_path : str
             Root directory where dataset files live.
-        algorithms : Optional[str]
-            Comma-separated algorithm names to run (e.g. ``"opensearch_faiss_hnsw"``).
-            If *None*, all opensearch-prefixed algorithms are included.
-        count : int
-            Number of neighbors *k* (informational for this loader).
-        batch_size : int
-            Query batch size (informational for this loader).
         **kwargs
             Recognized extra keys:
 
-            - ``dataset_configuration`` – path to a custom ``datasets.yaml``
             - ``algorithm_configuration`` – path to an extra algo config dir/file
+            - ``algorithms`` – comma-separated algorithm names to run
             - ``groups`` – comma-separated group names to restrict to
-            - ``subset_size`` – limit dataset to first *N* vectors
             - ``host`` – OpenSearch host (default: ``"localhost"``)
             - ``port`` – OpenSearch port (default: ``9200``)
             - ``username`` – HTTP auth username (default: ``"admin"``)
@@ -174,35 +106,17 @@ class OpenSearchConfigLoader(ConfigLoader):
 
         Returns
         -------
-        Tuple[DatasetConfig, List[BenchmarkConfig]]
+        List[BenchmarkConfig]
         """
-        ds_yaml = kwargs.get("dataset_configuration") or os.path.join(
-            self.config_path, "datasets", "datasets.yaml"
-        )
-        all_ds = _load_yaml(ds_yaml)
-        ds_conf = _get_dataset_conf(dataset, all_ds)
+        algo_files = [
+            algo_file
+            for algo_file in self.gather_algorithm_configs(
+                self.config_path, kwargs.get("algorithm_configuration")
+            )
+            if os.path.basename(algo_file).startswith("opensearch")
+        ]
 
-        def _resolve(rel: Optional[str]) -> Optional[str]:
-            if rel and not os.path.isabs(rel):
-                return os.path.join(dataset_path, rel)
-            return rel
-
-        dataset_config = DatasetConfig(
-            name=ds_conf["name"],
-            base_file=_resolve(ds_conf.get("base_file")),
-            query_file=_resolve(ds_conf.get("query_file")),
-            groundtruth_neighbors_file=_resolve(
-                ds_conf.get("groundtruth_neighbors_file")
-            ),
-            distance=ds_conf.get("distance", "euclidean"),
-            dims=ds_conf.get("dims"),
-            subset_size=kwargs.get("subset_size"),
-        )
-
-        algo_files = _gather_algo_configs(
-            self.config_path, kwargs.get("algorithm_configuration")
-        )
-
+        algorithms = kwargs.get("algorithms")
         allowed_algos = (
             [a.strip() for a in algorithms.split(",")] if algorithms else None
         )
@@ -232,7 +146,7 @@ class OpenSearchConfigLoader(ConfigLoader):
         benchmark_configs: List[BenchmarkConfig] = []
 
         for algo_file in algo_files:
-            algo_yaml = _load_yaml(algo_file)
+            algo_yaml = self.load_yaml_file(algo_file)
             algo_name = algo_yaml.get("name", "")
             if allowed_algos and algo_name not in allowed_algos:
                 continue
@@ -246,27 +160,9 @@ class OpenSearchConfigLoader(ConfigLoader):
             for group_name, group_conf in groups.items():
                 build_spec: Dict[str, List] = group_conf.get("build", {})
                 search_spec: Dict[str, List] = group_conf.get("search", {})
+                search_params_list = expand_param_grid(search_spec)
 
-                build_keys = list(build_spec.keys())
-                build_combos = (
-                    list(itertools.product(*build_spec.values()))
-                    if build_spec
-                    else [()]
-                )
-
-                search_keys = list(search_spec.keys())
-                search_combos = (
-                    list(itertools.product(*search_spec.values()))
-                    if search_spec
-                    else [()]
-                )
-                search_params_list = [
-                    dict(zip(search_keys, vals)) for vals in search_combos
-                ]
-
-                for build_vals in build_combos:
-                    build_param = dict(zip(build_keys, build_vals))
-
+                for build_param in expand_param_grid(build_spec):
                     # Human-readable index label
                     prefix = (
                         f"{algo_name}_{group_name}"
@@ -314,7 +210,7 @@ class OpenSearchConfigLoader(ConfigLoader):
                         )
                     )
 
-        return dataset_config, benchmark_configs
+        return benchmark_configs
 
 
 # Mapping from cuvs-bench distance metric names to OpenSearch space_type
@@ -754,7 +650,7 @@ class OpenSearchBackend(BenchmarkBackend):
         Parameters
         ----------
         dataset : Dataset
-            Must have either non-empty ``base_vectors`` or a valid
+            Must have either non-empty ``training_vectors`` or a valid
             ``base_file`` path.
         indexes : List[IndexConfig]
             The first element provides the build parameters.
@@ -813,15 +709,12 @@ class OpenSearchBackend(BenchmarkBackend):
                     success=True,
                 )
 
-        # Load base vectors (may be empty if only file path is provided)
-        base_vectors = dataset.base_vectors
-        subset_size = dataset.metadata.get("subset_size")
-        if base_vectors.size == 0 and dataset.base_file:
-            base_vectors = _load_vectors(dataset.base_file, subset_size)
+        # Dataset handles lazy vector loading from base_file when needed.
+        base_vectors = dataset.training_vectors
 
         if base_vectors.size == 0:
             return self._failed_build_result(
-                "No base vectors available. Provide dataset.base_vectors "
+                "No training vectors available. Provide dataset.training_vectors "
                 "or a valid dataset.base_file path.",
                 build_params=build_param,
             )
@@ -961,10 +854,8 @@ class OpenSearchBackend(BenchmarkBackend):
                 success=True,
             )
 
-        # Load query vectors and ground truth from files if not already loaded
+        # Dataset handles lazy loading from query/ground-truth files when needed.
         query_vectors = dataset.query_vectors
-        if query_vectors.size == 0 and dataset.query_file:
-            query_vectors = _load_vectors(dataset.query_file)
 
         if query_vectors.size == 0:
             return self._failed_search_result(
@@ -975,9 +866,6 @@ class OpenSearchBackend(BenchmarkBackend):
             )
 
         groundtruth = dataset.groundtruth_neighbors
-        if groundtruth is None and dataset.groundtruth_neighbors_file:
-            groundtruth = _load_vectors(dataset.groundtruth_neighbors_file)
-
         n_queries = query_vectors.shape[0]
 
         # Run search for each search-parameter combination
@@ -1021,13 +909,7 @@ class OpenSearchBackend(BenchmarkBackend):
 
             recall = 0.0
             if groundtruth is not None:
-                gt_k = min(k, groundtruth.shape[1])
-                gt = groundtruth[:, :gt_k]
-                n_correct = sum(
-                    len(set(neighbors[i, :k].tolist()) & set(gt[i].tolist()))
-                    for i in range(n_queries)
-                )
-                recall = n_correct / (n_queries * gt_k)
+                recall = compute_recall(neighbors, groundtruth, k)
 
             per_param_results.append(
                 {

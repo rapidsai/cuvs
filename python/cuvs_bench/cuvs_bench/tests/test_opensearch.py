@@ -45,7 +45,7 @@ def _make_dataset(
     groundtruth = np.argsort(dists, axis=1)[:, :k].astype(np.int32)
     return Dataset(
         name="test",
-        base_vectors=base,
+        training_vectors=base,
         query_vectors=queries,
         groundtruth_neighbors=groundtruth,
     )
@@ -323,7 +323,7 @@ class TestOpenSearchBackend:
     def test_search_fails_without_query_vectors(self):
         dataset = Dataset(
             name="empty",
-            base_vectors=np.empty((0, 4), dtype=np.float32),
+            training_vectors=np.empty((0, 4), dtype=np.float32),
             query_vectors=np.empty((0, 4), dtype=np.float32),
         )
         result = _make_backend().search(dataset, [_make_index_cfg()], k=3)
