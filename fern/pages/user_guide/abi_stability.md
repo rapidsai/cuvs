@@ -101,7 +101,9 @@ This includes:
 
 ## Why C++ ABI Stability Is Challenging
 
-<info>The cuVS ABI guarantee is focused on the C shared library, not the C++ API. C is the right boundary for long-lived binary compatibility because exported function names, struct layouts, and library versions can be controlled explicitly.</info>
+<Note>The cuVS ABI guarantee is focused on the C shared library, not the C++ API.</Note>
+
+C is the right boundary for long-lived binary compatibility because exported function names, struct layouts, and library versions can be controlled explicitly.
 
 C++ exposes many more implementation details at the binary boundary. A compiled C++ caller may depend on compiler-specific name mangling, template instantiations, inline functions, object layout, virtual tables, exception handling, standard library types, allocator behavior, CUDA compiler behavior, and the exact versions of dependencies such as RAFT and RMM. Even a source-compatible change can alter the binary symbols or layouts that an already-built application expects.
 
