@@ -1372,15 +1372,6 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
 {
   static_assert(NUM_SAMPLES <= 32);
 
-  using input_t = typename std::remove_const<Data_t>::type;
-  if (build_config.internal_distance_dtype == CUDA_R_16F && build_config.dataset_dim <= 16 &&
-      std::is_same_v<input_t, float>) {
-    RAFT_LOG_WARN(
-      "Using fp16 for distance computation for data in fp32 with small dimensions (%zu) <= 16 may "
-      "result in low quality results. Consider setting internal_distance_dtype = CUDA_R_32F.",
-      build_config.dataset_dim);
-  }
-
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   auto graph_buffer_view = raft::make_device_matrix_view<Index_t, int64_t>(
     reinterpret_cast<Index_t*>(graph_buffer_.data_handle()), nrow_, DEGREE_ON_DEVICE);
@@ -1430,18 +1421,22 @@ template <typename DistEpilogue_t>
 void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_epilogue)
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
-  // Kernel dispatch logic:
-  // fp32 data can have an effective type of fp32 OR fp16 (when internal_distance_dtype is
-  // CUDA_R_16F, fp32 host data is downcast into a device-side fp16 buffer at copy-in time so the
-  // WMMA kernel reads it in fp16). Based on EFFECTIVE dtype:
-  //   fp32 data || L1 distance  -> SIMT: internally converted to fp32 for distance computation
-  //     on-the-fly
-  //   dtype <= fp16 && non-L1 metrics  -> WMMA (tensor-core accelerated dot product):
-  //     internally converted to fp16 for distance computation on-the-fly
 
-  bool use_simt =
-    (std::is_same_v<input_t, float> && build_config_.internal_distance_dtype != CUDA_R_16F) ||
-    build_config_.metric == cuvs::distance::DistanceType::L1;
+  // Kernel dispatch logic, based on the effective distance-computation dtype (which depends on
+  // the input dtype and dist_comp_dtype):
+  //   fp32 dist (only fp32 input, dist_comp_dtype == FP32 or AUTO with dim <= 16) -> SIMT: scalar
+  //     element-wise distance computation in fp32.
+  //   fp16 dist (everything else: fp16/int8/uint8 input, or fp32 input with dist_comp_dtype ==
+  //     FP16 or AUTO with dim > 16) -> WMMA (tensor-core accelerated dot product). Non-fp16
+  //     dtypes are converted to fp16 on-the-fly while loading into shared memory; for fp32 host
+  //     input this conversion happens earlier at copy-in time (see d_data_half_).
+  //   L1 distance for any input -> SIMT (L1 needs element-wise ops, can't use tensor cores).
+  using DCT = cuvs::neighbors::nn_descent::DIST_COMP_DTYPE;
+  bool use_fp16_dist =
+    std::is_same_v<input_t, float> && (build_config_.dist_comp_dtype == DCT::FP16 ||
+                                       (build_config_.dist_comp_dtype == DCT::AUTO && ndim_ > 16));
+  bool use_simt = (std::is_same_v<input_t, float> && !use_fp16_dist) ||
+                  build_config_.metric == cuvs::distance::DistanceType::L1;
 
   auto launch_kernel = [&](auto* typed_ptr) {
     if (use_simt) {
@@ -1483,8 +1478,8 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
   };
 
   if (d_data_half_.has_value()) {
-    // Host fp32 input was downcast to a device-side fp16 buffer via internal_distance_dtype =
-    // CUDA_R_16F.
+    // Host fp32 input was downcast to a device-side fp16 buffer because distances are computed in
+    // fp16 (dist_comp_dtype == FP16, or AUTO with dim > 16).
     launch_kernel(static_cast<const half*>(d_data_ptr_));
   } else {
     // Data stored as input_t: device data used directly, or host data copied as-is.
@@ -1526,22 +1521,25 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                         build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                         build_config_.metric == cuvs::distance::DistanceType::CosineExpanded;
 
-  bool downcast_host_data = !data_on_device && std::is_same_v<input_t, float> &&
-                            build_config_.internal_distance_dtype == CUDA_R_16F;
+  // For fp32 host input, downcast to a device-side fp16 buffer when distance computation will be
+  // done in fp16 anyway: dispatch matches the SIMT/WMMA decision in local_join() (FP16 explicit, or
+  // AUTO with dim > 16).
+  using DCT = cuvs::neighbors::nn_descent::DIST_COMP_DTYPE;
+  bool fp32_input_uses_fp16_dist =
+    std::is_same_v<input_t, float> &&
+    (build_config_.dist_comp_dtype == DCT::FP16 ||
+     (build_config_.dist_comp_dtype == DCT::AUTO && build_config_.dataset_dim > 16));
+  bool downcast_host_data = !data_on_device && fp32_input_uses_fp16_dist;
 
   if (data_on_device) {
     // When user-given data is on device, we use it directly. This can be any type (fp32, fp16,
     // int8, uint8)
     d_data_ptr_ = data;
   } else if (downcast_host_data) {
-    // When user-given data is fp32 host data, and internal_distance_dtype is CUDA_R_16F, we
-    // allocate an fp16 device buffer and downcast at copy-in time. Storing the dataset on device
-    // in fp16 (instead of fp32) for this path halves both the device memory footprint and the
-    // per-iteration read bandwidth of the WMMA kernel.
-    //
-    // TODO (https://github.com/rapidsai/cuvs/issues/2079): Remove the `internal_distance_dtype`
-    // parameter and this host-fp32 -> device-fp16 downcast path once cuML UMAP/HDBSCAN accept fp16
-    // input natively (https://github.com/rapidsai/cuml/issues/8102)
+    // When user-given data is fp32 host data and distances will be computed in fp16, we allocate
+    // an fp16 device buffer and downcast at copy-in time. Storing the dataset on device in fp16
+    // (instead of fp32) for this path halves both the device memory footprint and the per-
+    // iteration read bandwidth of the WMMA kernel.
     if (!d_data_half_.has_value()) {
       d_data_half_.emplace(raft::make_device_matrix<half, size_t, raft::row_major>(
         res, build_config_.max_dataset_size, build_config_.dataset_dim));
