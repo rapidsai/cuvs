@@ -155,15 +155,12 @@ inline ncclDataType_t nccl_dtype<int64_t>()
  *                           Optional pinned host slice of size n_local used
  *                           to cache this rank's normalized weights.
  */
-template <typename T, typename IdxT, typename MatrixAccessor, typename WeightAccessor>
+template <typename T, typename IdxT>
 void mnmg_fit(
   const raft::resources& handle,
   const cuvs::cluster::kmeans::params& params,
-  const std::vector<
-    raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, MatrixAccessor>>& X_parts,
-  const std::optional<std::vector<
-    raft::mdspan<const T, raft::vector_extent<IdxT>, raft::layout_right, WeightAccessor>>>&
-    sample_weight_parts,
+  const std::vector<raft::host_matrix_view<const T, IdxT>>& X_parts,
+  const std::optional<std::vector<raft::host_vector_view<const T, IdxT>>>& sample_weight_parts,
   raft::device_matrix_view<T, IdxT> centroids,
   raft::host_scalar_view<T> inertia,
   raft::host_scalar_view<IdxT> n_iter,
@@ -186,19 +183,6 @@ void mnmg_fit(
 
   const raft::resources& dev_res =
     use_nccl ? raft::resource::set_current_device_to_rank(handle, rank) : handle;
-
-  using matrix_view_t =
-    raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, MatrixAccessor>;
-  using weight_view_t =
-    raft::mdspan<const T, raft::vector_extent<IdxT>, raft::layout_right, WeightAccessor>;
-  constexpr bool data_on_host      = raft::is_host_mdspan_v<matrix_view_t>;
-  constexpr bool data_on_device    = raft::is_device_mdspan_v<matrix_view_t>;
-  constexpr bool weights_on_host   = raft::is_host_mdspan_v<weight_view_t>;
-  constexpr bool weights_on_device = raft::is_device_mdspan_v<weight_view_t>;
-  static_assert(data_on_host || data_on_device,
-                "partition views must be host- or device-accessible raft mdspans");
-  static_assert(weights_on_host || weights_on_device,
-                "weight views must be host- or device-accessible raft mdspans");
 
   auto stream     = raft::resource::get_cuda_stream(dev_res);
   auto n_features = static_cast<IdxT>(centroids.extent(1));
@@ -311,28 +295,23 @@ void mnmg_fit(
   std::optional<raft::pinned_vector<T, IdxT>> local_scaled_weights;
   T* scaled_weights_ptr = nullptr;
   if (sample_weight_parts.has_value()) {
-    if constexpr (weights_on_host) {
-      if (scaled_weights_cache.has_value()) {
-        RAFT_EXPECTS(static_cast<IdxT>(scaled_weights_cache->extent(0)) == n_local,
-                     "scaled_weights_cache must have extent equal to n_local");
-        scaled_weights_ptr = scaled_weights_cache->data_handle();
-      } else {
-        local_scaled_weights = raft::make_pinned_vector<T, IdxT>(dev_res, n_local);
-        scaled_weights_ptr   = local_scaled_weights->data_handle();
-      }
-
-      for (size_t part_idx = 0; part_idx < sample_weight_parts->size(); ++part_idx) {
-        auto const& weights = (*sample_weight_parts)[part_idx];
-        auto part_rows      = static_cast<IdxT>(weights.extent(0));
-        auto* dst           = scaled_weights_ptr + part_offsets[part_idx];
-        auto const* src     = weights.data_handle();
-        for (IdxT i = 0; i < part_rows; ++i) {
-          dst[i] = src[i] * weight_scale;
-        }
-      }
+    if (scaled_weights_cache.has_value()) {
+      RAFT_EXPECTS(static_cast<IdxT>(scaled_weights_cache->extent(0)) == n_local,
+                   "scaled_weights_cache must have extent equal to n_local");
+      scaled_weights_ptr = scaled_weights_cache->data_handle();
     } else {
-      RAFT_EXPECTS(!scaled_weights_cache.has_value(),
-                   "scaled_weights_cache is only supported with host sample weights");
+      local_scaled_weights = raft::make_pinned_vector<T, IdxT>(dev_res, n_local);
+      scaled_weights_ptr   = local_scaled_weights->data_handle();
+    }
+
+    for (size_t part_idx = 0; part_idx < sample_weight_parts->size(); ++part_idx) {
+      auto const& weights = (*sample_weight_parts)[part_idx];
+      auto part_rows      = static_cast<IdxT>(weights.extent(0));
+      auto* dst           = scaled_weights_ptr + part_offsets[part_idx];
+      auto const* src     = weights.data_handle();
+      for (IdxT i = 0; i < part_rows; ++i) {
+        dst[i] = src[i] * weight_scale;
+      }
     }
   }
 
@@ -365,35 +344,18 @@ void mnmg_fit(
   auto d_done_flag  = raft::make_device_scalar<int64_t>(dev_res, 0);
   auto h_done_flag  = raft::make_pinned_scalar<int64_t>(dev_res, 0);
 
-  bool need_compute_norms = metric == cuvs::distance::DistanceType::L2Expanded ||
-                            metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                            metric == cuvs::distance::DistanceType::CosineExpanded;
   auto h_norm_cache =
     raft::make_pinned_vector<T, IdxT>(dev_res, (need_compute_norms && has_data) ? n_local : 0);
   bool norms_cached = false;
 
-  // Stage `batch_weights` for the current batch, either by H2D-copying the
-  // pre-scaled cache slice (host weights) or by aliasing the device weights
-  // into a contiguous device buffer with an in-place rescale.
+  // Stage `batch_weights` for the current batch by copying the pre-scaled host
+  // cache slice into the reusable device buffer.
   auto prepare_batch_weights = [&](size_t part_idx, IdxT batch_offset, IdxT cur_batch_size) {
     if (sample_weight_parts.has_value()) {
-      if (scaled_weights_ptr != nullptr) {
-        raft::copy(batch_weights.data_handle(),
-                   scaled_weights_ptr + part_offsets[part_idx] + batch_offset,
-                   cur_batch_size,
-                   stream);
-      } else {
-        raft::copy(batch_weights.data_handle(),
-                   (*sample_weight_parts)[part_idx].data_handle() + batch_offset,
-                   cur_batch_size,
-                   stream);
-        if (weight_scale != T{1}) {
-          auto bw =
-            raft::make_device_vector_view<T, IdxT>(batch_weights.data_handle(), cur_batch_size);
-          raft::linalg::map(
-            dev_res, bw, raft::mul_const_op<T>{weight_scale}, raft::make_const_mdspan(bw));
-        }
-      }
+      raft::copy(batch_weights.data_handle(),
+                 scaled_weights_ptr + part_offsets[part_idx] + batch_offset,
+                 cur_batch_size,
+                 stream);
     }
 
     return raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
@@ -416,7 +378,7 @@ void mnmg_fit(
         static_cast<size_t>(streaming_batch_size),
         stream,
         rmm::mr::get_current_device_resource_ref(),
-        false);
+        true);
 
       for (auto const& data_batch : data_batches) {
         fn(part_idx, data_batch);
@@ -435,33 +397,19 @@ void mnmg_fit(
     auto input_centroids_const =
       raft::make_device_matrix_view<const T, IdxT>(centroids.data_handle(), n_clusters, n_features);
 
-    if constexpr (data_on_host) {
-      init_centroids_for_mg_batched<T, IdxT>(dev_res,
-                                             iter_params,
-                                             streaming_batch_size,
-                                             X_parts,
-                                             n_features,
-                                             input_centroids_const,
-                                             rank_centroids.view(),
-                                             workspace,
-                                             rank,
-                                             num_ranks,
-                                             mnmg_allreduce,
-                                             mnmg_allgather,
-                                             mnmg_bcast);
-    } else {
-      // Device-resident parts: the global init helper currently only consumes
-      // host-resident inputs, so we keep the previous behavior of using rank
-      // 0's existing centroids buffer when `InitMethod::Array` is requested
-      // and broadcast it to the rest. Other init methods are validated up
-      // front by callers that route device data through the device path.
-      RAFT_EXPECTS(iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Array,
-                   "device-resident X_parts only support InitMethod::Array");
-      if (rank == 0) {
-        raft::copy(
-          rank_centroids.data_handle(), centroids.data_handle(), n_clusters * n_features, stream);
-      }
-    }
+    init_centroids_for_mg_batched<T, IdxT>(dev_res,
+                                           iter_params,
+                                           streaming_batch_size,
+                                           X_parts,
+                                           n_features,
+                                           input_centroids_const,
+                                           rank_centroids.view(),
+                                           workspace,
+                                           rank,
+                                           num_ranks,
+                                           mnmg_allreduce,
+                                           mnmg_allgather,
+                                           mnmg_bcast);
 
     MNMG_BCAST(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
@@ -513,13 +461,8 @@ void mnmg_fit(
           if (need_compute_norms) {
             auto norm_offset = part_offsets[part_idx] + batch_offset;
             if (!norms_cached) {
-              if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-                raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-                  dev_res, batch_data_view, L2NormBatch_view, raft::sqrt_op{});
-              } else {
-                raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-                  dev_res, batch_data_view, L2NormBatch_view);
-              }
+              raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+                dev_res, batch_data_view, L2NormBatch_view);
               raft::copy(h_norm_cache.data_handle() + norm_offset,
                          L2NormBatch.data_handle(),
                          current_batch_size,

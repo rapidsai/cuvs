@@ -756,8 +756,8 @@ void fit(const raft::resources& handle,
 //
 // These thin wrappers delegate to mnmg_fit() in kmeans_mg_batched.cuh so the
 // device-data fit() above remains the only path that talks directly to
-// raft::comms; every "new" MNMG entry point (host-streaming, host-parts,
-// device-parts) is funneled through the unified batched implementation.
+// raft::comms; host-streaming and host-parts are funneled through the unified
+// batched implementation.
 // =========================================================================
 
 // MNMG kmeans fit with host data (streaming).
@@ -773,21 +773,6 @@ void fit(const raft::resources& handle,
   mnmg_fit<DataT, IndexT>(handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
 
-// MNMG kmeans fit with multiple local device data partitions.
-template <typename DataT, typename IndexT>
-void fit(const raft::resources& handle,
-         const cuvs::cluster::kmeans::params& params,
-         const std::vector<raft::device_matrix_view<const DataT, IndexT>>& X_parts,
-         const std::optional<std::vector<raft::device_vector_view<const DataT, IndexT>>>&
-           sample_weight_parts,
-         raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
-{
-  mnmg_fit<DataT, IndexT>(
-    handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
-}
-
 // MNMG kmeans fit with multiple local host data partitions.
 template <typename DataT, typename IndexT>
 void fit(const raft::resources& handle,
@@ -799,8 +784,7 @@ void fit(const raft::resources& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  mnmg_fit<DataT, IndexT>(
-    handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
+  mnmg_fit<DataT, IndexT>(handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
 };  // namespace cuvs::cluster::kmeans::mg::detail
