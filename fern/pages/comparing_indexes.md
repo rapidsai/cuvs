@@ -10,6 +10,8 @@ Imagine every tuning run is a toy car. You want a car that is fast, but you also
 
 For vector indexes, each tuning run is a point with [quality](#recall), build time, and search performance. A point is on the Pareto curve when no other run is better on the metric being compared without making another metric worse. Finding these points usually requires a parameter sweep or another hyperparameter optimization method.
 
+<img alt="Example Pareto curve for vector search tuning runs. Green points form the frontier where no other run has both higher quality and lower latency." src="/assets/images/pareto_curve_vector_search.svg" />
+
 For each quality bucket, summarize build time by taking the points on the Pareto curve in that bucket and averaging their corresponding build times. This gives an expected build time for the quality window instead of forcing one run to represent the whole bucket.
 
 ## Recall
