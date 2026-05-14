@@ -1538,6 +1538,10 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     // allocate an fp16 device buffer and downcast at copy-in time. Storing the dataset on device
     // in fp16 (instead of fp32) for this path halves both the device memory footprint and the
     // per-iteration read bandwidth of the WMMA kernel.
+    //
+    // TODO (https://github.com/rapidsai/cuvs/issues/2079): Remove the `internal_distance_dtype`
+    // parameter and this host-fp32 -> device-fp16 downcast path once cuML UMAP/HDBSCAN accept fp16
+    // input natively (https://github.com/rapidsai/cuml/issues/8102)
     if (!d_data_half_.has_value()) {
       d_data_half_.emplace(raft::make_device_matrix<half, size_t, raft::row_major>(
         res, build_config_.max_dataset_size, build_config_.dataset_dim));
