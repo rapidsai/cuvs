@@ -166,26 +166,19 @@ class ConfigLoader(ABC):
         Tuple[DatasetConfig, List[BenchmarkConfig]]
             Dataset configuration and list of benchmark configurations to run
         """
-        # Shared step 1: Load dataset YAML
         ds_yaml_path = kwargs.get("dataset_configuration") or os.path.join(
             self.config_path, "datasets", "datasets.yaml"
         )
         ds_conf_all = self.load_yaml_file(ds_yaml_path)
-
-        # Shared step 2: Find dataset by name
         ds_conf = self.get_dataset_configuration(dataset, ds_conf_all)
-
-        # Shared step 3: Construct DatasetConfig with resolved paths
         dataset_config = self.build_dataset_config(
             ds_conf, dataset_path, kwargs.get("subset_size")
         )
 
-        # Shared step 4: Discover algo groups (backend-specific hook)
         algo_groups = self._discover_algo_groups(
             ds_conf, dataset, dataset_path, **kwargs
         )
 
-        # Shared step 5: Expand params for each group
         expanded_groups = []
         for algo_name, group_name, group_conf, group_meta in algo_groups:
             build_combos = expand_param_grid(group_conf.get("build", {}))
@@ -195,7 +188,6 @@ class ConfigLoader(ABC):
                  build_combos, search_combos, group_meta)
             )
 
-        # Shared step 6: Build configs (backend-specific hook)
         benchmark_configs = self._build_benchmark_configs(
             dataset_config, ds_conf, dataset, dataset_path,
             expanded_groups, **kwargs
