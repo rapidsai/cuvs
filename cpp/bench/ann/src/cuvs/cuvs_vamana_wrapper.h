@@ -10,6 +10,7 @@
 #include <cuvs/neighbors/vamana.hpp>
 #include <utils.h>
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -197,6 +198,14 @@ template <typename T, typename IdxT>
 void cuvs_vamana<T, IdxT>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
+  static std::atomic<bool> search_logged{false};
+  bool expected = false;
+  if (search_logged.compare_exchange_strong(expected, true)) {
+    log_info("cuvs_vamana search first call: batch_size=%d k=%d query_ptr=%p",
+             batch_size,
+             k,
+             static_cast<const void*>(queries));
+  }
   diskann_memory_search_->search(queries, batch_size, k, neighbors, distances);
 }
 

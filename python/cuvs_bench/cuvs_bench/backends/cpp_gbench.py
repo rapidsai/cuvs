@@ -86,6 +86,22 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             details.append(f"{name}: {message}")
         return f"{phase} benchmark error(s){location}: " + "; ".join(details)
 
+    @staticmethod
+    def _index_debug_summary(
+        indexes: List[IndexConfig],
+    ) -> List[Dict[str, Any]]:
+        """Return the C++ benchmark index payload fields useful in CI logs."""
+        return [
+            {
+                "name": idx.name,
+                "algo": idx.algo,
+                "file": idx.file,
+                "build_param": idx.build_param,
+                "search_params": idx.search_params,
+            }
+            for idx in indexes
+        ]
+
     def build(
         self,
         dataset: Dataset,
@@ -249,6 +265,17 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         start_time = time.perf_counter()
 
         try:
+            print("[cuvs-bench] C++ build launch", flush=True)
+            print(f"  executable: {self.executable_path}", flush=True)
+            print(f"  temp_config: {temp_config_path}", flush=True)
+            print(f"  benchmark_out: {benchmark_out}", flush=True)
+            print(f"  data_prefix: {self.data_prefix}", flush=True)
+            print(
+                "  indexes: "
+                + json.dumps(self._index_debug_summary(indexes), default=str),
+                flush=True,
+            )
+            print(f"  command: {' '.join(cmd)}", flush=True)
             subprocess.run(
                 cmd,
                 check=True,
@@ -272,11 +299,17 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 raise ValueError(
                     "No benchmarks found in Google Benchmark output"
                 )
+            print(
+                f"[cuvs-bench] C++ build parsed {len(benchmarks)} "
+                f"benchmark row(s) from {benchmark_out}",
+                flush=True,
+            )
 
             error_message = self._gbench_error_message(
                 benchmarks, "Build", benchmark_out
             )
             if error_message:
+                print(f"[cuvs-bench] {error_message}", flush=True)
                 raise RuntimeError(error_message)
 
             # Return aggregated result
@@ -298,6 +331,11 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             )
 
         except subprocess.CalledProcessError as e:
+            print(
+                f"[cuvs-bench] C++ build subprocess failed: "
+                f"returncode={e.returncode} stderr={e.stderr}",
+                flush=True,
+            )
             return BuildResult(
                 index_path=first_index.file,
                 build_time_seconds=time.perf_counter() - start_time,
@@ -309,6 +347,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             )
 
         except Exception as e:
+            print(f"[cuvs-bench] C++ build exception: {e}", flush=True)
             return BuildResult(
                 index_path=first_index.file,
                 build_time_seconds=time.perf_counter() - start_time,
@@ -515,6 +554,21 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         start_time = time.perf_counter()
 
         try:
+            print("[cuvs-bench] C++ search launch", flush=True)
+            print(f"  executable: {self.executable_path}", flush=True)
+            print(f"  temp_config: {temp_config_path}", flush=True)
+            print(f"  temp_output_json: {temp_output_json}", flush=True)
+            print(f"  output_json: {output_json}", flush=True)
+            print(f"  data_prefix: {self.data_prefix}", flush=True)
+            print(
+                f"  total_search_configs: {total_search_configs}", flush=True
+            )
+            print(
+                "  indexes: "
+                + json.dumps(self._index_debug_summary(indexes), default=str),
+                flush=True,
+            )
+            print(f"  command: {' '.join(cmd)}", flush=True)
             subprocess.run(
                 cmd,
                 check=True,
@@ -552,11 +606,17 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 raise ValueError(
                     "No benchmarks found in Google Benchmark output"
                 )
+            print(
+                f"[cuvs-bench] C++ search parsed {len(benchmarks)} "
+                f"benchmark row(s) from {output_json}",
+                flush=True,
+            )
 
             error_message = self._gbench_error_message(
                 benchmarks, "Search", output_json
             )
             if error_message:
+                print(f"[cuvs-bench] {error_message}", flush=True)
                 raise RuntimeError(error_message)
 
             # Aggregate metrics across all benchmarks
@@ -599,6 +659,11 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             )
 
         except subprocess.CalledProcessError as e:
+            print(
+                f"[cuvs-bench] C++ search subprocess failed: "
+                f"returncode={e.returncode} stderr={e.stderr}",
+                flush=True,
+            )
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
@@ -612,6 +677,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             )
 
         except Exception as e:
+            print(f"[cuvs-bench] C++ search exception: {e}", flush=True)
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
