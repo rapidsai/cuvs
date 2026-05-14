@@ -129,15 +129,16 @@ class ConfigLoader(ABC):
     """
     Abstract base class for configuration loaders.
 
-    Uses a template method pattern: load() handles the shared steps
-    (loading dataset YAML, looking up the dataset, constructing
-    DatasetConfig) then delegates to _build_benchmark_configs() for
-    backend-specific logic. Backend authors only implement
-    _build_benchmark_configs() and receive the DatasetConfig already built.
+    Uses a template method: load() handles all shared steps (dataset YAML,
+    dataset lookup, DatasetConfig construction, algo group discovery, and
+    parameter expansion) transparently. Backend config loaders implement
+    two hooks:
 
-    Provides shared helper methods for common config-loading operations
-    (YAML loading, dataset lookup, algorithm config gathering) so that
-    individual loaders do not need to reimplement them.
+    - _discover_algo_groups(): return algo groups to benchmark
+    - _build_benchmark_configs(): build BenchmarkConfigs from
+      already-expanded parameter combinations
+
+    No config loader needs to call expand_param_grid directly.
     """
 
     def load(
@@ -149,9 +150,7 @@ class ConfigLoader(ABC):
         """
         Load and prepare benchmark configurations.
 
-        Handles shared config-loading steps (dataset YAML, dataset lookup,
-        DatasetConfig construction) then delegates to the backend-specific
-        _build_benchmark_configs() for producing BenchmarkConfig objects.
+        Handles all shared steps then delegates to backend-specific hooks.
 
         Parameters
         ----------
@@ -160,8 +159,7 @@ class ConfigLoader(ABC):
         dataset_path : str
             Path to dataset directory
         **kwargs
-            Backend-specific arguments passed through to
-            _build_benchmark_configs()
+            Backend-specific arguments passed through to hooks
 
         Returns
         -------
@@ -182,11 +180,47 @@ class ConfigLoader(ABC):
             ds_conf, dataset_path, kwargs.get("subset_size")
         )
 
-        # Backend-specific step: produce BenchmarkConfig list
+        # Shared step 4: Discover algo groups (backend-specific hook)
+        algo_groups = self._discover_algo_groups(
+            ds_conf, dataset, dataset_path, **kwargs
+        )
+
+        # Shared step 5: Expand params for each group
+        expanded_groups = []
+        for algo_name, group_name, group_conf, group_meta in algo_groups:
+            build_combos = expand_param_grid(group_conf.get("build", {}))
+            search_combos = expand_param_grid(group_conf.get("search", {}))
+            expanded_groups.append(
+                (algo_name, group_name, group_conf,
+                 build_combos, search_combos, group_meta)
+            )
+
+        # Shared step 6: Build configs (backend-specific hook)
         benchmark_configs = self._build_benchmark_configs(
-            dataset_config, ds_conf, dataset, dataset_path, **kwargs
+            dataset_config, ds_conf, dataset, dataset_path,
+            expanded_groups, **kwargs
         )
         return dataset_config, benchmark_configs
+
+    @abstractmethod
+    def _discover_algo_groups(
+        self,
+        dataset_conf: dict,
+        dataset: str,
+        dataset_path: str,
+        **kwargs,
+    ) -> List[Tuple[str, str, dict, dict]]:
+        """
+        Discover algorithm groups to benchmark.
+
+        Returns
+        -------
+        List[Tuple[str, str, dict, dict]]
+            List of (algo_name, group_name, group_conf, group_meta).
+            group_meta is backend-specific (e.g., executable info for C++,
+            connection params for OpenSearch).
+        """
+        pass
 
     @abstractmethod
     def _build_benchmark_configs(
@@ -195,32 +229,18 @@ class ConfigLoader(ABC):
         dataset_conf: dict,
         dataset: str,
         dataset_path: str,
+        expanded_groups: List[Tuple[str, str, dict, List, List, dict]],
         **kwargs,
     ) -> List[BenchmarkConfig]:
         """
-        Build backend-specific benchmark configurations.
-
-        Called by load() after the shared steps are complete. Each backend
-        implements this with its own logic (executable discovery for C++,
-        connection params for OpenSearch, etc.).
+        Build BenchmarkConfigs from already-expanded parameter combinations.
 
         Parameters
         ----------
-        dataset_config : DatasetConfig
-            Already-constructed dataset configuration
-        dataset_conf : dict
-            Raw dataset dict from YAML (for backends that need extra fields)
-        dataset : str
-            Dataset name
-        dataset_path : str
-            Path to dataset directory
-        **kwargs
-            Backend-specific arguments
-
-        Returns
-        -------
-        List[BenchmarkConfig]
-            List of benchmark configurations to run
+        expanded_groups : List[Tuple]
+            List of (algo_name, group_name, group_conf,
+            build_combos, search_combos, group_meta) where build_combos
+            and search_combos are already-expanded lists of param dicts.
         """
         pass
 
@@ -407,62 +427,18 @@ class CppGBenchConfigLoader(ConfigLoader):
                 self._gpu_present = False
         return self._gpu_present
 
-    def _build_benchmark_configs(
-        self,
-        dataset_config: DatasetConfig,
-        dataset_conf: dict,
-        dataset: str,
-        dataset_path: str,
-        **kwargs,
-    ) -> List[BenchmarkConfig]:
-        """
-        Build C++ benchmark configurations.
-
-        Parameters
-        ----------
-        dataset_config : DatasetConfig
-            Already-constructed dataset configuration
-        dataset_conf : dict
-            Raw dataset dict from YAML
-        dataset : str
-            Dataset name
-        dataset_path : str
-            Path to dataset directory
-        **kwargs
-            C++ specific arguments: algorithm_configuration, algorithms,
-            groups, algo_groups, count, batch_size, subset_size,
-            and tune mode kwargs (_tune_mode, _tune_build_params,
-            _tune_search_params)
-
-        Returns
-        -------
-        List[BenchmarkConfig]
-            Benchmark configs grouped by executable
-        """
-        # Extract tune mode kwargs (passed by orchestrator._run_trial)
-        tune_mode = kwargs.pop("_tune_mode", False)
-        tune_build_params = kwargs.pop("_tune_build_params", None)
-        tune_search_params = kwargs.pop("_tune_search_params", None)
-
+    def _discover_algo_groups(self, dataset_conf, dataset, dataset_path,
+                              **kwargs):
+        """Discover C++ algorithm groups to benchmark."""
         algorithm_configuration = kwargs.get("algorithm_configuration")
         algorithms = kwargs.get("algorithms")
         groups = kwargs.get("groups")
-        algo_groups = kwargs.get("algo_groups")
+        algo_groups_arg = kwargs.get("algo_groups")
         count = kwargs.get("count", 10)
         batch_size = kwargs.get("batch_size", 10000)
-        subset_size = kwargs.get("subset_size")
         executable_dir = kwargs.get("executable_dir")
 
         config_path = self.config_path
-
-        # Prepare conf_file for constraint validation
-        conf_file = {"dataset": dataset_conf}
-        if subset_size:
-            conf_file["dataset"]["subset_size"] = subset_size
-        conf_file["search_basic_param"] = {
-            "k": count,
-            "batch_size": batch_size,
-        }
 
         # Gather and load algorithm configs
         algos_conf_fs = self.gather_algorithm_configs(
@@ -472,8 +448,8 @@ class CppGBenchConfigLoader(ConfigLoader):
         allowed_algos = algorithms.split(",") if algorithms else None
         allowed_groups = groups.split(",") if groups else None
         allowed_algo_groups = (
-            [algo_group.split(".") for algo_group in algo_groups.split(",")]
-            if algo_groups
+            [ag.split(".") for ag in algo_groups_arg.split(",")]
+            if algo_groups_arg
             else None
         )
 
@@ -489,56 +465,9 @@ class CppGBenchConfigLoader(ConfigLoader):
             os.path.join(config_path, "algorithms.yaml")
         )
 
-        # Prepare executables and convert to BenchmarkConfig list
-        benchmark_configs = self._prepare_benchmark_configs(
-            algos_conf,
-            algos_yaml,
-            self.gpu_present,
-            conf_file,
-            dataset_path,
-            dataset,
-            count,
-            batch_size,
-            tune_mode=tune_mode,
-            tune_build_params=tune_build_params,
-            tune_search_params=tune_search_params,
-            executable_dir=executable_dir,
-        )
-
-        return benchmark_configs
-
-    def _prepare_benchmark_configs(
-        self,
-        algos_conf: dict,
-        algos_yaml: dict,
-        gpu_present: bool,
-        conf_file: dict,
-        dataset_path: str,
-        dataset: str,
-        count: int,
-        batch_size: int,
-        tune_mode: bool = False,
-        tune_build_params: dict = None,
-        tune_search_params: dict = None,
-        executable_dir: Optional[str] = None,
-    ) -> List[BenchmarkConfig]:
-        """
-        Prepare list of BenchmarkConfig from algorithm configurations.
-
-        This matches the old workflow (run.py prepare_executables) by grouping
-        ALL indexes for the same executable into ONE BenchmarkConfig.
-        This ensures ONE C++ command runs ALL indexes together.
-
-        In tune mode, generates a single config with exact Optuna-suggested params
-        instead of Cartesian product expansion.
-        """
-        # Group indexes by executable (matches run.py executables_to_run structure)
-        # Key: (executable, executable_path, output_filename)
-        # Value: {"index": [...], "algo_info": {...}}
-        executables_to_run = {}
-
+        result = []
         for algo, algo_conf in algos_conf.items():
-            if not self.validate_algorithm(algos_yaml, algo, gpu_present):
+            if not self.validate_algorithm(algos_yaml, algo, self.gpu_present):
                 continue
 
             for group, group_conf in algo_conf["groups"].items():
@@ -557,45 +486,92 @@ class CppGBenchConfigLoader(ConfigLoader):
                     warnings.warn(f"Executable not found for {algo}")
                     continue
 
-                # Get algorithm info from algorithms.yaml
                 algo_info = algos_yaml.get(algo, {})
+                group_meta = {
+                    "executable": executable,
+                    "executable_path": executable_path,
+                    "file_name": file_name,
+                    "algo_info": algo_info,
+                    "algos_conf": algos_conf,
+                    "conf_file": {
+                        "dataset": dataset_conf,
+                        "search_basic_param": {
+                            "k": count,
+                            "batch_size": batch_size,
+                        },
+                    },
+                }
+                result.append((algo, group, group_conf, group_meta))
 
-                # Prepare index configurations
-                indexes = self.prepare_indexes(
-                    group_conf,
-                    algo,
-                    group,
-                    conf_file,
-                    algos_conf,
-                    dataset_path,
-                    dataset,
-                    count,
-                    batch_size,
-                    tune_mode=tune_mode,
-                    tune_build_params=tune_build_params,
-                    tune_search_params=tune_search_params,
+        return result
+
+    def _build_benchmark_configs(self, dataset_config, dataset_conf,
+                                 dataset, dataset_path, expanded_groups,
+                                 **kwargs):
+        """Build C++ BenchmarkConfigs, grouping indexes by executable."""
+        tune_mode = kwargs.get("_tune_mode", False)
+        tune_build_params = kwargs.get("_tune_build_params")
+        tune_search_params = kwargs.get("_tune_search_params")
+        count = kwargs.get("count", 10)
+        batch_size = kwargs.get("batch_size", 10000)
+        subset_size = kwargs.get("subset_size")
+
+        executables_to_run = {}
+
+        for (algo, group, group_conf,
+             build_combos, search_combos, group_meta) in expanded_groups:
+
+            conf_file = group_meta["conf_file"]
+            if subset_size:
+                conf_file["dataset"]["subset_size"] = subset_size
+            algos_conf = group_meta["algos_conf"]
+            executable = group_meta["executable"]
+            executable_path = group_meta["executable_path"]
+            file_name = group_meta["file_name"]
+            algo_info = group_meta["algo_info"]
+
+            # Use tune params if in tune mode, otherwise use expanded combos
+            if tune_mode and tune_build_params is not None:
+                actual_build = [tune_build_params.copy()]
+                actual_search = (
+                    [tune_search_params.copy()]
+                    if tune_search_params
+                    else [{}]
                 )
+            else:
+                actual_build = build_combos
+                actual_search = search_combos
 
-                # Group by executable (matches run.py)
-                key = (executable, executable_path, file_name)
-                if key not in executables_to_run:
-                    executables_to_run[key] = {
-                        "index": [],
-                        "algo_info": algo_info,
-                        "dataset_path": dataset_path,
-                        "dataset": dataset,
-                    }
-                executables_to_run[key]["index"].extend(indexes)
+            indexes = self.prepare_indexes(
+                actual_build,
+                actual_search,
+                algo,
+                group,
+                conf_file,
+                algos_conf,
+                dataset_path,
+                dataset,
+                count,
+                batch_size,
+                tune_mode=tune_mode,
+            )
 
-        # Convert grouped indexes to BenchmarkConfig objects
-        # ONE BenchmarkConfig per executable (with ALL indexes)
+            key = (executable, executable_path, file_name)
+            if key not in executables_to_run:
+                executables_to_run[key] = {
+                    "index": [],
+                    "algo_info": algo_info,
+                    "dataset_path": dataset_path,
+                    "dataset": dataset,
+                }
+            executables_to_run[key]["index"].extend(indexes)
+
         benchmark_configs = []
         for (
             executable,
             executable_path,
             file_name,
         ), data in executables_to_run.items():
-            # Convert raw index dicts to IndexConfig objects
             index_configs = [
                 IndexConfig(
                     name=idx["name"],
@@ -616,7 +592,7 @@ class CppGBenchConfigLoader(ConfigLoader):
                     ),
                     "data_prefix": data["dataset_path"],
                     "dataset": data["dataset"],
-                    "output_filename": file_name,  # Tuple: (build_name, search_name)
+                    "output_filename": file_name,
                     "algo": index_configs[0].algo if index_configs else "",
                 },
             )
@@ -805,7 +781,8 @@ class CppGBenchConfigLoader(ConfigLoader):
 
     def prepare_indexes(
         self,
-        group_conf: dict,
+        all_build_params: list,
+        all_search_params: list,
         algo: str,
         group: str,
         conf_file: dict,
@@ -815,22 +792,24 @@ class CppGBenchConfigLoader(ConfigLoader):
         count: int,
         batch_size: int,
         tune_mode: bool = False,
-        tune_build_params: dict = None,
-        tune_search_params: dict = None,
     ) -> list:
         """
-        Prepare the index configurations for the given algorithm and group.
+        Prepare index configurations from pre-expanded parameters.
 
         Parameters
         ----------
-        group_conf : dict
-            The configuration for the algorithm group.
+        all_build_params : list
+            Already-expanded build parameter dicts.
+        all_search_params : list
+            Already-expanded search parameter dicts.
         algo : str
             The name of the algorithm.
         group : str
             The name of the group.
         conf_file : dict
             The main configuration file.
+        algos_conf : dict
+            The loaded algorithm configurations.
         dataset_path : str
             The path to the dataset directory.
         dataset : str
@@ -840,31 +819,14 @@ class CppGBenchConfigLoader(ConfigLoader):
         batch_size : int
             The size of each batch for processing.
         tune_mode : bool
-            If True, use exact params from Optuna instead of Cartesian product.
-        tune_build_params : dict
-            Exact build parameters from Optuna (e.g., {"nlist": 5347}).
-        tune_search_params : dict
-            Exact search parameters from Optuna (e.g., {"nprobe": 73}).
+            If True, skip constraint validation.
 
         Returns
         -------
         list
             A list of index configurations.
-            - Sweep mode: Multiple indexes (Cartesian product)
-            - Tune mode: Single index (Optuna params)
         """
         indexes = []
-        build_params = group_conf.get("build", {})
-        search_params = group_conf.get("search", {})
-
-        if tune_mode and tune_build_params is not None:
-            all_build_params = [tune_build_params.copy()]
-            all_search_params = (
-                [tune_search_params.copy()] if tune_search_params else [{}]
-            )
-        else:
-            all_build_params = expand_param_grid(build_params)
-            all_search_params = expand_param_grid(search_params)
 
         for build_param in all_build_params:
             index = {"algo": algo, "build_param": build_param}
@@ -895,9 +857,10 @@ class CppGBenchConfigLoader(ConfigLoader):
                 dataset_path, dataset, "index", index_filename
             )
 
-            # Handle search params
-            if tune_mode and tune_search_params is not None:
-                index["search_params"] = [tune_search_params.copy()]
+            # Validate and filter search params (skipped in tune mode
+            # since tune params are already exact)
+            if tune_mode:
+                index["search_params"] = list(all_search_params)
             else:
                 index["search_params"] = self.validate_search_params(
                     all_search_params,
