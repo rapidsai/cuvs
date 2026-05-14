@@ -522,8 +522,8 @@ class CppGBenchConfigLoader(ConfigLoader):
             file_name = group_meta["file_name"]
             algo_info = group_meta["algo_info"]
 
-            # Use tune params if in tune mode, otherwise use expanded combos
-            if tune_mode and tune_build_params is not None:
+            build_from_tune = tune_mode and tune_build_params is not None
+            if build_from_tune:
                 actual_build = [tune_build_params.copy()]
                 actual_search = (
                     [tune_search_params.copy()]
@@ -545,7 +545,7 @@ class CppGBenchConfigLoader(ConfigLoader):
                 dataset,
                 count,
                 batch_size,
-                tune_mode=tune_mode,
+                tune_mode=build_from_tune,
             )
 
             key = (executable, executable_path, file_name)
