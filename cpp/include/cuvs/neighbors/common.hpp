@@ -276,11 +276,16 @@ struct dataset_view<padded_dataset_container, DataT, IdxT, true, false> {
 // -----------------------------------------------------------------------------
 //
 // Owning block is first for file organization. `dataset_view<vpq_dataset_container, …>` is
-// forward-declared so `as_dataset_view()` can be declared here; its definition (and the view’s
-// constructor body that wraps `this`) come after the full view specialization.
+// forward-declared so `as_dataset_view()` can return that type; the view constructor and a small
+// `vpq_dataset_as_view_impl` helper are defined after the full view specialization.
 
 template <typename DataT, typename IdxT>
 struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
+
+template <typename DataT, typename IdxT>
+[[nodiscard]] auto vpq_dataset_as_view_impl(
+  dataset<vpq_dataset_container, DataT, IdxT, true, false> const* self)
+  -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
 
 template <typename DataT, typename IdxT>
 struct dataset<vpq_dataset_container, DataT, IdxT, true, false> {
@@ -341,7 +346,10 @@ struct dataset<vpq_dataset_container, DataT, IdxT, true, false> {
   /** Non-owning view for storing in `any_dataset_view` (same role as
    * `padded_dataset::as_dataset_view`). */
   [[nodiscard]] auto as_dataset_view() const
-    -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
+    -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>
+  {
+    return vpq_dataset_as_view_impl(this);
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -369,11 +377,11 @@ struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false> {
 };
 
 template <typename DataT, typename IdxT>
-[[nodiscard]] inline auto
-dataset<vpq_dataset_container, DataT, IdxT, true, false>::as_dataset_view() const
+[[nodiscard]] inline auto vpq_dataset_as_view_impl(
+  dataset<vpq_dataset_container, DataT, IdxT, true, false> const* self)
   -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>
 {
-  return dataset_view<vpq_dataset_container, DataT, IdxT, true, false>(this);
+  return dataset_view<vpq_dataset_container, DataT, IdxT, true, false>(self);
 }
 
 // -----------------------------------------------------------------------------
@@ -448,7 +456,7 @@ struct dataset_view<strided_dataset_container, DataT, IdxT, true, false> {
  * tags, and some bodies must spell `dataset_view<padded_dataset_container, …>` before
  * `padded_dataset_view` exists (see `dataset<padded_dataset_container>::as_dataset_view`).
  * VPQ: `dataset_view<vpq_dataset_container, …>` is forward-declared, then owning `dataset`, then
- * the full view specialization and `as_dataset_view()` out-of-line (constructor needs a complete
+ * the full view specialization and `vpq_dataset_as_view_impl` (view constructor needs a complete
  * view type).
  *
  * Variant member helpers (`any_dataset_view_types`, `any_owning_dataset_types`) follow; see

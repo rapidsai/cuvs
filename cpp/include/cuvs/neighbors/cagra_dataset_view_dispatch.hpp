@@ -86,6 +86,11 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
       auto& vpq = std::get<typename OT::vpq_f32_owning>(store);
       return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
     }
+    // CAGRA-Q (float vectors): codebooks are typically half; owning storage is `vpq_f16_owning`.
+    if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
+      auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
+      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
+    }
   } else if constexpr (std::is_same_v<T, half>) {
     if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
       return any_dataset_view<T, IdxT>(
