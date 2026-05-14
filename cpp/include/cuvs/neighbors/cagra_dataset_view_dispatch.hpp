@@ -58,7 +58,12 @@ auto clone_any_dataset_view_for_cagra_index(any_dataset_view<T, IdxT> const& roo
 
 /**
  * @brief Map `any_owning_dataset` storage to `any_dataset_view<T, IdxT>` for CAGRA index
- *        `update_dataset` (element type \p T must match the owning variant member).
+ *        `update_dataset`.
+ *
+ * Dense padded/strided owning members must match index element type \p T. VPQ owning members are
+ * tagged by **codebook** element type (`vpq_f32_owning` / `vpq_f16_owning`); they are handled once
+ * here for every supported \p T, since `any_dataset_view<T, IdxT>` always carries VPQ as
+ * `vpq_f32_view` / `vpq_f16_view` regardless of \p T.
  */
 template <typename T, typename IdxT>
 auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_dataset_view<T, IdxT>
@@ -73,6 +78,19 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
       typename nb::any_dataset_view_types<T, IdxT>::empty_view(e.dim()));
   }
 
+  // VPQ: variant names reflect codebook storage (float/half), not index `T`.
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
+                std::is_same_v<T, uint8_t>) {
+    if (std::holds_alternative<typename OT::vpq_f32_owning>(store)) {
+      auto& vpq = std::get<typename OT::vpq_f32_owning>(store);
+      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
+    }
+    if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
+      auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
+      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
+    }
+  }
+
   if constexpr (std::is_same_v<T, float>) {
     if (std::holds_alternative<typename OT::padded_f32_owning>(store)) {
       return any_dataset_view<T, IdxT>(
@@ -82,15 +100,6 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
       return any_dataset_view<T, IdxT>(
         nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f32_owning>(store).view()));
     }
-    if (std::holds_alternative<typename OT::vpq_f32_owning>(store)) {
-      auto& vpq = std::get<typename OT::vpq_f32_owning>(store);
-      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
-    }
-    // CAGRA-Q (float vectors): codebooks are typically half; owning storage is `vpq_f16_owning`.
-    if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
-      auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
-      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
-    }
   } else if constexpr (std::is_same_v<T, half>) {
     if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
       return any_dataset_view<T, IdxT>(
@@ -99,10 +108,6 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
     if (std::holds_alternative<typename OT::strided_f16_owning>(store)) {
       return any_dataset_view<T, IdxT>(
         nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f16_owning>(store).view()));
-    }
-    if (std::holds_alternative<typename OT::vpq_f16_owning>(store)) {
-      auto& vpq = std::get<typename OT::vpq_f16_owning>(store);
-      return any_dataset_view<T, IdxT>(vpq.as_dataset_view());
     }
   } else if constexpr (std::is_same_v<T, int8_t>) {
     if (std::holds_alternative<typename OT::padded_i8_owning>(store)) {
