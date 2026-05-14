@@ -15,18 +15,10 @@ name: opensearch_faiss_hnsw
 groups:
   base:
     build:
-      m: [16, 32]
-      ef_construction: [100, 200, 512]
+      m: [32, 64, 96]
+      ef_construction: [64, 128, 256]
     search:
-      ef_search: [50, 100, 200, 512]
-
-  large:
-    build:
-      m: [32]
-      ef_construction: [200, 512]
-    search:
-      ef_search: [100, 200, 512, 1024]
-
+      ef_search: [10, 20, 40, 60, 80, 120, 200, 400, 600, 800]
   test:
     build:
       m: [16]

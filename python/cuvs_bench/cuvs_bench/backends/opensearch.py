@@ -169,13 +169,8 @@ class OpenSearchConfigLoader(ConfigLoader):
             - ``verify_certs`` – verify SSL certificates (default: ``False``)
             - ``bulk_batch_size`` – vectors per bulk request (default: ``500``)
             - ``remote_index_build`` – enable GPU remote index build (default: ``False``)
-            - ``remote_build_size_min`` – minimum segment size to trigger GPU build (default: ``"1kb"``)
-            - ``remote_build_s3_endpoint`` – S3 endpoint URL
-            - ``remote_build_s3_bucket`` – bucket name (default: ``"opensearch-vectors"``)
-            - ``remote_build_s3_prefix`` – key prefix for ``.faiss`` polling (default: ``"knn-indexes/"``)
-            - ``remote_build_s3_access_key`` – S3 access key
-            - ``remote_build_s3_secret_key`` – S3 secret key
-            - ``remote_build_timeout`` – GPU build timeout in seconds (default: ``600``)
+            - ``remote_build_size_min`` – minimum segment size to trigger GPU build (default: OpenSearch's default)
+            - ``remote_build_timeout`` – GPU build timeout in seconds (default: ``1800``)
 
         Returns
         -------
@@ -230,12 +225,6 @@ class OpenSearchConfigLoader(ConfigLoader):
             # Remote Index Build (OpenSearch 3.0+, faiss engine only)
             "remote_index_build",
             "remote_build_size_min",
-            "remote_build_s3_endpoint",
-            "remote_build_s3_bucket",
-            "remote_build_s3_prefix",
-            "remote_build_s3_access_key",
-            "remote_build_s3_secret_key",
-            "remote_build_s3_session_token",
             "remote_build_timeout",
         )
         conn_kwargs = {k: kwargs[k] for k in _conn_keys if k in kwargs}
@@ -339,6 +328,31 @@ _DISTANCE_TO_SPACE_TYPE: Dict[str, str] = {
     "angular": "cosinesimil",
 }
 
+_DEFAULT_REMOTE_BUILD_TIMEOUT = 30 * 60
+_REMOTE_BUILD_START_TIMEOUT = 30.0
+
+_REMOTE_BUILD_MERGE_OPS = "remote_index_build_current_merge_operations"
+_REMOTE_BUILD_FLUSH_OPS = "remote_index_build_current_flush_operations"
+_REMOTE_BUILD_REQUEST_SUCCESS_COUNT = "build_request_success_count"
+_REMOTE_BUILD_REQUEST_FAILURE_COUNT = "build_request_failure_count"
+_REMOTE_BUILD_SUCCESS_COUNT = "index_build_success_count"
+_REMOTE_BUILD_FAILURE_COUNT = "index_build_failure_count"
+
+_REMOTE_BUILD_BUILD_STAT_KEYS = (
+    _REMOTE_BUILD_MERGE_OPS,
+    _REMOTE_BUILD_FLUSH_OPS,
+)
+_REMOTE_BUILD_CLIENT_STAT_KEYS = (
+    _REMOTE_BUILD_REQUEST_SUCCESS_COUNT,
+    _REMOTE_BUILD_REQUEST_FAILURE_COUNT,
+    _REMOTE_BUILD_SUCCESS_COUNT,
+    _REMOTE_BUILD_FAILURE_COUNT,
+)
+_REMOTE_BUILD_STAT_KEYS = (
+    *_REMOTE_BUILD_CLIENT_STAT_KEYS,
+    *_REMOTE_BUILD_BUILD_STAT_KEYS,
+)
+
 
 class OpenSearchBackend(BenchmarkBackend):
     """
@@ -373,13 +387,8 @@ class OpenSearchBackend(BenchmarkBackend):
         - ``remote_index_build`` – set ``index.knn.remote_index_build.enabled=true``
           on the index at creation time, opting it into the GPU build path (default: ``False``).
         - ``remote_build_size_min`` – minimum segment size to trigger GPU build, e.g. ``"1kb"``
-          (default: ``"1kb"`` when ``remote_index_build=True``)
-        - ``remote_build_s3_endpoint`` – S3 endpoint URL for build polling
-        - ``remote_build_s3_bucket`` – bucket name (default: ``"opensearch-vectors"``)
-        - ``remote_build_s3_prefix`` – key prefix to scan for ``.faiss`` files (default: ``"knn-indexes/"``)
-        - ``remote_build_s3_access_key`` – S3 access key
-        - ``remote_build_s3_secret_key`` – S3 secret key
-        - ``remote_build_timeout`` – seconds to wait for GPU build (default: ``600``)
+          (default: OpenSearch's default)
+        - ``remote_build_timeout`` – seconds to wait for GPU build (default: ``1800``)
 
     """
 
@@ -414,6 +423,7 @@ class OpenSearchBackend(BenchmarkBackend):
                 http_auth=(username, password) if username else None,
                 use_ssl=use_ssl,
                 verify_certs=verify_certs,
+                timeout=None,
             )
         return self.__client
 
@@ -453,11 +463,10 @@ class OpenSearchBackend(BenchmarkBackend):
 
         When ``remote_index_build=True``, ``index.knn.remote_index_build.enabled``
         is set to ``true`` in the index settings, opting qualifying segments into
-        the GPU build path. ``remote_build_size_min`` sets
-        ``index.knn.remote_index_build.size.min`` to control the minimum segment
-        size that triggers the GPU build; the default ``"1kb"`` ensures any
-        non-trivial segment is built remotely. The cluster-level infrastructure
-        is assumed to be pre-configured externally.
+        the GPU build path. If ``remote_build_size_min`` is provided it overrides
+        ``index.knn.remote_index_build.size.min``; otherwise OpenSearch's default
+        applies. The cluster-level infrastructure is assumed to be pre-configured
+        externally.
         """
         m = build_param.get("m", 16)
         ef_construction = build_param.get("ef_construction", 100)
@@ -502,9 +511,10 @@ class OpenSearchBackend(BenchmarkBackend):
                     "Use algorithms='opensearch_faiss_hnsw'."
                 )
             index_settings["knn.remote_index_build.enabled"] = True
-            index_settings["knn.remote_index_build.size.min"] = (
-                remote_build_size_min or "1kb"
-            )
+            if remote_build_size_min:
+                index_settings["knn.remote_index_build.size.min"] = (
+                    remote_build_size_min
+                )
 
         return {
             "settings": {"index": index_settings},
@@ -565,123 +575,163 @@ class OpenSearchBackend(BenchmarkBackend):
                 )
         print(f"  Indexed all {total} vectors")
 
-    def _make_s3_client(self):
-        """Create a boto3 S3 client from config. Returns (client, bucket, prefix)."""
-        try:
-            import boto3
-            from botocore.config import Config as BotocoreConfig
-        except ImportError as exc:
-            raise ImportError(
-                "boto3 is required for remote index build polling. "
-                "Install it with:  pip install boto3"
-            ) from exc
+    def _get_knn_remote_build_stats(self) -> dict:
+        """Query kNN stats API and return summed remote build counters across all nodes.
 
-        s3 = boto3.client(
-            "s3",
-            endpoint_url=self.config.get("remote_build_s3_endpoint"),
-            aws_access_key_id=self.config.get("remote_build_s3_access_key"),
-            aws_secret_access_key=self.config.get(
-                "remote_build_s3_secret_key"
-            ),
-            aws_session_token=self.config.get("remote_build_s3_session_token"),
-            region_name="us-east-1",
-            config=BotocoreConfig(signature_version="s3v4"),
-        )
-        bucket = self.config.get(
-            "remote_build_s3_bucket", "opensearch-vectors"
-        )
-        prefix = self.config.get("remote_build_s3_prefix", "knn-indexes/")
-        return s3, bucket, prefix
+        The remote build stats live under a nested structure in the response:
+          nodes.<node-id>.remote_vector_index_build_stats.build_stats.*
+          nodes.<node-id>.remote_vector_index_build_stats.client_stats.*
+        """
+        resp = self._client.knn.stats()
+        totals = {key: 0 for key in _REMOTE_BUILD_STAT_KEYS}
+        for node_stats in resp.get("nodes", {}).values():
+            remote = node_stats.get("remote_vector_index_build_stats", {})
+            build = remote.get("build_stats", {})
+            client = remote.get("client_stats", {})
+            for key in _REMOTE_BUILD_BUILD_STAT_KEYS:
+                totals[key] += build.get(key, 0)
+            for key in _REMOTE_BUILD_CLIENT_STAT_KEYS:
+                totals[key] += client.get(key, 0)
+        return totals
 
-    def _count_faiss_files(self) -> int:
-        """Return the number of .faiss files currently in S3 under the configured prefix."""
-        s3, bucket, prefix = self._make_s3_client()
-        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        return sum(
-            1
-            for obj in resp.get("Contents", [])
-            if obj["Key"].endswith(".faiss")
+    def _format_remote_build_stats(self, stats: Dict[str, int]) -> str:
+        return ", ".join(
+            f"{key}={stats.get(key, 0)}" for key in _REMOTE_BUILD_STAT_KEYS
         )
 
-    def _count_index_segments(self, index_name: str) -> int:
-        """Return the number of Lucene segments currently in the index."""
-        resp = self._client.indices.segments(index=index_name)
-        total = 0
-        for shard_group in (
-            resp.get("indices", {})
-            .get(index_name, {})
-            .get("shards", {})
-            .values()
-        ):
-            for shard in shard_group:
-                total += len(shard.get("segments", {}))
-        return total
+    def _remote_build_delta(
+        self, stats: Dict[str, int], initial_stats: Dict[str, int], key: str
+    ) -> int:
+        return stats.get(key, 0) - initial_stats.get(key, 0)
 
-    def _wait_for_ingestion_builds(
+    def _flush_index(self, index_name: str) -> None:
+        resp = self._client.indices.flush(
+            index=index_name, request_timeout=None
+        )
+        shards = resp.get("_shards", {})
+        total = shards.get("total", 0)
+        successful = shards.get("successful", 0)
+        failed = shards.get("failed", 0)
+
+        if failed or successful != total:
+            raise RuntimeError(
+                f"Flush did not complete on all shards for {index_name}: {resp}"
+            )
+
+    def _resolve_index_name(self, index_cfg: IndexConfig) -> str:
+        return self.config.get(
+            "index_name", index_cfg.name.replace(".", "_").lower()
+        )
+
+    def _failed_build_result(
+        self, error_message: str, build_params: Optional[Dict[str, Any]] = None
+    ) -> BuildResult:
+        return BuildResult(
+            index_path="",
+            build_time_seconds=0.0,
+            index_size_bytes=0,
+            algorithm=self.algo,
+            build_params=build_params or {},
+            success=False,
+            error_message=error_message,
+        )
+
+    def _failed_search_result(
         self,
-        index_name: str,
-        timeout: int = 600,
-        poll_interval: int = 5,
-    ) -> None:
-        """
-        Wait for all GPU builds triggered during ingestion to complete.
-
-        After bulk indexing, OpenSearch may have flushed several segments and
-        dispatched a GPU build for each one.  This method counts segments in
-        the index, then polls S3 until that many ``.faiss`` files exist —
-        confirming every ingestion-time GPU build has finished.
-
-        Must be called *before* force-merge so the pre-merge `.faiss` count
-        is stable.
-        """
-        segment_count = self._count_index_segments(index_name)
-        if segment_count == 0:
-            return
-        print(
-            f"  Waiting for {segment_count} ingestion-time GPU build(s) to complete..."
-        )
-        self._wait_for_remote_build(
-            expected_count=segment_count,
-            timeout=timeout,
-            poll_interval=poll_interval,
-        )
-        print(
-            f"  All {segment_count} ingestion-time GPU build(s) confirmed in S3."
+        k: int,
+        error_message: str,
+        search_params: Optional[List[Dict[str, Any]]] = None,
+    ) -> SearchResult:
+        return SearchResult(
+            neighbors=np.zeros((0, k), dtype=np.int64),
+            distances=np.zeros((0, k), dtype=np.float32),
+            search_time_ms=0.0,
+            queries_per_second=0.0,
+            recall=0.0,
+            algorithm=self.algo,
+            search_params=search_params or [],
+            success=False,
+            error_message=error_message,
         )
 
     def _wait_for_remote_build(
         self,
-        expected_count: int = 1,
-        timeout: int = 600,
+        initial_stats: Dict[str, int],
+        timeout: int = _DEFAULT_REMOTE_BUILD_TIMEOUT,
         poll_interval: int = 5,
+        no_activity_timeout: float = _REMOTE_BUILD_START_TIMEOUT,
     ) -> None:
         """
-        Poll S3 until at least *expected_count* .faiss files exist under the
-        configured prefix.
+        Poll the kNN stats API until all submitted remote GPU builds complete.
 
-        Raises ``TimeoutError`` if the expected number of files does not appear
-        within *timeout* seconds.
+        *initial_stats* should be snapshotted from
+        ``_get_knn_remote_build_stats()`` immediately before ingestion starts.
+
+        Raises ``TimeoutError`` if submitted builds do not complete within
+        *timeout* seconds.
         """
-        s3, bucket, prefix = self._make_s3_client()
+        start = time.perf_counter()
+        deadline = start + timeout
+        no_activity_deadline = start + min(no_activity_timeout, timeout)
+        observed_activity = False
+        stats: Optional[Dict[str, int]] = None
 
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            try:
-                resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-                faiss_files = [
-                    obj["Key"]
-                    for obj in resp.get("Contents", [])
-                    if obj["Key"].endswith(".faiss")
-                ]
-                if len(faiss_files) >= expected_count:
-                    return
-            except Exception as exc:
-                print(f"  S3 poll error: {exc}")
+        while time.perf_counter() < deadline:
+            stats = self._get_knn_remote_build_stats()
+            request_failure_delta = self._remote_build_delta(
+                stats, initial_stats, _REMOTE_BUILD_REQUEST_FAILURE_COUNT
+            )
+            build_failure_delta = self._remote_build_delta(
+                stats, initial_stats, _REMOTE_BUILD_FAILURE_COUNT
+            )
+            if request_failure_delta > 0 or build_failure_delta > 0:
+                raise RuntimeError(
+                    "GPU build failed via kNN stats API: "
+                    f"{self._format_remote_build_stats(stats)}"
+                )
+
+            submitted_delta = self._remote_build_delta(
+                stats, initial_stats, _REMOTE_BUILD_REQUEST_SUCCESS_COUNT
+            )
+            completed_delta = self._remote_build_delta(
+                stats, initial_stats, _REMOTE_BUILD_SUCCESS_COUNT
+            )
+            current_ops = (
+                stats[_REMOTE_BUILD_MERGE_OPS] + stats[_REMOTE_BUILD_FLUSH_OPS]
+            )
+            is_idle = current_ops == 0
+            if submitted_delta > 0 or completed_delta > 0 or current_ops > 0:
+                observed_activity = True
+
+            if (
+                submitted_delta > 0
+                and completed_delta >= submitted_delta
+                and is_idle
+            ):
+                return
+
+            if (
+                not observed_activity
+                and time.perf_counter() >= no_activity_deadline
+            ):
+                raise RuntimeError(
+                    "No remote GPU build was observed via kNN stats API. "
+                    "OpenSearch may not have scheduled one because the segment "
+                    "size did not meet its default remote build threshold. "
+                    "Set remote_build_size_min lower if this benchmark must "
+                    "force remote builds. "
+                    f"Stats: {self._format_remote_build_stats(stats)}"
+                )
             time.sleep(poll_interval)
 
+        stats_msg = (
+            self._format_remote_build_stats(stats)
+            if stats is not None
+            else "unavailable"
+        )
         raise TimeoutError(
             f"GPU build not confirmed after {timeout}s: "
-            f"expected {expected_count} .faiss file(s) in s3://{bucket}/{prefix}"
+            f"last stats: {stats_msg}"
         )
 
     def build(
@@ -699,7 +749,7 @@ class OpenSearchBackend(BenchmarkBackend):
         is skipped.
 
         When ``remote_index_build=True`` the build time includes the full GPU
-        build flow: ingest → force merge → wait for ``.faiss`` files in S3.
+        build flow: ingest → flush → wait for GPU build confirmation via kNN stats API.
 
         Parameters
         ----------
@@ -719,32 +769,16 @@ class OpenSearchBackend(BenchmarkBackend):
         """
         skip = self._pre_flight_check()
         if skip:
-            return BuildResult(
-                index_path="",
-                build_time_seconds=0.0,
-                index_size_bytes=0,
-                algorithm=self.algo,
-                build_params={},
-                success=False,
-                error_message=f"pre-flight check failed: {skip}",
+            return self._failed_build_result(
+                f"pre-flight check failed: {skip}"
             )
 
         if not indexes:
-            return BuildResult(
-                index_path="",
-                build_time_seconds=0.0,
-                index_size_bytes=0,
-                algorithm=self.algo,
-                build_params={},
-                success=False,
-                error_message="No indexes provided",
-            )
+            return self._failed_build_result("No indexes provided")
 
         index_cfg = indexes[0]
         build_param = index_cfg.build_param
-        index_name = self.config.get(
-            "index_name", index_cfg.name.replace(".", "_").lower()
-        )
+        index_name = self._resolve_index_name(index_cfg)
         engine = self.config.get("engine", "lucene")
         bulk_batch_size = int(self.config.get("bulk_batch_size", 500))
         remote_index_build = bool(self.config.get("remote_index_build", False))
@@ -786,17 +820,10 @@ class OpenSearchBackend(BenchmarkBackend):
             base_vectors = _load_vectors(dataset.base_file, subset_size)
 
         if base_vectors.size == 0:
-            return BuildResult(
-                index_path="",
-                build_time_seconds=0.0,
-                index_size_bytes=0,
-                algorithm=self.algo,
+            return self._failed_build_result(
+                "No base vectors available. Provide dataset.base_vectors "
+                "or a valid dataset.base_file path.",
                 build_params=build_param,
-                success=False,
-                error_message=(
-                    "No base vectors available. Provide dataset.base_vectors "
-                    "or a valid dataset.base_file path."
-                ),
             )
 
         dims = base_vectors.shape[1]
@@ -813,30 +840,26 @@ class OpenSearchBackend(BenchmarkBackend):
         )
         self._client.indices.create(index=index_name, body=mapping)
 
-        # Bulk index, then trigger and await the GPU build (if remote)
+        if remote_index_build:
+            remote_timeout = int(
+                self.config.get(
+                    "remote_build_timeout", _DEFAULT_REMOTE_BUILD_TIMEOUT
+                )
+            )
+            pre_ingest_stats = self._get_knn_remote_build_stats()
+
+        # Bulk index, then flush segments before timing build completion.
         t0 = time.perf_counter()
         self._bulk_index(index_name, base_vectors, bulk_batch_size)
-        self._client.indices.refresh(index=index_name, request_timeout=120)
-        if remote_index_build:
-            remote_timeout = int(self.config.get("remote_build_timeout", 600))
-            # Wait for every GPU build dispatched during ingestion to finish.
-            # Segments flushed mid-ingest each trigger their own GPU build, so
-            # all of those must complete before we proceed.
-            self._wait_for_ingestion_builds(index_name, timeout=remote_timeout)
-            # Snapshot .faiss count now that ingestion builds are done, then
-            # force-merge to one segment to trigger the final GPU build.
-            pre_merge_count = self._count_faiss_files()
-
-        self._client.indices.forcemerge(
-            index=index_name, max_num_segments=1, request_timeout=300
-        )
-
+        self._flush_index(index_name)
         if remote_index_build:
             self._wait_for_remote_build(
-                expected_count=pre_merge_count + 1,
+                initial_stats=pre_ingest_stats,
                 timeout=remote_timeout,
             )
         build_time = time.perf_counter() - t0
+
+        self._client.indices.refresh(index=index_name, request_timeout=120)
 
         # Index size
         stats = self._client.indices.stats(index=index_name)
@@ -910,35 +933,15 @@ class OpenSearchBackend(BenchmarkBackend):
         """
         skip = self._pre_flight_check()
         if skip:
-            return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
-                search_time_ms=0.0,
-                queries_per_second=0.0,
-                recall=0.0,
-                algorithm=self.algo,
-                search_params=[],
-                success=False,
-                error_message=f"pre-flight check failed: {skip}",
+            return self._failed_search_result(
+                k, f"pre-flight check failed: {skip}"
             )
 
         if not indexes:
-            return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
-                search_time_ms=0.0,
-                queries_per_second=0.0,
-                recall=0.0,
-                algorithm=self.algo,
-                search_params=[],
-                success=False,
-                error_message="No indexes provided",
-            )
+            return self._failed_search_result(k, "No indexes provided")
 
         index_cfg = indexes[0]
-        index_name = self.config.get(
-            "index_name", index_cfg.name.replace(".", "_").lower()
-        )
+        index_name = self._resolve_index_name(index_cfg)
         engine = self.config.get("engine", "lucene")
         search_params_list = index_cfg.search_params or [{}]
 
@@ -964,19 +967,11 @@ class OpenSearchBackend(BenchmarkBackend):
             query_vectors = _load_vectors(dataset.query_file)
 
         if query_vectors.size == 0:
-            return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
-                search_time_ms=0.0,
-                queries_per_second=0.0,
-                recall=0.0,
-                algorithm=self.algo,
+            return self._failed_search_result(
+                k,
+                "No query vectors available. Provide dataset.query_vectors "
+                "or a valid dataset.query_file path.",
                 search_params=search_params_list,
-                success=False,
-                error_message=(
-                    "No query vectors available. Provide dataset.query_vectors "
-                    "or a valid dataset.query_file path."
-                ),
             )
 
         groundtruth = dataset.groundtruth_neighbors

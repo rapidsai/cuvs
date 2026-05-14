@@ -154,18 +154,16 @@ class TestOpenSearchConfigLoader:
             dataset="test-ds",
             dataset_path="/data",
             remote_index_build=True,
+            remote_build_size_min="2kb",
+            remote_build_timeout=123,
             remote_build_s3_endpoint="http://s3:9000",
-            remote_build_s3_bucket="my-bucket",
-            remote_build_s3_access_key="mykey",
-            remote_build_s3_secret_key="mysecret",
         )
 
         bc = configs[0].backend_config
         assert bc["remote_index_build"] is True
-        assert bc["remote_build_s3_endpoint"] == "http://s3:9000"
-        assert bc["remote_build_s3_bucket"] == "my-bucket"
-        assert bc["remote_build_s3_access_key"] == "mykey"
-        assert bc["remote_build_s3_secret_key"] == "mysecret"
+        assert bc["remote_build_size_min"] == "2kb"
+        assert bc["remote_build_timeout"] == 123
+        assert "remote_build_s3_endpoint" not in bc
 
 
 class TestOpenSearchBackend:
@@ -194,6 +192,133 @@ class TestOpenSearchBackend:
                 build_param={},
                 remote_index_build=True,
             )
+
+    def test_remote_build_uses_opensearch_default_size_when_unspecified(self):
+        backend = _make_backend()
+        mapping = backend._build_index_mapping(
+            dims=4,
+            engine="faiss",
+            space_type="l2",
+            build_param={},
+            remote_index_build=True,
+        )
+
+        settings = mapping["settings"]["index"]
+        assert settings["knn.remote_index_build.enabled"] is True
+        assert "knn.remote_index_build.size.min" not in settings
+
+    def test_remote_build_size_min_overrides_default(self):
+        backend = _make_backend()
+        mapping = backend._build_index_mapping(
+            dims=4,
+            engine="faiss",
+            space_type="l2",
+            build_param={},
+            remote_index_build=True,
+            remote_build_size_min="2kb",
+        )
+
+        settings = mapping["settings"]["index"]
+        assert settings["knn.remote_index_build.size.min"] == "2kb"
+
+    def test_wait_for_remote_build_raises_on_failure_count(self):
+        backend = _make_backend()
+        initial_stats = {
+            "build_request_success_count": 0,
+            "build_request_failure_count": 0,
+            "index_build_success_count": 0,
+            "index_build_failure_count": 0,
+            "remote_index_build_current_merge_operations": 0,
+            "remote_index_build_current_flush_operations": 0,
+        }
+        backend._get_knn_remote_build_stats = lambda: {
+            "build_request_success_count": 1,
+            "build_request_failure_count": 0,
+            "index_build_success_count": 0,
+            "index_build_failure_count": 1,
+            "remote_index_build_current_merge_operations": 0,
+            "remote_index_build_current_flush_operations": 0,
+        }
+
+        with pytest.raises(RuntimeError, match="GPU build failed"):
+            backend._wait_for_remote_build(
+                initial_stats=initial_stats,
+                timeout=1,
+                poll_interval=0,
+            )
+
+    def test_wait_for_remote_build_raises_when_no_build_observed(self):
+        backend = _make_backend()
+        initial_stats = {
+            "build_request_success_count": 0,
+            "build_request_failure_count": 0,
+            "index_build_success_count": 0,
+            "index_build_failure_count": 0,
+            "remote_index_build_current_merge_operations": 0,
+            "remote_index_build_current_flush_operations": 0,
+        }
+        backend._get_knn_remote_build_stats = lambda: {
+            "build_request_success_count": 0,
+            "build_request_failure_count": 0,
+            "index_build_success_count": 0,
+            "index_build_failure_count": 0,
+            "remote_index_build_current_merge_operations": 0,
+            "remote_index_build_current_flush_operations": 0,
+        }
+
+        with pytest.raises(RuntimeError, match="No remote GPU build"):
+            backend._wait_for_remote_build(
+                initial_stats=initial_stats,
+                timeout=1,
+                poll_interval=0,
+                no_activity_timeout=0,
+            )
+
+    def test_wait_for_remote_build_waits_for_all_submitted_builds(self):
+        backend = _make_backend()
+        initial_stats = {
+            "build_request_success_count": 0,
+            "build_request_failure_count": 0,
+            "index_build_success_count": 0,
+            "index_build_failure_count": 0,
+            "remote_index_build_current_merge_operations": 0,
+            "remote_index_build_current_flush_operations": 0,
+        }
+        stats_sequence = iter(
+            [
+                {
+                    "build_request_success_count": 2,
+                    "build_request_failure_count": 0,
+                    "index_build_success_count": 1,
+                    "index_build_failure_count": 0,
+                    "remote_index_build_current_merge_operations": 0,
+                    "remote_index_build_current_flush_operations": 1,
+                },
+                {
+                    "build_request_success_count": 3,
+                    "build_request_failure_count": 0,
+                    "index_build_success_count": 2,
+                    "index_build_failure_count": 0,
+                    "remote_index_build_current_merge_operations": 0,
+                    "remote_index_build_current_flush_operations": 1,
+                },
+                {
+                    "build_request_success_count": 3,
+                    "build_request_failure_count": 0,
+                    "index_build_success_count": 3,
+                    "index_build_failure_count": 0,
+                    "remote_index_build_current_merge_operations": 0,
+                    "remote_index_build_current_flush_operations": 0,
+                },
+            ]
+        )
+        backend._get_knn_remote_build_stats = lambda: next(stats_sequence)
+
+        backend._wait_for_remote_build(
+            initial_stats=initial_stats,
+            timeout=1,
+            poll_interval=0,
+        )
 
     def test_search_fails_without_query_vectors(self):
         dataset = Dataset(
@@ -225,6 +350,11 @@ def remote_build_env(opensearch_url):
     # S3_ENDPOINT is optional — omit it (or leave unset) to use real AWS S3.
     s3_endpoint = os.environ.get("S3_ENDPOINT") or None
     s3_bucket = os.environ.get("S3_BUCKET")
+    s3_region = (
+        os.environ.get("S3_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1"
+    )
     s3_access_key = os.environ.get("S3_ACCESS_KEY")
     s3_secret_key = os.environ.get("S3_SECRET_KEY")
     s3_session_token = os.environ.get("S3_SESSION_TOKEN") or None
@@ -268,6 +398,7 @@ def remote_build_env(opensearch_url):
             "settings": {
                 "bucket": s3_bucket,
                 "base_path": s3_prefix.rstrip("/"),
+                "region": s3_region,
             },
         },
     ).raise_for_status()
@@ -310,14 +441,8 @@ def live_remote_build_backend(opensearch_url, remote_build_env):
             "verify_certs": False,
             "requires_network": True,
             "remote_index_build": True,
-            "remote_build_s3_endpoint": remote_build_env["s3_endpoint"],
-            "remote_build_s3_bucket": remote_build_env["s3_bucket"],
-            "remote_build_s3_prefix": remote_build_env["s3_prefix"],
-            "remote_build_s3_access_key": remote_build_env["s3_access_key"],
-            "remote_build_s3_secret_key": remote_build_env["s3_secret_key"],
-            "remote_build_s3_session_token": remote_build_env[
-                "s3_session_token"
-            ],
+            # Keep the tiny integration dataset above the remote build threshold.
+            "remote_build_size_min": "1kb",
         }
     )
     try:
