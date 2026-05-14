@@ -340,7 +340,7 @@ struct dataset<vpq_dataset_container, DataT, IdxT, true, false> {
 
   /** Non-owning view for storing in `any_dataset_view` (same role as
    * `padded_dataset::as_dataset_view`). */
-  [[nodiscard]] auto as_dataset_view() const noexcept
+  [[nodiscard]] auto as_dataset_view() const
     -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
 };
 
@@ -358,7 +358,7 @@ struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false> {
 
   dataset_view() = default;
 
-  explicit dataset_view(target_type const* ptr) noexcept : target_(ptr)
+  explicit dataset_view(target_type const* ptr) : target_(ptr)
   {
     RAFT_EXPECTS(ptr != nullptr, "vpq_dataset_view: null target");
   }
@@ -370,7 +370,7 @@ struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false> {
 
 template <typename DataT, typename IdxT>
 [[nodiscard]] inline auto
-dataset<vpq_dataset_container, DataT, IdxT, true, false>::as_dataset_view() const noexcept
+dataset<vpq_dataset_container, DataT, IdxT, true, false>::as_dataset_view() const
   -> dataset_view<vpq_dataset_container, DataT, IdxT, true, false>
 {
   return dataset_view<vpq_dataset_container, DataT, IdxT, true, false>(this);

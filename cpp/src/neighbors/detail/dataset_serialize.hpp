@@ -234,13 +234,23 @@ template <typename DataT, typename IdxT>
 auto deserialize_strided(raft::resources const& res, std::istream& is)
   -> std::unique_ptr<any_owning_dataset<IdxT>>
 {
-  auto n_rows     = raft::deserialize_scalar<IdxT>(res, is);
-  auto dim        = raft::deserialize_scalar<uint32_t>(res, is);
-  auto stride     = raft::deserialize_scalar<uint32_t>(res, is);
+  auto n_rows = raft::deserialize_scalar<IdxT>(res, is);
+  auto dim    = raft::deserialize_scalar<uint32_t>(res, is);
+  auto stride = raft::deserialize_scalar<uint32_t>(res, is);
+  RAFT_EXPECTS(dim <= stride,
+               "deserialize_strided: logical dim (%u) must not exceed row stride (%u).",
+               static_cast<unsigned>(dim),
+               static_cast<unsigned>(stride));
   auto host_array = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
   raft::deserialize_mdspan(res, is, host_array.view());
-  auto strided = make_strided_dataset(res, std::move(host_array), stride);
-  return std::make_unique<any_owning_dataset<IdxT>>(std::move(*strided));
+  // Always rebuild CAGRA's padded device layout from the dense host payload. The on-disk
+  // "stride" is informational; `strided_owning_dataset::dim()` is derived from the strided
+  // mdspan's extent(1), which can disagree with the serialized logical `dim` for some layouts
+  // (notably float16 / layout_stride), corrupting search after load. `make_padded_dataset` uses
+  // the authoritative logical column count from the host view (matches serialize's memcpy2D
+  // width and `padded_dataset_view::dim()`).
+  auto padded = cuvs::neighbors::make_padded_dataset(res, host_array.view());
+  return cuvs::neighbors::wrap_any_owning(std::move(padded));
 }
 
 template <typename DataT, typename IdxT>
