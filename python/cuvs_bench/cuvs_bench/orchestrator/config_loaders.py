@@ -184,13 +184,23 @@ class ConfigLoader(ABC):
             build_combos = expand_param_grid(group_conf.get("build", {}))
             search_combos = expand_param_grid(group_conf.get("search", {}))
             expanded_groups.append(
-                (algo_name, group_name, group_conf,
-                 build_combos, search_combos, group_meta)
+                (
+                    algo_name,
+                    group_name,
+                    group_conf,
+                    build_combos,
+                    search_combos,
+                    group_meta,
+                )
             )
 
         benchmark_configs = self._build_benchmark_configs(
-            dataset_config, ds_conf, dataset, dataset_path,
-            expanded_groups, **kwargs
+            dataset_config,
+            ds_conf,
+            dataset,
+            dataset_path,
+            expanded_groups,
+            **kwargs,
         )
         return dataset_config, benchmark_configs
 
@@ -419,8 +429,9 @@ class CppGBenchConfigLoader(ConfigLoader):
                 self._gpu_present = False
         return self._gpu_present
 
-    def _discover_algo_groups(self, dataset_conf, dataset, dataset_path,
-                              **kwargs):
+    def _discover_algo_groups(
+        self, dataset_conf, dataset, dataset_path, **kwargs
+    ):
         """Discover C++ algorithm groups to benchmark."""
         algorithm_configuration = kwargs.get("algorithm_configuration")
         algorithms = kwargs.get("algorithms")
@@ -497,9 +508,15 @@ class CppGBenchConfigLoader(ConfigLoader):
 
         return result
 
-    def _build_benchmark_configs(self, dataset_config, dataset_conf,
-                                 dataset, dataset_path, expanded_groups,
-                                 **kwargs):
+    def _build_benchmark_configs(
+        self,
+        dataset_config,
+        dataset_conf,
+        dataset,
+        dataset_path,
+        expanded_groups,
+        **kwargs,
+    ):
         """Build C++ BenchmarkConfigs, grouping indexes by executable."""
         tune_mode = kwargs.get("_tune_mode", False)
         tune_build_params = kwargs.get("_tune_build_params")
@@ -510,9 +527,14 @@ class CppGBenchConfigLoader(ConfigLoader):
 
         executables_to_run = {}
 
-        for (algo, group, group_conf,
-             build_combos, search_combos, group_meta) in expanded_groups:
-
+        for (
+            algo,
+            group,
+            group_conf,
+            build_combos,
+            search_combos,
+            group_meta,
+        ) in expanded_groups:
             conf_file = group_meta["conf_file"]
             if subset_size:
                 conf_file["dataset"]["subset_size"] = subset_size
@@ -526,9 +548,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             if build_from_tune:
                 actual_build = [tune_build_params.copy()]
                 actual_search = (
-                    [tune_search_params.copy()]
-                    if tune_search_params
-                    else [{}]
+                    [tune_search_params.copy()] if tune_search_params else [{}]
                 )
             else:
                 actual_build = build_combos
