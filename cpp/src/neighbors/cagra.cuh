@@ -32,14 +32,6 @@
 
 namespace cuvs::neighbors::cagra {
 
-template <typename T, typename IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&& r)
-{
-  r.idx.host_build_ace_device_store_ = std::move(r.dataset);
-  r.idx.index_owning_dataset_storage_.reset();
-  return std::move(r.idx);
-}
-
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
@@ -316,8 +308,7 @@ index<T, IdxT> build(
                  "ACE: Dataset must be on host for ACE build");
     auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-    return finalize_index_from_ace(
-      cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view));
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
   }
   RAFT_EXPECTS(
     raft::get_device_for_address(dataset.data_handle()) == -1,

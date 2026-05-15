@@ -1115,7 +1115,7 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
-cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
+cuvs::neighbors::cagra::index<T, IdxT> build_ace(
   raft::resources const& res,
   const index_params& params,
   raft::host_matrix_view<const T, int64_t, row_major> dataset)
@@ -1493,7 +1493,6 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
 
     auto index_creation_start = std::chrono::high_resolution_clock::now();
     index<T, IdxT> idx(res, params.metric);
-    std::optional<raft::device_matrix<T, int64_t, raft::row_major>> device_dataset;
     // Only add graph and dataset if not using disk storage. The returned index is empty if using
     // disk storage. Use the files written to disk for search.
     if (!use_disk_mode) {
@@ -1506,7 +1505,13 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
           auto padded = cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(dataset));
           idx.update_dataset(
             res, cuvs::neighbors::any_dataset_view<T, int64_t>(padded->as_dataset_view()));
-          device_dataset.emplace(std::move(padded->data_));
+          RAFT_LOG_WARN(
+            "ACE: `index_params.attach_dataset_on_build` is deprecated for in-memory ACE builds "
+            "that upload a padded device copy. Storage is kept on the index "
+            "(`host_build_ace_device_store_`). Prefer `attach_dataset_on_build = false` and "
+            "`index.update_dataset(res, ...)` with a padded view or owning dataset you retain.");
+          cuvs::neighbors::cagra::adopt_device_matrix_into_index_for_ace_attach(
+            idx, std::move(padded->data_));
         } catch (std::bad_alloc& e) {
           RAFT_LOG_WARN(
             "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
@@ -1542,8 +1547,7 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
       std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start).count();
     RAFT_LOG_INFO("ACE: Partitioned CAGRA build completed in %ld ms total", total_elapsed);
 
-    return cuvs::neighbors::cagra::ace_build_result<T, IdxT>{std::move(idx),
-                                                             std::move(device_dataset)};
+    return std::move(idx);
   } catch (const std::exception& e) {
     // Clean up build directory on failure if we created it
     RAFT_LOG_ERROR("ACE: Build failed with exception: %s", e.what());
@@ -2520,6 +2524,14 @@ void adopt_host_padded_into_index_for_host_attach(
 {
   idx.index_owning_dataset_storage_ = cuvs::neighbors::wrap_any_owning(std::move(padded_own));
   idx.host_build_ace_device_store_.reset();
+}
+
+template <typename T, typename IdxT>
+void adopt_device_matrix_into_index_for_ace_attach(
+  index<T, IdxT>& idx, raft::device_matrix<T, int64_t, raft::row_major>&& rows)
+{
+  idx.host_build_ace_device_store_.emplace(std::move(rows));
+  idx.index_owning_dataset_storage_.reset();
 }
 
 }  // namespace cuvs::neighbors::cagra

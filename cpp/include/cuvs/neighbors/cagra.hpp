@@ -383,16 +383,25 @@ static_assert(std::is_aggregate_v<search_params>);
 
 template <typename T, typename IdxT>
 struct index;
-template <typename T, typename IdxT>
-struct ace_build_result;
-
-template <typename T, typename IdxT>
-index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&&);
 
 template <typename T, typename IdxT>
 void adopt_host_padded_into_index_for_host_attach(
   index<T, IdxT>& idx,
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own);
+
+/**
+ * @internal Deprecated in-memory ACE `attach_dataset_on_build`: after `make_padded_dataset` and
+ * `update_dataset` with a padded view, moves the backing `raft::device_matrix` into
+ * `index::host_build_ace_device_store_` and clears `index_owning_dataset_storage_`.
+ *
+ * Mirrors `adopt_host_padded_into_index_for_host_attach` only at a high level: both satisfy
+ * attach-on-build lifetime for the index's dataset view, but the non-ACE host path owns a
+ * `device_padded_dataset` via `index_owning_dataset_storage_`, while this path owns the row
+ * buffer in the separate optional matrix field instead.
+ */
+template <typename T, typename IdxT>
+void adopt_device_matrix_into_index_for_ace_attach(
+  index<T, IdxT>& idx, raft::device_matrix<T, int64_t, raft::row_major>&& rows);
 
 /**
  * @defgroup cagra_cpp_index CAGRA index type
@@ -924,13 +933,27 @@ struct index : cuvs::neighbors::index {
     mapping_fd_.emplace(std::move(fd));
   }
 
+  /**
+   * @internal Transfers ownership of `host_build_ace_device_store_` out of the index (moves the
+   * optional). Used by `cagra::merge` when the CPU-memory fallback rebuilds via `build_ace` so the
+   * merged rows can live in `merge_result::dataset` while the index keeps only a view. Do not use
+   * to “relocate” rows for the C API build path: the index’s dataset view must keep matching
+   * storage unless you re-bind the dataset.
+   */
+  std::optional<raft::device_matrix<T, int64_t, raft::row_major>>
+  release_host_build_ace_device_store()
+  {
+    return std::move(host_build_ace_device_store_);
+  }
+
  private:
-  template <typename T2, typename I2>
-  friend index<T2, I2> finalize_index_from_ace(ace_build_result<T2, I2>&&);
   template <typename T2, typename I2>
   friend void adopt_host_padded_into_index_for_host_attach(
     index<T2, I2>& idx,
     std::unique_ptr<cuvs::neighbors::device_padded_dataset<T2, int64_t>> padded_own);
+  template <typename T2, typename I2>
+  friend void adopt_device_matrix_into_index_for_ace_attach(
+    index<T2, I2>& idx, raft::device_matrix<T2, int64_t, raft::row_major>&& rows);
 
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
@@ -947,8 +970,10 @@ struct index : cuvs::neighbors::index {
   std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>>
     index_owning_dataset_storage_{};
   /**
-   * Optional ACE device row storage when `detail::build_ace` materializes a padded copy for
-   * `attach_dataset_on_build` (lives for the same lifetime as the index in the public `build` API).
+   * Optional ACE device row storage: deprecated in-memory `attach_dataset_on_build` installs the
+   * backing `raft::device_matrix` here via `adopt_device_matrix_into_index_for_ace_attach`.
+   * `release_host_build_ace_device_store()` is used by merge’s host-memory fallback to move rows
+   * into `merge_result::dataset`.
    */
   std::optional<raft::device_matrix<T, int64_t, raft::row_major>> host_build_ace_device_store_{};
 
@@ -978,16 +1003,6 @@ template <typename T, typename IdxT>
 struct merge_result {
   cuvs::neighbors::cagra::index<T, IdxT> idx;
   raft::device_matrix<T, int64_t, raft::row_major> dataset;
-};
-
-/**
- * Result of ACE build from host dataset. When \p dataset has value, the index holds a view
- * over it; caller must keep \p dataset alive for the lifetime of \p idx.
- */
-template <typename T, typename IdxT>
-struct ace_build_result {
-  cuvs::neighbors::cagra::index<T, IdxT> idx;
-  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> dataset;
 };
 
 /**
@@ -1076,12 +1091,12 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
- *             `build_ace`. Matrix overloads do not support VPQ compression.
+ *             `make_padded_dataset` for host uploads. For ACE, use `build_ace`. Matrix overloads
+ *             do not support VPQ compression.
  */
 [[deprecated(
   "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
-  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
+  "build_ace for ACE; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
@@ -1167,12 +1182,12 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
- *             `build_ace`. Matrix overloads do not support VPQ compression.
+ *             `make_padded_dataset` for host uploads. For ACE, use `build_ace`. Matrix overloads
+ *             do not support VPQ compression.
  */
 [[deprecated(
   "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
-  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
+  "build_ace for ACE; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
@@ -1262,12 +1277,12 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
- *             `build_ace`. Matrix overloads do not support VPQ compression.
+ *             `make_padded_dataset` for host uploads. For ACE, use `build_ace`. Matrix overloads
+ *             do not support VPQ compression.
  */
 [[deprecated(
   "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
-  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
+  "build_ace for ACE; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
@@ -1358,47 +1373,46 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
- *             `build_ace`. Matrix overloads do not support VPQ compression.
+ *             `make_padded_dataset` for host uploads. For ACE, use `build_ace`. Matrix overloads
+ *             do not support VPQ compression.
  */
 [[deprecated(
   "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; use "
-  "build_ace for ACE ace_build_result; matrix overloads do not support VPQ.")]]
+  "build_ace for ACE; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 
 /**
- * @brief ACE host build returning the full `ace_build_result` (index + optional device matrix).
+ * @brief ACE host build returning `cagra::index`.
  *
- * Requires `graph_build_params` to be `ace_params`. For a single `cagra::index` return with
- * internal lifetime management, use `cagra::build(res, params, host_view)` (backward
- * compatible). For the generic padded-`dataset_view` path, use
- * `cagra::build(res, params, make_padded_dataset* / view)`.
+ * Requires `graph_build_params` to be `ace_params`. For the same return type via the deprecated
+ * host matrix overload, use `cagra::build(res, params, host_view)`. For the generic padded
+ * `dataset_view` path, use `cagra::build(res, params, make_padded_dataset* / view)`.
  */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<float, uint32_t>;
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
 /** @copydoc build_ace */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<half, uint32_t>;
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
 /** @copydoc build_ace */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<int8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
 /** @copydoc build_ace */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::ace_build_result<uint8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 
 /**
  * @brief Build the index from a device `dataset_view` (non-owning).

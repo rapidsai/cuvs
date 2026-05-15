@@ -184,11 +184,12 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
 
     auto host_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       updated_dataset.data_handle(), updated_dataset.extent(0), updated_dataset.extent(1));
-    auto ace_res = cagra::detail::build_ace<T, IdxT>(handle, params, host_view);
-    if (ace_res.dataset.has_value()) {
-      return cagra::merge_result<T, IdxT>{std::move(ace_res.idx), std::move(*ace_res.dataset)};
+    auto idx    = cagra::detail::build_ace<T, IdxT>(handle, params, host_view);
+    auto peeled = idx.release_host_build_ace_device_store();
+    if (peeled.has_value()) {
+      return cagra::merge_result<T, IdxT>{std::move(idx), std::move(*peeled)};
     }
-    return cagra::merge_result<T, IdxT>{std::move(ace_res.idx),
+    return cagra::merge_result<T, IdxT>{std::move(idx),
                                         raft::make_device_matrix<T, int64_t>(handle, 0, dim)};
   }
 }
