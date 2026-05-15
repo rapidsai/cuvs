@@ -1308,7 +1308,7 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     ace_params.ef_construction);
 
   // Build CAGRA index using ACE
-  auto ace_index = cuvs::neighbors::cagra::build_ace(res, cagra_params, dataset);
+  auto ace_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
   // Convert CAGRA index to HNSW index

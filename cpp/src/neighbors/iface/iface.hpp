@@ -111,7 +111,7 @@ void build(const raft::resources& handle,
         // Host mdspan is only accepted on the ACE build path; non-ACE requires dataset_view.
         if (std::holds_alternative<cagra::graph_build_params::ace_params>(
               cagra_params.graph_build_params)) {
-          auto idx = cuvs::neighbors::cagra::build_ace(handle, cagra_params, index_dataset);
+          auto idx = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
           interface.index_.emplace(std::move(idx));
         } else {
           iface_detail::cagra_from_host_padded(handle, cagra_params, index_dataset, interface);
@@ -123,7 +123,7 @@ void build(const raft::resources& handle,
       if (dataset_on_host) {
         if (std::holds_alternative<cagra::graph_build_params::ace_params>(
               cagra_params.graph_build_params)) {
-          auto idx = cuvs::neighbors::cagra::build_ace(handle, cagra_params, index_dataset);
+          auto idx = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
           interface.index_.emplace(std::move(idx));
         } else {
           iface_detail::cagra_from_host_padded(handle, cagra_params, index_dataset, interface);

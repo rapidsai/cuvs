@@ -54,21 +54,6 @@ auto build(raft::resources const& handle,
     handle, params, dataset);
 }
 
-auto build_ace(raft::resources const& handle,
-               const cuvs::neighbors::cagra::index_params& params,
-               raft::host_matrix_view<const data_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<data_t, index_t>
-{
-  RAFT_EXPECTS(
-    std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params),
-    "cagra::build_ace requires graph_build_params to be ace_params. For cagra::index, use "
-    "cagra::build(res, params, host_view). For non-ACE views, use cagra::build(res, params, "
-    "dataset_view).");
-  RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
-               "ACE: Dataset must be on host for ACE build");
-  return ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset);
-}
-
 // Definition lives in cagra.cuh; callers that only include cagra.hpp need this symbol in libcuvs.
 // The device_matrix_view overload above may inline the any_dataset_view template, so emit it
 // explicitly.

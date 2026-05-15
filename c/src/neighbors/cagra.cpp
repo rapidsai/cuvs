@@ -223,7 +223,7 @@ void _build(cuvsResources_t res,
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
           index_params.graph_build_params)) {
-      auto index = cuvs::neighbors::cagra::build_ace(*res_ptr, index_params, mds);
+      auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
       auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
         nullptr, raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr), std::move(index)};
       assign_lifetime_holder<T>(output_index, output_index->dtype, holder);

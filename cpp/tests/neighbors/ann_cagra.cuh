@@ -48,9 +48,10 @@ namespace cuvs::neighbors::cagra {
 namespace {
 
 /**
- * If \p ace_host_dataset is set, builds from that host mdspan via `cagra::build_ace`. Otherwise
- * builds from \p padded via `cagra::build`. When \p params.compression is set (deprecated), the
- * dense `cagra::build` path may train VPQ and store it on the index; ACE may ignore it.
+ * If \p ace_host_dataset is set, builds from that host mdspan via `cagra::build` (ACE is selected
+ * by `graph_build_params`). Otherwise builds from \p padded via `cagra::build`. When \p
+ * params.compression is set (deprecated), the dense `cagra::build` path may train VPQ and store it
+ * on the index; ACE may ignore it.
  */
 template <typename DataT, typename IdxT>
 void cagra_build_into_index(
@@ -61,7 +62,7 @@ void cagra_build_into_index(
   cagra::index<DataT, IdxT>& index)
 {
   if (ace_host_dataset.has_value()) {
-    index = cagra::build_ace(res, params, *ace_host_dataset);
+    index = cagra::build(res, params, *ace_host_dataset);
     return;
   }
   index = cagra::build(res, params, cuvs::neighbors::any_dataset_view<DataT, int64_t>(padded));
