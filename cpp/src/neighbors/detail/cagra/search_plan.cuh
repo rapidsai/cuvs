@@ -13,6 +13,7 @@
 // #include "topk_for_cagra/topk.h"
 
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>
 
 #include <cuvs/distance/distance.hpp>
@@ -108,7 +109,17 @@ struct search_plan_impl_base : public search_params {
       graph_degree(graph_degree),
       topk(topk)
   {
-    if (algo == search_algo::AUTO) {
+    if (persistent) {
+      if (algo == search_algo::AUTO) {
+        algo = search_algo::SINGLE_CTA;
+        RAFT_LOG_DEBUG("Auto strategy: persistent enabled, selecting single-cta");
+      } else if (algo != search_algo::SINGLE_CTA) {
+        RAFT_LOG_WARN(
+          "CAGRA persistent kernel is only supported with SINGLE_CTA search (algo=%d); "
+          "persistent will have no effect",
+          static_cast<int>(algo));
+      }
+    } else if (algo == search_algo::AUTO) {
       const size_t num_sm = raft::getMultiProcessorCount();
       if (itopk_size <= 512 && search_params::max_queries >= num_sm * 2lu) {
         algo = search_algo::SINGLE_CTA;
