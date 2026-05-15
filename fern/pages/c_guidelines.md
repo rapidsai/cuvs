@@ -29,7 +29,7 @@ Prefer explicit create and destroy functions for every opaque object that owns m
 
 ### API Stability
 
-The C API is the stable boundary used by downstream integrations and cuVS language bindings. Add new functions or fields before removing old ones, avoid changing the meaning of existing parameters, and keep ABI compatibility in mind when changing public structs or exported symbols.
+The C API is the stable boundary used by downstream integrations and cuVS language bindings. Add new functions or fields before removing old ones, avoid changing the meaning of existing parameters, and keep [ABI compatibility](../developer_guide/abi_stability.md) in mind when changing public structs or exported symbols.
 
 ### Stateless C APIs
 
@@ -118,7 +118,12 @@ Destroy functions should tolerate cleanup after partial setup when practical, an
 
 ### Multi-GPU
 
-Multi-GPU C APIs should follow the same one-process-per-GPU model as the underlying cuVS implementation. Communicator and resource ownership should remain explicit through `cuvsResources_t` and related multi-GPU handles.
+Multi-GPU C APIs generally use one of two execution strategies:
+
+1. Single-process multi-GPU: one host process owns and coordinates multiple GPUs. Use `cuvsMultiGpuResourcesCreate` or `cuvsMultiGpuResourcesCreateWithDeviceIds` for this model. These functions return a `cuvsResources_t` backed by `raft::device_resources_snmg`; release it with `cuvsMultiGpuResourcesDestroy`.
+2. One-process-per-GPU: each process owns one GPU and participates as a communication rank. APIs that wrap this model should accept the process-local `cuvsResources_t` for the calling rank and document how communicator setup, rank ownership, and synchronization are provided by the underlying implementation.
+
+APIs may support either strategy or both, but they should document which resource handle users are expected to create. Use `cuvsMultiGpuResourcesSetMemoryPool` to configure an RMM memory pool across devices managed by a single-process multi-GPU resource. Continue to use `cuvsStreamSet`, `cuvsStreamGet`, and `cuvsStreamSync` for stream ownership and synchronization through the supplied opaque resource handle.
 
 Single-GPU C APIs should not require communication libraries or multi-GPU setup.
 

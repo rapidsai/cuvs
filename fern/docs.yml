@@ -187,6 +187,8 @@ navigation:
             path: "./pages/c_guidelines.md"
           - page: "C++ Guidelines"
             path: "./pages/cpp_guidelines.md"
+          - page: "Java Guidelines"
+            path: "./pages/java_guidelines.md"
           - page: "Python Guidelines"
             path: "./pages/python_guidelines.md"
       - section: "Advanced Topics"

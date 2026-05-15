@@ -96,10 +96,9 @@ void deserialize(raft::resources const& res, std::istream& is, index<int64_t>* i
 ## Common Design Considerations
 
 1. Use `.hpp` for headers that can be compiled by `gcc` against the CUDA runtime. Use `.cuh` when a header requires `nvcc`.
-2. Put public parameter structs and lightweight public types in `<primitive_name>_types.hpp`. These files should not require `nvcc`.
-3. Keep public types simple. They should store state, not perform computation.
-4. Document every public API with a clear summary, parameter descriptions, and a short usage example when helpful.
-5. Before adding a primitive, check whether an existing primitive can be extended cleanly. Add a new public API only when the behavior is genuinely distinct.
+2. Keep public types simple. They should store state, not perform computation.
+3. Document every public API with a clear summary, parameter descriptions, and a short usage example when helpful.
+4. Before adding a primitive, check whether an existing primitive can be extended cleanly. Add a new public API only when the behavior is genuinely distinct.
 
 ### Performance
 
@@ -211,9 +210,14 @@ int main()
 
 ### Multi-GPU
 
-cuVS uses a one-process-per-GPU model. Single-GPU algorithms should not depend on a communication library. Multi-GPU algorithms should communicate through `raft::comms::comms_t`, which users provide through `raft::resources`.
+cuVS multi-GPU APIs generally use one of two execution strategies:
 
-Developers can assume:
+1. Single-process multi-GPU: one host process owns and coordinates multiple GPUs. Use `raft::device_resources_snmg` in examples and public API documentation for this model. It owns the selected devices, streams, communication resources, and per-device execution state.
+2. One-process-per-GPU: each process owns one GPU and participates as a communication rank. Use `raft::device_resources` or `raft::resources` with an initialized `raft::comms::comms_t`. Access communication through `raft::resource::get_comms`, and guard optional communication paths with `raft::resource::comms_initialized`.
+
+APIs may support either strategy or both, but they should document which resource object users are expected to construct. Keep streams, stream pools, memory resources, and communicators attached to the supplied resource object instead of creating unmanaged process-wide state. Single-GPU APIs should not depend on communication libraries or require multi-GPU resources.
+
+For one-process-per-GPU implementations, developers can assume:
 
 1. `raft::comms::comms_t` has been initialized correctly.
 2. All participating ranks call the multi-GPU algorithm cooperatively.
