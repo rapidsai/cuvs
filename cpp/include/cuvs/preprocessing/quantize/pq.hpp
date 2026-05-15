@@ -251,10 +251,27 @@ void inverse_transform(
  * an extra pack copy; wider row pitch triggers a contiguous dense copy first. Empty views and
  * already-VPQ-encoded views are rejected.
  *
- * Call this when you want a `cuvs::neighbors::vpq_dataset` that you keep alive and attach with
- * `cagra::index::update_dataset(res, vpq.as_dataset_view())`. When using deprecated
- * `cagra::index_params::compression`, `cagra::build` trains VPQ internally and owns it on the index
- * instead.
+ * Typical **CAGRA** usage: build the graph on dense vectors, then replace the index dataset with an
+ * owning VPQ buffer so search uses compressed storage (metric must remain `L2Expanded` for this
+ * path). Train VPQ from the same CAGRA-padded device layout you used for `cagra::build`, then call
+ * `cagra::index::update_dataset` with `any_owning_dataset<int64_t>` so the index owns the result.
+ *
+ * @code{.cpp}
+ * #include <cuvs/neighbors/cagra.hpp>
+ * #include <cuvs/preprocessing/quantize/pq.hpp>
+ *
+ * // `idx` is a `cagra::index<float, uint32_t>` already built (e.g. via `cagra::build`) on dense
+ * // rows. `padded` is a `device_padded_dataset_view<float, int64_t>` view of those same rows.
+ * cuvs::neighbors::vpq_params vpq_params{};
+ * auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset<float>(res, vpq_params, padded);
+ * idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
+ * @endcode
+ *
+ * To keep the `vpq_dataset` in caller scope instead, use a non-owning view and ensure it outlives
+ * the index: `idx.update_dataset(res, vpq.as_dataset_view());`
+ *
+ * When using deprecated `cagra::index_params::compression`, `cagra::build` trains VPQ internally
+ * and owns it on the index instead of using this factory.
  *
  * @tparam T Source vector element type (`float`, `half`, `int8_t`, or `uint8_t`).
  */

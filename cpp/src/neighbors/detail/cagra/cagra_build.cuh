@@ -5,7 +5,6 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../vpq_dataset.cuh"
 #include "graph_core.cuh"
 #include <cuvs/preprocessing/quantize/pq.hpp>
 

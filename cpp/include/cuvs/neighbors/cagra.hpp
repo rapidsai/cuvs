@@ -641,6 +641,17 @@ struct index : cuvs::neighbors::index {
    * only, search for this field to find call sites to revisit. The active owning member must be
    * handled by `any_owning_dataset_to_index_view<T, …>` (padded/strided with row type `T`, VPQ
    * `vpq_f16_owning` / `vpq_f32_owning` when `T` is `half` / `float`, or empty).
+   *
+   * **VPQ (caller-trained):** train with `cuvs::preprocessing::quantize::pq::make_vpq_dataset` on a
+   * CAGRA-compatible device view, then move the owning `vpq_dataset` into the index:
+   * @code{.cpp}
+   * #include <cuvs/preprocessing/quantize/pq.hpp>
+   * cuvs::neighbors::vpq_params vpq_params{};
+   * auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset<float>(res, vpq_params, padded);
+   * idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
+   * @endcode
+   * See `make_vpq_dataset` in `cuvs/preprocessing/quantize/pq.hpp` for the full CAGRA-oriented
+   * example and includes.
    */
   void update_dataset(raft::resources const& res,
                       cuvs::neighbors::any_owning_dataset<dataset_index_type>&& dataset)
