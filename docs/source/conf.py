@@ -117,6 +117,7 @@ html_theme_options = {
     "twitter_url": "https://twitter.com/rapidsai",
     "show_toc_level": 1,
     "navbar_align": "right",
+    "navigation_depth": 5,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,

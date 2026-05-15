@@ -5,34 +5,8 @@ Preprocessing
    :language: c
    :class: highlight
 
-Binary Quantizer
-----------------
+.. toctree::
+   :maxdepth: 2
 
-.. doxygengroup:: preprocessing_c_binary
-    :project: cuvs
-    :members:
-    :content-only:
-
-Product Quantizer
------------------
-
-.. doxygengroup:: preprocessing_c_pq
-    :project: cuvs
-    :members:
-    :content-only:
-
-PCA (Principal Component Analysis)
------------------------------------
-
-.. doxygengroup:: preprocessing_c_pca
-    :project: cuvs
-    :members:
-    :content-only:
-
-Scalar Quantizer
-----------------
-
-.. doxygengroup:: preprocessing_c_scalar
-    :project: cuvs
-    :members:
-    :content-only:
+   preprocessing_pca.rst
+   preprocessing_quantize.rst

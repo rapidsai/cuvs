@@ -1,14 +1,14 @@
 .. _comparing_indexes:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Comparing performance of vector indexes
+Comparing Performance of Vector Indexes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This document provides a brief overview methodology for comparing vector search indexes and models. For guidance on how to choose and configure an index type, please refer to :doc:`this <vector_databases_vs_vector_search>` guide.
 
 Unlike traditional database indexes, which will generally return correct results even without performance tuning, vector search indexes are more closely related to ML models and they can return absolutely garbage results if they have not been tuned.
 
-For this reason, it’s important to consider the parameters that an index is built upon, both for its potential quality and throughput/latency, when comparing two trained indexes. While easier to build an index on its default parameters than having to tune them, a well tuned index can have a significantly better search quality AND perform within search perf constraints like maximal throughput and minimal latency.
+For this reason, it's important to consider the parameters that an index is built upon, both for its potential quality and throughput/latency, when comparing two trained indexes. While easier to build an index on its default parameters than having to tune them, a well tuned index can have a significantly better search quality AND perform within search perf constraints like maximal throughput and minimal latency.
 
 
 What is recall?
@@ -40,7 +40,7 @@ We suggest averaging performance within a range of recall. For general guidance,
 .. image:: images/recall_buckets.png
 
 
-This allows us to make observations such as “at 95% recall level, model A can be built 3x faster than model B, but model B has 2x lower latency than model A”
+This allows us to make observations such as "at 95% recall level, model A can be built 3x faster than model B, but model B has 2x lower latency than model A"
 
 .. image:: images/build_benchmarks.png
 
@@ -53,7 +53,7 @@ The resulting data points will construct a curve known as a Pareto optimum. Plea
 How do I do this on large vector databases?
 ===========================================
 
-It turns out that most vector databases, like Milvus for example, make many smaller vector search indexing models for a single “index”, and the distribution of the vectors across the smaller index models are assumed to be completely uniform. This means we can use subsampling to our benefit, and tune on smaller sub-samples of the overall dataset.
+It turns out that most vector databases, like Milvus for example, make many smaller vector search indexing models for a single "index", and the distribution of the vectors across the smaller index models are assumed to be completely uniform. This means we can use subsampling to our benefit, and tune on smaller sub-samples of the overall dataset.
 
 Please note, however, that there are often caps on the size of each of these smaller indexes, and that needs to be taken into consideration when choosing the size of the sub sample to tune.
 

@@ -1,5 +1,5 @@
-Bruteforce
-==========
+Brute Force KNN
+===============
 
 The bruteforce method is running the KNN algorithm. It performs an extensive search, and in contrast to ANN methods produces an exact result.
 

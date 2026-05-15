@@ -1,5 +1,5 @@
-Brute-force
-===========
+Brute Force KNN
+===============
 
 Brute-force, or flat index, is the most simple index type, as it ultimately boils down to an exhaustive matrix multiplication.
 

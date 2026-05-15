@@ -4,17 +4,17 @@ Getting Started
 
 - `New to vector search?`_
 
-  * :doc:`Primer on vector search <choosing_and_configuring_indexes>`
+  * :doc:`Primer on Vector Search <choosing_and_configuring_indexes>`
 
-  * :doc:`Vector search indexes vs vector databases <vector_databases_vs_vector_search>`
+  * :doc:`Vector Search Indexes vs Vector Databases <vector_databases_vs_vector_search>`
 
-  * :doc:`Index tuning guide <tuning_guide>`
+  * :doc:`Index Tuning Guide <tuning_guide>`
 
-  * :doc:`Comparing vector search index performance <comparing_indexes>`
+  * :doc:`Comparing Vector Search Index Performance <comparing_indexes>`
 
 - `Supported indexes`_
 
-  * :doc:`Vector search index guide <neighbors/neighbors>`
+  * :doc:`Vector Search Index Guide <neighbors/neighbors>`
 
 - `Using cuVS APIs`_
 
@@ -60,7 +60,7 @@ Supported indexes
 
 cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our :doc:`vector search index guide <neighbors/neighbors>` to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
 
-The primary goal of cuVS is to enable speed, scale, and flexibility (in that order)- and one of the important value propositions is to enhance existing software deployments with extensible GPU capabilities to improve pain points while not interrupting parts of the system that work well today with CPU.
+The primary goal of cuVS is to enable speed, scale, and flexibility (in that order) -- and one of the important value propositions is to enhance existing software deployments with extensible GPU capabilities to improve pain points while not interrupting parts of the system that work well today with CPU.
 
 
 Using cuVS APIs

@@ -2,7 +2,7 @@ Quantization
 ============
 
 .. role:: py(code)
-   :language: c++
+   :language: c
    :class: highlight
 
 .. toctree::

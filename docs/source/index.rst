@@ -11,8 +11,8 @@ Useful Resources
 - `Example Notebooks <https://github.com/rapidsai/cuvs/tree/HEAD/notebooks>`_: Example notebooks
 - `Code Examples <https://github.com/rapidsai/cuvs/tree/HEAD/examples>`_: Self-contained code examples
 - `RAPIDS Community <https://rapids.ai/community.html>`_: Get help, contribute, and collaborate.
-- `GitHub repository <https://github.com/rapidsai/cuvs>`_: Download the cuVS source code.
-- `Issue tracker <https://github.com/rapidsai/cuvs/issues>`_: Report issues or request features.
+- `GitHub Repository <https://github.com/rapidsai/cuvs>`_: Download the cuVS source code.
+- `Issue Tracker <https://github.com/rapidsai/cuvs/issues>`_: Report issues or request features.
 
 
 
