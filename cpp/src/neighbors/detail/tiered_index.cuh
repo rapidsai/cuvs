@@ -133,12 +133,12 @@ struct index_state {
         ann_build_pad =
           std::shared_ptr<cuvs::neighbors::device_padded_dataset<value_type, int64_t>>(
             std::move(own));
-        auto br = cuvs::neighbors::cagra::build<float, uint32_t>(
+        auto index = cuvs::neighbors::cagra::build<float, uint32_t>(
           res, tiered_params, ann_build_pad->as_dataset_view());
         RAFT_EXPECTS(!tiered_params.compression.has_value(),
                      "tiered_index: set compression only after building upstream CAGRA; use "
                      "make_vpq_dataset + update_dataset on the upstream index.");
-        return std::make_shared<UpstreamT>(std::move(br.idx));
+        return std::make_shared<UpstreamT>(std::move(index));
       }
     }
 

@@ -97,14 +97,13 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
         (const DataT*)database.data(), ps.n_rows, ps.dim);
       cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded(handle_, database_view);
 
-      auto cagra_build_res = cuvs::neighbors::cagra::build(handle_, index_params, padded.view);
+      auto index = cuvs::neighbors::cagra::build(handle_, index_params, padded.view);
       raft::resource::sync_stream(handle_);
 
       cuvs::neighbors::hnsw::search_params search_params;
       search_params.ef = ps.ef;
       cuvs::neighbors::hnsw::index_params hnsw_params;
-      auto hnsw_index =
-        cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, cagra_build_res.idx);
+      auto hnsw_index = cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, index);
       auto queries_HNSW_view =
         raft::make_host_matrix_view<DataT, int64_t>(queries_h.data(), ps.n_queries, ps.dim);
       auto indices_HNSW_view =

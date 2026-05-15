@@ -72,8 +72,7 @@ void cagra_build_into_index(
     }
     return;
   }
-  auto br = cagra::build(res, params, cuvs::neighbors::any_dataset_view<DataT, int64_t>(padded));
-  index   = std::move(br.idx);
+  index = cagra::build(res, params, cuvs::neighbors::any_dataset_view<DataT, int64_t>(padded));
 }
 
 struct test_cagra_sample_filter {

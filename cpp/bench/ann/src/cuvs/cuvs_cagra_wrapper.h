@@ -227,21 +227,21 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       cudaPointerAttributes ptr_attrs{};
       RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, mds.data_handle()));
       const bool device_src = (reinterpret_cast<T const*>(ptr_attrs.devicePointer) != nullptr);
-      // `build_result` is move-only; use a non-const `br` per branch so
-      // `std::move(br.idx)` moves (a const `br` would try to copy the deleted
+      // `cagra::index` is move-only; use a non-const `index` per branch so
+      // `std::move(index)` moves (a const `index` would try to copy the deleted
       // cagra::index copy ctor).
       if (device_src && src_stride == required_stride) {
         auto const pdv    = cuvs::neighbors::make_padded_dataset_view(handle_, mds);
         *input_dataset_v_ = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
           mds.data_handle(), static_cast<int64_t>(nrow), static_cast<int64_t>(dim_));
-        auto br = cuvs::neighbors::cagra::build<T, IdxT>(handle_, params, pdv);
-        index_  = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(br.idx));
+        auto index = cuvs::neighbors::cagra::build<T, IdxT>(handle_, params, pdv);
+        index_     = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(index));
       } else {
         auto padded = cuvs::neighbors::make_padded_dataset(handle_, mds);
-        auto br =
+        auto index =
           cuvs::neighbors::cagra::build<T, IdxT>(handle_, params, padded->as_dataset_view());
         *dataset_ = std::move(padded->data_);
-        index_    = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(br.idx));
+        index_    = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(index));
       }
     }
   } else {
@@ -297,16 +297,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
           RAFT_CUDA_TRY(cudaPointerGetAttributes(&sub_attrs, mds_sub.data_handle()));
           const bool sub_device = (reinterpret_cast<T const*>(sub_attrs.devicePointer) != nullptr);
           if (sub_device && src_sub == req_sub) {
-            sub_index = std::move(
-              cuvs::neighbors::cagra::build<T, IdxT>(
-                handle_, params, cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub))
-                .idx);
+            sub_index = cuvs::neighbors::cagra::build<T, IdxT>(
+              handle_, params, cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub));
           } else {
             auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, mds_sub);
-            auto out        = cuvs::neighbors::cagra::build<T, IdxT>(
+            auto index      = cuvs::neighbors::cagra::build<T, IdxT>(
               handle_, params, padded_sub->as_dataset_view());
             sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
-            sub_index = std::move(out.idx);
+            sub_index = std::move(index);
           }
         } else {
           auto mds_sub           = sub_dev;
@@ -318,16 +316,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
           RAFT_CUDA_TRY(cudaPointerGetAttributes(&sub_attrs, mds_sub.data_handle()));
           const bool sub_device = (reinterpret_cast<T const*>(sub_attrs.devicePointer) != nullptr);
           if (sub_device && src_sub == req_sub) {
-            sub_index = std::move(
-              cuvs::neighbors::cagra::build<T, IdxT>(
-                handle_, params, cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub))
-                .idx);
+            sub_index = cuvs::neighbors::cagra::build<T, IdxT>(
+              handle_, params, cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub));
           } else {
             auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, mds_sub);
-            auto out        = cuvs::neighbors::cagra::build<T, IdxT>(
+            auto index      = cuvs::neighbors::cagra::build<T, IdxT>(
               handle_, params, padded_sub->as_dataset_view());
             sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
-            sub_index = std::move(out.idx);
+            sub_index = std::move(index);
           }
         }
       }

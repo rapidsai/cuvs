@@ -325,8 +325,7 @@ index<T, IdxT> build(
     "device data, use cagra::build with raft::device_matrix_view or a device dataset_view.");
   auto hview = raft::make_host_matrix_view<const T, int64_t, row_major>(
     dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-  auto bres = detail::build_from_host_matrix<T, IdxT>(res, params, hview);
-  return std::move(bres.idx);
+  return detail::build_from_host_matrix<T, IdxT>(res, params, hview);
 }
 
 /**
@@ -337,9 +336,9 @@ index<T, IdxT> build(
  * stores the original view when `attach_dataset_on_build` is true.
  */
 template <typename T, typename IdxT>
-build_result<T, IdxT> build(raft::resources const& res,
-                            const index_params& params,
-                            cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
+index<T, IdxT> build(raft::resources const& res,
+                     const index_params& params,
+                     cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
 {
   return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(res, params, dataset);
 }

@@ -70,15 +70,15 @@ void cagra_from_host_padded(raft::resources const& h,
       m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0)) : static_cast<uint32_t>(m.extent(1));
     auto d_m = raft::make_device_strided_matrix_view<T const, int64_t, row_major>(
       devp, m.extent(0), m.extent(1), s_stride);
-    auto padded  = cuvs::neighbors::make_padded_dataset_view(h, d_m);
-    auto build_r = cuvs::neighbors::cagra::build(h, cagra_params, padded);
+    auto padded = cuvs::neighbors::make_padded_dataset_view(h, d_m);
+    auto index  = cuvs::neighbors::cagra::build(h, cagra_params, padded);
     interface.cagra_owned_dataset_.reset();
-    interface.index_.emplace(std::move(build_r.idx));
+    interface.index_.emplace(std::move(index));
   } else {
     auto padded_r = cuvs::neighbors::make_padded_dataset(h, m);
-    auto build_r  = cuvs::neighbors::cagra::build(h, cagra_params, padded_r->as_dataset_view());
+    auto index    = cuvs::neighbors::cagra::build(h, cagra_params, padded_r->as_dataset_view());
     interface.cagra_owned_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(padded_r));
-    interface.index_.emplace(std::move(build_r.idx));
+    interface.index_.emplace(std::move(index));
   }
 }
 }  // namespace iface_detail

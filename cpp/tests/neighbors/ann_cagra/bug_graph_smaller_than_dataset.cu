@@ -57,11 +57,11 @@ class cagra_graph_smaller_than_dataset_test : public ::testing::Test {
 
     cuvs::neighbors::test::padded_device_matrix_for_cagra<data_type> padded_full(
       res, raft::make_const_mdspan(dataset.view()));
-    auto cagra_build_res = cagra::build(res, index_params, padded_full.view);
+    auto index = cagra::build(res, index_params, padded_full.view);
     raft::resource::sync_stream(res);
 
     // Get the graph from the index
-    auto original_graph = cagra_build_res.idx.graph();
+    auto original_graph = index.graph();
     ASSERT_EQ(original_graph.extent(0), n_dataset);
 
     // Recreate the bug scenario: LARGE dataset, SMALL graph
@@ -76,19 +76,19 @@ class cagra_graph_smaller_than_dataset_test : public ::testing::Test {
     small_index_params.graph_degree = 32;
     cuvs::neighbors::test::padded_device_matrix_for_cagra<data_type> padded_small(
       res, small_dataset_view);
-    auto cagra_build_res_small = cagra::build(res, small_index_params, padded_small.view);
+    auto small_index = cagra::build(res, small_index_params, padded_small.view);
     raft::resource::sync_stream(res);
 
     // Step 2: Update to FULL dataset (1000 points) but keep small graph (500 nodes)
     // This creates the exact bug scenario: dataset.size=1000, graph.extent(0)=500
-    cagra_build_res_small.idx.update_dataset(
+    small_index.update_dataset(
       res, cuvs::neighbors::make_padded_dataset_view(res, raft::make_const_mdspan(dataset.view())));
 
     // Verify the mismatch - THIS IS THE BUG SCENARIO!
-    ASSERT_EQ(cagra_build_res_small.idx.graph().extent(0), n_graph);  // Graph has 500 nodes
-    ASSERT_EQ(cagra_build_res_small.idx.size(), n_dataset);           // Dataset has 1000 points
-    ASSERT_NE(cagra_build_res_small.idx.graph().extent(0),
-              cagra_build_res_small.idx.size());  // Mismatch!
+    ASSERT_EQ(small_index.graph().extent(0), n_graph);  // Graph has 500 nodes
+    ASSERT_EQ(small_index.size(), n_dataset);           // Dataset has 1000 points
+    ASSERT_NE(small_index.graph().extent(0),
+              small_index.size());  // Mismatch!
 
     // Create queries
     auto queries = raft::make_device_matrix<data_type, int64_t>(res, n_queries, n_dim);
@@ -111,7 +111,7 @@ class cagra_graph_smaller_than_dataset_test : public ::testing::Test {
     // After fix: random seeds use graph.extent(0) (500) -> only accesses graph[0-499] -> SAFE!
     cagra::search(res,
                   search_params,
-                  cagra_build_res_small.idx,
+                  small_index,
                   raft::make_const_mdspan(queries.view()),
                   neighbors.view(),
                   distances.view());
@@ -137,7 +137,7 @@ class cagra_graph_smaller_than_dataset_test : public ::testing::Test {
 
     cagra::search(res,
                   search_params,
-                  cagra_build_res_small.idx,
+                  small_index,
                   raft::make_const_mdspan(queries.view()),
                   neighbors.view(),
                   distances.view());

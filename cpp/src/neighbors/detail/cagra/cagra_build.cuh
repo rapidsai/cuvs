@@ -1101,7 +1101,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 }
 
 template <typename T, typename IdxT>
-cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
+cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
   raft::resources const& res,
   const index_params& params,
   cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset);
@@ -1390,11 +1390,10 @@ cuvs::neighbors::cagra::ace_build_result<T, IdxT> build_ace(
       // device_padded_dataset_view.
       auto sub_dataset_dev =
         cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(sub_dataset.view()));
-      auto sub_build_res = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
+      auto sub_index = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
         res,
         sub_index_params,
         cuvs::neighbors::any_dataset_view<T, int64_t>(sub_dataset_dev->as_dataset_view()));
-      auto sub_index = std::move(sub_build_res.idx);
 
       auto optimize_end = std::chrono::high_resolution_clock::now();
       auto optimize_elapsed =
@@ -2326,15 +2325,14 @@ auto try_attach_padded_dataset_on_build(
   index_params const& params,
   cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> cagra_graph_host)
-  -> std::optional<cuvs::neighbors::cagra::build_result<T, IdxT>>
+  -> std::optional<cuvs::neighbors::cagra::index<T, IdxT>>
 {
   try {
-    cuvs::neighbors::cagra::build_result<T, IdxT> out{
-      index<T, IdxT>(res,
-                     params.metric,
-                     cuvs::neighbors::any_dataset_view<T, int64_t>(padded),
-                     raft::make_const_mdspan(cagra_graph_host))};
-    return out;
+    return cuvs::neighbors::cagra::index<T, IdxT>(
+      res,
+      params.metric,
+      cuvs::neighbors::any_dataset_view<T, int64_t>(padded),
+      raft::make_const_mdspan(cagra_graph_host));
   } catch (std::bad_alloc&) {
     RAFT_LOG_WARN(
       "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
@@ -2369,18 +2367,6 @@ void attach_deprecated_compression_vpq_to_index_if_set(
   idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
 }
 
-template <typename T, typename IdxT>
-void attach_deprecated_compression_vpq_to_build_result_if_set(
-  raft::resources const& res,
-  std::optional<cuvs::neighbors::vpq_params> const& compression,
-  cuvs::distance::DistanceType metric,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded,
-  cuvs::neighbors::cagra::build_result<T, IdxT>& out)
-{
-  if (!compression.has_value()) { return; }
-  attach_deprecated_compression_vpq_to_index_if_set(res, compression, metric, padded, out.idx);
-}
-
 /**
  * Build from a host row-major matrix without uploading the full dataset early when IVF-PQ graph
  * construction can consume host batches directly. NN-descent / iterative paths still materialize a
@@ -2389,7 +2375,7 @@ void attach_deprecated_compression_vpq_to_build_result_if_set(
  * (unless deprecated `compression` replaces the dataset with VPQ first).
  */
 template <typename T, typename IdxT = uint32_t>
-cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
+cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
   raft::resources const& res,
   const index_params& params,
   raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset)
@@ -2446,22 +2432,22 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
           "cagra::detail::build_from_host_matrix: internal error — padded device storage missing "
           "after attach_dataset_on_build.");
         attach_deprecated_compression_vpq_to_index_if_set(
-          res, params.compression, params.metric, padded, out.idx);
+          res, params.compression, params.metric, padded, out);
         padded_own.reset();
       } else {
-        adopt_host_padded_into_index_for_host_attach(out.idx, std::move(padded_own));
+        adopt_host_padded_into_index_for_host_attach(out, std::move(padded_own));
       }
       return out;
     }
     padded_own.reset();
   }
 
-  cuvs::neighbors::cagra::build_result<T, IdxT> out{index<T, IdxT>(res, params.metric)};
-  out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+  cuvs::neighbors::cagra::index<T, IdxT> out(res, params.metric);
+  out.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   if (params.compression.has_value()) {
     auto const padded_for_vpq = ensure_padded();
     attach_deprecated_compression_vpq_to_index_if_set(
-      res, params.compression, params.metric, padded_for_vpq, out.idx);
+      res, params.compression, params.metric, padded_for_vpq, out);
   }
   padded_own.reset();
   return out;
@@ -2477,7 +2463,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_host_matrix(
  * for graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
  */
 template <typename T, typename IdxT = uint32_t>
-cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
+cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
   raft::resources const& res,
   const index_params& params,
   cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
@@ -2513,7 +2499,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
     if (auto attached =
           try_attach_padded_dataset_on_build<T, IdxT>(res, params, padded, cagra_graph.view())) {
       auto out = std::move(*attached);
-      attach_deprecated_compression_vpq_to_build_result_if_set(
+      attach_deprecated_compression_vpq_to_index_if_set(
         res, params.compression, params.metric, padded, out);
       return out;
     }
@@ -2522,7 +2508,7 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build_from_device_matrix(
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   attach_deprecated_compression_vpq_to_index_if_set(
     res, params.compression, params.metric, padded, idx);
-  return cuvs::neighbors::cagra::build_result<T, IdxT>{std::move(idx)};
+  return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail
 

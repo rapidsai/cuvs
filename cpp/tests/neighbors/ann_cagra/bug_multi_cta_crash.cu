@@ -29,7 +29,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     cagra_index_params.intermediate_graph_degree = 48;
 
     build_padded_.emplace(res, raft::make_const_mdspan(dataset->view()));
-    auto cagra_build_res = cagra::build(res, cagra_index_params, build_padded_->view);
+    auto cagra_index = cagra::build(res, cagra_index_params, build_padded_->view);
     raft::resource::sync_stream(res);
 
     cagra::search_params cagra_search_params;
@@ -43,7 +43,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     raft::resources res_search;
     cagra::search(res_search,
                   cagra_search_params,
-                  cagra_build_res.idx,
+                  cagra_index,
                   raft::make_const_mdspan(queries->view()),
                   neighbors->view(),
                   distances->view());

@@ -33,7 +33,7 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
     try {
       cuvs::neighbors::test::padded_device_matrix_for_cagra<data_type> padded(
         res, raft::make_const_mdspan(dataset->view()));
-      [[maybe_unused]] auto cagra_build_res = cagra::build(res, ix_ps, padded.view);
+      [[maybe_unused]] auto ix = cagra::build(res, ix_ps, padded.view);
       raft::resource::sync_stream(res);
     } catch (const std::exception&) {
       SUCCEED();

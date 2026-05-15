@@ -74,8 +74,8 @@ TEST(Issue93Reproducer, ConcurrentSearchDifferentGraphDegrees)
       graph_build_params::nn_descent_params(ip.intermediate_graph_degree, ip.metric);
 
     padded_builders.emplace_back(handle, raft::make_const_mdspan(database.view()));
-    auto cagra_build_res = cagra::build(handle, ip, padded_builders.back().view);
-    indices.push_back(std::move(cagra_build_res.idx));
+    auto index = cagra::build(handle, ip, padded_builders.back().view);
+    indices.push_back(std::move(index));
   }
   raft::resource::sync_stream(handle);
 

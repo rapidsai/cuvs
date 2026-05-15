@@ -384,8 +384,6 @@ static_assert(std::is_aggregate_v<search_params>);
 template <typename T, typename IdxT>
 struct index;
 template <typename T, typename IdxT>
-struct build_result;
-template <typename T, typename IdxT>
 struct ace_build_result;
 
 template <typename T, typename IdxT>
@@ -959,22 +957,6 @@ struct index : cuvs::neighbors::index {
  */
 
 /**
- * Result of `cagra::build` for APIs that return extra state alongside the index. Host-matrix builds
- * that attach a padded device copy on the index store it in `index::index_owning_dataset_storage_`
- * when needed. When deprecated `index_params::compression` is set, VPQ is trained inside `build`
- * and stored on the index. Otherwise, for explicit VPQ, train with
- * `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and attach via `index::update_dataset` with
- * `vpq.as_dataset_view()` while keeping the `vpq_dataset` alive.
- */
-template <typename T, typename IdxT>
-struct build_result {
-  cuvs::neighbors::cagra::index<T, IdxT> idx;
-
-  /** Implicit conversion to index (moves `idx` out). */
-  operator cuvs::neighbors::cagra::index<T, IdxT>() && { return std::move(idx); }
-};
-
-/**
  * Result of merging CAGRA indices. The index holds a view over \p dataset; caller must keep
  * \p dataset alive for the lifetime of \p idx. If \p index_params passed to \p cagra::merge had
  * deprecated \p index_params::compression set, the internal rebuild may train VPQ and own it on
@@ -1036,7 +1018,7 @@ struct ace_build_result {
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
  *             not support VPQ compression.
  */
@@ -1082,7 +1064,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
  *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
@@ -1128,7 +1110,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
  *             not support VPQ compression.
  */
@@ -1173,7 +1155,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
  *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
@@ -1220,7 +1202,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
  *             not support VPQ compression.
  */
@@ -1268,7 +1250,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
  *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
@@ -1316,7 +1298,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
  *             not support VPQ compression.
  */
@@ -1364,7 +1346,7 @@ auto build(raft::resources const& res,
  *
  * @return the constructed cagra index
  *
- * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `build_result`, using
+ * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
  *             `make_padded_dataset` for host uploads. For ACE returning `ace_build_result`, use
  *             `build_ace`. Matrix overloads do not support VPQ compression.
  */
@@ -1381,7 +1363,7 @@ auto build(raft::resources const& res,
  *
  * Requires `graph_build_params` to be `ace_params`. For a single `cagra::index` return with
  * internal lifetime management, use `cagra::build(res, params, host_view)` (backward
- * compatible). For the generic padded-`dataset_view` path that returns `build_result`, use
+ * compatible). For the generic padded-`dataset_view` path, use
  * `cagra::build(res, params, make_padded_dataset* / view)`.
  */
 auto build_ace(raft::resources const& res,
@@ -1425,7 +1407,7 @@ template <typename T, typename IdxT = uint32_t>
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
-  -> cuvs::neighbors::cagra::build_result<T, IdxT>;
+  -> cuvs::neighbors::cagra::index<T, IdxT>;
 
 /**
  * @brief Same as `build<T, IdxT>(res, params, dataset_view)` but deduces \p T from
@@ -1439,7 +1421,7 @@ template <typename T, typename IdxT = uint32_t>
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
-  -> cuvs::neighbors::cagra::build_result<T, IdxT>
+  -> cuvs::neighbors::cagra::index<T, IdxT>
 {
   return cuvs::neighbors::cagra::build<T, IdxT>(
     res, params, cuvs::neighbors::any_dataset_view<T, int64_t>(dataset));

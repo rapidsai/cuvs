@@ -200,21 +200,21 @@ void _build(cuvsResources_t res,
     // Device `cagra::build` requires a row stride compatible with 16-byte alignment; bare DLPack
     // buffers (e.g. small dim) are often tightly packed and must be copied via `make_padded_dataset`.
     if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
-      auto view      = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
-      auto build_res = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
-      auto* raw      = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(build_res.idx));
+      auto view  = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
+      auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
+      auto* raw  = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(index));
       assign_standalone_index<T>(output_index, output_index->dtype, raw);
     } else {
-      auto padded    = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
-      auto build_res = cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
+      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
       if (index_params.compression.has_value()) {
-        auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(build_res.idx));
+        auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(index));
         assign_standalone_index<T>(output_index, output_index->dtype, raw);
       } else {
         auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
           cuvs::neighbors::wrap_any_owning(std::move(padded)),
           raft::device_matrix<T, int64_t>(*res_ptr),
-          std::move(build_res.idx)};
+          std::move(index)};
         assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
       }
     }
@@ -232,16 +232,16 @@ void _build(cuvsResources_t res,
         nullptr, std::move(storage), std::move(result.idx)};
       assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
     } else {
-      auto padded    = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
-      auto build_res = cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
+      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, padded->as_dataset_view());
       if (index_params.compression.has_value()) {
-        auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(build_res.idx));
+        auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(index));
         assign_standalone_index<T>(output_index, output_index->dtype, raw);
       } else {
         auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
           cuvs::neighbors::wrap_any_owning(std::move(padded)),
           raft::device_matrix<T, int64_t>(*res_ptr),
-          std::move(build_res.idx)};
+          std::move(index)};
         assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
       }
     }

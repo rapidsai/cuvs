@@ -32,12 +32,8 @@ auto build(raft::resources const& handle,
            raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<data_t, index_t>
 {
-  // `build` on `any_dataset_view` returns `build_result`; convert to `index` via implicit
-  // conversion.
   auto padded = cuvs::neighbors::make_padded_dataset_view(handle, dataset);
-  cuvs::neighbors::cagra::index<data_t, index_t> out =
-    cuvs::neighbors::cagra::build(handle, params, padded);
-  return out;
+  return cuvs::neighbors::cagra::build(handle, params, padded);
 }
 
 // TODO(removal): Deprecated build(host_matrix_view)->index (delete with cagra.hpp declarations).
@@ -55,9 +51,8 @@ auto build(raft::resources const& handle,
     return ::cuvs::neighbors::cagra::finalize_index_from_ace(
       ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset));
   }
-  auto bres = ::cuvs::neighbors::cagra::detail::build_from_host_matrix<data_t, index_t>(
+  return ::cuvs::neighbors::cagra::detail::build_from_host_matrix<data_t, index_t>(
     handle, params, dataset);
-  return std::move(bres.idx);
 }
 
 auto build_ace(raft::resources const& handle,
@@ -68,7 +63,8 @@ auto build_ace(raft::resources const& handle,
   RAFT_EXPECTS(
     std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params),
     "cagra::build_ace requires graph_build_params to be ace_params. For cagra::index, use "
-    "cagra::build(res, params, host_view). For build_result, use cagra::build(res, params, view).");
+    "cagra::build(res, params, host_view). For non-ACE views, use cagra::build(res, params, "
+    "dataset_view).");
   RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
                "ACE: Dataset must be on host for ACE build");
   return ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset);
@@ -77,7 +73,7 @@ auto build_ace(raft::resources const& handle,
 // Definition lives in cagra.cuh; callers that only include cagra.hpp need this symbol in libcuvs.
 // The device_matrix_view overload above may inline the any_dataset_view template, so emit it
 // explicitly.
-template build_result<data_t, index_t> build<data_t, index_t>(
+template cuvs::neighbors::cagra::index<data_t, index_t> build<data_t, index_t>(
   raft::resources const& res,
   const index_params& params,
   cuvs::neighbors::any_dataset_view<data_t, int64_t> const& dataset);

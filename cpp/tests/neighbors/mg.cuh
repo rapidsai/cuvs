@@ -378,8 +378,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded(clique_, index_dataset);
-        auto cagra_build_res = cuvs::neighbors::cagra::build(clique_, index_params, padded.view);
-        cuvs::neighbors::cagra::serialize(clique_, index_file.filename, cagra_build_res.idx);
+        auto index = cuvs::neighbors::cagra::build(clique_, index_params, padded.view);
+        cuvs::neighbors::cagra::serialize(clique_, index_file.filename, index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
