@@ -244,7 +244,12 @@ void inverse_transform(
   std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt);
 
 /**
- * @brief Train VPQ storage (codebooks + encoded rows) from a CAGRA-style padded device view.
+ * @brief Train VPQ storage (codebooks + encoded rows) from a device dataset view.
+ *
+ * Accepts `cuvs::neighbors::any_dataset_view<T, int64_t>`: padded or strided dense device rows.
+ * Row-major tight storage (logical stride equals dimension) is passed through to training without
+ * an extra pack copy; wider row pitch triggers a contiguous dense copy first. Empty views and
+ * already-VPQ-encoded views are rejected.
  *
  * Call this when you want a `cuvs::neighbors::vpq_dataset` that you keep alive and attach with
  * `cagra::index::update_dataset(res, vpq.as_dataset_view())`. When using deprecated
@@ -257,7 +262,7 @@ template <typename T>
 [[nodiscard]] cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset(
   raft::resources const& res,
   cuvs::neighbors::vpq_params const& params,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded);
+  cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset);
 
 /** @} */  // end of group product
 

@@ -2363,7 +2363,7 @@ void attach_deprecated_compression_vpq_to_index_if_set(
   RAFT_EXPECTS(
     metric == cuvs::distance::DistanceType::L2Expanded,
     "cagra build (deprecated index_params::compression / VPQ): metric must be L2Expanded.");
-  auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset(res, *compression, padded);
+  auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset<T>(res, *compression, padded);
   idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
 }
 

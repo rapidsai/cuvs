@@ -8,6 +8,9 @@
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
 #include <raft/matrix/copy.cuh>
+#include <raft/util/cudart_utils.hpp>
+
+#include <variant>
 
 namespace cuvs::preprocessing::quantize::pq {
 
@@ -78,23 +81,22 @@ CUVS_INST_VPQ_BUILD(uint8_t);
 namespace {
 
 template <typename T>
-auto make_vpq_dataset_impl(raft::resources const& res,
-                           cuvs::neighbors::vpq_params const& params,
-                           cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded)
-  -> cuvs::neighbors::vpq_dataset<half, int64_t>
+auto vpq_train_from_device_rows(raft::resources const& res,
+                                cuvs::neighbors::vpq_params const& params,
+                                T const* src_ptr,
+                                int64_t n_rows,
+                                int64_t dim,
+                                int64_t stride) -> cuvs::neighbors::vpq_dataset<half, int64_t>
 {
-  const auto n_r = static_cast<int64_t>(padded.n_rows());
-  const auto d   = static_cast<int64_t>(padded.dim());
-  const auto str = static_cast<int64_t>(padded.stride());
-  auto stream    = raft::resource::get_cuda_stream(res);
-  if (str != d) {
-    auto dense = raft::make_device_matrix<T, int64_t>(res, n_r, d);
-    raft::copy_matrix(dense.data_handle(), d, padded.view().data_handle(), str, d, n_r, stream);
-    auto dense_view = raft::make_device_matrix_view<const T, int64_t>(dense.data_handle(), n_r, d);
+  auto stream = raft::resource::get_cuda_stream(res);
+  if (stride != dim) {
+    auto dense = raft::make_device_matrix<T, int64_t>(res, n_rows, dim);
+    raft::copy_matrix(dense.data_handle(), dim, src_ptr, stride, dim, n_rows, stream);
+    auto dense_view =
+      raft::make_device_matrix_view<const T, int64_t>(dense.data_handle(), n_rows, dim);
     return vpq_build(res, params, dense_view);
   }
-  auto row_view =
-    raft::make_device_matrix_view<const T, int64_t>(padded.view().data_handle(), n_r, d);
+  auto row_view = raft::make_device_matrix_view<const T, int64_t>(src_ptr, n_rows, dim);
   return vpq_build(res, params, row_view);
 }
 
@@ -104,26 +106,50 @@ template <typename T>
 cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset(
   raft::resources const& res,
   cuvs::neighbors::vpq_params const& params,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded)
+  cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
 {
-  return make_vpq_dataset_impl<T>(res, params, padded);
+  using VT      = cuvs::neighbors::any_dataset_view_types<T, int64_t>;
+  auto const& v = dataset.as_variant();
+  if (std::holds_alternative<typename VT::empty_view>(v)) {
+    RAFT_FAIL("make_vpq_dataset: dataset view is empty");
+  }
+  if (std::holds_alternative<typename VT::vpq_f16_view>(v) ||
+      std::holds_alternative<typename VT::vpq_f32_view>(v)) {
+    RAFT_FAIL(
+      "make_vpq_dataset: source is already VPQ-compressed; train from dense device vectors");
+  }
+  if (std::holds_alternative<typename VT::padded_view>(v)) {
+    auto const& padded = std::get<typename VT::padded_view>(v);
+    const auto n_r     = static_cast<int64_t>(padded.n_rows());
+    const auto d       = static_cast<int64_t>(padded.dim());
+    const auto str     = static_cast<int64_t>(padded.stride());
+    return vpq_train_from_device_rows<T>(res, params, padded.view().data_handle(), n_r, d, str);
+  }
+  if (std::holds_alternative<typename VT::strided_view>(v)) {
+    auto const& strided = std::get<typename VT::strided_view>(v);
+    const auto n_r      = static_cast<int64_t>(strided.n_rows());
+    const auto d        = static_cast<int64_t>(strided.dim());
+    const auto str      = static_cast<int64_t>(strided.stride());
+    return vpq_train_from_device_rows<T>(res, params, strided.view().data_handle(), n_r, d, str);
+  }
+  RAFT_FAIL("make_vpq_dataset: unsupported dataset view alternative");
 }
 
 template cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset<float>(
   raft::resources const&,
   cuvs::neighbors::vpq_params const&,
-  cuvs::neighbors::device_padded_dataset_view<float, int64_t> const&);
+  cuvs::neighbors::any_dataset_view<float, int64_t> const&);
 template cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset<half>(
   raft::resources const&,
   cuvs::neighbors::vpq_params const&,
-  cuvs::neighbors::device_padded_dataset_view<half, int64_t> const&);
+  cuvs::neighbors::any_dataset_view<half, int64_t> const&);
 template cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset<int8_t>(
   raft::resources const&,
   cuvs::neighbors::vpq_params const&,
-  cuvs::neighbors::device_padded_dataset_view<int8_t, int64_t> const&);
+  cuvs::neighbors::any_dataset_view<int8_t, int64_t> const&);
 template cuvs::neighbors::vpq_dataset<half, int64_t> make_vpq_dataset<uint8_t>(
   raft::resources const&,
   cuvs::neighbors::vpq_params const&,
-  cuvs::neighbors::device_padded_dataset_view<uint8_t, int64_t> const&);
+  cuvs::neighbors::any_dataset_view<uint8_t, int64_t> const&);
 
 }  // namespace cuvs::preprocessing::quantize::pq
