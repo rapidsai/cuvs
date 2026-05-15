@@ -430,8 +430,9 @@ struct blob_mmap {
   // Heap-allocate the once_flag so that blob_mmap remains movable (std::once_flag
   // itself is neither copyable nor movable). Multiple threads can race on the
   // first call to handle() via blob<T>::data(); without this serialization each
-  // racing thread would mmap the file and the losing emplace would munmap the
-  // winner's mapping out from under it -- a flaky SIGSEGV in ann benchmarks.
+  // racing thread would mmap the file and the losing emplace would munmap
+  // the winner's mapping AND invalidate the reference the winner had already
+  // returned to its caller -- a flaky SIGSEGV in ann benchmarks.
   mutable std::unique_ptr<std::once_flag> handle_once_ = std::make_unique<std::once_flag>();
 
   [[nodiscard]] auto handle() const -> const std::tuple<mmap_owner, ptrdiff_t>&
