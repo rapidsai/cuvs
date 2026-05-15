@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../kmeans.cuh"
+#include "kmeans_mg_batched.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/copy.cuh>
@@ -35,7 +36,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <numeric>
+#include <optional>
 #include <random>
+#include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
@@ -463,35 +466,31 @@ void checkWeights(const raft::resources& handle,
                   raft::device_vector_view<DataT, IndexT> weight)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  rmm::device_scalar<DataT> wt_aggr(stream);
+  auto d_wt_sum       = raft::make_device_scalar<DataT>(handle, DataT{0});
 
   const auto& comm = raft::resource::get_comms(handle);
 
   auto n_samples = weight.extent(0);
   raft::linalg::mapThenSumReduce(
-    wt_aggr.data(), n_samples, raft::identity_op{}, stream, weight.data_handle());
+    d_wt_sum.data_handle(), n_samples, raft::identity_op{}, stream, weight.data_handle());
 
-  comm.allreduce<DataT>(wt_aggr.data(),  // sendbuff
-                        wt_aggr.data(),  // recvbuff
-                        1,               // count
+  comm.allreduce<DataT>(d_wt_sum.data_handle(),  // sendbuff
+                        d_wt_sum.data_handle(),  // recvbuff
+                        1,                       // count
                         raft::comms::op_t::SUM,
                         stream);
-  DataT wt_sum = wt_aggr.value(stream);
-  raft::resource::sync_stream(handle, stream);
-  RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
 
-  if (wt_sum != n_samples) {
-    CUVS_LOG_KMEANS(handle,
-                    "[Warning!] KMeans: normalizing the user provided sample weights to "
-                    "sum up to %d samples",
-                    n_samples);
-
-    raft::linalg::map(handle,
-                      weight,
-                      raft::compose_op(raft::mul_const_op<DataT>{static_cast<DataT>(n_samples)},
-                                       raft::div_const_op<DataT>{wt_sum}),
-                      raft::make_const_mdspan(weight));
-  }
+  // Normalize weights so they sum to n_samples (per rank). Reading the sum from
+  // a device pointer avoids a host copy / stream sync. When the sum already
+  // equals n_samples this is a numerical no-op (matches single-GPU behavior).
+  const DataT* d_wt_sum_ptr = d_wt_sum.data_handle();
+  raft::linalg::map(
+    handle,
+    weight,
+    [n_samples, d_wt_sum_ptr] __device__(DataT w) {
+      return w * static_cast<DataT>(n_samples) / *d_wt_sum_ptr;
+    },
+    raft::make_const_mdspan(weight));
 }
 
 template <typename DataT, typename IndexT>
@@ -750,6 +749,42 @@ void fit(const raft::resources& handle,
       break;
     }
   }
+}
+
+// =========================================================================
+// Streaming / multi-partition fit overloads.
+//
+// These thin wrappers delegate to mnmg_fit() in kmeans_mg_batched.cuh so the
+// device-data fit() above remains the only path that talks directly to
+// raft::comms; host-streaming and host-parts are funneled through the unified
+// batched implementation.
+// =========================================================================
+
+// MNMG kmeans fit with host data (streaming).
+template <typename DataT, typename IndexT>
+void fit(const raft::resources& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const DataT, IndexT> X,
+         std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
+         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::host_scalar_view<DataT> inertia,
+         raft::host_scalar_view<IndexT> n_iter)
+{
+  mnmg_fit<DataT, IndexT>(handle, params, X, sample_weight, centroids, inertia, n_iter);
+}
+
+// MNMG kmeans fit with multiple local host data partitions.
+template <typename DataT, typename IndexT>
+void fit(const raft::resources& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::host_matrix_view<const DataT, IndexT>>& X_parts,
+         const std::optional<std::vector<raft::host_vector_view<const DataT, IndexT>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::host_scalar_view<DataT> inertia,
+         raft::host_scalar_view<IndexT> n_iter)
+{
+  mnmg_fit<DataT, IndexT>(handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
 };  // namespace cuvs::cluster::kmeans::mg::detail

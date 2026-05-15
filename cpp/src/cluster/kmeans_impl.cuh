@@ -5,6 +5,7 @@
 #pragma once
 
 #include "kmeans.cuh"
+#include "kmeans_mg.hpp"
 
 namespace cuvs::cluster::kmeans {
 
@@ -20,8 +21,9 @@ void fit_main(raft::resources const& handle,
 {
   cuvs::cluster::kmeans::params p = params;
   p.init                          = kmeans::params::InitMethod::Array;
-  auto sw                         = std::make_optional(
-    raft::make_device_vector_view<const DataT, IndexT>(sample_weights.data_handle(), X.extent(0)));
+  RAFT_EXPECTS(sample_weights.extent(0) == X.extent(0),
+               "invalid parameter (sample_weight!=n_samples)");
+  auto sw = std::make_optional(sample_weights);
   cuvs::cluster::kmeans::detail::kmeans_fit(
     handle, p, X, sw, centroids, inertia, n_iter, std::ref(workspace));
 }
@@ -66,8 +68,12 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  cuvs::cluster::kmeans::detail::fit<DataT, IndexT>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  if (raft::resource::comms_initialized(handle)) {
+    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
+  } else {
+    cuvs::cluster::kmeans::detail::fit<DataT, IndexT>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  }
 }
 
 }  // namespace cuvs::cluster::kmeans
