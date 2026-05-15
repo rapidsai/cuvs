@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
+#include "cagra_padded_build_helpers.cuh"
 #include "naive_knn.cuh"
 
 #include <cuvs/neighbors/cagra.hpp>
@@ -218,9 +219,9 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         d_mode = distribution_mode::SHARDED;
 
       mg_index_params<cagra::index_params> index_params;
-      index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
-        raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
-      index_params.mode = d_mode;
+      // Host dataset uses ACE build path; must set ace_params (not ivf_pq_params).
+      index_params.graph_build_params = cagra::graph_build_params::ace_params{};
+      index_params.mode               = d_mode;
 
       mg_search_params<cagra::search_params> search_params;
 
@@ -376,7 +377,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
-        auto index = cuvs::neighbors::cagra::build(clique_, index_params, index_dataset);
+        cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded(clique_, index_dataset);
+        auto index = cuvs::neighbors::cagra::build(clique_, index_params, padded.view);
         cuvs::neighbors::cagra::serialize(clique_, index_file.filename, index);
       }
 
@@ -554,9 +556,9 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       ASSERT_TRUE(ps.num_queries <= 4);
 
       mg_index_params<cagra::index_params> index_params;
-      index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
-        raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
-      index_params.mode = REPLICATED;
+      // Host dataset uses ACE build path; must set ace_params (not ivf_pq_params).
+      index_params.graph_build_params = cagra::graph_build_params::ace_params{};
+      index_params.mode               = REPLICATED;
 
       mg_search_params<cagra::search_params> search_params;
       search_params.search_mode = ROUND_ROBIN;

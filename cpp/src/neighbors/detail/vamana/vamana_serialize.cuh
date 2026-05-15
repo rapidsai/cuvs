@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <fstream>
 #include <type_traits>
+#include <variant>
 
 namespace cuvs::neighbors::vamana::detail {
 
@@ -58,18 +59,37 @@ void to_file(const std::string& dataset_base_file, raft::host_matrix<T, int64_t>
  */
 template <typename T>
 void serialize_dataset(raft::resources const& res,
-                       const cuvs::neighbors::dataset<int64_t>* dataset,
+                       const cuvs::neighbors::any_dataset_view<T, int64_t>* dataset,
                        const std::string& dataset_base_file)
 {
+  if (dataset == nullptr) { return; }
   // try allocating a buffer for the dataset on host
   try {
-    const auto* strided_dataset =
-      dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(dataset);
-    if (strided_dataset) {
-      auto nrows     = strided_dataset->n_rows();
-      auto dim       = strided_dataset->dim();
-      auto stride    = strided_dataset->stride();
-      auto d_data    = strided_dataset->view();
+    namespace nb   = cuvs::neighbors;
+    using VT       = nb::any_dataset_view_types<T, int64_t>;
+    auto const& va = dataset->as_variant();
+    if (std::holds_alternative<typename VT::strided_view>(va)) {
+      auto const& v  = std::get<typename VT::strided_view>(va);
+      auto nrows     = v.n_rows();
+      auto dim       = v.dim();
+      auto stride    = v.stride();
+      auto d_data    = v.view();
+      auto h_dataset = raft::make_host_matrix<T, int64_t>(nrows, dim);
+      raft::copy_matrix(h_dataset.data_handle(),
+                        dim,
+                        d_data.data_handle(),
+                        stride,
+                        dim,
+                        nrows,
+                        raft::resource::get_cuda_stream(res));
+      raft::resource::sync_stream(res);
+      to_file(dataset_base_file, h_dataset);
+    } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+      auto const& v  = std::get<typename VT::padded_view>(va);
+      auto nrows     = v.n_rows();
+      auto dim       = v.dim();
+      auto stride    = v.stride();
+      auto d_data    = v.view();
       auto h_dataset = raft::make_host_matrix<T, int64_t>(nrows, dim);
       raft::copy_matrix(h_dataset.data_handle(),
                         dim,
@@ -81,7 +101,7 @@ void serialize_dataset(raft::resources const& res,
       raft::resource::sync_stream(res);
       to_file(dataset_base_file, h_dataset);
     } else {
-      RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
+      RAFT_LOG_DEBUG("serialize_dataset: unsupported dataset variant for full-precision export");
     }
   } catch (std::bad_alloc& e) {
     RAFT_LOG_INFO("Failed to serialize dataset");
@@ -122,7 +142,7 @@ void serialize_dataset(raft::resources const& res,
 template <typename T, typename IdxT, typename HostMatT>
 void serialize_sector_aligned(raft::resources const& res,
                               const HostMatT& h_graph,
-                              const cuvs::neighbors::dataset<int64_t>& dataset,
+                              const cuvs::neighbors::any_dataset_view<T, int64_t>& dataset,
                               const uint64_t medoid,
                               std::ofstream& output_writer)
 {
@@ -159,18 +179,33 @@ void serialize_sector_aligned(raft::resources const& res,
   const uint64_t nnodes_per_sector = sector_len / max_node_len;  // 0 if max_node_len > sector_len
 
   // copy dataset to host
-  auto dataset_strided =
-    dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(&dataset);
-  if (!dataset_strided) { RAFT_FAIL("Invalid dataset"); }
-  auto d_data = dataset_strided->view();
-  auto h_data = raft::make_host_matrix<T, int64_t>(npts, ndims);
-  raft::copy_matrix(h_data.data_handle(),
-                    ndims,
-                    d_data.data_handle(),
-                    dataset_strided->stride(),
-                    ndims,
-                    npts,
-                    raft::resource::get_cuda_stream(res));
+  auto h_data    = raft::make_host_matrix<T, int64_t>(npts, ndims);
+  namespace nb   = cuvs::neighbors;
+  using VT       = nb::any_dataset_view_types<T, int64_t>;
+  auto const& va = dataset.as_variant();
+  if (std::holds_alternative<typename VT::strided_view>(va)) {
+    auto const& v = std::get<typename VT::strided_view>(va);
+    auto d_data   = v.view();
+    raft::copy_matrix(h_data.data_handle(),
+                      ndims,
+                      d_data.data_handle(),
+                      v.stride(),
+                      ndims,
+                      npts,
+                      raft::resource::get_cuda_stream(res));
+  } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+    auto const& v = std::get<typename VT::padded_view>(va);
+    auto d_data   = v.view();
+    raft::copy_matrix(h_data.data_handle(),
+                      ndims,
+                      d_data.data_handle(),
+                      v.stride(),
+                      ndims,
+                      npts,
+                      raft::resource::get_cuda_stream(res));
+  } else {
+    RAFT_FAIL("Invalid dataset");
+  }
   raft::resource::sync_stream(res);
 
   // buffers

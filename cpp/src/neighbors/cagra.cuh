@@ -26,19 +26,95 @@
 
 #include <rmm/cuda_stream_view.hpp>
 
+#include <memory>
+#include <optional>
+#include <type_traits>
+#include <variant>
+
 namespace cuvs::neighbors::cagra {
+
+template <typename T, typename IdxT>
+std::optional<raft::device_matrix<T, int64_t, raft::row_major>>
+index<T, IdxT>::release_owning_padded_device_matrix_for_merge(raft::resources const& res)
+{
+  namespace nb = cuvs::neighbors;
+  if (!index_owning_dataset_storage_) { return std::nullopt; }
+  using OT = nb::any_owning_dataset_types<dataset_index_type>;
+  auto own = std::move(index_owning_dataset_storage_);
+  index_owning_dataset_storage_.reset();
+  auto& var = own->as_variant();
+
+  auto finish = [&](raft::device_matrix<T, int64_t, raft::row_major>&& rows, uint32_t logic_dim) {
+    update_dataset(res,
+                   nb::device_padded_dataset_view<T, dataset_index_type>(
+                     raft::make_const_mdspan(rows.view()), logic_dim));
+    raft::resource::sync_stream(res);
+    return std::optional<raft::device_matrix<T, int64_t, raft::row_major>>{std::move(rows)};
+  };
+
+  if constexpr (std::is_same_v<T, float>) {
+    if (!std::holds_alternative<typename OT::padded_f32_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_f32_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  } else if constexpr (std::is_same_v<T, half>) {
+    if (!std::holds_alternative<typename OT::padded_f16_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_f16_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  } else if constexpr (std::is_same_v<T, int8_t>) {
+    if (!std::holds_alternative<typename OT::padded_i8_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_i8_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  } else if constexpr (std::is_same_v<T, uint8_t>) {
+    if (!std::holds_alternative<typename OT::padded_u8_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_u8_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  }
+  return std::nullopt;
+}
 
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 {
-  // Get the dataset view
-  auto dataset_view = this->dataset();
+  // raft::linalg::reduce wants row-major with leading dim = row pitch in elements. Prefer padded
+  // storage's native row-major view; for strided non-owning rows use the mdspan stride, not only
+  // index::dataset()'s synthetic mdspan when avoidable. Skip norm precomputation for VPQ
+  // (compressed codes); CosineExpanded with VPQ is handled (or rejected) on the search path.
+  namespace nb    = cuvs::neighbors;
+  bool skip_norms = false;
+  std::optional<raft::device_matrix_view<const T, int64_t, raft::row_major>> rm_dataset;
+
+  using VT       = nb::any_dataset_view_types<T, int64_t>;
+  auto const& va = dataset_->as_variant();
+  if (std::holds_alternative<typename VT::padded_view>(va)) {
+    rm_dataset = std::get<typename VT::padded_view>(va).view();
+  } else if (std::holds_alternative<typename VT::strided_view>(va)) {
+    auto const& v       = std::get<typename VT::strided_view>(va);
+    auto sv             = v.view();
+    const int64_t pitch = sv.stride(0) > 0 ? sv.stride(0) : static_cast<int64_t>(sv.extent(1));
+    rm_dataset          = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      sv.data_handle(), sv.extent(0), pitch);
+  } else if (std::holds_alternative<typename VT::vpq_f16_view>(va) ||
+             std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+    skip_norms = true;
+  }
+
+  if (skip_norms) { return; }
+
+  if (!rm_dataset.has_value()) {
+    auto strided = this->dataset();
+    rm_dataset   = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      strided.data_handle(), strided.extent(0), strided.stride(0));
+  }
 
   // Allocate norms vector if not already allocated
-  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != dataset_view.extent(0)) {
+  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != rm_dataset->extent(0)) {
     dataset_norms_.reset();
-    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, rm_dataset->extent(0));
   }
 
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
@@ -47,16 +123,14 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   // first scale the dataset and then compute norms
   auto scaled_sq_op = raft::compose_op(
     raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
-  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
-    res,
-    raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      dataset_view.data_handle(), dataset_view.extent(0), dataset_view.stride(0)),
-    dataset_norms_->view(),
-    (float)0,
-    false,
-    scaled_sq_op,
-    raft::add_op(),
-    raft::sqrt_op{});
+  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(res,
+                                                *rm_dataset,
+                                                dataset_norms_->view(),
+                                                (float)0,
+                                                false,
+                                                scaled_sq_op,
+                                                raft::add_op(),
+                                                raft::sqrt_op{});
 }
 
 /**
@@ -262,6 +336,8 @@ void optimize(
   detail::optimize(res, knn_graph, new_graph, guarantee_connectivity);
 }
 
+// TODO(removal): Deprecated host mdspan build->index (delete with matrix-view build API).
+
 template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
@@ -271,16 +347,35 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
-  // Check if ACE dispatch is requested via graph_build_params
   if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
-    // ACE expects the dataset to be on host due to the large dataset size
     RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
                  "ACE: Dataset must be on host for ACE build");
     auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
     return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
   }
-  return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
+  RAFT_EXPECTS(
+    raft::get_device_for_address(dataset.data_handle()) == -1,
+    "cagra::build: non-ACE path from an mdspan host overload must use host memory. For "
+    "device data, use cagra::build with raft::device_matrix_view or a device dataset_view.");
+  auto hview = raft::make_host_matrix_view<const T, int64_t, row_major>(
+    dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+  return detail::build_from_host_matrix<T, IdxT>(res, params, hview);
+}
+
+/**
+ * @brief Build the index from a device `any_dataset_view` (strided, padded, VPQ, or empty).
+ *
+ * Graph construction uses
+ * `convert_dataset_view_to_padded_for_graph_build`. The index
+ * stores the original view when `attach_dataset_on_build` is true.
+ */
+template <typename T, typename IdxT>
+index<T, IdxT> build(raft::resources const& res,
+                     const index_params& params,
+                     cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
+{
+  return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(res, params, dataset);
 }
 
 /**
@@ -398,10 +493,10 @@ void extend(
 }
 
 template <class T, class IdxT>
-index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::index_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                     const cuvs::neighbors::filtering::base_filter& row_filter)
+merge_result<T, IdxT> merge(raft::resources const& handle,
+                            const cagra::index_params& params,
+                            std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                            const cuvs::neighbors::filtering::base_filter& row_filter)
 {
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
@@ -415,7 +510,7 @@ index<T, IdxT> merge(raft::resources const& handle,
              const cuvs::neighbors::cagra::index_params& params,                        \
              std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,             \
              const cuvs::neighbors::filtering::base_filter& row_filter)                 \
-    -> cuvs::neighbors::cagra::index<T, IdxT>                                           \
+    -> cuvs::neighbors::cagra::merge_result<T, IdxT>                                    \
   {                                                                                     \
     return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices, row_filter); \
   }
