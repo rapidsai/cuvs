@@ -125,6 +125,10 @@ struct params : base_params {
    * When set to 0 (default) with host data uses `min(3 * n_clusters, n_samples)`
    * as a default.
    *
+   * In Batched multi-GPU host-data fits, the effective KMeansPlusPlus initialization
+   * sample is materialized on device and seeding is run on rank 0. Rank 0
+   * must have enough GPU memory for this sample and the seeding workspace.
+   *
    * Default: 0.
    */
   int64_t init_size = 0;
@@ -179,6 +183,17 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * on the host. Data is processed in GPU-sized batches, streaming from host to device.
  * The batch size is controlled by params.streaming_batch_size.
  *
+ * Multi-GPU dispatch is selected automatically based on the handle state:
+ *   - If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X
+ *     is split across GPUs internally with an OpenMP parallel region and NCCL.
+ *   - If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as
+ *     this worker's partition, and RAFT communicators are used for collectives.
+ *   - Otherwise: single-GPU batched k-means.
+ *
+ * With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the
+ * effective initialization sample must fit in rank 0 GPU memory because
+ * seeding is run on rank 0 before centroids are broadcast.
+ *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
  *   #include <cuvs/cluster/kmeans.hpp>
@@ -208,7 +223,8 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *               raft::make_host_scalar_view(&n_iter));
  * @endcode
  *
- * @param[in]     handle        The raft handle.
+ * @param[in]     handle        The raft handle. When a multi-GPU resource is
+ *                              attached, multi-GPU dispatch is used automatically.
  * @param[in]     params        Parameters for KMeans model. Batch size is read from
  *                              params.streaming_batch_size.
  * @param[in]     X             Training instances on HOST memory. The data must
