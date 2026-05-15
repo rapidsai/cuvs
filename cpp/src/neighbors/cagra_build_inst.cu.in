@@ -32,7 +32,8 @@ auto build(raft::resources const& handle,
            raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<data_t, index_t>
 {
-  // `build` on dataset_view returns build_result; convert to index when no deferred padded owner.
+  // `build` on `any_dataset_view` returns `build_result`; convert to `index` via implicit
+  // conversion.
   auto padded = cuvs::neighbors::make_padded_dataset_view(handle, dataset);
   cuvs::neighbors::cagra::index<data_t, index_t> out =
     cuvs::neighbors::cagra::build(handle, params, padded);
@@ -56,9 +57,6 @@ auto build(raft::resources const& handle,
   }
   auto bres = ::cuvs::neighbors::cagra::detail::build_from_host_matrix<data_t, index_t>(
     handle, params, dataset);
-  if (auto own = std::move(bres.deferred_host_dataset)) {
-    return ::cuvs::neighbors::cagra::finalize_index_from_padded(std::move(bres), std::move(own));
-  }
   return std::move(bres.idx);
 }
 

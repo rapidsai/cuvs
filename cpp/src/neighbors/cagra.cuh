@@ -40,18 +40,6 @@ cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_ace(ace_build_result<
   return std::move(r.idx);
 }
 
-template <typename T, typename IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> finalize_index_from_padded(
-  build_result<T, IdxT>&& br,
-  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> own)
-{
-  RAFT_EXPECTS(own != nullptr,
-               "finalize_index_from_padded: null deferred padded dataset unique_ptr");
-  br.idx.index_owning_dataset_storage_ = cuvs::neighbors::wrap_any_owning(std::move(own));
-  br.idx.host_build_ace_device_store_.reset();
-  return std::move(br.idx);
-}
-
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
@@ -338,9 +326,6 @@ index<T, IdxT> build(
   auto hview = raft::make_host_matrix_view<const T, int64_t, row_major>(
     dataset.data_handle(), dataset.extent(0), dataset.extent(1));
   auto bres = detail::build_from_host_matrix<T, IdxT>(res, params, hview);
-  if (auto own = std::move(bres.deferred_host_dataset)) {
-    return finalize_index_from_padded<T, IdxT>(std::move(bres), std::move(own));
-  }
   return std::move(bres.idx);
 }
 

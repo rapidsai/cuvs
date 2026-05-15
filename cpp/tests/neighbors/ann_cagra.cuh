@@ -73,10 +73,7 @@ void cagra_build_into_index(
     return;
   }
   auto br = cagra::build(res, params, cuvs::neighbors::any_dataset_view<DataT, int64_t>(padded));
-  RAFT_EXPECTS(!br.deferred_host_dataset,
-               "cagra_build_into_index: deferred host padded storage is not supported here; adjust "
-               "attach_dataset_on_build or use the host-matrix build API with finalize.");
-  index = std::move(br.idx);
+  index   = std::move(br.idx);
 }
 
 struct test_cagra_sample_filter {

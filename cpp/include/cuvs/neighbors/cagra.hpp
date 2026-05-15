@@ -390,9 +390,11 @@ struct ace_build_result;
 
 template <typename T, typename IdxT>
 index<T, IdxT> finalize_index_from_ace(ace_build_result<T, IdxT>&&);
+
 template <typename T, typename IdxT>
-index<T, IdxT> finalize_index_from_padded(
-  build_result<T, IdxT>&&, std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>);
+void adopt_host_padded_into_index_for_host_attach(
+  index<T, IdxT>& idx,
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own);
 
 /**
  * @defgroup cagra_cpp_index CAGRA index type
@@ -917,8 +919,9 @@ struct index : cuvs::neighbors::index {
   template <typename T2, typename I2>
   friend index<T2, I2> finalize_index_from_ace(ace_build_result<T2, I2>&&);
   template <typename T2, typename I2>
-  friend index<T2, I2> finalize_index_from_padded(
-    build_result<T2, I2>&&, std::unique_ptr<cuvs::neighbors::device_padded_dataset<T2, int64_t>>);
+  friend void adopt_host_padded_into_index_for_host_attach(
+    index<T2, I2>& idx,
+    std::unique_ptr<cuvs::neighbors::device_padded_dataset<T2, int64_t>> padded_own);
 
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
@@ -956,31 +959,19 @@ struct index : cuvs::neighbors::index {
  */
 
 /**
- * Result of `cagra::build` when the implementation must return extra owning state alongside the
- * index (e.g. deferred host padded GPU storage). When deprecated `index_params::compression` is
- * set, VPQ is trained inside `build` and stored in the index (no `vpq_dataset` field here).
- * Otherwise, for explicit VPQ, train with `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and
- * attach via `index::update_dataset` with `vpq.as_dataset_view()` while keeping the `vpq_dataset`
- * alive.
+ * Result of `cagra::build` for APIs that return extra state alongside the index. Host-matrix builds
+ * that attach a padded device copy on the index store it in `index::index_owning_dataset_storage_`
+ * when needed. When deprecated `index_params::compression` is set, VPQ is trained inside `build`
+ * and stored on the index. Otherwise, for explicit VPQ, train with
+ * `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and attach via `index::update_dataset` with
+ * `vpq.as_dataset_view()` while keeping the `vpq_dataset` alive.
  */
 template <typename T, typename IdxT>
 struct build_result {
   cuvs::neighbors::cagra::index<T, IdxT> idx;
-  /**
-   * Host-matrix build only: GPU padded dataset kept alive until `finalize_index_from_padded` moves
-   * it for indices that attach raw vectors on build; unset for graph-only builds.
-   */
-  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> deferred_host_dataset{};
 
-  /** Implicit conversion to index when there is no deferred host padded storage to finalize. */
-  operator cuvs::neighbors::cagra::index<T, IdxT>() &&
-  {
-    RAFT_EXPECTS(
-      !deferred_host_dataset,
-      "When using deferred host padded storage, keep the full build_result alive and use "
-      "finalize_index_from_padded when deferred_host_dataset is set.");
-    return std::move(idx);
-  }
+  /** Implicit conversion to index (moves `idx` out). */
+  operator cuvs::neighbors::cagra::index<T, IdxT>() && { return std::move(idx); }
 };
 
 /**
