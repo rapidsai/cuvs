@@ -16,6 +16,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/resource/stream_view.hpp>
 #include <raft/core/serialize.hpp>
 
@@ -770,7 +771,7 @@ struct index : cuvs::neighbors::index {
     if (lseek(fd.get(), 0, SEEK_SET) == -1) {
       RAFT_FAIL("Failed to seek to beginning of dataset file");
     }
-    auto header = raft::detail::numpy_serializer::read_header(stream);
+    auto header = raft::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(header.shape.size() == 2,
                  "Dataset file should be 2D, got %zu dimensions",
                  header.shape.size());
@@ -805,7 +806,7 @@ struct index : cuvs::neighbors::index {
     if (lseek(fd.get(), 0, SEEK_SET) == -1) {
       RAFT_FAIL("Failed to seek to beginning of graph file");
     }
-    auto header = raft::detail::numpy_serializer::read_header(stream);
+    auto header = raft::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(
       header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
@@ -846,7 +847,7 @@ struct index : cuvs::neighbors::index {
     if (lseek(fd.get(), 0, SEEK_SET) == -1) {
       RAFT_FAIL("Failed to seek to beginning of mapping file");
     }
-    auto header = raft::detail::numpy_serializer::read_header(stream);
+    auto header = raft::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(header.shape.size() == 1,
                  "Mapping file should be 1D, got %zu dimensions",
                  header.shape.size());
