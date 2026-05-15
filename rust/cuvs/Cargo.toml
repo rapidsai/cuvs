@@ -18,7 +18,6 @@ ndarray = "0.15"
 
 [dev-dependencies]
 ndarray-rand = "0.14"
-mark-flaky-tests = "1"
 tempfile = "3"
 
 [package.metadata.docs.rs]
