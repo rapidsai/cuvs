@@ -14,11 +14,10 @@ https://docs.opensearch.org/latest/vector-search/remote-index-build/
 
 import os
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from ._utils import compute_recall, expand_param_grid
 from .base import BenchmarkBackend, BuildResult, Dataset, SearchResult
 from ..orchestrator.config_loaders import (
     ConfigLoader,
@@ -32,16 +31,11 @@ class OpenSearchConfigLoader(ConfigLoader):
     """
     Configuration loader for the OpenSearch backend.
 
-    Reads the shared ``datasets.yaml`` and opensearch-prefixed algorithm YAML
-    files from the standard config directory. Expands the Cartesian product of
-    build-parameter lists and returns one :class:`BenchmarkConfig` per
-    build-parameter combination (with one :class:`IndexConfig` each carrying
-    the full list of search-parameter combinations).
-
-    Registration
-    ------------
-        from cuvs_bench.orchestrator import register_config_loader
-        register_config_loader("opensearch", OpenSearchConfigLoader)
+    Reads opensearch-prefixed algorithm YAML files from the standard config
+    directory. The shared :class:`ConfigLoader` base handles dataset loading
+    and parameter expansion before calling into this loader's OpenSearch-
+    specific hooks. This built-in loader is registered automatically when
+    :mod:`cuvs_bench.orchestrator` is imported.
     """
 
     def __init__(self, config_path: Optional[Union[str, os.PathLike]] = None):
@@ -66,48 +60,14 @@ class OpenSearchConfigLoader(ConfigLoader):
     def backend_type(self) -> str:
         return "opensearch"
 
-    def _build_benchmark_configs(
+    def _discover_algo_groups(
         self,
-        dataset_config: DatasetConfig,
         dataset_conf: dict,
         dataset: str,
         dataset_path: str,
         **kwargs,
-    ) -> List[BenchmarkConfig]:
-        """
-        Build OpenSearch benchmark configurations.
-
-        Parameters
-        ----------
-        dataset_config : DatasetConfig
-            Already-constructed dataset configuration.
-        dataset_conf : dict
-            Raw dataset configuration from YAML.
-        dataset : str
-            Dataset name; must appear in ``datasets.yaml``.
-        dataset_path : str
-            Root directory where dataset files live.
-        **kwargs
-            Recognized extra keys:
-
-            - ``algorithm_configuration`` – path to an extra algo config dir/file
-            - ``algorithms`` – comma-separated algorithm names to run
-            - ``groups`` – comma-separated group names to restrict to
-            - ``host`` – OpenSearch host (default: ``"localhost"``)
-            - ``port`` – OpenSearch port (default: ``9200``)
-            - ``username`` – HTTP auth username (default: ``"admin"``)
-            - ``password`` – HTTP auth password (default: ``"admin"``)
-            - ``use_ssl`` – whether to use HTTPS (default: ``False``)
-            - ``verify_certs`` – verify SSL certificates (default: ``False``)
-            - ``bulk_batch_size`` – vectors per bulk request (default: ``500``)
-            - ``remote_index_build`` – enable GPU remote index build (default: ``False``)
-            - ``remote_build_size_min`` – minimum segment size to trigger GPU build (default: OpenSearch's default)
-            - ``remote_build_timeout`` – GPU build timeout in seconds (default: ``1800``)
-
-        Returns
-        -------
-        List[BenchmarkConfig]
-        """
+    ):
+        """Discover OpenSearch algorithm groups to benchmark."""
         algo_files = [
             algo_file
             for algo_file in self.gather_algorithm_configs(
@@ -126,6 +86,40 @@ class OpenSearchConfigLoader(ConfigLoader):
             else None
         )
 
+        result = []
+
+        for algo_file in algo_files:
+            algo_yaml = self.load_yaml_file(algo_file)
+            algo_name = algo_yaml.get("name", "")
+            if allowed_algos and algo_name not in allowed_algos:
+                continue
+
+            groups: Dict[str, Any] = algo_yaml.get("groups", {})
+            if allowed_groups:
+                groups = {
+                    k: v for k, v in groups.items() if k in allowed_groups
+                }
+
+            for group_name, group_conf in groups.items():
+                result.append((algo_name, group_name, group_conf, {}))
+
+        return result
+
+    def _build_benchmark_configs(
+        self,
+        dataset_config: DatasetConfig,
+        dataset_conf: dict,
+        dataset: str,
+        dataset_path: str,
+        expanded_groups: List[Tuple[str, str, dict, List, List, dict]],
+        **kwargs,
+    ) -> List[BenchmarkConfig]:
+        """
+        Build OpenSearch benchmark configurations from expanded param combos.
+
+        The base ConfigLoader has already expanded each group's build and
+        search parameter grids before calling this hook.
+        """
         host = kwargs.get("host", "localhost")
         port = kwargs.get("port", 9200)
 
@@ -143,72 +137,73 @@ class OpenSearchConfigLoader(ConfigLoader):
         )
         conn_kwargs = {k: kwargs[k] for k in _conn_keys if k in kwargs}
 
+        tune_mode = kwargs.get("_tune_mode", False)
+        tune_build_params = kwargs.get("_tune_build_params")
+        tune_search_params = kwargs.get("_tune_search_params")
+
         benchmark_configs: List[BenchmarkConfig] = []
 
-        for algo_file in algo_files:
-            algo_yaml = self.load_yaml_file(algo_file)
-            algo_name = algo_yaml.get("name", "")
-            if allowed_algos and algo_name not in allowed_algos:
-                continue
+        for (
+            algo_name,
+            group_name,
+            _group_conf,
+            build_combos,
+            search_combos,
+            _group_meta,
+        ) in expanded_groups:
+            if tune_mode and tune_build_params is not None:
+                actual_build = [tune_build_params]
+                actual_search = (
+                    [tune_search_params] if tune_search_params else [{}]
+                )
+            else:
+                actual_build = build_combos
+                actual_search = search_combos
 
-            groups: Dict[str, Any] = algo_yaml.get("groups", {})
-            if allowed_groups:
-                groups = {
-                    k: v for k, v in groups.items() if k in allowed_groups
+            for build_param in actual_build:
+                prefix = (
+                    algo_name
+                    if group_name == "base"
+                    else f"{algo_name}_{group_name}"
+                )
+                parts = [prefix] + [f"{k}{v}" for k, v in build_param.items()]
+                index_label = ".".join(parts)
+
+                # OpenSearch index names must be lowercase with no dots
+                os_index_name = index_label.replace(".", "_").lower()
+                index_file = os.path.join(
+                    dataset_path, dataset, "index", index_label
+                )
+
+                index_cfg = IndexConfig(
+                    name=index_label,
+                    algo=algo_name,
+                    build_param=build_param,
+                    search_params=actual_search,
+                    file=index_file,
+                )
+
+                engine = "lucene"
+                if "faiss" in algo_name:
+                    engine = "faiss"
+
+                backend_cfg: Dict[str, Any] = {
+                    "name": index_label,
+                    "host": host,
+                    "port": port,
+                    "index_name": os_index_name,
+                    "engine": engine,
+                    "algo": algo_name,
+                    "requires_network": True,
+                    **conn_kwargs,
                 }
 
-            for group_name, group_conf in groups.items():
-                build_spec: Dict[str, List] = group_conf.get("build", {})
-                search_spec: Dict[str, List] = group_conf.get("search", {})
-                search_params_list = expand_param_grid(search_spec)
-
-                for build_param in expand_param_grid(build_spec):
-                    # Human-readable index label
-                    prefix = (
-                        f"{algo_name}_{group_name}"
-                        if group_name != "base"
-                        else algo_name
+                benchmark_configs.append(
+                    BenchmarkConfig(
+                        indexes=[index_cfg],
+                        backend_config=backend_cfg,
                     )
-                    parts = [prefix] + [
-                        f"{k}{v}" for k, v in build_param.items()
-                    ]
-                    index_label = ".".join(parts)
-
-                    # OpenSearch index names must be lowercase with no dots
-                    os_index_name = index_label.replace(".", "_").lower()
-                    index_file = os.path.join(
-                        dataset_path, dataset, "index", index_label
-                    )
-
-                    index_cfg = IndexConfig(
-                        name=index_label,
-                        algo=algo_name,
-                        build_param=build_param,
-                        search_params=search_params_list,
-                        file=index_file,
-                    )
-
-                    engine = "lucene"
-                    if "faiss" in algo_name:
-                        engine = "faiss"
-
-                    backend_cfg: Dict[str, Any] = {
-                        "name": index_label,
-                        "host": host,
-                        "port": port,
-                        "index_name": os_index_name,
-                        "engine": engine,
-                        "algo": algo_name,
-                        "requires_network": True,
-                        **conn_kwargs,
-                    }
-
-                    benchmark_configs.append(
-                        BenchmarkConfig(
-                            indexes=[index_cfg],
-                            backend_config=backend_cfg,
-                        )
-                    )
+                )
 
         return benchmark_configs
 
@@ -254,8 +249,9 @@ class OpenSearchBackend(BenchmarkBackend):
     """
     Benchmark backend for OpenSearch's k-NN plugin.
 
-    Supports the faiss (HNSW / IVF) and lucene (HNSW) engines. Vectors are bulk-indexed as ``knn_vector`` fields and retrieved
-    via the standard ``knn`` query type.
+    Supports the faiss (HNSW / IVF) and lucene (HNSW) engines. Vectors are
+    bulk-indexed as ``knn_vector`` fields and retrieved via the standard
+    ``knn`` query type.
 
     Requires ``opensearch-py`` Python package.
 
@@ -441,7 +437,7 @@ class OpenSearchBackend(BenchmarkBackend):
 
         Vectors are stored under the ``"vector"`` field with their integer
         row index as the document ``_id`` so they can be mapped back to
-        ground-truth neighbor lists.
+        dataset and ground-truth neighbor IDs.
         """
         from opensearchpy.helpers import streaming_bulk
 
@@ -472,7 +468,8 @@ class OpenSearchBackend(BenchmarkBackend):
         print(f"  Indexed all {total} vectors")
 
     def _get_knn_remote_build_stats(self) -> dict:
-        """Query kNN stats API and return summed remote build counters across all nodes.
+        """
+        Query the kNN stats API for cluster-wide remote build counters.
 
         The remote build stats live under a nested structure in the response:
           nodes.<node-id>.remote_vector_index_build_stats.build_stats.*
@@ -563,8 +560,10 @@ class OpenSearchBackend(BenchmarkBackend):
         *initial_stats* should be snapshotted from
         ``_get_knn_remote_build_stats()`` immediately before ingestion starts.
 
-        Raises ``TimeoutError`` if submitted builds do not complete within
-        *timeout* seconds.
+        Raises ``RuntimeError`` if the stats report a failed remote build or if
+        no remote build activity starts before *no_activity_timeout*. Raises
+        ``TimeoutError`` if submitted builds do not complete within *timeout*
+        seconds.
         """
         start = time.perf_counter()
         deadline = start + timeout
@@ -638,14 +637,15 @@ class OpenSearchBackend(BenchmarkBackend):
         dry_run: bool = False,
     ) -> BuildResult:
         """
-        Build an OpenSearch k-NN index from the dataset's base vectors.
+        Build an OpenSearch k-NN index from the dataset's training vectors.
 
-        Creates an index with k-NN plugin mapping and bulk-indexes all base
-        vectors.  If the index already exists and ``force=False`` the build
-        is skipped.
+        Creates an index with k-NN plugin mapping and bulk-indexes all training
+        vectors. If the index already exists and ``force=False`` the build is
+        skipped.
 
-        When ``remote_index_build=True`` the build time includes the full GPU
-        build flow: ingest → flush → wait for GPU build confirmation via kNN stats API.
+        Build time measures ingest and flush. When ``remote_index_build=True``
+        it also includes waiting for GPU build confirmation via the kNN stats
+        API. The final index refresh runs after build timing is recorded.
 
         Parameters
         ----------
@@ -790,20 +790,21 @@ class OpenSearchBackend(BenchmarkBackend):
 
         Iterates over every search-parameter combination defined in the index
         config, updating the index-level ``ef_search`` setting between runs.
-        Metrics (recall, QPS, latency) are collected per parameter set and
-        stored in ``SearchResult.metadata["per_search_param_results"]``.
+        Metrics (QPS, latency) are collected per parameter set and stored in
+        ``SearchResult.metadata["per_search_param_results"]``.
 
         The *neighbors* and *distances* arrays in the returned result reflect
         the **last** search-parameter combination (highest ef_search by
-        convention), while *recall* and *queries_per_second* are the averages
-        across all parameter combinations.
+        convention), while *queries_per_second* is the average across all
+        parameter combinations. This backend returns ``recall=0.0``; the
+        shared orchestrator path computes recall from the returned neighbors
+        and dataset ground truth.
 
         Parameters
         ----------
         dataset : Dataset
             Must have either non-empty ``query_vectors`` or a valid
-            ``query_file`` path.  Ground truth is loaded from
-            ``groundtruth_neighbors_file`` if available.
+            ``query_file`` path.
         indexes : List[IndexConfig]
             The first element is used; its ``search_params`` list defines the
             ef_search values to sweep.
@@ -854,7 +855,7 @@ class OpenSearchBackend(BenchmarkBackend):
                 success=True,
             )
 
-        # Dataset handles lazy loading from query/ground-truth files when needed.
+        # Dataset handles lazy loading from query files when needed.
         query_vectors = dataset.query_vectors
 
         if query_vectors.size == 0:
@@ -865,7 +866,6 @@ class OpenSearchBackend(BenchmarkBackend):
                 search_params=search_params_list,
             )
 
-        groundtruth = dataset.groundtruth_neighbors
         n_queries = query_vectors.shape[0]
 
         # Run search for each search-parameter combination
@@ -907,23 +907,17 @@ class OpenSearchBackend(BenchmarkBackend):
             elapsed = time.perf_counter() - t0
             qps = n_queries / elapsed if elapsed > 0 else 0.0
 
-            recall = 0.0
-            if groundtruth is not None:
-                recall = compute_recall(neighbors, groundtruth, k)
-
             per_param_results.append(
                 {
                     "search_params": sp,
                     "search_time_ms": elapsed * 1000.0,
                     "queries_per_second": qps,
-                    "recall": recall,
                 }
             )
             last_neighbors = neighbors
             last_distances = distances
 
         # Aggregate across all search-param combinations
-        avg_recall = float(np.mean([r["recall"] for r in per_param_results]))
         avg_qps = float(
             np.mean([r["queries_per_second"] for r in per_param_results])
         )
@@ -936,7 +930,7 @@ class OpenSearchBackend(BenchmarkBackend):
             distances=last_distances,
             search_time_ms=total_search_time_ms,
             queries_per_second=avg_qps,
-            recall=avg_recall,
+            recall=0.0,
             algorithm=self.algo,
             search_params=search_params_list,
             metadata={
