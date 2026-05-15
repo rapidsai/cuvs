@@ -2,6 +2,7 @@ Advanced Topics
 ===============
 
 - `Just-in-Time Compilation`_
+- :doc:`UDF Usage <udf_usage>`
 
 Just-in-Time Compilation
 ------------------------
@@ -16,7 +17,13 @@ Thus, the JIT compilation is a one-time cost and you can expect no loss in real 
 Currently, the following capabilities will trigger a JIT compilation:
 - IVF Flat search APIs: :doc:`cuvs::neighbors::ivf_flat::search() <cpp_api/neighbors_ivf_flat>`
 
+UDFs are available in the following APIs:
+-----------------------------------------
+- IVF Flat search (C++ only): experimental custom distance via ``search_params.metric_udf``; see
+  :doc:`udf_usage`.
+
 .. toctree::
    :maxdepth: 2
 
    jit_lto_guide
+   udf_usage
