@@ -1,3 +1,7 @@
+---
+slug: developer-guide/coding-guidelines/c-guidelines
+---
+
 # C Guidelines
 
 This page collects the engineering conventions that keep cuVS C APIs stable, predictable, and easy to use from downstream projects and language bindings. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when designing public C APIs, C wrappers, or C-facing documentation.

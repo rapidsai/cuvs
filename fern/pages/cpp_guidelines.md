@@ -1,3 +1,7 @@
+---
+slug: developer-guide/coding-guidelines/cpp-guidelines
+---
+
 # C++ Guidelines
 
 This page collects the engineering conventions that keep cuVS APIs stable, predictable, and easy to maintain. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when designing public APIs, writing CUDA/C++ implementation code, or preparing a change for review.
@@ -305,6 +309,14 @@ pre-commit run -a verify-copyright
 ### Testing
 
 Public APIs need direct test coverage because downstream projects rely on their compile-time and runtime behavior. Prefer tests that exercise the public entry point, cover edge cases, and make the expected behavior visible without requiring downstream projects to catch regressions first.
+
+### Performance Benchmarking
+
+The most important implementation details in cuVS are written in C++ and CUDA, so performance-sensitive changes need benchmarks with clear baselines. Benchmarks should show that regressions have not occurred, intended improvements can be reproduced consistently, and the implementation scales as expected across problem sizes and hardware configurations. For relevant indexing APIs, it is often preferable to use the [cuVS Bench Tool](cuvs_bench/index.md) for reproducible benchmarks.
+
+Attach benchmark results to the relevant GitHub pull request so future reviewers and contributors have an audit trail. Pull requests that change performance-critical code should not be merged without proper benchmarks in place.
+
+For multi-GPU APIs, include scaling measurements whenever the change affects communication, partitioning, synchronization, or resource use across ranks. A change that improves a single-GPU path should not silently reduce multi-GPU efficiency.
 
 ### Error Handling
 

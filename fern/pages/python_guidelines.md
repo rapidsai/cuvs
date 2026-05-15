@@ -1,3 +1,7 @@
+---
+slug: developer-guide/coding-guidelines/python-guidelines
+---
+
 # Python Guidelines
 
 This page collects Python-facing conventions for cuVS development. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when changing Python APIs, Cython bindings, Python packaging, or user-facing Python documentation.

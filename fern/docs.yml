@@ -27,7 +27,7 @@ check:
     broken-links: "error"
 redirects:
   - source: "/cuvs/developer-guide/guidelines/c-guidelines"
-    destination: "/cuvs/developer-guide/coding-guidelines/c-guidelines"
+    destination: "/cuvs/developer-guide/coding-guidelines/cpp-guidelines"
   - source: "/cuvs/developer-guide/guidelines/python-guidelines"
     destination: "/cuvs/developer-guide/coding-guidelines/python-guidelines"
 layout:

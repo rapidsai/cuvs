@@ -48,7 +48,7 @@ There are several benefits to using cuVS and GPUs for vector search, including
 
 1. Fast index build
 2. Latency critical and high throughput search
-3. Parameter tuning
+3. [Parameter tuning](tuning_guide.md)
 4. Cost savings
 5. Interoperability (build on GPU, deploy on CPU)
 6. Multiple language support
