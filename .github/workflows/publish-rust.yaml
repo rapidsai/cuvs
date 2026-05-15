@@ -17,9 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '13.1.1'
+          - '13.2.0'
     container:
-      image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      image: "rapidsai/ci-conda:26.08-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
