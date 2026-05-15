@@ -768,11 +768,95 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
+  set(distance_ns "cuvs::distance::detail")
+  set(pairwise_matrix_jit_dir
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/pairwise_matrix/jit_lto_kernels"
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "pairwise_matrix_@distance_abbrev@_data_@data_abbrev@_acc_@acc_abbrev@_out_@out_abbrev@_index_@index_abbrev@_layout_@layout_abbrev@_veclen_@veclen@"
+    MATRIX_JSON_FILE "${pairwise_matrix_jit_dir}/compute_distance_epilog_matrix.json"
+    KERNEL_INPUT_FILE "${pairwise_matrix_jit_dir}/pairwise_matrix_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${distance_ns}::fragment_tag_pairwise_matrix<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_@out_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_fin_op_identity, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/kernel"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "pairwise_matrix_@distance_abbrev@_data_@data_abbrev@_acc_@acc_abbrev@_out_@out_abbrev@_index_@index_abbrev@_fin_op_rbf_layout_@layout_abbrev@_veclen_@veclen@"
+    MATRIX_JSON_FILE "${pairwise_matrix_jit_dir}/compute_distance_epilog_rbf_matrix.json"
+    KERNEL_INPUT_FILE "${pairwise_matrix_jit_dir}/pairwise_matrix_rbf_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${distance_ns}::fragment_tag_pairwise_matrix<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_@out_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_fin_op_rbf, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/kernel_rbf"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "pairwise_matrix_compute_distance_@distance_abbrev@_data_@data_abbrev@_acc_@acc_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${pairwise_matrix_jit_dir}/compute_distance_matrix.json"
+    KERNEL_INPUT_FILE "${pairwise_matrix_jit_dir}/compute_distance_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${distance_ns}::fragment_tag_compute_distance<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "pairwise_matrix_compute_distance_@distance_abbrev@_data_@data_abbrev@_acc_@acc_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${pairwise_matrix_jit_dir}/compute_distance_rbf_matrix.json"
+    KERNEL_INPUT_FILE "${pairwise_matrix_jit_dir}/compute_distance_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${distance_ns}::fragment_tag_compute_distance<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance_rbf"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "pairwise_matrix_compute_distance_epilog_@distance_abbrev@_data_@data_abbrev@_acc_@acc_abbrev@_index_@index_abbrev@_layout_@layout_abbrev@_veclen_@veclen@"
+    MATRIX_JSON_FILE "${pairwise_matrix_jit_dir}/compute_distance_epilog_matrix.json"
+    KERNEL_INPUT_FILE "${pairwise_matrix_jit_dir}/compute_distance_epilog_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${distance_ns}::fragment_tag_compute_distance_epilog<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance_epilog"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "pairwise_matrix_compute_distance_epilog_@distance_abbrev@_data_@data_abbrev@_acc_@acc_abbrev@_index_@index_abbrev@_layout_@layout_abbrev@_veclen_@veclen@"
+    MATRIX_JSON_FILE "${pairwise_matrix_jit_dir}/compute_distance_epilog_rbf_matrix.json"
+    KERNEL_INPUT_FILE "${pairwise_matrix_jit_dir}/compute_distance_epilog_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${distance_ns}::fragment_tag_compute_distance_epilog<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
+    FRAGMENT_TAG_HEADER_FILES
+      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance_epilog_rbf"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
   endblock()
 
-  # Note that this matrix contains an `arch_includes` placeholder, since we don't currently have a
-  # way to do an item-wise transform on a list after computing the matrix product and before
-  # configuring the file
   generate_inst_matrix(
     pairwise_matrix_dispatch_inst_files
     MATRIX_JSON_FILE
