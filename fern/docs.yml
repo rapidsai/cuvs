@@ -25,6 +25,11 @@ colors:
 check:
   rules:
     broken-links: "error"
+redirects:
+  - source: "/cuvs/developer-guide/guidelines/c-guidelines"
+    destination: "/cuvs/developer-guide/coding-guidelines/c-guidelines"
+  - source: "/cuvs/developer-guide/guidelines/python-guidelines"
+    destination: "/cuvs/developer-guide/coding-guidelines/python-guidelines"
 layout:
   searchbar-placement: "header"
   page-width: "1376px"
@@ -59,11 +64,13 @@ navigation:
   - page: "Installation"
     path: "./pages/build.md"
   - section: "Getting Started"
+    path: "./pages/getting_started.md"
     contents:
       - section: "Introduction"
+        path: "./pages/introduction.md"
         contents:
           - page: "Vector Search"
-            path: "./pages/choosing_and_configuring_indexes.md"
+            path: "./pages/what_is_vector_search.md"
           - page: "Clustering"
             path: "./pages/clustering.md"
           - page: "Compression"
@@ -80,6 +87,7 @@ navigation:
         hidden: true
         path: "./pages/working_with_ann_indexes.md"
   - section: "User Guide"
+    path: "./pages/user_guide.md"
     contents:
       - page: "cuVS API Basics"
         hidden: true
@@ -87,10 +95,12 @@ navigation:
       - page: "Interoperability"
         hidden: true
         path: "./pages/api_interoperability.md"
-      - section: "API Guides"
+      - section: "API Guide"
+        path: "./pages/api_guide.md"
         collapsed: true
         contents:
           - section: "Clustering Guide"
+            path: "./pages/cluster/index.md"
             contents:
               - page: "K-Means"
                 path: "./pages/cluster/kmeans.md"
@@ -99,6 +109,7 @@ navigation:
               - page: "Spectral Clustering"
                 path: "./pages/cluster/spectral.md"
           - section: "Indexing Guide"
+            path: "./pages/neighbors/neighbors.md"
             contents:
               - page: "Brute-force"
                 path: "./pages/neighbors/bruteforce.md"
@@ -117,6 +128,7 @@ navigation:
               - page: "All-neighbors"
                 path: "./pages/neighbors/all_neighbors.md"
           - section: "Preprocessing Guide"
+            path: "./pages/preprocessing/index.md"
             contents:
               - page: "Binary Quantizer"
                 path: "./pages/preprocessing/binary_quantizer.md"
@@ -129,16 +141,19 @@ navigation:
               - page: "Spectral Embedding"
                 path: "./pages/preprocessing/spectral_embedding.md"
           - section: "Other APIs"
+            path: "./pages/other/index.md"
             contents:
               - page: "Pairwise Distances"
                 path: "./pages/other/pairwise_distances.md"
               - page: "K-selection"
                 path: "./pages/other/select_k.md"
       - section: "Benchmarking Guide"
+        path: "./pages/benchmarking_guide.md"
         contents:
           - page: "Methodologies"
             path: "./pages/comparing_indexes.md"
           - section: "cuVS Bench Tool"
+            path: "./pages/cuvs_bench/index.md"
             contents:
               - page: "Introduction"
                 path: "./pages/cuvs_bench/introduction.md"
@@ -160,10 +175,16 @@ navigation:
         path: "./pages/user_guide/abi_stability.md"
       - page: "Integration Patterns"
         path: "./pages/user_guide/integration_patterns.md"
+      - page: "References"
+        path: "./pages/references.md"
   - section: "Developer Guide"
+    path: "./pages/developer_guide.md"
     contents:
-      - section: "Guidelines"
+      - section: "Coding Guidelines"
+        path: "./pages/coding_guidelines.md"
         contents:
+          - page: "C Guidelines"
+            path: "./pages/c_guidelines.md"
           - page: "C++ Guidelines"
             path: "./pages/cpp_guidelines.md"
           - page: "Python Guidelines"
@@ -173,6 +194,8 @@ navigation:
         contents:
           - page: "ABI Stability"
             path: "./developer_guide/abi_stability.md"
+          - page: "JIT Compilation"
+            path: "./pages/jit_compilation.md"
           - page: "Link-time Optimization"
             path: "./pages/jit_lto_guide.md"
       - page: "Contributing"

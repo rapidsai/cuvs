@@ -1,6 +1,6 @@
 # cuVS: Vector Search and Clustering on the GPU
 
-Welcome to cuVS, the premier library for GPU-accelerated vector search and clustering! cuVS provides several core building blocks for constructing new algorithms, as well as end-to-end vector search and clustering algorithms for use either standalone or through a growing list of [integrations](integrations.md).
+cuVS is a GPU-accelerated library for vector search, clustering, and preprocessing. It provides both core building blocks for constructing new algorithms and end-to-end algorithms that can be used directly or through a growing list of [integrations](integrations.md).
 
 ## Useful Resources
 
@@ -14,25 +14,25 @@ Welcome to cuVS, the premier library for GPU-accelerated vector search and clust
 
 ## What is cuVS?
 
-cuVS contains state-of-the-art implementations of several algorithms for running approximate and exact nearest neighbors and clustering on the GPU. It can be used directly or through the various databases and other libraries that have integrated it. The primary goal of cuVS is to simplify the use of GPUs for vector similarity search and clustering.
+cuVS contains state-of-the-art implementations of several algorithms for running approximate and exact nearest neighbors and clustering on the GPU. It can be used directly or through the various databases and other libraries that have integrated it. The primary goal of cuVS is to simplify the use of GPUs for vector similarity search, preprocessing, and clustering. For a broader introduction, start with the [introductory materials](introduction.md) in Getting Started.
 
-Vector search is an information retrieval method that has been growing in popularity over the past few  years, partly because of the rising importance of multimedia embeddings created from unstructured data and the need to perform semantic search on the embeddings to find items which are semantically similar to each other.
-
-Vector search is also used in *data mining and machine learning* tasks and comprises an important step in many *clustering* and *visualization* algorithms like [UMAP](https://arxiv.org/abs/2008.00325), [t-SNE](https://lvdmaaten.github.io/tsne/), K-means, and [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html).
+Vector search is an information retrieval method for finding semantically similar items in embedding spaces, especially when working with multimedia embeddings created from unstructured data. It is also used in *data mining and machine learning* tasks and comprises an important step in many *clustering* and *visualization* algorithms like [UMAP](https://arxiv.org/abs/2008.00325), [t-SNE](https://lvdmaaten.github.io/tsne/), K-means, and [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html).
 
 Finally, faster vector search enables interactions between dense vectors and graphs. Converting a pile of dense vectors into nearest neighbors graphs unlocks the entire world of graph analysis algorithms, such as those found in [GraphBLAS](https://graphblas.org/) and [cuGraph](https://github.com/rapidsai/cugraph).
 
-Below are some common use-cases for vector search
+## Where is cuVS used?
+
+These are common places where vector search appears. For more examples, see [Use-cases](use_cases.md) and [Integrations](integrations.md).
 
 ### Semantic search
-- Generative AI & Retrieval augmented generation (RAG)
+- Generative AI: RAG & Agentic AI
 - Recommender systems
 - Computer vision
 - Image search
 - Text search
 - Audio search
 - Molecular search
-- Model training
+- Model Training: LLMs & Transformers
 
 ### Data mining
 - Clustering algorithms
@@ -61,14 +61,3 @@ In addition to the items above, cuVS shoulders the responsibility of keeping non
 cuVS is built on top of the RAPIDS RAFT library of high performance machine learning primitives and provides all the necessary routines for vector search and clustering on the GPU.
 
 <img alt="cuVS is built on top of low-level CUDA libraries and provides many important routines that enable vector search and clustering on the GPU" src="/assets/images/tech_stack.png" />
-
-## Pages
-
-- [Installation](build.md)
-- [Getting Started](getting_started.md)
-- [Integrations](integrations.md)
-- [cuVS Bench](cuvs_bench/introduction.md)
-- [Advanced Topics](advanced_topics.md)
-- [Contributing](contributing.md)
-- [C++ Guidelines](cpp_guidelines.md)
-- [Python Guidelines](python_guidelines.md)

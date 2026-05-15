@@ -2,7 +2,9 @@
 
 Vector search indexes and vector databases solve related but different problems. A vector search index is the algorithmic structure used to find nearest neighbors. A vector database is a production system that stores vectors, manages writes, handles failures, scales across machines, and uses one or more vector search indexes internally.
 
-For guidance on choosing an index, see the [primer on vector search indexes](choosing_and_configuring_indexes.md).
+For guidance on choosing an index, see [What is Vector Search?](what_is_vector_search.md).
+
+If you are looking for cuVS-powered vector databases and search engines, see the [Databases section of Integrations](integrations.md#databases).
 
 This page explains how vector databases use indexes internally, why local and global partitioning behave differently, and how hybrid designs combine both approaches. By the end, you should understand which database architecture you are tuning and why that changes the search, ingestion, and compaction tradeoffs.
 
@@ -60,4 +62,12 @@ Vector indexes are often tuned like machine learning models: sample representati
 
 Locally partitioned indexes are usually easier to tune for index quality and latency because each segment can be treated as a smaller local problem. Globally partitioned indexes are harder to tune at scale because parameters such as `n_lists` and `n_probes` depend on the full dataset size and vector distribution, so the problem cannot be broken into independent segments as easily.
 
-Refer to the [tuning guide](tuning_guide.md) for more detail.
+Refer to [Tuning Indexes](tuning_guide.md) for more detail.
+
+## Conclusion
+
+A vector database is more than a vector search index. It combines indexing with storage, ingestion, filtering, consistency, compaction, scaling, and operational controls.
+
+The most important architectural question is how the database partitions vectors. Local partitioning is straightforward to operate, but each query may need to search every partition. Global partitioning pays more cost up front to preserve vector locality, which can reduce query work and improve cache behavior. Hybrid designs combine segment-oriented ingestion with globally assigned partitions to balance operational simplicity with better search efficiency.
+
+When choosing or tuning a vector database, consider both algorithmic metrics such as recall and latency and system-level constraints such as freshness, memory, disk, compaction, and scale-out behavior.

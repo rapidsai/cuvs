@@ -48,4 +48,4 @@ Vector search can be used to inspect *embedding quality*. Nearest-neighbor examp
 
 ## Choosing a starting point
 
-Start with [Vector Search](choosing_and_configuring_indexes.md) when you need to choose an index. Start with [Vector Database](vector_databases_vs_vector_search.md) when you are deciding between a standalone index library and a managed database or search engine. Start with the [Clustering Guide](cluster/kmeans.md) or [Preprocessing Guide](preprocessing/product_quantization.md) when the goal is batch analysis, compression, or dataset preparation rather than online retrieval.
+Start with [Vector Search](what_is_vector_search.md) when you need to choose an index. Start with [Vector Database](vector_databases_vs_vector_search.md) when you are deciding between a standalone index library and a managed database or search engine. Start with the [Clustering Guide](cluster/kmeans.md) or [Preprocessing Guide](preprocessing/product_quantization.md) when the goal is batch analysis, compression, or dataset preparation rather than online retrieval.

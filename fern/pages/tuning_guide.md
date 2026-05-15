@@ -2,7 +2,7 @@
 
 Tuning means choosing parameters that meet recall, latency, throughput, memory, freshness, and build-time goals. For cuVS workflows, there are two related problems: tuning a vector search index and tuning a vector database that uses one or more indexes internally.
 
-For background on index choices, see the [primer on vector search indexes](choosing_and_configuring_indexes.md). For the difference between an index and a vector database, see [Vector Database](vector_databases_vs_vector_search.md).
+For background on index choices, see [What is Vector Search?](what_is_vector_search.md). For the difference between an index and a vector database, see [Vector Database](vector_databases_vs_vector_search.md).
 
 This page explains how to tune standalone indexes, how that maps to common hyperparameter optimization workflows, and how tuning changes when the index is embedded inside a locally or globally partitioned vector database.
 

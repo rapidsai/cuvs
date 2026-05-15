@@ -47,7 +47,7 @@ For database architecture terms, see the [Vector Database](vector_databases_vs_v
 
 Representative-sample tuning is appropriate when the benchmarked sample matches the unit that will actually be searched in production. For locally partitioned systems, that usually means tuning against the expected partition or segment size, not the full database size. For globally partitioned systems, tuning is more dependent on the full data distribution, so random samples need to be used carefully.
 
-For a step-by-step workflow, see the [tuning guide](tuning_guide.md).
+For a step-by-step workflow, see [Tuning Indexes](tuning_guide.md).
 
 ## Methodology summary
 

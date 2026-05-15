@@ -2,11 +2,17 @@
 
 Clustering groups similar vectors without requiring pre-labeled examples. Instead of asking for the nearest neighbors of one query, a clustering algorithm looks across a dataset and assigns vectors to groups that share some notion of similarity.
 
-In vector search systems, clustering is often used before search rather than after it. It can summarize data, find structure, create partitions, train quantizers, and make large datasets easier to index. The right clustering method depends on whether you need compact centroids, a hierarchy of connected components, or graph-aware groups.
+Many clustering approaches use nearest-neighbor-style operations internally. For example, K-Means assigns each vector to its nearest centroid, which turns the assignment step into a nearest-neighbor search over the current set of centroids.
+
+Clustering is especially important for vectors because vectors do not have a natural lexical order. Text, relational, and other structured data can often be organized with lexicographic or key-based ordering. Vectors instead have geometric relationships: nearby points are similar, distant points are less similar, and useful organization depends on preserving spatial locality. Clustering provides that organization by grouping vectors that occupy nearby regions of the embedding space.
+
+In vector search systems, clustering is often used before search rather than after it. It can summarize data, find structure, create partitions, train quantizers, and make large datasets easier to index. The right clustering method depends on whether you need compact centroids, density-based regions, a hierarchy of connected components, or graph-aware groups.
 
 This page introduces the main clustering methods used around cuVS workflows: K-Means, single-linkage clustering, and spectral clustering. By the end, you should understand why K-Means is often the practical default for vector search at scale and when the other methods are a better fit.
 
-## Quick comparison
+<img alt="A four-panel overview comparing centroid-based, hierarchical, density-based, and graph-based clustering methods." src="/assets/images/clustering_methods_overview.png" />
+
+## Clustering Algorithms in cuVS
 
 | Method | How it groups data | Good fit | Main tradeoff |
 | --- | --- | --- | --- |
@@ -14,7 +20,7 @@ This page introduces the main clustering methods used around cuVS workflows: K-M
 | [Single-linkage](cluster/single_linkage.md) | Builds a hierarchy by repeatedly connecting the closest clusters | Dendrograms, connected components, and chain-like cluster structure | Can merge through thin bridges between groups |
 | [Spectral clustering](cluster/spectral.md) | Builds a graph, embeds the graph with eigenvectors, then clusters the embedding | Curved, connected, or graph-shaped clusters | More expensive because it needs graph and eigensolver work |
 
-## K-Means
+### K-Means
 
 K-Means learns `k` centroid vectors and assigns each data vector to the closest centroid. Each centroid acts like a representative for one group. The algorithm alternates between assigning vectors to centroids and updating centroids from the assigned vectors.
 
@@ -24,7 +30,7 @@ The main limitation is shape. K-Means works best when clusters are roughly compa
 
 See the [K-Means](cluster/kmeans.md) guide for API examples and memory guidance.
 
-## Single-linkage clustering
+### Single-Linkage Clustering
 
 Single-linkage clustering is hierarchical. It starts with each vector as its own cluster, then repeatedly merges the two clusters connected by the shortest distance between any pair of points. The result is a tree of merges called a dendrogram.
 
@@ -34,7 +40,7 @@ The same behavior can also be a weakness. Because a single close pair can merge 
 
 See the [Single-linkage](cluster/single_linkage.md) guide for API examples and tuning notes.
 
-## Spectral clustering
+### Spectral Clustering
 
 Spectral clustering builds a graph over the data, computes an embedding from that graph, and then clusters the embedding, often with K-Means. It uses connectivity rather than only direct distance to centroids.
 
