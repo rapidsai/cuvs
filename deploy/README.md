@@ -1,6 +1,6 @@
 # OpenSearch kNN Benchmark
 
-Docker Compose benchmark comparing CPU and GPU kNN index builds in OpenSearch using [cuvs-bench](https://github.com/jrbourbeau/cuvs/tree/main/python/cuvs_bench). Supports both local CPU builds and [GPU-accelerated remote index builds](https://docs.opensearch.org/latest/vector-search/remote-index-build/) via the `REMOTE_INDEX_BUILD` environment variable.
+Docker Compose benchmark comparing CPU and GPU kNN index builds in OpenSearch using `cuvs-bench`. Supports both local CPU builds and [GPU-accelerated remote index builds](https://docs.opensearch.org/latest/vector-search/remote-index-build/) via the `REMOTE_INDEX_BUILD` environment variable.
 
 ## How it works
 
@@ -31,7 +31,7 @@ OpenSearch flushes a segment
 - **GPU mode only** (`--profile gpu`, `REMOTE_INDEX_BUILD=true`):
   - NVIDIA GPU with CUDA support
   - NVIDIA Container Toolkit — [installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-  - AWS S3 bucket (or S3-compatible store) for staging vectors and built indexes
+  - AWS S3 bucket for staging vectors and built indexes
 
 ## Usage
 
@@ -50,7 +50,7 @@ export DATASET_PATH=/path/to/ann-benchmark-datasets   # directory containing dat
 GPU mode also requires S3 credentials:
 
 ```bash
-export S3_BUCKET=my-opensearch-vectors                 # S3 bucket name
+export S3_BUCKET=opepsearch-s3-bucket             # S3 bucket name
 export AWS_ACCESS_KEY_ID=<access-key-id>
 export AWS_SECRET_ACCESS_KEY=<secret-access-key>
 ```
@@ -63,6 +63,8 @@ export AWS_DEFAULT_REGION=us-east-1        # AWS region for the S3 bucket (defau
 export DATASET=sift-128-euclidean          # default
 export BENCH_GROUPS=test                   # test | base (default: test)
 export K=10                                # number of neighbors (default: 10)
+export BATCH_SIZE=10000                    # query/bulk batch size (default: 10000)
+export REMOTE_BUILD_TIMEOUT=1800           # seconds to wait for remote builds (default: 1800)
 ```
 
 Start all services:
@@ -90,8 +92,8 @@ docker compose down -v
 3. **GPU mode only**: Applies cluster settings to enable remote index build and point OpenSearch at the builder service
 4. Runs `cuvs-bench` build phase (handled entirely by the OpenSearch backend):
    - Creates the kNN index and bulk-ingests dataset vectors
-   - **GPU mode**: Waits for all ingestion-time GPU builds to complete, then force-merges to one segment to trigger the final GPU build and polls the kNN stats API every 5 s until the build is confirmed complete
-   - **CPU mode**: Force-merges the index to one segment
+   - **GPU mode**: Flushes segments, waits for all submitted remote GPU builds to complete, and polls the kNN stats API every 5 s until the build is confirmed complete
+   - **CPU mode**: Flushes and refreshes the local OpenSearch index
    - Records total build time in the result
 5. Runs `cuvs-bench` search phase and prints a recall/QPS/latency table
 6. Exports benchmark JSON results to CSV (`cuvs_bench.run --data-export`)
@@ -138,13 +140,13 @@ $DATASET_PATH/
 | Group | Build params | Search params | Use case |
 |---|---|---|---|
 | `test` | 1 combo (m=16, ef_construction=100) | ef_search: 50, 100 | Quick smoke test |
-| `base` | 16 combos (m=[32,64,96,128] × ef_construction=[64,128,256,512]) | ef_search: 10–800 | Standard benchmark |
+| `base` | 9 combos (m=[32,64,96] × ef_construction=[64,128,256]) | ef_search: 10–800 | Standard benchmark |
 
 ## GPU build verification
 
-The cuvs-bench OpenSearch backend polls the kNN stats API every 5 seconds, waiting for `index_build_success_count` to increment by the expected number of new builds and for all in-flight flush and merge operations to reach zero.
+The cuvs-bench OpenSearch backend snapshots remote-build stats before ingest, then polls the kNN stats API every 5 seconds until `index_build_success_count` catches up with `build_request_success_count` and all in-flight flush and merge operations reach zero.
 
-The build raises a `TimeoutError` (causing the `bench` container to exit with code 1) if the expected number of successful builds is not confirmed within 600 seconds.
+The build raises a `TimeoutError` (causing the `bench` container to exit with code 1) if the expected successful builds are not confirmed within `REMOTE_BUILD_TIMEOUT` seconds. If no remote build is observed shortly after ingest, the backend raises an error that suggests lowering `REMOTE_BUILD_SIZE_MIN`; leave it unset to use OpenSearch's default threshold, or set it explicitly to override that value.
 
 ## CPU vs GPU comparison
 
@@ -177,9 +179,9 @@ docker compose run --rm --no-deps bench \
     pytest /opt/cuvs/python/cuvs_bench/cuvs_bench/tests/test_opensearch.py -v
 ```
 
-### Integration tests (live OpenSearch node)
+### Integration tests (live OpenSearch node only)
 
-Requires a running OpenSearch node. S3 credentials are not required for these tests.
+Requires a running OpenSearch node. S3 credentials and the GPU profile are not required for these tests.
 
 ```bash
 docker compose up -d --wait opensearch
@@ -191,22 +193,24 @@ docker compose run --rm --no-deps \
 
 ### Remote index build integration tests (full GPU stack)
 
-Requires the full stack (OpenSearch and the remote index builder) and S3 credentials.
+Requires the full stack (OpenSearch and the remote index builder), S3 credentials, and a GPU-capable host. Export the AWS credentials and region before starting OpenSearch; its S3 keystore is populated at container startup. Use `--profile gpu` when starting the services so Docker Compose includes `remote-index-builder`. The pytest command itself does not need the profile flag because it runs against the already-started services.
 
 ```bash
+export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
 docker compose --profile gpu up -d --wait opensearch remote-index-builder
 docker compose run --rm --no-deps \
     -e OPENSEARCH_URL=http://opensearch:9200 \
     -e BUILDER_URL=http://remote-index-builder:1025 \
     -e S3_BUCKET=${S3_BUCKET} \
-    -e AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
-    -e AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
-    -e AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
+    -e AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} \
+    -e S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID} \
+    -e S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY} \
+    -e S3_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
     bench \
     pytest /opt/cuvs/python/cuvs_bench/cuvs_bench/tests/test_opensearch.py -v -m integration
 ```
 
-This runs all integration tests including `TestOpenSearchRemoteIndexBuildIntegration`, which verifies the full GPU build flow end-to-end.
+This lets the pytest `integration` marker decide which tests run. With only OpenSearch running, remote-build tests skip because the GPU builder and S3 environment are unavailable. With the GPU stack running, the same marker includes the remote-build coverage.
 
 ## Ports
 

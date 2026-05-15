@@ -5,8 +5,8 @@ FROM opensearchproject/opensearch:3.6.0
 # upload raw vectors and download GPU-built indexes via S3.
 RUN /usr/share/opensearch/bin/opensearch-plugin install --batch repository-s3
 
-# entrypoint.sh populates the keystore from S3_ACCESS_KEY / S3_SECRET_KEY
-# environment variables at container startup, then execs opensearch.
+# entrypoint.sh populates the keystore from AWS credential environment
+# variables at container startup, then execs opensearch.
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

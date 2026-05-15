@@ -4,20 +4,44 @@ set -e
 DATASET="${DATASET:-sift-128-euclidean}"
 BENCH_GROUPS="${BENCH_GROUPS:-test}"
 K="${K:-10}"
-# Auto-detect GPU mode: remote-index-builder only appears in Docker DNS when
-# started via --profile gpu. DNS entries are registered at network setup time
-# (before containers run), so this check is reliable by the time entrypoint
-# executes (OpenSearch healthy check alone takes 30+ seconds).
-if getent hosts remote-index-builder > /dev/null 2>&1; then
+BATCH_SIZE="${BATCH_SIZE:-10000}"
+ALGORITHM="opensearch_faiss_hnsw"
+
+wait_for_builder() {
     echo "remote-index-builder detected — waiting for it to be ready..."
     until python3 -c 'import socket; socket.create_connection(("remote-index-builder", 1025), 2).close()' 2>/dev/null; do
         sleep 5
     done
     echo "remote-index-builder is ready."
-    export REMOTE_INDEX_BUILD=true
+}
+
+if [ -n "${REMOTE_INDEX_BUILD:-}" ]; then
+    case "${REMOTE_INDEX_BUILD,,}" in
+        true|1|yes)
+            wait_for_builder
+            export REMOTE_INDEX_BUILD=true
+            ;;
+        false|0|no)
+            echo "REMOTE_INDEX_BUILD=false — using CPU build mode."
+            export REMOTE_INDEX_BUILD=false
+            ;;
+        *)
+            echo "ERROR: REMOTE_INDEX_BUILD must be true or false when set (got '${REMOTE_INDEX_BUILD}')" >&2
+            exit 1
+            ;;
+    esac
 else
-    echo "remote-index-builder not available — using CPU build mode."
-    export REMOTE_INDEX_BUILD=false
+    # Auto-detect GPU mode: remote-index-builder only appears in Docker DNS when
+    # started via --profile gpu. DNS entries are registered at network setup time
+    # (before containers run), so this check is reliable by the time entrypoint
+    # executes (OpenSearch healthy check alone takes 30+ seconds).
+    if getent hosts remote-index-builder > /dev/null 2>&1; then
+        wait_for_builder
+        export REMOTE_INDEX_BUILD=true
+    else
+        echo "remote-index-builder not available — using CPU build mode."
+        export REMOTE_INDEX_BUILD=false
+    fi
 fi
 
 # Step 1: Download dataset (skipped automatically if already present)
@@ -32,17 +56,17 @@ python -u run.py
 python -m cuvs_bench.run --data-export \
     --dataset "$DATASET" \
     --dataset-path /data/datasets \
-    --algorithms opensearch_faiss_hnsw \
+    --algorithms "$ALGORITHM" \
     --groups "$BENCH_GROUPS" \
     --count "$K" \
-    --batch-size 10000 \
+    --batch-size "$BATCH_SIZE" \
     --search-mode latency
 
 # Step 4: Plot — PNGs written to /data/datasets (mounted from host $DATASET_PATH)
 python -m cuvs_bench.plot \
     --dataset "$DATASET" \
     --dataset-path /data/datasets \
-    --algorithms opensearch_faiss_hnsw \
+    --algorithms "$ALGORITHM" \
     --groups "$BENCH_GROUPS" \
     --count "$K" \
     --output-filepath /data/datasets

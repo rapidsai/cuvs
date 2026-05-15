@@ -27,9 +27,12 @@
 #   AWS_SESSION_TOKEN       STS session token (required for temporary credentials)
 #   AWS_DEFAULT_REGION      AWS region for the S3 bucket (default: us-east-1)
 #   REMOTE_INDEX_BUILD      Override GPU/CPU mode detection (true/false); normally auto-detected
+#   REMOTE_BUILD_SIZE_MIN   Optional minimum segment size override for remote builds
+#   REMOTE_BUILD_TIMEOUT    Remote build wait timeout in seconds (default: 1800)
 #   DATASET                 Dataset name (default: sift-128-euclidean)
-#   BENCH_GROUPS            Parameter sweep group: test | base | large (default: test)
+#   BENCH_GROUPS            Parameter sweep group: test | base (default: test)
 #   K                       Number of neighbors to search for (default: 10)
+#   BATCH_SIZE              cuvs-bench query/bulk batch size (default: 10000)
 #
 # Usage:
 #   CPU:  docker compose up --build
@@ -41,6 +44,12 @@
 #   remote-index-builder downloads from S3, builds index on GPU, uploads result
 #   OpenSearch downloads the finished index from S3 and merges it into the shard
 
+x-aws-env: &aws-env
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+
 services:
 
   # ── OpenSearch ───────────────────────────────────────────────────────────────
@@ -48,12 +57,8 @@ services:
     build:
       context: ./opensearch
     environment:
-      - OPENSEARCH_JAVA_OPTS=-Xms16g -Xmx16g
-      # S3 credentials — entrypoint.sh writes these into the keystore at startup.
-      # If unset, OpenSearch starts without S3 configured (remote index build unavailable).
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      <<: *aws-env
+      OPENSEARCH_JAVA_OPTS: -Xms16g -Xmx16g
     ulimits:
       nofile:
         soft: 65536
@@ -76,10 +81,7 @@ services:
     profiles: [gpu]
     image: opensearchproject/remote-vector-index-builder:api-latest
     environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      <<: *aws-env
     ports:
       - "1025:1025"
     healthcheck:
@@ -106,19 +108,23 @@ services:
       opensearch:
         condition: service_healthy
     environment:
-      - OPENSEARCH_URL=http://opensearch:9200
-      - OPENSEARCH_HOST=opensearch
-      - OPENSEARCH_PORT=9200
-      - BUILDER_URL=http://remote-index-builder:1025
-      - S3_BUCKET=${S3_BUCKET:-}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
-      - DATASET=${DATASET:-sift-128-euclidean}
-      - DATASET_PATH=/data/datasets
-      - BENCH_GROUPS=${BENCH_GROUPS:-test}
-      - K=${K:-10}
+      <<: *aws-env
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+      BUILDER_URL: http://remote-index-builder:1025
+      REMOTE_INDEX_BUILD: ${REMOTE_INDEX_BUILD:-}
+      REMOTE_BUILD_SIZE_MIN: ${REMOTE_BUILD_SIZE_MIN:-}
+      REMOTE_BUILD_TIMEOUT: ${REMOTE_BUILD_TIMEOUT:-1800}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:-}
+      S3_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      DATASET: ${DATASET:-sift-128-euclidean}
+      DATASET_PATH: /data/datasets
+      BENCH_GROUPS: ${BENCH_GROUPS:-test}
+      K: ${K:-10}
+      BATCH_SIZE: ${BATCH_SIZE:-10000}
     volumes:
       - ${DATASET_PATH:-/tmp/datasets}:/data/datasets
     restart: "no"

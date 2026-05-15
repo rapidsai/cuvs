@@ -117,6 +117,7 @@ curl -X PUT http://localhost:9200/my-vectors \
     "settings": {
       "index.knn": true,
       "index.knn.remote_index_build.enabled": true,
+      "index.knn.remote_index_build.size.min": "1kb",
       "number_of_shards": 1,
       "number_of_replicas": 1
     },
@@ -140,11 +141,11 @@ curl -X PUT http://localhost:9200/my-vectors \
   }'
 ```
 
-GPU builds are only available with the `faiss` engine. The `lucene` engine always builds locally.
+GPU builds are only available with the `faiss` engine. The `lucene` engine always builds locally. The low `size.min` value above is useful for demos because it forces small flushed segments onto the remote path; use OpenSearch's default or a larger production threshold for real workloads.
 
 ## Verifying the GPU build
 
-The `remote-index-build/` directory contains an end-to-end demo script that ingests 200,000 random vectors, triggers a force-merge, and confirms the GPU build completed by polling S3 for the resulting `.faiss` file.
+The `remote-index-build/` directory contains an end-to-end demo script that ingests 200,000 random vectors, flushes the index to trigger remote builds, and confirms the GPU build completed by polling S3 for the resulting `.faiss` file.
 
 Run it inside a temporary container on the same Docker network:
 
@@ -157,6 +158,8 @@ docker compose run --rm \
   -e AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
   -e AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
   -e AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1} \
+  -e REMOTE_BUILD_SIZE_MIN=${REMOTE_BUILD_SIZE_MIN:-} \
+  -e REMOTE_BUILD_TIMEOUT=${REMOTE_BUILD_TIMEOUT:-1800} \
   -v $(pwd)/remote-index-build:/app/remote-index-build \
   --no-deps bench \
   python remote-index-build/run.py

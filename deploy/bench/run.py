@@ -7,8 +7,8 @@ Steps:
   2. Configure cluster settings for GPU remote index build
   3. Build kNN index via cuvs-bench:
        a. Bulk-ingest dataset vectors
-       b. Trigger force-merge to kick off the GPU build
-       c. Poll S3 for .faiss files confirming GPU build completion
+       b. Flush segments to kick off remote GPU builds when enabled
+       c. Poll kNN stats until every submitted remote build completes
   4. Run cuvs-bench search benchmarks and print results
   5. Write gbench-compatible JSON result files so cuvs_bench.run --data-export
      and cuvs_bench.plot can be used for CSV export and plotting
@@ -29,6 +29,8 @@ OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", "9200"))
 BUILDER_URL     = os.environ.get("BUILDER_URL",     "http://remote-index-builder:1025")
 
 REMOTE_INDEX_BUILD = os.environ.get("REMOTE_INDEX_BUILD", "false").lower() == "true"
+REMOTE_BUILD_SIZE_MIN = os.environ.get("REMOTE_BUILD_SIZE_MIN", "").strip()
+REMOTE_BUILD_TIMEOUT = int(os.environ.get("REMOTE_BUILD_TIMEOUT", "1800"))
 
 S3_BUCKET  = os.environ.get("S3_BUCKET", "")
 S3_REGION  = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
@@ -37,7 +39,9 @@ DATASET      = os.environ.get("DATASET",       "sift-128-euclidean")
 DATASET_PATH = os.environ.get("DATASET_PATH",  "/data/datasets")
 BENCH_GROUPS = os.environ.get("BENCH_GROUPS",  "test")
 K            = int(os.environ.get("K", "10"))
+BATCH_SIZE   = int(os.environ.get("BATCH_SIZE", "10000"))
 
+ALGORITHM = "opensearch_faiss_hnsw"
 REPO_NAME = "vector-repo"
 
 session = requests.Session()
@@ -48,6 +52,16 @@ session.headers.update({"Content-Type": "application/json"})
 
 def banner(msg: str) -> None:
     print(f"\n{'─'*60}\n  {msg}\n{'─'*60}")
+
+
+def _recall_for_entry(
+    result: SearchResult, entry_index: int, entry_count: int
+) -> float | None:
+    # cuVS computes recall in the orchestrator from SearchResult.neighbors. The
+    # OpenSearch backend returns neighbors for the final search-parameter run.
+    if entry_index == entry_count - 1:
+        return float(result.recall)
+    return None
 
 
 # ── OpenSearch setup ──────────────────────────────────────────────────────────
@@ -135,22 +149,33 @@ def write_result_files(
     build_list  = [r for r in build_results  if isinstance(r, BuildResult)]
     search_list = [r for r in search_results if isinstance(r, SearchResult)]
     search_benchmarks = []
+    skipped_without_recall = 0
     for build_r, search_r in zip(build_list, search_list):
         if not search_r.success or not build_r.index_path:
             continue
-        for entry in (search_r.metadata or {}).get("per_search_param_results", []):
-            search_benchmarks.append({
-                "name": build_r.index_path,
-                "real_time": entry["search_time_ms"],
-                "time_unit": "ms",
-                "Recall": entry["recall"],
-                "items_per_second": entry["queries_per_second"],
-                # Latency field expected by data_export in seconds
-                "Latency": entry["search_time_ms"] / 1000.0,
-            })
+        per_param = (search_r.metadata or {}).get("per_search_param_results", [])
+        for entry_index, entry in enumerate(per_param):
+            recall = _recall_for_entry(search_r, entry_index, len(per_param))
+            if recall is None:
+                skipped_without_recall += 1
+                continue
+            latency_ms = float(entry["search_time_ms"])
+            search_benchmarks.append(
+                {
+                    "name": build_r.index_path,
+                    "real_time": latency_ms,
+                    "time_unit": "ms",
+                    "Recall": recall,
+                    "items_per_second": float(entry["queries_per_second"]),
+                    # Latency field expected by data_export in seconds
+                    "Latency": latency_ms / 1000.0,
+                }
+            )
 
     build_file  = os.path.join(build_dir,  f"{algo},{groups}.json")
-    search_file = os.path.join(search_dir, f"{algo},{groups},k{k},bs{batch_size}.json")
+    search_file = os.path.join(
+        search_dir, f"{algo},{groups},k{k},bs{batch_size}.json"
+    )
 
     with open(build_file, "w") as fh:
         json.dump({"benchmarks": build_benchmarks}, fh, indent=2)
@@ -160,13 +185,23 @@ def write_result_files(
     print(f"\n  Result files written:")
     print(f"    {build_file}")
     print(f"    {search_file}")
+    if skipped_without_recall:
+        print(
+            "    skipped "
+            f"{skipped_without_recall} search rows without per-parameter recall"
+        )
 
 
 # ── results ───────────────────────────────────────────────────────────────────
 
-def _print_result_row(params: dict, recall: float, qps: float, latency_ms: float) -> None:
+def _print_result_row(
+    params: dict, recall: float | None, qps: float | None, latency_ms: float | None
+) -> None:
     params_str = ", ".join(f"{k}={v}" for k, v in params.items())
-    print(f"  {params_str:<40}  {recall:<12.4f}  {qps:>8.1f}  {latency_ms:>12.2f}")
+    recall_str = "n/a" if recall is None else f"{recall:.4f}"
+    qps_str = "n/a" if qps is None else f"{qps:.1f}"
+    latency_str = "n/a" if latency_ms is None else f"{latency_ms:.2f}"
+    print(f"  {params_str:<40}  {recall_str:<12}  {qps_str:>8}  {latency_str:>12}")
 
 
 def print_results(results: list) -> None:
@@ -179,13 +214,25 @@ def print_results(results: list) -> None:
     header = f"  {'params':<40}  {'recall@'+str(K):<12}  {'QPS':>8}  {'latency (ms)':>12}"
     print(header)
     print("  " + "─" * (len(header) - 2))
+    missing_recall_rows = 0
     for r in search_results:
-        per_param = (r.metadata or {}).get("per_search_param_results")
-        if per_param:
-            for entry in per_param:
-                _print_result_row(entry["search_params"], entry["recall"], entry["queries_per_second"], entry["search_time_ms"])
-        else:
-            _print_result_row(r.search_params[0] if r.search_params else {}, r.recall, r.queries_per_second, r.search_time_ms)
+        per_param = (r.metadata or {}).get("per_search_param_results", [])
+        entry_count = len(per_param)
+        for entry_index, entry in enumerate(per_param):
+            recall = _recall_for_entry(r, entry_index, entry_count)
+            if recall is None:
+                missing_recall_rows += 1
+            _print_result_row(
+                entry["search_params"],
+                recall,
+                float(entry["queries_per_second"]),
+                float(entry["search_time_ms"]),
+            )
+    if missing_recall_rows:
+        print(
+            "\n  Note: this cuVS version does not report recall for every "
+            "OpenSearch search parameter row."
+        )
 
 
 # ── entrypoint ────────────────────────────────────────────────────────────────
@@ -203,7 +250,10 @@ def main() -> None:
     if REMOTE_INDEX_BUILD:
         print(f"  GPU builder        : {BUILDER_URL}")
         print(f"  S3 bucket          : s3://{S3_BUCKET}/knn-indexes/  (region: {S3_REGION})")
+        print(f"  Build size minimum : {REMOTE_BUILD_SIZE_MIN or 'OpenSearch default'}")
+        print(f"  Build timeout      : {REMOTE_BUILD_TIMEOUT}s")
     print(f"  Dataset            : {DATASET}  (path: {DATASET_PATH})")
+    print(f"  Algorithm          : {ALGORITHM}")
     print(f"  Groups             : {BENCH_GROUPS}  k={K}")
 
     if REMOTE_INDEX_BUILD:
@@ -216,7 +266,7 @@ def main() -> None:
     bench_kwargs = dict(
         dataset=DATASET,
         dataset_path=DATASET_PATH,
-        algorithms="opensearch_faiss_hnsw",
+        algorithms=ALGORITHM,
         groups=BENCH_GROUPS,
         host=OPENSEARCH_HOST,
         port=OPENSEARCH_PORT,
@@ -224,6 +274,10 @@ def main() -> None:
         verify_certs=False,
         remote_index_build=REMOTE_INDEX_BUILD,
     )
+    if REMOTE_INDEX_BUILD:
+        bench_kwargs["remote_build_timeout"] = REMOTE_BUILD_TIMEOUT
+        if REMOTE_BUILD_SIZE_MIN:
+            bench_kwargs["remote_build_size_min"] = REMOTE_BUILD_SIZE_MIN
     # ── Build phase ───────────────────────────────────────────────────────────
     mode = "GPU remote build" if REMOTE_INDEX_BUILD else "CPU"
     banner(f"Building index ({mode} via cuvs-bench)")
@@ -231,7 +285,7 @@ def main() -> None:
         build=True,
         search=False,
         force=True,
-        bulk_batch_size=10_000,
+        bulk_batch_size=BATCH_SIZE,
         **bench_kwargs,
     )
 
@@ -270,6 +324,7 @@ def main() -> None:
         algo=bench_kwargs["algorithms"],
         groups=BENCH_GROUPS,
         k=K,
+        batch_size=BATCH_SIZE,
     )
 
     print("\n" + "═" * 60)
