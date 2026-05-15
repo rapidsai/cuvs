@@ -72,6 +72,13 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
                                   cuvsCagraIndex_t cagra_index,
                                   cuvsHnswIndex_t hnsw_index) except +
 
+    cuvsError_t cuvsHnswFromCagraWithDataset(
+        cuvsResources_t res,
+        cuvsHnswIndexParams_t params,
+        cuvsCagraIndex_t cagra_index,
+        cuvsHnswIndex_t hnsw_index,
+        DLManagedTensor* dataset_tensor) except +
+
     cuvsError_t cuvsHnswBuild(cuvsResources_t res,
                               cuvsHnswIndexParams_t params,
                               DLManagedTensor* dataset,
