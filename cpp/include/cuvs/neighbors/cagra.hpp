@@ -385,23 +385,9 @@ template <typename T, typename IdxT>
 struct index;
 
 template <typename T, typename IdxT>
-void adopt_host_padded_into_index_for_host_attach(
+void adopt_owning_padded_dataset_into_index(
   index<T, IdxT>& idx,
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own);
-
-/**
- * @internal Deprecated in-memory ACE `attach_dataset_on_build`: after `make_padded_dataset` and
- * `update_dataset` with a padded view, moves the backing `raft::device_matrix` into
- * `index::host_build_ace_device_store_` and clears `index_owning_dataset_storage_`.
- *
- * Mirrors `adopt_host_padded_into_index_for_host_attach` only at a high level: both satisfy
- * attach-on-build lifetime for the index's dataset view, but the non-ACE host path owns a
- * `device_padded_dataset` via `index_owning_dataset_storage_`, while this path owns the row
- * buffer in the separate optional matrix field instead.
- */
-template <typename T, typename IdxT>
-void adopt_device_matrix_into_index_for_ace_attach(
-  index<T, IdxT>& idx, raft::device_matrix<T, int64_t, raft::row_major>&& rows);
 
 /**
  * @defgroup cagra_cpp_index CAGRA index type
@@ -645,7 +631,8 @@ struct index : cuvs::neighbors::index {
    * Replace the dataset with an owning type-erased dataset (transfers ownership into the index).
    *
    * Bytes are stored in `index_owning_dataset_storage_` so this index is the owner (not the
-   * caller). Same member backs `update_dataset(host_matrix)` and deprecated
+   * caller). Same member backs `update_dataset(host_matrix)`, deprecated in-memory ACE
+   * `attach_dataset_on_build` (via `adopt_owning_padded_dataset_into_index`), and deprecated
    * `index_params::compression` VPQ attach. If the API moves to caller-owned buffers with views
    * only, search for this field to find call sites to revisit. The active owning member must be
    * handled by `any_owning_dataset_to_index_view<T, …>` (padded/strided with row type `T`, VPQ
@@ -934,27 +921,19 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * @internal Transfers ownership of `host_build_ace_device_store_` out of the index (moves the
-   * optional). Used by `cagra::merge` when the CPU-memory fallback rebuilds the merged host matrix
-   * via the internal ACE build so the
-   * merged rows can live in `merge_result::dataset` while the index keeps only a view. Do not use
-   * to “relocate” rows for the C API build path: the index’s dataset view must keep matching
-   * storage unless you re-bind the dataset.
+   * @internal If `index_owning_dataset_storage_` holds an owning `device_padded_dataset<T>` for
+   * this element type, moves its device row matrix out (for `merge_result::dataset`), clears owning
+   * storage, and re-binds the index to a non-owning `device_padded_dataset_view` over that matrix.
+   * Otherwise returns `std::nullopt` (merge supplies an empty placeholder matrix).
    */
   std::optional<raft::device_matrix<T, int64_t, raft::row_major>>
-  release_host_build_ace_device_store()
-  {
-    return std::move(host_build_ace_device_store_);
-  }
+  release_owning_padded_device_matrix_for_merge(raft::resources const& res);
 
  private:
   template <typename T2, typename I2>
-  friend void adopt_host_padded_into_index_for_host_attach(
+  friend void adopt_owning_padded_dataset_into_index(
     index<T2, I2>& idx,
     std::unique_ptr<cuvs::neighbors::device_padded_dataset<T2, int64_t>> padded_own);
-  template <typename T2, typename I2>
-  friend void adopt_device_matrix_into_index_for_ace_attach(
-    index<T2, I2>& idx, raft::device_matrix<T2, int64_t, raft::row_major>&& rows);
 
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
@@ -970,13 +949,6 @@ struct index : cuvs::neighbors::index {
    */
   std::unique_ptr<cuvs::neighbors::any_owning_dataset<dataset_index_type>>
     index_owning_dataset_storage_{};
-  /**
-   * Optional ACE device row storage: deprecated in-memory `attach_dataset_on_build` installs the
-   * backing `raft::device_matrix` here via `adopt_device_matrix_into_index_for_ace_attach`.
-   * `release_host_build_ace_device_store()` is used by merge’s host-memory fallback to move rows
-   * into `merge_result::dataset`.
-   */
-  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> host_build_ace_device_store_{};
 
   // File descriptors for disk-backed index components (ACE disk mode)
   std::optional<cuvs::util::file_descriptor> dataset_fd_;

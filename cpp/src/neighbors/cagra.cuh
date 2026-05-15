@@ -28,9 +28,53 @@
 
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <variant>
 
 namespace cuvs::neighbors::cagra {
+
+template <typename T, typename IdxT>
+std::optional<raft::device_matrix<T, int64_t, raft::row_major>>
+index<T, IdxT>::release_owning_padded_device_matrix_for_merge(raft::resources const& res)
+{
+  namespace nb = cuvs::neighbors;
+  if (!index_owning_dataset_storage_) { return std::nullopt; }
+  using OT = nb::any_owning_dataset_types<dataset_index_type>;
+  auto own = std::move(index_owning_dataset_storage_);
+  index_owning_dataset_storage_.reset();
+  auto& var = own->as_variant();
+
+  auto finish = [&](raft::device_matrix<T, int64_t, raft::row_major>&& rows, uint32_t logic_dim) {
+    update_dataset(res,
+                   nb::device_padded_dataset_view<T, dataset_index_type>(
+                     raft::make_const_mdspan(rows.view()), logic_dim));
+    raft::resource::sync_stream(res);
+    return std::optional<raft::device_matrix<T, int64_t, raft::row_major>>{std::move(rows)};
+  };
+
+  if constexpr (std::is_same_v<T, float>) {
+    if (!std::holds_alternative<typename OT::padded_f32_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_f32_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  } else if constexpr (std::is_same_v<T, half>) {
+    if (!std::holds_alternative<typename OT::padded_f16_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_f16_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  } else if constexpr (std::is_same_v<T, int8_t>) {
+    if (!std::holds_alternative<typename OT::padded_i8_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_i8_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  } else if constexpr (std::is_same_v<T, uint8_t>) {
+    if (!std::holds_alternative<typename OT::padded_u8_owning>(var)) { return std::nullopt; }
+    auto pad                 = std::move(std::get<typename OT::padded_u8_owning>(var));
+    const uint32_t logic_dim = pad.dim();
+    return finish(std::move(pad.data_), logic_dim);
+  }
+  return std::nullopt;
+}
 
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>

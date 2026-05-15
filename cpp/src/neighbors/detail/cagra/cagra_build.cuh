@@ -1508,10 +1508,9 @@ cuvs::neighbors::cagra::index<T, IdxT> build_ace(
           RAFT_LOG_WARN(
             "ACE: `index_params.attach_dataset_on_build` is deprecated for in-memory ACE builds "
             "that upload a padded device copy. Storage is kept on the index "
-            "(`host_build_ace_device_store_`). Prefer `attach_dataset_on_build = false` and "
+            "(`index_owning_dataset_storage_`). Prefer `attach_dataset_on_build = false` and "
             "`index.update_dataset(res, ...)` with a padded view or owning dataset you retain.");
-          cuvs::neighbors::cagra::adopt_device_matrix_into_index_for_ace_attach(
-            idx, std::move(padded->data_));
+          cuvs::neighbors::cagra::adopt_owning_padded_dataset_into_index(idx, std::move(padded));
         } catch (std::bad_alloc& e) {
           RAFT_LOG_WARN(
             "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
@@ -2438,7 +2437,7 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
           res, params.compression, params.metric, padded, out);
         padded_own.reset();
       } else {
-        adopt_host_padded_into_index_for_host_attach(out, std::move(padded_own));
+        adopt_owning_padded_dataset_into_index(out, std::move(padded_own));
       }
       return out;
     }
@@ -2518,20 +2517,11 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
 namespace cuvs::neighbors::cagra {
 
 template <typename T, typename IdxT>
-void adopt_host_padded_into_index_for_host_attach(
+void adopt_owning_padded_dataset_into_index(
   index<T, IdxT>& idx,
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own)
 {
   idx.index_owning_dataset_storage_ = cuvs::neighbors::wrap_any_owning(std::move(padded_own));
-  idx.host_build_ace_device_store_.reset();
-}
-
-template <typename T, typename IdxT>
-void adopt_device_matrix_into_index_for_ace_attach(
-  index<T, IdxT>& idx, raft::device_matrix<T, int64_t, raft::row_major>&& rows)
-{
-  idx.host_build_ace_device_store_.emplace(std::move(rows));
-  idx.index_owning_dataset_storage_.reset();
 }
 
 }  // namespace cuvs::neighbors::cagra
