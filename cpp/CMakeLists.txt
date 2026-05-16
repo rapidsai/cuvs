@@ -1072,6 +1072,7 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
                CXX_VISIBILITY_PRESET hidden
+               CUDA_VISIBILITY_PRESET hidden
                VISIBILITY_INLINES_HIDDEN ON
   )
   target_compile_options(
