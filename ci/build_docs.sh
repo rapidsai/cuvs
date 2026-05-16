@@ -14,6 +14,8 @@ rapids-logger "Create test conda environment"
 rapids-logger "Configuring conda strict channel priority"
 conda config --set channel_priority strict
 
+source ./ci/use_conda_packages_from_prs.sh
+
 RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
 export RAPIDS_VERSION_MAJOR_MINOR
 

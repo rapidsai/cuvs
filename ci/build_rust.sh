@@ -13,6 +13,8 @@ rapids-logger "Create test conda environment"
 rapids-logger "Configuring conda strict channel priority"
 conda config --set channel_priority strict
 
+source ./ci/use_conda_packages_from_prs.sh
+
 rapids-dependency-file-generator \
   --output conda \
   --file-key rust \
