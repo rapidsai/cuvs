@@ -263,15 +263,19 @@ void search_main(raft::resources const& res,
  * @param neighbors  per-segment output neighbor views — each [num_queries, topk]
  * @param distances  per-segment output distance views — each [num_queries, topk]
  */
-template <typename T, typename OutputIdxT = uint32_t, typename IdxT = uint32_t,
-          typename DistanceT = float>
+template <typename T,
+          typename OutputIdxT         = uint32_t,
+          typename IdxT               = uint32_t,
+          typename DistanceT          = float,
+          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 void search_multi_segment(
   raft::resources const& res,
   search_params params,
   const std::vector<const index<T, IdxT>*>& indices,
   const std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>>& queries,
   const std::vector<raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>>& distances)
+  const std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>>& distances,
+  CagraSampleFilterT sample_filter = CagraSampleFilterT{})
 {
   static_assert(std::is_same_v<IdxT, uint32_t>, "Only uint32_t graph index type is supported");
   static_assert(std::is_same_v<DistanceT, float>, "Only float distances are supported");
@@ -282,8 +286,8 @@ void search_multi_segment(
                  distances.size() == num_segments,
                "All input vectors must have the same size");
 
-  const int64_t dim       = queries[0].extent(1);
-  const uint32_t topk     = static_cast<uint32_t>(neighbors[0].extent(1));
+  const int64_t dim        = queries[0].extent(1);
+  const uint32_t topk      = static_cast<uint32_t>(neighbors[0].extent(1));
   const uint32_t n_queries = static_cast<uint32_t>(queries[0].extent(0));
 
   // Find the max graph_degree across all segments (needed for the shared kernel plan).
@@ -326,10 +330,9 @@ void search_multi_segment(
   auto plan_desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
     res, params, *strided_dset0, indices[0]->metric(), dataset_norms_ptr0);
 
-  single_cta_search::search<T, graph_idx_type, DistanceT,
-                             cuvs::neighbors::filtering::none_sample_filter,
-                             graph_idx_type, OutputIdxT>
-    plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
+  single_cta_search::
+    search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, OutputIdxT>
+      plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
   // Build per-segment descriptors and result pointers on the host.
   // The device copy is allocated below.
@@ -349,7 +352,8 @@ void search_multi_segment(
     const float* norms_ptr = nullptr;
     if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
       RAFT_EXPECTS(indices[i]->dataset_norms().has_value(),
-                   "Dataset norms required for CosineExpanded metric (segment %u)", i);
+                   "Dataset norms required for CosineExpanded metric (segment %u)",
+                   i);
       norms_ptr = indices[i]->dataset_norms().value().data_handle();
     }
     seg_dataset_descs.push_back(dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
@@ -379,7 +383,8 @@ void search_multi_segment(
 
   // Launch all-segment kernel; stream ordering ensures descriptor upload and per-segment
   // dataset_desc device-init complete before the search kernel executes.
-  plan.run_multi_segment(res, dev_seg_descs_buf.data(), num_segments, n_queries, topk);
+  plan.run_multi_segment(
+    res, dev_seg_descs_buf.data(), num_segments, n_queries, topk, sample_filter);
   // dev_seg_descs_buf destructor returns memory to workspace pool (stream-ordered).
 
   // Post-process distances (scale + metric transform) for each segment.
@@ -389,11 +394,10 @@ void search_multi_segment(
     float* dist_out          = distances[i].data_handle();
     const DistanceT* dist_in = distances[i].data_handle();
     if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, n_queries);
-      auto scaled_sq_op =
-        raft::compose_op(raft::sq_op{},
-                         raft::div_const_op<DistanceT>{DistanceT(kScale)},
-                         raft::cast_op<DistanceT>());
+      auto query_norms  = raft::make_device_vector<DistanceT, int64_t>(res, n_queries);
+      auto scaled_sq_op = raft::compose_op(raft::sq_op{},
+                                           raft::div_const_op<DistanceT>{DistanceT(kScale)},
+                                           raft::cast_op<DistanceT>());
       raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
         res,
         raft::make_device_matrix_view<const T, int64_t, raft::row_major>(

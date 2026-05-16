@@ -731,6 +731,9 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  * @param[in]  queries      array of num_segments DLManagedTensor* (device, float32, [nq, dim])
  * @param[out] neighbors    array of num_segments DLManagedTensor* (device, uint32, [nq, topk])
  * @param[out] distances    array of num_segments DLManagedTensor* (device, float32, [nq, topk])
+ * @param[in]  filter       filter to apply during search; use {.type=NO_FILTER, .addr=0} for
+ *                          unfiltered search, or {.type=MULTI_SEGMENT_BITSET, .addr=ptr} where
+ *                          ptr is a uintptr_t-cast cuvsMultiSegmentBitsetFilter*
  */
 cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
                                         cuvsCagraSearchParams_t params,
@@ -738,7 +741,8 @@ cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
                                         cuvsCagraIndex_t* indices,
                                         DLManagedTensor** queries,
                                         DLManagedTensor** neighbors,
-                                        DLManagedTensor** distances);
+                                        DLManagedTensor** distances,
+                                        cuvsFilter filter);
 
 /**
  * @}

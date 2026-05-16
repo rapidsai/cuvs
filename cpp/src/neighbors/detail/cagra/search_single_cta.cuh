@@ -87,7 +87,8 @@ struct search
 
   uint32_t num_itopk_candidates;
 
-  /** Number of elements in a hashmap covering @p n_queries queries across @p n_segments segments. */
+  /** Number of elements in a hashmap covering @p n_queries queries across @p n_segments segments.
+   */
   static size_t hashmap_element_count(size_t n_segments, size_t n_queries, size_t h_bitlen)
   {
     return n_segments * n_queries * hashmap::get_size(h_bitlen);
@@ -218,12 +219,13 @@ struct search
    * @param num_queries    queries per segment (gridDim.y)
    * @param topk           neighbors to return per (query, segment)
    */
-  void run_multi_segment(
-    raft::resources const& res,
-    const multi_segment_desc_t<DATA_T, INDEX_T, DISTANCE_T>* segment_descs,
-    uint32_t num_segments,
-    uint32_t num_queries,
-    uint32_t topk)
+  template <typename SampleFilterT>
+  void run_multi_segment(raft::resources const& res,
+                         const multi_segment_desc_t<DATA_T, INDEX_T, DISTANCE_T>* segment_descs,
+                         uint32_t num_segments,
+                         uint32_t num_queries,
+                         uint32_t topk,
+                         SampleFilterT sample_filter)
   {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
@@ -238,8 +240,7 @@ struct search
       ms_hashmap_ptr = ms_hashmap_buf.data();
     }
 
-    select_and_run_multi_segment<DATA_T, INDEX_T, DISTANCE_T, INDEX_T,
-                                 cuvs::neighbors::filtering::none_sample_filter>(
+    select_and_run_multi_segment<DATA_T, INDEX_T, DISTANCE_T, INDEX_T, SampleFilterT>(
       segment_descs,
       num_segments,
       num_queries,
@@ -252,7 +253,7 @@ struct search
       ms_hashmap_ptr,
       small_hash_bitlen,
       small_hash_reset_interval,
-      cuvs::neighbors::filtering::none_sample_filter{},
+      sample_filter,
       stream);
     // ms_hashmap_buf destructor returns memory to workspace pool (stream-ordered).
   }

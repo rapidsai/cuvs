@@ -695,7 +695,8 @@ extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
                                                    cuvsCagraIndex_t* indices,
                                                    DLManagedTensor** queries,
                                                    DLManagedTensor** neighbors,
-                                                   DLManagedTensor** distances)
+                                                   DLManagedTensor** distances,
+                                                   cuvsFilter filter)
 {
   return cuvs::core::translate_exceptions([=] {
     RAFT_EXPECTS(num_segments > 0, "num_segments must be > 0");
@@ -712,9 +713,9 @@ extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
       indices[0]->dtype.code == kDLFloat && indices[0]->dtype.bits == 32,
       "Multi-segment search only supports float32 indices");
 
-    using T        = float;
-    using IdxT     = uint32_t;
-    using OutIdxT  = uint32_t;
+    using T         = float;
+    using IdxT      = uint32_t;
+    using OutIdxT   = uint32_t;
     using DistanceT = float;
     using IndexT    = cuvs::neighbors::cagra::index<T, IdxT>;
 
@@ -732,8 +733,28 @@ extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
       d_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(d_vec[i])>>(distances[i]);
     }
 
-    cuvs::neighbors::cagra::search_multi_segment(
-      *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec);
+    if (filter.type == NO_FILTER) {
+      cuvs::neighbors::cagra::search_multi_segment(
+        *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec);
+    } else if (filter.type == MULTI_SEGMENT_BITSET) {
+      auto* f = reinterpret_cast<cuvsMultiSegmentBitsetFilter*>(filter.addr);
+      RAFT_EXPECTS(f != nullptr, "MULTI_SEGMENT_BITSET filter addr must be non-null");
+
+      using bitset_mdspan_t  = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+      using offsets_mdspan_t = raft::device_vector_view<int64_t, int64_t, raft::row_major>;
+      auto bitset_mds  = cuvs::core::from_dlpack<bitset_mdspan_t>(f->combined_bitset);
+      auto offsets_mds = cuvs::core::from_dlpack<offsets_mdspan_t>(f->segment_offsets);
+
+      cuvs::core::bitset_view<std::uint32_t, int64_t> combined_bitset_view(
+        bitset_mds, f->total_bitset_bits);
+      cuvs::neighbors::filtering::multi_segment_bitset_filter<uint32_t, int64_t> ms_filter(
+        combined_bitset_view, offsets_mds.data_handle());
+
+      cuvs::neighbors::cagra::search_multi_segment(
+        *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec, ms_filter);
+    } else {
+      RAFT_FAIL("Unsupported filter type for multi-segment search: %d", (int)filter.type);
+    }
   });
 }
 

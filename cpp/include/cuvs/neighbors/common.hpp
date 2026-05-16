@@ -493,7 +493,7 @@ namespace filtering {
  * @{
  */
 
-enum class FilterType { None, Bitmap, Bitset };
+enum class FilterType { None, Bitmap, Bitset, MultiSegmentBitset };
 
 struct base_filter {
   ~base_filter()                             = default;
@@ -611,6 +611,45 @@ struct bitset_filter : public base_filter {
 
   template <typename csr_matrix_t>
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
+};
+
+/**
+ * @brief Filter for multi-segment CAGRA search backed by a single concatenated bitset.
+ *
+ * All per-segment bitsets are packed into one contiguous device buffer. The offset
+ * for segment i (in bits) is segment_offsets_[i]. Inside a multi-segment kernel,
+ * blockIdx.z carries the segment index, so each thread block automatically selects
+ * the correct portion of the bitset.
+ *
+ * @tparam bitset_t  Word type of the bitset (e.g. uint32_t)
+ * @tparam index_t   Index type (e.g. int64_t)
+ */
+template <typename bitset_t, typename index_t>
+struct multi_segment_bitset_filter : public base_filter {
+  using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
+
+  const view_t combined_bitset_;
+  const index_t* segment_offsets_;  // device pointer to [num_segments] bit offsets
+
+  _RAFT_HOST_DEVICE multi_segment_bitset_filter(const view_t combined_bitset,
+                                                const index_t* segment_offsets)
+    : combined_bitset_(combined_bitset), segment_offsets_(segment_offsets)
+  {
+  }
+
+  /** \cond */
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
+                                                              const uint32_t sample_ix) const
+  {
+#ifdef __CUDA_ARCH__
+    return combined_bitset_.test(segment_offsets_[blockIdx.z] + static_cast<index_t>(sample_ix));
+#else
+    return true;  // unreachable on host; blockIdx.z is device-only
+#endif
+  }
+  /** \endcond */
+
+  FilterType get_filter_type() const override { return FilterType::MultiSegmentBitset; }
 };
 
 /** @} */  // end group neighbors_filtering

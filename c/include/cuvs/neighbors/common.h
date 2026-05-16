@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
+#include <dlpack/dlpack.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -26,8 +27,27 @@ enum cuvsFilterType {
   /* Filter an index with a bitset */
   BITSET = 1,
   /* Filter an index with a bitmap */
-  BITMAP = 2
+  BITMAP = 2,
+  /* Filter multiple index segments with a single concatenated bitset plus per-segment offsets */
+  MULTI_SEGMENT_BITSET = 3
 };
+
+/**
+ * @brief Filter parameters for multi-segment search.
+ *
+ * Holds a single device bitset that is the concatenation of per-segment bitsets,
+ * together with a device array of per-segment bit offsets.  Pass a pointer to
+ * this struct (cast to uintptr_t) in cuvsFilter::addr with
+ * cuvsFilter::type == MULTI_SEGMENT_BITSET.
+ */
+typedef struct {
+  /** Device tensor (uint32, flat) of packed bitset words for all segments concatenated. */
+  DLManagedTensor* combined_bitset;
+  /** Total number of logical bits in combined_bitset. */
+  int64_t total_bitset_bits;
+  /** Device tensor (int64, [num_segments]) of per-segment bit offsets into combined_bitset. */
+  DLManagedTensor* segment_offsets;
+} cuvsMultiSegmentBitsetFilter;
 
 /**
  * @brief Struct to hold address of cuvs::neighbors::prefilter and its type
