@@ -811,11 +811,11 @@ using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
  *       `cuvs::neighbors::ivf_pq::helpers::resize_list` which handle type casting internally.
  */
 template <typename ListT>
-void resize_list(raft::resources const& res,
-                 std::shared_ptr<ListT>& orig_list,  // NOLINT
-                 const typename ListT::spec_type& spec,
-                 typename ListT::size_type new_used_size,
-                 typename ListT::size_type old_used_size);
+CUVS_EXPORT void resize_list(raft::resources const& res,
+                             std::shared_ptr<ListT>& orig_list,  // NOLINT
+                             const typename ListT::spec_type& spec,
+                             typename ListT::size_type new_used_size,
+                             typename ListT::size_type old_used_size);
 
 /**
  * Serialize a list to an output stream.

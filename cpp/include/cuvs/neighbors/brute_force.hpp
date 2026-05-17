@@ -35,7 +35,7 @@ struct search_params : cuvs::neighbors::search_params {};
  * @tparam T data element type
  */
 template <typename T, typename DistT = T>
-struct index : cuvs::neighbors::index {
+struct CUVS_EXPORT index : cuvs::neighbors::index {
   using index_params_type  = brute_force::index_params;
   using search_params_type = brute_force::search_params;
   using index_type         = int64_t;

@@ -111,13 +111,13 @@ void composite_index<T, IdxT, OutputIdxT>::search(
                             cuvs::selection::SelectAlgo::kAuto);
 }
 
-template class CUVS_EXPORT composite_index<float, uint32_t, uint32_t>;
-template class CUVS_EXPORT composite_index<float, uint32_t, int64_t>;
-template class CUVS_EXPORT composite_index<half, uint32_t, uint32_t>;
-template class CUVS_EXPORT composite_index<half, uint32_t, int64_t>;
-template class CUVS_EXPORT composite_index<int8_t, uint32_t, uint32_t>;
-template class CUVS_EXPORT composite_index<int8_t, uint32_t, int64_t>;
-template class CUVS_EXPORT composite_index<uint8_t, uint32_t, uint32_t>;
-template class CUVS_EXPORT composite_index<uint8_t, uint32_t, int64_t>;
+template class composite_index<float, uint32_t, uint32_t>;
+template class composite_index<float, uint32_t, int64_t>;
+template class composite_index<half, uint32_t, uint32_t>;
+template class composite_index<half, uint32_t, int64_t>;
+template class composite_index<int8_t, uint32_t, uint32_t>;
+template class composite_index<int8_t, uint32_t, int64_t>;
+template class composite_index<uint8_t, uint32_t, uint32_t>;
+template class composite_index<uint8_t, uint32_t, int64_t>;
 
 }  // namespace cuvs::neighbors::composite

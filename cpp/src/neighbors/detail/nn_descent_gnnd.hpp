@@ -151,7 +151,7 @@ class BloomFilter {
 };
 
 template <typename Index_t>
-struct GnndGraph {
+struct CUVS_EXPORT GnndGraph {
   raft::resources const& res;
   static constexpr int segment_size = 32;
   InternalID_t<Index_t>* h_graph;
