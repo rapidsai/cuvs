@@ -192,7 +192,7 @@ struct CUVS_EXPORT GnndGraph {
 };
 
 template <typename Data_t = float, typename Index_t = int>
-class GNND {
+class CUVS_EXPORT GNND {
  public:
   GNND(raft::resources const& res, const BuildConfig& build_config);
   GNND(const GNND&)            = delete;
