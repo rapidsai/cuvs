@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -229,7 +229,7 @@ void index<T, DistT>::update_dataset(
       res, idx, queries, neighbors, distances, sample_filter);                                  \
   }                                                                                             \
                                                                                                 \
-  template struct cuvs::neighbors::brute_force::index<T, DistT>;
+  template struct CUVS_EXPORT cuvs::neighbors::brute_force::index<T, DistT>;
 
 CUVS_INST_BFKNN(float, float);
 CUVS_INST_BFKNN(half, float);
