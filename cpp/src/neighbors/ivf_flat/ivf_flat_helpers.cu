@@ -210,11 +210,12 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
 
 namespace cuvs::neighbors::ivf {
 
-template CUVS_EXPORT void resize_list<ivf::list<ivf_flat::list_spec, uint32_t, half, int64_t>>(
+template CUVS_EXPORT void
+resize_list<list<cuvs::neighbors::ivf_flat::list_spec, uint32_t, half, int64_t>>(
   raft::resources const&,
-  std::shared_ptr<ivf::list<ivf_flat::list_spec, uint32_t, half, int64_t>>&,
-  const ivf::list<ivf_flat::list_spec, uint32_t, half, int64_t>::spec_type&,
-  ivf::list<ivf_flat::list_spec, uint32_t, half, int64_t>::size_type,
-  ivf::list<ivf_flat::list_spec, uint32_t, half, int64_t>::size_type);
+  std::shared_ptr<list<cuvs::neighbors::ivf_flat::list_spec, uint32_t, half, int64_t>>&,
+  const list<cuvs::neighbors::ivf_flat::list_spec, uint32_t, half, int64_t>::spec_type&,
+  list<cuvs::neighbors::ivf_flat::list_spec, uint32_t, half, int64_t>::size_type,
+  list<cuvs::neighbors::ivf_flat::list_spec, uint32_t, half, int64_t>::size_type);
 
 }  // namespace cuvs::neighbors::ivf

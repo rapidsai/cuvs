@@ -39,4 +39,6 @@ auto build(raft::resources const& handle,
   return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
 }
 
+template class CUVS_EXPORT index<data_t, index_t>;
+
 }  // namespace cuvs::neighbors::cagra
