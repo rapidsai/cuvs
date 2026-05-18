@@ -4,8 +4,8 @@
  */
 #pragma once
 
+#include "../../core/mnmg_comms.cuh"
 #include "kmeans.cuh"
-#include "kmeans_mg_batched_comms.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -25,6 +25,8 @@
 #include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
+
+using cuvs::core::detail::mnmg_comms;
 
 template <typename IndexT>
 IndexT get_global_kmeanspp_init_sample_size(const cuvs::cluster::kmeans::params& params,

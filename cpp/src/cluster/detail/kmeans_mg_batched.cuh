@@ -6,9 +6,9 @@
 
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
-#include "kmeans_mg_batched_comms.cuh"
 #include "kmeans_mg_batched_init.cuh"
 
+#include "../../core/mnmg_comms.cuh"
 #include "../../core/omp_wrapper.hpp"
 #include "../../neighbors/detail/ann_utils.cuh"
 
@@ -48,6 +48,8 @@
 #include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
+
+using cuvs::core::detail::mnmg_comms;
 
 /**
  * @brief Shared multi-GPU k-means fit core, called per rank.
