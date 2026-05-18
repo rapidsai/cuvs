@@ -19,6 +19,7 @@
 #include <raft/core/memory_type.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
@@ -55,6 +56,31 @@
 #include <random>
 
 namespace cuvs::cluster::kmeans::detail {
+
+/**
+ * @brief Returns true if the fused distance NN implementation should be used.
+ *
+ * On Ampere (SM <= 8.x) always use fused.
+ * On Hopper (SM 9.x) use fused when m or n >= 4096.
+ * On Blackwell (SM >= 10.x) use unfused.
+ */
+template <typename MathT, typename IdxT, typename LabelT>
+bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
+{
+  cudaDeviceProp prop;
+  prop = raft::resource::get_device_properties(handle);
+  if (prop.major <= 8) {
+    // Use fused for Ampere or before
+    return true;
+  } else if (prop.major == 9 && (m >= 4096 || n >= 4096)) {
+    // On Hopper if m, n are bigger than 4096, use fused
+    return true;
+  } else if (prop.major >= 10) {
+    // On Blackwell onwards, use unfused
+    return false;
+  }
+  return false;
+}
 
 template <typename DataT, typename IndexT>
 struct SamplingOp {
