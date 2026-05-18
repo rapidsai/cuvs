@@ -27,7 +27,8 @@ BUILDER_URL    = os.environ.get("BUILDER_URL",    "http://remote-index-builder:1
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 S3_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-# boto3 reads AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY automatically
+# boto3 uses AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY when set, otherwise it
+# falls through to the default credential provider chain.
 
 INDEX_NAME = "gpu-demo"
 DIMENSION  = 256    # matches common embedding model output sizes
@@ -215,8 +216,8 @@ def verify_gpu_build(timeout: int = REMOTE_BUILD_TIMEOUT) -> None:
     print(f"  Bucket  : s3://{S3_BUCKET}/knn-indexes/")
     print(f"  Timeout : {timeout}s  (poll interval: 5s)\n")
 
-    # boto3 picks up AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
-    # from the environment automatically.
+    # boto3 uses static AWS env vars when set, otherwise it falls through to
+    # the default credential provider chain.
     s3 = boto3.client("s3", region_name=S3_REGION)
 
     deadline = time.time() + timeout

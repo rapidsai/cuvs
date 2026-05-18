@@ -47,18 +47,25 @@ Set required environment variables:
 export DATASET_PATH=/path/to/ann-benchmark-datasets   # directory containing dataset files
 ```
 
-GPU mode also requires S3 credentials:
+GPU mode also requires an S3 bucket. Static AWS keys are supported, but optional
+when the containers can use another AWS default credential provider such as an
+EC2 instance role:
 
 ```bash
-export S3_BUCKET=opepsearch-s3-bucket             # S3 bucket name
+export S3_BUCKET=opensearch-s3-bucket             # S3 bucket name
+```
+
+If you are using static credentials instead of a default provider, also export:
+
+```bash
 export AWS_ACCESS_KEY_ID=<access-key-id>
 export AWS_SECRET_ACCESS_KEY=<secret-access-key>
+export AWS_SESSION_TOKEN=<session-token>   # required when using temporary (STS) credentials
 ```
 
 Optionally configure the benchmark:
 
 ```bash
-export AWS_SESSION_TOKEN=<session-token>   # required when using temporary (STS) credentials
 export AWS_DEFAULT_REGION=us-east-1        # AWS region for the S3 bucket (default: us-east-1)
 export DATASET=sift-128-euclidean          # default
 export BENCH_GROUPS=test                   # test | base (default: test)
@@ -193,7 +200,9 @@ docker compose run --rm --no-deps \
 
 ### Remote index build integration tests (full GPU stack)
 
-Requires the full stack (OpenSearch and the remote index builder), S3 credentials, and a GPU-capable host. Export the AWS credentials and region before starting OpenSearch; its S3 keystore is populated at container startup. Use `--profile gpu` when starting the services so Docker Compose includes `remote-index-builder`. The pytest command itself does not need the profile flag because it runs against the already-started services.
+Requires the full stack (OpenSearch and the remote index builder), S3 access, and a GPU-capable host. Export the S3 bucket and region before starting OpenSearch. If you are using static AWS keys, export them before startup so OpenSearch can populate its S3 keystore; otherwise the containers can use the AWS default credential provider chain. Use `--profile gpu` when starting the services so Docker Compose includes `remote-index-builder`. The pytest command itself does not need the profile flag because it runs against the already-started services.
+
+When using static AWS keys, map them into the test fixture's `S3_*` variable names:
 
 ```bash
 export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}

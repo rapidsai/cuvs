@@ -13,18 +13,19 @@
 # GPU mode only (--profile gpu):
 #   - NVIDIA GPU with CUDA support
 #   - NVIDIA Container Toolkit  https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
-#   - An S3 bucket and AWS credentials (set via environment variables below)
+#   - An S3 bucket and credentials from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+#     or another AWS default credential provider, such as an EC2 instance role
 #
 # Required environment variables (set in shell or a .env file):
 #   DATASET_PATH            Absolute path to the directory containing dataset files
 #
 # GPU mode only:
 #   S3_BUCKET               S3 bucket name for staging vectors and built indexes
-#   AWS_ACCESS_KEY_ID       AWS access key ID
-#   AWS_SECRET_ACCESS_KEY   AWS secret access key
 #
 # Optional environment variables:
-#   AWS_SESSION_TOKEN       STS session token (required for temporary credentials)
+#   AWS_ACCESS_KEY_ID       AWS access key ID (optional if using default credentials)
+#   AWS_SECRET_ACCESS_KEY   AWS secret access key (optional if using default credentials)
+#   AWS_SESSION_TOKEN       STS session token (required for temporary static credentials)
 #   AWS_DEFAULT_REGION      AWS region for the S3 bucket (default: us-east-1)
 #   REMOTE_INDEX_BUILD      Override GPU/CPU mode detection (true/false); normally auto-detected
 #   REMOTE_BUILD_SIZE_MIN   Optional minimum segment size override for remote builds
@@ -45,9 +46,9 @@
 #   OpenSearch downloads the finished index from S3 and merges it into the shard
 
 x-aws-env: &aws-env
-  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+  AWS_ACCESS_KEY_ID:
+  AWS_SECRET_ACCESS_KEY:
+  AWS_SESSION_TOKEN:
   AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
 
 services:
@@ -117,9 +118,6 @@ services:
       REMOTE_BUILD_SIZE_MIN: ${REMOTE_BUILD_SIZE_MIN:-}
       REMOTE_BUILD_TIMEOUT: ${REMOTE_BUILD_TIMEOUT:-1800}
       S3_BUCKET: ${S3_BUCKET:-}
-      S3_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:-}
-      S3_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
       DATASET: ${DATASET:-sift-128-euclidean}
       DATASET_PATH: /data/datasets
       BENCH_GROUPS: ${BENCH_GROUPS:-test}
