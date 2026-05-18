@@ -361,9 +361,12 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
         indices.push_back(ptr.get());
       }
 
-      auto merge_res = cuvs::neighbors::cagra::merge(handle_, params, indices);
-      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(merge_res.idx));
-      *dataset_ = std::move(merge_res.dataset);
+      cuvs::neighbors::filtering::none_sample_filter merge_row_filter;
+      auto merge_storage =
+        cuvs::neighbors::cagra::make_merged_dataset(handle_, indices, merge_row_filter);
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
+        cuvs::neighbors::cagra::merge(handle_, params, indices, merge_storage, merge_row_filter));
+      *dataset_ = std::move(merge_storage.merged_storage);
     }
   }
 }

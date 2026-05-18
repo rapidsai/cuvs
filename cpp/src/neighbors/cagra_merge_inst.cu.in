@@ -14,5 +14,27 @@ using index_t = @index_type@;
 }  // namespace
 
 namespace cuvs::neighbors::cagra {
+
+// Non-template wrappers for cagra.hpp declarations; template bodies live in cagra.cuh.
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<data_t, index_t>*>& indices,
+           merged_dataset_storage<data_t, index_t>& storage,
+           const cuvs::neighbors::filtering::base_filter& row_filter)
+  -> cuvs::neighbors::cagra::index<data_t, index_t>
+{
+  return ::cuvs::neighbors::cagra::merge<data_t, index_t>(
+    res, params, indices, storage, row_filter);
+}
+
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<data_t, index_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter)
+  -> cuvs::neighbors::cagra::index<data_t, index_t>
+{
+  return ::cuvs::neighbors::cagra::merge<data_t, index_t>(res, params, indices, row_filter);
+}
+
 CUVS_INST_CAGRA_MERGE(data_t, index_t);
 }  // namespace cuvs::neighbors::cagra

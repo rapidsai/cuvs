@@ -1171,8 +1171,10 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         indices.push_back(&index0);
         indices.push_back(&index1);
 
-        auto merge_res =
-          cuvs::neighbors::cagra::merge(handle_, index_params, indices, bitset_filter_obj);
+        auto merge_storage =
+          cuvs::neighbors::cagra::make_merged_dataset(handle_, indices, bitset_filter_obj);
+        auto merge_idx = cuvs::neighbors::cagra::merge(
+          handle_, index_params, indices, merge_storage, bitset_filter_obj);
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
@@ -1187,12 +1189,8 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        cuvs::neighbors::cagra::search(handle_,
-                                       search_params,
-                                       merge_res.idx,
-                                       search_queries_view,
-                                       indices_out_view,
-                                       dists_out_view);
+        cuvs::neighbors::cagra::search(
+          handle_, search_params, merge_idx, search_queries_view, indices_out_view, dists_out_view);
 
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
@@ -1401,10 +1399,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         std::vector<cagra::index<DataT, IdxT>*> indices_to_merge{&index0, &index1};
 
         if (ps.merge_strategy == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
-          auto merged = cagra::merge(handle_, index_params, indices_to_merge);
+          auto merge_storage =
+            cuvs::neighbors::cagra::make_merged_dataset(handle_, indices_to_merge);
+          auto merged_idx = cagra::merge(handle_, index_params, indices_to_merge, merge_storage);
           cagra::search(handle_,
                         search_params,
-                        merged.idx,
+                        merged_idx,
                         search_queries_view,
                         indices_out_view,
                         dists_out_view);

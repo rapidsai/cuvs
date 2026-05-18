@@ -33,49 +33,6 @@
 
 namespace cuvs::neighbors::cagra {
 
-template <typename T, typename IdxT>
-std::optional<raft::device_matrix<T, int64_t, raft::row_major>>
-index<T, IdxT>::release_owning_padded_device_matrix_for_merge(raft::resources const& res)
-{
-  namespace nb = cuvs::neighbors;
-  if (!index_owning_dataset_storage_) { return std::nullopt; }
-  using OT = nb::any_owning_dataset_types<dataset_index_type>;
-  auto own = std::move(index_owning_dataset_storage_);
-  index_owning_dataset_storage_.reset();
-  auto& var = own->as_variant();
-
-  auto finish = [&](raft::device_matrix<T, int64_t, raft::row_major>&& rows, uint32_t logic_dim) {
-    update_dataset(res,
-                   nb::device_padded_dataset_view<T, dataset_index_type>(
-                     raft::make_const_mdspan(rows.view()), logic_dim));
-    raft::resource::sync_stream(res);
-    return std::optional<raft::device_matrix<T, int64_t, raft::row_major>>{std::move(rows)};
-  };
-
-  if constexpr (std::is_same_v<T, float>) {
-    if (!std::holds_alternative<typename OT::padded_f32_owning>(var)) { return std::nullopt; }
-    auto pad                 = std::move(std::get<typename OT::padded_f32_owning>(var));
-    const uint32_t logic_dim = pad.dim();
-    return finish(std::move(pad.data_), logic_dim);
-  } else if constexpr (std::is_same_v<T, half>) {
-    if (!std::holds_alternative<typename OT::padded_f16_owning>(var)) { return std::nullopt; }
-    auto pad                 = std::move(std::get<typename OT::padded_f16_owning>(var));
-    const uint32_t logic_dim = pad.dim();
-    return finish(std::move(pad.data_), logic_dim);
-  } else if constexpr (std::is_same_v<T, int8_t>) {
-    if (!std::holds_alternative<typename OT::padded_i8_owning>(var)) { return std::nullopt; }
-    auto pad                 = std::move(std::get<typename OT::padded_i8_owning>(var));
-    const uint32_t logic_dim = pad.dim();
-    return finish(std::move(pad.data_), logic_dim);
-  } else if constexpr (std::is_same_v<T, uint8_t>) {
-    if (!std::holds_alternative<typename OT::padded_u8_owning>(var)) { return std::nullopt; }
-    auto pad                 = std::move(std::get<typename OT::padded_u8_owning>(var));
-    const uint32_t logic_dim = pad.dim();
-    return finish(std::move(pad.data_), logic_dim);
-  }
-  return std::nullopt;
-}
-
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
@@ -493,24 +450,50 @@ void extend(
 }
 
 template <class T, class IdxT>
-merge_result<T, IdxT> merge(raft::resources const& handle,
-                            const cagra::index_params& params,
-                            std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                            const cuvs::neighbors::filtering::base_filter& row_filter)
+cuvs::neighbors::cagra::index<T, IdxT> merge(
+  raft::resources const& handle,
+  const cagra::index_params& params,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+  merged_dataset_storage<T, IdxT>& storage,
+  const cuvs::neighbors::filtering::base_filter& row_filter)
 {
-  return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
+  return cagra::detail::merge<T, IdxT>(handle, params, indices, storage, row_filter);
+}
+
+template <class T, class IdxT>
+cuvs::neighbors::cagra::index<T, IdxT> merge(
+  raft::resources const& handle,
+  const cagra::index_params& params,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+  const cuvs::neighbors::filtering::base_filter& row_filter)
+{
+  return cagra::merge_owning_deprecated<T, IdxT>(handle, params, indices, row_filter);
 }
 
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
 
-#define CUVS_INST_CAGRA_MERGE(T, IdxT)                                                  \
-  auto merge(raft::resources const& handle,                                             \
-             const cuvs::neighbors::cagra::index_params& params,                        \
-             std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,             \
-             const cuvs::neighbors::filtering::base_filter& row_filter)                 \
-    -> cuvs::neighbors::cagra::merge_result<T, IdxT>                                    \
-  {                                                                                     \
-    return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices, row_filter); \
-  }
+#define CUVS_INST_CAGRA_MERGE(T, IdxT)                                                    \
+  template cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>                        \
+  cuvs::neighbors::cagra::make_merged_dataset<T, IdxT>(                                   \
+    raft::resources const& handle,                                                        \
+    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> const& indices,                  \
+    cuvs::neighbors::filtering::base_filter const& row_filter);                           \
+  template cuvs::neighbors::cagra::index<T, IdxT> cuvs::neighbors::cagra::merge<T, IdxT>( \
+    raft::resources const& handle,                                                        \
+    const cuvs::neighbors::cagra::index_params& params,                                   \
+    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
+    cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>& storage,                     \
+    cuvs::neighbors::filtering::base_filter const& row_filter);                           \
+  template cuvs::neighbors::cagra::index<T, IdxT> cuvs::neighbors::cagra::merge<T, IdxT>( \
+    raft::resources const& handle,                                                        \
+    const cuvs::neighbors::cagra::index_params& params,                                   \
+    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
+    cuvs::neighbors::filtering::base_filter const& row_filter);                           \
+  template cuvs::neighbors::cagra::index<T, IdxT>                                         \
+  cuvs::neighbors::cagra::merge_owning_deprecated<T, IdxT>(                               \
+    raft::resources const& handle,                                                        \
+    const cuvs::neighbors::cagra::index_params& params,                                   \
+    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
+    cuvs::neighbors::filtering::base_filter const& row_filter);

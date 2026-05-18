@@ -547,24 +547,29 @@ void _merge(cuvsResources_t res,
     index_ptrs.push_back(idx_ptr);
   }
 
-  cuvs::neighbors::cagra::merge_result<T, uint32_t> merge_res = [&]() {
+  auto merged_idx = [&]() {
     if (filter.type == NO_FILTER) {
       return cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs);
     } else if (filter.type == BITSET) {
-      using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+      int64_t merged_row_count = 0;
+      for (auto* idx_ptr : index_ptrs) {
+        merged_row_count += static_cast<int64_t>(idx_ptr->size());
+      }
+      using filter_mdspan_type =
+        raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
       auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
       auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
       cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(
-        removed_indices, total_size);
-      auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
+        removed_indices, merged_row_count);
+      auto bitset_filter_obj =
+        cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>(removed_indices_bitset);
       return cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs, bitset_filter_obj);
     } else {
       RAFT_FAIL("Unsupported filter type: BITMAP");
     }
   }();
-
   auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-    nullptr, std::move(merge_res.dataset), std::move(merge_res.idx)};
+    nullptr, raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr), std::move(merged_idx)};
   assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
 }
 

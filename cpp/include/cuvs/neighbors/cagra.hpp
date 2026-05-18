@@ -920,15 +920,6 @@ struct index : cuvs::neighbors::index {
     mapping_fd_.emplace(std::move(fd));
   }
 
-  /**
-   * @internal If `index_owning_dataset_storage_` holds an owning `device_padded_dataset<T>` for
-   * this element type, moves its device row matrix out (for `merge_result::dataset`), clears owning
-   * storage, and re-binds the index to a non-owning `device_padded_dataset_view` over that matrix.
-   * Otherwise returns `std::nullopt` (merge supplies an empty placeholder matrix).
-   */
-  std::optional<raft::device_matrix<T, int64_t, raft::row_major>>
-  release_owning_padded_device_matrix_for_merge(raft::resources const& res);
-
  private:
   template <typename T2, typename I2>
   friend void adopt_owning_padded_dataset_into_index(
@@ -966,16 +957,32 @@ struct index : cuvs::neighbors::index {
  */
 
 /**
- * Result of merging CAGRA indices. The index holds a view over \p dataset; caller must keep
- * \p dataset alive for the lifetime of \p idx. If \p index_params passed to \p cagra::merge had
- * deprecated \p index_params::compression set, the internal rebuild may train VPQ and own it on
- * \p idx; otherwise attach VPQ with `make_vpq_dataset` on a padded view of \p dataset and
- * `merged.idx.update_dataset(res, vpq.as_dataset_view())` while keeping the `vpq_dataset` alive.
+ * @brief Row counts and strides for a CAGRA merge (metadata only; no GPU storage).
+ *
+ * A populated instance is carried inside `merged_dataset_storage` together with the owning
+ * device matrices allocated by `make_merged_dataset`.
+ */
+struct merged_dataset {
+  int64_t merged_rows{};      ///< Full concatenation row count (staging for merge + filter).
+  int64_t filtered_rows{};    ///< Dataset rows the merged index will reference (filtered or full).
+  int64_t stride_elements{};  ///< Row pitch in elements (>= dim, matches input index rows).
+  uint32_t dim{};
+  bool bitset_filtered{};  ///< If true, `merged_dataset_storage` holds a second matrix for rows
+                           ///< after the bitset filter.
+};
+
+/**
+ * @brief Device storage for a physical CAGRA merge, allocated by `make_merged_dataset`.
+ *
+ * Owns the full-merge staging matrix (`merged_storage`) and, when `layout.bitset_filtered` is
+ * true, the filtered output matrix (`filtered_storage`). `merge` writes into these buffers and
+ * returns an index that views them; keep this object alive while using that index.
  */
 template <typename T, typename IdxT>
-struct merge_result {
-  cuvs::neighbors::cagra::index<T, IdxT> idx;
-  raft::device_matrix<T, int64_t, raft::row_major> dataset;
+struct merged_dataset_storage {
+  merged_dataset layout{};
+  raft::device_matrix<T, int64_t, raft::row_major> merged_storage;
+  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> filtered_storage{};
 };
 
 /**
@@ -2666,70 +2673,127 @@ void serialize_to_hnswlib(
  * @{
  */
 
+/** @brief Allocate device merge buffers for the given indices and row filter.
+ *
+ * Computes row counts and stride (see `merged_dataset`), allocates `merged_storage` with shape
+ * `[merged_rows, stride_elements]`, and when using a bitset row filter also allocates
+ * `filtered_storage` with shape `[filtered_rows, stride_elements]`. Pass the result to `merge` with
+ * the same `indices` and `row_filter`.
+ */
+template <typename T, typename IdxT>
+merged_dataset_storage<T, IdxT> make_merged_dataset(
+  raft::resources const& res,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> const& indices,
+  const cuvs::neighbors::filtering::base_filter& row_filter =
+    cuvs::neighbors::filtering::none_sample_filter{});
+
 /** @brief Merge multiple CAGRA indices into a single index.
  *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
+ * Writes concatenated rows into `storage.merged_storage`, optionally copies the filtered subset
+ * into `storage.filtered_storage`, and builds the graph. The returned index holds a non-owning
+ * view over `storage.filtered_storage` when `storage.layout.bitset_filtered` is true, otherwise
+ * over `storage.merged_storage`. The caller must keep `storage` alive for the lifetime of that
+ * index.
  *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
+ * Recomputes merge layout from `indices` and `row_filter` and checks it matches `storage.layout`
+ * (same rules as `make_merged_dataset`). That catches mismatched `indices`/`row_filter` versus the
+ * factory call, or a corrupted `layout` field; it does not allocate.
  *
- * @note: This API only supports physical merge (`merge_strategy = MERGE_STRATEGY_PHYSICAL`), and
- * attempting a logical merge here will throw an error.
+ * @note This API only supports physical merge (`merge_strategy = MERGE_STRATEGY_PHYSICAL`).
  *
- * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<float, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<float, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
  *   std::vector<cagra::index<float, uint32_t>*> indices{&index0, &index1};
- *
- *   auto merged_index = cagra::merge(res, index_params, indices);
+ *   auto storage = cagra::make_merged_dataset(res, indices);
+ *   auto merged_index =
+ *     cagra::merge(res, index_params, indices, storage,
+ * cuvs::neighbors::filtering::none_sample_filter{});
  * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- * @param[in] row_filter an optional device filter function object that greenlights rows
- *    to include in the merged index  (none_sample_filter for no filtering)
- * @return merge_result with .idx (merged index holding a view over .dataset) and .dataset;
- *         caller must keep .dataset alive for the lifetime of .idx when the index still views it.
  */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
+           merged_dataset_storage<float, uint32_t>& storage,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::merge_result<float, uint32_t>;
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
 /** @copydoc merge */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
+           merged_dataset_storage<half, uint32_t>& storage,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::merge_result<half, uint32_t>;
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
 /** @copydoc merge */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
+           merged_dataset_storage<int8_t, uint32_t>& storage,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::merge_result<int8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
 /** @copydoc merge */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
+           merged_dataset_storage<uint8_t, uint32_t>& storage,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::merge_result<uint8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+
+/**
+ * @brief Merge multiple CAGRA indices (allocates merge buffers on the index).
+ *
+ * Allocates merge storage internally, runs merge, and stores the merged dataset on the returned
+ * index (`index_owning_dataset_storage_`). Prefer `make_merged_dataset` plus `merge(..., storage)`
+ * when you need explicit control over merge buffer allocation.
+ */
+[[deprecated(
+  "Prefer make_merged_dataset(res, indices, row_filter) then merge(res, params, indices, storage, "
+  "row_filter); keep merged_dataset_storage alive while using the index.")]]
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/** @copydoc merge */
+[[deprecated(
+  "Prefer make_merged_dataset(res, indices, row_filter) then merge(res, params, indices, storage, "
+  "row_filter); keep merged_dataset_storage alive while using the index.")]]
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/** @copydoc merge */
+[[deprecated(
+  "Prefer make_merged_dataset(res, indices, row_filter) then merge(res, params, indices, storage, "
+  "row_filter); keep merged_dataset_storage alive while using the index.")]]
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+
+/** @copydoc merge */
+[[deprecated(
+  "Prefer make_merged_dataset(res, indices, row_filter) then merge(res, params, indices, storage, "
+  "row_filter); keep merged_dataset_storage alive while using the index.")]]
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
  */
