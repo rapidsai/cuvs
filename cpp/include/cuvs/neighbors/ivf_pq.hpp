@@ -132,6 +132,22 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t max_train_points_per_pq_code = 256;
 
   /**
+   * Use CAGRA vs brute force for cluster assignment during extend() (and add_data_on_build).
+   * - std::nullopt (default): brute-force assignment.
+   * - true: use CAGRA for assignment.
+   * - false: brute-force assignment (explicit).
+   */
+  std::optional<bool> use_ann_for_extend;
+
+  /**
+   * Use CAGRA vs brute force for balanced k-means *fit* (training centroids; they move each EM iter).
+   * - std::nullopt (default): brute-force assignment during fit.
+   * - true: ANN-based assignment during fit (CAGRA with periodic index rebuilds).
+   * - false: brute-force assignment during fit (explicit).
+   */
+  std::optional<bool> use_ann_for_fit;
+
+  /**
    * Creates index_params based on shape of the input dataset.
    * Usage example:
    * @code{.cpp}
@@ -421,6 +437,9 @@ class index_iface {
     const raft::resources& res) const = 0;
   virtual raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
     const raft::resources& res) const = 0;
+
+  /** Stored IVF-PQ build param: CAGRA vs brute for extend/add_data cluster assignment (nullopt => brute). */
+  virtual std::optional<bool> use_ann_for_extend() const = 0;
 };
 
 /**
@@ -655,6 +674,8 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    * @param[in] label list ID
    */
   uint32_t get_list_size_in_bytes(uint32_t label) const override;
+
+  std::optional<bool> use_ann_for_extend() const noexcept override;
 
   /**
    * @brief Construct index from implementation pointer.
