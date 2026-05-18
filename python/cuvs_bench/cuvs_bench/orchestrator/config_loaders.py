@@ -10,7 +10,6 @@ This module defines the abstract ConfigLoader interface and backend-specific
 implementations that handle configuration loading and preprocessing.
 """
 
-import itertools
 import os
 import warnings
 from abc import ABC, abstractmethod
@@ -20,6 +19,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
+from ..backends._utils import expand_param_grid
 
 
 @dataclass
@@ -118,6 +119,7 @@ class DatasetConfig:
     base_file: Optional[str] = None
     query_file: Optional[str] = None
     groundtruth_neighbors_file: Optional[str] = None
+    groundtruth_distances_file: Optional[str] = None
     distance: str = "euclidean"
     dims: Optional[int] = None
     subset_size: Optional[int] = None
@@ -127,22 +129,98 @@ class ConfigLoader(ABC):
     """
     Abstract base class for configuration loaders.
 
-    Each backend type has its own ConfigLoader that knows how to:
-    - Load configuration from files or other sources
-    - Expand parameter combinations
-    - Validate constraints
-    - Produce standardized BenchmarkConfig objects
+    Uses a template method pattern: load() handles the shared steps
+    (loading dataset YAML, looking up the dataset, constructing
+    DatasetConfig) then delegates to _build_benchmark_configs() for
+    backend-specific logic. Backend authors only implement
+    _build_benchmark_configs() and receive the DatasetConfig already built.
+
+    Provides shared helper methods for common config-loading operations
+    (YAML loading, dataset lookup, algorithm config gathering) so that
+    individual loaders do not need to reimplement them.
     """
 
-    @abstractmethod
-    def load(self, **kwargs) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
+    def load(
+        self,
+        dataset: str,
+        dataset_path: str,
+        **kwargs,
+    ) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
         """
         Load and prepare benchmark configurations.
+
+        Handles shared config-loading steps (dataset YAML, dataset lookup,
+        DatasetConfig construction) then delegates to the backend-specific
+        _build_benchmark_configs() for producing BenchmarkConfig objects.
+
+        Parameters
+        ----------
+        dataset : str
+            Dataset name
+        dataset_path : str
+            Path to dataset directory
+        **kwargs
+            Backend-specific arguments passed through to
+            _build_benchmark_configs()
 
         Returns
         -------
         Tuple[DatasetConfig, List[BenchmarkConfig]]
             Dataset configuration and list of benchmark configurations to run
+        """
+        # Shared step 1: Load dataset YAML
+        ds_yaml_path = kwargs.get("dataset_configuration") or os.path.join(
+            self.config_path, "datasets", "datasets.yaml"
+        )
+        ds_conf_all = self.load_yaml_file(ds_yaml_path)
+
+        # Shared step 2: Find dataset by name
+        ds_conf = self.get_dataset_configuration(dataset, ds_conf_all)
+
+        # Shared step 3: Construct DatasetConfig with resolved paths
+        dataset_config = self.build_dataset_config(
+            ds_conf, dataset_path, kwargs.get("subset_size")
+        )
+
+        # Backend-specific step: produce BenchmarkConfig list
+        benchmark_configs = self._build_benchmark_configs(
+            dataset_config, ds_conf, dataset, dataset_path, **kwargs
+        )
+        return dataset_config, benchmark_configs
+
+    @abstractmethod
+    def _build_benchmark_configs(
+        self,
+        dataset_config: DatasetConfig,
+        dataset_conf: dict,
+        dataset: str,
+        dataset_path: str,
+        **kwargs,
+    ) -> List[BenchmarkConfig]:
+        """
+        Build backend-specific benchmark configurations.
+
+        Called by load() after the shared steps are complete. Each backend
+        implements this with its own logic (executable discovery for C++,
+        connection params for OpenSearch, etc.).
+
+        Parameters
+        ----------
+        dataset_config : DatasetConfig
+            Already-constructed dataset configuration
+        dataset_conf : dict
+            Raw dataset dict from YAML (for backends that need extra fields)
+        dataset : str
+            Dataset name
+        dataset_path : str
+            Path to dataset directory
+        **kwargs
+            Backend-specific arguments
+
+        Returns
+        -------
+        List[BenchmarkConfig]
+            List of benchmark configurations to run
         """
         pass
 
@@ -151,6 +229,139 @@ class ConfigLoader(ABC):
     def backend_type(self) -> str:
         """Return the backend type this loader is for (e.g., 'cpp_gbench')."""
         pass
+
+    def build_dataset_config(
+        self,
+        dataset_conf: dict,
+        dataset_path: Optional[str] = None,
+        subset_size: Optional[int] = None,
+    ) -> DatasetConfig:
+        """
+        Construct a DatasetConfig from a dataset YAML dict.
+
+        Resolves relative file paths against dataset_path if provided.
+
+        Parameters
+        ----------
+        dataset_conf : dict
+            Dataset configuration dict from datasets.yaml
+        dataset_path : Optional[str]
+            Base path for resolving relative file paths
+        subset_size : Optional[int]
+            Limit dataset to first N vectors
+
+        Returns
+        -------
+        DatasetConfig
+        """
+
+        def _resolve(rel):
+            if rel and dataset_path and not os.path.isabs(rel):
+                return os.path.join(dataset_path, rel)
+            return rel
+
+        return DatasetConfig(
+            name=dataset_conf["name"],
+            base_file=_resolve(dataset_conf.get("base_file")),
+            query_file=_resolve(dataset_conf.get("query_file")),
+            groundtruth_neighbors_file=_resolve(
+                dataset_conf.get("groundtruth_neighbors_file")
+            ),
+            groundtruth_distances_file=_resolve(
+                dataset_conf.get("groundtruth_distances_file")
+            ),
+            distance=dataset_conf.get("distance", "euclidean"),
+            dims=dataset_conf.get("dims"),
+            subset_size=subset_size,
+        )
+
+    def load_yaml_file(self, file_path: str) -> dict:
+        """
+        Load a YAML file and return its contents as a dictionary.
+
+        Parameters
+        ----------
+        file_path : str
+            The path to the YAML file.
+
+        Returns
+        -------
+        dict
+            The contents of the YAML file.
+        """
+        with open(file_path, "r") as f:
+            return yaml.safe_load(f)
+
+    def get_dataset_configuration(
+        self, dataset: str, dataset_conf_all: list
+    ) -> dict:
+        """
+        Retrieve the configuration for a specific dataset.
+
+        Parameters
+        ----------
+        dataset : str
+            The name of the dataset to retrieve the configuration for.
+        dataset_conf_all : list
+            A list of dataset configurations.
+
+        Returns
+        -------
+        dict
+            The configuration for the specified dataset.
+
+        Raises
+        ------
+        ValueError
+            If the dataset configuration is not found.
+        """
+        for d in dataset_conf_all:
+            if dataset == d["name"]:
+                return d
+        raise ValueError(
+            f"Could not find a dataset configuration for '{dataset}'"
+        )
+
+    def gather_algorithm_configs(
+        self, config_path: str, algorithm_configuration: Optional[str]
+    ) -> list:
+        """
+        Gather the list of algorithm configuration files.
+
+        Parameters
+        ----------
+        config_path : str
+            The path to the config directory.
+        algorithm_configuration : Optional[str]
+            The path to the algorithm configuration directory or file.
+
+        Returns
+        -------
+        list
+            A list of paths to the algorithm configuration files.
+        """
+        algos_conf_fs = os.listdir(os.path.join(config_path, "algos"))
+        algos_conf_fs = [
+            os.path.join(config_path, "algos", f)
+            for f in algos_conf_fs
+            if f.endswith((".yaml", ".yml"))
+        ]
+
+        if algorithm_configuration:
+            if os.path.isdir(algorithm_configuration):
+                algos_conf_fs += [
+                    os.path.join(algorithm_configuration, f)
+                    for f in os.listdir(algorithm_configuration)
+                    if f.endswith((".yaml", ".yml"))
+                ]
+            elif os.path.isfile(algorithm_configuration):
+                algos_conf_fs.append(algorithm_configuration)
+            else:
+                warnings.warn(
+                    f"algorithm_configuration path does not exist: "
+                    f"{algorithm_configuration}"
+                )
+        return algos_conf_fs
 
 
 class CppGBenchConfigLoader(ConfigLoader):
@@ -196,94 +407,53 @@ class CppGBenchConfigLoader(ConfigLoader):
                 self._gpu_present = False
         return self._gpu_present
 
-    def load(
+    def _build_benchmark_configs(
         self,
+        dataset_config: DatasetConfig,
+        dataset_conf: dict,
         dataset: str,
         dataset_path: str,
-        dataset_configuration: Optional[str] = None,
-        algorithm_configuration: Optional[str] = None,
-        algorithms: Optional[str] = None,
-        groups: Optional[str] = None,
-        algo_groups: Optional[str] = None,
-        count: int = 10,
-        batch_size: int = 10000,
-        subset_size: Optional[int] = None,
         **kwargs,
-    ) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
+    ) -> List[BenchmarkConfig]:
         """
-        Load C++ benchmark configurations from YAML files.
+        Build C++ benchmark configurations.
 
         Parameters
         ----------
+        dataset_config : DatasetConfig
+            Already-constructed dataset configuration
+        dataset_conf : dict
+            Raw dataset dict from YAML
         dataset : str
             Dataset name
         dataset_path : str
             Path to dataset directory
-        dataset_configuration : Optional[str]
-            Path to dataset configuration file
-        algorithm_configuration : Optional[str]
-            Path to algorithm configuration directory or file
-        algorithms : Optional[str]
-            Comma-separated list of algorithms to run
-        groups : Optional[str]
-            Comma-separated list of groups to run
-        algo_groups : Optional[str]
-            Comma-separated list of algorithm groups
-        count : int
-            Number of neighbors (k)
-        batch_size : int
-            Batch size for search
-        subset_size : Optional[int]
-            Dataset subset size
         **kwargs
-            Additional keyword arguments. In tune mode, the orchestrator
-            passes these internal kwargs:
-
-            - _tune_mode : bool
-                If True, returns single config with exact params instead of
-                Cartesian product expansion from YAML.
-            - _tune_build_params : dict
-                Exact build parameters suggested by Optuna
-                (e.g., {"nlist": 5347})
-            - _tune_search_params : dict
-                Exact search parameters suggested by Optuna
-                (e.g., {"nprobe": 73})
+            C++ specific arguments: algorithm_configuration, algorithms,
+            groups, algo_groups, count, batch_size, subset_size,
+            and tune mode kwargs (_tune_mode, _tune_build_params,
+            _tune_search_params)
 
         Returns
         -------
-        Tuple[DatasetConfig, List[BenchmarkConfig]]
-            Dataset config and list of benchmark configs.
-            - Sweep mode: Multiple configs (Cartesian product of YAML params)
-            - Tune mode: Single config (exact Optuna-suggested params)
+        List[BenchmarkConfig]
+            Benchmark configs grouped by executable
         """
         # Extract tune mode kwargs (passed by orchestrator._run_trial)
         tune_mode = kwargs.pop("_tune_mode", False)
         tune_build_params = kwargs.pop("_tune_build_params", None)
         tune_search_params = kwargs.pop("_tune_search_params", None)
 
+        algorithm_configuration = kwargs.get("algorithm_configuration")
+        algorithms = kwargs.get("algorithms")
+        groups = kwargs.get("groups")
+        algo_groups = kwargs.get("algo_groups")
+        count = kwargs.get("count", 10)
+        batch_size = kwargs.get("batch_size", 10000)
+        subset_size = kwargs.get("subset_size")
+        executable_dir = kwargs.get("executable_dir")
+
         config_path = self.config_path
-
-        # Load dataset configuration
-        dataset_conf_all = self.load_yaml_file(
-            dataset_configuration
-            or os.path.join(config_path, "datasets", "datasets.yaml")
-        )
-        dataset_conf = self.get_dataset_configuration(
-            dataset, dataset_conf_all
-        )
-
-        # Create DatasetConfig
-        dataset_config = DatasetConfig(
-            name=dataset_conf["name"],
-            base_file=dataset_conf.get("base_file"),
-            query_file=dataset_conf.get("query_file"),
-            groundtruth_neighbors_file=dataset_conf.get(
-                "groundtruth_neighbors_file"
-            ),
-            distance=dataset_conf.get("distance", "euclidean"),
-            dims=dataset_conf.get("dims"),
-            subset_size=subset_size,
-        )
 
         # Prepare conf_file for constraint validation
         conf_file = {"dataset": dataset_conf}
@@ -332,9 +502,10 @@ class CppGBenchConfigLoader(ConfigLoader):
             tune_mode=tune_mode,
             tune_build_params=tune_build_params,
             tune_search_params=tune_search_params,
+            executable_dir=executable_dir,
         )
 
-        return dataset_config, benchmark_configs
+        return benchmark_configs
 
     def _prepare_benchmark_configs(
         self,
@@ -349,6 +520,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         tune_mode: bool = False,
         tune_build_params: dict = None,
         tune_search_params: dict = None,
+        executable_dir: Optional[str] = None,
     ) -> List[BenchmarkConfig]:
         """
         Prepare list of BenchmarkConfig from algorithm configurations.
@@ -373,7 +545,12 @@ class CppGBenchConfigLoader(ConfigLoader):
                 try:
                     executable, executable_path, file_name = (
                         self.find_executable(
-                            algos_yaml, algo, group, count, batch_size
+                            algos_yaml,
+                            algo,
+                            group,
+                            count,
+                            batch_size,
+                            executable_dir,
                         )
                     )
                 except FileNotFoundError:
@@ -448,92 +625,8 @@ class CppGBenchConfigLoader(ConfigLoader):
         return benchmark_configs
 
     # =========================================================================
-    # `Helper methods (copied from run.py as-is)`
+    # C++ specific helper methods
     # =========================================================================
-
-    def load_yaml_file(self, file_path: str) -> dict:
-        """
-        Load a YAML file and return its contents as a dictionary.
-
-        Parameters
-        ----------
-        file_path : str
-            The path to the YAML file.
-
-        Returns
-        -------
-        dict
-            The contents of the YAML file.
-        """
-        with open(file_path, "r") as f:
-            return yaml.safe_load(f)
-
-    def get_dataset_configuration(
-        self, dataset: str, dataset_conf_all: list
-    ) -> dict:
-        """
-        Retrieve the configuration for a specific dataset.
-
-        Parameters
-        ----------
-        dataset : str
-            The name of the dataset to retrieve the configuration for.
-        dataset_conf_all : list
-            A list of dataset configurations.
-
-        Returns
-        -------
-        dict
-            The configuration for the specified dataset.
-
-        Raises
-        ------
-        ValueError
-            If the dataset configuration is not found.
-        """
-        for d in dataset_conf_all:
-            if dataset == d["name"]:
-                return d
-        raise ValueError("Could not find a dataset configuration")
-
-    def gather_algorithm_configs(
-        self, config_path: str, algorithm_configuration: Optional[str]
-    ) -> list:
-        """
-        Gather the list of algorithm configuration files.
-
-        Parameters
-        ----------
-        config_path : str
-            The path to the config directory.
-        algorithm_configuration : Optional[str]
-            The path to the algorithm configuration directory or file.
-
-        Returns
-        -------
-        list
-            A list of paths to the algorithm configuration files.
-        """
-        algos_conf_fs = os.listdir(os.path.join(config_path, "algos"))
-        algos_conf_fs = [
-            os.path.join(config_path, "algos", f)
-            for f in algos_conf_fs
-            if ".json" not in f
-            and "constraint" not in f
-            and ".py" not in f
-            and "__pycache__" not in f
-        ]
-
-        if algorithm_configuration:
-            if os.path.isdir(algorithm_configuration):
-                algos_conf_fs += [
-                    os.path.join(algorithm_configuration, f)
-                    for f in os.listdir(algorithm_configuration)
-                    if ".json" not in f
-                ]
-            elif os.path.isfile(algorithm_configuration):
-                algos_conf_fs.append(algorithm_configuration)
-        return algos_conf_fs
 
     def load_algorithms_conf(
         self,
@@ -620,7 +713,13 @@ class CppGBenchConfigLoader(ConfigLoader):
         )
 
     def find_executable(
-        self, algos_conf: dict, algo: str, group: str, k: int, batch_size: int
+        self,
+        algos_conf: dict,
+        algo: str,
+        group: str,
+        k: int,
+        batch_size: int,
+        executable_dir: Optional[str] = None,
     ) -> Tuple[str, str, Tuple[str, str]]:
         """
         Find the executable for the given algorithm and group.
@@ -637,6 +736,8 @@ class CppGBenchConfigLoader(ConfigLoader):
             The number of nearest neighbors to search for.
         batch_size : int
             The size of each batch for processing.
+        executable_dir : Optional[str]
+            User-specified directory to search first.
 
         Returns
         -------
@@ -646,12 +747,14 @@ class CppGBenchConfigLoader(ConfigLoader):
         """
         executable = algos_conf[algo]["executable"]
         file_name = (f"{algo},{group}", f"{algo},{group},k{k},bs{batch_size}")
-        build_path = self.get_build_path(executable)
+        build_path = self.get_build_path(executable, executable_dir)
         if build_path:
             return executable, build_path, file_name
         raise FileNotFoundError(executable)
 
-    def get_build_path(self, executable: str) -> Optional[str]:
+    def get_build_path(
+        self, executable: str, executable_dir: Optional[str] = None
+    ) -> Optional[str]:
         """
         Get the build path for the given executable.
 
@@ -659,12 +762,20 @@ class CppGBenchConfigLoader(ConfigLoader):
         ----------
         executable : str
             The name of the executable.
+        executable_dir : Optional[str]
+            User-specified directory to search first. If provided and the
+            executable exists there, it is used before auto-discovery.
 
         Returns
         -------
         Optional[str]
             The build path for the executable, if found.
         """
+        if executable_dir is not None:
+            build_path = os.path.join(executable_dir, executable)
+            if os.path.exists(build_path):
+                print(f"-- Using cuVS bench from {build_path}.")
+                return build_path
 
         devcontainer_path = "/home/coder/cuvs/cpp/build/latest/bench/ann"
         if os.path.exists(devcontainer_path):
@@ -747,40 +858,19 @@ class CppGBenchConfigLoader(ConfigLoader):
         search_params = group_conf.get("search", {})
 
         if tune_mode and tune_build_params is not None:
-            # TUNE MODE: Use exact params from Optuna (single config)
-            param_names = list(tune_build_params.keys())
-            all_build_params = [tuple(tune_build_params.values())]
-            # For search params, use tune_search_params keys/values
-            if tune_search_params:
-                search_param_names = tuple(tune_search_params.keys())
-                search_param_lists = [[v] for v in tune_search_params.values()]
-            else:
-                search_param_names, search_param_lists = [], []
-        else:
-            # SWEEP MODE: Cartesian product of all YAML params
-            all_build_params = itertools.product(*build_params.values())
-            search_param_names, search_param_lists = (
-                zip(*search_params.items()) if search_params else ([], [])
+            all_build_params = [tune_build_params.copy()]
+            all_search_params = (
+                [tune_search_params.copy()] if tune_search_params else [{}]
             )
-            param_names = list(build_params.keys())
-        for params in all_build_params:
-            # Build the build_param dict using appropriate keys
-            if tune_mode and tune_build_params is not None:
-                # Tune mode: use exact params from Optuna
-                index = {
-                    "algo": algo,
-                    "build_param": tune_build_params.copy(),
-                }
-            else:
-                # Sweep mode: use YAML param names
-                index = {
-                    "algo": algo,
-                    "build_param": dict(zip(param_names, params)),
-                }
+        else:
+            all_build_params = expand_param_grid(build_params)
+            all_search_params = expand_param_grid(search_params)
 
-            # Build index name from params
+        for build_param in all_build_params:
+            index = {"algo": algo, "build_param": build_param}
+
             index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
-            for name, val in zip(param_names, params):
+            for name, val in build_param.items():
                 index_name += f".{name}{val}"
 
             # Skip constraint validation in tune mode (Optuna handles bounds)
@@ -789,7 +879,7 @@ class CppGBenchConfigLoader(ConfigLoader):
                     algos_conf,
                     algo,
                     "build",
-                    index["build_param"],
+                    build_param,
                     None,
                     conf_file["dataset"].get("dims"),
                     count,
@@ -807,16 +897,12 @@ class CppGBenchConfigLoader(ConfigLoader):
 
             # Handle search params
             if tune_mode and tune_search_params is not None:
-                # Tune mode: use exact search params from Optuna (as single-item list)
                 index["search_params"] = [tune_search_params.copy()]
             else:
-                # Sweep mode: validate and expand search params
                 index["search_params"] = self.validate_search_params(
-                    itertools.product(*search_param_lists),
-                    search_param_names,
-                    index["build_param"],
+                    all_search_params,
+                    build_param,
                     algo,
-                    group_conf,
                     algos_conf,
                     conf_file,
                     count,
@@ -830,29 +916,26 @@ class CppGBenchConfigLoader(ConfigLoader):
     def validate_search_params(
         self,
         all_search_params,
-        search_param_names,
         build_params,
         algo,
-        group_conf,
         algos_conf,
         conf_file,
         count,
         batch_size,
     ) -> list:
         """
-        Validate and prepare the search parameters for the given algorithm
-        and group.
+        Validate and filter search parameter combinations.
 
         Parameters
         ----------
-        all_search_params : itertools.product
-            The Cartesian product of search parameter values.
-        search_param_names : list
-            The names of the search parameters.
+        all_search_params : List[Dict[str, Any]]
+            List of search parameter dicts (from expand_param_grid).
+        build_params : dict
+            The build parameters for the current index.
         algo : str
             The name of the algorithm.
-        group_conf : dict
-            The configuration for the algorithm group.
+        algos_conf : dict
+            The loaded algorithm configurations.
         conf_file : dict
             The main configuration file.
         count : int
@@ -863,11 +946,10 @@ class CppGBenchConfigLoader(ConfigLoader):
         Returns
         -------
         list
-            A list of validated search parameters.
+            A list of validated search parameter dicts.
         """
         search_params_list = []
-        for search_params in all_search_params:
-            search_dict = dict(zip(search_param_names, search_params))
+        for search_dict in all_search_params:
             if self.validate_constraints(
                 algos_conf,
                 algo,
