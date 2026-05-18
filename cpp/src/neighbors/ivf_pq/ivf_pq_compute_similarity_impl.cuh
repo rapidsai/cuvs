@@ -93,9 +93,9 @@ auto get_lut_type_tag()
     return tag_lut_f{};
   } else if constexpr (std::is_same_v<LutT, half>) {
     return tag_lut_h{};
-  } else if constexpr (std::is_same_v<LutT, cuvs::neighbors::ivf_pq::detail::fp_8bit<5u, false>>) {
+  } else if constexpr (std::is_same_v<LutT, fp_8bit<5u, false>>) {
     return tag_lut_fp8_unsigned{};
-  } else if constexpr (std::is_same_v<LutT, cuvs::neighbors::ivf_pq::detail::fp_8bit<5u, true>>) {
+  } else if constexpr (std::is_same_v<LutT, fp_8bit<5u, true>>) {
     return tag_lut_fp8_signed{};
   } else {
     static_assert(sizeof(LutT) == 0, "Unsupported LutT type");

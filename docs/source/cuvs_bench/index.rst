@@ -65,7 +65,7 @@ Conda
    conda activate cuvs_benchmarks
 
    # to install GPU package:
-   conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> cuda-version=13.1*
+   conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> cuda-version=13.2*
 
    # to install CPU package for usage in CPU-only systems:
    conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
@@ -113,22 +113,8 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     # (1) Prepare dataset.
     python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
 
-.. code-block:: python
-
     # (2) Build and search index.
-    from cuvs_bench.orchestrator import BenchmarkOrchestrator
-
-    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
-    results = orchestrator.run_benchmark(
-        dataset="deep-image-96-inner",
-        algorithms="cuvs_cagra",
-        count=10,
-        batch_size=10,
-        build=True,
-        search=True,
-    )
-
-.. code-block:: bash
+    python -m cuvs_bench.run --dataset deep-image-96-inner --algorithms cuvs_cagra --batch-size 10 -k 10 --build --search
 
     # (3) Export data.
     python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
@@ -210,22 +196,10 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     python -m cuvs_bench.split_groundtruth --groundtruth datasets/deep-1B/deep_new_groundtruth.public.10K.bin
     # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
 
-.. code-block:: python
+.. code-block:: bash
 
     # (2) Build and search index.
-    from cuvs_bench.orchestrator import BenchmarkOrchestrator
-
-    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
-    results = orchestrator.run_benchmark(
-        dataset="deep-1B",
-        algorithms="cuvs_cagra",
-        count=10,
-        batch_size=10,
-        build=True,
-        search=True,
-    )
-
-.. code-block:: bash
+    python -m cuvs_bench.run --dataset deep-1B --algorithms cuvs_cagra --batch-size 10 -k 10 --build --search
 
     # (3) Export data.
     python -m cuvs_bench.run --data-export --dataset deep-1B

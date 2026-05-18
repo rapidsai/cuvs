@@ -203,13 +203,15 @@ void extend(raft::resources const& handle,
     }
   }
   // Predict the cluster labels for the new data, in batches if necessary
-  utils::batch_load_iterator<T> vec_batches(new_vectors,
-                                            n_rows,
-                                            index->dim(),
-                                            max_batch_size,
-                                            copy_stream,
-                                            raft::resource::get_workspace_resource_ref(handle),
-                                            enable_prefetch);
+  auto vec_batches =
+    utils::make_batch_load_iterator<T>(handle,
+                                       new_vectors,
+                                       n_rows,
+                                       IdxT{index->dim()},
+                                       max_batch_size,
+                                       copy_stream,
+                                       raft::resource::get_workspace_resource_ref(handle),
+                                       enable_prefetch);
   vec_batches.prefetch_next_batch();
 
   for (const auto& batch : vec_batches) {
@@ -296,17 +298,19 @@ void extend(raft::resources const& handle,
     raft::make_device_vector_view(list_sizes_ptr, n_lists),
     raft::make_device_vector_view<const uint32_t>(old_list_sizes_dev.data_handle(), n_lists));
 
-  utils::batch_load_iterator<IdxT> vec_indices(new_indices,
-                                               n_rows,
-                                               1,
-                                               max_batch_size,
-                                               stream,
-                                               raft::resource::get_workspace_resource_ref(handle));
+  auto vec_indices =
+    utils::make_batch_load_iterator<IdxT>(handle,
+                                          new_indices,
+                                          n_rows,
+                                          IdxT{1},
+                                          max_batch_size,
+                                          stream,
+                                          raft::resource::get_workspace_resource_ref(handle));
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
-  utils::batch_load_iterator<IdxT> idx_batch = vec_indices.begin();
-  size_t next_report_offset                  = 0;
-  size_t d_report_offset                     = n_rows * 5 / 100;
+  auto idx_batch            = vec_indices.begin();
+  size_t next_report_offset = 0;
+  size_t d_report_offset    = n_rows * 5 / 100;
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());

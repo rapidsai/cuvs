@@ -12,8 +12,12 @@
 #include <raft/core/host_mdspan.hpp>
 
 #include <cuda_fp16.h>
+#include <cuvs/core/export.hpp>
 
-namespace cuvs::preprocessing::quantize::binary {
+namespace CUVS_EXPORT cuvs {
+namespace preprocessing {
+namespace quantize {
+namespace binary {
 
 /**
  * @defgroup binary Binary quantizer utilities
@@ -428,4 +432,7 @@ void transform(raft::resources const& res,
 
 /** @} */  // end of group binary
 
-}  // namespace cuvs::preprocessing::quantize::binary
+}  // namespace binary
+}  // namespace quantize
+}  // namespace preprocessing
+}  // namespace CUVS_EXPORT cuvs

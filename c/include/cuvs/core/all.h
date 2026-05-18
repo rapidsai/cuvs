@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cuvs/core/c_config.h>
+#include <cuvs/core/export.h>
 #include <cuvs/core/c_api.h>
 
 #include <cuvs/cluster/kmeans.h>
