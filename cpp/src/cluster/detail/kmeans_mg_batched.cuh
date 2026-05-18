@@ -126,6 +126,10 @@ void mnmg_fit(const raft::resources& handle,
                "centroids.extent(0) must equal n_clusters");
   RAFT_EXPECTS(centroids.extent(1) == n_features, "centroids.extent(1) must equal n_features");
   RAFT_EXPECTS(num_ranks > 0, "num_ranks must be positive");
+  if (sample_weight.has_value()) {
+    RAFT_EXPECTS(sample_weight->extent(0) == n_local,
+                 "invalid parameter (sample_weight extent must equal local row count)");
+  }
 
   RAFT_LOG_DEBUG("MNMG KMeans fit: rank=%d/%d, n_local=%zu, n_features=%zu, n_clusters=%d",
                  rank,
@@ -516,10 +520,15 @@ void batched_fit_omp(const raft::resources& clique,
                  params.metric == cuvs::distance::DistanceType::L2SqrtExpanded,
                "kmeans only supports L2Expanded or L2SqrtExpanded distance metrics.");
 
-  raft::resource::get_nccl_comms(clique);
-  int num_ranks     = raft::resource::get_num_ranks(clique);
   IndexT n_samples  = X.extent(0);
   IndexT n_features = X.extent(1);
+  if (sample_weight.has_value()) {
+    RAFT_EXPECTS(sample_weight->extent(0) == n_samples,
+                 "invalid parameter (sample_weight extent must equal n_samples)");
+  }
+
+  raft::resource::get_nccl_comms(clique);
+  int num_ranks = raft::resource::get_num_ranks(clique);
 
   IndexT base = n_samples / num_ranks;
   IndexT rem  = n_samples % num_ranks;
