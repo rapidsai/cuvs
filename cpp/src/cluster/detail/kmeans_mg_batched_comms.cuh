@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include <raft/core/error.hpp>
 #include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/nccl_comm.hpp>
@@ -14,28 +15,42 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
 template <typename T>
-ncclDataType_t nccl_dtype();
+inline constexpr bool unsupported_nccl_dtype_v = false;
 
-template <>
-inline ncclDataType_t nccl_dtype<float>()
+template <typename T>
+inline ncclDataType_t nccl_dtype()
 {
-  return ncclFloat;
+  using U = std::remove_cv_t<T>;
+  if constexpr (std::is_same_v<U, float>) {
+    return ncclFloat;
+  } else if constexpr (std::is_same_v<U, double>) {
+    return ncclDouble;
+  } else if constexpr (std::is_same_v<U, int> || std::is_same_v<U, std::int32_t>) {
+    return ncclInt32;
+  } else if constexpr (std::is_same_v<U, std::int64_t>) {
+    return ncclInt64;
+  } else {
+    static_assert(unsupported_nccl_dtype_v<U>,
+                  "Unsupported NCCL data type for MG batched k-means collectives. Supported "
+                  "types are float, double, int/std::int32_t, and std::int64_t.");
+    return ncclFloat;
+  }
 }
 
-template <>
-inline ncclDataType_t nccl_dtype<double>()
+inline ncclRedOp_t nccl_op(raft::comms::op_t op)
 {
-  return ncclDouble;
-}
-
-template <>
-inline ncclDataType_t nccl_dtype<std::int64_t>()
-{
-  return ncclInt64;
+  switch (op) {
+    case raft::comms::op_t::SUM: return ncclSum;
+    case raft::comms::op_t::PROD: return ncclProd;
+    case raft::comms::op_t::MIN: return ncclMin;
+    case raft::comms::op_t::MAX: return ncclMax;
+  }
+  RAFT_FAIL("Unsupported allreduce operation");
 }
 
 class mnmg_comms {
@@ -51,14 +66,17 @@ class mnmg_comms {
   cudaStream_t stream() const { return stream_; }
 
   template <typename T>
-  void allreduce(T* sendbuf, T* recvbuf, std::size_t count) const
+  void allreduce(T* sendbuf,
+                 T* recvbuf,
+                 std::size_t count,
+                 raft::comms::op_t op = raft::comms::op_t::SUM) const
   {
     if (use_nccl_) {
       RAFT_NCCL_TRY(
-        ncclAllReduce(sendbuf, recvbuf, count, nccl_dtype<T>(), ncclSum, nccl_comm_, stream_));
+        ncclAllReduce(sendbuf, recvbuf, count, nccl_dtype<T>(), nccl_op(op), nccl_comm_, stream_));
     } else {
       const auto& comm = raft::resource::get_comms(dev_res_);
-      comm.allreduce(sendbuf, recvbuf, count, raft::comms::op_t::SUM, stream_);
+      comm.allreduce(sendbuf, recvbuf, count, op, stream_);
     }
   }
 

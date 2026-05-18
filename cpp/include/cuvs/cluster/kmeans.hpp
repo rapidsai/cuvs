@@ -126,8 +126,9 @@ struct params : base_params {
    * as a default.
    *
    * In Batched multi-GPU host-data fits, the effective KMeansPlusPlus initialization
-   * sample is materialized on device and seeding is run on rank 0. Rank 0
-   * must have enough GPU memory for this sample and the seeding workspace.
+   * sample is materialized on device on every rank. Every rank must have enough
+   * GPU memory for this sample, and rank 0 must also have enough GPU memory for
+   * the seeding workspace.
    *
    * Default: 0.
    */
@@ -191,8 +192,9 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *   - Otherwise: single-GPU batched k-means.
  *
  * With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the
- * effective initialization sample must fit in rank 0 GPU memory because
- * seeding is run on rank 0 before centroids are broadcast.
+ * effective initialization sample must fit in GPU memory on every rank because
+ * it is materialized on every device. Rank 0 must also have enough GPU memory
+ * for the seeding workspace before centroids are broadcast.
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>

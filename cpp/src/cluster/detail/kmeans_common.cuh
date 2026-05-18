@@ -623,8 +623,7 @@ void compute_centroid_shift(raft::resources const& handle,
  *
  * Checks the cost-ratio and centroid-shift stopping conditions and writes
  * 0 or 1 into @p done_flag, and advances @p prior_clustering_cost.
- * @p FlagT is deduced from @p done_flag (default `int`); MG callers pass
- * `int64_t` for NCCL allreduce compatibility.
+ * @p FlagT is deduced from @p done_flag (default `int`).
  */
 template <typename DataT, typename FlagT = int>
 __device__ void check_convergence(raft::device_scalar_view<const DataT> clustering_cost,

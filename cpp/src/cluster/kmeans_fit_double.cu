@@ -5,6 +5,9 @@
 
 #include "kmeans.cuh"
 #include "kmeans_impl.cuh"
+#include <raft/core/logger.hpp>
+#include <raft/core/resource/comms.hpp>
+#include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
 
 #ifdef CUVS_BUILD_MG_ALGOS
@@ -83,6 +86,11 @@ void fit(raft::resources const& handle,
     mg::detail::mnmg_fit<double, int64_t>(
       handle, params, X, sample_weight, centroids, inertia, n_iter);
   } else
+#else
+  if (raft::resource::is_multi_gpu(handle) || raft::resource::comms_initialized(handle)) {
+    RAFT_LOG_WARN(
+      "MG handle detected but cuVS built without MG support; falling back to single-GPU.");
+  }
 #endif
   {
     cuvs::cluster::kmeans::detail::fit<double, int64_t>(

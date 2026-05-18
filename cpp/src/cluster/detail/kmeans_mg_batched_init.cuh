@@ -35,9 +35,6 @@ IndexT get_global_kmeanspp_init_sample_size(const cuvs::cluster::kmeans::params&
   IndexT init_sample_size  = params.init_size > 0
                                ? std::min(static_cast<IndexT>(params.init_size), global_n)
                                : default_init_size;
-  if (params.streaming_batch_size > 0) {
-    init_sample_size = std::min(init_sample_size, static_cast<IndexT>(params.streaming_batch_size));
-  }
   return std::max(init_sample_size, n_clusters);
 }
 

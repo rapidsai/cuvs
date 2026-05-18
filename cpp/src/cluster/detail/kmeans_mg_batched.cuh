@@ -179,6 +179,11 @@ void mnmg_fit(const raft::resources& handle,
     comms.allreduce(d_global_wt->data_handle(), d_global_wt->data_handle(), 1);
     comms.group_end();
 
+    T h_global_wt = T{0};
+    raft::copy(&h_global_wt, d_global_wt->data_handle(), 1, stream);
+    raft::resource::sync_stream(dev_res);
+    RAFT_EXPECTS(h_global_wt > T{0}, "invalid parameter (sum of sample weights must be positive)");
+
     if (has_data) {
       const IdxT* d_global_n_ptr = d_global_n->data_handle();
       const T* d_global_wt_ptr   = d_global_wt->data_handle();
@@ -214,18 +219,18 @@ void mnmg_fit(const raft::resources& handle,
   std::mt19937 gen(params.rng_state.seed);
 
   // On-device convergence state, mirroring single-GPU `detail::fit`.
-  // The flag is `int64_t` for NCCL allreduce compatibility; SUM>0 means
-  // any rank converged, which guards against FP non-determinism in
-  // compute_centroid_shift diverging ranks.
+  // MAX acts as an OR over per-rank 0/1 flags and guards against FP
+  // non-determinism in compute_centroid_shift diverging ranks.
   auto d_prior_cost = raft::make_device_scalar<T>(dev_res, T{0});
-  auto d_done_flag  = raft::make_device_scalar<int64_t>(dev_res, 0);
-  auto h_done_flag  = raft::make_pinned_scalar<int64_t>(dev_res, 0);
+  auto d_done_flag  = raft::make_device_scalar<int>(dev_res, 0);
+  auto h_done_flag  = raft::make_pinned_scalar<int>(dev_res, 0);
 
-  std::optional<cuvs::spatial::knn::detail::utils::batch_load_iterator<T>> data_batches_opt;
+  using data_batch_iterator_t =
+    cuvs::spatial::knn::detail::utils::batch_load_iterator<decltype(X_local)>;
+  std::optional<data_batch_iterator_t> data_batches_opt;
   if (has_data) {
-    data_batches_opt.emplace(X_local.data_handle(),
-                             n_local,
-                             n_features,
+    data_batches_opt.emplace(dev_res,
+                             X_local,
                              streaming_batch_size,
                              stream,
                              rmm::mr::get_current_device_resource_ref(),
@@ -388,19 +393,21 @@ void mnmg_fit(const raft::resources& handle,
 
       raft::linalg::map_offset(
         dev_res,
-        raft::make_device_vector_view<int64_t, int>(d_done_flag.data_handle(), 1),
+        raft::make_device_vector_view<int, int>(d_done_flag.data_handle(), 1),
         [=] __device__(int) {
           cuvs::cluster::kmeans::detail::check_convergence(
             d_cost_view, d_prior_view, d_norm_view, tol, iter, d_done_view);
           return *d_done_view.data_handle();
         });
 
-      comms.allreduce(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
+      comms.allreduce(
+        d_done_flag.data_handle(), d_done_flag.data_handle(), 1, raft::comms::op_t::MAX);
 
       raft::copy(dev_res,
                  raft::make_pinned_scalar_view(h_done_flag.data_handle()),
-                 raft::make_device_scalar_view<const int64_t>(d_done_flag.data_handle()));
+                 raft::make_device_scalar_view<const int>(d_done_flag.data_handle()));
     }
+    local_n_iter = std::min(local_n_iter, static_cast<IdxT>(iter_params.max_iter));
 
     // Recompute inertia against the converged centroids
     raft::matrix::fill(dev_res, clustering_cost.view(), T{0});
@@ -500,23 +507,39 @@ void batched_fit_omp(const raft::resources& clique,
   IdxT rem  = n_samples % num_ranks;
 
   cuvs::core::omp::check_threads(num_ranks);
+  int actual_threads = 0;
+  // Verify the actual OpenMP team size before any rank enters NCCL collectives.
 #pragma omp parallel num_threads(num_ranks)
   {
-    int r        = cuvs::core::omp::get_thread_num();
-    IdxT offset  = r * base + std::min<IdxT>(r, rem);
-    IdxT n_local = base + (r < rem ? 1 : 0);
-
-    auto X_local = raft::make_host_matrix_view<const T, IdxT>(
-      X.data_handle() + offset * n_features, n_local, n_features);
-
-    std::optional<raft::host_vector_view<const T, IdxT>> sw_local;
-    if (sample_weight.has_value()) {
-      sw_local =
-        raft::make_host_vector_view<const T, IdxT>(sample_weight->data_handle() + offset, n_local);
+#pragma omp single nowait
+    {
+      actual_threads = cuvs::core::omp::get_num_threads();
     }
 
-    mnmg_fit<T, IdxT>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
+#pragma omp barrier
+    if (actual_threads == num_ranks) {
+      int r        = cuvs::core::omp::get_thread_num();
+      IdxT offset  = r * base + std::min<IdxT>(r, rem);
+      IdxT n_local = base + (r < rem ? 1 : 0);
+
+      auto X_local = raft::make_host_matrix_view<const T, IdxT>(
+        X.data_handle() + offset * n_features, n_local, n_features);
+
+      std::optional<raft::host_vector_view<const T, IdxT>> sw_local;
+      if (sample_weight.has_value()) {
+        sw_local = raft::make_host_vector_view<const T, IdxT>(sample_weight->data_handle() + offset,
+                                                              n_local);
+      }
+
+      mnmg_fit<T, IdxT>(clique, params, X_local, sw_local, centroids, inertia, n_iter);
+    }
   }
+
+  RAFT_EXPECTS(
+    actual_threads == num_ranks,
+    "OpenMP created %d threads but k-means MG requires exactly %d threads, one per rank.",
+    actual_threads,
+    num_ranks);
 }
 
 }  // namespace cuvs::cluster::kmeans::mg::detail
