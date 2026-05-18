@@ -25,8 +25,8 @@ import requests
 OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://opensearch:9200")
 BUILDER_URL    = os.environ.get("BUILDER_URL",    "http://remote-index-builder:1025")
 
-S3_BUCKET = os.environ["S3_BUCKET"]
-S3_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+S3_BUCKET = os.environ.get("S3_BUCKET", "").strip()
+S3_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
 # boto3 uses AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY when set, otherwise it
 # falls through to the default credential provider chain.
 
@@ -291,6 +291,15 @@ def search_vectors() -> None:
 # ── entrypoint ────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    if not S3_BUCKET:
+        print(
+            "ERROR: S3_BUCKET is not set. The remote index build demo requires "
+            "an S3 bucket for vector and index staging. Set it before running, "
+            "for example: export S3_BUCKET=<your-s3-bucket>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     print("\n" + "═" * 60)
     print("  OpenSearch GPU Remote Index Build — End-to-End Demo")
     print("═" * 60)

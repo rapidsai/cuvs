@@ -67,7 +67,7 @@ export AWS_SESSION_TOKEN=<session-token>   # required for temporary (STS) creden
 Optionally configure the region:
 
 ```bash
-export AWS_DEFAULT_REGION=us-east-1        # default: us-east-1
+export AWS_DEFAULT_REGION=us-west-2        # default: us-west-2
 ```
 
 Start OpenSearch and the GPU builder:
@@ -90,7 +90,7 @@ curl -X PUT http://localhost:9200/_snapshot/<your-s3-bucket> \
     "settings": {
       "bucket": "<your-s3-bucket>",
       "base_path": "knn-indexes",
-      "region": "us-east-1"
+      "region": "us-west-2"
     }
   }'
 ```
@@ -159,7 +159,7 @@ docker compose run --rm \
   -e OPENSEARCH_URL=http://opensearch:9200 \
   -e BUILDER_URL=http://remote-index-builder:1025 \
   -e S3_BUCKET=${S3_BUCKET} \
-  -e AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1} \
+  -e AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2} \
   -e REMOTE_BUILD_SIZE_MIN=${REMOTE_BUILD_SIZE_MIN:-} \
   -e REMOTE_BUILD_TIMEOUT=${REMOTE_BUILD_TIMEOUT:-1800} \
   -v $(pwd)/remote-index-build:/app/remote-index-build \

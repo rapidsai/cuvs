@@ -44,7 +44,7 @@ sudo sysctl -w vm.max_map_count=262144
 Set required environment variables:
 
 ```bash
-export DATASET_PATH=/path/to/ann-benchmark-datasets   # directory containing dataset files
+export DATASET_PATH="$(pwd)/ann-benchmark-datasets"   # directory containing dataset files
 ```
 
 GPU mode also requires an S3 bucket. Static AWS keys are supported, but optional
@@ -52,7 +52,7 @@ when the containers can use another AWS default credential provider such as an
 EC2 instance role:
 
 ```bash
-export S3_BUCKET=opensearch-s3-bucket             # S3 bucket name
+export S3_BUCKET=opensearch-cuvs-bench            # S3 bucket name
 ```
 
 If you are using static credentials instead of a default provider, also export:
@@ -66,7 +66,7 @@ export AWS_SESSION_TOKEN=<session-token>   # required when using temporary (STS)
 Optionally configure the benchmark:
 
 ```bash
-export AWS_DEFAULT_REGION=us-east-1        # AWS region for the S3 bucket (default: us-east-1)
+export AWS_DEFAULT_REGION=us-west-2        # AWS region for the S3 bucket (default: us-west-2)
 export DATASET=sift-128-euclidean          # default
 export BENCH_GROUPS=test                   # test | base (default: test)
 export K=10                                # number of neighbors (default: 10)
@@ -205,7 +205,7 @@ Requires the full stack (OpenSearch and the remote index builder), S3 access, an
 When using static AWS keys, map them into the test fixture's `S3_*` variable names:
 
 ```bash
-export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
 docker compose --profile gpu up -d --wait opensearch remote-index-builder
 docker compose run --rm --no-deps \
     -e OPENSEARCH_URL=http://opensearch:9200 \

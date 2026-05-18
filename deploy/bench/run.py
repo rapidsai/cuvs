@@ -32,8 +32,8 @@ REMOTE_INDEX_BUILD = os.environ.get("REMOTE_INDEX_BUILD", "false").lower() == "t
 REMOTE_BUILD_SIZE_MIN = os.environ.get("REMOTE_BUILD_SIZE_MIN", "").strip()
 REMOTE_BUILD_TIMEOUT = int(os.environ.get("REMOTE_BUILD_TIMEOUT", "1800"))
 
-S3_BUCKET  = os.environ.get("S3_BUCKET", "")
-S3_REGION  = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+S3_BUCKET  = os.environ.get("S3_BUCKET", "").strip()
+S3_REGION  = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
 
 DATASET      = os.environ.get("DATASET",       "sift-128-euclidean")
 DATASET_PATH = os.environ.get("DATASET_PATH",  "/data/datasets")
@@ -222,6 +222,7 @@ def print_results(results: list) -> None:
             recall = _recall_for_entry(r, entry_index, entry_count)
             if recall is None:
                 missing_recall_rows += 1
+                continue
             _print_result_row(
                 entry["search_params"],
                 recall,
@@ -230,8 +231,8 @@ def print_results(results: list) -> None:
             )
     if missing_recall_rows:
         print(
-            "\n  Note: this cuVS version does not report recall for every "
-            "OpenSearch search parameter row."
+            "\n  Omitted "
+            f"{missing_recall_rows} timing-only search rows without recall."
         )
 
 
@@ -239,7 +240,12 @@ def print_results(results: list) -> None:
 
 def main() -> None:
     if REMOTE_INDEX_BUILD and not S3_BUCKET:
-        print("ERROR: S3_BUCKET must be set when REMOTE_INDEX_BUILD=true")
+        print(
+            "ERROR: S3_BUCKET is not set. Remote index build requires an S3 "
+            "bucket for vector and index staging. Set it before starting the "
+            "stack, for example: export S3_BUCKET=<your-s3-bucket>",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     print("\n" + "═" * 60)

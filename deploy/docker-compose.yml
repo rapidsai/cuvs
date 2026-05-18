@@ -26,7 +26,7 @@
 #   AWS_ACCESS_KEY_ID       AWS access key ID (optional if using default credentials)
 #   AWS_SECRET_ACCESS_KEY   AWS secret access key (optional if using default credentials)
 #   AWS_SESSION_TOKEN       STS session token (required for temporary static credentials)
-#   AWS_DEFAULT_REGION      AWS region for the S3 bucket (default: us-east-1)
+#   AWS_DEFAULT_REGION      AWS region for the S3 bucket (default: us-west-2)
 #   REMOTE_INDEX_BUILD      Override GPU/CPU mode detection (true/false); normally auto-detected
 #   REMOTE_BUILD_SIZE_MIN   Optional minimum segment size override for remote builds
 #   REMOTE_BUILD_TIMEOUT    Remote build wait timeout in seconds (default: 1800)
@@ -49,7 +49,7 @@ x-aws-env: &aws-env
   AWS_ACCESS_KEY_ID:
   AWS_SECRET_ACCESS_KEY:
   AWS_SESSION_TOKEN:
-  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-west-2}
 
 services:
 
