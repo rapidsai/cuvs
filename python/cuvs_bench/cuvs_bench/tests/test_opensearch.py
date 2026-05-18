@@ -410,15 +410,19 @@ def remote_build_env(opensearch_url):
         repo_response.raise_for_status()
         initial_snapshot_repo = repo_response.json().get(repo_name)
 
+    snapshot_settings = {
+        "bucket": s3_bucket,
+        "base_path": s3_prefix.rstrip("/"),
+        "region": s3_region,
+    }
+    if s3_endpoint is not None:
+        snapshot_settings["endpoint"] = s3_endpoint
+
     session.put(
         f"{opensearch_url}/_snapshot/{repo_name}",
         json={
             "type": "s3",
-            "settings": {
-                "bucket": s3_bucket,
-                "base_path": s3_prefix.rstrip("/"),
-                "region": s3_region,
-            },
+            "settings": snapshot_settings,
         },
     ).raise_for_status()
 
