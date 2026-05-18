@@ -1706,7 +1706,7 @@ template <typename IdxT = uint32_t,
           typename AccessorOutputGraph =
             raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void optimize(
-  raft::resources const& res,
+  raft::resources const& res_const,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorKnnGraph> knn_graph,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph> new_graph,
   const bool guarantee_connectivity       = true,
@@ -1714,6 +1714,12 @@ void optimize(
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
+
+  // TODO(achirkin): come up with a reasonable API to initialize a non-empty stream pool.
+  // raft::resource::set_cuda_stream_pool below modifies the resource, so it cannot be const.
+  // The optimize() is a heavy function, so copying the resource and creating a private stream pool
+  // is not a big overhead.
+  raft::resources res{res_const};
 
   // large temporary memory for large arrays, e.g. everything >= O(graph_size)
   auto large_tmp_mr = raft::resource::get_large_workspace_resource_ref(res);
