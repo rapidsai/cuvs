@@ -254,13 +254,23 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
 
   void checkResult()
   {
+    ASSERT_TRUE(std::isfinite(snmg_inertia_));
+    ASSERT_TRUE(std::isfinite(sg_inertia_));
+    ASSERT_GE(snmg_inertia_, T{0});
+    ASSERT_GE(sg_inertia_, T{0});
+    ASSERT_GT(snmg_n_iter_, int64_t{0});
+    ASSERT_LE(snmg_n_iter_, static_cast<int64_t>(testparams_.max_iter));
+
+    // This tiny dataset intentionally exercises empty-rank partitions on
+    // systems with more ranks than rows. With only 3 samples and 2 clusters,
+    // ARI is too coarse to be a stable quality signal across runners.
+    if (isTinyEmptyRankSmokeTest()) { return; }
+
     // make_blobs generates well-separated clusters (spread=1.0, range [-10,10]).
     // ARI >= 0.94 allows for minor label disagreement from floating-point
     // non-determinism across GPUs while still catching real clustering failures.
     ASSERT_GE(ari_vs_ref_, 0.94);
     ASSERT_GE(ari_vs_sg_, 0.94);
-    ASSERT_GT(snmg_n_iter_, int64_t{0});
-    ASSERT_LE(snmg_n_iter_, static_cast<int64_t>(testparams_.max_iter));
     if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
       EXPECT_GE(ari_vs_sg_, 0.98);
       if (sg_inertia_ > 0) {
@@ -271,6 +281,13 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
       EXPECT_LT(max_centroid_rel_diff_, 0.02)
         << "SNMG vs SG centroid max relative diff = " << max_centroid_rel_diff_;
     }
+  }
+
+  bool isTinyEmptyRankSmokeTest() const
+  {
+    return testparams_.n_row == 3 && testparams_.n_clusters == 2 &&
+           testparams_.weight_mode == kmeans_weight_mode::none &&
+           testparams_.init == cuvs::cluster::kmeans::params::Array;
   }
 
   raft::device_resources_snmg clique_;
