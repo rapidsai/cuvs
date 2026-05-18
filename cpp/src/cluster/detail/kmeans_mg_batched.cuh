@@ -43,7 +43,9 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <numeric>
 #include <random>
+#include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
@@ -206,6 +208,21 @@ void mnmg_fit(const raft::resources& handle,
     n_init = 1;
   }
 
+  std::vector<IdxT> rank_counts;
+  IdxT global_n = static_cast<IdxT>(n_local);
+  if (params.init != cuvs::cluster::kmeans::params::InitMethod::Array) {
+    rank_counts =
+      get_rank_sample_counts<IdxT>(dev_res, static_cast<IdxT>(n_local), num_ranks, comms);
+    global_n = std::accumulate(rank_counts.begin(), rank_counts.end(), IdxT{0});
+    RAFT_EXPECTS(global_n >= n_clusters,
+                 "global initialization requires global row count (%zu) >= n_clusters (%zu); "
+                 "rank %d has %zu local rows",
+                 static_cast<size_t>(global_n),
+                 static_cast<size_t>(n_clusters),
+                 rank,
+                 static_cast<size_t>(n_local));
+  }
+
   auto best_centroids = n_init > 1
                           ? raft::make_device_matrix<T, IdxT>(dev_res, n_clusters, n_features)
                           : raft::make_device_matrix<T, IdxT>(dev_res, 0, 0);
@@ -219,8 +236,9 @@ void mnmg_fit(const raft::resources& handle,
   std::mt19937 gen(params.rng_state.seed);
 
   // On-device convergence state, mirroring single-GPU `detail::fit`.
-  // MAX acts as an OR over per-rank 0/1 flags and guards against FP
-  // non-determinism in compute_centroid_shift diverging ranks.
+  // After centroid sums, weights, and cost are allreduced, centroid
+  // finalization and shift evaluation are deterministic with identical inputs
+  // on every rank, so each rank can evaluate the same convergence flag locally.
   auto d_prior_cost = raft::make_device_scalar<T>(dev_res, T{0});
   auto d_done_flag  = raft::make_device_scalar<int>(dev_res, 0);
   auto h_done_flag  = raft::make_pinned_scalar<int>(dev_res, 0);
@@ -255,8 +273,9 @@ void mnmg_fit(const raft::resources& handle,
                                            input_centroids_const,
                                            rank_centroids.view(),
                                            workspace,
+                                           rank_counts,
+                                           global_n,
                                            rank,
-                                           num_ranks,
                                            comms);
     comms.bcast(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
@@ -269,7 +288,7 @@ void mnmg_fit(const raft::resources& handle,
     *h_done_flag.data_handle() = 0;
 
     for (local_n_iter = 1; local_n_iter <= iter_params.max_iter; ++local_n_iter) {
-      // Consume the previous iteration's allreduced flag from pinned host.
+      // Consume the previous iteration's convergence flag from pinned host.
       if (local_n_iter > 1) {
         raft::resource::sync_stream(dev_res);
         if (*h_done_flag.data_handle()) {
@@ -372,9 +391,9 @@ void mnmg_fit(const raft::resources& handle,
                                                                  rank_centroids_const,
                                                                  new_centroids.view());
 
-      // Phase 4: device-side convergence evaluation. Compute shift,
-      // run `check_convergence` via `map_offset`, allreduce the flag,
-      // shadow into pinned host. Consumed at top of next iteration.
+      // Phase 4: device-side convergence evaluation. Compute shift, run
+      // `check_convergence` via `map_offset`, and shadow the flag into pinned
+      // host. Consumed at top of next iteration.
       cuvs::cluster::kmeans::detail::compute_centroid_shift<T, IdxT>(
         dev_res,
         rank_centroids_const,
@@ -399,9 +418,6 @@ void mnmg_fit(const raft::resources& handle,
             d_cost_view, d_prior_view, d_norm_view, tol, iter, d_done_view);
           return *d_done_view.data_handle();
         });
-
-      comms.allreduce(
-        d_done_flag.data_handle(), d_done_flag.data_handle(), 1, raft::comms::op_t::MAX);
 
       raft::copy(dev_res,
                  raft::make_pinned_scalar_view(h_done_flag.data_handle()),

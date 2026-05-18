@@ -139,6 +139,9 @@ struct params : base_params {
    * When set to 0, defaults to n_samples (process all at once).
    * Only used by the batched (host-data) code path and ignored by device-data
    * overloads.
+   *
+   * In multi-GPU mode, this is a per-rank batch size. Each rank processes up to
+   * this many local samples per batch, clamped to that rank's local sample count.
    * Default: 0 (process all data at once).
    */
   int64_t streaming_batch_size = 0;
@@ -182,7 +185,8 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *
  * This overload supports out-of-core computation where the dataset resides
  * on the host. Data is processed in GPU-sized batches, streaming from host to device.
- * The batch size is controlled by params.streaming_batch_size.
+ * The batch size is controlled by params.streaming_batch_size. In multi-GPU mode,
+ * this is a per-rank batch size.
  *
  * Multi-GPU dispatch is selected automatically based on the handle state:
  *   - If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X

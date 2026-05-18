@@ -156,10 +156,10 @@ raft::device_matrix<DataT, IndexT> sample_global_host_rows(
   int rank,
   int root,
   const std::vector<IndexT>& rank_counts,
+  IndexT global_n,
   const mnmg_comms& comms)
 {
   auto n_features = X_local.extent(1);
-  IndexT global_n = std::accumulate(rank_counts.begin(), rank_counts.end(), IndexT{0});
   auto sample_ids = broadcast_sampled_global_indices(
     handle, params.rng_state.seed, global_n, sample_size, rank, root, comms);
   auto owned_samples = get_owned_sample_indices(sample_ids, rank_counts, rank);
@@ -187,13 +187,13 @@ void init_centroids_for_mg_batched(raft::resources const& handle,
                                    raft::device_matrix_view<const DataT, IndexT> initial_centroids,
                                    raft::device_matrix_view<DataT, IndexT> centroids,
                                    rmm::device_uvector<char>& workspace,
+                                   const std::vector<IndexT>& rank_counts,
+                                   IndexT global_n,
                                    int rank,
-                                   int num_ranks,
                                    const mnmg_comms& comms)
 {
   constexpr int root = 0;
   auto stream        = comms.stream();
-  auto n_local       = X_local.extent(0);
   auto n_features    = X_local.extent(1);
   auto n_clusters    = static_cast<IndexT>(params.n_clusters);
 
@@ -207,24 +207,14 @@ void init_centroids_for_mg_batched(raft::resources const& handle,
     return;
   }
 
-  auto rank_counts = get_rank_sample_counts<IndexT>(handle, n_local, num_ranks, comms);
-  IndexT global_n  = std::accumulate(rank_counts.begin(), rank_counts.end(), IndexT{0});
-  RAFT_EXPECTS(global_n >= n_clusters,
-               "global initialization requires global row count (%zu) >= n_clusters (%zu); "
-               "rank %d has %zu local rows",
-               static_cast<size_t>(global_n),
-               static_cast<size_t>(n_clusters),
-               rank,
-               static_cast<size_t>(n_local));
-
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
     auto sampled_rows = sample_global_host_rows<DataT, IndexT>(
-      handle, params, X_local, n_clusters, rank, root, rank_counts, comms);
+      handle, params, X_local, n_clusters, rank, root, rank_counts, global_n, comms);
     raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
     IndexT init_sample_size = get_global_kmeanspp_init_sample_size(params, global_n, n_clusters);
     auto init_sample        = sample_global_host_rows<DataT, IndexT>(
-      handle, params, X_local, init_sample_size, rank, root, rank_counts, comms);
+      handle, params, X_local, init_sample_size, rank, root, rank_counts, global_n, comms);
 
     if (rank == root) {
       // KMeans++ seeding runs on root, so root must have enough device memory
