@@ -55,7 +55,7 @@ void transform_batch(raft::resources const& res,
 
   // Compute the labels for each vector
   cuvs::cluster::kmeans::balanced_params kmeans_params;
-  kmeans_params.metric = index.metric();
+  kmeans_params.metric = coarse_clustering_metric(index.metric());
 
   cuvs::cluster::kmeans_balanced::predict(
     res, kmeans_params, dataset, cluster_centers, output_labels, utils::mapping<float>{});
