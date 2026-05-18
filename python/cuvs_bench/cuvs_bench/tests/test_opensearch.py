@@ -339,12 +339,14 @@ def remote_build_env(opensearch_url):
     Required environment variables:
       BUILDER_URL      URL of the remote index builder service
       S3_BUCKET        Bucket name used by OpenSearch for vector staging
-      S3_ACCESS_KEY    S3 access key ID
-      S3_SECRET_KEY    S3 secret access key
 
     Optional environment variables:
       S3_ENDPOINT      Custom S3 endpoint URL (omit to use real AWS S3)
-      S3_SESSION_TOKEN STS session token (required for temporary credentials)
+
+    S3 credentials are not passed through the OpenSearchBackend config or
+    snapshot repository registration. The OpenSearch process/container must
+    already have access to them, for example through its environment or
+    OpenSearch keystore.
     """
     builder_url = os.environ.get("BUILDER_URL")
     # S3_ENDPOINT is optional — omit it (or leave unset) to use real AWS S3.
@@ -355,9 +357,6 @@ def remote_build_env(opensearch_url):
         or os.environ.get("AWS_DEFAULT_REGION")
         or "us-east-1"
     )
-    s3_access_key = os.environ.get("S3_ACCESS_KEY")
-    s3_secret_key = os.environ.get("S3_SECRET_KEY")
-    s3_session_token = os.environ.get("S3_SESSION_TOKEN") or None
     s3_prefix = "knn-indexes/"
 
     missing = [
@@ -365,8 +364,6 @@ def remote_build_env(opensearch_url):
         for name, val in {
             "BUILDER_URL": builder_url,
             "S3_BUCKET": s3_bucket,
-            "S3_ACCESS_KEY": s3_access_key,
-            "S3_SECRET_KEY": s3_secret_key,
         }.items()
         if not val
     ]
@@ -377,19 +374,41 @@ def remote_build_env(opensearch_url):
 
     try:
         requests.get(builder_url, timeout=2)
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.RequestException:
         pytest.skip(f"Remote index builder not reachable at {builder_url}")
 
     if s3_endpoint is not None:
         try:
             requests.get(s3_endpoint, timeout=2)
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.RequestException:
             pytest.skip(f"S3 endpoint not reachable at {s3_endpoint}")
 
     # Register the S3 snapshot repo and enable remote index build
     session = requests.Session()
     session.headers.update({"Content-Type": "application/json"})
     repo_name = "vector-repo"
+    remote_build_setting_keys = (
+        "knn.remote_index_build.enabled",
+        "knn.remote_index_build.repository",
+        "knn.remote_index_build.service.endpoint",
+    )
+
+    cluster_settings_response = session.get(
+        f"{opensearch_url}/_cluster/settings"
+    )
+    cluster_settings_response.raise_for_status()
+    cluster_settings = cluster_settings_response.json()
+    initial_remote_build_settings = {
+        key: cluster_settings.get("persistent", {}).get(key)
+        for key in remote_build_setting_keys
+    }
+
+    repo_response = session.get(f"{opensearch_url}/_snapshot/{repo_name}")
+    if repo_response.status_code == 404:
+        initial_snapshot_repo = None
+    else:
+        repo_response.raise_for_status()
+        initial_snapshot_repo = repo_response.json().get(repo_name)
 
     session.put(
         f"{opensearch_url}/_snapshot/{repo_name}",
@@ -414,14 +433,31 @@ def remote_build_env(opensearch_url):
         },
     ).raise_for_status()
 
-    return {
-        "s3_endpoint": s3_endpoint,
-        "s3_bucket": s3_bucket,
-        "s3_prefix": s3_prefix,
-        "s3_access_key": s3_access_key,
-        "s3_secret_key": s3_secret_key,
-        "s3_session_token": s3_session_token,
-    }
+    try:
+        yield {
+            "s3_endpoint": s3_endpoint,
+            "s3_bucket": s3_bucket,
+            "s3_prefix": s3_prefix,
+        }
+    finally:
+        try:
+            session.put(
+                f"{opensearch_url}/_cluster/settings",
+                json={
+                    "persistent": initial_remote_build_settings,
+                },
+            )
+            if initial_snapshot_repo is None:
+                session.delete(f"{opensearch_url}/_snapshot/{repo_name}")
+            else:
+                session.put(
+                    f"{opensearch_url}/_snapshot/{repo_name}",
+                    json=initial_snapshot_repo,
+                )
+        except requests.exceptions.RequestException:
+            pass
+        finally:
+            session.close()
 
 
 @pytest.fixture
