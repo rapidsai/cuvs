@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../util/serialize_validation.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 #include <cuvs/neighbors/common.hpp>
@@ -22,13 +23,13 @@ namespace cuvs::neighbors::ivf_sq::detail {
 
 constexpr int serialization_version = 1;
 
-template <typename IdxT>
-void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT>& index_)
+template <typename CodeT>
+void serialize(raft::resources const& handle, std::ostream& os, const index<CodeT>& index_)
 {
   RAFT_LOG_DEBUG(
     "Saving IVF-SQ index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
 
-  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>().to_string();
+  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<CodeT>().to_string();
   dtype_string.resize(4);
   os << dtype_string;
 
@@ -37,7 +38,6 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT
   serialize_scalar(handle, os, index_.dim());
   serialize_scalar(handle, os, index_.n_lists());
   serialize_scalar(handle, os, index_.metric());
-  serialize_scalar(handle, os, index_.adaptive_centers());
   serialize_scalar(handle, os, index_.conservative_memory_allocation());
   serialize_mdspan(handle, os, index_.centers());
 
@@ -61,7 +61,7 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT
   raft::resource::sync_stream(handle);
   serialize_mdspan(handle, os, sizes_host.view());
 
-  list_spec<uint32_t, IdxT, int64_t> list_store_spec{index_.dim(), true};
+  list_spec<uint32_t, CodeT, int64_t> list_store_spec{index_.dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::serialize_list(handle,
                         os,
@@ -72,10 +72,10 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT
   raft::resource::sync_stream(handle);
 }
 
-template <typename IdxT>
+template <typename CodeT>
 void serialize(raft::resources const& handle,
                const std::string& filename,
-               const index<IdxT>& index_)
+               const index<CodeT>& index_)
 {
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
@@ -84,24 +84,42 @@ void serialize(raft::resources const& handle,
   if (!of) { RAFT_FAIL("Error writing output %s", filename.c_str()); }
 }
 
-template <typename IdxT>
-auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
+template <typename CodeT>
+auto deserialize(raft::resources const& handle, std::istream& is) -> index<CodeT>
 {
   char dtype_string[4];
-  is.read(dtype_string, 4);
+  RAFT_EXPECTS(is.read(dtype_string, 4), "ivf_sq::deserialize: failed to read dtype prefix");
+  RAFT_EXPECTS(cuvs::util::validate_serialized_dtype<CodeT>(dtype_string, sizeof(dtype_string)),
+               "ivf_sq::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
   if (ver != serialization_version) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
-  auto n_rows           = raft::deserialize_scalar<int64_t>(handle, is);
-  auto dim              = raft::deserialize_scalar<uint32_t>(handle, is);
-  auto n_lists          = raft::deserialize_scalar<uint32_t>(handle, is);
-  auto metric           = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
-  bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
-  bool cma              = raft::deserialize_scalar<bool>(handle, is);
+  auto n_rows  = raft::deserialize_scalar<int64_t>(handle, is);
+  auto dim     = raft::deserialize_scalar<uint32_t>(handle, is);
+  auto n_lists = raft::deserialize_scalar<uint32_t>(handle, is);
+  auto metric  = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
+  bool cma     = raft::deserialize_scalar<bool>(handle, is);
 
-  index<IdxT> index_ = index<IdxT>(handle, metric, n_lists, dim, adaptive_centers, cma);
+  RAFT_EXPECTS(cuvs::util::is_valid_distance_type(metric),
+               "ivf_sq::deserialize: invalid metric value %d",
+               static_cast<int>(metric));
+  RAFT_EXPECTS(n_lists <= cuvs::util::kMaxIvfNLists,
+               "ivf_sq::deserialize: n_lists=%u exceeds maximum %u",
+               n_lists,
+               cuvs::util::kMaxIvfNLists);
+  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(
+                 static_cast<std::size_t>(n_lists), static_cast<std::size_t>(dim), sizeof(float)),
+               "ivf_sq::deserialize: integer overflow in n_lists*dim*sizeof(float) "
+               "(n_lists=%u, dim=%u)",
+               n_lists,
+               dim);
+  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(static_cast<std::size_t>(dim), sizeof(float)),
+               "ivf_sq::deserialize: integer overflow in dim*sizeof(float) (dim=%u)",
+               dim);
+
+  index<CodeT> index_ = index<CodeT>(handle, metric, n_lists, dim, cma);
 
   deserialize_mdspan(handle, is, index_.centers());
 
@@ -121,8 +139,8 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
 
   deserialize_mdspan(handle, is, index_.list_sizes());
 
-  list_spec<uint32_t, IdxT, int64_t> list_device_spec{index_.dim(), cma};
-  list_spec<uint32_t, IdxT, int64_t> list_store_spec{index_.dim(), true};
+  list_spec<uint32_t, CodeT, int64_t> list_device_spec{index_.dim(), cma};
+  list_spec<uint32_t, CodeT, int64_t> list_store_spec{index_.dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::deserialize_list(handle, is, index_.lists()[label], list_store_spec, list_device_spec);
   }
@@ -133,29 +151,29 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
   return index_;
 }
 
-template <typename IdxT>
-auto deserialize(raft::resources const& handle, const std::string& filename) -> index<IdxT>
+template <typename CodeT>
+auto deserialize(raft::resources const& handle, const std::string& filename) -> index<CodeT>
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
-  auto index = detail::deserialize<IdxT>(handle, is);
+  auto index = detail::deserialize<CodeT>(handle, is);
   is.close();
   return index;
 }
 
 }  // namespace cuvs::neighbors::ivf_sq::detail
 
-#define CUVS_INST_IVF_SQ_SERIALIZE(IdxT)                                           \
-  void serialize(raft::resources const& handle,                                    \
-                 const std::string& filename,                                      \
-                 const cuvs::neighbors::ivf_sq::index<IdxT>& index)                \
-  {                                                                                \
-    cuvs::neighbors::ivf_sq::detail::serialize(handle, filename, index);           \
-  }                                                                                \
-                                                                                   \
-  void deserialize(raft::resources const& handle,                                  \
-                   const std::string& filename,                                    \
-                   cuvs::neighbors::ivf_sq::index<IdxT>* index)                    \
-  {                                                                                \
-    *index = cuvs::neighbors::ivf_sq::detail::deserialize<IdxT>(handle, filename); \
+#define CUVS_INST_IVF_SQ_SERIALIZE(CodeT)                                           \
+  void serialize(raft::resources const& handle,                                     \
+                 const std::string& filename,                                       \
+                 const cuvs::neighbors::ivf_sq::index<CodeT>& index)                \
+  {                                                                                 \
+    cuvs::neighbors::ivf_sq::detail::serialize(handle, filename, index);            \
+  }                                                                                 \
+                                                                                    \
+  void deserialize(raft::resources const& handle,                                   \
+                   const std::string& filename,                                     \
+                   cuvs::neighbors::ivf_sq::index<CodeT>* index)                    \
+  {                                                                                 \
+    *index = cuvs::neighbors::ivf_sq::detail::deserialize<CodeT>(handle, filename); \
   }

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -216,7 +216,7 @@ class GNND {
                          int2* list_sizes,
                          cudaStream_t stream = 0);
 
-  template <typename DistEpilogue_t = raft::identity_op>
+  template <typename DistEpilogue_t>
   void local_join(cudaStream_t stream = 0, DistEpilogue_t dist_epilogue = DistEpilogue_t{});
 
   raft::resources const& res;
@@ -264,10 +264,11 @@ inline BuildConfig get_build_config(raft::resources const& res,
                          params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                          params.metric == cuvs::distance::DistanceType::CosineExpanded ||
                          params.metric == cuvs::distance::DistanceType::InnerProduct ||
-                         params.metric == cuvs::distance::DistanceType::BitwiseHamming;
+                         params.metric == cuvs::distance::DistanceType::BitwiseHamming ||
+                         params.metric == cuvs::distance::DistanceType::L1;
   RAFT_EXPECTS(allowed_metrics,
                "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded, "
-               "InnerProduct or BitwiseHamming");
+               "InnerProduct, BitwiseHamming or L1");
   RAFT_EXPECTS(
     metric == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -9,6 +9,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <raft/core/logger.hpp>
 
@@ -44,14 +45,13 @@ void serialize(const raft::resources& res,
   // Remove padding before saving the dataset
   auto src = dataset.view();
   auto dst = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
-                                  sizeof(DataT) * dim,
-                                  src.data_handle(),
-                                  sizeof(DataT) * stride,
-                                  sizeof(DataT) * dim,
-                                  n_rows,
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(dst.data_handle(),
+                    dim,
+                    src.data_handle(),
+                    stride,
+                    dim,
+                    n_rows,
+                    raft::resource::get_cuda_stream(res));
   raft::resource::sync_stream(res);
   raft::serialize_mdspan(res, os, dst.view());
 }
@@ -162,25 +162,35 @@ template <typename IdxT>
 auto deserialize_dataset(raft::resources const& res, std::istream& is)
   -> std::unique_ptr<dataset<IdxT>>
 {
-  switch (raft::deserialize_scalar<dataset_instance_tag>(res, is)) {
+  const auto tag = raft::deserialize_scalar<dataset_instance_tag>(res, is);
+  switch (tag) {
     case kSerializeEmptyDataset: return deserialize_empty<IdxT>(res, is);
-    case kSerializeStridedDataset:
-      switch (raft::deserialize_scalar<cudaDataType_t>(res, is)) {
+    case kSerializeStridedDataset: {
+      const auto dtype = raft::deserialize_scalar<cudaDataType_t>(res, is);
+      switch (dtype) {
         case CUDA_R_32F: return deserialize_strided<float, IdxT>(res, is);
         case CUDA_R_16F: return deserialize_strided<half, IdxT>(res, is);
         case CUDA_R_8I: return deserialize_strided<int8_t, IdxT>(res, is);
         case CUDA_R_8U: return deserialize_strided<uint8_t, IdxT>(res, is);
-        default: break;
+        default:
+          RAFT_FAIL("Failed to deserialize dataset: unsupported strided dataset element type %d.",
+                    static_cast<int>(dtype));
       }
-    case kSerializeVPQDataset:
-      switch (raft::deserialize_scalar<cudaDataType_t>(res, is)) {
+    }
+    case kSerializeVPQDataset: {
+      const auto dtype = raft::deserialize_scalar<cudaDataType_t>(res, is);
+      switch (dtype) {
         case CUDA_R_32F: return deserialize_vpq<float, IdxT>(res, is);
         case CUDA_R_16F: return deserialize_vpq<half, IdxT>(res, is);
-        default: break;
+        default:
+          RAFT_FAIL("Failed to deserialize dataset: unsupported VPQ dtype %d.",
+                    static_cast<int>(dtype));
       }
-    default: break;
+    }
+    default:
+      RAFT_FAIL("Failed to deserialize dataset: unknown instance tag %u.",
+                static_cast<unsigned>(tag));
   }
-  RAFT_FAIL("Failed to deserialize dataset: unsupported combination of instance tags.");
 }
 
 }  // namespace cuvs::neighbors::detail

@@ -1,0 +1,59 @@
+{
+  "_types": [
+    {
+      "data_type": "float",
+      "data_abbrev": "f",
+      "index_type": "uint32_t",
+      "index_abbrev": "u32",
+      "distance_type": "float",
+      "distance_abbrev": "f"
+    },
+    {
+      "data_type": "half",
+      "data_abbrev": "h",
+      "index_type": "uint32_t",
+      "index_abbrev": "u32",
+      "distance_type": "float",
+      "distance_abbrev": "f"
+    },
+    {
+      "data_type": "int8_t",
+      "data_abbrev": "i8",
+      "index_type": "uint32_t",
+      "index_abbrev": "u32",
+      "distance_type": "float",
+      "distance_abbrev": "f"
+    },
+    {
+      "data_type": "uint8_t",
+      "data_abbrev": "u8",
+      "index_type": "uint32_t",
+      "index_abbrev": "u32",
+      "distance_type": "float",
+      "distance_abbrev": "f"
+    }
+  ],
+  "_mxdim_team": [
+    {
+      "dim": "128",
+      "team_size": "8"
+    },
+    {
+      "dim": "256",
+      "team_size": "16"
+    },
+    {
+      "dim": "512",
+      "team_size": "32"
+    }
+  ],
+  "_codebook": [
+    {
+      "codebook_type": "half",
+      "codebook_abbrev": "h"
+    }
+  ],
+  "pq_bits": ["8"],
+  "pq_len": ["2", "4"],
+  "metric": ["L2Expanded"]
+}
