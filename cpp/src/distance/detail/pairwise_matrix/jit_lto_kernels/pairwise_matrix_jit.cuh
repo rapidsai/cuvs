@@ -200,7 +200,7 @@ void pairwise_matrix_jit_dispatch(OpT distance_op,
     dim3 grid =
       launchConfigGenerator<Policy>(params.m, params.n, smem_size, launcher->get_kernel());
 
-    launcher->dispatch<pairwise_matrix_jit_kernel_t<OpT, IdxT, DataT, OutT, FinOpT>>(
+    launcher->template dispatch<pairwise_matrix_jit_kernel_t<OpT, IdxT, DataT, OutT, FinOpT>>(
       stream, grid, block, smem_size, distance_op, params);
   };
 
