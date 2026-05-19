@@ -101,7 +101,7 @@ auto build(raft::resources const& handle,
   }
 
   auto dataset_const_view = raft::make_const_mdspan(d_dataset_view);
-  rmm::device_uvector<float> cluster_centers(params.n_lists * dim, stream, device_memory);
+  rmm::device_uvector<float> cluster_centers(params.n_lists * dim, stream, big_memory_resource);
   rmm::device_uvector<uint32_t> labels(n_rows, stream, big_memory_resource);
 
   // Scope for kmeans training set allocation.
