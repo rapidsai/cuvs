@@ -857,6 +857,9 @@ if(NOT BUILD_CPU_ONLY)
   )
   endblock()
 
+  # Note that this matrix contains an `arch_includes` placeholder, since we don't currently have a
+  # way to do an item-wise transform on a list after computing the matrix product and before
+  # configuring the file
   generate_inst_matrix(
     pairwise_matrix_dispatch_inst_files
     MATRIX_JSON_FILE
