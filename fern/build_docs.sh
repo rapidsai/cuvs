@@ -30,10 +30,10 @@ Examples:
 EOF
 }
 
-require_node_18() {
+require_node_22() {
   if ! command -v node >/dev/null 2>&1; then
-    echo "Fern docs require Node.js 18 or newer, but node was not found on PATH." >&2
-    echo "Install or activate Node.js 18+ before running fern/build_docs.sh." >&2
+    echo "Fern docs require Node.js 22 or newer, but node was not found on PATH." >&2
+    echo "Install or activate Node.js 22+ before running fern/build_docs.sh." >&2
     exit 1
   fi
 
@@ -42,15 +42,15 @@ require_node_18() {
   node_version=$(node -p 'process.versions.node' 2>/dev/null || true)
   node_major="${node_version%%.*}"
 
-  if [[ ! "${node_major}" =~ ^[0-9]+$ || "${node_major}" -lt 18 ]]; then
-    echo "Fern docs require Node.js 18 or newer, but found Node.js ${node_version:-unknown}." >&2
+  if [[ ! "${node_major}" =~ ^[0-9]+$ || "${node_major}" -lt 22 ]]; then
+    echo "Fern docs require Node.js 22 or newer, but found Node.js ${node_version:-unknown}." >&2
     echo "Older Node.js versions can fail with errors such as \"SyntaxError: Unexpected token '.'.\"" >&2
-    echo "Install or activate Node.js 18+ before running fern/build_docs.sh." >&2
+    echo "Install or activate Node.js 22+ before running fern/build_docs.sh." >&2
     exit 1
   fi
 }
 
-require_node_18
+require_node_22
 
 if [[ -n "${FERN_CLI:-}" ]]; then
   FERN_CMD=("${FERN_CLI}")

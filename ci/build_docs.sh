@@ -27,4 +27,39 @@ set -eu
 rapids-print-env
 
 rapids-logger "Validate Fern docs"
-fern/build_docs.sh "${FERN_DOCS_MODE:-check}"
+
+find_pr_number() {
+  local ref
+  for ref in "${RAPIDS_REF_NAME:-}" "${GITHUB_REF:-}" "${GITHUB_REF_NAME:-}"; do
+    if [[ "${ref}" =~ (^|/)pull-request/([0-9]+)$ ]]; then
+      echo "${BASH_REMATCH[2]}"
+      return 0
+    fi
+    if [[ "${ref}" =~ ^refs/pull/([0-9]+)/ ]]; then
+      echo "${BASH_REMATCH[1]}"
+      return 0
+    fi
+    if [[ "${ref}" =~ ^([0-9]+)/merge$ ]]; then
+      echo "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done
+}
+
+FERN_DOCS_MODE="${FERN_DOCS_MODE:-check}"
+FERN_DOCS_ARGS=()
+
+if [[ "${FERN_DOCS_MODE}" == "preview" ]]; then
+  FERN_PREVIEW_ID="${FERN_DOCS_PREVIEW_ID:-}"
+  if [[ -z "${FERN_PREVIEW_ID}" ]]; then
+    PR_NUMBER="$(find_pr_number || true)"
+    if [[ -n "${PR_NUMBER}" ]]; then
+      FERN_PREVIEW_ID="pr-${PR_NUMBER}"
+    fi
+  fi
+  if [[ -n "${FERN_PREVIEW_ID}" ]]; then
+    FERN_DOCS_ARGS+=(--id "${FERN_PREVIEW_ID}")
+  fi
+fi
+
+fern/build_docs.sh "${FERN_DOCS_MODE}" "${FERN_DOCS_ARGS[@]}"
