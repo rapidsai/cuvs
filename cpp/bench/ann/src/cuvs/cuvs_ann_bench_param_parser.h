@@ -99,7 +99,11 @@ void parse_build_param(const nlohmann::json& conf,
   param.n_lists = conf.at("nlist");
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
   if (conf.contains("ratio")) {
-    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+    throw std::runtime_error(
+      "cuvs_ivf_sq build parameter ratio was replaced by max_train_points_per_cluster");
+  }
+  if (conf.contains("max_train_points_per_cluster")) {
+    param.max_train_points_per_cluster = conf.at("max_train_points_per_cluster");
   }
 }
 

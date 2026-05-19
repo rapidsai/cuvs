@@ -288,10 +288,10 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
   cuvs::neighbors::ivf_sq::index<uint8_t> build_index(bool add_data_on_build)
   {
     cuvs::neighbors::ivf_sq::index_params index_params;
-    index_params.n_lists                  = ps.nlist;
-    index_params.metric                   = ps.metric;
-    index_params.add_data_on_build        = add_data_on_build;
-    index_params.kmeans_trainset_fraction = 0.5;
+    index_params.n_lists                      = ps.nlist;
+    index_params.metric                       = ps.metric;
+    index_params.add_data_on_build            = add_data_on_build;
+    index_params.max_train_points_per_cluster = 256;
 
     if (!ps.host_dataset) {
       auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(

@@ -24,13 +24,19 @@ namespace cuvs::neighbors::ivf_sq {
 
 constexpr static uint32_t kIndexGroupSize = 32;
 
+/**
+ * @brief IVF-SQ index build parameters.
+ *
+ * IVF-SQ currently uses 8-bit scalar quantization, storing one `uint8_t` code per vector
+ * dimension.
+ */
 struct index_params : cuvs::neighbors::index_params {
   /** The number of inverted lists (clusters) */
   uint32_t n_lists = 1024;
   /** The number of iterations searching for kmeans centers (index building). */
   uint32_t kmeans_n_iters = 20;
-  /** The fraction of data to use during iterative kmeans building. */
-  double kmeans_trainset_fraction = 0.5;
+  /** The number of data vectors (per cluster) to use during iterative kmeans building. */
+  uint32_t max_train_points_per_cluster = 256;
   /**
    * By default, the algorithm allocates more space than necessary for individual clusters
    * (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of
@@ -471,7 +477,6 @@ void build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -502,7 +507,6 @@ auto extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -530,7 +534,6 @@ void extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -561,7 +564,6 @@ auto extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -589,7 +591,6 @@ void extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -620,7 +621,6 @@ auto extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -648,7 +648,6 @@ void extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data
@@ -679,7 +678,6 @@ auto extend(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   ivf_sq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
- *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
  *   // fill the index with the data

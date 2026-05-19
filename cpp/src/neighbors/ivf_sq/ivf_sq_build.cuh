@@ -36,6 +36,7 @@
 
 #include <rmm/cuda_stream_view.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 
@@ -498,8 +499,7 @@ inline auto build(
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half>, "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-  RAFT_EXPECTS(params.kmeans_trainset_fraction > 0.0 && params.kmeans_trainset_fraction <= 1.0,
-               "kmeans_trainset_fraction must be in (0, 1]");
+  RAFT_EXPECTS(params.max_train_points_per_cluster > 0, "max_train_points_per_cluster must be > 0");
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
                "Cosine metric requires more than one dim");
 
@@ -509,13 +509,20 @@ inline auto build(
   // This mirrors IVF-PQ, which also trains its codebook on a subset of the data.
   {
     raft::random::RngState random_state{137};
-    auto trainset_ratio = std::max<size_t>(
-      1, n_rows / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, idx.n_lists()));
-    auto n_rows_train = n_rows / trainset_ratio;
-    auto trainset =
-      raft::make_device_mdarray<T>(handle,
-                                   raft::resource::get_large_workspace_resource_ref(handle),
-                                   raft::make_extents<int64_t>(n_rows_train, idx.dim()));
+    auto max_train_rows =
+      static_cast<size_t>(idx.n_lists()) * static_cast<size_t>(params.max_train_points_per_cluster);
+    if (max_train_rows > static_cast<size_t>(n_rows)) {
+      RAFT_LOG_WARN(
+        "ivf_sq::build: requested k-means training set size (%zu) exceeds "
+        "dataset size (%zu); using the full dataset for training.",
+        max_train_rows,
+        static_cast<size_t>(n_rows));
+    }
+    auto n_rows_train = std::min<size_t>(static_cast<size_t>(n_rows), max_train_rows);
+    auto trainset     = raft::make_device_mdarray<T>(
+      handle,
+      raft::resource::get_large_workspace_resource_ref(handle),
+      raft::make_extents<int64_t>(static_cast<int64_t>(n_rows_train), idx.dim()));
     raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, int64_t>(

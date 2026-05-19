@@ -5,21 +5,21 @@ groups:
   base:
     build:
       nlist: [1024, 2048, 4096]
-      ratio: [2, 4]
+      max_train_points_per_cluster: [256]
       niter: [25]
     search:
       nprobe: [1, 5, 10, 20, 50, 100, 200]
   large:
     build:
       nlist: [8192, 16384, 32768]
-      ratio: [4]
+      max_train_points_per_cluster: [256]
       niter: [20]
     search:
       nprobe: [10, 20, 50, 100, 200, 500, 1000]
   test:
     build:
       nlist: [1024]
-      ratio: [2]
+      max_train_points_per_cluster: [256]
       niter: [20]
     search:
       nprobe: [1, 5]
