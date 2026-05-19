@@ -274,36 +274,6 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2SqrtExpanded
- * - InnerProduct
- * - CosineExpanded
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   ivf_sq::index_params index_params;
- *   // create and fill the index from a [N, D] dataset
- *   ivf_sq::index<uint8_t> index;
- *   ivf_sq::build(handle, index_params, dataset, index);
- * @endcode
- *
- * @param[in] handle
- * @param[in] index_params configure the index building
- * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
- * @param[out] idx reference to ivf_sq::index
- *
- */
-void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_sq::index_params& index_params,
-           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
-
-/**
- * @brief Build the index from the dataset for efficient search.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -323,36 +293,6 @@ auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
-
-/**
- * @brief Build the index from the dataset for efficient search.
- *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2SqrtExpanded
- * - InnerProduct
- * - CosineExpanded
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   ivf_sq::index_params index_params;
- *   // create and fill the index from a [N, D] dataset
- *   ivf_sq::index<uint8_t> index;
- *   ivf_sq::build(handle, index_params, dataset, index);
- * @endcode
- *
- * @param[in] handle
- * @param[in] index_params configure the index building
- * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
- * @param[out] idx reference to ivf_sq::index
- *
- */
-void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_sq::index_params& index_params,
-           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -380,36 +320,6 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2SqrtExpanded
- * - InnerProduct
- * - CosineExpanded
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   ivf_sq::index_params index_params;
- *   // create and fill the index from a [N, D] dataset
- *   ivf_sq::index<uint8_t> index;
- *   ivf_sq::build(handle, index_params, dataset, index);
- * @endcode
- *
- * @param[in] handle
- * @param[in] index_params configure the index building
- * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
- * @param[out] idx reference to ivf_sq::index
- *
- */
-void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_sq::index_params& index_params,
-           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
-
-/**
- * @brief Build the index from the dataset for efficient search.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -429,36 +339,6 @@ auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
-
-/**
- * @brief Build the index from the dataset for efficient search.
- *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2SqrtExpanded
- * - InnerProduct
- * - CosineExpanded
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   ivf_sq::index_params index_params;
- *   // create and fill the index from a [N, D] dataset
- *   ivf_sq::index<uint8_t> index;
- *   ivf_sq::build(handle, index_params, dataset, index);
- * @endcode
- *
- * @param[in] handle
- * @param[in] index_params configure the index building
- * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
- * @param[out] idx reference to ivf_sq::index
- *
- */
-void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_sq::index_params& index_params,
-           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
 
 /**
  * @}

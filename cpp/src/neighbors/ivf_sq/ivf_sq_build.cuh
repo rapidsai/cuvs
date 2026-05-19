@@ -586,24 +586,6 @@ inline auto build(
 }
 
 template <typename T, typename CodeT>
-void build(raft::resources const& handle,
-           const index_params& params,
-           raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
-           index<CodeT>& idx)
-{
-  idx = build<T, CodeT>(handle, params, dataset);
-}
-
-template <typename T, typename CodeT>
-void build(raft::resources const& handle,
-           const index_params& params,
-           raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
-           index<CodeT>& idx)
-{
-  idx = build<T, CodeT>(handle, params, dataset);
-}
-
-template <typename T, typename CodeT>
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,

@@ -19,14 +19,6 @@ namespace cuvs::neighbors::ivf_sq {
       std::move(cuvs::neighbors::ivf_sq::detail::build<T, CodeT>(handle, params, dataset)));  \
   }                                                                                           \
                                                                                               \
-  void build(raft::resources const& handle,                                                   \
-             const cuvs::neighbors::ivf_sq::index_params& params,                             \
-             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,             \
-             cuvs::neighbors::ivf_sq::index<CodeT>& idx)                                      \
-  {                                                                                           \
-    cuvs::neighbors::ivf_sq::detail::build<T, CodeT>(handle, params, dataset, idx);           \
-  }                                                                                           \
-                                                                                              \
   auto build(raft::resources const& handle,                                                   \
              const cuvs::neighbors::ivf_sq::index_params& params,                             \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)               \
@@ -34,14 +26,6 @@ namespace cuvs::neighbors::ivf_sq {
   {                                                                                           \
     return cuvs::neighbors::ivf_sq::index<CodeT>(                                             \
       std::move(cuvs::neighbors::ivf_sq::detail::build<T, CodeT>(handle, params, dataset)));  \
-  }                                                                                           \
-                                                                                              \
-  void build(raft::resources const& handle,                                                   \
-             const cuvs::neighbors::ivf_sq::index_params& params,                             \
-             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,               \
-             cuvs::neighbors::ivf_sq::index<CodeT>& idx)                                      \
-  {                                                                                           \
-    cuvs::neighbors::ivf_sq::detail::build<T, CodeT>(handle, params, dataset, idx);           \
   }                                                                                           \
                                                                                               \
   auto extend(raft::resources const& handle,                                                  \
