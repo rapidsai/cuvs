@@ -7,7 +7,6 @@
 
 namespace cuvs::distance::detail {
 
-
 struct tag_layout_row {};
 struct tag_layout_col {};
 

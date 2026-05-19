@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -19,10 +19,10 @@
  *    build.
  */
 
-#include "../distance_ops/cutlass.cuh"                               // ops::has_cutlass_op
+#include "../distance_ops/cutlass.cuh"                                 // ops::has_cutlass_op
 #include "../pairwise_matrix/jit_lto_kernels/pairwise_matrix_jit.cuh"  // pairwise_matrix_jit_dispatch
-#include <raft/core/error.hpp>                                      // RAFT_CUDA_TRY
-#include <raft/util/arch.cuh>                                       // raft::util::arch::SM_*
+#include <raft/core/error.hpp>                                         // RAFT_CUDA_TRY
+#include <raft/util/arch.cuh>                                          // raft::util::arch::SM_*
 
 // NOTE: to minimize compile times, we do not include dispatch_sm80.cuh.
 // Including dispatch_sm80.cuh can slow down compile times (due to CUTLASS).

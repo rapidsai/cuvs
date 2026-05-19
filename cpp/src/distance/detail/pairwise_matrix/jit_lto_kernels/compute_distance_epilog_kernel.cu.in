@@ -13,12 +13,12 @@
 
 namespace {
 
-using data_t   = @data_type@;
-using acc_t    = @acc_type@;
-using index_t  = @index_type@;
-using op_t     = @op_type@<data_t, acc_t, index_t>;
+using data_t         = @data_type@;
+using acc_t          = @acc_type@;
+using index_t        = @index_type@;
+using op_t           = @op_type@<data_t, acc_t, index_t>;
 constexpr int veclen = @veclen@;
-using policy_t = typename raft::linalg::Policy4x4<data_t, veclen>::@policy_type@;
+using policy_t       = typename raft::linalg::Policy4x4<data_t, veclen>::@policy_type@;
 
 }  // namespace
 

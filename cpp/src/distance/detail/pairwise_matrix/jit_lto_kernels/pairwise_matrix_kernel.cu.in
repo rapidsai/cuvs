@@ -16,17 +16,17 @@
 
 namespace {
 
-using data_t      = @data_type@;
-using acc_t       = @acc_type@;
-using out_t       = @out_type@;
-using index_t     = @index_type@;
-using fin_op_t    = raft::identity_op;
-using op_t        = @op_type@<data_t, acc_t, index_t>;
-constexpr int veclen = @veclen@;
-using policies_t  = raft::linalg::Policy4x4<data_t, veclen>;
-using policy_t    = typename policies_t::@policy_type@;
+using data_t             = @data_type@;
+using acc_t              = @acc_type@;
+using out_t              = @out_type@;
+using index_t            = @index_type@;
+using fin_op_t           = raft::identity_op;
+using op_t               = @op_type@<data_t, acc_t, index_t>;
+constexpr int veclen     = @veclen@;
+using policies_t         = raft::linalg::Policy4x4<data_t, veclen>;
+using policy_t           = typename policies_t::@policy_type@;
 constexpr bool row_major = std::is_same_v<policy_t, typename policies_t::Policy>;
-using base_t      = raft::linalg::Contractions_NT<data_t, index_t, policy_t, row_major>;
+using base_t             = raft::linalg::Contractions_NT<data_t, index_t, policy_t, row_major>;
 
 }  // namespace
 
