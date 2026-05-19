@@ -302,11 +302,11 @@ RAFT_KERNEL compute_residuals_inplace_kernel(
 }
 
 template <typename T, typename CodeT>
-void extend(raft::resources const& handle,
-            index<CodeT>* index,
-            const T* new_vectors,
-            const int64_t* new_indices,
-            int64_t n_rows)
+void extend_inplace(raft::resources const& handle,
+                    index<CodeT>* index,
+                    const T* new_vectors,
+                    const int64_t* new_indices,
+                    int64_t n_rows)
 {
   using LabelT = uint32_t;
   RAFT_EXPECTS(index != nullptr, "index cannot be empty.");
@@ -472,18 +472,6 @@ void extend(raft::resources const& handle,
   }
 }
 
-template <typename T, typename CodeT>
-auto extend(raft::resources const& handle,
-            const index<CodeT>& orig_index,
-            const T* new_vectors,
-            const int64_t* new_indices,
-            int64_t n_rows) -> index<CodeT>
-{
-  auto ext_index = clone(handle, orig_index);
-  detail::extend(handle, &ext_index, new_vectors, new_indices, n_rows);
-  return ext_index;
-}
-
 template <typename T, typename CodeT, typename accessor>
 inline auto build(
   raft::resources const& handle,
@@ -579,53 +567,13 @@ inline auto build(
   }
 
   if (params.add_data_on_build) {
-    detail::extend<T, CodeT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
+    detail::extend_inplace<T, CodeT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
   }
 
   return idx;
 }
 
 template <typename T, typename CodeT>
-auto extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const index<CodeT>& orig_index) -> index<CodeT>
-{
-  RAFT_EXPECTS(new_vectors.extent(1) == orig_index.dim(),
-               "new_vectors should have the same dimension as the index");
-  if (new_indices.has_value()) {
-    RAFT_EXPECTS(new_indices.value().extent(0) == new_vectors.extent(0),
-                 "new_vectors and new_indices have different number of rows");
-  }
-  int64_t n_rows = new_vectors.extent(0);
-  return extend<T, CodeT>(handle,
-                          orig_index,
-                          new_vectors.data_handle(),
-                          new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                          n_rows);
-}
-
-template <typename T, typename CodeT>
-auto extend(raft::resources const& handle,
-            raft::host_matrix_view<const T, int64_t, raft::row_major> new_vectors,
-            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
-            const index<CodeT>& orig_index) -> index<CodeT>
-{
-  RAFT_EXPECTS(new_vectors.extent(1) == orig_index.dim(),
-               "new_vectors should have the same dimension as the index");
-  if (new_indices.has_value()) {
-    RAFT_EXPECTS(new_indices.value().extent(0) == new_vectors.extent(0),
-                 "new_vectors and new_indices have different number of rows");
-  }
-  int64_t n_rows = new_vectors.extent(0);
-  return extend<T, CodeT>(handle,
-                          orig_index,
-                          new_vectors.data_handle(),
-                          new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                          n_rows);
-}
-
-template <typename T, typename CodeT>
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
@@ -637,11 +585,11 @@ void extend(raft::resources const& handle,
     RAFT_EXPECTS(new_indices.value().extent(0) == new_vectors.extent(0),
                  "new_vectors and new_indices have different number of rows");
   }
-  detail::extend(handle,
-                 idx,
-                 new_vectors.data_handle(),
-                 new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                 new_vectors.extent(0));
+  detail::extend_inplace(handle,
+                         idx,
+                         new_vectors.data_handle(),
+                         new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                         new_vectors.extent(0));
 }
 
 template <typename T, typename CodeT>
@@ -656,11 +604,11 @@ void extend(raft::resources const& handle,
     RAFT_EXPECTS(new_indices.value().extent(0) == new_vectors.extent(0),
                  "new_vectors and new_indices have different number of rows");
   }
-  detail::extend(handle,
-                 idx,
-                 new_vectors.data_handle(),
-                 new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                 new_vectors.extent(0));
+  detail::extend_inplace(handle,
+                         idx,
+                         new_vectors.data_handle(),
+                         new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                         new_vectors.extent(0));
 }
 
 }  // namespace detail

@@ -350,37 +350,7 @@ auto build(raft::resources const& handle,
  */
 
 /**
- * @brief Extend the index with the new data.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   ivf_sq::index_params index_params;
- *   index_params.add_data_on_build = false;      // don't populate index on build
- *   // train the index from a [N, D] dataset
- *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
- *   // fill the index with the data
- *   std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
- *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
- * @endcode
- *
- * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
- *    here to imply a continuous range `[0...n_rows)`.
- * @param[in] orig_index the original index
- *
- * @return the constructed extended ivf-sq index
- */
-auto extend(raft::resources const& handle,
-            raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
-  -> cuvs::neighbors::ivf_sq::index<uint8_t>;
-
-/**
- * @brief Extend the index with the new data.
+ * @brief Extend the index with the new data in-place.
  *
  * Usage example:
  * @code{.cpp}
@@ -407,37 +377,7 @@ void extend(raft::resources const& handle,
             cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
 /**
- * @brief Extend the index with the new data.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   ivf_sq::index_params index_params;
- *   index_params.add_data_on_build = false;      // don't populate index on build
- *   // train the index from a [N, D] dataset
- *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
- *   // fill the index with the data
- *   std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
- *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
- * @endcode
- *
- * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
- *    here to imply a continuous range `[0...n_rows)`.
- * @param[in] orig_index the original index
- *
- * @return the constructed extended ivf-sq index
- */
-auto extend(raft::resources const& handle,
-            raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
-  -> cuvs::neighbors::ivf_sq::index<uint8_t>;
-
-/**
- * @brief Extend the index with the new data.
+ * @brief Extend the index with the new data in-place.
  *
  * Usage example:
  * @code{.cpp}
@@ -464,37 +404,7 @@ void extend(raft::resources const& handle,
             cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
 /**
- * @brief Extend the index with the new data.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   ivf_sq::index_params index_params;
- *   index_params.add_data_on_build = false;      // don't populate index on build
- *   // train the index from a [N, D] dataset
- *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
- *   // fill the index with the data
- *   std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
- *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
- * @endcode
- *
- * @param[in] handle
- * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
- *    here to imply a continuous range `[0...n_rows)`.
- * @param[in] orig_index the original index
- *
- * @return the constructed extended ivf-sq index
- */
-auto extend(raft::resources const& handle,
-            raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
-            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
-  -> cuvs::neighbors::ivf_sq::index<uint8_t>;
-
-/**
- * @brief Extend the index with the new data.
+ * @brief Extend the index with the new data in-place.
  *
  * Usage example:
  * @code{.cpp}
@@ -521,37 +431,7 @@ void extend(raft::resources const& handle,
             cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
 /**
- * @brief Extend the index with the new data.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   ivf_sq::index_params index_params;
- *   index_params.add_data_on_build = false;      // don't populate index on build
- *   // train the index from a [N, D] dataset
- *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
- *   // fill the index with the data
- *   std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
- *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
- * @endcode
- *
- * @param[in] handle
- * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
- *    here to imply a continuous range `[0...n_rows)`.
- * @param[in] orig_index the original index
- *
- * @return the constructed extended ivf-sq index
- */
-auto extend(raft::resources const& handle,
-            raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
-            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
-  -> cuvs::neighbors::ivf_sq::index<uint8_t>;
-
-/**
- * @brief Extend the index with the new data.
+ * @brief Extend the index with the new data in-place.
  *
  * Usage example:
  * @code{.cpp}
