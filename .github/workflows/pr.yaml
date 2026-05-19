@@ -587,7 +587,6 @@ jobs:
       container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       script: "ci/build_go.sh"
   docs-build:
-    needs: conda-python-build
     permissions:
       actions: read
       contents: read
