@@ -14,6 +14,7 @@
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 #include <raft/util/integer_utils.hpp>
+#include <raft/util/vectorized.cuh>
 
 #include <cstdint>
 #include <type_traits>
@@ -146,7 +147,8 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
   const uint32_t* my_coarse = coarse_indices + query_ix * n_probes;
   const uint32_t* my_chunk  = chunk_indices + query_ix * n_probes;
 
-  constexpr uint32_t veclen         = 16;
+  constexpr uint32_t veclen         = list_spec<uint32_t, uint8_t, int64_t>::kVecLen;
+  using code_vec_t                  = raft::TxN_t<uint8_t, veclen>;
   constexpr uint32_t kWarpsPerBlock = BlockDim / raft::WarpSize;
   const uint32_t warp_id            = threadIdx.x / raft::WarpSize;
   const uint32_t lane_id            = threadIdx.x % raft::WarpSize;
@@ -180,7 +182,7 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
 
     const uint8_t* codes   = data_ptrs[cluster_id];
     uint32_t sample_offset = (probe_ix > 0) ? my_chunk[probe_ix - 1] : 0;
-    uint32_t padded_dim    = ((dim + veclen - 1) / veclen) * veclen;
+    uint32_t padded_dim    = raft::Pow2<veclen>::roundUp(dim);
     uint32_t n_dim_blocks  = padded_dim / veclen;
 
     for (uint32_t group = warp_id * kIndexGroupSize; group < cluster_sz;
@@ -197,9 +199,8 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
       const uint8_t* group_data = codes + size_t(group) * padded_dim;
 
       for (uint32_t bl = 0; bl < n_dim_blocks; bl++) {
-        uint8_t codes_local[veclen];
-        *reinterpret_cast<uint4*>(codes_local) = *reinterpret_cast<const uint4*>(
-          group_data + bl * (veclen * kIndexGroupSize) + lane_id * veclen);
+        code_vec_t codes_local;
+        codes_local.load(group_data + bl * (veclen * kIndexGroupSize) + lane_id * veclen, 0);
 
         const uint32_t l = bl * veclen;
 #pragma unroll
@@ -208,7 +209,7 @@ __device__ __forceinline__ void ivf_sq_scan_impl(const uint8_t* const* data_ptrs
             accumulate_distance(s_query_term[l + j],
                                 s_aux[l + j],
                                 s_sq_scale[l + j],
-                                codes_local[j],
+                                codes_local.val.data[j],
                                 dist,
                                 v_norm_sq);
           }

@@ -343,13 +343,15 @@ void extend(raft::resources const& handle,
     }
   }
 
-  utils::batch_load_iterator<T> vec_batches(new_vectors,
-                                            n_rows,
-                                            index->dim(),
-                                            max_batch_size,
-                                            copy_stream,
-                                            raft::resource::get_workspace_resource_ref(handle),
-                                            enable_prefetch);
+  auto vec_batches =
+    utils::make_batch_load_iterator<T>(handle,
+                                       new_vectors,
+                                       n_rows,
+                                       int64_t{index->dim()},
+                                       max_batch_size,
+                                       copy_stream,
+                                       raft::resource::get_workspace_resource_ref(handle),
+                                       enable_prefetch);
   vec_batches.prefetch_next_batch();
 
   const bool needs_prefetch_sync = enable_prefetch && vec_batches.does_copy();
@@ -397,16 +399,17 @@ void extend(raft::resources const& handle,
   ivf::detail::recompute_internal_state(handle, *index);
   raft::copy(list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream);
 
-  utils::batch_load_iterator<int64_t> vec_indices(
-    new_indices,
-    n_rows,
-    1,
-    max_batch_size,
-    stream,
-    raft::resource::get_workspace_resource_ref(handle));
+  auto vec_indices =
+    utils::make_batch_load_iterator<int64_t>(handle,
+                                             new_indices,
+                                             n_rows,
+                                             int64_t{1},
+                                             max_batch_size,
+                                             stream,
+                                             raft::resource::get_workspace_resource_ref(handle));
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
-  utils::batch_load_iterator<int64_t> idx_batch = vec_indices.begin();
+  auto idx_batch = vec_indices.begin();
 
   size_t next_report_offset = 0;
   size_t d_report_offset    = n_rows * 5 / 100;

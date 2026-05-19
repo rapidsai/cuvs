@@ -13,6 +13,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
+#include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::ivf_sq {
 
@@ -107,7 +108,7 @@ struct list_spec {
 
   constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
   {
-    uint32_t padded = ((dim + kVecLen - 1) / kVecLen) * kVecLen;
+    uint32_t padded = raft::round_up_safe<uint32_t>(dim, kVecLen);
     return raft::make_extents<SizeT>(n_rows, padded);
   }
 };
