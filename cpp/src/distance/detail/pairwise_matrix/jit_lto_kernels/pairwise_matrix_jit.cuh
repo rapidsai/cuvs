@@ -179,22 +179,18 @@ void pairwise_matrix_jit_dispatch(OpT distance_op,
     using FinOpTag    = pairwise_fin_op_tag_t<FinOpT>;
     using LayoutTag   = pairwise_layout_tag_t<row_major()>;
 
-    PairwiseMatrixPlanner planner;
-    planner.add_entrypoint<DistanceTag,
-                           DataTag,
-                           AccTag,
-                           OutTag,
-                           IndexTag,
-                           FinOpTag,
-                           LayoutTag,
-                           veclen>();
-    planner.add_compute_distance_function<DistanceTag, DataTag, AccTag, IndexTag>();
-    planner.add_compute_distance_epilog_function<DistanceTag,
-                                                 DataTag,
-                                                 AccTag,
-                                                 IndexTag,
-                                                 LayoutTag,
-                                                 veclen>();
+    PairwiseMatrixPlanner<DistanceTag,
+                          DataTag,
+                          AccTag,
+                          OutTag,
+                          IndexTag,
+                          FinOpTag,
+                          LayoutTag,
+                          veclen>
+      planner;
+    planner.add_entrypoint();
+    planner.add_compute_distance_function();
+    planner.add_compute_distance_epilog_function();
 
     auto launcher = planner.get_launcher();
 
