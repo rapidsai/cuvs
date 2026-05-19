@@ -12,12 +12,10 @@
 
 namespace {
 
-// clang-format off
 using data_t  = @data_type@;
 using acc_t   = @acc_type@;
 using index_t = @index_type@;
 using op_t    = @op_type@<data_t, acc_t, index_t>;
-// clang-format on
 
 }  // namespace
 
