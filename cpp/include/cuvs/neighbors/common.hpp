@@ -19,6 +19,7 @@
 
 #include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
+#include <cuvs/core/export.hpp>
 #include <raft/core/detail/macros.hpp>
 
 #include <memory>
@@ -27,7 +28,6 @@
 
 #ifdef __cpp_lib_bitops
 #include <bit>
-#include <cuvs/core/export.hpp>
 #endif
 
 namespace CUVS_EXPORT cuvs {
