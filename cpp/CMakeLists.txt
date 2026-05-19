@@ -781,7 +781,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${distance_ns}::fragment_tag_pairwise_matrix<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_@out_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_fin_op_identity, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+      "<cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/kernel"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -794,7 +794,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${distance_ns}::fragment_tag_pairwise_matrix<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_@out_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_fin_op_rbf, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+      "<cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/kernel_rbf"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -808,7 +808,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${distance_ns}::fragment_tag_compute_distance<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+      "<cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -822,7 +822,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${distance_ns}::fragment_tag_compute_distance<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+      "<cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance_rbf"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -836,7 +836,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${distance_ns}::fragment_tag_compute_distance_epilog<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+      "<cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance_epilog"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
@@ -850,7 +850,7 @@ if(NOT BUILD_CPU_ONLY)
     FRAGMENT_TAG_FORMAT
       "${distance_ns}::fragment_tag_compute_distance_epilog<${distance_ns}::tag_distance_@distance_abbrev@, ${distance_ns}::tag_@data_abbrev@, ${distance_ns}::tag_@acc_abbrev@, ${distance_ns}::tag_index_@index_abbrev@, ${distance_ns}::tag_layout_@layout_abbrev@, @veclen@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<distance/detail/pairwise_matrix/jit_lto_kernels/registration_tags.hpp>"
+      "<cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/pairwise_matrix/compute_distance_epilog_rbf"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements

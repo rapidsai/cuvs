@@ -6,8 +6,7 @@
 #pragma once
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-
-#include "registration_tags.hpp"
+#include <cuvs/detail/jit_lto/pairwise_matrix/pairwise_matrix_fragments.hpp>
 
 #include <string>
 #include <utility>

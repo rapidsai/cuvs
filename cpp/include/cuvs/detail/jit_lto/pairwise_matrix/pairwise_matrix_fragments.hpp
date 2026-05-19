@@ -7,12 +7,6 @@
 
 namespace cuvs::distance::detail {
 
-struct tag_f {};
-struct tag_h {};
-struct tag_d {};
-
-struct tag_index_i {};
-struct tag_index_i64 {};
 
 struct tag_layout_row {};
 struct tag_layout_col {};
