@@ -2,7 +2,7 @@
 
 The cuVS documentation is a Fern project in [../fern](../fern).
 
-Fern requires Node.js 18 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
+Fern requires Node.js 22 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
 
 ## Preview locally
 

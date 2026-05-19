@@ -43,7 +43,7 @@ You may prefer `mamba` over `conda` for faster environment solves. The `conda/en
 
 ## Documentation Preview
 
-The NVIDIA cuVS documentation is a Fern project in the repository's `fern` directory. Fern requires Node.js 18 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
+The NVIDIA cuVS documentation is a Fern project in the repository's `fern` directory. Fern requires Node.js 22 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
 
 Run the local preview from the repository root:
 

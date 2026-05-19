@@ -32,7 +32,7 @@ dependencies:
 - make
 - nccl>=2.19
 - ninja
-- nodejs>=18
+- nodejs>=22
 - numpy>=1.23,<3.0
 - openblas
 - pre-commit

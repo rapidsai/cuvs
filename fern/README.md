@@ -4,7 +4,7 @@ The cuVS documentation lives in this Fern project. Pages are in `fern/pages`, an
 
 The C, C++, Python, Java, Rust, and Go API reference pages are generated from the source tree by `fern/scripts/generate_api_reference.py`. `fern/build_docs.sh` refreshes those pages before validation, preview, and publish runs.
 
-Fern requires Node.js 18 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
+Fern requires Node.js 22 or newer. If the docs fail with an error such as `SyntaxError: Unexpected token '.'`, check `node --version` and activate a newer Node.js runtime.
 
 ## Preview locally
 
