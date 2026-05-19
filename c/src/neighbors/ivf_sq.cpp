@@ -4,6 +4,7 @@
  */
 
 #include <cstdint>
+#include <optional>
 #include <dlpack/dlpack.h>
 
 #include <raft/core/error.hpp>
@@ -26,8 +27,7 @@ void convert_c_index_params(cuvsIvfSqIndexParams params,
   out->add_data_on_build             = params.add_data_on_build;
   out->n_lists                       = params.n_lists;
   out->kmeans_n_iters                = params.kmeans_n_iters;
-  out->kmeans_trainset_fraction      = params.kmeans_trainset_fraction;
-  out->adaptive_centers              = params.adaptive_centers;
+  out->max_train_points_per_cluster  = params.max_train_points_per_cluster;
   out->conservative_memory_allocation = params.conservative_memory_allocation;
 }
 void convert_c_search_params(cuvsIvfSqSearchParams params,
@@ -39,6 +39,17 @@ void convert_c_search_params(cuvsIvfSqSearchParams params,
 
 namespace {
 
+using index_type = cuvs::neighbors::ivf_sq::index<uint8_t>;
+
+void _reset_index(cuvsIvfSqIndex_t index)
+{
+  RAFT_EXPECTS(index != nullptr, "index cannot be null");
+  auto index_ptr = reinterpret_cast<index_type*>(index->addr);
+  index->addr    = 0;
+  index->dtype   = DLDataType{};
+  delete index_ptr;
+}
+
 template <typename T>
 void* _build(cuvsResources_t res, cuvsIvfSqIndexParams params, DLManagedTensor* dataset_tensor)
 {
@@ -48,21 +59,16 @@ void* _build(cuvsResources_t res, cuvsIvfSqIndexParams params, DLManagedTensor* 
   cuvs::neighbors::ivf_sq::convert_c_index_params(params, &build_params);
 
   auto dataset = dataset_tensor->dl_tensor;
-  auto dim     = dataset.shape[1];
-
-  auto index = new cuvs::neighbors::ivf_sq::index<uint8_t>(*res_ptr, build_params, dim);
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<const T, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::ivf_sq::build(*res_ptr, build_params, mds, *index);
+    return new index_type(cuvs::neighbors::ivf_sq::build(*res_ptr, build_params, mds));
   } else {
-    using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    using mdspan_type = raft::host_matrix_view<const T, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::ivf_sq::build(*res_ptr, build_params, mds, *index);
+    return new index_type(cuvs::neighbors::ivf_sq::build(*res_ptr, build_params, mds));
   }
-
-  return index;
 }
 
 template <typename T>
@@ -134,21 +140,28 @@ void _extend(cuvsResources_t res,
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_sq::index<uint8_t>*>(index.addr);
 
   bool on_device = cuvs::core::is_dlpack_device_compatible(new_vectors->dl_tensor);
-  if (on_device != cuvs::core::is_dlpack_device_compatible(new_indices->dl_tensor)) {
+  if (new_indices != nullptr &&
+      on_device != cuvs::core::is_dlpack_device_compatible(new_indices->dl_tensor)) {
     RAFT_FAIL("extend inputs must both either be on device memory or host memory");
   }
 
   if (on_device) {
     using vectors_mdspan_type = raft::device_matrix_view<const T, int64_t, raft::row_major>;
-    using indices_mdspan_type = raft::device_vector_view<int64_t, int64_t>;
+    using indices_mdspan_type = raft::device_vector_view<const int64_t, int64_t>;
     auto vectors_mds          = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
-    auto indices_mds          = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+    std::optional<indices_mdspan_type> indices_mds;
+    if (new_indices != nullptr) {
+      indices_mds.emplace(cuvs::core::from_dlpack<indices_mdspan_type>(new_indices));
+    }
     cuvs::neighbors::ivf_sq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
   } else {
     using vectors_mdspan_type = raft::host_matrix_view<const T, int64_t, raft::row_major>;
-    using indices_mdspan_type = raft::host_vector_view<int64_t, int64_t>;
+    using indices_mdspan_type = raft::host_vector_view<const int64_t, int64_t>;
     auto vectors_mds          = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
-    auto indices_mds          = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+    std::optional<indices_mdspan_type> indices_mds;
+    if (new_indices != nullptr) {
+      indices_mds.emplace(cuvs::core::from_dlpack<indices_mdspan_type>(new_indices));
+    }
     cuvs::neighbors::ivf_sq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
   }
 }
@@ -168,9 +181,7 @@ extern "C" cuvsError_t cuvsIvfSqIndexCreate(cuvsIvfSqIndex_t* index)
 extern "C" cuvsError_t cuvsIvfSqIndexDestroy(cuvsIvfSqIndex_t index_c_ptr)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto index     = *index_c_ptr;
-    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_sq::index<uint8_t>*>(index.addr);
-    delete index_ptr;
+    _reset_index(index_c_ptr);
     delete index_c_ptr;
   });
 }
@@ -183,6 +194,15 @@ extern "C" cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
 
+    if (dataset.dtype.code != kDLFloat ||
+        (dataset.dtype.bits != 32 && dataset.dtype.bits != 16)) {
+      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+                dataset.dtype.code,
+                dataset.dtype.bits);
+    }
+
+    _reset_index(index);
+
     index->dtype.code = dataset.dtype.code;
     index->dtype.bits = dataset.dtype.bits;
 
@@ -190,10 +210,6 @@ extern "C" cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
       index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
       index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor));
-    } else {
-      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
-                dataset.dtype.code,
-                dataset.dtype.bits);
     }
   });
 }
@@ -269,8 +285,7 @@ extern "C" cuvsError_t cuvsIvfSqIndexParamsCreate(cuvsIvfSqIndexParams_t* params
                                        .add_data_on_build              = true,
                                        .n_lists                        = 1024,
                                        .kmeans_n_iters                 = 20,
-                                       .kmeans_trainset_fraction       = 0.5,
-                                       .adaptive_centers               = false,
+                                       .max_train_points_per_cluster    = 256,
                                        .conservative_memory_allocation = false};
   });
 }
@@ -295,8 +310,10 @@ extern "C" cuvsError_t cuvsIvfSqDeserialize(cuvsResources_t res,
                                             const char* filename,
                                             cuvsIvfSqIndex_t index)
 {
-  return cuvs::core::translate_exceptions(
-    [=] { index->addr = reinterpret_cast<uintptr_t>(_deserialize(res, filename)); });
+  return cuvs::core::translate_exceptions([=] {
+    _reset_index(index);
+    index->addr = reinterpret_cast<uintptr_t>(_deserialize(res, filename));
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfSqSerialize(cuvsResources_t res,
