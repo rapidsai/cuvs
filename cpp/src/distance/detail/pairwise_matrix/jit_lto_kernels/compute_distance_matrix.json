@@ -112,7 +112,7 @@
     "_index": [
       {
         "index_type": "int",
-        "index_abbrev": "i"
+        "index_abbrev": "i32"
       }
     ]
   },
