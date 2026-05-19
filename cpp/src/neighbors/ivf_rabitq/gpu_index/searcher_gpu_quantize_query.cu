@@ -965,38 +965,46 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, true>
                                    : computeInnerProductsWithBitwise<true>;
-      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      auto const& kernel_launcher = [&]() -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
-      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-        kernel, shared_mem_size, kernel_launcher);
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, false>
                                    : computeInnerProductsWithBitwise<false>;
-      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      auto const& kernel_launcher = [&]() -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
-      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-        kernel, shared_mem_size, kernel_launcher);
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<4, true>
                                    : computeInnerProductsWithBitwise<true>;
-      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      auto const& kernel_launcher = [&]() -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
-      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-        kernel, shared_mem_size, kernel_launcher);
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<4, false>
                                    : computeInnerProductsWithBitwise<false>;
-      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      auto const& kernel_launcher = [&]() -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
-      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-        kernel, shared_mem_size, kernel_launcher);
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }

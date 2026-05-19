@@ -676,11 +676,13 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
           (size_t)queue_buffer_smem_bytes);
     auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort<true>
                                                  : computeInnerProductsWithLUT16Opt<true>;
-    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    auto const& kernel_launcher = [&]() -> void {
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     };
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-      kernel, shared_mem_size, kernel_launcher);
+    cudaKernel_t cuda_kernel;
+    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
   } else {
     size_t first_part_shared_mem = lut_size / num_queries;
     size_t second_part_shared_mem =
@@ -690,11 +692,13 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
       max(first_part_shared_mem + second_part_shared_mem, (size_t)queue_buffer_smem_bytes);
     auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort<false>
                                                  : computeInnerProductsWithLUT16Opt<false>;
-    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    auto const& kernel_launcher = [&]() -> void {
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     };
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-      kernel, shared_mem_size, kernel_launcher);
+    cudaKernel_t cuda_kernel;
+    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 

@@ -1420,12 +1420,14 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
 
   unsigned long long seed     = time(nullptr);
   auto kernel_fn              = fully_fused_kernel;  // decay to function pointer for std::atomic
-  auto const& kernel_launcher = [&](auto const& kernel) {
-    kernel<<<kConstNum, block_size, shared_mem_size, stream_>>>(
+  auto const& kernel_launcher = [&]() {
+    kernel_fn<<<kConstNum, block_size, shared_mem_size, stream_>>>(
       d_factors.data(), kConstNum, dim, ex_bits, seed);
   };
-  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-    kernel_fn, static_cast<uint32_t>(shared_mem_size), kernel_launcher);
+  cudaKernel_t cuda_kernel;
+  RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel_fn)));
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel_fn)>>(
+    static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
   RAFT_CUDA_TRY(cudaGetLastError());
 
   // Use CUB for reduction - handles any size optimally

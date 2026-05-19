@@ -113,7 +113,8 @@ repos:
                 exclude: |
                   (?x)
                     ^CHANGELOG[.]md$|
-                    ^cpp/cmake/patches/cutlass/build-export[.]patch$
+                    ^cpp/cmake/patches/cutlass/build-export[.]patch$|
+                    ^rust/cuvs-sys/src/bindings[.]rs$
       - repo: https://github.com/rapidsai/pre-commit-hooks
         rev: v1.3.3
         hooks:
@@ -147,7 +148,8 @@ repos:
                 cpp/src/distance/detail/fused_distance_nn/persistent_gemm[.]h$|
                 cpp/src/distance/detail/fused_distance_nn/epilogue_elementwise[.]cuh$|
                 cpp/src/distance/detail/fused_distance_nn/predicated_tile_iterator_reduced_vec[.]h$|
-                cpp/src/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast[.]h$
+                cpp/src/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast[.]h$|
+                rust/cuvs-sys/src/bindings[.]rs$
               )
           - id: verify-copyright
             name: verify-copyright-scikit-learn
@@ -194,6 +196,10 @@ repos:
         rev: v0.10.0.1
         hooks:
           - id: shellcheck
+      - repo: https://github.com/zizmorcore/zizmor-pre-commit
+        rev: v1.24.1
+        hooks:
+          - id: zizmor
 
 default_language_version:
       python: python3

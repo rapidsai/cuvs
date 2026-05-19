@@ -102,13 +102,15 @@ index<T, IdxT> build(
     }
   }
 
-  utils::batch_load_iterator<T> dataset_vec_batches(dataset.data_handle(),
-                                                    dataset.extent(0),
-                                                    dataset.extent(1),
-                                                    max_batch_size,
-                                                    copy_stream,
-                                                    device_memory,
-                                                    enable_prefetch);
+  auto dataset_vec_batches =
+    utils::make_batch_load_iterator<T>(res,
+                                       dataset.data_handle(),
+                                       static_cast<int64_t>(dataset.extent(0)),
+                                       static_cast<int64_t>(dataset.extent(1)),
+                                       max_batch_size,
+                                       copy_stream,
+                                       device_memory,
+                                       enable_prefetch);
 
   dataset_vec_batches.reset();
   dataset_vec_batches.prefetch_next_batch();

@@ -737,11 +737,13 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                                  : computeInnerProductsWithLUT<true>;
     size_t shared_mem_size =
       num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + queue_buffer_smem_bytes;
-    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    auto const& kernel_launcher = [&]() -> void {
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     };
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-      kernel, shared_mem_size, kernel_launcher);
+    cudaKernel_t cuda_kernel;
+    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
   } else {
     auto kernel = use_block_sort ? computeInnerProductsWithLUTBlockSort<false>
                                  : computeInnerProductsWithLUT<false>;
@@ -749,11 +751,13 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
       max(num_chunks * LUT_SIZE * sizeof(float) +
             (use_block_sort ? max_cluster_size * (sizeof(float) + sizeof(int)) : 0),
           (size_t)queue_buffer_smem_bytes);
-    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    auto const& kernel_launcher = [&]() -> void {
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     };
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-      kernel, shared_mem_size, kernel_launcher);
+    cudaKernel_t cuda_kernel;
+    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 

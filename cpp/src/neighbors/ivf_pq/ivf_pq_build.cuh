@@ -67,6 +67,14 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
 
+inline cuvs::distance::DistanceType coarse_clustering_metric(
+  cuvs::distance::DistanceType metric) noexcept
+{
+  return metric == cuvs::distance::DistanceType::InnerProduct
+           ? cuvs::distance::DistanceType::L2Expanded
+           : metric;
+}
+
 /**
  * @brief Compute residual vectors from the source dataset given by selected indices.
  *
@@ -1078,8 +1086,14 @@ void extend(raft::resources const& handle,
     }
   }
   // Predict the cluster labels for the new data, in batches if necessary
-  utils::batch_load_iterator<T> vec_batches(
-    new_vectors, n_rows, index->dim(), max_batch_size, copy_stream, device_memory, enable_prefetch);
+  auto vec_batches = utils::make_batch_load_iterator<T>(handle,
+                                                        new_vectors,
+                                                        n_rows,
+                                                        index->dim(),
+                                                        max_batch_size,
+                                                        copy_stream,
+                                                        device_memory,
+                                                        enable_prefetch);
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
@@ -1106,7 +1120,7 @@ void extend(raft::resources const& handle,
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
-      kmeans_params.metric = index->metric();
+      kmeans_params.metric = coarse_clustering_metric(index->metric());
       cuvs::cluster::kmeans::predict(
         handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
       vec_batches.prefetch_next_batch();
@@ -1175,8 +1189,8 @@ void extend(raft::resources const& handle,
 
   // By this point, the index state is updated and valid except it doesn't contain the new data
   // Fill the extended index with the new data (possibly, in batches)
-  utils::batch_load_iterator<IdxT> idx_batches(
-    new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
+  auto idx_batches = utils::make_batch_load_iterator<IdxT>(
+    handle, new_indices, n_rows, IdxT{1}, max_batch_size, stream, batches_mr);
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
@@ -1317,7 +1331,7 @@ auto build(raft::resources const& handle,
       cluster_centers, impl->n_lists(), impl->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    kmeans_params.metric  = coarse_clustering_metric(impl->metric());
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
@@ -1329,6 +1343,9 @@ auto build(raft::resources const& handle,
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
+    if (impl->metric() == distance::DistanceType::CosineExpanded) {
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
+    }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
     cuvs::cluster::kmeans::predict(

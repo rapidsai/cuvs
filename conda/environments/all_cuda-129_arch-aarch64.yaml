@@ -10,7 +10,7 @@ dependencies:
 - c-compiler
 - clang-tools==20.1.8
 - clang==20.1.8
-- cmake>=3.30.4
+- cmake>=4.0
 - cuda-nvcc
 - cuda-nvrtc-dev
 - cuda-nvtx-dev
@@ -33,7 +33,7 @@ dependencies:
 - libcusparse-dev
 - libnvjitlink-dev
 - libopenblas<=0.3.30
-- librmm==26.6.*,>=0.0.0a0
+- librmm==26.8.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -41,7 +41,7 @@ dependencies:
 - numpydoc
 - openblas
 - pre-commit
-- pylibraft==26.6.*,>=0.0.0a0
+- pylibraft==26.8.*,>=0.0.0a0
 - pytest
 - pytest-cov
 - rapids-build-backend>=0.4.0,<0.5.0
