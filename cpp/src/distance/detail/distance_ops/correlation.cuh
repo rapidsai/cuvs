@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <raft/core/operators.hpp>            // raft::sqrt
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
 #include <cuda_fp16.h>
