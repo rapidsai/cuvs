@@ -17,18 +17,17 @@
 
 namespace {
 
-// clang-format off
 using data_t      = @data_type@;
 using acc_t       = @acc_type@;
 using out_t       = @out_type@;
 using index_t     = @index_type@;
 using fin_op_t    = cuvs::distance::kernels::rbf_fin_op<out_t>;
 using op_t        = @op_type@<data_t, acc_t, index_t>;
-using policies_t  = raft::linalg::Policy4x4<data_t, @veclen@>;
+constexpr int veclen = @veclen@;
+using policies_t  = raft::linalg::Policy4x4<data_t, veclen>;
 using policy_t    = typename policies_t::@policy_type@;
 constexpr bool row_major = std::is_same_v<policy_t, typename policies_t::Policy>;
 using base_t      = raft::linalg::Contractions_NT<data_t, index_t, policy_t, row_major>;
-// clang-format on
 
 }  // namespace
 
@@ -43,7 +42,6 @@ extern "C" __global__ __launch_bounds__(policy_t::Nthreads, 2) void pairwise_mat
   auto row_epilog_op = raft::void_op();
 
   constexpr bool write_out                = true;
-  constexpr bool use_jit_device_functions = true;
   PairwiseDistances<data_t,
                     out_t,
                     index_t,
@@ -54,8 +52,7 @@ extern "C" __global__ __launch_bounds__(policy_t::Nthreads, 2) void pairwise_mat
                     decltype(row_epilog_op),
                     row_major,
                     write_out,
-                    base_t,
-                    use_jit_device_functions>
+                    base_t>
     obj(params.x,
         params.y,
         params.m,

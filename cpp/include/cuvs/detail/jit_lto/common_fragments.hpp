@@ -17,7 +17,7 @@ struct tag_filter_bitset {};
 
 struct tag_bitset_u32 {};
 
-struct tag_index_i {};
+struct tag_index_i32 {};
 struct tag_index_u32 {};
 struct tag_index_i64 {};
 

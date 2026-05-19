@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <raft/core/operators.hpp>            // raft::abs, raft::max
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
 namespace cuvs::distance::detail::ops {

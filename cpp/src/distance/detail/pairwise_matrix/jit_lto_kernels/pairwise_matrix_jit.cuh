@@ -7,6 +7,7 @@
 
 #include "pairwise_matrix_planner.hpp"
 
+#include <cuvs/detail/jit_lto/common_fragments.hpp>
 #include <distance/detail/distance_ops/all_ops.cuh>
 #include <distance/detail/kernels/rbf_fin_op.cuh>
 #include <distance/detail/pairwise_distance_base.cuh>
@@ -31,11 +32,11 @@ template <typename T>
 constexpr auto get_pairwise_scalar_type_tag()
 {
   if constexpr (std::is_same_v<T, float>) {
-    return tag_f{};
+    return cuvs::neighbors::detail::tag_f{};
   } else if constexpr (std::is_same_v<T, double>) {
-    return tag_d{};
+    return cuvs::neighbors::detail::tag_d{};
   } else if constexpr (std::is_same_v<T, half> || std::is_same_v<T, __half>) {
-    return tag_h{};
+    return cuvs::neighbors::detail::tag_h{};
   } else {
     static_assert(pairwise_matrix_jit_always_false_v<T>,
                   "Pairwise matrix JIT LTO does not have a scalar tag for this type");
@@ -46,9 +47,9 @@ template <typename IdxT>
 constexpr auto get_pairwise_index_type_tag()
 {
   if constexpr (std::is_same_v<IdxT, int>) {
-    return tag_index_i{};
+    return cuvs::neighbors::detail::tag_index_i32{};
   } else if constexpr (std::is_same_v<IdxT, int64_t>) {
-    return tag_index_i64{};
+    return cuvs::neighbors::detail::tag_index_i64{};
   } else {
     static_assert(pairwise_matrix_jit_always_false_v<IdxT>,
                   "Pairwise matrix JIT LTO does not have an index tag for this type");
