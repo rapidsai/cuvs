@@ -24,7 +24,7 @@ The easiest (and most reproducible) way to install the dependencies needed to bu
 
 .. code-block:: bash
 
-    conda env create --name cuvs_benchmarks -f conda/environments/bench_ann_cuda-131_arch-$(uname -m).yaml
+    conda env create --name cuvs_benchmarks -f conda/environments/bench_ann_cuda-132_arch-$(uname -m).yaml
     conda activate cuvs_benchmarks
 
 The above conda environment will also reduce the compile times as dependencies like FAISS will already be installed and not need to be compiled with `rapids-cmake`.
