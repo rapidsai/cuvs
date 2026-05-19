@@ -16,6 +16,8 @@
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <rmm/cuda_stream_pool.hpp>
 
+#include <numeric>
+
 namespace cuvs::neighbors::ivf_sq {
 
 struct test_ivf_sample_filter {
@@ -31,7 +33,7 @@ struct AnnIvfSqInputs {
   IdxT nprobe;
   IdxT nlist;
   cuvs::distance::DistanceType metric;
-  bool adaptive_centers;
+  bool host_dataset = false;
 };
 
 template <typename IdxT>
@@ -40,7 +42,7 @@ template <typename IdxT>
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
      << p.nprobe << ", " << p.nlist << ", "
      << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
-     << ", " << p.adaptive_centers << '}' << std::endl;
+     << ", " << (p.host_dataset ? "host" : "device") << '}' << std::endl;
   return os;
 }
 
@@ -55,120 +57,94 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
   {
   }
 
-  void testIVFSQ()
+  void testAll()
   {
-    size_t queries_size = ps.num_queries * ps.k;
-    std::vector<IdxT> indices_ivfsq(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
-    std::vector<T> distances_ivfsq(queries_size);
-    std::vector<T> distances_naive(queries_size);
+    auto naive = compute_naive_knn();
+    auto idx   = build_index(true);
 
     {
-      rmm::device_uvector<T> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-      cuvs::neighbors::naive_knn<T, DataT, IdxT>(handle_,
-                                                 distances_naive_dev.data(),
-                                                 indices_naive_dev.data(),
-                                                 search_queries.data(),
-                                                 database.data(),
-                                                 ps.num_queries,
-                                                 ps.num_db_vecs,
-                                                 ps.dim,
-                                                 ps.k,
-                                                 ps.metric);
-      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
-      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
-      raft::resource::sync_stream(handle_);
+      SCOPED_TRACE("Search");
+      checkSearch(idx, naive);
     }
-
     {
-      double min_recall =
-        std::min(1.0, static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist));
-
-      rmm::device_uvector<T> distances_ivfsq_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_ivfsq_dev(queries_size, stream_);
-
-      {
-        cuvs::neighbors::ivf_sq::index_params index_params;
-        cuvs::neighbors::ivf_sq::search_params search_params;
-        index_params.n_lists          = ps.nlist;
-        index_params.metric           = ps.metric;
-        index_params.adaptive_centers = ps.adaptive_centers;
-        search_params.n_probes        = ps.nprobe;
-
-        index_params.add_data_on_build        = true;
-        index_params.kmeans_trainset_fraction = 0.5;
-
-        auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-
-        auto idx = cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
-
-        // Test extend: build without data, then extend
-        cuvs::neighbors::ivf_sq::index_params index_params_no_add;
-        index_params_no_add.n_lists                  = ps.nlist;
-        index_params_no_add.metric                   = ps.metric;
-        index_params_no_add.adaptive_centers         = ps.adaptive_centers;
-        index_params_no_add.add_data_on_build        = false;
-        index_params_no_add.kmeans_trainset_fraction = 0.5;
-
-        auto idx_empty =
-          cuvs::neighbors::ivf_sq::build(handle_, index_params_no_add, database_view);
-
-        auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
-        raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
-        raft::resource::sync_stream(handle_);
-
-        auto indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
-          vector_indices.data_handle(), ps.num_db_vecs);
-        cuvs::neighbors::ivf_sq::extend(
-          handle_,
-          database_view,
-          std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(indices_view),
-          &idx_empty);
-
-        // Serialize / deserialize round-trip
-        tmp_index_file index_file;
-        cuvs::neighbors::ivf_sq::serialize(handle_, index_file.filename, idx);
-        cuvs::neighbors::ivf_sq::index<uint8_t> index_loaded(handle_);
-        cuvs::neighbors::ivf_sq::deserialize(handle_, index_file.filename, &index_loaded);
-        ASSERT_EQ(idx.size(), index_loaded.size());
-        ASSERT_EQ(idx.dim(), index_loaded.dim());
-        ASSERT_EQ(idx.n_lists(), index_loaded.n_lists());
-
-        auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          search_queries.data(), ps.num_queries, ps.dim);
-        auto indices_out_view =
-          raft::make_device_matrix_view<IdxT, IdxT>(indices_ivfsq_dev.data(), ps.num_queries, ps.k);
-        auto dists_out_view =
-          raft::make_device_matrix_view<T, IdxT>(distances_ivfsq_dev.data(), ps.num_queries, ps.k);
-
-        cuvs::neighbors::ivf_sq::search(handle_,
-                                        search_params,
-                                        index_loaded,
-                                        search_queries_view,
-                                        indices_out_view,
-                                        dists_out_view);
-
-        raft::update_host(
-          distances_ivfsq.data(), distances_ivfsq_dev.data(), queries_size, stream_);
-        raft::update_host(indices_ivfsq.data(), indices_ivfsq_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-      }
-      // SQ introduces quantization error, so we relax the distance epsilon
-      float eps = 0.1;
-      ASSERT_TRUE(eval_neighbours(indices_naive,
-                                  indices_ivfsq,
-                                  distances_naive,
-                                  distances_ivfsq,
-                                  ps.num_queries,
-                                  ps.k,
-                                  eps,
-                                  min_recall));
+      SCOPED_TRACE("Serialize");
+      checkSerialize(idx);
+    }
+    {
+      SCOPED_TRACE("Filter");
+      checkFilter(idx);
+    }
+    {
+      SCOPED_TRACE("Extend");
+      checkExtend(naive);
     }
   }
 
-  void testFilter()
+ protected:
+  struct SearchResults {
+    std::vector<IdxT> indices;
+    std::vector<T> distances;
+  };
+
+  void checkSearch(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx, const SearchResults& naive)
+  {
+    auto results = search_index(idx);
+
+    float eps = 0.1;
+    ASSERT_TRUE(eval_neighbours(naive.indices,
+                                results.indices,
+                                naive.distances,
+                                results.distances,
+                                ps.num_queries,
+                                ps.k,
+                                eps,
+                                min_recall_threshold()));
+  }
+
+  void checkSerialize(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx)
+  {
+    tmp_index_file index_file;
+    cuvs::neighbors::ivf_sq::serialize(handle_, index_file.filename, idx);
+    cuvs::neighbors::ivf_sq::index<uint8_t> index_loaded(handle_);
+    cuvs::neighbors::ivf_sq::deserialize(handle_, index_file.filename, &index_loaded);
+
+    ASSERT_EQ(idx.size(), index_loaded.size());
+    ASSERT_EQ(idx.dim(), index_loaded.dim());
+    ASSERT_EQ(idx.n_lists(), index_loaded.n_lists());
+
+    auto results_orig   = search_index(idx);
+    auto results_loaded = search_index(index_loaded);
+
+    float eps = 0.001;
+    ASSERT_TRUE(eval_neighbours(results_orig.indices,
+                                results_loaded.indices,
+                                results_orig.distances,
+                                results_loaded.distances,
+                                ps.num_queries,
+                                ps.k,
+                                eps,
+                                1.0));
+  }
+
+  void checkExtend(const SearchResults& naive)
+  {
+    auto idx_empty = build_index(false);
+    extend_index(&idx_empty);
+
+    auto results = search_index(idx_empty);
+
+    float eps = 0.1;
+    ASSERT_TRUE(eval_neighbours(naive.indices,
+                                results.indices,
+                                naive.distances,
+                                results.distances,
+                                ps.num_queries,
+                                ps.k,
+                                eps,
+                                min_recall_threshold()));
+  }
+
+  void checkFilter(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx)
   {
     if (ps.num_db_vecs <= static_cast<IdxT>(test_ivf_sample_filter::offset)) {
       GTEST_SKIP() << "Skipping filter test: num_db_vecs <= filter offset";
@@ -212,19 +188,8 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
       rmm::device_uvector<IdxT> indices_ivfsq_dev(queries_size, stream_);
 
       {
-        cuvs::neighbors::ivf_sq::index_params index_params;
         cuvs::neighbors::ivf_sq::search_params search_params;
-        index_params.n_lists          = ps.nlist;
-        index_params.metric           = ps.metric;
-        index_params.adaptive_centers = ps.adaptive_centers;
-        search_params.n_probes        = ps.nprobe;
-
-        index_params.add_data_on_build        = true;
-        index_params.kmeans_trainset_fraction = 0.5;
-
-        auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-        auto index = cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
+        search_params.n_probes = ps.nprobe;
 
         auto removed_indices =
           raft::make_device_vector<IdxT, int64_t>(handle_, test_ivf_sample_filter::offset);
@@ -245,7 +210,7 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
 
         cuvs::neighbors::ivf_sq::search(handle_,
                                         search_params,
-                                        index,
+                                        idx,
                                         search_queries_view,
                                         indices_out_view,
                                         dists_out_view,
@@ -290,7 +255,123 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
     search_queries.resize(0, stream_);
   }
 
- private:
+  double min_recall_threshold()
+  {
+    return std::min(1.0, static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist));
+  }
+
+  SearchResults compute_naive_knn()
+  {
+    size_t queries_size = ps.num_queries * ps.k;
+    SearchResults results;
+    results.indices.resize(queries_size);
+    results.distances.resize(queries_size);
+
+    rmm::device_uvector<T> distances_dev(queries_size, stream_);
+    rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+    cuvs::neighbors::naive_knn<T, DataT, IdxT>(handle_,
+                                               distances_dev.data(),
+                                               indices_dev.data(),
+                                               search_queries.data(),
+                                               database.data(),
+                                               ps.num_queries,
+                                               ps.num_db_vecs,
+                                               ps.dim,
+                                               ps.k,
+                                               ps.metric);
+    raft::update_host(results.distances.data(), distances_dev.data(), queries_size, stream_);
+    raft::update_host(results.indices.data(), indices_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
+    return results;
+  }
+
+  cuvs::neighbors::ivf_sq::index<uint8_t> build_index(bool add_data_on_build)
+  {
+    cuvs::neighbors::ivf_sq::index_params index_params;
+    index_params.n_lists                      = ps.nlist;
+    index_params.metric                       = ps.metric;
+    index_params.add_data_on_build            = add_data_on_build;
+    index_params.max_train_points_per_cluster = 256;
+
+    if (!ps.host_dataset) {
+      auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+        (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+      return cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
+    } else {
+      auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
+      raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+      raft::resource::sync_stream(handle_);
+      return cuvs::neighbors::ivf_sq::build(
+        handle_, index_params, raft::make_const_mdspan(host_database.view()));
+    }
+  }
+
+  void extend_index(cuvs::neighbors::ivf_sq::index<uint8_t>* idx)
+  {
+    if (!ps.host_dataset) {
+      auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+        (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+      auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
+      raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
+      raft::resource::sync_stream(handle_);
+
+      auto indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
+        vector_indices.data_handle(), ps.num_db_vecs);
+      cuvs::neighbors::ivf_sq::extend(
+        handle_,
+        database_view,
+        std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(indices_view),
+        idx);
+    } else {
+      auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
+      raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+      raft::resource::sync_stream(handle_);
+
+      auto vector_indices = raft::make_host_vector<IdxT>(handle_, ps.num_db_vecs);
+      std::iota(
+        vector_indices.data_handle(), vector_indices.data_handle() + ps.num_db_vecs, IdxT(0));
+
+      auto indices_view =
+        raft::make_host_vector_view<const IdxT, IdxT>(vector_indices.data_handle(), ps.num_db_vecs);
+      auto host_database_view = raft::make_host_matrix_view<const DataT, IdxT>(
+        host_database.data_handle(), ps.num_db_vecs, ps.dim);
+      cuvs::neighbors::ivf_sq::extend(
+        handle_,
+        host_database_view,
+        std::make_optional<raft::host_vector_view<const IdxT, IdxT>>(indices_view),
+        idx);
+    }
+  }
+
+  SearchResults search_index(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx)
+  {
+    size_t queries_size = ps.num_queries * ps.k;
+    SearchResults results;
+    results.indices.resize(queries_size);
+    results.distances.resize(queries_size);
+
+    cuvs::neighbors::ivf_sq::search_params search_params;
+    search_params.n_probes = ps.nprobe;
+
+    rmm::device_uvector<T> distances_dev(queries_size, stream_);
+    rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+
+    auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
+      search_queries.data(), ps.num_queries, ps.dim);
+    auto indices_out_view =
+      raft::make_device_matrix_view<IdxT, IdxT>(indices_dev.data(), ps.num_queries, ps.k);
+    auto dists_out_view =
+      raft::make_device_matrix_view<T, IdxT>(distances_dev.data(), ps.num_queries, ps.k);
+
+    cuvs::neighbors::ivf_sq::search(
+      handle_, search_params, idx, search_queries_view, indices_out_view, dists_out_view);
+
+    raft::update_host(results.distances.data(), distances_dev.data(), queries_size, stream_);
+    raft::update_host(results.indices.data(), indices_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
+    return results;
+  }
+
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
   AnnIvfSqInputs<IdxT> ps;
@@ -299,159 +380,194 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
 };
 
 const std::vector<AnnIvfSqInputs<int64_t>> inputs = {
-  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, adaptive_centers
+  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric
 
   // ===== Dimension edge cases (all four metrics) =====
   // dim=1 (CosineExpanded excluded: requires dim > 1)
-  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
   // dim=2,3,4,5 (unaligned)
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // dim=7,8 (around veclen=16 boundary, not a multiple of veclen)
-  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // dim=15,16,17 (around veclen=16 boundary)
-  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // dim=31,32,33 (around 2*veclen boundary)
-  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
   // medium dims
-  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
   // large dims (may exceed shared memory limits)
-  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::CosineExpanded},
 
   // ===== k edge cases =====
-  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 2, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 5, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 50, 100, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 2, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 5, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 50, 100, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::InnerProduct},
+
+  // ===== Large k (beyond fused top-k kMaxSqScanCapacity=256, exercises materialized fallback)
+  // =====
+  // k=257: smallest k that forces the materialized path (Capacity clamped to 0)
+  {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::InnerProduct},
+  {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::CosineExpanded},
+  // k=300: comfortably above the fused top-k threshold
+  {100, 10000, 32, 300, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 32, 300, 64, 64, cuvs::distance::DistanceType::InnerProduct},
 
   // ===== nprobe / nlist edge cases =====
   // nprobe == nlist (exhaustive probe)
-  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded},
   // nprobe == 1 (minimal probe)
-  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // nprobe > nlist (clamped to nlist)
-  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // various nprobe
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
   // very small nlist
-  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::CosineExpanded},
   // smaller nlist
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, false},
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false},
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2SqrtExpanded},
 
   // ===== Dataset size edge cases =====
   // single query
-  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // very few queries
-  {2, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {5, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {2, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {5, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // very few db vectors (nlist reduced to fit)
-  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::CosineExpanded, false},
-  // small db with many empty clusters
-  {100, 100, 16, 5, 20, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 100, 16, 5, 20, 64, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::L2Expanded},
+  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::CosineExpanded},
   // larger datasets
-  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
 
   // ===== Large query batches (gridDim.x > 65535) =====
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, false},
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
-  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::CosineExpanded},
   // just above the old 65535 limit
-  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::CosineExpanded, false},
+  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::L2Expanded},
+  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::CosineExpanded},
 
-  // ===== Adaptive centers (all four metrics, multiple dims) =====
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
+  // ===== Recall-stability: same data, different query counts =====
+  {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
+  {50000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
+
+  // ===== Host dataset: build + extend from host_matrix_view =====
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
-  {1000, 10000, 32, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 32, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 32, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 3, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {100, 10000, 64, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, true},
+};
 
-  // ===== Recall-stability: same data, different query counts =====
-  {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
-  {50000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
+const std::vector<AnnIvfSqInputs<int64_t>> inputs_half = {
+  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, host_dataset
+
+  // All four metrics at a standard dimension
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+
+  // Unaligned and small dimensions
+  {1000, 10000, 3, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+
+  // Medium / larger dimensions
+  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+
+  // k edge cases
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 50, 100, 1024, cuvs::distance::DistanceType::L2Expanded},
+
+  // nprobe / nlist edge cases
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded},
+
+  // Host dataset
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
 };
 
 }  // namespace cuvs::neighbors::ivf_sq

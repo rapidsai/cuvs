@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -40,7 +40,7 @@ mod params;
 pub use params::Params;
 
 use crate::dlpack::ManagedTensor;
-use crate::error::{check_cuvs, Result};
+use crate::error::{Result, check_cuvs};
 use crate::resources::Resources;
 
 /// Find clusters with the k-means algorithm
@@ -145,8 +145,8 @@ pub fn cluster_cost(res: &Resources, x: &ManagedTensor, centroids: &ManagedTenso
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
+    use ndarray_rand::rand_distr::Uniform;
 
     #[test]
     fn test_kmeans() {
@@ -162,9 +162,7 @@ mod tests {
         let dataset = ManagedTensor::from(&dataset).to_device(&res).unwrap();
 
         let centroids_host = ndarray::Array::<f32, _>::zeros((n_clusters, n_features));
-        let mut centroids = ManagedTensor::from(&centroids_host)
-            .to_device(&res)
-            .unwrap();
+        let mut centroids = ManagedTensor::from(&centroids_host).to_device(&res).unwrap();
 
         let params = Params::new().unwrap().set_n_clusters(n_clusters as i32);
 
@@ -181,16 +179,7 @@ mod tests {
         let mut labels = ManagedTensor::from(&labels_host).to_device(&res).unwrap();
 
         // make sure the prediction for each centroid is the centroid itself
-        predict(
-            &res,
-            &params,
-            &centroids,
-            &None,
-            &centroids,
-            &mut labels,
-            false,
-        )
-        .unwrap();
+        predict(&res, &params, &centroids, &None, &centroids, &mut labels, false).unwrap();
 
         labels.to_host(&res, &mut labels_host).unwrap();
         assert_eq!(labels_host[[0,]], 0);

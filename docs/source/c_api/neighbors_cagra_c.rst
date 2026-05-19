@@ -50,6 +50,14 @@ Index search
     :members:
     :content-only:
 
+Index merge
+-----------
+
+.. doxygengroup:: cagra_c_index_merge
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index serialize
 ---------------
 

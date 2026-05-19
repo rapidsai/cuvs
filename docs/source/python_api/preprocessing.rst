@@ -5,6 +5,20 @@ Preprocessing
    :language: python
    :class: highlight
 
+PCA (Principal Component Analysis)
+###################################
+
+.. autoclass:: cuvs.preprocessing.pca.Params
+    :members:
+
+.. autofunction:: cuvs.preprocessing.pca.fit
+
+.. autofunction:: cuvs.preprocessing.pca.fit_transform
+
+.. autofunction:: cuvs.preprocessing.pca.transform
+
+.. autofunction:: cuvs.preprocessing.pca.inverse_transform
+
 Binary Quantizer
 ################
 

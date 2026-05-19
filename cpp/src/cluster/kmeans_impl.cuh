@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -18,8 +18,12 @@ void fit_main(raft::resources const& handle,
               raft::host_scalar_view<IndexT> n_iter,
               rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::kmeans::detail::kmeans_fit_main<DataT, IndexT>(
-    handle, params, X, sample_weights, centroids, inertia, n_iter, workspace);
+  cuvs::cluster::kmeans::params p = params;
+  p.init                          = kmeans::params::InitMethod::Array;
+  auto sw                         = std::make_optional(
+    raft::make_device_vector_view<const DataT, IndexT>(sample_weights.data_handle(), X.extent(0)));
+  cuvs::cluster::kmeans::detail::kmeans_fit(
+    handle, p, X, sw, centroids, inertia, n_iter, std::ref(workspace));
 }
 
 template <typename DataT, typename IndexT>
@@ -31,7 +35,6 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
   if (raft::resource::comms_initialized(handle)) {
     cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
   } else {
@@ -52,6 +55,19 @@ void predict(raft::resources const& handle,
 {
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
+}
+
+template <typename DataT, typename IndexT>
+void fit(raft::resources const& handle,
+         const kmeans::params& params,
+         raft::host_matrix_view<const DataT, IndexT> X,
+         std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
+         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::host_scalar_view<DataT> inertia,
+         raft::host_scalar_view<IndexT> n_iter)
+{
+  cuvs::cluster::kmeans::detail::fit<DataT, IndexT>(
+    handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
 
 }  // namespace cuvs::cluster::kmeans

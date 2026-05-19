@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-use std::io::{stderr, Write};
+use std::io::{Write, stderr};
 
 use crate::dlpack::ManagedTensor;
-use crate::error::{check_cuvs, Result};
+use crate::error::{Result, check_cuvs};
 use crate::ivf_pq::{IndexParams, SearchParams};
 use crate::resources::Resources;
 
@@ -30,12 +30,7 @@ impl Index {
         let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsIvfPqBuild(
-                res.0,
-                params.0,
-                dataset.as_ptr(),
-                index.0,
-            ))?;
+            check_cuvs(ffi::cuvsIvfPqBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
         }
         Ok(index)
     }
@@ -92,8 +87,8 @@ impl Drop for Index {
 mod tests {
     use super::*;
     use ndarray::s;
-    use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
+    use ndarray_rand::rand_distr::Uniform;
 
     #[test]
     fn test_ivf_pq() {
@@ -125,20 +120,14 @@ mod tests {
         // outputs
         let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host)
-            .to_device(&res)
-            .unwrap();
+        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host)
-            .to_device(&res)
-            .unwrap();
+        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
 
-        index
-            .search(&res, &search_params, &queries, &neighbors, &distances)
-            .unwrap();
+        index.search(&res, &search_params, &queries, &neighbors, &distances).unwrap();
 
         // Copy back to host memory
         distances.to_host(&res, &mut distances_host).unwrap();
@@ -181,14 +170,10 @@ mod tests {
             let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
 
             let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-            let neighbors = ManagedTensor::from(&neighbors_host)
-                .to_device(&res)
-                .unwrap();
+            let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
 
             let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-            let distances = ManagedTensor::from(&distances_host)
-                .to_device(&res)
-                .unwrap();
+            let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
             // This should work on every iteration because search() takes &self
             index

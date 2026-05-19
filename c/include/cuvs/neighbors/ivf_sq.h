@@ -42,21 +42,11 @@ struct cuvsIvfSqIndexParams {
   uint32_t n_lists;
   /** The number of iterations searching for kmeans centers (index building). */
   uint32_t kmeans_n_iters;
-  /** The fraction of data to use during iterative kmeans building. */
-  double kmeans_trainset_fraction;
   /**
-   * By default (adaptive_centers = false), the cluster centers are trained in `ivf_sq::build`,
-   * and never modified in `ivf_sq::extend`. As a result, you may need to retrain the index
-   * from scratch after invoking (`ivf_sq::extend`) a few times with new data, the distribution of
-   * which is no longer representative of the original training set.
-   *
-   * The alternative behavior (adaptive_centers = true) is to update the cluster centers for new
-   * data when it is added. In this case, `index.centers()` are always exactly the centroids of the
-   * data in the corresponding clusters. The drawback of this behavior is that the centroids depend
-   * on the order of adding new data (through the classification of the added data); that is,
-   * `index.centers()` "drift" together with the changing distribution of the newly added data.
+   * The number of data vectors per cluster to use during iterative kmeans building.
+   * The index uses at most `n_lists * max_train_points_per_cluster` rows for training.
    */
-  bool adaptive_centers;
+  uint32_t max_train_points_per_cluster;
   /**
    * By default, the algorithm allocates more space than necessary for individual clusters
    * (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of
@@ -77,7 +67,7 @@ typedef struct cuvsIvfSqIndexParams* cuvsIvfSqIndexParams_t;
  * @param[in] index_params cuvsIvfSqIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqIndexParamsCreate(cuvsIvfSqIndexParams_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexParamsCreate(cuvsIvfSqIndexParams_t* index_params);
 
 /**
  * @brief De-allocate IVF-SQ Index params
@@ -85,7 +75,7 @@ cuvsError_t cuvsIvfSqIndexParamsCreate(cuvsIvfSqIndexParams_t* index_params);
  * @param[in] index_params
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqIndexParamsDestroy(cuvsIvfSqIndexParams_t index_params);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexParamsDestroy(cuvsIvfSqIndexParams_t index_params);
 /**
  * @}
  */
@@ -111,7 +101,7 @@ typedef struct cuvsIvfSqSearchParams* cuvsIvfSqSearchParams_t;
  * @param[in] params cuvsIvfSqSearchParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqSearchParamsCreate(cuvsIvfSqSearchParams_t* params);
+CUVS_EXPORT cuvsError_t cuvsIvfSqSearchParamsCreate(cuvsIvfSqSearchParams_t* params);
 
 /**
  * @brief De-allocate IVF-SQ search params
@@ -119,7 +109,7 @@ cuvsError_t cuvsIvfSqSearchParamsCreate(cuvsIvfSqSearchParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqSearchParamsDestroy(cuvsIvfSqSearchParams_t params);
+CUVS_EXPORT cuvsError_t cuvsIvfSqSearchParamsDestroy(cuvsIvfSqSearchParams_t params);
 /**
  * @}
  */
@@ -145,23 +135,23 @@ typedef cuvsIvfSqIndex* cuvsIvfSqIndex_t;
  * @param[in] index cuvsIvfSqIndex_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqIndexCreate(cuvsIvfSqIndex_t* index);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexCreate(cuvsIvfSqIndex_t* index);
 
 /**
  * @brief De-allocate IVF-SQ index
  *
  * @param[in] index cuvsIvfSqIndex_t to de-allocate
  */
-cuvsError_t cuvsIvfSqIndexDestroy(cuvsIvfSqIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexDestroy(cuvsIvfSqIndex_t index);
 
 /** Get the number of clusters/inverted lists */
-cuvsError_t cuvsIvfSqIndexGetNLists(cuvsIvfSqIndex_t index, int64_t* n_lists);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexGetNLists(cuvsIvfSqIndex_t index, int64_t* n_lists);
 
 /** Get the dimensionality of the data */
-cuvsError_t cuvsIvfSqIndexGetDim(cuvsIvfSqIndex_t index, int64_t* dim);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexGetDim(cuvsIvfSqIndex_t index, int64_t* dim);
 
 /** Get the size of the index */
-cuvsError_t cuvsIvfSqIndexGetSize(cuvsIvfSqIndex_t index, int64_t* size);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexGetSize(cuvsIvfSqIndex_t index, int64_t* size);
 
 /**
  * @brief Get the cluster centers corresponding to the lists [n_lists, dim]
@@ -170,7 +160,7 @@ cuvsError_t cuvsIvfSqIndexGetSize(cuvsIvfSqIndex_t index, int64_t* size);
  * @param[out] centers Preallocated array on host or device memory to store output, [n_lists, dim]
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqIndexGetCenters(cuvsIvfSqIndex_t index, DLManagedTensor* centers);
+CUVS_EXPORT cuvsError_t cuvsIvfSqIndexGetCenters(cuvsIvfSqIndex_t index, DLManagedTensor* centers);
 
 /**
  * @}
@@ -221,7 +211,7 @@ cuvsError_t cuvsIvfSqIndexGetCenters(cuvsIvfSqIndex_t index, DLManagedTensor* ce
  * @param[out] index cuvsIvfSqIndex_t Newly built IVF-SQ index
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
                            cuvsIvfSqIndexParams_t index_params,
                            DLManagedTensor* dataset,
                            cuvsIvfSqIndex_t index);
@@ -274,7 +264,7 @@ cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
-cuvsError_t cuvsIvfSqSearch(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsIvfSqSearch(cuvsResources_t res,
                             cuvsIvfSqSearchParams_t search_params,
                             cuvsIvfSqIndex_t index,
                             DLManagedTensor* queries,
@@ -294,7 +284,7 @@ cuvsError_t cuvsIvfSqSearch(cuvsResources_t res,
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  * @param[in] filter cuvsFilter to filter neighbors based on the given bitset
  */
-cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
                                       cuvsIvfSqSearchParams_t search_params,
                                       cuvsIvfSqIndex_t index,
                                       DLManagedTensor* queries,
@@ -330,7 +320,7 @@ cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
  * @param[in] filename the file name for saving the index
  * @param[in] index IVF-SQ index
  */
-cuvsError_t cuvsIvfSqSerialize(cuvsResources_t res, const char* filename, cuvsIvfSqIndex_t index);
+CUVS_EXPORT cuvsError_t cuvsIvfSqSerialize(cuvsResources_t res, const char* filename, cuvsIvfSqIndex_t index);
 
 /**
  * Load index from file.
@@ -341,7 +331,7 @@ cuvsError_t cuvsIvfSqSerialize(cuvsResources_t res, const char* filename, cuvsIv
  * @param[in] filename the name of the file that stores the index
  * @param[out] index IVF-SQ index loaded from disk
  */
-cuvsError_t cuvsIvfSqDeserialize(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsIvfSqDeserialize(cuvsResources_t res,
                                  const char* filename,
                                  cuvsIvfSqIndex_t index);
 /**
@@ -357,11 +347,12 @@ cuvsError_t cuvsIvfSqDeserialize(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] new_vectors DLManagedTensor* the new vectors to add to the index
- * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors
+ * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors. If the index
+ *            is empty, this can be NULL to imply a continuous range `[0...n_rows)`.
  * @param[inout] index IVF-SQ index to be extended
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfSqExtend(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsIvfSqExtend(cuvsResources_t res,
                             DLManagedTensor* new_vectors,
                             DLManagedTensor* new_indices,
                             cuvsIvfSqIndex_t index);

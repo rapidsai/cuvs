@@ -19,7 +19,7 @@ in the index, and
 Filtering considerations
 ------------------------
 
-IVF methods only apply filters to the lists which are probed for each query point. As a result, the results of a filtered query will likely differ signficiantly from the results of a filtering applid to an exact method like brute-force. For example. imagine you have 3 IVF lists each containing 2 vectors and you perform a query against only the closest 2 lists but you filter out all but 1 element. If that remaining element happens to be in one of the lists which was not proved, it will not be considered at all in the search results. It's important to consider this when using any of the IVF methods in your applications.
+IVF methods only apply filters to the lists which are probed for each query point. As a result, the results of a filtered query will likely differ significantly from the results of a filtering applid to an exact method like brute-force. For example. imagine you have 3 IVF lists each containing 2 vectors and you perform a query against only the closest 2 lists but you filter out all but 1 element. If that remaining element happens to be in one of the lists which was not proved, it will not be considered at all in the search results. It's important to consider this when using any of the IVF methods in your applications.
 
 
 Configuration parameters
