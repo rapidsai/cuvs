@@ -55,8 +55,7 @@ template <typename DataT,
           typename rowEpilogueLambda,
           bool isRowMajor    = true,
           bool writeOut      = true,
-          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>,
-          bool useJitDeviceFunctions = false>
+          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
 struct PairwiseDistances : public BaseClass {
   // Get accumulation type from distance_op
   using AccT = typename OpT::AccT;
@@ -152,12 +151,8 @@ struct PairwiseDistances : public BaseClass {
           // Calculate distance_op epilog.
           // Use .template to disambiguate (See:
           // https://en.cppreference.com/w/cpp/language/dependent_name)
-          if constexpr (useJitDeviceFunctions) {
-            compute_distance_epilog<Policy, OpT, AccT, IdxT>(
-              distance_op, acc, regxn, regyn, tile_idx_n, tile_idx_m);
-          } else {
-            distance_op.template epilog<Policy>(acc, regxn, regyn, tile_idx_n, tile_idx_m);
-          }
+          compute_distance_epilog<Policy, OpT, AccT, IdxT>(
+            distance_op, acc, regxn, regyn, tile_idx_n, tile_idx_m);
           // And any possible additional epilogs
           epilog_op(acc, regxn, regyn, tile_idx_n, tile_idx_m);
         } else {
@@ -166,12 +161,8 @@ struct PairwiseDistances : public BaseClass {
           // Calculate distance_op epilog.
           // Use .template to disambiguate (See:
           // https://en.cppreference.com/w/cpp/language/dependent_name)
-          if constexpr (useJitDeviceFunctions) {
-            compute_distance_epilog<Policy, OpT, AccT, IdxT>(
-              distance_op, acc, nullptr, nullptr, tile_idx_n, tile_idx_m);
-          } else {
-            distance_op.template epilog<Policy>(acc, nullptr, nullptr, tile_idx_n, tile_idx_m);
-          }
+          compute_distance_epilog<Policy, OpT, AccT, IdxT>(
+            distance_op, acc, nullptr, nullptr, tile_idx_n, tile_idx_m);
           // And any possible additional epilogs
           epilog_op(acc, nullptr, nullptr, tile_idx_n, tile_idx_m);
         }
@@ -215,12 +206,8 @@ struct PairwiseDistances : public BaseClass {
       for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
         for (int j = 0; j < P::AccColsPerTh; ++j) {
-          if constexpr (useJitDeviceFunctions) {
-            compute_distance<OpT, DataT, AccT, IdxT>(
-              distance_op, acc[i][j], reg_x[i][v], reg_y[j][v]);
-          } else {
-            distance_op.core(acc[i][j], reg_x[i][v], reg_y[j][v]);
-          }
+          compute_distance<OpT, DataT, AccT, IdxT>(
+            distance_op, acc[i][j], reg_x[i][v], reg_y[j][v]);
         }
       }
     }
