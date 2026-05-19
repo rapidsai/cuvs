@@ -21,7 +21,6 @@
 
 #include "../distance_ops/cutlass.cuh"                                 // ops::has_cutlass_op
 #include "../pairwise_matrix/jit_lto_kernels/pairwise_matrix_jit.cuh"  // pairwise_matrix_jit_dispatch
-#include <raft/core/error.hpp>                                         // RAFT_CUDA_TRY
 #include <raft/util/arch.cuh>                                          // raft::util::arch::SM_*
 
 // NOTE: to minimize compile times, we do not include dispatch_sm80.cuh.
@@ -48,16 +47,14 @@ void pairwise_matrix_sm80_dispatch(OpT,
                                    SM_compat_t,
                                    cudaStream_t);
 
-inline auto current_device_arch()
+template <typename OpT,
+          typename DataT,
+          typename AccT,
+          typename OutT,
+          typename FinOpT,
+          typename IdxT>
+__global__ void pairwise_matrix_arch_probe_kernel()
 {
-  int device = 0;
-  RAFT_CUDA_TRY(cudaGetDevice(&device));
-
-  int major = 0;
-  int minor = 0;
-  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-  return raft::util::arch::SM(major * 10 + minor);
 }
 
 template <typename OpT,
@@ -100,7 +97,9 @@ void pairwise_matrix_dispatch(OpT distance_op,
     pairwise_matrix_jit_dispatch(distance_op, params, stream);
   } else {
     auto cutlass_range = arch::SM_range(arch::SM_80(), arch::SM_future());
-    auto runtime_arch  = current_device_arch();
+    auto kernel        = pairwise_matrix_arch_probe_kernel<OpT, DataT, AccT, OutT, FinOpT, IdxT>;
+    void* kernel_ptr   = reinterpret_cast<void*>(kernel);
+    auto runtime_arch  = arch::kernel_virtual_arch(kernel_ptr);
 
     // TODO: CUTLASS does not support odd `k` with half DataT.
     bool unsupported_half = (sizeof(DataT) == 2) && ((k % 2) != 0);
