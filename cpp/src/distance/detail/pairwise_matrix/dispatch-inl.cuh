@@ -47,6 +47,9 @@ void pairwise_matrix_sm80_dispatch(OpT,
                                    SM_compat_t,
                                    cudaStream_t);
 
+// This kernel is never launched. It only gives arch::kernel_virtual_arch a static kernel pointer
+// from this TU/fatbin, without forcing JIT compilation just to decide whether the CUTLASS path is
+// usable.
 template <typename OpT,
           typename DataT,
           typename AccT,
