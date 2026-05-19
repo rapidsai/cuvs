@@ -62,26 +62,15 @@ cdef class IndexParams:
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
         building.
-    kmeans_trainset_fraction : int, default = 0.5
-        If kmeans_trainset_fraction is less than 1, then the dataset is
-        subsampled, and only n_samples * kmeans_trainset_fraction rows
-        are used for training.
+    max_train_points_per_cluster : int, default = 256
+        The number of data vectors per cluster to use during iterative
+        kmeans building. The index uses at most
+        n_lists * max_train_points_per_cluster rows for training.
     add_data_on_build : bool, default = True
         After training the coarse and fine quantizers, we will populate
         the index with the dataset if add_data_on_build == True, otherwise
         the index is left empty, and the extend method can be used
         to add new vectors to the index.
-    adaptive_centers : bool, default = False
-        By default (adaptive_centers = False), the cluster centers are
-        trained in `ivf_sq.build`, and never modified in
-        `ivf_sq.extend`. The alternative behavior (adaptive_centers
-        = true) is to update the cluster centers for new data when it is
-        added. In this case, `index.centers()` are always exactly the
-        centroids of the data in the corresponding clusters. The drawback
-        of this behavior is that the centroids depend on the order of
-        adding new data (through the classification of the added data);
-        that is, `index.centers()` "drift" together with the changing
-        distribution of the newly added data.
     conservative_memory_allocation : bool, default = False
         By default, the algorithm allocates more space than necessary for
         individual clusters (`list_data`). This allows to amortize the cost
@@ -103,8 +92,7 @@ cdef class IndexParams:
                  metric="sqeuclidean",
                  metric_arg=2.0,
                  kmeans_n_iters=20,
-                 kmeans_trainset_fraction=0.5,
-                 adaptive_centers=False,
+                 max_train_points_per_cluster=256,
                  add_data_on_build=True,
                  conservative_memory_allocation=False):
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -112,8 +100,7 @@ cdef class IndexParams:
         self.params.add_data_on_build = add_data_on_build
         self.params.n_lists = n_lists
         self.params.kmeans_n_iters = kmeans_n_iters
-        self.params.kmeans_trainset_fraction = kmeans_trainset_fraction
-        self.params.adaptive_centers = adaptive_centers
+        self.params.max_train_points_per_cluster = max_train_points_per_cluster
         self.params.conservative_memory_allocation = \
             conservative_memory_allocation
 
@@ -141,12 +128,8 @@ cdef class IndexParams:
         return self.params.kmeans_n_iters
 
     @property
-    def kmeans_trainset_fraction(self):
-        return self.params.kmeans_trainset_fraction
-
-    @property
-    def adaptive_centers(self):
-        return self.params.adaptive_centers
+    def max_train_points_per_cluster(self):
+        return self.params.max_train_points_per_cluster
 
     @property
     def conservative_memory_allocation(self):

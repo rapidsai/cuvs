@@ -21,8 +21,7 @@ cdef extern from "cuvs/neighbors/ivf_sq.h" nogil:
         bool add_data_on_build
         uint32_t n_lists
         uint32_t kmeans_n_iters
-        double kmeans_trainset_fraction
-        bool adaptive_centers
+        uint32_t max_train_points_per_cluster
         bool conservative_memory_allocation
 
     ctypedef cuvsIvfSqIndexParams* cuvsIvfSqIndexParams_t
