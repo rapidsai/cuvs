@@ -141,20 +141,14 @@ struct dtype_traits<__half> {
   static __device__ __forceinline__ float to_float(__half v) { return __half2float(v); }
 };
 
-template <>
-struct dtype_traits<uint8_t> {
+template <typename T>
+concept Byte = std::is_same_v<T, uint8_t> or std::is_same_v<T, int8_t>;
+template <Byte T>
+struct dtype_traits<T> {
   static constexpr int APAD           = 4;
   static constexpr int BPAD           = 4;
   static constexpr int TILE_COL_WIDTH = 128;
-  static __device__ __forceinline__ float to_float(uint8_t v) { return static_cast<float>(v); }
-};
-
-template <>
-struct dtype_traits<int8_t> {
-  static constexpr int APAD           = 4;
-  static constexpr int BPAD           = 4;
-  static constexpr int TILE_COL_WIDTH = 128;
-  static __device__ __forceinline__ float to_float(int8_t v) { return static_cast<float>(v); }
+  static __device__ __forceinline__ float to_float(T v) { return static_cast<float>(v); }
 };
 
 template <typename T>
@@ -270,7 +264,7 @@ __device__ __forceinline__ void load_vec(__half* vec_buffer,
                                          const int lane_id)
 {
   constexpr int num_load_elems_per_warp = raft::warp_size();
-  constexpr __half half_0                         = 0;
+  const __half half_0                   = __float2half(0.0f);
   for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
     int idx = step * num_load_elems_per_warp + lane_id;
     if (idx < load_dims) {
