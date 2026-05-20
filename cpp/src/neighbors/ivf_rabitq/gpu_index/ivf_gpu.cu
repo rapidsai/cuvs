@@ -7,6 +7,7 @@
 // Created by Stardust on 2/23/25.
 //
 
+#include "../../../util/serialize_validation.hpp"
 #include "ivf_gpu.cuh"
 #include "searcher_gpu.cuh"
 #include <raft/util/integer_utils.hpp>
@@ -112,6 +113,26 @@ void IVFGPU::load_transposed(const char* filename)
   // Skip legacy batch_flag field for backward compatibility
   bool legacy_batch_flag;
   read_exact(&legacy_batch_flag, sizeof(bool));
+
+  // Validate header fields to guard against malicious or corrupted files. With these bounds,
+  // downstream `num_vectors * per_vector_bytes` products in AllocateDeviceMemory/the Get*Bytes
+  // helpers cannot overflow size_t (per_vector_bytes is bounded by num_padded_dim).
+  RAFT_EXPECTS(num_dimensions > 0, "ivf_rabitq::deserialize: num_dimensions=0 in: %s", filename);
+  RAFT_EXPECTS(ex_bits < 9,
+               "ivf_rabitq::deserialize: ex_bits=%zu out of valid range [0, 9) in: %s",
+               ex_bits,
+               filename);
+  RAFT_EXPECTS(num_centroids > 0 && num_centroids <= cuvs::util::kMaxIvfNLists,
+               "ivf_rabitq::deserialize: num_centroids=%zu out of valid range (0, %u] in: %s",
+               num_centroids,
+               cuvs::util::kMaxIvfNLists,
+               filename);
+  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(num_vectors, num_padded_dim),
+               "ivf_rabitq::deserialize: num_vectors=%zu * num_padded_dim=%zu overflows size_t "
+               "in: %s",
+               num_vectors,
+               num_padded_dim,
+               filename);
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
   this->DQ = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits);
@@ -836,113 +857,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
   // 13. Add rotated centroids
   // -------------------------
   initializer->AddVectors(d_rotated_centroids.data_handle());
-
-  raft::resource::sync_stream(handle_);
-}
-
-void IVFGPU::construct(const float* host_data,
-                       const float* host_centroids,
-                       const PID* host_cluster_ids,
-                       bool fast_quantize)
-{
-  DQ->fast_quantize_flag = fast_quantize;
-
-  // pre-compute rescaling factors for search
-  DQ->compute_query_scaling_factors(this->num_padded_dim);
-
-  // compute rescaling factors for query if needed
-  if (DQ->fast_quantize_flag) { DQ->compute_quantize_scaling_factors(); }
-
-  if (DQ->fast_quantize_flag) {
-    if (ex_bits == 3) {
-      DQ->set_quantize_scaling_factors(DQ->get_query_scaling_factor()->const_scaling_factor_4bit);
-    } else if (ex_bits == 7) {
-      DQ->set_quantize_scaling_factors(DQ->get_query_scaling_factor()->const_scaling_factor_8bit);
-    } else {
-      DQ->compute_quantize_scaling_factors();
-    }
-  }
-
-  // -------------------------
-  // Build cluster membership info on host.
-  // -------------------------
-  // Single-pass counting
-  std::vector<size_t> counts(num_centroids, 0);
-  for (size_t i = 0; i < num_vectors; ++i) {
-    PID cid = host_cluster_ids[i];
-    RAFT_EXPECTS(cid < num_centroids, "cluster id %u out of range [0, %zu)", cid, num_centroids);
-    counts[cid]++;
-  }
-
-  // Build cluster metadata and offsets in one go
-  std::vector<GPUClusterMeta> h_cluster_meta;
-  h_cluster_meta.reserve(num_centroids);
-  std::vector<size_t> offsets(num_centroids + 1);
-  offsets[0] = 0;
-
-  for (size_t i = 0; i < num_centroids; ++i) {
-    h_cluster_meta.emplace_back(counts[i], offsets[i]);  // Direct construction
-    offsets[i + 1] = offsets[i] + counts[i];
-  }
-
-  // If you still need the PID lists, use flat layout
-  std::vector<PID> flat_pids(num_vectors);
-  std::vector<size_t> write_pos(offsets.begin(),
-                                offsets.end() - 1);  // Copy offsets[0..num_centroids-1]
-
-  for (size_t i = 0; i < num_vectors; ++i) {
-    PID cid                     = host_cluster_ids[i];
-    flat_pids[write_pos[cid]++] = static_cast<PID>(i);
-  }
-
-  // -------------------------
-  // Copy the raw data and centroids from host to device.
-  // -------------------------
-  //    auto start_gpu_normal = std::chrono::high_resolution_clock::now();
-
-  size_t ids_bytes       = num_vectors * sizeof(PID);
-  DQ->fast_quantize_flag = fast_quantize;
-  rmm::device_uvector<float> d_data(num_vectors * num_dimensions, stream_);
-  rmm::device_uvector<float> d_centroid(num_centroids * num_dimensions, stream_);
-  raft::copy(d_data.data(), host_data, num_vectors * num_dimensions, stream_);
-  raft::copy(d_centroid.data(), host_centroids, num_centroids * num_dimensions, stream_);
-  // -------------------------
-  // Allocate device memory for IVF arrays based on cluster sizes.
-  // -------------------------
-  AllocateDeviceMemory();
-  raft::copy(ids_.data_handle(), flat_pids.data(), ids_bytes / sizeof(PID), stream_);
-
-  raft::copy(cluster_meta_.data_handle(), h_cluster_meta.data(), num_centroids, stream_);
-
-  // -------------------------
-  // Allocate device buffer for rotated centroids.
-  // Note: rotated centroids will be stored as a matrix with num_centroids rows and D columns.
-  // -------------------------
-  rmm::device_uvector<float> d_rotated_centroids(num_centroids * num_padded_dim, stream_);
-
-  // -------------------------
-  // Get max cluster length and allocate temporary buffer for quantization
-  // Do note that this update will disable the ability of quantization with multiple streams
-  // -------------------------
-  max_cluster_length = 0;
-  for (const auto& meta : h_cluster_meta) {
-    max_cluster_length = std::max(max_cluster_length, meta.num);
-  }
-  DQ->alloc_buffers(max_cluster_length);
-
-  // -------------------------
-  // For each cluster, perform quantization.
-  // -------------------------
-  // Process clusters sequentially on host (could be parallelized with caution).
-  for (size_t i = 0; i < num_centroids; ++i) {
-    const float* cur_centroid = d_centroid.data() + i * num_dimensions;
-    float* cur_rotated_c      = d_rotated_centroids.data() + i * num_padded_dim;
-    GPUClusterMeta& cp        = h_cluster_meta[i];
-    quantize_cluster(cp, d_data.data(), cur_centroid, cur_rotated_c);
-  }
-
-  // After quantization, add the rotated centroids into the initializer.
-  initializer->AddVectors(d_rotated_centroids.data());
 
   raft::resource::sync_stream(handle_);
 }

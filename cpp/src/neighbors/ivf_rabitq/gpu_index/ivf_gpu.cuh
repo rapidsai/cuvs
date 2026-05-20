@@ -170,18 +170,6 @@ class IVFGPU {
   /**
    * @brief Build function
    *
-   * @param host_data pointer to host data.
-   * @param host_centroids pointer to centroids.
-   * @param pids PIDs of vectors.
-   */
-  void construct(const float* host_data,
-                 const float* host_centroids,
-                 const uint32_t* pids,
-                 bool fast_quantize = false);
-
-  /**
-   * @brief Build function
-   *
    * @param device_data pointer to device data.
    * @param device_centroids pointer to centroids.
    * @param device_cluster_ids PIDs of vectors.
