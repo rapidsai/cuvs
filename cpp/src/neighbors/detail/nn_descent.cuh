@@ -270,7 +270,7 @@ __device__ __forceinline__ void load_vec(__half* vec_buffer,
                                          const int lane_id)
 {
   constexpr int num_load_elems_per_warp = raft::warp_size();
-  __half half_0                         = __float2half(0.0f);
+  constexpr __half half_0                         = 0;
   for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
     int idx = step * num_load_elems_per_warp + lane_id;
     if (idx < load_dims) {
