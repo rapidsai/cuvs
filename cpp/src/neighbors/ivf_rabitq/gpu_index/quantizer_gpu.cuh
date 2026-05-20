@@ -74,7 +74,6 @@ class DataQuantizerGPU {
     // 3 factors for batch: f_add, f_rescale and f_error are stored separately
     return SHORT_CODE_LENGTH * sizeof(uint32_t);
   }
-  size_t num_blocks(size_t num) const { return raft::div_rounding_up_safe<size_t>(num, FAST_SIZE); }
   static constexpr size_t num_short_factors() { return NUM_SHORT_FACTORS; }
   const FastQuantizeFactors* get_query_scaling_factor() const { return &fast_quantize_factors; }
   FastQuantizeFactors* get_query_scaling_factor() { return &fast_quantize_factors; }
@@ -141,51 +140,6 @@ class DataQuantizerGPU {
                                      float* d_ex_factor,
                                      float* d_rotated_c);
 
-  /*!
-   * @brief Get pointer of factors for the current block.
-   *
-   * Each block (stored in uint32_t*) contains the 1st bit of quantization code
-   * and corresponding factors.
-   */
-  float* block_factor(uint32_t* block) const
-  {
-    return reinterpret_cast<float*>(&block[SHORT_CODE_LENGTH]);  // same as CPU version.
-  }
-
-  // Assume these helper inline functions are defined (they mirror the CPU versions):
-  // block_factor: returns pointer to the factor section in a short code block.
-  __host__ inline float* block_factor(uint32_t* block, size_t D) const
-  {
-    return reinterpret_cast<float*>(
-      &block[SHORT_CODE_LENGTH]);  // Example: adjust offset appropriately.
-  }
-  __host__ inline float* factor_x2(uint32_t* block_fac) const
-  {
-    return reinterpret_cast<float*>(block_fac);  // In our layout, x2 is at the beginning.
-  }
-  __host__ inline float* factor_ip(uint32_t* block_fac, size_t FAST_SIZE) const
-  {
-    return reinterpret_cast<float*>(block_fac) + 1;  // adjust as needed.
-  }
-  __host__ inline float* factor_sumxb(uint32_t* block_fac, size_t FAST_SIZE) const
-  {
-    return reinterpret_cast<float*>(block_fac) + 2;
-  }
-  __host__ inline float* factor_err(uint32_t* block_fac, size_t FAST_SIZE) const
-  {
-    return reinterpret_cast<float*>(block_fac) + 3;
-  }
-  // next_block returns pointer to next block in the short_data buffer.
-  // For this example, assume each block occupies: code_len + factor bytes.
-  // TODO: remove unused num_factors
-  __host__ inline uint32_t* next_block(uint32_t* block,
-                                       size_t code_len,
-                                       size_t FAST_SIZE,
-                                       size_t num_factors = 1) const
-  {
-    return block + code_len + num_factors;
-  }
-
  private:
   // Dimension and quantization parameters
   size_t DIM;                // Original data dimension.
@@ -197,7 +151,6 @@ class DataQuantizerGPU {
   double FAC_ERR;
   float const_scaling_factor;
   FastQuantizeFactors fast_quantize_factors;
-  static constexpr size_t FAST_SIZE = 4;
 #if defined(HIGH_ACC_FAST_SCAN)
   static constexpr size_t NUM_SHORT_FACTORS = 1;
 #else

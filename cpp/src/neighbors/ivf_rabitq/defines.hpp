@@ -9,8 +9,6 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-constexpr size_t FAST_SIZE = 32;
-
 using PID = uint32_t;
 
 struct Candidate {

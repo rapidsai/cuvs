@@ -277,18 +277,10 @@ void IVFGPU::init_clusters(const std::vector<size_t>& cluster_sizes)
   cluster_meta_host_ = raft::make_host_vector<GPUClusterMeta, int64_t>(num_centroids);
 
   size_t added_vectors = 0;
-  size_t added_blocks  = 0;
   for (size_t i = 0; i < num_centroids; ++i) {
-    // For cluster i, get number of vectors.
-    size_t num = cluster_sizes[i];
-    // Compute how many blocks are needed for this cluster.
-    size_t num_blocks = DQ->num_blocks(num);
-
-    // Create a GPUClusterMeta structure for this cluster.
+    size_t num            = cluster_sizes[i];
     cluster_meta_host_(i) = {num, added_vectors};
-
     added_vectors += num;
-    added_blocks += num_blocks;
   }
 
   // Copy the host cluster metadata to device memory.

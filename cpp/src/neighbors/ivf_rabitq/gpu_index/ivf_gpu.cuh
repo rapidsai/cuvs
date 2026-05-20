@@ -44,20 +44,15 @@ class IVFGPU {
   class GPUClusterMeta {
    public:
     size_t num;          // Number of vectors in this cluster.
-    size_t iter;         // Number of iterations for FastScan.
-    size_t remain;       // Number of leftover vectors after blocks.
     size_t start_index;  // Combined offset: index of first vector in the flattened arrays.
 
-    // Constructor: computes iter and REMAIN based on FAST_SIZE.
     __host__ __device__ GPUClusterMeta(size_t num, size_t start_idx)
       : num(num), start_index(start_idx)
     {
-      iter   = num / FAST_SIZE;
-      remain = num - iter * FAST_SIZE;
     }
 
     // default constructor (useful for vector initialize)
-    GPUClusterMeta() : num(0), iter(0), remain(0), start_index(0) {}
+    GPUClusterMeta() : num(0), start_index(0) {}
 
     // Copy constructor.
     GPUClusterMeta(const GPUClusterMeta& other) = default;
