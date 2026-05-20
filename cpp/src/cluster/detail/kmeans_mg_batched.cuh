@@ -55,11 +55,52 @@ using cuvs::core::detail::mnmg_comms;
  * @brief Shared multi-GPU k-means fit core, called per rank.
  *
  * Backs both Path 1 (OMP threads sharing a clique with NCCL comms) and Path 2
- * (one rank per process with RAFT comms). Each rank streams its local partition
- * list through Lloyd iterations using batched device-side reductions,
- * allreducing partial centroid sums, weights, and clustering cost at the end of
- * each iteration. The single-matrix-per-rank case is a one-element partition
- * list and forwards to this overload.
+ * (one rank per process with RAFT comms). The active backend is selected via
+ * `raft::resource::is_multi_gpu(handle)`. Each rank owns zero or more local
+ * partitions, supplied as a vector of mdspans with the same accessor type. The
+ * implementation streams every local partition through Lloyd iterations using
+ * batched device-side reductions, allreducing partial centroid sums, weights,
+ * convergence state, and clustering cost at the end of each iteration.
+ *
+ * Best-of-`n_init` is tracked per rank. RAFT comms ranks each write their own
+ * caller-provided outputs; SNMG OMP threads share caller-provided outputs, so
+ * only rank 0 writes them.
+ *
+ * @tparam DataT    Data / weight type (float or double)
+ * @tparam IndexT   Index type (int or int64_t)
+ * @tparam Accessor RAFT mdspan accessor type for the input data and optional
+ *                  weights. Host and device accessors are supported, but all
+ *                  partitions in one call must use the same accessor.
+ *
+ * @param[in]  handle        RAFT resources. For Path 1 this is the shared
+ *                           clique; for Path 2 this is the per-process handle.
+ * @param[in]  params        K-means parameters (n_clusters, init, max_iter,
+ *                           n_init, tol, metric, batch_*, etc.).
+ * @param[in]  X_parts       Local dataset partitions for this rank. Each
+ *                           partition is [n_rows_i x n_features]. Individual
+ *                           partitions may be empty, and a rank may have no
+ *                           local rows as long as at least one rank has data.
+ * @param[in]  sample_weight_parts
+ *                           Optional per-partition row weights. When set, it
+ *                           must contain one weight vector per data partition,
+ *                           with each vector length equal to the corresponding
+ *                           partition row count. When unset, all samples are
+ *                           weighted equally.
+ * @param[in,out] centroids  Device matrix [n_clusters x n_features]. On entry,
+ *                           used as the initial centers when
+ *                           `params.init == InitMethod::Array`. On return, all
+ *                           RAFT comms ranks write the converged centroids;
+ *                           SNMG writes them from rank 0 only.
+ * @param[out] inertia       Host scalar receiving the final clustering cost on
+ *                           all RAFT comms ranks, or rank 0 for SNMG.
+ * @param[out] n_iter        Host scalar receiving the iteration count at which
+ *                           the run terminated on all RAFT comms ranks, or
+ *                           rank 0 for SNMG.
+ * @param[in,out] scaled_weights_cache
+ *                           Optional pinned host cache of size equal to the
+ *                           rank-local row count. Used only for host weight
+ *                           partitions to store globally normalized weights
+ *                           before streaming batches to device.
  */
 template <typename DataT, typename IndexT, typename Accessor>
 void mnmg_fit(
