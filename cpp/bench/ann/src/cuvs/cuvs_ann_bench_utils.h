@@ -73,7 +73,7 @@ class shared_raft_resources {
   try : large_mr_() {
     orig_resource_ =
       rmm::mr::set_current_device_resource(rmm::mr::failure_callback_resource_adaptor<>{
-        rmm::mr::pool_memory_resource{rmm::mr::get_current_device_resource(),
+        rmm::mr::pool_memory_resource{rmm::mr::get_current_device_resource_ref(),
                                       1024 * 1024 * 1024ull},
         rmm_oom_callback,
         nullptr});

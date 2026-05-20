@@ -132,7 +132,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    auto mr      = rmm::mr::get_current_device_resource();
+    auto mr      = rmm::mr::get_current_device_resource_ref();
     *ptr         = mr.allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
   });
 }
@@ -141,7 +141,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    auto mr      = rmm::mr::get_current_device_resource();
+    auto mr      = rmm::mr::get_current_device_resource_ref();
     mr.deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
   });
 }

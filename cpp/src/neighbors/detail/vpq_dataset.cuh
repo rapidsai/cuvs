@@ -513,7 +513,7 @@ void process_and_fill_codes(
     static_cast<ix_t>(dim),
     static_cast<size_t>(max_batch_size),
     stream,
-    rmm::mr::get_current_device_resource());
+    rmm::mr::get_current_device_resource_ref());
   for (const auto& batch : _vpq_batches_codes) {
     auto batch_view        = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
     auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(nullptr, 0);
