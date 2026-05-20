@@ -256,7 +256,7 @@ template <typename Index>
 void recompute_internal_state(const raft::resources& res, Index& index)
 {
   auto stream  = raft::resource::get_cuda_stream(res);
-  auto tmp_res = raft::resource::get_workspace_resource(res);
+  auto tmp_res = raft::resource::get_workspace_resource_ref(res);
   rmm::device_uvector<uint32_t> sorted_sizes(index.n_lists(), stream, tmp_res);
 
   // Actualize the list pointers

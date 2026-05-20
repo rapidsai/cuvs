@@ -85,7 +85,7 @@ class BatchLoadIteratorTest : public ::testing::Test {
     int64_t total_processed = 0;
 
     auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
-    auto workspace_mr                   = raft::resource::get_workspace_resource(res);
+    auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
     {
       bli::batch_load_iterator<mdspan_t> iter(res,
@@ -154,7 +154,7 @@ TEST_F(BatchLoadIteratorTest, EmptyViewFromHost)
   auto host_view  = host_empty.view();
 
   auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
-  auto workspace_mr                   = raft::resource::get_workspace_resource(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
   bli::batch_load_iterator<raft::host_matrix_view<IdxT, int64_t>> iter(
     res, host_view, /*batch_size=*/128, copy_stream, workspace_mr, enable_prefetch);
@@ -167,7 +167,7 @@ TEST_F(BatchLoadIteratorTest, EmptyViewFromDevice)
   auto device_view  = device_empty.view();
 
   auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
-  auto workspace_mr                   = raft::resource::get_workspace_resource(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
   bli::batch_load_iterator<raft::device_matrix_view<IdxT, int64_t>> iter(
     res, device_view, /*batch_size=*/128, copy_stream, workspace_mr, enable_prefetch);
@@ -290,7 +290,7 @@ TEST_F(BatchLoadIteratorTest, MakeBatchLoadIteratorHostPtr)
                                                   n_cols,
                                                   batch_size_rows,
                                                   copy_stream,
-                                                  raft::resource::get_workspace_resource(res),
+                                                  raft::resource::get_workspace_resource_ref(res),
                                                   enable_prefetch);
   EXPECT_TRUE(iter.does_copy());
 
@@ -329,7 +329,7 @@ TEST_F(BatchLoadIteratorTest, MakeBatchLoadIteratorDevicePtr)
                                                   n_cols,
                                                   batch_size_rows,
                                                   copy_stream,
-                                                  raft::resource::get_workspace_resource(res),
+                                                  raft::resource::get_workspace_resource_ref(res),
                                                   enable_prefetch);
   EXPECT_FALSE(iter.does_copy());
 

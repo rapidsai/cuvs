@@ -864,7 +864,7 @@ struct batch_load_iterator {
   {
   }
 
-  /** Convenience overload that uses `get_workspace_resource(res)` as the memory resource. */
+  /** Convenience overload that uses `get_workspace_resource_ref(res)` as the memory resource. */
   batch_load_iterator(raft::resources const& res,
                       MdspanT input_view,
                       size_type batch_size,
@@ -876,7 +876,7 @@ struct batch_load_iterator {
                           input_view,
                           batch_size,
                           copy_stream,
-                          raft::resource::get_workspace_resource(res),
+                          raft::resource::get_workspace_resource_ref(res),
                           prefetch,
                           initialize,
                           host_writeback)
@@ -1036,7 +1036,7 @@ class batch_load_iterator_dyn {
   {
   }
 
-  /** Convenience overload that uses `get_workspace_resource(res)` as the memory resource. */
+  /** Convenience overload that uses `get_workspace_resource_ref(res)` as the memory resource. */
   batch_load_iterator_dyn(raft::resources const& res,
                           T* ptr,
                           IdxT n_rows,
@@ -1052,7 +1052,7 @@ class batch_load_iterator_dyn {
                               row_width,
                               batch_size,
                               copy_stream,
-                              raft::resource::get_workspace_resource(res),
+                              raft::resource::get_workspace_resource_ref(res),
                               prefetch,
                               initialize,
                               host_writeback)
@@ -1229,7 +1229,7 @@ auto make_batch_load_iterator(raft::resources const& res,
                                           host_writeback);
 }
 
-/** Convenience overload that uses `get_workspace_resource(res)` as the memory resource. */
+/** Convenience overload that uses `get_workspace_resource_ref(res)` as the memory resource. */
 template <typename T, typename IdxT = int64_t>
 auto make_batch_load_iterator(raft::resources const& res,
                               T const* ptr,
@@ -1247,7 +1247,7 @@ auto make_batch_load_iterator(raft::resources const& res,
                                            row_width,
                                            batch_size,
                                            copy_stream,
-                                           raft::resource::get_workspace_resource(res),
+                                           raft::resource::get_workspace_resource_ref(res),
                                            prefetch,
                                            initialize,
                                            host_writeback);

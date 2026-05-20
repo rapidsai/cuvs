@@ -851,7 +851,7 @@ void merge_graph_gpu(
 
   namespace bli                       = cuvs::spatial::knn::detail::utils;
   auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
-  auto workspace_mr                   = raft::resource::get_workspace_resource(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
   bli::batch_load_iterator<
     raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, AccessorOutputGraph>>
@@ -1001,7 +1001,7 @@ void sort_knn_graph(
   const uint64_t input_graph_degree = knn_graph.extent(1);
   IdxT* const input_graph_ptr       = knn_graph.data_handle();
 
-  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource_ref(res);
 
   auto d_input_graph = raft::make_device_mdarray<IdxT>(
     res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
@@ -1625,7 +1625,7 @@ void prune_graph_gpu(
 
   namespace bli                       = cuvs::spatial::knn::detail::utils;
   auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
-  auto workspace_mr                   = raft::resource::get_workspace_resource(res);
+  auto workspace_mr                   = raft::resource::get_workspace_resource_ref(res);
 
   // Single-batch read-only iterator for the input graph (graph_size rows fit in one batch).
   bli::batch_load_iterator<
@@ -1722,9 +1722,9 @@ void optimize(
   raft::resources res{res_const};
 
   // large temporary memory for large arrays, e.g. everything >= O(graph_size)
-  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource_ref(res);
   // temporary memory for small arrays, e.g. everything <= O(batchsize * graph_degree)
-  auto default_ws_mr = raft::resource::get_workspace_resource(res);
+  auto default_ws_mr = raft::resource::get_workspace_resource_ref(res);
 
   // create a stream pool if not already present
   if (!res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) ||

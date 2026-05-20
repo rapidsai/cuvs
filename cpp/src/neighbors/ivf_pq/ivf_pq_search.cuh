@@ -440,7 +440,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     topK,
     index.dim());
   auto stream = raft::resource::get_cuda_stream(handle);
-  auto mr     = raft::resource::get_workspace_resource(handle);
+  auto mr     = raft::resource::get_workspace_resource_ref(handle);
 
   bool manage_local_topk         = is_local_topk_feasible(topK, n_probes, n_queries);
   auto topk_len                  = manage_local_topk ? n_probes * topK : max_samples;
@@ -927,7 +927,7 @@ inline void search(raft::resources const& handle,
     max_samples = ms;
   }
 
-  auto mr = raft::resource::get_workspace_resource(handle);
+  auto mr = raft::resource::get_workspace_resource_ref(handle);
 
   // Maximum number of query vectors to search at the same time.
   // Number of queries in the outer loop, which includes query transform and coarse search.

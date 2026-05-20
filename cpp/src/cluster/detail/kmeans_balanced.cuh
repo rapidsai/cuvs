@@ -321,7 +321,7 @@ void compute_norm(const raft::resources& handle,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("compute_norm");
   auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<MathT> mapped_dataset(
-    0, stream, mr.value_or(raft::resource::get_workspace_resource(handle)));
+    0, stream, mr.value_or(raft::resource::get_workspace_resource_ref(handle)));
 
   const MathT* dataset_ptr = nullptr;
 
@@ -383,7 +383,7 @@ void predict(const raft::resources& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "predict(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
-  auto mem_res = mr.value_or(raft::resource::get_workspace_resource(handle));
+  auto mem_res = mr.value_or(raft::resource::get_workspace_resource_ref(handle));
   auto [max_minibatch_size, _mem_per_row] = calc_minibatch_size<MathT>(
     handle, n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
   rmm::device_uvector<MathT> cur_dataset(
@@ -995,7 +995,7 @@ void build_hierarchical(const raft::resources& handle,
 
   // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
   rmm::mr::managed_memory_resource managed_memory;
-  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource_ref(handle);
   auto [max_minibatch_size, mem_per_row]       = calc_minibatch_size<MathT>(
     handle, n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
 

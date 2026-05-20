@@ -190,7 +190,7 @@ class device_matrix_view_from_host {
       // live on stack and not returned to a user.
       // The user may opt to set this resource to managed memory to allow large allocations.
       device_mem_.emplace(raft::make_device_mdarray<T, IdxT>(
-        res, raft::resource::get_large_workspace_resource(res), host_view.extents()));
+        res, raft::resource::get_large_workspace_resource_ref(res), host_view.extents()));
       raft::copy(res, device_mem_->view(), host_view);
       device_ptr = device_mem_->data_handle();
     }
