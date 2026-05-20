@@ -15,18 +15,16 @@ Index settings: number_of_shards, number_of_replicas, vector_field.
 Search params (knn): num_candidates, vector_field.
 """
 
-import itertools
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import yaml
-
 
 from .base import BenchmarkBackend, BuildResult, Dataset, SearchResult
 from .registry import register_backend, register_config_loader
+from ._utils import load_vectors
 from ..orchestrator.config_loaders import (
     BenchmarkConfig,
     ConfigLoader,
@@ -34,26 +32,27 @@ from ..orchestrator.config_loaders import (
     IndexConfig,
 )
 
+if TYPE_CHECKING:
+    from elasticsearch import Elasticsearch
+
 
 def _load_fbin(path: Path) -> np.ndarray:
-    """Load big-ann-bench fbin format (header: n_rows, n_cols as uint32, then float32)."""
-    with open(path, "rb") as f:
-        n_rows, n_cols = np.fromfile(f, dtype=np.uint32, count=2)
-        data = np.fromfile(f, dtype=np.float32).reshape(n_rows, n_cols)
-    return data
+    """Load big-ann-bench fbin format via shared vector loader."""
+    return load_vectors(os.fspath(path))
 
 
 def _load_ibin(path: Path) -> np.ndarray:
-    """Load big-ann-bench ibin format (header: shape as uint32, then int32)."""
-    with open(path, "rb") as f:
-        shape = np.fromfile(f, dtype=np.uint32, count=2)
-        data = np.fromfile(f, dtype=np.int32).reshape(shape[0], shape[1])
-    return data
+    """Load big-ann-bench ibin format via shared vector loader."""
+    return load_vectors(os.fspath(path))
 
 
 def _distance_to_similarity(distance: str) -> str:
     """Map cuvs-bench distance metric to ES dense_vector similarity."""
-    m = {"euclidean": "l2_norm", "inner_product": "max_inner_product", "cosine": "cosine"}
+    m = {
+        "euclidean": "l2_norm",
+        "inner_product": "max_inner_product",
+        "cosine": "cosine",
+    }
     return m.get(distance, "l2_norm")
 
 
@@ -110,8 +109,14 @@ class ElasticBackend(BenchmarkBackend):
             }
             basic_auth = self.config.get("basic_auth")
             if basic_auth is not None:
-                if isinstance(basic_auth, (list, tuple)) and len(basic_auth) >= 2:
-                    kwargs["basic_auth"] = (str(basic_auth[0]), str(basic_auth[1]))
+                if (
+                    isinstance(basic_auth, (list, tuple))
+                    and len(basic_auth) >= 2
+                ):
+                    kwargs["basic_auth"] = (
+                        str(basic_auth[0]),
+                        str(basic_auth[1]),
+                    )
                 elif isinstance(basic_auth, str) and ":" in basic_auth:
                     user, _, passwd = basic_auth.partition(":")
                     kwargs["basic_auth"] = (user, passwd)
@@ -178,7 +183,9 @@ class ElasticBackend(BenchmarkBackend):
             if client.indices.exists(index=index_name):
                 if not force:
                     stats = client.indices.stats(index=index_name)
-                    index_size = stats["_all"]["primaries"]["store"]["size_in_bytes"]
+                    index_size = stats["_all"]["primaries"]["store"][
+                        "size_in_bytes"
+                    ]
                     return BuildResult(
                         index_path=index_name,
                         build_time_seconds=0,
@@ -199,7 +206,8 @@ class ElasticBackend(BenchmarkBackend):
                 error_message=str(e),
             )
 
-        if not dataset.base_file:
+        vectors = dataset.training_vectors
+        if vectors.size == 0:
             return BuildResult(
                 index_path="",
                 build_time_seconds=0.0,
@@ -207,19 +215,10 @@ class ElasticBackend(BenchmarkBackend):
                 algorithm=self.algo,
                 build_params={},
                 success=False,
-                error_message="base_file is required for Elasticsearch backend",
-            )
-
-        base_path = Path(dataset.base_file)
-        if not base_path.exists():
-            return BuildResult(
-                index_path="",
-                build_time_seconds=0.0,
-                index_size_bytes=0,
-                algorithm=self.algo,
-                build_params={},
-                success=False,
-                error_message=f"Base file not found: {base_path}",
+                error_message=(
+                    "training_vectors are required for Elasticsearch backend "
+                    "(directly or via dataset.base_file)"
+                ),
             )
 
         # similarity: from config, or derive from dataset distance
@@ -228,18 +227,21 @@ class ElasticBackend(BenchmarkBackend):
         )
 
         try:
-            vectors = _load_fbin(base_path)
             n_vectors = len(vectors)
             dims = vectors.shape[1]
             client = self._get_client()
 
-            vector_field = build_params.get("vector_field", _DEFAULT_VECTOR_FIELD)
+            vector_field = build_params.get(
+                "vector_field", _DEFAULT_VECTOR_FIELD
+            )
             index_type = build_params.get("type", _DEFAULT_INDEX_TYPE)
             m = build_params.get("m", _DEFAULT_M)
             ef_construction = build_params.get(
                 "ef_construction", _DEFAULT_EF_CONSTRUCTION
             )
-            num_shards = build_params.get("number_of_shards", _DEFAULT_NUM_SHARDS)
+            num_shards = build_params.get(
+                "number_of_shards", _DEFAULT_NUM_SHARDS
+            )
             num_replicas = build_params.get(
                 "number_of_replicas", _DEFAULT_NUM_REPLICAS
             )
@@ -275,8 +277,11 @@ class ElasticBackend(BenchmarkBackend):
             client.indices.create(index=index_name, body=index_config)
 
             from elasticsearch.helpers import bulk
+
             chunk_size = 1000
-            progress_interval = max(50, n_vectors // (chunk_size * 20))  # ~20 progress lines
+            progress_interval = max(
+                50, n_vectors // (chunk_size * 20)
+            )  # ~20 progress lines
             for i in range(0, n_vectors, chunk_size):
                 chunk = vectors[i : i + chunk_size]
                 actions = [
@@ -288,8 +293,13 @@ class ElasticBackend(BenchmarkBackend):
                     for j, vec in enumerate(chunk)
                 ]
                 bulk(client, actions, raise_on_error=True)
-                if progress_interval and (i // chunk_size) % progress_interval == 0:
-                    print(f"    Indexed {min(i + chunk_size, n_vectors):,}/{n_vectors:,} vectors")
+                if (
+                    progress_interval
+                    and (i // chunk_size) % progress_interval == 0
+                ):
+                    print(
+                        f"    Indexed {min(i + chunk_size, n_vectors):,}/{n_vectors:,} vectors"
+                    )
 
             client.indices.refresh(index=index_name)
             build_time = time.perf_counter() - t0
@@ -367,7 +377,8 @@ class ElasticBackend(BenchmarkBackend):
                 error_message="No indexes provided",
             )
 
-        if not dataset.query_file:
+        query_vectors = dataset.query_vectors
+        if query_vectors.size == 0:
             return SearchResult(
                 neighbors=np.zeros((0, k), dtype=np.int64),
                 distances=np.zeros((0, k), dtype=np.float32),
@@ -377,32 +388,16 @@ class ElasticBackend(BenchmarkBackend):
                 algorithm=self.algo,
                 search_params=[],
                 success=False,
-                error_message="query_file is required",
-            )
-
-        query_path = Path(dataset.query_file)
-        if not query_path.exists():
-            return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
-                search_time_ms=0,
-                queries_per_second=0,
-                recall=0,
-                algorithm=self.algo,
-                search_params=[],
-                success=False,
-                error_message=f"Query file not found: {query_path}",
+                error_message=(
+                    "query_vectors are required for Elasticsearch backend "
+                    "(directly or via dataset.query_file)"
+                ),
             )
 
         try:
-            query_vectors = _load_fbin(query_path)
             n_queries = len(query_vectors)
 
             groundtruth = dataset.groundtruth_neighbors
-            if groundtruth is None and dataset.groundtruth_neighbors_file:
-                gt_path = Path(dataset.groundtruth_neighbors_file)
-                if gt_path.exists():
-                    groundtruth = _load_ibin(gt_path)
 
             index_name = self.config.get("index_name", "cuvs_bench_vectors")
             index_cfg = indexes[0]
@@ -413,7 +408,9 @@ class ElasticBackend(BenchmarkBackend):
             last_distances = np.zeros((n_queries, k), dtype=np.float32)
 
             for sp in search_params_list:
-                num_candidates = sp.get("num_candidates", _DEFAULT_NUM_CANDIDATES)
+                num_candidates = sp.get(
+                    "num_candidates", _DEFAULT_NUM_CANDIDATES
+                )
                 vector_field = sp.get("vector_field", _DEFAULT_VECTOR_FIELD)
 
                 neighbors = np.full((n_queries, k), -1, dtype=np.int64)
@@ -431,7 +428,9 @@ class ElasticBackend(BenchmarkBackend):
                         }
                     }
                     t_q = time.perf_counter()
-                    resp = self._get_client().search(index=index_name, body=body, size=k)
+                    resp = self._get_client().search(
+                        index=index_name, body=body, size=k
+                    )
                     latencies.append((time.perf_counter() - t_q) * 1000)
                     hits = resp.get("hits", {}).get("hits", [])
                     for j, hit in enumerate(hits[:k]):
@@ -439,32 +438,47 @@ class ElasticBackend(BenchmarkBackend):
                         distances[i, j] = float(hit["_score"])
 
                 elapsed_ms = (time.perf_counter() - t0) * 1000
-                qps = n_queries / (elapsed_ms / 1000) if elapsed_ms > 0 else 0.0
+                qps = (
+                    n_queries / (elapsed_ms / 1000) if elapsed_ms > 0 else 0.0
+                )
 
                 recall = 0.0
                 if groundtruth is not None:
                     gt_k = min(k, groundtruth.shape[1])
                     n_correct = sum(
-                        len(set(neighbors[i, :k].tolist()) & set(groundtruth[i, :gt_k].tolist()))
+                        len(
+                            set(neighbors[i, :k].tolist())
+                            & set(groundtruth[i, :gt_k].tolist())
+                        )
                         for i in range(n_queries)
                     )
-                    recall = n_correct / (n_queries * gt_k) if gt_k > 0 else 0.0
+                    recall = (
+                        n_correct / (n_queries * gt_k) if gt_k > 0 else 0.0
+                    )
 
-                per_param_results.append({
-                    "search_params": sp,
-                    "search_time_ms": elapsed_ms,
-                    "queries_per_second": qps,
-                    "recall": recall,
-                    "p50_ms": float(np.percentile(latencies, 50)),
-                    "p95_ms": float(np.percentile(latencies, 95)),
-                    "p99_ms": float(np.percentile(latencies, 99)),
-                })
+                per_param_results.append(
+                    {
+                        "search_params": sp,
+                        "search_time_ms": elapsed_ms,
+                        "queries_per_second": qps,
+                        "recall": recall,
+                        "p50_ms": float(np.percentile(latencies, 50)),
+                        "p95_ms": float(np.percentile(latencies, 95)),
+                        "p99_ms": float(np.percentile(latencies, 99)),
+                    }
+                )
                 last_neighbors = neighbors
                 last_distances = distances
 
-            avg_recall = float(np.mean([r["recall"] for r in per_param_results]))
-            avg_qps = float(np.mean([r["queries_per_second"] for r in per_param_results]))
-            total_ms = float(sum(r["search_time_ms"] for r in per_param_results))
+            avg_recall = float(
+                np.mean([r["recall"] for r in per_param_results])
+            )
+            avg_qps = float(
+                np.mean([r["queries_per_second"] for r in per_param_results])
+            )
+            total_ms = float(
+                sum(r["search_time_ms"] for r in per_param_results)
+            )
 
             return SearchResult(
                 neighbors=last_neighbors,
@@ -479,7 +493,10 @@ class ElasticBackend(BenchmarkBackend):
                     "p95_ms": per_param_results[-1]["p95_ms"],
                     "p99_ms": per_param_results[-1]["p99_ms"],
                 },
-                metadata={"per_search_param_results": per_param_results},
+                metadata={
+                    "per_search_param_results": per_param_results,
+                    "recall_is_authoritative": True,
+                },
                 success=True,
             )
         except Exception as e:
@@ -535,164 +552,210 @@ class ElasticConfigLoader(ConfigLoader):
         self,
         dataset: str = "",
         dataset_path: str = "",
-        count: int = 10,
-        batch_size: int = 10000,
-        host: str = "localhost",
-        port: int = 9200,
-        index_name: str = "cuvs_bench_vectors",
-        basic_auth: Optional[Any] = None,
-        algorithms: Optional[str] = None,
-        subset_size: Optional[int] = None,
         **kwargs,
     ) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
-        """Load Elasticsearch benchmark configuration."""
-        tune_mode = kwargs.pop("_tune_mode", False)
-        tune_build_params = kwargs.pop("_tune_build_params", None)
-        tune_search_params = kwargs.pop("_tune_search_params", None)
-        username = kwargs.pop("username", None)
-        password = kwargs.pop("password", None)
-        scheme = kwargs.pop("scheme", "http")
+        """Load Elasticsearch benchmark configuration via shared ConfigLoader flow."""
+        return super().load(
+            dataset=dataset, dataset_path=dataset_path, **kwargs
+        )
+
+    def _discover_algo_groups(
+        self,
+        dataset_conf,
+        dataset,
+        dataset_path,
+        **kwargs,
+    ):
+        """Discover elastic algorithm groups using shared loader semantics."""
+        algorithm_configuration = kwargs.get("algorithm_configuration")
+        algorithms_arg = kwargs.get("algorithms")
+        groups_arg = kwargs.get("groups")
+        algo_groups_arg = kwargs.get("algo_groups")
+
+        algos_conf_fs = self.gather_algorithm_configs(
+            self.config_path, algorithm_configuration
+        )
+
+        elastic_algos = []
+        for algo_f in algos_conf_fs:
+            try:
+                algo_conf = self.load_yaml_file(algo_f)
+            except Exception:
+                continue
+            if not isinstance(algo_conf, dict):
+                continue
+            algo_name = algo_conf.get("name", "")
+            if not algo_name.startswith("elastic_"):
+                continue
+            elastic_algos.append(algo_conf)
+
+        if not elastic_algos:
+            default_grp = {
+                "build": {"m": [16], "ef_construction": [100]},
+                "search": {"num_candidates": [100]},
+            }
+            elastic_algos = [
+                {"name": "elastic_hnsw", "groups": {"base": default_grp}}
+            ]
+
+        allowed_algos = (
+            [a.strip() for a in algorithms_arg.split(",") if a.strip()]
+            if algorithms_arg
+            else None
+        )
+        allowed_groups = (
+            [g.strip() for g in groups_arg.split(",") if g.strip()]
+            if groups_arg
+            else None
+        )
+        algo_group_map: Dict[str, set] = {}
+        if algo_groups_arg:
+            for item in algo_groups_arg.split(","):
+                item = item.strip()
+                if not item or "." not in item:
+                    continue
+                algo_name, group_name = item.split(".", 1)
+                algo_group_map.setdefault(algo_name, set()).add(group_name)
+
+        # Backward-compatible fallback for older elastic usage where `algorithms`
+        # was used as a group selector (e.g. algorithms="test").
+        if allowed_algos and not allowed_groups and not algo_group_map:
+            known_groups = {
+                group_name
+                for algo_conf in elastic_algos
+                for group_name in algo_conf.get("groups", {})
+            }
+            if all(name in known_groups for name in allowed_algos):
+                allowed_groups = allowed_algos
+                allowed_algos = None
+
+        if allowed_groups is None and not algo_group_map:
+            allowed_groups = ["base"]
+
+        result = []
+        for algo_conf in elastic_algos:
+            algo_name = algo_conf["name"]
+            if allowed_algos and algo_name not in allowed_algos:
+                continue
+
+            groups = dict(algo_conf.get("groups", {}))
+            if allowed_groups is not None:
+                groups = {
+                    group_name: group_conf
+                    for group_name, group_conf in groups.items()
+                    if group_name in allowed_groups
+                }
+            if algo_name in algo_group_map:
+                groups = {
+                    group_name: group_conf
+                    for group_name, group_conf in groups.items()
+                    if group_name in algo_group_map[algo_name]
+                }
+
+            for group_name, group_conf in groups.items():
+                result.append((algo_name, group_name, group_conf, {}))
+
+        if not result and allowed_groups:
+            raise ValueError(
+                f"Could not find elastic groups {allowed_groups} in elastic configs"
+            )
+        if not result and allowed_algos:
+            raise ValueError(
+                f"Could not find elastic algorithms {allowed_algos} in elastic configs"
+            )
+
+        return result
+
+    def _build_benchmark_configs(
+        self,
+        dataset_config,
+        dataset_conf,
+        dataset,
+        dataset_path,
+        expanded_groups,
+        **kwargs,
+    ):
+        """Build BenchmarkConfigs from shared expanded elastic parameter groups."""
+        host = kwargs.get("host", "localhost")
+        port = kwargs.get("port", 9200)
+        scheme = kwargs.get("scheme", "http")
+        basic_auth = kwargs.get("basic_auth")
+        username = kwargs.get("username")
+        password = kwargs.get("password")
         if basic_auth is None and username and password:
             basic_auth = (username, password)
 
-        datasets_path = os.path.join(
-            self.config_path, "datasets", "datasets.yaml"
-        )
-        try:
-            with open(datasets_path) as f:
-                datasets = yaml.safe_load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f"Datasets config not found: {datasets_path}"
-            ) from None
-
-        dataset_conf = next((d for d in datasets if d["name"] == dataset), None)
-        if not dataset_conf:
-            raise ValueError(f"Dataset '{dataset}' not found")
-
-        def _resolve(rel: Optional[str]) -> Optional[str]:
-            if rel and not os.path.isabs(rel):
-                return os.path.join(dataset_path, rel)
-            return rel
-
-        dataset_config = DatasetConfig(
-            name=dataset_conf["name"],
-            base_file=_resolve(dataset_conf.get("base_file")),
-            query_file=_resolve(dataset_conf.get("query_file")),
-            groundtruth_neighbors_file=_resolve(
-                dataset_conf.get("groundtruth_neighbors_file")
-            ),
-            distance=dataset_conf.get("distance", "euclidean"),
-            dims=dataset_conf.get("dims"),
-            subset_size=subset_size,
-        )
-
-        if tune_mode and tune_build_params is not None and tune_search_params is not None:
-            algo_name = algorithms or "elastic_hnsw"
-            build_param = dict(tune_build_params)
-            if "type" not in build_param and algo_name.startswith("elastic_"):
-                build_param["type"] = algo_name.replace("elastic_", "", 1)
-            name_parts = [f"{k}{v}" for k, v in build_param.items() if k in ("m", "ef_construction")]
-            index_label = "_".join([f"{algo_name}_tune"] + name_parts) if name_parts else f"{algo_name}_tune"
-            es_index_name = index_label.lower().replace(".", "_")
-            index_config = IndexConfig(
-                name=index_label,
-                algo=algo_name,
-                build_param=build_param,
-                search_params=[tune_search_params],
-                file="",
-            )
-            config = BenchmarkConfig(
-                indexes=[index_config],
-                backend_config={
-                    "name": index_label,
-                    "host": host,
-                    "port": port,
-                    "scheme": scheme,
-                    "index_name": es_index_name,
-                    "basic_auth": basic_auth,
-
-                    **build_param,
-                },
-            )
-            return dataset_config, [config]
-
-        elastic_config_dir = _get_elastic_config_path()
-        elastic_algo_path = os.path.join(elastic_config_dir, "algos", "elastic.yaml")
-        default_grp = {
-            "build": {"m": [16], "ef_construction": [100]},
-            "search": {"num_candidates": [100]},
-        }
-        if os.path.exists(elastic_algo_path):
-            with open(elastic_algo_path) as f:
-                algo_conf = yaml.safe_load(f)
-        else:
-            algo_conf = {"groups": {"base": default_grp}}
-
-        groups = algo_conf.get("groups", {"base": default_grp})
-        group_name = algorithms or "base"
-        if group_name not in groups:
-            raise ValueError(
-                f"Algorithm group '{group_name}' not found in elastic.yaml. "
-                f"Available: {list(groups.keys())}"
-            )
-        group_conf = groups[group_name]
-
-        build_params = group_conf.get(
-            "build", {"m": [16], "ef_construction": [100]}
-        )
-        search_params = group_conf.get("search", {"num_candidates": [100]})
-
-        # Ensure all param values are lists for itertools.product
-        def _to_list_values(d: Dict[str, Any]) -> Dict[str, List[Any]]:
-            return {k: v if isinstance(v, list) else [v] for k, v in d.items()}
-
-        build_params = _to_list_values(build_params)
-        search_params = _to_list_values(search_params)
-
-        build_combos = list(itertools.product(*build_params.values()))
-        search_combos = list(itertools.product(*search_params.values()))
-        build_keys = list(build_params.keys())
-        search_keys = list(search_params.keys())
-
-        search_params_list = [
-            dict(zip(search_keys, svals)) for svals in search_combos
-        ]
+        tune_mode = kwargs.get("_tune_mode", False)
+        tune_build_params = kwargs.get("_tune_build_params")
+        tune_search_params = kwargs.get("_tune_search_params")
 
         benchmark_configs = []
-        for bvals in build_combos:
-            bdict = dict(zip(build_keys, bvals))
-            algo_name = f"elastic_{bdict.get('type', 'hnsw')}"
+        for (
+            algo_name,
+            group_name,
+            _group_conf,
+            build_combos,
+            search_combos,
+            _group_meta,
+        ) in expanded_groups:
+            if tune_mode and tune_build_params is not None:
+                actual_build = [dict(tune_build_params)]
+                actual_search = (
+                    [dict(tune_search_params)] if tune_search_params else [{}]
+                )
+            else:
+                actual_build = build_combos
+                actual_search = search_combos
 
-            # Derive a unique, human-readable index name from build params
-            prefix = f"{algo_name}_{group_name}" if group_name != "base" else algo_name
-            name_parts = [f"{k}{v}" for k, v in bdict.items() if k in ("m", "ef_construction")]
-            index_label = "_".join([prefix] + name_parts) if name_parts else prefix
-            es_index_name = index_label.lower().replace(".", "_")
+            for build_param in actual_build:
+                build_param = dict(build_param)
+                if "type" not in build_param and algo_name.startswith(
+                    "elastic_"
+                ):
+                    build_param["type"] = algo_name.replace("elastic_", "", 1)
 
-            index_config = IndexConfig(
-                name=index_label,
-                algo=algo_name,
-                build_param=bdict,
-                search_params=search_params_list,
-                file="",
-            )
-            config = BenchmarkConfig(
-                indexes=[index_config],
-                backend_config={
-                    "name": index_label,
-                    "host": host,
-                    "port": port,
-                    "scheme": scheme,
-                    "index_name": es_index_name,
-                    "basic_auth": basic_auth,
+                if tune_mode:
+                    label_prefix = f"{algo_name}_tune"
+                elif group_name != "base":
+                    label_prefix = f"{algo_name}_{group_name}"
+                else:
+                    label_prefix = algo_name
 
-                    **bdict,
-                },
-            )
-            benchmark_configs.append(config)
+                name_parts = [
+                    f"{k}{v}"
+                    for k, v in build_param.items()
+                    if k in ("m", "ef_construction")
+                ]
+                index_label = (
+                    "_".join([label_prefix] + name_parts)
+                    if name_parts
+                    else label_prefix
+                )
+                es_index_name = index_label.lower().replace(".", "_")
 
-        return dataset_config, benchmark_configs
+                index_config = IndexConfig(
+                    name=index_label,
+                    algo=algo_name,
+                    build_param=build_param,
+                    search_params=[dict(sp) for sp in actual_search],
+                    file="",
+                )
+                benchmark_configs.append(
+                    BenchmarkConfig(
+                        indexes=[index_config],
+                        backend_config={
+                            "name": index_label,
+                            "host": host,
+                            "port": port,
+                            "scheme": scheme,
+                            "index_name": es_index_name,
+                            "basic_auth": basic_auth,
+                            **build_param,
+                        },
+                    )
+                )
+
+        return benchmark_configs
 
 
 def register() -> None:
@@ -711,6 +774,7 @@ def register() -> None:
 
 # ── Convenience API ───────────────────────────────────────────────────────────
 
+
 def run_build(
     dataset: str = "test-data",
     dataset_path: str = "./datasets",
@@ -723,11 +787,18 @@ def run_build(
     """Build an Elasticsearch vector index. Returns list of BuildResult."""
     register()
     from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
     orch = BenchmarkOrchestrator(backend_type="elastic")
     return orch.run_benchmark(
-        build=True, search=False,
-        dataset=dataset, dataset_path=dataset_path,
-        host=host, port=port, algorithms=algorithms, force=force, **kwargs,
+        build=True,
+        search=False,
+        dataset=dataset,
+        dataset_path=dataset_path,
+        host=host,
+        port=port,
+        algorithms=algorithms,
+        force=force,
+        **kwargs,
     )
 
 
@@ -742,11 +813,17 @@ def run_search(
     """Run kNN search against an existing Elasticsearch index. Returns list of SearchResult."""
     register()
     from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
     orch = BenchmarkOrchestrator(backend_type="elastic")
     return orch.run_benchmark(
-        build=False, search=True,
-        dataset=dataset, dataset_path=dataset_path,
-        host=host, port=port, algorithms=algorithms, **kwargs,
+        build=False,
+        search=True,
+        dataset=dataset,
+        dataset_path=dataset_path,
+        host=host,
+        port=port,
+        algorithms=algorithms,
+        **kwargs,
     )
 
 
@@ -764,9 +841,16 @@ def run_benchmark(
     """Run build and/or search. Returns list of results."""
     register()
     from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
     orch = BenchmarkOrchestrator(backend_type="elastic")
     return orch.run_benchmark(
-        build=build, search=search,
-        dataset=dataset, dataset_path=dataset_path,
-        host=host, port=port, algorithms=algorithms, force=force, **kwargs,
+        build=build,
+        search=search,
+        dataset=dataset,
+        dataset_path=dataset_path,
+        host=host,
+        port=port,
+        algorithms=algorithms,
+        force=force,
+        **kwargs,
     )

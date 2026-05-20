@@ -24,6 +24,15 @@ from ..backends._utils import compute_recall
 from .config_loaders import DatasetConfig
 
 
+def _should_compute_recall(result: SearchResult) -> bool:
+    """Return True when orchestrator should derive recall from neighbors."""
+    return (
+        result.success
+        and result.neighbors.size > 0
+        and not result.metadata.get("recall_is_authoritative", False)
+    )
+
+
 class BenchmarkOrchestrator:
     """
     Orchestrator for running benchmarks using the pluggable backend system.
@@ -260,7 +269,7 @@ class BenchmarkOrchestrator:
                     # Compute recall for backends that return actual neighbors.
                     # The C++ backend computes recall in the subprocess and returns
                     # empty neighbors, so this is skipped for it.
-                    if search_result.success and search_result.neighbors.size > 0:
+                    if _should_compute_recall(search_result):
                         gt = bench_dataset.groundtruth_neighbors
                         if gt is not None:
                             search_result.recall = compute_recall(
@@ -598,7 +607,7 @@ class BenchmarkOrchestrator:
             # Compute recall for backends that return actual neighbors.
             # Note: The recall computation relies on empty neighbors to
             # distinguish backends that already computed recall.
-            if result.success and result.neighbors.size > 0:
+            if _should_compute_recall(result):
                 gt = bench_dataset.groundtruth_neighbors
                 if gt is not None:
                     result.recall = compute_recall(result.neighbors, gt, count)
