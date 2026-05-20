@@ -8,6 +8,7 @@
 //
 
 #include "../../../util/serialize_validation.hpp"
+#include "../../detail/ann_utils.cuh"
 #include "ivf_gpu.cuh"
 #include "searcher_gpu.cuh"
 #include <raft/util/integer_utils.hpp>
@@ -895,18 +896,6 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
                          d_rotated_c);
 }
 
-// Add query and centroid norms to dot product matrix
-__global__ void add_norms_kernel(
-  float* distances, const float* query_norms, const float* centroid_norms, int Q, int K)
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < Q * K) {
-    int q          = idx / K;
-    int k          = idx % K;
-    distances[idx] = distances[idx] + query_norms[q] + centroid_norms[k];
-  }
-}
-
 // Optimized kernel to prepare keys and values from d_raft_idx
 __global__ void prepare_keys_values(
   const int* d_raft_idx, int* d_cluster_keys, int* d_query_values, int batch_size, int nprobe)
@@ -1088,8 +1077,23 @@ void IVFGPU::PrepareClusterSearchInputs(
   rmm::cuda_stream_view searcher_stream  = searcher_batch->get_stream();
   const size_t batch_size                = queries.extent(0);
 
-  // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
-  const float alpha = -2.f, beta = 0.f;
+  // Compute ||q - c||^2 = -2 * q . c + ||q||^2 + ||c||^2 into centroid_distances:
+  //  (1) query norms (squared L2, no sqrt - default fin_op on L2Norm returns sum of squares;
+  //      centroid norms were precomputed in compute_centroid_norms() and cached in centroid_norms_)
+  //  (2) outer_add writes (q_norm + c_norm) into centroid_distances, overwriting the prior
+  //      uninitialized contents of the freshly-allocated SearcherGPU scratch buffer
+  //  (3) matmul with beta=1 accumulates -2 * Q * C^T on top
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    searcher_handle,
+    queries,
+    raft::make_device_vector_view<float, int64_t>(searcher_batch->get_q_norms(), batch_size));
+  cuvs::spatial::knn::detail::utils::outer_add(searcher_batch->get_q_norms(),
+                                               batch_size,
+                                               centroid_norms_.data_handle(),
+                                               num_centroids,
+                                               searcher_batch->get_centroid_distances(),
+                                               searcher_stream);
+  const float alpha = -2.f, beta = 1.f;
   raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
     searcher_handle,
     /* trans_a = */ true,
@@ -1105,24 +1109,6 @@ void IVFGPU::PrepareClusterSearchInputs(
     &beta,
     searcher_batch->get_centroid_distances(),
     num_centroids);
-
-  // Step 2: query norms (squared L2, no sqrt - default fin_op on L2Norm returns sum of squares).
-  // Centroid norms are precomputed once in compute_centroid_norms() and cached in centroid_norms_.
-  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-    searcher_handle,
-    queries,
-    raft::make_device_vector_view<float, int64_t>(searcher_batch->get_q_norms(), batch_size));
-
-  // Step 3: add all norms together
-  int add_threads = 256;
-  int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, searcher_stream>>>(
-    searcher_batch->get_centroid_distances(),
-    searcher_batch->get_q_norms(),
-    centroid_norms_.data_handle(),
-    batch_size,
-    num_centroids);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step 4: select top-nprobe clusters per query
   auto d_raft_vals = raft::make_device_matrix<float, int64_t>(searcher_handle, batch_size, nprobe);
