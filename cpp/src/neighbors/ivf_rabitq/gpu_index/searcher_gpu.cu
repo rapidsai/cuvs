@@ -15,8 +15,8 @@
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
+#include <cuvs/selection/select_k.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/matrix/select_k.cuh>
 
 #include <rmm/device_uvector.hpp>
 
@@ -616,17 +616,18 @@ __global__ void computeInnerProductsWithLUTBlockSort(const ComputeInnerProductsK
   }
 }
 
-void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
-                                          IVFGPU::GPUClusterMeta* d_cluster_meta,
-                                          ClusterQueryPair* d_sorted_pairs,
-                                          size_t num_queries,
-                                          const float* d_query,
-                                          const float* d_G_k1xSumq,
-                                          const float* d_G_kbxSumq,
-                                          size_t nprobe,
-                                          size_t topk,
-                                          float* d_final_dists,
-                                          PID* d_final_pids)
+void SearcherGPU::SearchClusterQueryPairs(
+  const IVFGPU& cur_ivf,
+  IVFGPU::GPUClusterMeta* d_cluster_meta,
+  ClusterQueryPair* d_sorted_pairs,
+  size_t num_queries,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+  const float* d_G_k1xSumq,
+  const float* d_G_kbxSumq,
+  size_t nprobe,
+  size_t topk,
+  raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids)
 {
   // First allocate space for LUT
   size_t lut_size = num_queries * (D / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
@@ -636,7 +637,7 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                d_lut_for_queries.data() + d_lut_for_queries.size(),
                -std::numeric_limits<float>::infinity());
   // precompute LUTS
-  launchPrecomputeLUTs(d_query, d_lut_for_queries.data(), num_queries, D, stream_);
+  launchPrecomputeLUTs(queries.data_handle(), d_lut_for_queries.data(), num_queries, D, stream_);
 
   // check if the inner products kernel should use block sort to keep a top-k priority queue vs.
   // outputting distances from all vectors in probed clusters
@@ -667,15 +668,14 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                                                 max_probed_vectors_count);
 
   // allocate memory for intermediate output
-  size_t total_elements =
-    use_block_sort ? num_queries * nprobe * topk : num_queries * max_probed_vectors_count.value();
-  auto d_topk_dists = raft::make_device_vector<float, int64_t>(handle_, total_elements);
-  auto d_topk_pids  = raft::make_device_vector<PID, int64_t>(handle_, total_elements);
+  size_t n_cols     = use_block_sort ? nprobe * topk : max_probed_vectors_count.value();
+  auto d_topk_dists = raft::make_device_matrix<float, int64_t>(handle_, num_queries, n_cols);
+  auto d_topk_pids  = raft::make_device_matrix<uint32_t, int64_t>(handle_, num_queries, n_cols);
 
   // initialize distances
   thrust::fill(thrust::cuda::par.on(stream_),
                d_topk_dists.data_handle(),
-               d_topk_dists.data_handle() + total_elements,
+               d_topk_dists.data_handle() + d_topk_dists.size(),
                std::numeric_limits<float>::infinity());
 
   rmm::device_uvector<int> d_query_write_counters(num_queries, stream_);
@@ -706,7 +706,7 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
 
   ComputeInnerProductsKernelParams kernelParams;
   kernelParams.d_sorted_pairs          = d_sorted_pairs;
-  kernelParams.d_query                 = d_query;
+  kernelParams.d_query                 = queries.data_handle();
   kernelParams.d_short_data            = cur_ivf.get_short_data_device();
   kernelParams.d_cluster_meta          = d_cluster_meta;
   kernelParams.d_lut_for_queries_float = d_lut_for_queries.data();
@@ -762,17 +762,16 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // merge results from different blocks
-  raft::matrix::detail::select_k(
+  cuvs::selection::select_k(
     handle_,
-    d_topk_dists.data_handle(),
-    d_topk_pids.data_handle(),
-    num_queries,
-    use_block_sort ? (nprobe * topk) : max_probed_vectors_count.value(),
-    topk,
+    raft::make_device_matrix_view<const float, int64_t>(
+      d_topk_dists.data_handle(), num_queries, n_cols),
+    std::make_optional(raft::make_device_matrix_view<const uint32_t, int64_t>(
+      d_topk_pids.data_handle(), num_queries, n_cols)),
     d_final_dists,
     d_final_pids,
-    /*select_min = */ true,
-    /* sorted = */ false);
+    /*select_min=*/true,
+    /*sorted=*/false);
 
   raft::resource::sync_stream(handle_);
 }

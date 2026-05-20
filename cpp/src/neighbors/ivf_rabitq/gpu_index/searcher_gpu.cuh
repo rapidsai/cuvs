@@ -69,42 +69,45 @@ class SearcherGPU {
   }  // unit_q must be allocated with `malloc` or similar, as opposed to `new`
 
   /** @brief Search <cluster_id, query_id> pairs */
-  void SearchClusterQueryPairs(const IVFGPU& cur_ivf,
-                               IVFGPU::GPUClusterMeta* d_cluster_meta,
-                               ClusterQueryPair* d_sorted_pairs,
-                               size_t num_queries,
-                               const float* d_query,
-                               const float* d_G_k1xSumq,
-                               const float* d_G_kbxSumq,
-                               size_t nprobe,
-                               size_t topk,
-                               float* d_final_dists,
-                               PID* d_final_pids);
+  void SearchClusterQueryPairs(
+    const IVFGPU& cur_ivf,
+    IVFGPU::GPUClusterMeta* d_cluster_meta,
+    ClusterQueryPair* d_sorted_pairs,
+    size_t num_queries,
+    raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+    const float* d_G_k1xSumq,
+    const float* d_G_kbxSumq,
+    size_t nprobe,
+    size_t topk,
+    raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+    raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids);
 
-  void SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
-                                           IVFGPU::GPUClusterMeta* d_cluster_meta,
-                                           ClusterQueryPair* d_sorted_pairs,
-                                           size_t num_queries,
-                                           const float* d_query,
-                                           const float* d_G_k1xSumq,
-                                           const float* d_G_kbxSumq,
-                                           size_t nprobe,
-                                           size_t topk,
-                                           float* d_final_dists,
-                                           PID* d_final_pids);
+  void SearchClusterQueryPairsSharedMemOpt(
+    const IVFGPU& cur_ivf,
+    IVFGPU::GPUClusterMeta* d_cluster_meta,
+    ClusterQueryPair* d_sorted_pairs,
+    size_t num_queries,
+    raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+    const float* d_G_k1xSumq,
+    const float* d_G_kbxSumq,
+    size_t nprobe,
+    size_t topk,
+    raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+    raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids);
 
-  void SearchClusterQueryPairsQuantizeQuery(const IVFGPU& cur_ivf,
-                                            IVFGPU::GPUClusterMeta* d_cluster_meta,
-                                            ClusterQueryPair* d_sorted_pairs,
-                                            size_t num_queries,
-                                            const float* d_query,
-                                            const float* d_G_k1xSumq,
-                                            const float* d_G_kbxSumq,
-                                            size_t nprobe,
-                                            size_t topk,
-                                            float* d_final_dists,
-                                            PID* d_final_pids,
-                                            bool use_4bit = false);
+  void SearchClusterQueryPairsQuantizeQuery(
+    const IVFGPU& cur_ivf,
+    IVFGPU::GPUClusterMeta* d_cluster_meta,
+    ClusterQueryPair* d_sorted_pairs,
+    size_t num_queries,
+    raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+    const float* d_G_k1xSumq,
+    const float* d_G_kbxSumq,
+    size_t nprobe,
+    size_t topk,
+    raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+    raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids,
+    bool use_4bit = false);
 
  private:
   raft::resources const& handle_;  // reusable resource handle

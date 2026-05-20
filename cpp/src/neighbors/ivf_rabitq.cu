@@ -234,46 +234,26 @@ void search(raft::resources const& handle,
                                /* rabitq_quantize_flag = */ true);
   searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
 
-  auto final_ids = raft::make_device_vector<uint32_t, int64_t>(handle, NQ * k);
+  auto final_ids = raft::make_device_matrix<uint32_t, int64_t>(handle, NQ, k);
+  auto queries_view =
+    raft::make_device_matrix_view<const T, int64_t>(rotated_queries.data_handle(), NQ, padded_dim);
 
   if (params.mode == search_mode::LUT32) {
-    idx.rabitq_index().BatchClusterSearch(rotated_queries.data_handle(),
-                                          k,
-                                          params.n_probes,
-                                          &searcher,
-                                          NQ,
-                                          distances.data_handle(),
-                                          final_ids.data_handle());
+    idx.rabitq_index().BatchClusterSearch(
+      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view());
   } else if (params.mode == search_mode::LUT16) {
     // test v3 lut using fp16
-    idx.rabitq_index().BatchClusterSearchLUT16(rotated_queries.data_handle(),
-                                               k,
-                                               params.n_probes,
-                                               &searcher,
-                                               NQ,
-                                               distances.data_handle(),
-                                               final_ids.data_handle());
+    idx.rabitq_index().BatchClusterSearchLUT16(
+      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view());
   } else if (params.mode == search_mode::QUANT8) {
-    idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
-                                                       k,
-                                                       params.n_probes,
-                                                       &searcher,
-                                                       NQ,
-                                                       distances.data_handle(),
-                                                       final_ids.data_handle(),
-                                                       8);
+    idx.rabitq_index().BatchClusterSearchQuantizeQuery(
+      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view(), 8);
   } else if (params.mode == search_mode::QUANT4) {
-    idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
-                                                       k,
-                                                       params.n_probes,
-                                                       &searcher,
-                                                       NQ,
-                                                       distances.data_handle(),
-                                                       final_ids.data_handle(),
-                                                       4);
+    idx.rabitq_index().BatchClusterSearchQuantizeQuery(
+      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view(), 4);
   }
 
-  // cast data in d_final_ids to array of IdxT in neighbors
+  // cast data in final_ids to array of IdxT in neighbors
   raft::linalg::map(
     handle,
     neighbors,

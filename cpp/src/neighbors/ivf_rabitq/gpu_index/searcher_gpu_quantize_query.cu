@@ -14,8 +14,8 @@
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
+#include <cuvs/selection/select_k.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/matrix/select_k.cuh>
 
 #include <cub/block/block_reduce.cuh>
 
@@ -759,13 +759,13 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   IVFGPU::GPUClusterMeta* d_cluster_meta,
   ClusterQueryPair* d_sorted_pairs,
   size_t num_queries,
-  const float* d_query,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
   const float* d_G_k1xSumq,
   const float* d_G_kbxSumq,
   size_t nprobe,
   size_t topk,
-  float* d_final_dists,
-  PID* d_final_pids,
+  raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids,
   bool use_4bit  // Add parameter to choose 4-bit or 8-bit
 )
 {
@@ -800,7 +800,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       const int grid_size  = num_queries;
       size_t shared_mem    = D * sizeof(float) + D * sizeof(int8_t) + block_size * sizeof(float);
       exrabitq_quantize_query<block_size>
-        <<<grid_size, block_size, shared_mem, stream_>>>(d_query,
+        <<<grid_size, block_size, shared_mem, stream_>>>(queries.data_handle(),
                                                          num_queries,
                                                          D,
                                                          num_bits,
@@ -813,14 +813,16 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       // Step 1: Find min/max for each query
       const int block_size = 256;
       const int grid_size  = num_queries;
-      findQueryRanges<<<grid_size, block_size, 0, stream_>>>(
-        d_query, d_query_ranges.data_handle(), num_queries, cur_ivf.get_num_padded_dim());
+      findQueryRanges<<<grid_size, block_size, 0, stream_>>>(queries.data_handle(),
+                                                             d_query_ranges.data_handle(),
+                                                             num_queries,
+                                                             cur_ivf.get_num_padded_dim());
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Step 2: Quantize queries to int8_t with BQ=8
       if (use_4bit) {
         quantizeQueriesToInt4<<<grid_size, block_size, 0, stream_>>>(
-          d_query,
+          queries.data_handle(),
           d_query_ranges.data_handle(),
           d_quantized_queries.data_handle(),
           d_widths.data_handle(),
@@ -829,7 +831,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
         RAFT_CUDA_TRY(cudaPeekAtLastError());
       } else {
         quantizeQueriesToInt8<<<grid_size, block_size, 0, stream_>>>(
-          d_query,
+          queries.data_handle(),
           d_query_ranges.data_handle(),
           d_quantized_queries.data_handle(),
           d_widths.data_handle(),
@@ -887,15 +889,14 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                                 max_probed_vectors_count);
 
   // allocate memory for intermediate output
-  size_t total_elements =
-    use_block_sort ? num_queries * nprobe * topk : num_queries * max_probed_vectors_count.value();
-  auto d_topk_dists = raft::make_device_vector<float, int64_t>(handle_, total_elements);
-  auto d_topk_pids  = raft::make_device_vector<PID, int64_t>(handle_, total_elements);
+  size_t n_cols     = use_block_sort ? nprobe * topk : max_probed_vectors_count.value();
+  auto d_topk_dists = raft::make_device_matrix<float, int64_t>(handle_, num_queries, n_cols);
+  auto d_topk_pids  = raft::make_device_matrix<uint32_t, int64_t>(handle_, num_queries, n_cols);
 
   // initialize distances
   thrust::fill(thrust::cuda::par.on(stream_),
                d_topk_dists.data_handle(),
-               d_topk_dists.data_handle() + total_elements,
+               d_topk_dists.data_handle() + d_topk_dists.size(),
                std::numeric_limits<float>::infinity());
 
   thrust::fill(thrust::cuda::par.on(stream_),
@@ -932,7 +933,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   ComputeInnerProductsKernelParams kernelParams;
   kernelParams.d_sorted_pairs          = d_sorted_pairs;
-  kernelParams.d_query                 = d_query;
+  kernelParams.d_query                 = queries.data_handle();
   kernelParams.d_short_data            = cur_ivf.get_short_data_device();
   kernelParams.d_cluster_meta          = d_cluster_meta;
   kernelParams.d_packed_queries        = d_packed_queries.data_handle();
@@ -1010,17 +1011,16 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   }
 
   // Merge results
-  raft::matrix::detail::select_k(
+  cuvs::selection::select_k(
     handle_,
-    d_topk_dists.data_handle(),
-    d_topk_pids.data_handle(),
-    num_queries,
-    use_block_sort ? (nprobe * topk) : max_probed_vectors_count.value(),
-    topk,
+    raft::make_device_matrix_view<const float, int64_t>(
+      d_topk_dists.data_handle(), num_queries, n_cols),
+    std::make_optional(raft::make_device_matrix_view<const uint32_t, int64_t>(
+      d_topk_pids.data_handle(), num_queries, n_cols)),
     d_final_dists,
     d_final_pids,
-    /*select_min = */ true,
-    /* sorted = */ false);
+    /*select_min=*/true,
+    /*sorted=*/false);
 
   raft::resource::sync_stream(handle_);
 }

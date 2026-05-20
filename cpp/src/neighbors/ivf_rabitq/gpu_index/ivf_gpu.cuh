@@ -271,30 +271,33 @@ class IVFGPU {
   DataQuantizerGPU& quantizer() const { return *(this->DQ); }
   RotatorGPU& rotator() const { return *(this->Rota); }
 
-  void BatchClusterSearch(const float* d_query,
-                          size_t k,
-                          size_t nprobe,
-                          void* searcher,
-                          size_t batch_size,
-                          float* d_final_dists,
-                          PID* d_final_pids);
+  void BatchClusterSearch(
+    raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+    size_t k,
+    size_t nprobe,
+    void* searcher,
+    size_t batch_size,
+    raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+    raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids);
 
-  void BatchClusterSearchLUT16(const float* d_query,
-                               size_t k,
-                               size_t nprobe,
-                               void* searcher,
-                               size_t batch_size,
-                               float* d_final_dists,
-                               PID* d_final_pids);
+  void BatchClusterSearchLUT16(
+    raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+    size_t k,
+    size_t nprobe,
+    void* searcher,
+    size_t batch_size,
+    raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+    raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids);
 
-  void BatchClusterSearchQuantizeQuery(const float* d_query,
-                                       size_t k,
-                                       size_t nprobe,
-                                       void* searcher,
-                                       size_t batch_size,
-                                       float* d_final_dists,
-                                       PID* d_final_pids,
-                                       int query_bits);
+  void BatchClusterSearchQuantizeQuery(
+    raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+    size_t k,
+    size_t nprobe,
+    void* searcher,
+    size_t batch_size,
+    raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
+    raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids,
+    int query_bits);
 
  private:
   void PrepareClusterSearchInputs(const float* d_query,
