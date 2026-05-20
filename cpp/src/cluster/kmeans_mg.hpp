@@ -65,6 +65,24 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<double> inertia,
          raft::host_scalar_view<int64_t> n_iter);
 
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const float, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const float, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const double, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const double, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
 /**
  * @brief MNMG kmeans fit with host data (streaming).
  *

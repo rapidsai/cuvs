@@ -9,8 +9,11 @@
 
 #include <cuvs/cluster/kmeans.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/init.cuh>
@@ -29,6 +32,14 @@
 namespace cuvs::cluster::kmeans::mg::detail {
 
 using cuvs::core::detail::mnmg_comms;
+
+template <typename DataT, typename IndexT, typename Accessor>
+using partitioned_matrix_view =
+  raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::layout_c_contiguous, Accessor>;
+
+template <typename DataT, typename IndexT, typename Accessor>
+using partitioned_vector_view =
+  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_c_contiguous, Accessor>;
 
 template <typename IndexT>
 IndexT get_global_kmeanspp_init_sample_size(const cuvs::cluster::kmeans::params& params,
@@ -160,11 +171,11 @@ std::pair<std::size_t, IndexT> locate_local_row(const std::vector<IndexT>& part_
   return {part_idx, local_idx - part_offsets[part_idx]};
 }
 
-template <typename DataT, typename IndexT>
-raft::device_matrix<DataT, IndexT> sample_global_host_rows(
+template <typename DataT, typename IndexT, typename Accessor>
+raft::device_matrix<DataT, IndexT> sample_global_rows(
   raft::resources const& handle,
   const cuvs::cluster::kmeans::params& params,
-  const std::vector<raft::host_matrix_view<const DataT, IndexT>>& X_parts,
+  const std::vector<partitioned_matrix_view<DataT, IndexT, Accessor>>& X_parts,
   IndexT n_features,
   IndexT sample_size,
   int rank,
@@ -189,23 +200,27 @@ raft::device_matrix<DataT, IndexT> sample_global_host_rows(
 
   for (auto const& owned_sample : owned_samples) {
     auto [part_idx, row_in_part] = locate_local_row(part_offsets, owned_sample.local_idx);
-    raft::copy(handle,
-               raft::make_device_vector_view<DataT, IndexT>(
-                 sampled_rows.data_handle() + owned_sample.sample_idx * n_features, n_features),
-               raft::make_host_vector_view<const DataT, IndexT>(
-                 X_parts[part_idx].data_handle() + row_in_part * n_features, n_features));
+    auto dst                     = raft::make_device_vector_view<DataT, IndexT>(
+      sampled_rows.data_handle() + owned_sample.sample_idx * n_features, n_features);
+    auto const* src = X_parts[part_idx].data_handle() + row_in_part * n_features;
+
+    if constexpr (raft::is_device_mdspan_v<partitioned_matrix_view<DataT, IndexT, Accessor>>) {
+      raft::copy(handle, dst, raft::make_device_vector_view<const DataT, IndexT>(src, n_features));
+    } else {
+      raft::copy(handle, dst, raft::make_host_vector_view<const DataT, IndexT>(src, n_features));
+    }
   }
 
   comms.allreduce(sampled_rows.data_handle(), sampled_rows.data_handle(), sampled_rows.size());
   return sampled_rows;
 }
 
-template <typename DataT, typename IndexT>
+template <typename DataT, typename IndexT, typename Accessor>
 void init_centroids_for_mg_batched(
   raft::resources const& handle,
   const cuvs::cluster::kmeans::params& params,
   IndexT /*streaming_batch_size*/,
-  const std::vector<raft::host_matrix_view<const DataT, IndexT>>& X_parts,
+  const std::vector<partitioned_matrix_view<DataT, IndexT, Accessor>>& X_parts,
   IndexT n_features,
   raft::device_matrix_view<const DataT, IndexT> initial_centroids,
   raft::device_matrix_view<DataT, IndexT> centroids,
@@ -230,21 +245,21 @@ void init_centroids_for_mg_batched(
   }
 
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-    auto sampled_rows = sample_global_host_rows<DataT, IndexT>(
+    auto sampled_rows = sample_global_rows<DataT, IndexT, Accessor>(
       handle, params, X_parts, n_features, n_clusters, rank, root, rank_counts, global_n, comms);
     raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
     IndexT init_sample_size = get_global_kmeanspp_init_sample_size(params, global_n, n_clusters);
-    auto init_sample        = sample_global_host_rows<DataT, IndexT>(handle,
-                                                              params,
-                                                              X_parts,
-                                                              n_features,
-                                                              init_sample_size,
-                                                              rank,
-                                                              root,
-                                                              rank_counts,
-                                                              global_n,
-                                                              comms);
+    auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(handle,
+                                                                   params,
+                                                                   X_parts,
+                                                                   n_features,
+                                                                   init_sample_size,
+                                                                   rank,
+                                                                   root,
+                                                                   rank_counts,
+                                                                   global_n,
+                                                                   comms);
 
     if (rank == root) {
       auto init_view = raft::make_const_mdspan(init_sample.view());
