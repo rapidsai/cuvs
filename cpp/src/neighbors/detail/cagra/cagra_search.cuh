@@ -334,6 +334,19 @@ void search_multi_segment(
     search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, OutputIdxT>
       plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
+  // Multi-segment produces the global top-k by merging itopk_size candidates from each segment.
+  // Require the combined pool to be at least topk; otherwise the merge is forced to fill the
+  // output with sentinels from segments that couldn't supply enough refined candidates. This is
+  // a necessary condition to avoid garbage in the output — not a sufficient one for good recall,
+  // which still depends on per-segment itopk_size relative to the true top-k's distribution
+  // across segments. Compared against the post-adjustment plan.itopk_size to mirror how
+  // single-segment validates topk in plan->check().
+  RAFT_EXPECTS(static_cast<uint64_t>(plan.itopk_size) * num_segments >= topk,
+               "itopk_size (%lu) * num_segments (%u) must be >= topk (%u).",
+               plan.itopk_size,
+               num_segments,
+               topk);
+
   // Build per-segment descriptors and result pointers on the host.
   // The device copy is allocated below.
   using seg_desc_t = single_cta_search::multi_segment_desc_t<T, graph_idx_type, DistanceT>;
