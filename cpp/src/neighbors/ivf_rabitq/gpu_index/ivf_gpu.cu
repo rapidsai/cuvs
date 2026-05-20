@@ -17,6 +17,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/detail/cublaslt_wrappers.hpp>
+#include <raft/linalg/norm.cuh>
 
 #include <rmm/device_buffer.hpp>
 #include <rmm/device_uvector.hpp>
@@ -862,7 +863,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
 }
 
 void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
-                              //                              const std::vector<PID>& IDs,
                               const float* d_data,      // device pointer
                               const float* d_centroid,  // device pointer
                               float* d_rotated_c) const
@@ -883,73 +883,6 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
                          cp.long_code(*this, 0, DQ->long_code_length()),
                          reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
                          d_rotated_c);
-}
-
-// Launch with: grid = Q + K (or a grid-stride size), block = norm_block_size
-// shared mem bytes = ((norm_block_size + 31) / 32) * sizeof(float)
-
-__global__ void row_norms_fused_kernel(const float* __restrict__ A,
-                                       int A_rows,
-                                       int A_cols,
-                                       const float* __restrict__ B,
-                                       int B_rows,
-                                       int B_cols,
-                                       float* __restrict__ A_norms,
-                                       float* __restrict__ B_norms)
-{
-  extern __shared__ float sdata[];  // size = nWarps
-  const int tid     = threadIdx.x;
-  const int lane    = tid & 31;
-  const int warp_id = tid >> 5;
-  const int nWarps  = (blockDim.x + 31) / 32;
-
-  const int total_rows = A_rows + B_rows;
-
-  // Grid-stride across rows so you’re not limited to gridDim.x == total_rows.
-  for (int g = blockIdx.x; g < total_rows; g += gridDim.x) {
-    const float* row_ptr;
-    int cols;
-    float* out_ptr;
-
-    if (g < A_rows) {
-      row_ptr = A + (size_t)g * A_cols;
-      cols    = A_cols;
-      out_ptr = A_norms + g;
-    } else {
-      const int br = g - A_rows;
-      row_ptr      = B + (size_t)br * B_cols;
-      cols         = B_cols;
-      out_ptr      = B_norms + br;
-    }
-
-    // Per-thread partial
-    float sum = 0.0f;
-    for (int c = tid; c < cols; c += blockDim.x) {
-      float v = row_ptr[c];
-      sum += v * v;
-    }
-
-    // In-warp reduction
-#pragma unroll
-    for (int off = 16; off > 0; off >>= 1) {
-      sum += __shfl_down_sync(0xffffffff, sum, off);
-    }
-
-    // Write one value per warp to shared
-    if (lane == 0) sdata[warp_id] = sum;
-    __syncthreads();
-
-    // Warp 0 reduces warp-partials
-    if (warp_id == 0) {
-      float warp_sum = (tid < nWarps) ? sdata[tid] : 0.0f;
-#pragma unroll
-      for (int off = 16; off > 0; off >>= 1) {
-        warp_sum += __shfl_down_sync(0xffffffff, warp_sum, off);
-      }
-      if (tid == 0) *out_ptr = warp_sum;
-    }
-    __syncthreads();  // reuse sdata safely next iteration
-  }
 }
 
 // Add query and centroid norms to dot product matrix
@@ -1108,28 +1041,33 @@ __global__ void computeQueryFactorsWarpKernel(const T* d_query,    // num_querie
 
 // Wrapper function
 template <typename T>
-void computeQueryFactors(const T* d_query,
-                         float* d_G_k1xSumq,
-                         float* d_G_kbxSumq,
-                         size_t num_queries,
-                         size_t D,
+void computeQueryFactors(raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+                         raft::device_vector_view<float, int64_t> d_G_k1xSumq,
+                         raft::device_vector_view<float, int64_t> d_G_kbxSumq,
                          size_t ex_bits,
                          cudaStream_t stream)
 {
+  const size_t num_queries = queries.extent(0);
+  const size_t D           = queries.extent(1);
+
   // Use 256 threads per block (8 warps per block)
   const int threads_per_block = 256;
   const int warps_per_block   = threads_per_block / 32;
   const int blocks            = (num_queries + warps_per_block - 1) / warps_per_block;
 
-  computeQueryFactorsWarpKernel<T><<<blocks, threads_per_block, 0, stream>>>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, num_queries, D, ex_bits);
+  computeQueryFactorsWarpKernel<T>
+    <<<blocks, threads_per_block, 0, stream>>>(queries.data_handle(),
+                                               d_G_k1xSumq.data_handle(),
+                                               d_G_kbxSumq.data_handle(),
+                                               num_queries,
+                                               D,
+                                               ex_bits);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
 void IVFGPU::PrepareClusterSearchInputs(
-  const float* d_query,
-  size_t batch_size,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
   size_t nprobe,
   SearcherGPU* searcher_batch,
   raft::device_vector<ClusterQueryPair, int64_t>& d_sorted_pairs,
@@ -1138,6 +1076,7 @@ void IVFGPU::PrepareClusterSearchInputs(
 {
   raft::resources const& searcher_handle = searcher_batch->get_handle();
   rmm::cuda_stream_view searcher_stream  = searcher_batch->get_stream();
+  const size_t batch_size                = queries.extent(0);
 
   // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
   const float alpha = -2.f, beta = 0.f;
@@ -1151,26 +1090,23 @@ void IVFGPU::PrepareClusterSearchInputs(
     &alpha,
     initializer->GetCentroid(0),
     num_padded_dim,
-    d_query,
+    queries.data_handle(),
     num_padded_dim,
     &beta,
     searcher_batch->get_centroid_distances(),
     num_centroids);
 
-  // Step 2: fused kernel to compute q and c norms
-  int grid                  = num_centroids + batch_size;
-  const int norm_block_size = 256;
-  size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, searcher_stream>>>(
-    d_query,
-    batch_size,
-    num_padded_dim,
-    initializer->GetCentroid(0),
-    num_centroids,
-    num_padded_dim,
-    searcher_batch->get_q_norms(),
-    searcher_batch->get_c_norms());
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  // Step 2: q and c norms (squared L2, no sqrt - default fin_op on L2Norm returns sum of squares)
+  auto centroids_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+    initializer->GetCentroid(0), num_centroids, num_padded_dim);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    searcher_handle,
+    queries,
+    raft::make_device_vector_view<float, int64_t>(searcher_batch->get_q_norms(), batch_size));
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    searcher_handle,
+    centroids_view,
+    raft::make_device_vector_view<float, int64_t>(searcher_batch->get_c_norms(), num_centroids));
 
   // Step 3: add all norms together
   int add_threads = 256;
@@ -1205,13 +1141,8 @@ void IVFGPU::PrepareClusterSearchInputs(
   // Step 6: compute query factors
   d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_handle, batch_size);
   d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_handle, batch_size);
-  computeQueryFactors<float>(d_query,
-                             d_G_k1xSumq.data_handle(),
-                             d_G_kbxSumq.data_handle(),
-                             batch_size,
-                             num_padded_dim,
-                             ex_bits,
-                             searcher_stream);
+  computeQueryFactors<float>(
+    queries, d_G_k1xSumq.view(), d_G_kbxSumq.view(), ex_bits, searcher_stream);
 
   // Sync here to ensure all outputs are visible before SearcherGPU reads them.
   raft::resource::sync_stream(searcher_handle);
@@ -1231,13 +1162,8 @@ void IVFGPU::BatchClusterSearch(
     raft::make_device_vector<ClusterQueryPair, int64_t>(searcher_batch->get_handle(), 0);
   auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
   auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  PrepareClusterSearchInputs(queries.data_handle(),
-                             batch_size,
-                             nprobe,
-                             searcher_batch,
-                             d_sorted_pairs,
-                             d_G_k1xSumq,
-                             d_G_kbxSumq);
+  PrepareClusterSearchInputs(
+    queries, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
   searcher_batch->SearchClusterQueryPairs(*this,
                                           cluster_meta_.data_handle(),
                                           d_sorted_pairs.data_handle(),
@@ -1265,13 +1191,8 @@ void IVFGPU::BatchClusterSearchLUT16(
     raft::make_device_vector<ClusterQueryPair, int64_t>(searcher_batch->get_handle(), 0);
   auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
   auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  PrepareClusterSearchInputs(queries.data_handle(),
-                             batch_size,
-                             nprobe,
-                             searcher_batch,
-                             d_sorted_pairs,
-                             d_G_k1xSumq,
-                             d_G_kbxSumq);
+  PrepareClusterSearchInputs(
+    queries, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
   searcher_batch->SearchClusterQueryPairsSharedMemOpt(*this,
                                                       cluster_meta_.data_handle(),
                                                       d_sorted_pairs.data_handle(),
@@ -1300,13 +1221,8 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(
     raft::make_device_vector<ClusterQueryPair, int64_t>(searcher_batch->get_handle(), 0);
   auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
   auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  PrepareClusterSearchInputs(queries.data_handle(),
-                             batch_size,
-                             nprobe,
-                             searcher_batch,
-                             d_sorted_pairs,
-                             d_G_k1xSumq,
-                             d_G_kbxSumq);
+  PrepareClusterSearchInputs(
+    queries, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
   searcher_batch->SearchClusterQueryPairsQuantizeQuery(*this,
                                                        cluster_meta_.data_handle(),
                                                        d_sorted_pairs.data_handle(),
