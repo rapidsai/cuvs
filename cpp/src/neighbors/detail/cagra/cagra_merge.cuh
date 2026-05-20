@@ -21,7 +21,7 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
-#include <rmm/resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include <chrono>
 #include <cstdio>

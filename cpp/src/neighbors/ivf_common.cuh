@@ -20,7 +20,7 @@ void sort_cluster_sizes_descending(uint32_t* input,
                                    uint32_t* output,
                                    uint32_t n_lists,
                                    rmm::cuda_stream_view stream,
-                                   rmm::device_async_resource tmp_res);
+                                   rmm::device_async_resource_ref tmp_res);
 
 /**
  * Default value returned by `search` when the `n_probes` is too small and top-k is too large.

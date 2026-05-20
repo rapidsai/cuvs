@@ -24,7 +24,7 @@
 #include <raft/linalg/norm.cuh>     // raft::linalg::norm
 #include <raft/matrix/detail/select_warpsort.cuh>
 
-#include <rmm/resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include <type_traits>
 
@@ -51,7 +51,7 @@ void search_impl(raft::resources const& handle,
                  bool select_min,
                  IdxT* neighbors,
                  AccT* distances,
-                 rmm::device_async_resource search_mr,
+                 rmm::device_async_resource_ref search_mr,
                  IvfSampleFilterT sample_filter)
 {
   auto stream = raft::resource::get_cuda_stream(handle);

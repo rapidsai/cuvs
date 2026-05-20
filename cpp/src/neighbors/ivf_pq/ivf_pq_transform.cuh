@@ -50,8 +50,8 @@ void transform_batch(raft::resources const& res,
                      raft::device_vector_view<uint32_t, IdxT> output_labels,
                      raft::device_matrix_view<uint8_t, IdxT, raft::row_major> output_dataset)
 {
-  IdxT n_rows                   = dataset.extent(0);
-  rmm::device_async_resource mr = raft::resource::get_workspace_resource(res);
+  IdxT n_rows                       = dataset.extent(0);
+  rmm::device_async_resource_ref mr = raft::resource::get_workspace_resource(res);
 
   // Compute the labels for each vector
   cuvs::cluster::kmeans::balanced_params kmeans_params;
@@ -115,7 +115,7 @@ void transform(raft::resources const& res,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::transform(n_rows = %u, dim = %u)", n_rows, dataset.extent(1));
 
-  rmm::device_async_resource mr = raft::resource::get_workspace_resource(res);
+  rmm::device_async_resource_ref mr = raft::resource::get_workspace_resource(res);
 
   // The cluster centers in the index are stored padded, which is not acceptable by
   // the kmeans_balanced::predict. Thus, we need the restructuring raft::copy.
@@ -137,8 +137,8 @@ void transform(raft::resources const& res,
     }
   }
 
-  constexpr size_t max_batch_size          = 65536;
-  rmm::device_async_resource device_memory = raft::resource::get_workspace_resource(res);
+  constexpr size_t max_batch_size              = 65536;
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(res);
 
   auto vec_batches = utils::make_batch_load_iterator<T>(res,
                                                         dataset.data_handle(),

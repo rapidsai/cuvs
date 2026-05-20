@@ -19,7 +19,7 @@
 #include <rmm/mr/per_device_resource.hpp>
 #include <rmm/mr/pinned_host_memory_resource.hpp>
 #include <rmm/mr/pool_memory_resource.hpp>
-#include <rmm/resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include "../core/exceptions.hpp"
 

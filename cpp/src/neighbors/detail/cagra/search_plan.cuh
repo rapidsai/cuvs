@@ -38,8 +38,8 @@ namespace cuvs::neighbors::cagra::detail {
 template <typename T>
 struct lightweight_uvector {
  private:
-  using raft_res_type            = const raft::resources*;
-  using rmm_res_type             = std::tuple<rmm::device_async_resource, rmm::cuda_stream_view>;
+  using raft_res_type = const raft::resources*;
+  using rmm_res_type  = std::tuple<rmm::device_async_resource_ref, rmm::cuda_stream_view>;
   static constexpr size_t kAlign = 256;
 
   std::variant<raft_res_type, rmm_res_type> res_;

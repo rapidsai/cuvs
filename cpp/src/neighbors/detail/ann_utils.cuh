@@ -21,7 +21,7 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include <cuda_fp16.hpp>
 
@@ -593,7 +593,7 @@ struct batch_load_iterator {
           MdspanT input_view,
           size_type batch_size,
           rmm::cuda_stream_view copy_stream,
-          rmm::device_async_resource mr,
+          rmm::device_async_resource_ref mr,
           bool prefetch,
           bool initialize,
           bool host_writeback)
@@ -853,7 +853,7 @@ struct batch_load_iterator {
                       MdspanT input_view,
                       size_type batch_size,
                       rmm::cuda_stream_view copy_stream,
-                      rmm::device_async_resource mr,
+                      rmm::device_async_resource_ref mr,
                       bool prefetch       = false,
                       bool initialize     = true,
                       bool host_writeback = false)
@@ -1018,7 +1018,7 @@ class batch_load_iterator_dyn {
                           IdxT row_width,
                           size_type batch_size,
                           rmm::cuda_stream_view copy_stream,
-                          rmm::device_async_resource mr,
+                          rmm::device_async_resource_ref mr,
                           bool prefetch       = false,
                           bool initialize     = true,
                           bool host_writeback = false)
@@ -1149,7 +1149,7 @@ class batch_load_iterator_dyn {
                         IdxT row_width,
                         size_type batch_size,
                         rmm::cuda_stream_view copy_stream,
-                        rmm::device_async_resource mr,
+                        rmm::device_async_resource_ref mr,
                         bool prefetch,
                         bool initialize,
                         bool host_writeback) -> std::variant<HostIter, DeviceIter>
@@ -1212,7 +1212,7 @@ auto make_batch_load_iterator(raft::resources const& res,
                               detail::type_identity_t<IdxT> row_width,
                               size_t batch_size,
                               rmm::cuda_stream_view copy_stream,
-                              rmm::device_async_resource mr,
+                              rmm::device_async_resource_ref mr,
                               bool prefetch       = false,
                               bool initialize     = true,
                               bool host_writeback = false) -> batch_load_iterator_dyn<T, IdxT>

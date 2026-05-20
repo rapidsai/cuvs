@@ -18,7 +18,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_pool.hpp>
-#include <rmm/resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include <cuda.h>
 #include <cuda_fp16.h>
@@ -276,7 +276,7 @@ void copy_with_padding(
   raft::resources const& res,
   raft::device_matrix<T, int64_t, raft::row_major>& dst,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> src,
-  rmm::device_async_resource mr = rmm::mr::get_current_device_resource())
+  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
 {
   size_t padded_dim = raft::round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
 

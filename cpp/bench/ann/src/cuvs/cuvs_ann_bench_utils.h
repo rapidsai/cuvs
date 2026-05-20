@@ -24,7 +24,7 @@
 #include <rmm/mr/managed_memory_resource.hpp>
 #include <rmm/mr/per_device_resource.hpp>
 #include <rmm/mr/pool_memory_resource.hpp>
-#include <rmm/resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include <memory>
 #include <type_traits>
@@ -98,7 +98,7 @@ class shared_raft_resources {
 
   ~shared_raft_resources() noexcept { rmm::mr::set_current_device_resource(orig_resource_); }
 
-  auto get_large_memory_resource() noexcept -> rmm::device_async_resource { return large_mr_; }
+  auto get_large_memory_resource() noexcept -> rmm::device_async_resource_ref { return large_mr_; }
 
  private:
   cuda::mr::any_resource<cuda::mr::device_accessible> orig_resource_;
