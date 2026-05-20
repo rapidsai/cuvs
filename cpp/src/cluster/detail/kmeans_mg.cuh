@@ -749,6 +749,7 @@ void fit(const raft::resources& handle,
       break;
     }
   }
+  n_iter[0] = std::min(n_iter[0], static_cast<IndexT>(params.max_iter));
 }
 
 // =========================================================================
