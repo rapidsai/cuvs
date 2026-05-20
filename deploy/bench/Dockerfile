@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir \
     h5py \
     matplotlib \
     "numpy<2" \
-    "opensearch-py>=2.4.0,<3.0.0" \
+    "opensearch-py>=2.4.0" \
     pandas \
     pyyaml \
     requests \

@@ -70,7 +70,8 @@ export AWS_DEFAULT_REGION=us-west-2        # AWS region for the S3 bucket (defau
 export DATASET=sift-128-euclidean          # default
 export BENCH_GROUPS=test                   # test | base (default: test)
 export K=10                                # number of neighbors (default: 10)
-export BATCH_SIZE=10000                    # query/bulk batch size (default: 10000)
+export BATCH_SIZE=                         # optional query batch size override
+export BUILD_BATCH_SIZE=                   # optional bulk ingest batch size override
 export REMOTE_BUILD_TIMEOUT=1800           # seconds to wait for remote builds (default: 1800)
 ```
 
@@ -101,6 +102,7 @@ docker compose down -v
    - Creates the kNN index and bulk-ingests dataset vectors
    - **GPU mode**: Flushes segments, waits for all submitted remote GPU builds to complete, and polls the kNN stats API every 5 s until the build is confirmed complete
    - **CPU mode**: Flushes and refreshes the local OpenSearch index
+   - Uses the backend's automatic OpenSearch bulk-ingest batch sizing by default; set `BUILD_BATCH_SIZE` to override it
    - Records total build time in the result
 5. Runs `cuvs-bench` search phase and prints a recall/QPS/latency table
 6. Exports benchmark JSON results to CSV (`cuvs_bench.run --data-export`)
@@ -146,8 +148,8 @@ $DATASET_PATH/
 
 | Group | Build params | Search params | Use case |
 |---|---|---|---|
-| `test` | 1 combo (m=16, ef_construction=100) | ef_search: 50, 100 | Quick smoke test |
-| `base` | 9 combos (m=[32,64,96] × ef_construction=[64,128,256]) | ef_search: 10–800 | Standard benchmark |
+| `test` | 1 combo (m=16) | ef_search: 10, 20 | Quick smoke test |
+| `base` | 4 combos (m=[16,32,48,64]) | ef_search: 10, 20, 40, 60, 80, 120, 200, 400, 600, 800 | Standard benchmark |
 
 ## GPU build verification
 

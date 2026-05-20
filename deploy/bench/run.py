@@ -39,7 +39,10 @@ DATASET      = os.environ.get("DATASET",       "sift-128-euclidean")
 DATASET_PATH = os.environ.get("DATASET_PATH",  "/data/datasets")
 BENCH_GROUPS = os.environ.get("BENCH_GROUPS",  "test")
 K            = int(os.environ.get("K", "10"))
-BATCH_SIZE   = int(os.environ.get("BATCH_SIZE", "10000"))
+BATCH_SIZE = os.environ.get("BATCH_SIZE", "").strip()
+BATCH_SIZE = int(BATCH_SIZE) if BATCH_SIZE else None
+BUILD_BATCH_SIZE = os.environ.get("BUILD_BATCH_SIZE", "").strip()
+BUILD_BATCH_SIZE = int(BUILD_BATCH_SIZE) if BUILD_BATCH_SIZE else None
 
 ALGORITHM = "opensearch_faiss_hnsw"
 REPO_NAME = "vector-repo"
@@ -61,6 +64,18 @@ def _recall_for_entry(
     # OpenSearch backend returns neighbors for the final search-parameter run.
     if entry_index == entry_count - 1:
         return float(result.recall)
+    return None
+
+
+def _get_search_batch_size(search_results: list) -> int | None:
+    if BATCH_SIZE is not None:
+        return BATCH_SIZE
+    for result in search_results:
+        if not isinstance(result, SearchResult):
+            continue
+        batch_size = (result.metadata or {}).get("batch_size")
+        if batch_size is not None:
+            return int(batch_size)
     return None
 
 
@@ -114,7 +129,7 @@ def write_result_files(
     algo: str,
     groups: str,
     k: int,
-    batch_size: int = 10000,
+    batch_size: int,
 ) -> None:
     """Write gbench-compatible JSON result files.
 
@@ -261,6 +276,14 @@ def main() -> None:
     print(f"  Dataset            : {DATASET}  (path: {DATASET_PATH})")
     print(f"  Algorithm          : {ALGORITHM}")
     print(f"  Groups             : {BENCH_GROUPS}  k={K}")
+    print(
+        "  Search batch size  : "
+        f"{BATCH_SIZE if BATCH_SIZE is not None else 'backend default'}"
+    )
+    print(
+        "  Build batch size   : "
+        f"{BUILD_BATCH_SIZE if BUILD_BATCH_SIZE is not None else 'backend auto'}"
+    )
 
     if REMOTE_INDEX_BUILD:
         register_repository()
@@ -268,8 +291,8 @@ def main() -> None:
 
     orchestrator = BenchmarkOrchestrator(backend_type="opensearch")
 
-    # Shared kwargs for both build and search phases
-    bench_kwargs = dict(
+    # Shared kwargs for both build and search phases.
+    common_kwargs = dict(
         dataset=DATASET,
         dataset_path=DATASET_PATH,
         algorithms=ALGORITHM,
@@ -278,12 +301,20 @@ def main() -> None:
         port=OPENSEARCH_PORT,
         use_ssl=False,
         verify_certs=False,
+    )
+
+    build_kwargs = dict(
+        common_kwargs,
         remote_index_build=REMOTE_INDEX_BUILD,
     )
+    if BUILD_BATCH_SIZE is not None:
+        build_kwargs["build_batch_size"] = BUILD_BATCH_SIZE
     if REMOTE_INDEX_BUILD:
-        bench_kwargs["remote_build_timeout"] = REMOTE_BUILD_TIMEOUT
+        build_kwargs["remote_build_timeout"] = REMOTE_BUILD_TIMEOUT
         if REMOTE_BUILD_SIZE_MIN:
-            bench_kwargs["remote_build_size_min"] = REMOTE_BUILD_SIZE_MIN
+            build_kwargs["remote_build_size_min"] = REMOTE_BUILD_SIZE_MIN
+
+
     # ── Build phase ───────────────────────────────────────────────────────────
     mode = "GPU remote build" if REMOTE_INDEX_BUILD else "CPU"
     banner(f"Building index ({mode} via cuvs-bench)")
@@ -291,8 +322,7 @@ def main() -> None:
         build=True,
         search=False,
         force=True,
-        bulk_batch_size=BATCH_SIZE,
-        **bench_kwargs,
+        **build_kwargs,
     )
 
     index_names = [
@@ -313,24 +343,32 @@ def main() -> None:
 
     # ── Search phase ──────────────────────────────────────────────────────────
     banner("Running search benchmarks (via cuvs-bench)")
-    search_results = orchestrator.run_benchmark(
+    search_run_kwargs = dict(
         build=False,
         search=True,
         count=K,
-        **bench_kwargs,
+        **common_kwargs,
     )
+    if BATCH_SIZE is not None:
+        search_run_kwargs["batch_size"] = BATCH_SIZE
+    search_results = orchestrator.run_benchmark(**search_run_kwargs)
 
     print_results(search_results)
+
+    batch_size = _get_search_batch_size(search_results)
+    if batch_size is None:
+        print("  ERROR: no successful search result reported a batch size")
+        sys.exit(1)
 
     write_result_files(
         build_results=build_results,
         search_results=search_results,
         dataset=DATASET,
         dataset_path=DATASET_PATH,
-        algo=bench_kwargs["algorithms"],
+        algo=common_kwargs["algorithms"],
         groups=BENCH_GROUPS,
         k=K,
-        batch_size=BATCH_SIZE,
+        batch_size=batch_size,
     )
 
     print("\n" + "═" * 60)
