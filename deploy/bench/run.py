@@ -10,8 +10,7 @@ Steps:
        b. Flush segments to kick off remote GPU builds when enabled
        c. Poll kNN stats until every submitted remote build completes
   4. Run cuvs-bench search benchmarks and print results
-  5. Write gbench-compatible JSON result files so cuvs_bench.run --data-export
-     and cuvs_bench.plot can be used for CSV export and plotting
+  5. Write gbench-compatible JSON result files for CSV export and plotting
 """
 
 import json
@@ -134,8 +133,8 @@ def write_result_files(
     """Write gbench-compatible JSON result files.
 
     Creates files under <dataset_path>/<dataset>/result/{build,search}/ in the
-    same format the C++ backend produces, so ``cuvs_bench.run --data-export``
-    and ``cuvs_bench.plot`` work without modification.
+    same format the C++ backend produces, so the cuvs-bench CSV exporters and
+    ``cuvs_bench.plot`` work without modification.
     """
     build_dir = os.path.join(dataset_path, dataset, "result", "build")
     search_dir = os.path.join(dataset_path, dataset, "result", "search")

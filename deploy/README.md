@@ -105,7 +105,7 @@ docker compose down -v
    - Uses the backend's automatic OpenSearch bulk-ingest batch sizing by default; set `BUILD_BATCH_SIZE` to override it
    - Records total build time in the result
 5. Runs `cuvs-bench` search phase and prints a recall/QPS/latency table
-6. Exports benchmark JSON results to CSV (`cuvs_bench.run --data-export`)
+6. Exports benchmark JSON results to CSV
 7. Generates recall vs. latency/throughput plots as PNGs in `$DATASET_PATH` (`cuvs_bench.plot`)
 
 ## Dataset format

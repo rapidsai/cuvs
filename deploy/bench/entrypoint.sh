@@ -5,11 +5,6 @@ DATASET="${DATASET:-sift-128-euclidean}"
 BENCH_GROUPS="${BENCH_GROUPS:-test}"
 K="${K:-10}"
 ALGORITHM="opensearch_faiss_hnsw"
-BATCH_SIZE="${BATCH_SIZE:-}"
-DATA_EXPORT_BATCH_ARGS=()
-if [ -n "$BATCH_SIZE" ]; then
-    DATA_EXPORT_BATCH_ARGS=(--batch-size "$BATCH_SIZE")
-fi
 
 wait_for_builder() {
     echo "remote-index-builder detected — waiting for it to be ready..."
@@ -57,13 +52,15 @@ python -m cuvs_bench.get_dataset \
 python -u run.py
 
 # Step 3: Export JSON → CSV (required by cuvs_bench.plot)
+# --batch-size is ignored when --data-export is set, but Click prompts for it
+# before entering main(), so pass a dummy value to keep the container non-interactive.
 python -m cuvs_bench.run --data-export \
     --dataset "$DATASET" \
     --dataset-path /data/datasets \
     --algorithms "$ALGORITHM" \
     --groups "$BENCH_GROUPS" \
     --count "$K" \
-    "${DATA_EXPORT_BATCH_ARGS[@]}" \
+    --batch-size 1 \
     --search-mode latency
 
 # Step 4: Plot — PNGs written to /data/datasets (mounted from host $DATASET_PATH)
