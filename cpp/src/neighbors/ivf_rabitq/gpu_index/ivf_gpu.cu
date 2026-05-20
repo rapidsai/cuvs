@@ -1068,13 +1068,13 @@ void computeQueryFactors(raft::device_matrix_view<const T, int64_t, raft::row_ma
 void IVFGPU::PrepareClusterSearchInputs(
   raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
   size_t nprobe,
-  SearcherGPU* searcher_batch,
+  SearcherGPU& searcher,
   raft::device_vector<ClusterQueryPair, int64_t>& d_sorted_pairs,
   raft::device_vector<float, int64_t>& d_G_k1xSumq,
   raft::device_vector<float, int64_t>& d_G_kbxSumq)
 {
-  raft::resources const& searcher_handle = searcher_batch->get_handle();
-  rmm::cuda_stream_view searcher_stream  = searcher_batch->get_stream();
+  raft::resources const& searcher_handle = searcher.get_handle();
+  rmm::cuda_stream_view searcher_stream  = searcher.get_stream();
   const size_t batch_size                = queries.extent(0);
 
   // Compute ||q - c||^2 = -2 * q . c + ||q||^2 + ||c||^2 into centroid_distances:
@@ -1086,35 +1086,34 @@ void IVFGPU::PrepareClusterSearchInputs(
   raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
     searcher_handle,
     queries,
-    raft::make_device_vector_view<float, int64_t>(searcher_batch->get_q_norms(), batch_size));
-  cuvs::spatial::knn::detail::utils::outer_add(searcher_batch->get_q_norms(),
+    raft::make_device_vector_view<float, int64_t>(searcher.get_q_norms(), batch_size));
+  cuvs::spatial::knn::detail::utils::outer_add(searcher.get_q_norms(),
                                                batch_size,
                                                centroid_norms_.data_handle(),
                                                num_centroids,
-                                               searcher_batch->get_centroid_distances(),
+                                               searcher.get_centroid_distances(),
                                                searcher_stream);
   const float alpha = -2.f, beta = 1.f;
-  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
-    searcher_handle,
-    /* trans_a = */ true,
-    /* trans_b = */ false,
-    num_centroids,
-    batch_size,
-    num_padded_dim,
-    &alpha,
-    initializer->GetCentroid(0),
-    num_padded_dim,
-    queries.data_handle(),
-    num_padded_dim,
-    &beta,
-    searcher_batch->get_centroid_distances(),
-    num_centroids);
+  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(searcher_handle,
+                                                               /* trans_a = */ true,
+                                                               /* trans_b = */ false,
+                                                               num_centroids,
+                                                               batch_size,
+                                                               num_padded_dim,
+                                                               &alpha,
+                                                               initializer->GetCentroid(0),
+                                                               num_padded_dim,
+                                                               queries.data_handle(),
+                                                               num_padded_dim,
+                                                               &beta,
+                                                               searcher.get_centroid_distances(),
+                                                               num_centroids);
 
   // Step 4: select top-nprobe clusters per query
   auto d_raft_vals = raft::make_device_matrix<float, int64_t>(searcher_handle, batch_size, nprobe);
   auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(searcher_handle, batch_size, nprobe);
   auto in_view     = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
+    searcher.get_centroid_distances(), batch_size, num_centroids);
   cuvs::selection::select_k(searcher_handle,
                             in_view,
                             std::nullopt,
@@ -1143,89 +1142,83 @@ void IVFGPU::BatchClusterSearch(
   raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
   size_t k,
   size_t nprobe,
-  void* searcher,
+  SearcherGPU& searcher,
   size_t batch_size,
   raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
   raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids)
 {
-  SearcherGPU* searcher_batch = (SearcherGPU*)searcher;
   auto d_sorted_pairs =
-    raft::make_device_vector<ClusterQueryPair, int64_t>(searcher_batch->get_handle(), 0);
-  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  PrepareClusterSearchInputs(
-    queries, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
-  searcher_batch->SearchClusterQueryPairs(*this,
-                                          cluster_meta_.data_handle(),
-                                          d_sorted_pairs.data_handle(),
-                                          batch_size,
-                                          queries,
-                                          d_G_k1xSumq.data_handle(),
-                                          d_G_kbxSumq.data_handle(),
-                                          nprobe,
-                                          k,
-                                          d_final_dists,
-                                          d_final_pids);
+    raft::make_device_vector<ClusterQueryPair, int64_t>(searcher.get_handle(), 0);
+  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher.get_handle(), 0);
+  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher.get_handle(), 0);
+  PrepareClusterSearchInputs(queries, nprobe, searcher, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
+  searcher.SearchClusterQueryPairs(*this,
+                                   cluster_meta_.data_handle(),
+                                   d_sorted_pairs.data_handle(),
+                                   batch_size,
+                                   queries,
+                                   d_G_k1xSumq.data_handle(),
+                                   d_G_kbxSumq.data_handle(),
+                                   nprobe,
+                                   k,
+                                   d_final_dists,
+                                   d_final_pids);
 }
 
 void IVFGPU::BatchClusterSearchLUT16(
   raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
   size_t k,
   size_t nprobe,
-  void* searcher,
+  SearcherGPU& searcher,
   size_t batch_size,
   raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
   raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids)
 {
-  SearcherGPU* searcher_batch = (SearcherGPU*)searcher;
   auto d_sorted_pairs =
-    raft::make_device_vector<ClusterQueryPair, int64_t>(searcher_batch->get_handle(), 0);
-  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  PrepareClusterSearchInputs(
-    queries, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
-  searcher_batch->SearchClusterQueryPairsSharedMemOpt(*this,
-                                                      cluster_meta_.data_handle(),
-                                                      d_sorted_pairs.data_handle(),
-                                                      batch_size,
-                                                      queries,
-                                                      d_G_k1xSumq.data_handle(),
-                                                      d_G_kbxSumq.data_handle(),
-                                                      nprobe,
-                                                      k,
-                                                      d_final_dists,
-                                                      d_final_pids);
+    raft::make_device_vector<ClusterQueryPair, int64_t>(searcher.get_handle(), 0);
+  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher.get_handle(), 0);
+  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher.get_handle(), 0);
+  PrepareClusterSearchInputs(queries, nprobe, searcher, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
+  searcher.SearchClusterQueryPairsSharedMemOpt(*this,
+                                               cluster_meta_.data_handle(),
+                                               d_sorted_pairs.data_handle(),
+                                               batch_size,
+                                               queries,
+                                               d_G_k1xSumq.data_handle(),
+                                               d_G_kbxSumq.data_handle(),
+                                               nprobe,
+                                               k,
+                                               d_final_dists,
+                                               d_final_pids);
 }
 
 void IVFGPU::BatchClusterSearchQuantizeQuery(
   raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
   size_t k,
   size_t nprobe,
-  void* searcher,
+  SearcherGPU& searcher,
   size_t batch_size,
   raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
   raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids,
   int query_bits)
 {
-  SearcherGPU* searcher_batch = (SearcherGPU*)searcher;
   auto d_sorted_pairs =
-    raft::make_device_vector<ClusterQueryPair, int64_t>(searcher_batch->get_handle(), 0);
-  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher_batch->get_handle(), 0);
-  PrepareClusterSearchInputs(
-    queries, nprobe, searcher_batch, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
-  searcher_batch->SearchClusterQueryPairsQuantizeQuery(*this,
-                                                       cluster_meta_.data_handle(),
-                                                       d_sorted_pairs.data_handle(),
-                                                       batch_size,
-                                                       queries,
-                                                       d_G_k1xSumq.data_handle(),
-                                                       d_G_kbxSumq.data_handle(),
-                                                       nprobe,
-                                                       k,
-                                                       d_final_dists,
-                                                       d_final_pids,
-                                                       query_bits == 4);
+    raft::make_device_vector<ClusterQueryPair, int64_t>(searcher.get_handle(), 0);
+  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(searcher.get_handle(), 0);
+  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(searcher.get_handle(), 0);
+  PrepareClusterSearchInputs(queries, nprobe, searcher, d_sorted_pairs, d_G_k1xSumq, d_G_kbxSumq);
+  searcher.SearchClusterQueryPairsQuantizeQuery(*this,
+                                                cluster_meta_.data_handle(),
+                                                d_sorted_pairs.data_handle(),
+                                                batch_size,
+                                                queries,
+                                                d_G_k1xSumq.data_handle(),
+                                                d_G_kbxSumq.data_handle(),
+                                                nprobe,
+                                                k,
+                                                d_final_dists,
+                                                d_final_pids,
+                                                query_bits == 4);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

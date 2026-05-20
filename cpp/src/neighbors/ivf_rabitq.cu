@@ -240,17 +240,17 @@ void search(raft::resources const& handle,
 
   if (params.mode == search_mode::LUT32) {
     idx.rabitq_index().BatchClusterSearch(
-      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view());
+      queries_view, k, params.n_probes, searcher, NQ, distances, final_ids.view());
   } else if (params.mode == search_mode::LUT16) {
     // test v3 lut using fp16
     idx.rabitq_index().BatchClusterSearchLUT16(
-      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view());
+      queries_view, k, params.n_probes, searcher, NQ, distances, final_ids.view());
   } else if (params.mode == search_mode::QUANT8) {
     idx.rabitq_index().BatchClusterSearchQuantizeQuery(
-      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view(), 8);
+      queries_view, k, params.n_probes, searcher, NQ, distances, final_ids.view(), 8);
   } else if (params.mode == search_mode::QUANT4) {
     idx.rabitq_index().BatchClusterSearchQuantizeQuery(
-      queries_view, k, params.n_probes, &searcher, NQ, distances, final_ids.view(), 4);
+      queries_view, k, params.n_probes, searcher, NQ, distances, final_ids.view(), 4);
   }
 
   // cast data in final_ids to array of IdxT in neighbors

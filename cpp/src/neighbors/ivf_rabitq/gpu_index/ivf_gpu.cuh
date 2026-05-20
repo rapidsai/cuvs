@@ -263,7 +263,7 @@ class IVFGPU {
     raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
     size_t k,
     size_t nprobe,
-    void* searcher,
+    SearcherGPU& searcher,
     size_t batch_size,
     raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
     raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids);
@@ -272,7 +272,7 @@ class IVFGPU {
     raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
     size_t k,
     size_t nprobe,
-    void* searcher,
+    SearcherGPU& searcher,
     size_t batch_size,
     raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
     raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids);
@@ -281,7 +281,7 @@ class IVFGPU {
     raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
     size_t k,
     size_t nprobe,
-    void* searcher,
+    SearcherGPU& searcher,
     size_t batch_size,
     raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
     raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids,
@@ -291,7 +291,7 @@ class IVFGPU {
   void PrepareClusterSearchInputs(
     raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
     size_t nprobe,
-    SearcherGPU* searcher_batch,
+    SearcherGPU& searcher,
     raft::device_vector<ClusterQueryPair, int64_t>& d_sorted_pairs,
     raft::device_vector<float, int64_t>& d_G_k1xSumq,
     raft::device_vector<float, int64_t>& d_G_kbxSumq);
