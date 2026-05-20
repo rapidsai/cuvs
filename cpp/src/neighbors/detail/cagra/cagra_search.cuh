@@ -253,22 +253,22 @@ void search_main(raft::resources const& res,
 /** @} */  // end group cagra
 
 /**
- * @brief Search all segments concurrently for a single query using one kernel launch.
+ * @brief Search all partitions concurrently for a single query using one kernel launch.
  *
- * Each segment's CTA runs independently (blockIdx.z = segment_id, blockIdx.y = query_id).
- * All segments must use float32 data with the same search parameters.
+ * Each partition's CTA runs independently (blockIdx.z = partition_id, blockIdx.y = query_id).
+ * All partitions must use float32 data with the same search parameters.
  *
- * @param indices    per-segment indices (strided datasets only for now)
- * @param queries    per-segment query views — same vector repeated for each segment
- * @param neighbors  per-segment output neighbor views — each [num_queries, topk]
- * @param distances  per-segment output distance views — each [num_queries, topk]
+ * @param indices    per-partition indices (strided datasets only for now)
+ * @param queries    per-partition query views — same vector repeated for each partition
+ * @param neighbors  per-partition output neighbor views — each [num_queries, topk]
+ * @param distances  per-partition output distance views — each [num_queries, topk]
  */
 template <typename T,
           typename OutputIdxT         = uint32_t,
           typename IdxT               = uint32_t,
           typename DistanceT          = float,
           typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   search_params params,
   const std::vector<const index<T, IdxT>*>& indices,
@@ -280,22 +280,22 @@ void search_multi_segment(
   static_assert(std::is_same_v<IdxT, uint32_t>, "Only uint32_t graph index type is supported");
   static_assert(std::is_same_v<DistanceT, float>, "Only float distances are supported");
 
-  const uint32_t num_segments = static_cast<uint32_t>(indices.size());
-  RAFT_EXPECTS(num_segments > 0, "At least one segment is required");
-  RAFT_EXPECTS(queries.size() == num_segments && neighbors.size() == num_segments &&
-                 distances.size() == num_segments,
+  const uint32_t num_partitions = static_cast<uint32_t>(indices.size());
+  RAFT_EXPECTS(num_partitions > 0, "At least one partition is required");
+  RAFT_EXPECTS(queries.size() == num_partitions && neighbors.size() == num_partitions &&
+                 distances.size() == num_partitions,
                "All input vectors must have the same size");
 
   const int64_t dim        = queries[0].extent(1);
   const uint32_t topk      = static_cast<uint32_t>(neighbors[0].extent(1));
   const uint32_t n_queries = static_cast<uint32_t>(queries[0].extent(0));
 
-  // Find the max graph_degree across all segments (needed for the shared kernel plan).
+  // Find the max graph_degree across all partitions (needed for the shared kernel plan).
   int64_t max_graph_degree = 0;
   int64_t max_dataset_size = 0;
-  for (uint32_t i = 0; i < num_segments; i++) {
+  for (uint32_t i = 0; i < num_partitions; i++) {
     RAFT_EXPECTS(!indices[i]->dataset_fd().has_value(),
-                 "Disk-based datasets are not supported for multi-segment search");
+                 "Disk-based datasets are not supported for multi-partition search");
     max_graph_degree = std::max(max_graph_degree, indices[i]->graph().extent(1));
     max_dataset_size = std::max(max_dataset_size, indices[i]->data().n_rows());
   }
@@ -306,18 +306,18 @@ void search_multi_segment(
       std::min<size_t>(static_cast<size_t>(n_queries), deviceProp.maxGridSize[1]);
   }
 
-  // Multi-segment uses a regular (non-persistent) single-CTA kernel launch.
+  // Multi-partition uses a regular (non-persistent) single-CTA kernel launch.
   // MULTI_CTA requires a different plan type (multi_cta_search::search) and is not supported here.
   // AUTO could resolve to MULTI_CTA for large itopk_size, so force SINGLE_CTA unconditionally.
   params.persistent = false;
   params.algo       = search_algo::SINGLE_CTA;
 
-  // Build a single search plan sized for the maximum graph_degree across all segments.
-  // For the first segment's descriptor type (strided float): use it to init the plan.
+  // Build a single search plan sized for the maximum graph_degree across all partitions.
+  // For the first partition's descriptor type (strided float): use it to init the plan.
   using graph_idx_type = uint32_t;
   auto* strided_dset0  = dynamic_cast<const strided_dataset<T, int64_t>*>(&indices[0]->data());
   RAFT_EXPECTS(strided_dset0 != nullptr,
-               "Multi-segment search only supports strided (non-compressed) datasets");
+               "Multi-partition search only supports strided (non-compressed) datasets");
 
   RAFT_EXPECTS(indices[0]->metric() != cuvs::distance::DistanceType::CosineExpanded ||
                  indices[0]->dataset_norms().has_value(),
@@ -326,7 +326,7 @@ void search_multi_segment(
   if (indices[0]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
     dataset_norms_ptr0 = indices[0]->dataset_norms().value().data_handle();
   }
-  // Use the first segment's descriptor to construct the plan (smem layout is type-dependent only).
+  // Use the first partition's descriptor to construct the plan (smem layout is type-dependent only).
   auto plan_desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
     res, params, *strided_dset0, indices[0]->metric(), dataset_norms_ptr0);
 
@@ -334,76 +334,76 @@ void search_multi_segment(
     search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, OutputIdxT>
       plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
-  // Multi-segment produces the global top-k by merging itopk_size candidates from each segment.
+  // Multi-partition produces the global top-k by merging itopk_size candidates from each partition.
   // Require the combined pool to be at least topk; otherwise the merge is forced to fill the
-  // output with sentinels from segments that couldn't supply enough refined candidates. This is
+  // output with sentinels from partitions that couldn't supply enough refined candidates. This is
   // a necessary condition to avoid garbage in the output — not a sufficient one for good recall,
-  // which still depends on per-segment itopk_size relative to the true top-k's distribution
-  // across segments. Compared against the post-adjustment plan.itopk_size to mirror how
-  // single-segment validates topk in plan->check().
-  RAFT_EXPECTS(static_cast<uint64_t>(plan.itopk_size) * num_segments >= topk,
-               "itopk_size (%lu) * num_segments (%u) must be >= topk (%u).",
+  // which still depends on per-partition itopk_size relative to the true top-k's distribution
+  // across partitions. Compared against the post-adjustment plan.itopk_size to mirror how
+  // single-partition validates topk in plan->check().
+  RAFT_EXPECTS(static_cast<uint64_t>(plan.itopk_size) * num_partitions >= topk,
+               "itopk_size (%lu) * num_partitions (%u) must be >= topk (%u).",
                plan.itopk_size,
-               num_segments,
+               num_partitions,
                topk);
 
-  // Build per-segment descriptors and result pointers on the host.
+  // Build per-partition descriptors and result pointers on the host.
   // The device copy is allocated below.
-  using seg_desc_t = single_cta_search::multi_segment_desc_t<T, graph_idx_type, DistanceT>;
-  std::vector<seg_desc_t> host_seg_descs(num_segments);
+  using part_desc_t = single_cta_search::multi_partition_desc_t<T, graph_idx_type, DistanceT>;
+  std::vector<part_desc_t> host_part_descs(num_partitions);
 
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  // Collect per-segment dataset descriptors (may trigger lazy device init on `stream`).
-  std::vector<dataset_descriptor_host<T, graph_idx_type, DistanceT>> seg_dataset_descs;
-  seg_dataset_descs.reserve(num_segments);
+  // Collect per-partition dataset descriptors (may trigger lazy device init on `stream`).
+  std::vector<dataset_descriptor_host<T, graph_idx_type, DistanceT>> part_dataset_descs;
+  part_dataset_descs.reserve(num_partitions);
 
-  for (uint32_t i = 0; i < num_segments; i++) {
+  for (uint32_t i = 0; i < num_partitions; i++) {
     auto* strided_dset = dynamic_cast<const strided_dataset<T, int64_t>*>(&indices[i]->data());
     RAFT_EXPECTS(strided_dset != nullptr,
-                 "All segments must have strided (non-compressed) datasets");
+                 "All partitions must have strided (non-compressed) datasets");
     const float* norms_ptr = nullptr;
     if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
       RAFT_EXPECTS(indices[i]->dataset_norms().has_value(),
-                   "Dataset norms required for CosineExpanded metric (segment %u)",
+                   "Dataset norms required for CosineExpanded metric (partition %u)",
                    i);
       norms_ptr = indices[i]->dataset_norms().value().data_handle();
     }
-    seg_dataset_descs.push_back(dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+    part_dataset_descs.push_back(dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *strided_dset, indices[i]->metric(), norms_ptr));
 
     // Call dev_ptr to trigger lazy device-side descriptor upload (enqueued on stream).
-    host_seg_descs[i].dataset_desc = seg_dataset_descs.back().dev_ptr(stream);
-    host_seg_descs[i].graph        = indices[i]->graph().data_handle();
-    host_seg_descs[i].graph_degree = static_cast<uint32_t>(indices[i]->graph().extent(1));
-    host_seg_descs[i].queries_ptr  = queries[i].data_handle();
+    host_part_descs[i].dataset_desc = part_dataset_descs.back().dev_ptr(stream);
+    host_part_descs[i].graph        = indices[i]->graph().data_handle();
+    host_part_descs[i].graph_degree = static_cast<uint32_t>(indices[i]->graph().extent(1));
+    host_part_descs[i].queries_ptr  = queries[i].data_handle();
 
     // Tag the result_indices_ptr with the OutputIdxT size (same convention as select_and_run).
     constexpr uintptr_t kTag = raft::Pow2<sizeof(OutputIdxT)>::Log2;
-    host_seg_descs[i].result_indices_ptr =
+    host_part_descs[i].result_indices_ptr =
       reinterpret_cast<uintptr_t>(neighbors[i].data_handle()) | kTag;
-    host_seg_descs[i].result_distances_ptr = distances[i].data_handle();
+    host_part_descs[i].result_distances_ptr = distances[i].data_handle();
   }
 
-  // Upload segment descriptors via workspace pool (no cudaMallocAsync/cudaFreeAsync after warmup).
-  lightweight_uvector<seg_desc_t> dev_seg_descs_buf(res);
-  dev_seg_descs_buf.resize(num_segments, stream);
-  RAFT_CUDA_TRY(cudaMemcpyAsync(dev_seg_descs_buf.data(),
-                                host_seg_descs.data(),
-                                num_segments * sizeof(seg_desc_t),
+  // Upload partition descriptors via workspace pool (no cudaMallocAsync/cudaFreeAsync after warmup).
+  lightweight_uvector<part_desc_t> dev_part_descs_buf(res);
+  dev_part_descs_buf.resize(num_partitions, stream);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(dev_part_descs_buf.data(),
+                                host_part_descs.data(),
+                                num_partitions * sizeof(part_desc_t),
                                 cudaMemcpyHostToDevice,
                                 stream));
 
-  // Launch all-segment kernel; stream ordering ensures descriptor upload and per-segment
+  // Launch all-partition kernel; stream ordering ensures descriptor upload and per-partition
   // dataset_desc device-init complete before the search kernel executes.
-  plan.run_multi_segment(
-    res, dev_seg_descs_buf.data(), num_segments, n_queries, topk, sample_filter);
-  // dev_seg_descs_buf destructor returns memory to workspace pool (stream-ordered).
+  plan.run_multi_partition(
+    res, dev_part_descs_buf.data(), num_partitions, n_queries, topk, sample_filter);
+  // dev_part_descs_buf destructor returns memory to workspace pool (stream-ordered).
 
-  // Post-process distances (scale + metric transform) for each segment.
+  // Post-process distances (scale + metric transform) for each partition.
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
-  for (uint32_t i = 0; i < num_segments; i++) {
+  for (uint32_t i = 0; i < num_partitions; i++) {
     float* dist_out          = distances[i].data_handle();
     const DistanceT* dist_in = distances[i].data_handle();
     if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {

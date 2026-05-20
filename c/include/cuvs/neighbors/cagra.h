@@ -713,36 +713,36 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsFilter filter);
 
 /**
- * @brief Search multiple CAGRA index segments concurrently using a single GPU kernel launch.
+ * @brief Search multiple CAGRA index partitions concurrently using a single GPU kernel launch.
  *
- * Launches a single kernel with grid (1, num_queries, num_segments) so each CTA handles one
- * (query, segment) pair concurrently. All results land in the caller-supplied device buffers
+ * Launches a single kernel with grid (1, num_queries, num_partitions) so each CTA handles one
+ * (query, partition) pair concurrently. All results land in the caller-supplied device buffers
  * on the same CUDA stream, so downstream operations (e.g. selectK) see them via stream ordering
  * with no explicit synchronization needed.
  *
- * Only float32 datasets are currently supported.  Distance values are comparable across segments
+ * Only float32 datasets are currently supported.  Distance values are comparable across partitions
  * (same scale) but are not postprocessed (no kScale correction) — they are suitable for
  * relative comparison (selectK / recall).
  *
- * @param[in]  res          cuvsResources_t opaque C handle
- * @param[in]  params       search parameters
- * @param[in]  num_segments number of index segments
- * @param[in]  indices      array of num_segments cuvsCagraIndex_t pointers
- * @param[in]  queries      array of num_segments DLManagedTensor* (device, float32, [nq, dim])
- * @param[out] neighbors    array of num_segments DLManagedTensor* (device, uint32, [nq, topk])
- * @param[out] distances    array of num_segments DLManagedTensor* (device, float32, [nq, topk])
- * @param[in]  filter       filter to apply during search; use {.type=NO_FILTER, .addr=0} for
- *                          unfiltered search, or {.type=MULTI_SEGMENT_BITSET, .addr=ptr} where
- *                          ptr is a uintptr_t-cast cuvsMultiSegmentBitsetFilter*
+ * @param[in]  res            cuvsResources_t opaque C handle
+ * @param[in]  params         search parameters
+ * @param[in]  num_partitions number of index partitions
+ * @param[in]  indices        array of num_partitions cuvsCagraIndex_t pointers
+ * @param[in]  queries        array of num_partitions DLManagedTensor* (device, float32, [nq, dim])
+ * @param[out] neighbors      array of num_partitions DLManagedTensor* (device, uint32, [nq, topk])
+ * @param[out] distances      array of num_partitions DLManagedTensor* (device, float32, [nq, topk])
+ * @param[in]  filter         filter to apply during search; use {.type=NO_FILTER, .addr=0} for
+ *                            unfiltered search, or {.type=MULTI_PARTITION_BITSET, .addr=ptr} where
+ *                            ptr is a uintptr_t-cast cuvsMultiPartitionBitsetFilter*
  */
-cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
-                                        cuvsCagraSearchParams_t params,
-                                        uint32_t num_segments,
-                                        cuvsCagraIndex_t* indices,
-                                        DLManagedTensor** queries,
-                                        DLManagedTensor** neighbors,
-                                        DLManagedTensor** distances,
-                                        cuvsFilter filter);
+cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
+                                          cuvsCagraSearchParams_t params,
+                                          uint32_t num_partitions,
+                                          cuvsCagraIndex_t* indices,
+                                          DLManagedTensor** queries,
+                                          DLManagedTensor** neighbors,
+                                          DLManagedTensor** distances,
+                                          cuvsFilter filter);
 
 /**
  * @}

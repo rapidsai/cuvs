@@ -1166,22 +1166,22 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
 }
 
 /**
- * @brief Multi-segment CAGRA search kernel.
+ * @brief Multi-partition CAGRA search kernel.
  *
- * Grid: (1, num_queries, num_segments).
- * Each CTA handles one (query, segment) pair independently.
+ * Grid: (1, num_queries, num_partitions).
+ * Each CTA handles one (query, partition) pair independently.
  * The global hashmap (if used) must be laid out as
- *   [num_segments][num_queries][hashmap::get_size(hash_bitlen)].
+ *   [num_partitions][num_queries][hashmap::get_size(hash_bitlen)].
  */
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           class DATASET_DESCRIPTOR_T,
           class SourceIndexT,
           class SAMPLE_FILTER_T>
-RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_ms(
-  const multi_segment_desc_t<typename DATASET_DESCRIPTOR_T::DATA_T,
-                              typename DATASET_DESCRIPTOR_T::INDEX_T,
-                              typename DATASET_DESCRIPTOR_T::DISTANCE_T>* segments,
+RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_mp(
+  const multi_partition_desc_t<typename DATASET_DESCRIPTOR_T::DATA_T,
+                                typename DATASET_DESCRIPTOR_T::INDEX_T,
+                                typename DATASET_DESCRIPTOR_T::DISTANCE_T>* partitions,
   const std::uint32_t top_k,
   const SourceIndexT* source_indices_ptr,
   const unsigned num_distilation,
@@ -1203,35 +1203,35 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_ms(
   using INDEX_T = typename DATASET_DESCRIPTOR_T::INDEX_T;
 
   const uint32_t query_id = blockIdx.y;
-  const uint32_t seg_id   = blockIdx.z;
-  const auto& seg         = segments[seg_id];
+  const uint32_t part_id  = blockIdx.z;
+  const auto& part        = partitions[part_id];
 
-  // Offset the global hashmap to the base of this segment's block.
+  // Offset the global hashmap to the base of this partition's block.
   // search_core will then add blockIdx.y * hash_size for the per-query offset, giving the correct
-  // layout: visited_hashmap_ptr[(seg_id * gridDim.y + query_id) * hash_size].
-  INDEX_T* seg_hashmap_ptr =
+  // layout: visited_hashmap_ptr[(part_id * gridDim.y + query_id) * hash_size].
+  INDEX_T* part_hashmap_ptr =
     (visited_hashmap_ptr != nullptr)
       ? visited_hashmap_ptr +
-          seg_id * static_cast<size_t>(gridDim.y) * hashmap::get_size(hash_bitlen)
+          part_id * static_cast<size_t>(gridDim.y) * hashmap::get_size(hash_bitlen)
       : nullptr;
 
   search_core<TOPK_BY_BITONIC_SORT,
               BITONIC_SORT_AND_MERGE_MULTI_WARPS,
               DATASET_DESCRIPTOR_T,
               SourceIndexT,
-              SAMPLE_FILTER_T>(seg.result_indices_ptr,
-                               seg.result_distances_ptr,
+              SAMPLE_FILTER_T>(part.result_indices_ptr,
+                               part.result_distances_ptr,
                                top_k,
-                               seg.dataset_desc,
-                               seg.queries_ptr,
-                               seg.graph,
-                               seg.graph_degree,
+                               part.dataset_desc,
+                               part.queries_ptr,
+                               part.graph,
+                               part.graph_degree,
                                source_indices_ptr,
                                num_distilation,
                                rand_xor_mask,
-                               nullptr,  // seed_ptr: not used in multi-segment
+                               nullptr,  // seed_ptr: not used in multi-partition
                                0,        // num_seeds
-                               seg_hashmap_ptr,
+                               part_hashmap_ptr,
                                max_candidates,
                                max_itopk,
                                internal_topk,
@@ -1251,9 +1251,9 @@ template <bool TOPK_BY_BITONIC_SORT,
           class DATASET_DESCRIPTOR_T,
           class SourceIndexT,
           class SAMPLE_FILTER_T>
-auto dispatch_kernel_ms = []() {
+auto dispatch_kernel_mp = []() {
   static_assert(TOPK_BY_BITONIC_SORT || !BITONIC_SORT_AND_MERGE_MULTI_WARPS);
-  return search_kernel_ms<TOPK_BY_BITONIC_SORT,
+  return search_kernel_mp<TOPK_BY_BITONIC_SORT,
                           BITONIC_SORT_AND_MERGE_MULTI_WARPS,
                           DATASET_DESCRIPTOR_T,
                           SourceIndexT,
@@ -1287,8 +1287,8 @@ inline TopkVariant select_topk_variant(unsigned itopk_size,
 }
 
 template <typename DATASET_DESCRIPTOR_T, typename SourceIndexT, typename SAMPLE_FILTER_T>
-struct search_kernel_config_ms {
-  using kernel_t = decltype(dispatch_kernel_ms<false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
+struct search_kernel_config_mp {
+  using kernel_t = decltype(dispatch_kernel_mp<false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
 
   static auto choose_itopk_and_mx_candidates(unsigned itopk_size,
                                              unsigned num_itopk_candidates,
@@ -1296,11 +1296,11 @@ struct search_kernel_config_ms {
   {
     switch (select_topk_variant(itopk_size, num_itopk_candidates, block_size)) {
       case TopkVariant::BITONIC:
-        return dispatch_kernel_ms<true, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+        return dispatch_kernel_mp<true, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
       case TopkVariant::BITONIC_MERGE_MULTI:
-        return dispatch_kernel_ms<true, true, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+        return dispatch_kernel_mp<true, true, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
       default:
-        return dispatch_kernel_ms<false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+        return dispatch_kernel_mp<false, false, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     }
   }
 };
@@ -2366,8 +2366,8 @@ auto get_runner(Args... args) -> std::shared_ptr<RunnerT>
  * @brief Computes the max_candidates and max_itopk constants passed to the search kernel.
  *
  * Both values are rounded up to the next power-of-two bucket supported by the kernel template
- * instantiations. They are the same for single-segment and multi-segment launches, so this helper
- * is shared by select_and_run and select_and_run_multi_segment.
+ * instantiations. They are the same for single-partition and multi-partition launches, so this
+ * helper is shared by select_and_run and select_and_run_multi_partition.
  */
 struct kernel_dispatch_params {
   uint32_t max_candidates;
@@ -2505,34 +2505,34 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
 }
 
 /**
- * @brief Launch the multi-segment CAGRA search kernel.
+ * @brief Launch the multi-partition CAGRA search kernel.
  *
- * Searches all N segments concurrently in a single kernel launch.  Each CTA (indexed by
- * blockIdx.y = query_id, blockIdx.z = seg_id) independently searches one segment for one query.
+ * Searches all N partitions concurrently in a single kernel launch.  Each CTA (indexed by
+ * blockIdx.y = query_id, blockIdx.z = part_id) independently searches one partition for one query.
  *
- * @param segment_descs  device pointer to array of num_segments descriptors
- * @param num_segments   number of segments (= gridDim.z)
- * @param num_queries    number of queries (= gridDim.y)
- * @param ps             search parameters (shared across all segments)
- * @param topk           number of neighbors to return per segment
+ * @param partition_descs device pointer to array of num_partitions descriptors
+ * @param num_partitions  number of partitions (= gridDim.z)
+ * @param num_queries     number of queries (= gridDim.y)
+ * @param ps              search parameters (shared across all partitions)
+ * @param topk            number of neighbors to return per partition
  * @param num_itopk_candidates  search_width * max_graph_degree
- * @param block_size     thread-block size
- * @param smem_size      shared memory per CTA (computed for max graph_degree)
- * @param hash_bitlen    global hashmap bit-length
- * @param hashmap_ptr    device buffer sized [num_segments * num_queries * get_size(hash_bitlen)]
+ * @param block_size      thread-block size
+ * @param smem_size       shared memory per CTA (computed for max graph_degree)
+ * @param hash_bitlen     global hashmap bit-length
+ * @param hashmap_ptr     device buffer sized [num_partitions * num_queries * get_size(hash_bitlen)]
  * @param small_hash_bitlen    small-hash bit-length (0 = disabled)
  * @param small_hash_reset_interval  reset interval for small hash
- * @param sample_filter  sample filter
- * @param stream         CUDA stream
+ * @param sample_filter   sample filter
+ * @param stream          CUDA stream
  */
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT,
           typename SampleFilterT>
-void select_and_run_multi_segment(
-  const multi_segment_desc_t<DataT, IndexT, DistanceT>* segment_descs,
-  uint32_t num_segments,
+void select_and_run_multi_partition(
+  const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
+  uint32_t num_partitions,
   uint32_t num_queries,
   const search_params& ps,
   uint32_t topk,
@@ -2551,18 +2551,18 @@ void select_and_run_multi_segment(
   auto [max_candidates, max_itopk] = kernel_dispatch_params::compute(ps, num_itopk_candidates);
 
   auto kernel =
-    search_kernel_config_ms<descriptor_base_type, SourceIndexT, SampleFilterT>::
+    search_kernel_config_mp<descriptor_base_type, SourceIndexT, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
 
   dim3 thread_dims(block_size, 1, 1);
-  dim3 block_dims(1, num_queries, num_segments);
-  RAFT_LOG_DEBUG("Launching ms kernel: %u threads, %u queries, %u segments, %u smem",
+  dim3 block_dims(1, num_queries, num_partitions);
+  RAFT_LOG_DEBUG("Launching mp kernel: %u threads, %u queries, %u partitions, %u smem",
                  block_size,
                  num_queries,
-                 num_segments,
+                 num_partitions,
                  smem_size);
   auto const& kernel_launcher = [&](auto const& kernel) -> void {
-    kernel<<<block_dims, thread_dims, smem_size, stream>>>(segment_descs,
+    kernel<<<block_dims, thread_dims, smem_size, stream>>>(partition_descs,
                                                            topk,
                                                            nullptr,  // source_indices_ptr
                                                            ps.num_random_samplings,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -17,7 +17,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 
 /**
- * Holds a precomputed multi-segment filter bitset and manages its device-memory lifecycle.
+ * Holds a precomputed multi-partition filter bitset and manages its device-memory lifecycle.
  *
  * <h3>Two-level caching</h3>
  * <ul>
@@ -36,19 +36,19 @@ public final class FilterBitsetHandle implements AutoCloseable {
   /** Device-side allocation pair, shared across all threads. */
   static final class DeviceData {
     final CloseableRMMAllocation combinedBitsetDP;
-    final CloseableRMMAllocation segOffsetsDP;
+    final CloseableRMMAllocation partOffsetsDP;
     final long totalBits;
-    final int numSegments;
+    final int numPartitions;
 
     DeviceData(
         CloseableRMMAllocation combinedBitsetDP,
-        CloseableRMMAllocation segOffsetsDP,
+        CloseableRMMAllocation partOffsetsDP,
         long totalBits,
-        int numSegments) {
+        int numPartitions) {
       this.combinedBitsetDP = combinedBitsetDP;
-      this.segOffsetsDP = segOffsetsDP;
+      this.partOffsetsDP = partOffsetsDP;
       this.totalBits = totalBits;
-      this.numSegments = numSegments;
+      this.numPartitions = numPartitions;
     }
 
     void close() {
@@ -57,7 +57,7 @@ public final class FilterBitsetHandle implements AutoCloseable {
       } catch (Exception ignored) {
       }
       try {
-        segOffsetsDP.close();
+        partOffsetsDP.close();
       } catch (Exception ignored) {
       }
     }
@@ -65,9 +65,9 @@ public final class FilterBitsetHandle implements AutoCloseable {
 
   // Host-side immutable data.
   final long[] combinedLongs;
-  final long[] segBitOffsets;
+  final long[] partBitOffsets;
   final long totalBits;
-  final int numSegments;
+  final int numPartitions;
 
   // Shared device allocation — uploaded once, visible to all threads via volatile.
   private volatile DeviceData sharedDeviceData;
@@ -78,15 +78,15 @@ public final class FilterBitsetHandle implements AutoCloseable {
   /**
    * Creates a handle from pre-packed host arrays.
    *
-   * @param combinedLongs  packed bitset words for all segments concatenated (64-bit aligned)
-   * @param segBitOffsets  per-segment bit offsets into {@code combinedLongs}
+   * @param combinedLongs  packed bitset words for all partitions concatenated (64-bit aligned)
+   * @param partBitOffsets  per-partition bit offsets into {@code combinedLongs}
    * @param totalBits      total number of logical bits in {@code combinedLongs}
    */
-  public FilterBitsetHandle(long[] combinedLongs, long[] segBitOffsets, long totalBits) {
+  public FilterBitsetHandle(long[] combinedLongs, long[] partBitOffsets, long totalBits) {
     this.combinedLongs = combinedLongs;
-    this.segBitOffsets = segBitOffsets;
+    this.partBitOffsets = partBitOffsets;
     this.totalBits = totalBits;
-    this.numSegments = segBitOffsets.length;
+    this.numPartitions = partBitOffsets.length;
   }
 
   /**
@@ -113,10 +113,10 @@ public final class FilterBitsetHandle implements AutoCloseable {
 
   private DeviceData upload(long cuvsRes) {
     long combinedBitsetBytes = (long) combinedLongs.length * Long.BYTES;
-    long segOffsetsBytes = (long) segBitOffsets.length * Long.BYTES;
+    long partOffsetsBytes = (long) partBitOffsets.length * Long.BYTES;
 
     CloseableRMMAllocation combinedBitsetDP = allocateRMMSegment(cuvsRes, combinedBitsetBytes);
-    CloseableRMMAllocation segOffsetsDP = allocateRMMSegment(cuvsRes, segOffsetsBytes);
+    CloseableRMMAllocation partOffsetsDP = allocateRMMSegment(cuvsRes, partOffsetsBytes);
 
     var stream = getStream(cuvsRes);
     // Host arenas must outlive the stream sync that confirms the H2D copies.
@@ -127,15 +127,16 @@ public final class FilterBitsetHandle implements AutoCloseable {
       cudaMemcpyAsync(
           combinedBitsetDP.handle(), hostBitset, combinedBitsetBytes, HOST_TO_DEVICE, stream);
 
-      MemorySegment hostOffsets = arena.allocate(segOffsetsBytes, Long.BYTES);
+      MemorySegment hostOffsets = arena.allocate(partOffsetsBytes, Long.BYTES);
       MemorySegment.copy(
-          segBitOffsets, 0, hostOffsets, ValueLayout.JAVA_LONG, 0, segBitOffsets.length);
-      cudaMemcpyAsync(segOffsetsDP.handle(), hostOffsets, segOffsetsBytes, HOST_TO_DEVICE, stream);
+          partBitOffsets, 0, hostOffsets, ValueLayout.JAVA_LONG, 0, partBitOffsets.length);
+      cudaMemcpyAsync(
+          partOffsetsDP.handle(), hostOffsets, partOffsetsBytes, HOST_TO_DEVICE, stream);
 
       checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync in FilterBitsetHandle.upload");
     }
     // Stream sync has returned — device memory is fully populated.
-    return new DeviceData(combinedBitsetDP, segOffsetsDP, totalBits, numSegments);
+    return new DeviceData(combinedBitsetDP, partOffsetsDP, totalBits, numPartitions);
   }
 
   /** Marks this handle closed and releases the shared device allocation. */

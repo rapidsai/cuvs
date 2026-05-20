@@ -1725,23 +1725,23 @@ void search(raft::resources const& res,
               cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
- * @brief Search multiple CAGRA index segments concurrently in a single kernel launch.
+ * @brief Search multiple CAGRA index partitions concurrently in a single kernel launch.
  *
- * Launches a single SINGLE_CTA kernel grid that covers all segments, with one CTA per segment.
- * All per-segment results are written into the caller-supplied device buffers on the stream
- * associated with @p res; the call returns when all segments have been submitted to the stream
+ * Launches a single SINGLE_CTA kernel grid that covers all partitions, with one CTA per partition.
+ * All per-partition results are written into the caller-supplied device buffers on the stream
+ * associated with @p res; the call returns when all partitions have been submitted to the stream
  * (not necessarily completed).  Use @c cuvsStreamSync to wait for completion.
  *
- * Distance values are comparable across segments but are not postprocessed (no kScale correction).
+ * Distance values are comparable across partitions but are not postprocessed (no kScale correction).
  *
  * @param[in]  res        raft resources
  * @param[in]  params     search parameters
- * @param[in]  indices    one index per segment
- * @param[in]  queries    per-segment query matrix [n_queries, dim]
- * @param[out] neighbors  per-segment result neighbors [n_queries, topk]
- * @param[out] distances  per-segment result distances [n_queries, topk]
+ * @param[in]  indices    one index per partition
+ * @param[in]  queries    per-partition query matrix [n_queries, dim]
+ * @param[out] neighbors  per-partition result neighbors [n_queries, topk]
+ * @param[out] distances  per-partition result distances [n_queries, topk]
  */
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
@@ -1751,7 +1751,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
@@ -1761,7 +1761,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
@@ -1771,7 +1771,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
@@ -1781,7 +1781,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
@@ -1791,7 +1791,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
@@ -1801,7 +1801,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
@@ -1811,7 +1811,7 @@ void search_multi_segment(
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
-void search_multi_segment(
+void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,

@@ -11,15 +11,15 @@
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 /**
- * @brief Per-segment descriptor for the multi-segment CAGRA search kernel.
+ * @brief Per-partition descriptor for the multi-partition CAGRA search kernel.
  *
- * One instance per Lucene segment; the kernel reads this array from device memory using
- * blockIdx.z as the segment index.
+ * One instance per index partition; the kernel reads this array from device memory using
+ * blockIdx.z as the partition index.
  */
 template <typename DataT, typename IndexT, typename DistanceT>
-struct alignas(16) multi_segment_desc_t {
+struct alignas(16) multi_partition_desc_t {
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc;
-  const DataT* queries_ptr;         // [num_queries, dim] for this segment
+  const DataT* queries_ptr;         // [num_queries, dim] for this partition
   const IndexT* graph;              // [dataset_size, graph_degree]
   uint32_t graph_degree;
   uint32_t _pad;
@@ -60,9 +60,9 @@ template <typename DataT,
           typename DistanceT,
           typename SourceIndexT,
           typename SampleFilterT>
-void select_and_run_multi_segment(
-  const multi_segment_desc_t<DataT, IndexT, DistanceT>* segment_descs,
-  uint32_t num_segments,
+void select_and_run_multi_partition(
+  const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
+  uint32_t num_partitions,
   uint32_t num_queries,
   const search_params& ps,
   uint32_t topk,

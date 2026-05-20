@@ -493,7 +493,7 @@ namespace filtering {
  * @{
  */
 
-enum class FilterType { None, Bitmap, Bitset, MultiSegmentBitset };
+enum class FilterType { None, Bitmap, Bitset, MultiPartitionBitset };
 
 struct base_filter {
   ~base_filter()                             = default;
@@ -614,26 +614,26 @@ struct bitset_filter : public base_filter {
 };
 
 /**
- * @brief Filter for multi-segment CAGRA search backed by a single concatenated bitset.
+ * @brief Filter for multi-partition CAGRA search backed by a single concatenated bitset.
  *
- * All per-segment bitsets are packed into one contiguous device buffer. The offset
- * for segment i (in bits) is segment_offsets_[i]. Inside a multi-segment kernel,
- * blockIdx.z carries the segment index, so each thread block automatically selects
+ * All per-partition bitsets are packed into one contiguous device buffer. The offset
+ * for partition i (in bits) is partition_offsets_[i]. Inside a multi-partition kernel,
+ * blockIdx.z carries the partition index, so each thread block automatically selects
  * the correct portion of the bitset.
  *
  * @tparam bitset_t  Word type of the bitset (e.g. uint32_t)
  * @tparam index_t   Index type (e.g. int64_t)
  */
 template <typename bitset_t, typename index_t>
-struct multi_segment_bitset_filter : public base_filter {
+struct multi_partition_bitset_filter : public base_filter {
   using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
 
   const view_t combined_bitset_;
-  const index_t* segment_offsets_;  // device pointer to [num_segments] bit offsets
+  const index_t* partition_offsets_;  // device pointer to [num_partitions] bit offsets
 
-  _RAFT_HOST_DEVICE multi_segment_bitset_filter(const view_t combined_bitset,
-                                                const index_t* segment_offsets)
-    : combined_bitset_(combined_bitset), segment_offsets_(segment_offsets)
+  _RAFT_HOST_DEVICE multi_partition_bitset_filter(const view_t combined_bitset,
+                                                  const index_t* partition_offsets)
+    : combined_bitset_(combined_bitset), partition_offsets_(partition_offsets)
   {
   }
 
@@ -642,14 +642,14 @@ struct multi_segment_bitset_filter : public base_filter {
                                                               const uint32_t sample_ix) const
   {
 #ifdef __CUDA_ARCH__
-    return combined_bitset_.test(segment_offsets_[blockIdx.z] + static_cast<index_t>(sample_ix));
+    return combined_bitset_.test(partition_offsets_[blockIdx.z] + static_cast<index_t>(sample_ix));
 #else
     return true;  // unreachable on host; blockIdx.z is device-only
 #endif
   }
   /** \endcond */
 
-  FilterType get_filter_type() const override { return FilterType::MultiSegmentBitset; }
+  FilterType get_filter_type() const override { return FilterType::MultiPartitionBitset; }
 };
 
 /** @} */  // end group neighbors_filtering

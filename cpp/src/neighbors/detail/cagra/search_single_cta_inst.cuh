@@ -34,10 +34,10 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
     SampleFilterT sample_filter,                                                   \
     cudaStream_t stream);
 
-#define instantiate_kernel_selection_ms(DataT, IndexT, DistanceT, SampleFilterT)               \
-  template void select_and_run_multi_segment<DataT, IndexT, DistanceT, IndexT, SampleFilterT>( \
-    const multi_segment_desc_t<DataT, IndexT, DistanceT>* segment_descs,                       \
-    uint32_t num_segments,                                                                     \
+#define instantiate_kernel_selection_mp(DataT, IndexT, DistanceT, SampleFilterT)                 \
+  template void select_and_run_multi_partition<DataT, IndexT, DistanceT, IndexT, SampleFilterT>( \
+    const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,                     \
+    uint32_t num_partitions,                                                                     \
     uint32_t num_queries,                                                                      \
     const search_params& ps,                                                                   \
     uint32_t topk,                                                                             \

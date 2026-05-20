@@ -5,30 +5,30 @@
 package com.nvidia.cuvs;
 
 /**
- * Holds the decoded results of a multi-segment GPU search.
+ * Holds the decoded results of a multi-partition GPU search.
  *
  * <p>Each entry {@code i} in [0, {@link #count}) identifies:
  * <ul>
- *   <li>which input segment the result came from ({@link #getSegmentIndex(int)})</li>
- *   <li>the local vector ordinal within that segment ({@link #getOrdinal(int)})</li>
+ *   <li>which input partition the result came from ({@link #getPartitionIndex(int)})</li>
+ *   <li>the local vector ordinal within that partition ({@link #getOrdinal(int)})</li>
  *   <li>the raw CAGRA distance ({@link #getDistance(int)})</li>
  * </ul>
  *
- * <p>The caller is responsible for mapping ordinals to Lucene doc IDs using the
- * segment-specific {@code ordToDoc} function and adding {@code docBase}.
+ * <p>The caller is responsible for mapping ordinals to its own global identifiers.
  *
  * @since 25.10
  */
-public class MultiSegmentSearchResults {
+public class MultiPartitionSearchResults {
 
   private final int count;
-  private final int[] segmentIndices;
+  private final int[] partitionIndices;
   private final int[] ordinals;
   private final float[] distances;
 
-  MultiSegmentSearchResults(int count, int[] segmentIndices, int[] ordinals, float[] distances) {
+  MultiPartitionSearchResults(
+      int count, int[] partitionIndices, int[] ordinals, float[] distances) {
     this.count = count;
-    this.segmentIndices = segmentIndices;
+    this.partitionIndices = partitionIndices;
     this.ordinals = ordinals;
     this.distances = distances;
   }
@@ -38,12 +38,12 @@ public class MultiSegmentSearchResults {
     return count;
   }
 
-  /** Index into the original segment list for result {@code i}. */
-  public int getSegmentIndex(int i) {
-    return segmentIndices[i];
+  /** Index into the original partition list for result {@code i}. */
+  public int getPartitionIndex(int i) {
+    return partitionIndices[i];
   }
 
-  /** Local vector ordinal within the segment for result {@code i}. */
+  /** Local vector ordinal within the partition for result {@code i}. */
   public int getOrdinal(int i) {
     return ordinals[i];
   }

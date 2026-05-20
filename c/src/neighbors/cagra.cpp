@@ -689,17 +689,17 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
-                                                   cuvsCagraSearchParams_t params,
-                                                   uint32_t num_segments,
-                                                   cuvsCagraIndex_t* indices,
-                                                   DLManagedTensor** queries,
-                                                   DLManagedTensor** neighbors,
-                                                   DLManagedTensor** distances,
-                                                   cuvsFilter filter)
+extern "C" cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
+                                                     cuvsCagraSearchParams_t params,
+                                                     uint32_t num_partitions,
+                                                     cuvsCagraIndex_t* indices,
+                                                     DLManagedTensor** queries,
+                                                     DLManagedTensor** neighbors,
+                                                     DLManagedTensor** distances,
+                                                     cuvsFilter filter)
 {
   return cuvs::core::translate_exceptions([=] {
-    RAFT_EXPECTS(num_segments > 0, "num_segments must be > 0");
+    RAFT_EXPECTS(num_partitions > 0, "num_partitions must be > 0");
     RAFT_EXPECTS(indices != nullptr && queries != nullptr && neighbors != nullptr &&
                    distances != nullptr,
                  "All pointer arrays must be non-null");
@@ -708,10 +708,10 @@ extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
     auto search_params = cuvs::neighbors::cagra::search_params();
     convert_c_search_params(*params, &search_params);
 
-    // Only float32 is supported for multi-segment search.
+    // Only float32 is supported for multi-partition search.
     RAFT_EXPECTS(
       indices[0]->dtype.code == kDLFloat && indices[0]->dtype.bits == 32,
-      "Multi-segment search only supports float32 indices");
+      "Multi-partition search only supports float32 indices");
 
     using T         = float;
     using IdxT      = uint32_t;
@@ -719,12 +719,12 @@ extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
     using DistanceT = float;
     using IndexT    = cuvs::neighbors::cagra::index<T, IdxT>;
 
-    std::vector<const IndexT*> idx_vec(num_segments);
-    std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>> q_vec(num_segments);
-    std::vector<raft::device_matrix_view<OutIdxT, int64_t, raft::row_major>> n_vec(num_segments);
-    std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>> d_vec(num_segments);
+    std::vector<const IndexT*> idx_vec(num_partitions);
+    std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>> q_vec(num_partitions);
+    std::vector<raft::device_matrix_view<OutIdxT, int64_t, raft::row_major>> n_vec(num_partitions);
+    std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>> d_vec(num_partitions);
 
-    for (uint32_t i = 0; i < num_segments; i++) {
+    for (uint32_t i = 0; i < num_partitions; i++) {
       RAFT_EXPECTS(indices[i] != nullptr && indices[i]->addr != 0,
                    "Index at position %u is null or not built", i);
       idx_vec[i] = reinterpret_cast<const IndexT*>(indices[i]->addr);
@@ -734,26 +734,26 @@ extern "C" cuvsError_t cuvsCagraSearchMultiSegment(cuvsResources_t res,
     }
 
     if (filter.type == NO_FILTER) {
-      cuvs::neighbors::cagra::search_multi_segment(
+      cuvs::neighbors::cagra::search_multi_partition(
         *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec);
-    } else if (filter.type == MULTI_SEGMENT_BITSET) {
-      auto* f = reinterpret_cast<cuvsMultiSegmentBitsetFilter*>(filter.addr);
-      RAFT_EXPECTS(f != nullptr, "MULTI_SEGMENT_BITSET filter addr must be non-null");
+    } else if (filter.type == MULTI_PARTITION_BITSET) {
+      auto* f = reinterpret_cast<cuvsMultiPartitionBitsetFilter*>(filter.addr);
+      RAFT_EXPECTS(f != nullptr, "MULTI_PARTITION_BITSET filter addr must be non-null");
 
       using bitset_mdspan_t  = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
       using offsets_mdspan_t = raft::device_vector_view<int64_t, int64_t, raft::row_major>;
       auto bitset_mds  = cuvs::core::from_dlpack<bitset_mdspan_t>(f->combined_bitset);
-      auto offsets_mds = cuvs::core::from_dlpack<offsets_mdspan_t>(f->segment_offsets);
+      auto offsets_mds = cuvs::core::from_dlpack<offsets_mdspan_t>(f->partition_offsets);
 
       cuvs::core::bitset_view<std::uint32_t, int64_t> combined_bitset_view(
         bitset_mds, f->total_bitset_bits);
-      cuvs::neighbors::filtering::multi_segment_bitset_filter<uint32_t, int64_t> ms_filter(
+      cuvs::neighbors::filtering::multi_partition_bitset_filter<uint32_t, int64_t> mp_filter(
         combined_bitset_view, offsets_mds.data_handle());
 
-      cuvs::neighbors::cagra::search_multi_segment(
-        *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec, ms_filter);
+      cuvs::neighbors::cagra::search_multi_partition(
+        *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec, mp_filter);
     } else {
-      RAFT_FAIL("Unsupported filter type for multi-segment search: %d", (int)filter.type);
+      RAFT_FAIL("Unsupported filter type for multi-partition search: %d", (int)filter.type);
     }
   });
 }
