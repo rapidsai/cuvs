@@ -342,6 +342,8 @@ class IVFGPU {
                         const float* cur_centroid,
                         float* rotated_c) const;
 
+  void compute_centroid_norms();
+
   void AllocateHostMemory();
 
   raft::resources const& handle_;  // reusable resource handle
@@ -360,6 +362,8 @@ class IVFGPU {
   raft::device_vector<GPUClusterMeta, int64_t> cluster_meta_ =
     raft::make_device_vector<GPUClusterMeta, int64_t>(handle_,
                                                       0);  // Device-side array of clusters.
+  raft::device_vector<float, int64_t> centroid_norms_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);
 
   // batch-data (SoA layout - factors stored separately)
   raft::device_vector<float, int64_t> short_factors_batch_ =

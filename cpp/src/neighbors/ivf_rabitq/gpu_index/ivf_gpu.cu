@@ -153,6 +153,7 @@ void IVFGPU::load_transposed(const char* filename)
   AllocateDeviceMemory();
   // Load initializer data (e.g., centroids) from file.
   this->initializer->LoadCentroids(input, filename);
+  compute_centroid_norms();
   // Read raw arrays from file into device memory.
   auto read_into_device = [&](void* d_ptr, size_t n_bytes) {
     std::vector<std::uint8_t> h_buf(n_bytes);  // host staging buffer
@@ -258,6 +259,15 @@ void IVFGPU::load_transposed(const char* filename)
   init_clusters(cluster_sizes);
 
   input.close();
+}
+
+void IVFGPU::compute_centroid_norms()
+{
+  centroid_norms_     = raft::make_device_vector<float, int64_t>(handle_, num_centroids);
+  auto centroids_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+    initializer->GetCentroid(0), num_centroids, num_padded_dim);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    handle_, centroids_view, centroid_norms_.view());
 }
 
 void IVFGPU::init_clusters(const std::vector<size_t>& cluster_sizes)
@@ -1096,17 +1106,12 @@ void IVFGPU::PrepareClusterSearchInputs(
     searcher_batch->get_centroid_distances(),
     num_centroids);
 
-  // Step 2: q and c norms (squared L2, no sqrt - default fin_op on L2Norm returns sum of squares)
-  auto centroids_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    initializer->GetCentroid(0), num_centroids, num_padded_dim);
+  // Step 2: query norms (squared L2, no sqrt - default fin_op on L2Norm returns sum of squares).
+  // Centroid norms are precomputed once in compute_centroid_norms() and cached in centroid_norms_.
   raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
     searcher_handle,
     queries,
     raft::make_device_vector_view<float, int64_t>(searcher_batch->get_q_norms(), batch_size));
-  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-    searcher_handle,
-    centroids_view,
-    raft::make_device_vector_view<float, int64_t>(searcher_batch->get_c_norms(), num_centroids));
 
   // Step 3: add all norms together
   int add_threads = 256;
@@ -1114,7 +1119,7 @@ void IVFGPU::PrepareClusterSearchInputs(
   add_norms_kernel<<<add_blocks, add_threads, 0, searcher_stream>>>(
     searcher_batch->get_centroid_distances(),
     searcher_batch->get_q_norms(),
-    searcher_batch->get_c_norms(),
+    centroid_norms_.data_handle(),
     batch_size,
     num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());

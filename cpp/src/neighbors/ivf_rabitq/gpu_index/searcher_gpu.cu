@@ -60,7 +60,6 @@ void SearcherGPU::AllocateSearcherSpace(size_t num_centroids, size_t num_queries
 {
   centroid_distances_ =
     raft::make_device_vector<float, int64_t>(handle_, num_queries * num_centroids);
-  c_norms_ = raft::make_device_vector<float, int64_t>(handle_, num_centroids);
   q_norms_ = raft::make_device_vector<float, int64_t>(handle_, num_queries);
   raft::resource::sync_stream(handle_);
 };
