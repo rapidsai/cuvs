@@ -10,7 +10,9 @@
 
 #include <@header_file@>
 #include <distance/detail/kernels/rbf_fin_op.cuh>
+#define CUVS_DISTANCE_PAIRWISE_USE_JIT
 #include <distance/detail/pairwise_distance_base.cuh>
+#undef CUVS_DISTANCE_PAIRWISE_USE_JIT
 #include <distance/detail/pairwise_matrix/params.cuh>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/contractions.cuh>
