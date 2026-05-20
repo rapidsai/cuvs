@@ -12,6 +12,7 @@ which offloads Faiss HNSW graph construction to a GPU-accelerated external servi
 https://docs.opensearch.org/latest/vector-search/remote-index-build/
 """
 
+import json
 import os
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -129,7 +130,7 @@ class OpenSearchConfigLoader(ConfigLoader):
             "password",
             "use_ssl",
             "verify_certs",
-            "bulk_batch_size",
+            "build_batch_size",
             # Remote Index Build (OpenSearch 3.0+, faiss engine only)
             "remote_index_build",
             "remote_build_size_min",
@@ -274,7 +275,8 @@ class OpenSearchBackend(BenchmarkBackend):
         - ``password`` – HTTP basic auth password (default: ``"admin"``)
         - ``use_ssl`` – use HTTPS (default: ``False``)
         - ``verify_certs`` – verify SSL certs (default: ``False``)
-        - ``bulk_batch_size`` – vectors per bulk request (default: ``500``)
+        - ``build_batch_size`` – vectors per bulk request. If omitted, choose
+          a batch size with roughly 1 MiB of raw vector data.
         - ``requires_network`` – trigger network pre-flight check (default: ``True``)
         - ``remote_index_build`` – set ``index.knn.remote_index_build.enabled=true``
           on the index at creation time, opting it into the GPU build path (default: ``False``).
@@ -430,41 +432,62 @@ class OpenSearchBackend(BenchmarkBackend):
         self,
         index_name: str,
         vectors: np.ndarray,
-        bulk_batch_size: int,
+        build_batch_size: Optional[int] = None,
     ) -> None:
         """
-        Bulk-index vectors into index_name using the helpers API.
+        Bulk-index vectors into index_name using the bulk API.
 
         Vectors are stored under the ``"vector"`` field with their integer
         row index as the document ``_id`` so they can be mapped back to
         dataset and ground-truth neighbor IDs.
         """
-        from opensearchpy.helpers import streaming_bulk
-
-        def _doc_generator():
-            for i, vec in enumerate(vectors):
-                yield {
-                    "_index": index_name,
-                    "_id": str(i),
-                    "vector": vec.tolist(),
-                }
+        if build_batch_size is None:
+            vector_size_bytes = vectors[0].nbytes
+            build_batch_size = max(1, (1024 * 1024) // vector_size_bytes)
 
         total = vectors.shape[0]
         indexed = 0
-        for ok, info in streaming_bulk(
-            self._client,
-            _doc_generator(),
-            chunk_size=bulk_batch_size,
-            request_timeout=120,
-        ):
-            if not ok:
-                raise RuntimeError(f"Failed to index document: {info}")
-            indexed += 1
-            milestone = max(total // 10, 1)
-            if indexed % milestone == 0:
-                print(
-                    f"  Indexed {indexed} / {total} vectors ({100 * indexed // total}%)"
+        progress_step = max(total / 10.0, 1.0)
+        next_progress = progress_step
+
+        for batch_start in range(0, total, build_batch_size):
+            batch_end = min(batch_start + build_batch_size, total)
+            body_lines = []
+
+            for doc_id, vec in enumerate(
+                vectors[batch_start:batch_end],
+                start=batch_start,
+            ):
+                body_lines.append(json.dumps({"index": {"_id": str(doc_id)}}))
+                body_lines.append(json.dumps({"vector": vec.tolist()}))
+
+            response = self._client.bulk(
+                index=index_name,
+                body="\n".join(body_lines) + "\n",
+                request_timeout=120,
+                headers={"Content-Type": "application/x-ndjson"},
+            )
+            if response.get("errors"):
+                failures = [
+                    item["index"]
+                    for item in response.get("items", [])
+                    if item.get("index", {}).get("error")
+                ]
+                first_failure = failures[0] if failures else response
+                raise RuntimeError(
+                    "Failed to bulk-index "
+                    f"{len(failures)} document(s): {first_failure}"
                 )
+
+            indexed += batch_end - batch_start
+            if indexed >= next_progress or indexed == total:
+                print(
+                    f"  Indexed {indexed} / {total} vectors "
+                    f"(~{100 * indexed // total}%)"
+                )
+                while next_progress <= indexed:
+                    next_progress += progress_step
+
         print(f"  Indexed all {total} vectors")
 
     def _get_knn_remote_build_stats(self) -> dict:
@@ -676,7 +699,7 @@ class OpenSearchBackend(BenchmarkBackend):
         build_param = index_cfg.build_param
         index_name = self._resolve_index_name(index_cfg)
         engine = self.config.get("engine", "lucene")
-        bulk_batch_size = int(self.config.get("bulk_batch_size", 500))
+        build_batch_size = self.config.get("build_batch_size")
         remote_index_build = bool(self.config.get("remote_index_build", False))
         remote_build_size_min = self.config.get("remote_build_size_min")
 
@@ -743,7 +766,7 @@ class OpenSearchBackend(BenchmarkBackend):
 
         # Bulk index, then flush segments before timing build completion.
         t0 = time.perf_counter()
-        self._bulk_index(index_name, base_vectors, bulk_batch_size)
+        self._bulk_index(index_name, base_vectors, build_batch_size)
         self._flush_index(index_name)
         if remote_index_build:
             self._wait_for_remote_build(
@@ -811,7 +834,8 @@ class OpenSearchBackend(BenchmarkBackend):
         k : int
             Number of neighbors to retrieve per query.
         batch_size : int
-            Unused; included for interface compatibility.
+            Number of query vectors to include in each OpenSearch multi-search
+            request.
         mode : str
             ``"latency"`` or ``"throughput"``; informational for this backend.
         force : bool
@@ -841,7 +865,9 @@ class OpenSearchBackend(BenchmarkBackend):
 
         if dry_run:
             print(
-                f"[dry_run] Would search OpenSearch index '{index_name}' with {len(search_params_list)} param set(s) (k={k})"
+                f"[dry_run] Would search OpenSearch index '{index_name}' "
+                f"with {len(search_params_list)} param set(s) "
+                f"(k={k}, batch_size={batch_size})"
             )
 
             return SearchResult(
@@ -867,6 +893,7 @@ class OpenSearchBackend(BenchmarkBackend):
             )
 
         n_queries = query_vectors.shape[0]
+        n_batches = (n_queries + batch_size - 1) // batch_size
 
         # Run search for each search-parameter combination
         per_param_results: List[Dict[str, Any]] = []
@@ -886,23 +913,46 @@ class OpenSearchBackend(BenchmarkBackend):
             distances = np.zeros((n_queries, k), dtype=np.float32)
 
             t0 = time.perf_counter()
-            for i, q_vec in enumerate(query_vectors):
-                body: Dict[str, Any] = {
-                    "size": k,
-                    "query": {
-                        "knn": {
-                            "vector": {
-                                "vector": q_vec.tolist(),
-                                "k": k,
-                            }
+            for batch_start in range(0, n_queries, batch_size):
+                batch_end = min(batch_start + batch_size, n_queries)
+                body: List[Dict[str, Any]] = []
+                for q_vec in query_vectors[batch_start:batch_end]:
+                    body.append({})
+                    body.append(
+                        {
+                            "size": k,
+                            "query": {
+                                "knn": {
+                                    "vector": {
+                                        "vector": q_vec.tolist(),
+                                        "k": k,
+                                    }
+                                }
+                            },
                         }
-                    },
-                }
-                resp = self._client.search(index=index_name, body=body)
-                hits = resp["hits"]["hits"]
-                for j, hit in enumerate(hits[:k]):
-                    neighbors[i, j] = int(hit["_id"])
-                    distances[i, j] = float(hit["_score"])
+                    )
+
+                resp = self._client.msearch(index=index_name, body=body)
+                responses = resp.get("responses", [])
+                if len(responses) != batch_end - batch_start:
+                    raise RuntimeError(
+                        "OpenSearch multi-search returned "
+                        f"{len(responses)} responses for "
+                        f"{batch_end - batch_start} queries"
+                    )
+
+                for batch_offset, search_resp in enumerate(responses):
+                    if "error" in search_resp:
+                        raise RuntimeError(
+                            "OpenSearch multi-search query failed: "
+                            f"{search_resp['error']}"
+                        )
+
+                    query_index = batch_start + batch_offset
+                    hits = search_resp["hits"]["hits"]
+                    for j, hit in enumerate(hits[:k]):
+                        neighbors[query_index, j] = int(hit["_id"])
+                        distances[query_index, j] = float(hit["_score"])
 
             elapsed = time.perf_counter() - t0
             qps = n_queries / elapsed if elapsed > 0 else 0.0
@@ -912,6 +962,8 @@ class OpenSearchBackend(BenchmarkBackend):
                     "search_params": sp,
                     "search_time_ms": elapsed * 1000.0,
                     "queries_per_second": qps,
+                    "batch_size": batch_size,
+                    "num_batches": n_batches,
                 }
             )
             last_neighbors = neighbors
@@ -935,6 +987,8 @@ class OpenSearchBackend(BenchmarkBackend):
             search_params=search_params_list,
             metadata={
                 "engine": engine,
+                "batch_size": batch_size,
+                "num_batches": n_batches,
                 "per_search_param_results": per_param_results,
             },
             success=True,
