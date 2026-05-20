@@ -32,6 +32,7 @@ REMOTE_BUILD_SIZE_MIN = os.environ.get("REMOTE_BUILD_SIZE_MIN", "").strip()
 REMOTE_BUILD_TIMEOUT = int(os.environ.get("REMOTE_BUILD_TIMEOUT", "1800"))
 
 S3_BUCKET  = os.environ.get("S3_BUCKET", "").strip()
+S3_PREFIX  = os.environ.get("S3_PREFIX", "knn-indexes").strip() or "knn-indexes"
 S3_REGION  = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
 
 DATASET      = os.environ.get("DATASET",       "sift-128-euclidean")
@@ -44,7 +45,8 @@ BUILD_BATCH_SIZE = os.environ.get("BUILD_BATCH_SIZE", "").strip()
 BUILD_BATCH_SIZE = int(BUILD_BATCH_SIZE) if BUILD_BATCH_SIZE else None
 
 ALGORITHM = "opensearch_faiss_hnsw"
-REPO_NAME = "vector-repo"
+REPO_NAME = os.environ.get("REMOTE_VECTOR_REPOSITORY", "vector-repo").strip()
+REPO_NAME = REPO_NAME or "vector-repo"
 
 session = requests.Session()
 session.headers.update({"Content-Type": "application/json"})
@@ -88,7 +90,7 @@ def register_repository() -> None:
             "type": "s3",
             "settings": {
                 "bucket":    S3_BUCKET,
-                "base_path": "knn-indexes",
+                "base_path": S3_PREFIX,
                 "region":    S3_REGION,
             },
         },
@@ -269,7 +271,8 @@ def main() -> None:
     print(f"  Remote index build : {REMOTE_INDEX_BUILD}")
     if REMOTE_INDEX_BUILD:
         print(f"  GPU builder        : {BUILDER_URL}")
-        print(f"  S3 bucket          : s3://{S3_BUCKET}/knn-indexes/  (region: {S3_REGION})")
+        print(f"  S3 bucket          : s3://{S3_BUCKET}/{S3_PREFIX}/  (region: {S3_REGION})")
+        print(f"  Repository         : {REPO_NAME}")
         print(f"  Build size minimum : {REMOTE_BUILD_SIZE_MIN or 'OpenSearch default'}")
         print(f"  Build timeout      : {REMOTE_BUILD_TIMEOUT}s")
     print(f"  Dataset            : {DATASET}  (path: {DATASET_PATH})")
@@ -312,7 +315,6 @@ def main() -> None:
         build_kwargs["remote_build_timeout"] = REMOTE_BUILD_TIMEOUT
         if REMOTE_BUILD_SIZE_MIN:
             build_kwargs["remote_build_size_min"] = REMOTE_BUILD_SIZE_MIN
-
 
     # ── Build phase ───────────────────────────────────────────────────────────
     mode = "GPU remote build" if REMOTE_INDEX_BUILD else "CPU"

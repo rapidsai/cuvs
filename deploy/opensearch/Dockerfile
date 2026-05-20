@@ -7,6 +7,7 @@ RUN /usr/share/opensearch/bin/opensearch-plugin install --batch repository-s3
 
 # entrypoint.sh populates the keystore from AWS credential environment
 # variables when provided, then execs opensearch.
+COPY opensearch.yml /usr/share/opensearch/config/opensearch.yml
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

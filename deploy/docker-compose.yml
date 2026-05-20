@@ -30,6 +30,8 @@
 #   REMOTE_INDEX_BUILD      Override GPU/CPU mode detection (true/false); normally auto-detected
 #   REMOTE_BUILD_SIZE_MIN   Optional minimum segment size override for remote builds
 #   REMOTE_BUILD_TIMEOUT    Remote build wait timeout in seconds (default: 1800)
+#   REMOTE_VECTOR_REPOSITORY Optional snapshot repository name (default: vector-repo)
+#   S3_PREFIX               Optional S3 prefix for staged vectors/indexes (default: knn-indexes)
 #   DATASET                 Dataset name (default: sift-128-euclidean)
 #   BENCH_GROUPS            Parameter sweep group: test | base (default: test)
 #   K                       Number of neighbors to search for (default: 10)
@@ -118,7 +120,9 @@ services:
       REMOTE_INDEX_BUILD: ${REMOTE_INDEX_BUILD:-}
       REMOTE_BUILD_SIZE_MIN: ${REMOTE_BUILD_SIZE_MIN:-}
       REMOTE_BUILD_TIMEOUT: ${REMOTE_BUILD_TIMEOUT:-1800}
+      REMOTE_VECTOR_REPOSITORY: ${REMOTE_VECTOR_REPOSITORY:-vector-repo}
       S3_BUCKET: ${S3_BUCKET:-}
+      S3_PREFIX: ${S3_PREFIX:-knn-indexes}
       DATASET: ${DATASET:-sift-128-euclidean}
       DATASET_PATH: /data/datasets
       BENCH_GROUPS: ${BENCH_GROUPS:-test}

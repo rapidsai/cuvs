@@ -7,11 +7,12 @@ K="${K:-10}"
 ALGORITHM="opensearch_faiss_hnsw"
 
 wait_for_builder() {
-    echo "remote-index-builder detected — waiting for it to be ready..."
-    until python3 -c 'import socket; socket.create_connection(("remote-index-builder", 1025), 2).close()' 2>/dev/null; do
+    builder_url="${BUILDER_URL:-http://remote-index-builder:1025}"
+    echo "Remote index build enabled — waiting for builder at ${builder_url}..."
+    until BUILDER_URL="${builder_url}" python3 -c 'import os, socket; from urllib.parse import urlparse; url = urlparse(os.environ["BUILDER_URL"]); socket.create_connection((url.hostname, url.port or 1025), 2).close()' 2>/dev/null; do
         sleep 5
     done
-    echo "remote-index-builder is ready."
+    echo "Remote index builder is ready."
 }
 
 if [ -n "${REMOTE_INDEX_BUILD:-}" ]; then
