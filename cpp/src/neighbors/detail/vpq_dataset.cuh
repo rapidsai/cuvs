@@ -583,10 +583,10 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
                                                      GetXFunc get_x_func)
 {
   uint32_t k = 0;
-  // If pq_len is a power of 2, we can use vectorized loads and stores
-  // Otherwise, we fall back to scalar loads and stores to avoid misaligned accesses
-  bool pq_len_is_pow2 = raft::is_pow2(pq_len);
-  if (pq_len_is_pow2) {
+  // Only use vectorized loads if pq_len is a multiple of 2 or 4 (prevents misaligned accesses)
+  const bool pq_len_div_4 = (pq_len & 3u) == 0u;
+  const bool pq_len_div_2 = (pq_len & 1u) == 0u;
+  if (pq_len_div_4) {
     for (; k + 3 < pq_len; k += 4) {
       vec_op<MathT, 4> x_vec, c0, c1, c2, c3;
       x_vec.val.data[0] = get_x_func(k);
@@ -606,6 +606,8 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
       d2 += c2.sum_squares();
       d3 += c3.sum_squares();
     }
+  }
+  if (pq_len_div_2) {
     for (; k + 1 < pq_len; k += 2) {
       vec_op<MathT, 2> x_vec, c0, c1, c2, c3;
       x_vec.val.data[0] = get_x_func(k);
