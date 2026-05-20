@@ -10,6 +10,7 @@
 #include "rotator_gpu.cuh"
 
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/detail/qr.cuh>
@@ -34,11 +35,11 @@ size_t RotatorGPU::size() const { return D; }
 
 void RotatorGPU::load(raft::resources const& handle, std::ifstream& input)
 {
-  auto stream   = raft::resource::get_cuda_stream(handle);
-  auto host_buf = raft::make_host_vector<float, int64_t>(D * D);
-  for (size_t i = 0; i < D * D; ++i) {
-    input.read(reinterpret_cast<char*>(&host_buf(i)), sizeof(float));
-  }
+  auto stream            = raft::resource::get_cuda_stream(handle);
+  auto host_buf          = raft::make_host_vector<float, int64_t>(D * D);
+  const auto matrix_size = static_cast<std::streamsize>(sizeof(float) * D * D);
+  input.read(reinterpret_cast<char*>(host_buf.data_handle()), matrix_size);
+  RAFT_EXPECTS(input.gcount() == matrix_size, "unexpected EOF reading rotator matrix");
   raft::copy(rotation_matrix_.data_handle(), host_buf.data_handle(), D * D, stream);
   raft::resource::sync_stream(handle);
 }
@@ -49,9 +50,9 @@ void RotatorGPU::save(raft::resources const& handle, std::ofstream& output) cons
   auto host_buf = raft::make_host_vector<float, int64_t>(D * D);
   raft::copy(host_buf.data_handle(), rotation_matrix_.data_handle(), D * D, stream);
   raft::resource::sync_stream(handle);
-  for (size_t i = 0; i < D * D; ++i) {
-    output.write(reinterpret_cast<char*>(&host_buf(i)), sizeof(float));
-  }
+  output.write(reinterpret_cast<char*>(host_buf.data_handle()),
+               static_cast<std::streamsize>(sizeof(float) * D * D));
+  RAFT_EXPECTS(static_cast<bool>(output), "failed to write rotator matrix");
 }
 
 // Rotate the matrix A and store the result in RAND_A on the GPU.
