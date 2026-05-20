@@ -78,7 +78,7 @@ int main()
   raft::device_resources dev_resources;
 
   // Set pool memory resource with 1 GiB initial pool size. All allocations use the same pool.
-  rmm::mr::pool_memory_resource pool_mr(rmm::mr::get_current_device_resource_ref(),
+  rmm::mr::pool_memory_resource pool_mr(rmm::mr::get_current_device_resource(),
                                         1024 * 1024 * 1024ull);
   rmm::mr::set_current_device_resource(pool_mr);
 

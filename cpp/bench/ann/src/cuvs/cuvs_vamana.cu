@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,7 @@
 
 #include <rmm/cuda_device.hpp>
 #include <rmm/mr/pool_memory_resource.hpp>
-#include <rmm/resource_ref.hpp>
+#include <rmm/resource.hpp>
 
 namespace cuvs::bench {
 

@@ -25,7 +25,7 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
-#include <rmm/resource_ref.hpp>
+#include <rmm/resource.hpp>
 
 #include <atomic>
 #include <cassert>
@@ -190,12 +190,12 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
 
-  inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
+  inline rmm::device_async_resource get_mr(AllocatorType mem_type)
   {
     switch (mem_type) {
       case (AllocatorType::kHostPinned): return mr_pinned_;
       case (AllocatorType::kHostHugePage): return mr_huge_page_;
-      default: return rmm::mr::get_current_device_resource_ref();
+      default: return rmm::mr::get_current_device_resource();
     }
   }
 };

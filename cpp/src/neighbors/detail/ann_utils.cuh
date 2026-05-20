@@ -21,7 +21,7 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/resource_ref.hpp>
+#include <rmm/resource.hpp>
 
 #include <cuda_fp16.hpp>
 
@@ -593,7 +593,7 @@ struct batch_load_iterator {
           MdspanT input_view,
           size_type batch_size,
           rmm::cuda_stream_view copy_stream,
-          rmm::device_async_resource_ref mr,
+          rmm::device_async_resource mr,
           bool prefetch,
           bool initialize,
           bool host_writeback)
@@ -853,7 +853,7 @@ struct batch_load_iterator {
                       MdspanT input_view,
                       size_type batch_size,
                       rmm::cuda_stream_view copy_stream,
-                      rmm::device_async_resource_ref mr,
+                      rmm::device_async_resource mr,
                       bool prefetch       = false,
                       bool initialize     = true,
                       bool host_writeback = false)
@@ -864,7 +864,7 @@ struct batch_load_iterator {
   {
   }
 
-  /** Convenience overload that uses `get_workspace_resource_ref(res)` as the memory resource. */
+  /** Convenience overload that uses `get_workspace_resource(res)` as the memory resource. */
   batch_load_iterator(raft::resources const& res,
                       MdspanT input_view,
                       size_type batch_size,
@@ -876,7 +876,7 @@ struct batch_load_iterator {
                           input_view,
                           batch_size,
                           copy_stream,
-                          raft::resource::get_workspace_resource_ref(res),
+                          raft::resource::get_workspace_resource(res),
                           prefetch,
                           initialize,
                           host_writeback)
@@ -1018,7 +1018,7 @@ class batch_load_iterator_dyn {
                           IdxT row_width,
                           size_type batch_size,
                           rmm::cuda_stream_view copy_stream,
-                          rmm::device_async_resource_ref mr,
+                          rmm::device_async_resource mr,
                           bool prefetch       = false,
                           bool initialize     = true,
                           bool host_writeback = false)
@@ -1036,7 +1036,7 @@ class batch_load_iterator_dyn {
   {
   }
 
-  /** Convenience overload that uses `get_workspace_resource_ref(res)` as the memory resource. */
+  /** Convenience overload that uses `get_workspace_resource(res)` as the memory resource. */
   batch_load_iterator_dyn(raft::resources const& res,
                           T* ptr,
                           IdxT n_rows,
@@ -1052,7 +1052,7 @@ class batch_load_iterator_dyn {
                               row_width,
                               batch_size,
                               copy_stream,
-                              raft::resource::get_workspace_resource_ref(res),
+                              raft::resource::get_workspace_resource(res),
                               prefetch,
                               initialize,
                               host_writeback)
@@ -1149,7 +1149,7 @@ class batch_load_iterator_dyn {
                         IdxT row_width,
                         size_type batch_size,
                         rmm::cuda_stream_view copy_stream,
-                        rmm::device_async_resource_ref mr,
+                        rmm::device_async_resource mr,
                         bool prefetch,
                         bool initialize,
                         bool host_writeback) -> std::variant<HostIter, DeviceIter>
@@ -1212,7 +1212,7 @@ auto make_batch_load_iterator(raft::resources const& res,
                               detail::type_identity_t<IdxT> row_width,
                               size_t batch_size,
                               rmm::cuda_stream_view copy_stream,
-                              rmm::device_async_resource_ref mr,
+                              rmm::device_async_resource mr,
                               bool prefetch       = false,
                               bool initialize     = true,
                               bool host_writeback = false) -> batch_load_iterator_dyn<T, IdxT>
@@ -1229,7 +1229,7 @@ auto make_batch_load_iterator(raft::resources const& res,
                                           host_writeback);
 }
 
-/** Convenience overload that uses `get_workspace_resource_ref(res)` as the memory resource. */
+/** Convenience overload that uses `get_workspace_resource(res)` as the memory resource. */
 template <typename T, typename IdxT = int64_t>
 auto make_batch_load_iterator(raft::resources const& res,
                               T const* ptr,
@@ -1247,7 +1247,7 @@ auto make_batch_load_iterator(raft::resources const& res,
                                            row_width,
                                            batch_size,
                                            copy_stream,
-                                           raft::resource::get_workspace_resource_ref(res),
+                                           raft::resource::get_workspace_resource(res),
                                            prefetch,
                                            initialize,
                                            host_writeback);

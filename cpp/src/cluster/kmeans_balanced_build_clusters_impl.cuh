@@ -68,7 +68,7 @@ void build_clusters(const raft::resources& handle,
     labels.data_handle(),
     cluster_sizes.data_handle(),
     mapping_op,
-    raft::resource::get_workspace_resource_ref(handle),
+    raft::resource::get_workspace_resource(handle),
     X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
 }
 

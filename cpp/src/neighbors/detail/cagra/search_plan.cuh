@@ -38,8 +38,8 @@ namespace cuvs::neighbors::cagra::detail {
 template <typename T>
 struct lightweight_uvector {
  private:
-  using raft_res_type = const raft::resources*;
-  using rmm_res_type  = std::tuple<rmm::device_async_resource_ref, rmm::cuda_stream_view>;
+  using raft_res_type            = const raft::resources*;
+  using rmm_res_type             = std::tuple<rmm::device_async_resource, rmm::cuda_stream_view>;
   static constexpr size_t kAlign = 256;
 
   std::variant<raft_res_type, rmm_res_type> res_;
@@ -58,7 +58,7 @@ struct lightweight_uvector {
     if (new_size == size_) { return; }
     if (std::holds_alternative<raft_res_type>(res_)) {
       auto& h = std::get<raft_res_type>(res_);
-      res_    = rmm_res_type{raft::resource::get_workspace_resource_ref(*h),
+      res_    = rmm_res_type{raft::resource::get_workspace_resource(*h),
                           raft::resource::get_cuda_stream(*h)};
     }
     auto& [r, s] = std::get<rmm_res_type>(res_);
@@ -80,7 +80,7 @@ struct lightweight_uvector {
     if (new_size == size_) { return; }
     if (std::holds_alternative<raft_res_type>(res_)) {
       auto& h = std::get<raft_res_type>(res_);
-      res_    = rmm_res_type{raft::resource::get_workspace_resource_ref(*h), stream};
+      res_    = rmm_res_type{raft::resource::get_workspace_resource(*h), stream};
     } else {
       std::get<rmm::cuda_stream_view>(std::get<rmm_res_type>(res_)) = stream;
     }

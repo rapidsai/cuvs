@@ -61,7 +61,7 @@ index 548618262..3be071550 100644
 -            rmm::mr::device_memory_resource* current_mr =
 -                    rmm::mr::get_per_device_resource(
 +            auto current_mr =
-+                    rmm::mr::get_per_device_resource_ref(
++                    rmm::mr::get_per_device_resource(
                              rmm::cuda_device_id{adjReq.device});
 -            p = current_mr->allocate(adjReq.stream, adjReq.size);
 +            p = current_mr.allocate(adjReq.stream, adjReq.size);

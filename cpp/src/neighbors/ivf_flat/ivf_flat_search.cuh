@@ -24,7 +24,7 @@
 #include <raft/linalg/norm.cuh>     // raft::linalg::norm
 #include <raft/matrix/detail/select_warpsort.cuh>
 
-#include <rmm/resource_ref.hpp>
+#include <rmm/resource.hpp>
 
 #include <type_traits>
 
@@ -51,7 +51,7 @@ void search_impl(raft::resources const& handle,
                  bool select_min,
                  IdxT* neighbors,
                  AccT* distances,
-                 rmm::device_async_resource_ref search_mr,
+                 rmm::device_async_resource search_mr,
                  IvfSampleFilterT sample_filter)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -355,22 +355,21 @@ inline void search_with_filtering(raft::resources const& handle,
   for (uint32_t offset_q = 0; offset_q < n_queries; offset_q += max_queries) {
     uint32_t queries_batch = raft::min(max_queries, n_queries - offset_q);
 
-    search_impl<T, float, IdxT, IvfSampleFilterT>(
-      handle,
-      index,
-      effective_metric,
-      params,
-      queries + offset_q * index.dim(),
-      queries_batch,
-      offset_q,
-      k,
-      n_probes,
-      max_samples,
-      cuvs::distance::is_min_close(effective_metric),
-      neighbors + offset_q * k,
-      distances + offset_q * k,
-      raft::resource::get_workspace_resource_ref(handle),
-      sample_filter);
+    search_impl<T, float, IdxT, IvfSampleFilterT>(handle,
+                                                  index,
+                                                  effective_metric,
+                                                  params,
+                                                  queries + offset_q * index.dim(),
+                                                  queries_batch,
+                                                  offset_q,
+                                                  k,
+                                                  n_probes,
+                                                  max_samples,
+                                                  cuvs::distance::is_min_close(effective_metric),
+                                                  neighbors + offset_q * k,
+                                                  distances + offset_q * k,
+                                                  raft::resource::get_workspace_resource(handle),
+                                                  sample_filter);
   }
 }
 

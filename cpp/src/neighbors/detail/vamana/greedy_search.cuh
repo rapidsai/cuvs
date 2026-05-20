@@ -14,7 +14,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/util/warp_primitives.cuh>
-#include <rmm/resource_ref.hpp>
+#include <rmm/resource.hpp>
 
 #include <chrono>
 #include <cstdio>

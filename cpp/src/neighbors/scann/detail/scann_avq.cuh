@@ -57,9 +57,8 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
                              raft::device_vector_view<LabelT, int64_t> cluster_sizes,
                              int64_t& max_cluster_size)
 {
-  cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
-  rmm::device_async_resource_ref device_memory =
-    raft::resource::get_workspace_resource_ref(dev_resources);
+  cudaStream_t stream                      = raft::resource::get_cuda_stream(dev_resources);
+  rmm::device_async_resource device_memory = raft::resource::get_workspace_resource(dev_resources);
 
   // Histrogram to compute cluster sizes
   int num_levels  = cluster_sizes.extent(0) + 1;
@@ -136,9 +135,8 @@ void sum_reduce_vector(raft::resources const& dev_resources,
                        raft::device_vector_view<T, int64_t> v,
                        raft::device_scalar_view<T> s)
 {
-  cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
-  rmm::device_async_resource_ref device_memory =
-    raft::resource::get_workspace_resource_ref(dev_resources);
+  cudaStream_t stream                      = raft::resource::get_cuda_stream(dev_resources);
+  rmm::device_async_resource device_memory = raft::resource::get_workspace_resource(dev_resources);
 
   size_t temp_storage_bytes = 0;
 
@@ -163,10 +161,9 @@ void cholesky_solver(raft::resources const& dev_resources,
                      raft::device_vector_view<T, int64_t> b,
                      raft::device_vector_view<T, int64_t> x)
 {
-  cudaStream_t stream          = raft::resource::get_cuda_stream(dev_resources);
-  cusolverDnHandle_t cusolverH = raft::resource::get_cusolver_dn_handle(dev_resources);
-  rmm::device_async_resource_ref device_memory =
-    raft::resource::get_workspace_resource_ref(dev_resources);
+  cudaStream_t stream                      = raft::resource::get_cuda_stream(dev_resources);
+  cusolverDnHandle_t cusolverH             = raft::resource::get_cusolver_dn_handle(dev_resources);
+  rmm::device_async_resource device_memory = raft::resource::get_workspace_resource(dev_resources);
 
   // RAFT_CUSOLVER_TRY(cusolverDnSetStream(cusolverH, stream));
 
