@@ -506,13 +506,15 @@ void process_and_fill_codes(
     return;
   }
 
-  for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator(
-         dataset.data_handle(),
-         n_rows,
-         dim,
-         max_batch_size,
-         stream,
-         rmm::mr::get_current_device_resource_ref())) {
+  auto _vpq_batches_codes = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<data_t>(
+    res,
+    dataset.data_handle(),
+    static_cast<ix_t>(n_rows),
+    static_cast<ix_t>(dim),
+    static_cast<size_t>(max_batch_size),
+    stream,
+    rmm::mr::get_current_device_resource_ref());
+  for (const auto& batch : _vpq_batches_codes) {
     auto batch_view        = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
     auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(nullptr, 0);
     if (inline_vq_labels) {
@@ -581,10 +583,10 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
                                                      GetXFunc get_x_func)
 {
   uint32_t k = 0;
-  // If pq_len is a power of 2, we can use vectorized loads and stores
-  // Otherwise, we fall back to scalar loads and stores to avoid misaligned accesses
-  bool pq_len_is_pow2 = raft::is_pow2(pq_len);
-  if (pq_len_is_pow2) {
+  // Only use vectorized loads if pq_len is a multiple of 2 or 4 (prevents misaligned accesses)
+  const bool pq_len_div_4 = (pq_len & 3u) == 0u;
+  const bool pq_len_div_2 = (pq_len & 1u) == 0u;
+  if (pq_len_div_4) {
     for (; k + 3 < pq_len; k += 4) {
       vec_op<MathT, 4> x_vec, c0, c1, c2, c3;
       x_vec.val.data[0] = get_x_func(k);
@@ -604,6 +606,8 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
       d2 += c2.sum_squares();
       d3 += c3.sum_squares();
     }
+  }
+  if (pq_len_div_2) {
     for (; k + 1 < pq_len; k += 2) {
       vec_op<MathT, 2> x_vec, c0, c1, c2, c3;
       x_vec.val.data[0] = get_x_func(k);
@@ -899,11 +903,12 @@ void process_and_fill_codes_subspaces(
     enable_prefetch_stream = true;
     copy_stream            = raft::resource::get_stream_from_stream_pool(res);
   }
-  auto vec_batches = cuvs::spatial::knn::detail::utils::batch_load_iterator(
+  auto vec_batches = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<data_t>(
+    res,
     dataset.data_handle(),
-    n_rows,
-    dim,
-    max_batch_size,
+    static_cast<ix_t>(n_rows),
+    static_cast<ix_t>(dim),
+    static_cast<size_t>(max_batch_size),
     copy_stream,
     raft::resource::get_workspace_resource_ref(res),
     enable_prefetch_stream);

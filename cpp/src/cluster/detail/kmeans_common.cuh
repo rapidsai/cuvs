@@ -19,6 +19,7 @@
 #include <raft/core/memory_type.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
@@ -55,6 +56,31 @@
 #include <random>
 
 namespace cuvs::cluster::kmeans::detail {
+
+/**
+ * @brief Returns true if the fused distance NN implementation should be used.
+ *
+ * On Ampere (SM <= 8.x) always use fused.
+ * On Hopper (SM 9.x) use fused when m or n >= 4096.
+ * On Blackwell (SM >= 10.x) use unfused.
+ */
+template <typename MathT, typename IdxT, typename LabelT>
+bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
+{
+  cudaDeviceProp prop;
+  prop = raft::resource::get_device_properties(handle);
+  if (prop.major <= 8) {
+    // Use fused for Ampere or before
+    return true;
+  } else if (prop.major == 9 && (m >= 4096 || n >= 4096)) {
+    // On Hopper if m, n are bigger than 4096, use fused
+    return true;
+  } else if (prop.major >= 10) {
+    // On Blackwell onwards, use unfused
+    return false;
+  }
+  return false;
+}
 
 template <typename DataT, typename IndexT>
 struct SamplingOp {
@@ -596,26 +622,26 @@ void compute_centroid_shift(raft::resources const& handle,
  * @brief Evaluate convergence criteria entirely on device.
  *
  * Checks the cost-ratio and centroid-shift stopping conditions and writes
- * a boolean result (0 or 1) into @p done_flag.  Also advances
- * @p prior_clustering_cost to the current cost for the next iteration.
+ * 0 or 1 into @p done_flag, and advances @p prior_clustering_cost.
+ * @p FlagT is deduced from @p done_flag (default `int`).
  */
-template <typename DataT>
+template <typename DataT, typename FlagT = int>
 __device__ void check_convergence(raft::device_scalar_view<const DataT> clustering_cost,
                                   raft::device_scalar_view<DataT> prior_clustering_cost,
                                   raft::device_scalar_view<const DataT> sqrd_norm_error,
                                   DataT tol,
                                   int n_iter,
-                                  raft::device_scalar_view<int> done_flag)
+                                  raft::device_scalar_view<FlagT> done_flag)
 {
   DataT cur_cost = *clustering_cost.data_handle();
   DataT norm_err = *sqrd_norm_error.data_handle();
-  int done       = 0;
+  FlagT done     = FlagT{0};
 
   if (cur_cost != DataT{0} && n_iter > 1) {
     DataT delta = cur_cost / *prior_clustering_cost.data_handle();
-    if (delta > DataT{1} - tol) done = 1;
+    if (delta > DataT{1} - tol) done = FlagT{1};
   }
-  if (norm_err < tol) done = 1;
+  if (norm_err < tol) done = FlagT{1};
 
   *prior_clustering_cost.data_handle() = cur_cost;
   *done_flag.data_handle()             = done;

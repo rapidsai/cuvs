@@ -105,7 +105,7 @@ endfunction()
 ConfigureTest(
   NAME NEIGHBORS_TEST
   PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu neighbors/sparse_brute_force.cu
-       neighbors/refine.cu
+       neighbors/refine.cu neighbors/distance_nn.cu
   GPUS 1
   PERCENT 100
 )
@@ -182,7 +182,7 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_HELPERS_TEST
-  PATH neighbors/ann_cagra/test_optimize_uint32_t.cu
+  PATH neighbors/ann_cagra/test_optimize_uint32_t.cu neighbors/ann_cagra/test_batch_load_iterator.cu
   GPUS 1
   PERCENT 100
 )
@@ -314,6 +314,14 @@ if(BUILD_MG_ALGOS)
   ConfigureTest(
     NAME NEIGHBORS_MG_TEST
     PATH neighbors/mg/test_float.cu
+    GPUS 1
+    PERCENT 100
+    ADDITIONAL_DEP NCCL::NCCL
+  )
+
+  ConfigureTest(
+    NAME CLUSTER_KMEANS_MG_BATCHED_TEST
+    PATH cluster/kmeans_mg_batched.cu
     GPUS 1
     PERCENT 100
     ADDITIONAL_DEP NCCL::NCCL

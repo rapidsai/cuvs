@@ -4,6 +4,7 @@
  */
 
 #include "../../distance/fused_distance_nn.cuh"
+#include "../../distance/unfused_distance_nn.cuh"
 #include "kmeans_common.cuh"
 
 #include <raft/matrix/init.cuh>
@@ -50,24 +51,50 @@ void minClusterAndDistanceCompute(
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
     raft::matrix::fill(handle, minClusterAndDistance, initial_value);
 
-    workspace.resize((sizeof(int)) * n_samples, stream);
+    bool should_use_fused =
+      use_fused<DataT, IndexT, IndexT>(handle, n_samples, n_clusters, n_features);
 
-    cuvs::distance::fusedDistanceNNMinReduce<DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
-      minClusterAndDistance.data_handle(),
-      X.data_handle(),
-      centroids.data_handle(),
-      L2NormX.data_handle(),
-      centroidsNorm.data_handle(),
-      n_samples,
-      n_clusters,
-      n_features,
-      (void*)workspace.data(),
-      metric != cuvs::distance::DistanceType::L2Expanded,
-      false,
-      true,
-      metric,
-      0.0f,
-      stream);
+    if (should_use_fused) {
+      workspace.resize((sizeof(int)) * n_samples, stream);
+
+      cuvs::distance::fusedDistanceNNMinReduce<DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
+        minClusterAndDistance.data_handle(),
+        X.data_handle(),
+        centroids.data_handle(),
+        L2NormX.data_handle(),
+        centroidsNorm.data_handle(),
+        n_samples,
+        n_clusters,
+        n_features,
+        (void*)workspace.data(),
+        metric != cuvs::distance::DistanceType::L2Expanded,
+        false,
+        true,
+        metric,
+        0.0f,
+        stream);
+    } else {
+      workspace.resize(sizeof(DataT) * n_samples * n_clusters, stream);
+
+      cuvs::distance::
+        unfusedDistanceNNMinReduce<DataT, DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
+          handle,
+          minClusterAndDistance.data_handle(),
+          X.data_handle(),
+          centroids.data_handle(),
+          L2NormX.data_handle(),
+          centroidsNorm.data_handle(),
+          n_samples,
+          n_clusters,
+          n_features,
+          (void*)workspace.data(),
+          metric != cuvs::distance::DistanceType::L2Expanded,
+          false,
+          true,
+          metric,
+          0.0f,
+          stream);
+    }
   } else {
     auto dataBatchSize      = getDataBatchSize(batch_samples, n_samples);
     auto centroidsBatchSize = getCentroidsBatchSize(batch_centroids, n_clusters);

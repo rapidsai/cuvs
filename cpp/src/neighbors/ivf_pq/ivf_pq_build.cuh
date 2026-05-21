@@ -1078,8 +1078,14 @@ void extend(raft::resources const& handle,
     }
   }
   // Predict the cluster labels for the new data, in batches if necessary
-  utils::batch_load_iterator<T> vec_batches(
-    new_vectors, n_rows, index->dim(), max_batch_size, copy_stream, device_memory, enable_prefetch);
+  auto vec_batches = utils::make_batch_load_iterator<T>(handle,
+                                                        new_vectors,
+                                                        n_rows,
+                                                        index->dim(),
+                                                        max_batch_size,
+                                                        copy_stream,
+                                                        device_memory,
+                                                        enable_prefetch);
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
@@ -1175,8 +1181,8 @@ void extend(raft::resources const& handle,
 
   // By this point, the index state is updated and valid except it doesn't contain the new data
   // Fill the extended index with the new data (possibly, in batches)
-  utils::batch_load_iterator<IdxT> idx_batches(
-    new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
+  auto idx_batches = utils::make_batch_load_iterator<IdxT>(
+    handle, new_indices, n_rows, IdxT{1}, max_batch_size, stream, batches_mr);
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
