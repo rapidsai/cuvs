@@ -20,6 +20,7 @@ examples/rust/     @rapidsai/cuvs-rust-codeowners
 
 #docs code owners
 docs/              @rapidsai/cuvs-docs-codeowners
+fern/              @rapidsai/cuvs-docs-codeowners
 
 #cmake code owners
 CMakeLists.txt                  @rapidsai/cuvs-cmake-codeowners
