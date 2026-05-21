@@ -1,10 +1,10 @@
 # Usage
 
-This page shows how to configure algorithms, run cuVS Bench from the command line, use Docker containers, and read the build and search results. The command-line runner uses the cuVS Bench orchestrator and the default `cpp_gbench` backend, so the end-to-end workflow can stay fully CLI-based. For dataset formats, built-in datasets, custom dataset descriptors, and ground-truth generation, see [Benchmark Datasets](datasets.md).
+This page shows how to configure algorithms, run NVIDIA cuVS Bench from the command line, use Docker containers, and read the build and search results. The command-line runner uses the NVIDIA cuVS Bench orchestrator and the default `cpp_gbench` backend, so the end-to-end workflow can stay fully CLI-based. For dataset formats, built-in datasets, custom dataset descriptors, and ground-truth generation, see [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets).
 
 ## Creating and customizing algorithm configurations
 
-Algorithm YAML files define the build and search parameter sweeps for each algorithm. Dataset YAML files are covered in [Benchmark Datasets](datasets.md#dataset-configurations).
+Algorithm YAML files define the build and search parameter sweeps for each algorithm. Dataset YAML files are covered in [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets#dataset-configurations).
 
 Algorithm configs live in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/algos`. A `cuvs_cagra` config looks like this:
 
@@ -54,7 +54,7 @@ Each config has three main fields:
 | `constraints` | Optional Python functions that reject invalid build or search parameter combinations. |
 | `groups` | Named parameter sweeps. Each group expands the cross product of its `build` and `search` values. |
 
-Create a custom YAML file with a `base` group to override the default benchmark parameters. For parameter guidance, see the [ANN Algorithm Parameter Tuning Guide](param_tuning.md).
+Create a custom YAML file with a `base` group to override the default benchmark parameters. For parameter guidance, see the [ANN Algorithm Parameter Tuning Guide](/user-guide/benchmarking-guide/cu-vs-bench-tool/cu-vs-bench-parameter-tuning-guide).
 
 | Library | Algorithms |
 | --- | --- |
@@ -63,11 +63,11 @@ Create a custom YAML file with a `base` group to override the default benchmark 
 | GGNN | `ggnn` |
 | HNSWLIB | `hnswlib` |
 | DiskANN | `diskann_memory`, `diskann_ssd` |
-| cuVS | `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`, `cuvs_vamana` |
+| NVIDIA cuVS | `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`, `cuvs_vamana` |
 
 ### Multi-GPU algorithms
 
-cuVS Bench includes single-node multi-GPU versions of IVF-Flat, IVF-PQ, and CAGRA.
+NVIDIA cuVS Bench includes single-node multi-GPU versions of IVF-Flat, IVF-PQ, and CAGRA.
 
 | Index type | Multi-GPU algo name |
 | --- | --- |
@@ -93,11 +93,11 @@ python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
 python -m cuvs_bench.plot --dataset deep-image-96-inner
 ```
 
-For available built-in datasets and ground-truth details, see [Benchmark Datasets](datasets.md#built-in-datasets).
+For available built-in datasets and ground-truth details, see [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets#built-in-datasets).
 
 ## Large-scale benchmarks (>10M vectors)
 
-`cuvs_bench.get_dataset` does not download billion-scale datasets. Prepare large datasets first using [Benchmark Datasets](datasets.md#dataset-sources), then run the same build, search, export, and plot workflow. Datasets at this scale are best suited to large-memory GPUs such as A100 or H100.
+`cuvs_bench.get_dataset` does not download billion-scale datasets. Prepare large datasets first using [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets#dataset-sources), then run the same build, search, export, and plot workflow. Datasets at this scale are best suited to large-memory GPUs such as A100 or H100.
 
 The following example prepares ground truth for the Yandex Deep-1B dataset and then runs benchmarks on a 100M-vector subset:
 
@@ -127,7 +127,7 @@ Use `python -m cuvs_bench.split_groundtruth --help` to see the full CLI help for
 
 ## Running with Docker containers
 
-Docker images can run the full workflow or open a shell for manual commands. See [Installation](install.md#docker) for image and tag guidance.
+Docker images can run the full workflow or open a shell for manual commands. See [Installation](/user-guide/benchmarking-guide/cu-vs-bench-tool/installation#docker) for image and tag guidance.
 
 ### End-to-end run on GPU
 
@@ -146,7 +146,7 @@ docker run --gpus all --rm -it -u $(id -u)                      \
 
 | Argument | Description |
 | --- | --- |
-| `rapidsai/cuvs-bench:26.06a-cuda12-py3.13` | Image to use. See [Installation](install.md#docker) for available tags. |
+| `rapidsai/cuvs-bench:26.06a-cuda12-py3.13` | Image to use. See [Installation](/user-guide/benchmarking-guide/cu-vs-bench-tool/installation#docker) for available tags. |
 | `"--dataset deep-image-96-angular"` | Dataset name. |
 | `"--normalize"` | Normalizes the dataset before benchmarking. |
 | `"--algorithms cuvs_cagra,hnswlib --batch-size 10 -k 10"` | Arguments passed to the benchmark run script. |
@@ -224,4 +224,4 @@ Search benchmarks report:
 
 ## Summary
 
-cuVS Bench usage has three main steps: configure datasets and algorithm sweeps, run build and search through Python or Docker, and compare the reported build and search measurements. Start with built-in datasets for smaller tests, prepare large datasets separately for scale testing, and use the result tables to compare quality, latency, throughput, build time, and resource behavior across parameter settings.
+NVIDIA cuVS Bench usage has three main steps: configure datasets and algorithm sweeps, run build and search through Python or Docker, and compare the reported build and search measurements. Start with built-in datasets for smaller tests, prepare large datasets separately for scale testing, and use the result tables to compare quality, latency, throughput, build time, and resource behavior across parameter settings.

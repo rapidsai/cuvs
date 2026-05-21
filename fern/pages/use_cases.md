@@ -1,14 +1,14 @@
 # Vector Search Use-Cases
 
-Vector search is a building block for finding nearby items in high-dimensional data. The vectors usually come from embedding models, feature extractors, simulations, sensors, logs, or other numeric representations. cuVS focuses on the accelerated algorithms behind those workflows: building indexes, searching indexes, clustering vectors, compressing vectors, and constructing neighborhood graphs.
+Vector search is a building block for finding nearby items in high-dimensional data. The vectors usually come from embedding models, feature extractors, simulations, sensors, logs, or other numeric representations. NVIDIA cuVS focuses on the accelerated algorithms behind those workflows: building indexes, searching indexes, clustering vectors, compressing vectors, and constructing neighborhood graphs.
 
-Use a [vector database](vector_databases_vs_vector_search.md) when the application needs ingestion, updates, metadata filtering, service APIs, durability, replication, and operations around vector search. Use cuVS directly when you need control over index construction, tuning, batch analysis, or integration into a custom system.
+Use a [vector database](/getting-started/introduction/vector-database) when the application needs ingestion, updates, metadata filtering, service APIs, durability, replication, and operations around vector search. Use NVIDIA cuVS directly when you need control over index construction, tuning, batch analysis, or integration into a custom system.
 
 ## Retrieval and search
 
 *Semantic search* is the most common vector search use-case. Text, images, audio, video, molecules, products, or user profiles are embedded into vectors, then a query is embedded and matched against nearby items. This supports natural-language document search, image search, code search, product search, and cross-modal search where the query and result use different media types.
 
-*Retrieval augmented generation*, or *RAG*, uses vector search to retrieve relevant context before generating an answer. A vector database is often useful here because production RAG systems need document ingestion, metadata filters, access control, index refreshes, and query APIs. cuVS can accelerate the index build and search paths used inside those systems or in custom RAG pipelines.
+*Retrieval augmented generation*, or *RAG*, uses vector search to retrieve relevant context before generating an answer. A vector database is often useful here because production RAG systems need document ingestion, metadata filters, access control, index refreshes, and query APIs. NVIDIA cuVS can accelerate the index build and search paths used inside those systems or in custom RAG pipelines.
 
 *Agentic AI systems* use vector search as memory, context retrieval, and tool-selection infrastructure. An agent can search prior conversations, task traces, documents, examples, code snippets, and tool descriptions to decide what context to use next. These workflows often need low-latency lookup, metadata filters, and frequent index refreshes as new memories or artifacts are created.
 
@@ -22,21 +22,21 @@ Use a [vector database](vector_databases_vs_vector_search.md) when the applicati
 
 Vector databases and search engines add operational features around vector search. Common use-cases include *enterprise knowledge retrieval*, *hybrid keyword and vector search*, *semantic product catalogs*, *multimodal asset search*, *agent memory*, *chatbot context retrieval*, *semantic caching*, and *real-time application search*.
 
-These systems usually combine vector similarity with metadata filters, ranking rules, tenant boundaries, index lifecycle management, and distributed execution. In that setting, cuVS is usually the accelerated indexing and search layer, while the database owns serving, storage, writes, and query planning. See [Integrations](integrations.md) for systems that expose cuVS-backed workflows.
+These systems usually combine vector similarity with metadata filters, ranking rules, tenant boundaries, index lifecycle management, and distributed execution. In that setting, NVIDIA cuVS is usually the accelerated indexing and search layer, while the database owns serving, storage, writes, and query planning. See [Integrations](/getting-started/integrations) for systems that expose NVIDIA cuVS-backed workflows.
 
 ## Batch analysis and exploration
 
 Vector search is also useful when search is not the final product. In *batch exploratory data analysis*, nearest-neighbor graphs and clustering algorithms help users understand the structure of a dataset before building an application.
 
-[All-neighbors](neighbors/all_neighbors.md) can build neighborhood graphs for *graph analytics*, *clustering*, *visualization*, and *manifold learning workflows*. A KNN graph often becomes the input to algorithms that need local connectivity rather than point lookups.
+[All-neighbors](/user-guide/api-guides/indexing-guide/all-neighbors) can build neighborhood graphs for *graph analytics*, *clustering*, *visualization*, and *manifold learning workflows*. A KNN graph often becomes the input to algorithms that need local connectivity rather than point lookups.
 
-[K-Means](cluster/kmeans.md) groups vectors around representative centroids. It is useful for segmentation, coarse partitioning, vector quantization, sampling, and summarizing large datasets. [Single-linkage](cluster/single_linkage.md) builds a hierarchy of merges, which is useful when the tree structure or dendrogram is part of the analysis. [Spectral clustering](cluster/spectral.md) works through graph structure and can separate clusters that are not well described by compact centroids.
+[K-Means](/user-guide/api-guides/clustering-guide/k-means) groups vectors around representative centroids. It is useful for segmentation, coarse partitioning, vector quantization, sampling, and summarizing large datasets. [Single-linkage](/user-guide/api-guides/clustering-guide/single-linkage) builds a hierarchy of merges, which is useful when the tree structure or dendrogram is part of the analysis. [Spectral clustering](/user-guide/api-guides/clustering-guide/spectral-clustering) works through graph structure and can separate clusters that are not well described by compact centroids.
 
-*Manifold learning* and *dimensionality reduction workflows* use neighborhood structure to reveal lower-dimensional patterns. These workflows are common for *visualization*, *exploratory analysis*, *quality checks*, *dataset debugging*, and *feature inspection*. [PCA](preprocessing/pca.md) provides a fast linear reduction path, while neighborhood graphs can feed nonlinear manifold methods in adjacent RAPIDS workflows.
+*Manifold learning* and *dimensionality reduction workflows* use neighborhood structure to reveal lower-dimensional patterns. These workflows are common for *visualization*, *exploratory analysis*, *quality checks*, *dataset debugging*, and *feature inspection*. [PCA](/user-guide/api-guides/preprocessing-guide/pca) provides a fast linear reduction path, while neighborhood graphs can feed nonlinear manifold methods in adjacent RAPIDS workflows.
 
 ## Compression and preprocessing
 
-Large vector datasets often need compression before they are practical to store or search. [Scalar Quantizer](preprocessing/scalar_quantizer.md), [Binary Quantizer](preprocessing/binary_quantizer.md), and [Product Quantization](preprocessing/product_quantization.md) reduce memory footprint and memory bandwidth. Compression is useful for *approximate scoring*, *storage reduction*, *index construction*, and *large-scale retrieval systems* where full-precision vectors are too expensive.
+Large vector datasets often need compression before they are practical to store or search. [Scalar Quantizer](/user-guide/api-guides/preprocessing-guide/scalar-quantizer), [Binary Quantizer](/user-guide/api-guides/preprocessing-guide/binary-quantizer), and [Product Quantization](/user-guide/api-guides/preprocessing-guide/product-quantization) reduce memory footprint and memory bandwidth. Compression is useful for *approximate scoring*, *storage reduction*, *index construction*, and *large-scale retrieval systems* where full-precision vectors are too expensive.
 
 *Quantization* often pairs with *refinement* or *reranking*. A compressed index quickly finds candidates, then a second stage recomputes distances for a smaller candidate set using more accurate vectors. This preserves much of the speed and memory benefit while recovering recall.
 
@@ -48,4 +48,4 @@ Vector search can be used to inspect *embedding quality*. Nearest-neighbor examp
 
 ## Choosing a starting point
 
-Start with [Vector Search](what_is_vector_search.md) when you need to choose an index. Start with [Vector Database](vector_databases_vs_vector_search.md) when you are deciding between a standalone index library and a managed database or search engine. Start with the [Clustering Guide](cluster/kmeans.md) or [Preprocessing Guide](preprocessing/product_quantization.md) when the goal is batch analysis, compression, or dataset preparation rather than online retrieval.
+Start with [Vector Search](/getting-started/introduction/vector-search) when you need to choose an index. Start with [Vector Database](/getting-started/introduction/vector-database) when you are deciding between a standalone index library and a managed database or search engine. Start with the [Clustering Guide](/user-guide/api-guides/clustering-guide/k-means) or [Preprocessing Guide](/user-guide/api-guides/preprocessing-guide/product-quantization) when the goal is batch analysis, compression, or dataset preparation rather than online retrieval.

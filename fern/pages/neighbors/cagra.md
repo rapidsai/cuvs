@@ -66,18 +66,21 @@ index = cagra.build(index_params, dataset)
 <Tab title="Java">
 
 ```java
-try (CuVSResources resources = CuVSResources.create()) {
+try (CuVSResources resources = CuVSResources.create();
+    CuVSMatrix dataset = loadDatasetMatrix()) {
   CagraIndexParams indexParams =
       new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
           .withMetric(CuvsDistanceType.L2Expanded)
           .build();
 
-  CagraIndex index =
+  try (CagraIndex index =
       CagraIndex.newBuilder(resources)
-          .withDataset(vectors)
+          .withDataset(dataset)
           .withIndexParams(indexParams)
-          .build();
+          .build()) {
+    // Use index for search or serialization.
+  }
 }
 ```
 
@@ -135,6 +138,100 @@ func buildCagraIndex(dataset cuvs.Tensor[float32]) (*cagra.CagraIndex, error) {
 
 </Tab>
 </Tabs>
+
+### Extending an index
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/cagra.h>
+
+cuvsResources_t res;
+cuvsCagraExtendParams_t extend_params;
+cuvsCagraIndex_t index;
+DLManagedTensor *additional_dataset;
+
+load_additional_dataset(additional_dataset);
+
+cuvsResourcesCreate(&res);
+cuvsCagraExtendParamsCreate(&extend_params);
+cuvsCagraIndexCreate(&index);
+
+// ... build or load index ...
+cuvsCagraExtend(res, extend_params, additional_dataset, index);
+
+cuvsCagraIndexDestroy(index);
+cuvsCagraExtendParamsDestroy(extend_params);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+cagra::index_params index_params;
+cagra::extend_params extend_params;
+auto dataset = load_dataset();
+auto additional_dataset = load_additional_dataset();
+
+auto index = cagra::build(res, index_params, dataset);
+cagra::extend(res, extend_params, additional_dataset, index);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import cagra
+
+dataset = load_data()
+additional_dataset = load_additional_data()
+
+index = cagra.build(cagra.IndexParams(), dataset)
+index = cagra.extend(cagra.ExtendParams(), index, additional_dataset)
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+package main
+
+import (
+	cuvs "github.com/rapidsai/cuvs/go"
+	"github.com/rapidsai/cuvs/go/cagra"
+)
+
+func extendCagraIndex(
+	resource cuvs.Resource,
+	index *cagra.CagraIndex,
+	additionalDataset cuvs.Tensor[float32],
+) error {
+	extendParams, err := cagra.CreateExtendParams()
+	if err != nil {
+		return err
+	}
+	defer extendParams.Close()
+
+	_, err = additionalDataset.ToDevice(&resource)
+	if err != nil {
+		return err
+	}
+
+	return cagra.ExtendIndex(resource, extendParams, &additionalDataset, index)
+}
+```
+
+</Tab>
+</Tabs>
+
+See the [C](/api-reference/c-api-neighbors-cagra#cuvscagraextend), [C++](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend), [Python](/api-reference/python-api-neighbors-cagra#extend), and [Go](/api-reference/go-api-cagra#extendindex) API references for the full signatures.
 
 ### Searching an index
 
@@ -202,15 +299,17 @@ neighbors, distances = cagra.search(search_params, index, queries, k)
 ```java
 CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
 
-CagraQuery cuvsQuery =
+try (CuVSMatrix queryVectors = loadQueryMatrix()) {
+  CagraQuery cuvsQuery =
     new CagraQuery.Builder()
         .withTopK(10)
         .withSearchParams(searchParams)
-        .withQueryVectors(queries)
+        .withQueryVectors(queryVectors)
         .build();
 
-// ... build or load index ...
-SearchResults results = index.search(cuvsQuery);
+  // ... build or load index ...
+  SearchResults results = index.search(cuvsQuery);
+}
 ```
 
 </Tab>
@@ -341,11 +440,12 @@ loaded_index = cagra.load("/tmp/cuvs-cagra.bin")
 <Tab title="Java">
 
 ```java
-try (CuVSResources resources = CuVSResources.create()) {
-  CagraIndex index =
+try (CuVSResources resources = CuVSResources.create();
+    CuVSMatrix dataset = loadDatasetMatrix();
+    CagraIndex index =
       CagraIndex.newBuilder(resources)
-          .withDataset(vectors)
-          .build();
+          .withDataset(dataset)
+          .build()) {
 
   try (FileOutputStream output = new FileOutputStream("/tmp/cuvs-cagra.bin")) {
     index.serialize(output);
@@ -384,7 +484,7 @@ fn save_and_load_cagra(dataset: &ndarray::Array2<f32>) -> Result<Index> {
 
 CAGRA builds and searches a nearest-neighbor graph.
 
-First, CAGRA builds an initial kNN graph. This is the first draft of the map: each vector is connected to vectors that look nearby. An exact brute-force build can create a very accurate initial graph, but it is usually too slow. In practice, the first graph does not need to be perfect because CAGRA improves it later. cuVS can build this initial graph with IVF-PQ or NN-Descent.
+First, CAGRA builds an initial kNN graph. This is the first draft of the map: each vector is connected to vectors that look nearby. An exact brute-force build can create a very accurate initial graph, but it is usually too slow. In practice, the first graph does not need to be perfect because CAGRA improves it later. NVIDIA cuVS can build this initial graph with IVF-PQ or NN-Descent.
 
 Second, CAGRA prunes the initial graph. This removes redundant paths and keeps the links that are most useful for search.
 
@@ -402,7 +502,7 @@ Use brute-force instead when exact results are required or the dataset is small 
 
 ## Interoperability with HNSW
 
-cuVS can convert a CAGRA graph to an HNSW graph. This lets the GPU build the graph while the CPU handles search later. This is useful when GPUs are available for indexing, but production search runs on CPUs.
+NVIDIA cuVS can convert a CAGRA graph to an HNSW graph. This lets the GPU build the graph while the CPU handles search later. This is useful when GPUs are available for indexing, but production search runs on CPUs.
 
 If the graph is being serialized or converted to HNSW right after build, avoid keeping the dataset attached to the CAGRA index when the binding exposes that option. In C++, for example, set `attach_dataset_on_build` to `false`.
 
@@ -539,6 +639,7 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import com.nvidia.cuvs.CagraIndexParams.HnswHeuristicType;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.HnswIndexParams;
@@ -547,14 +648,15 @@ import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
 
-try (CuVSResources resources = CuVSResources.create()) {
-  int dim = vectors[0].length;
+try (CuVSResources resources = CuVSResources.create();
+    CuVSMatrix dataset = loadDatasetMatrix()) {
+  int dim = (int) dataset.columns();
   int M = 32;
   int efConstruction = 200;
 
   CagraIndexParams cagraParams =
       CagraIndexParams.fromHnswParams(
-          vectors.length,
+          (int) dataset.size(),
           dim,
           M,
           efConstruction,
@@ -563,7 +665,7 @@ try (CuVSResources resources = CuVSResources.create()) {
 
   try (CagraIndex cagraIndex =
       CagraIndex.newBuilder(resources)
-          .withDataset(vectors)
+          .withDataset(dataset)
           .withIndexParams(cagraParams)
           .build()) {
     HnswIndexParams hnswParams =
@@ -731,24 +833,27 @@ distances, neighbors = cagra.search(
 ```java
 import java.util.BitSet;
 
-BitSet prefilter = new BitSet(vectors.length);
-prefilter.set(0, vectors.length);
+int numDocs = (int) dataset.size();
+BitSet prefilter = new BitSet(numDocs);
+prefilter.set(0, numDocs);
 
 for (int row : getFilteredRows()) {
   prefilter.clear(row);
 }
 
 CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-CagraQuery cuvsQuery =
+try (CuVSMatrix queryVectors = loadQueryMatrix()) {
+  CagraQuery cuvsQuery =
     new CagraQuery.Builder()
         .withTopK(10)
         .withSearchParams(searchParams)
-        .withQueryVectors(queries)
-        .withPrefilter(prefilter, vectors.length)
+        .withQueryVectors(queryVectors)
+        .withPrefilter(prefilter, numDocs)
         .build();
 
-// ... build or load index ...
-SearchResults results = index.search(cuvsQuery);
+  // ... build or load index ...
+  SearchResults results = index.search(cuvsQuery);
+}
 ```
 
 </Tab>
@@ -821,7 +926,7 @@ if err != nil {
 | `intermediate_graph_degree` | `128` | Number of neighbors kept in the initial graph before pruning. Larger values can improve the final graph, but increase build time and memory use. |
 | `graph_degree` | `64` | Number of neighbors kept for each vertex in the final graph. Larger values can improve recall, but use more memory and search work. |
 | `compression` | None | Optional vector product quantization parameters. When set, the compressed dataset is attached to the index and `attach_dataset_on_build` is effectively enabled. |
-| `graph_build_params` | `std::monostate` | Parameters for the initial graph builder. The default lets cuVS choose a heuristic; explicit options include IVF-PQ, NN-Descent, ACE, and iterative-search graph build parameters. |
+| `graph_build_params` | `std::monostate` | Parameters for the initial graph builder. The default lets NVIDIA cuVS choose a heuristic; explicit options include IVF-PQ, NN-Descent, ACE, and iterative-search graph build parameters. |
 | `guarantee_connectivity` | `False` | Uses a degree-constrained minimum spanning tree to guarantee the initial kNN graph is connected. This can improve recall on some datasets. |
 | `attach_dataset_on_build` | `True` | Keeps the dataset attached to the index after build. Set to `False` when serializing or converting to another graph format right after build. |
 
@@ -829,23 +934,23 @@ if err != nil {
 
 | Name | Default | Description |
 | --- | --- | --- |
-| `max_queries` | `0` | Maximum number of queries searched concurrently. `0` lets cuVS choose automatically. |
+| `max_queries` | `0` | Maximum number of queries searched concurrently. `0` lets NVIDIA cuVS choose automatically. |
 | `itopk_size` | 64 | Number of intermediate search results kept during search. This must be at least `k` and is the main search tuning knob. |
-| `max_iterations` | 0 | Maximum number of search iterations. `0` lets cuVS choose automatically. |
+| `max_iterations` | 0 | Maximum number of search iterations. `0` lets NVIDIA cuVS choose automatically. |
 | `algo` | `AUTO` | Search implementation. Options include `SINGLE_CTA`, `MULTI_CTA`, `MULTI_KERNEL`, and `AUTO`. |
-| `team_size` | 0 | Number of CUDA threads used to calculate each distance. Valid values are 4, 8, 16, or 32. `0` lets cuVS choose automatically. |
+| `team_size` | 0 | Number of CUDA threads used to calculate each distance. Valid values are 4, 8, 16, or 32. `0` lets NVIDIA cuVS choose automatically. |
 | `search_width` | 1 | Number of vertices selected as starting points for each search iteration. |
 | `min_iterations` | 0 | Minimum number of search iterations. |
-| `thread_block_size` | `0` | CUDA thread block size. Supported values include 64, 128, 256, 512, and 1024. `0` lets cuVS choose automatically. |
+| `thread_block_size` | `0` | CUDA thread block size. Supported values include 64, 128, 256, 512, and 1024. `0` lets NVIDIA cuVS choose automatically. |
 | `hashmap_mode` | `AUTO` | Hash map implementation used during search. Options include `HASH`, `SMALL`, and `AUTO`. |
-| `hashmap_min_bitlen` | `0` | Lower limit for the hash map bit length. `0` lets cuVS choose automatically. |
+| `hashmap_min_bitlen` | `0` | Lower limit for the hash map bit length. `0` lets NVIDIA cuVS choose automatically. |
 | `hashmap_max_fill_rate` | `0.5` | Maximum hash map fill rate. Valid values are greater than 0.1 and less than 0.9. |
 | `num_random_samplings` | `1` | Number of initial random seed-node selection iterations. |
 | `rand_xor_mask` | `0x128394` | Bit mask used for initial random seed-node selection. |
 | `persistent` | `False` | Uses the persistent search kernel where supported. Currently this applies only to `SINGLE_CTA`. |
 | `persistent_lifetime` | `2.0` | Seconds before a persistent kernel stops when no requests are received. |
 | `persistent_device_usage` | `1.0` | Fraction of the maximum grid size used by the persistent kernel. Lower values can leave GPU capacity for other work. |
-| `filtering_rate` | `-1.0` | Expected fraction of nodes filtered out during filtered search. Negative values let cuVS estimate it automatically. |
+| `filtering_rate` | `-1.0` | Expected fraction of nodes filtered out during filtered search. Negative values let NVIDIA cuVS estimate it automatically. |
 
 ## Tuning
 
@@ -859,7 +964,7 @@ If the final graph quality is still too low, increase `intermediate_graph_degree
 
 ### Persistent search
 
-Persistent search can improve throughput in services that run many concurrent CAGRA searches. Instead of launching a new search kernel for each request, cuVS can keep a persistent search kernel resident on the GPU and feed it incoming work. This reduces launch overhead and can help high-volume search services keep the GPU busy.
+Persistent search can improve throughput in services that run many concurrent CAGRA searches. Instead of launching a new search kernel for each request, NVIDIA cuVS can keep a persistent search kernel resident on the GPU and feed it incoming work. This reduces launch overhead and can help high-volume search services keep the GPU busy.
 
 Enable it with the `persistent` search parameter. Persistent search currently applies to the `SINGLE_CTA` search implementation, so set `algo` to `SINGLE_CTA` when you want to force this path instead of relying on `AUTO`.
 

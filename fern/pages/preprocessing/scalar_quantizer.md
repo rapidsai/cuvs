@@ -1,6 +1,6 @@
 # Scalar Quantizer
 
-Scalar quantization compresses floating-point vectors by mapping each value into a smaller integer type. In cuVS, the scalar quantizer learns a global floating-point range and then linearly maps values in that range to `int8`.
+Scalar quantization compresses floating-point vectors by mapping each value into a smaller integer type. In NVIDIA cuVS, the scalar quantizer learns a global floating-point range and then linearly maps values in that range to `int8`.
 
 Use scalar quantization when full-precision vectors are too expensive to store or move, but you still want a simple element-wise approximation that can be reconstructed later. It is often useful before storage, approximate scoring, or ANN workflows that can tolerate quantization error.
 
@@ -122,7 +122,7 @@ reconstructed = scalar.inverse_transform(quantizer, codes)
 
 The quantizer stores a minimum and maximum value. Each input value is clipped to that range and mapped into the available `int8` codes. Inverse transform applies the reverse mapping, so reconstructed values are approximate rather than exact.
 
-The range is learned from the training data. With `quantile = 1.0`, the full observed range is used. With a smaller quantile, cuVS ignores a small fraction of values at the high and low ends before choosing the range.
+The range is learned from the training data. With `quantile = 1.0`, the full observed range is used. With a smaller quantile, NVIDIA cuVS ignores a small fraction of values at the high and low ends before choosing the range.
 
 ## When to use Scalar Quantization
 

@@ -114,6 +114,17 @@ navigation:
         path: "./pages/api_guide.md"
         collapsed: true
         contents:
+          - section: "Core Types"
+            path: "./pages/core_types.md"
+            contents:
+              - page: "Memory Management"
+                path: "./pages/other/memory_management.md"
+              - page: "Multi-dim Arrays"
+                path: "./pages/other/multidimensional_arrays.md"
+              - page: "Multi-GPU"
+                path: "./pages/other/multi_gpu.md"
+              - page: "Resources"
+                path: "./pages/other/resources.md"
           - section: "Clustering Guide"
             path: "./pages/cluster/index.md"
             contents:

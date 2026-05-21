@@ -1,8 +1,8 @@
-# cuVS Bench Backends
+# NVIDIA cuVS Bench Backends
 
-This page explains how cuVS Bench separates benchmark orchestration from the system that actually builds and searches an index. Use it when you want to understand the built-in C++ benchmark backend, add a new backend for another product or service, or add a new indexing algorithm to the existing C++ backend.
+This page explains how NVIDIA cuVS Bench separates benchmark orchestration from the system that actually builds and searches an index. Use it when you want to understand the built-in C++ benchmark backend, add a new backend for another product or service, or add a new indexing algorithm to the existing C++ backend.
 
-cuVS Bench uses two pieces for each backend:
+NVIDIA cuVS Bench uses two pieces for each backend:
 
 | Piece | Purpose |
 | --- | --- |
@@ -98,7 +98,7 @@ class MyConfigLoader(ConfigLoader):
 
 ## Adding a backend
 
-Add a new backend when cuVS Bench needs to drive a different execution path, such as a vector database, remote service, or custom benchmark runner.
+Add a new backend when NVIDIA cuVS Bench needs to drive a different execution path, such as a vector database, remote service, or custom benchmark runner.
 
 1. Implement a config loader by subclassing `ConfigLoader` from `cuvs_bench.orchestrator.config_loaders`. Its `load()` method should return `(DatasetConfig, List[BenchmarkConfig])`.
 2. Implement a backend by subclassing `BenchmarkBackend` from `cuvs_bench.backends.base`. Its `build()` method should return `BuildResult`; its `search()` method should return `SearchResult`.
@@ -115,7 +115,7 @@ get_registry().register("my_backend", MyBackend)
 
 ## Example: Elasticsearch backend
 
-This example shows the shape of a network backend. The loader creates the dataset and benchmark configs. The backend uses `backend_config` to connect to the service, build the index, run search, and return cuVS Bench result objects.
+This example shows the shape of a network backend. The loader creates the dataset and benchmark configs. The backend uses `backend_config` to connect to the service, build the index, run search, and return NVIDIA cuVS Bench result objects.
 
 ```python
 from cuvs_bench.orchestrator.config_loaders import (
@@ -335,8 +335,8 @@ cuvs_ivf_pq:
   requires_gpu: true
 ```
 
-`executable` specifies the binary used to build and search the index. cuVS Bench expects it to be available in `cuvs/cpp/build/`. `requires_gpu` tells cuVS Bench whether the algorithm must run on a GPU node.
+`executable` specifies the binary used to build and search the index. NVIDIA cuVS Bench expects it to be available in `cuvs/cpp/build/`. `requires_gpu` tells NVIDIA cuVS Bench whether the algorithm must run on a GPU node.
 
 ## Summary
 
-cuVS Bench backends let the same benchmark workflow run against different execution targets. A config loader describes the dataset and parameter combinations, while a backend performs the build and search work. Use a new backend type for a new execution environment, and use the existing C++ backend when you are only adding another C++ ANN benchmark executable.
+NVIDIA cuVS Bench backends let the same benchmark workflow run against different execution targets. A config loader describes the dataset and parameter combinations, while a backend performs the build and search work. Use a new backend type for a new execution environment, and use the existing C++ backend when you are only adding another C++ ANN benchmark executable.

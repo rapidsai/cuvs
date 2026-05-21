@@ -1,6 +1,6 @@
 # Benchmark Datasets
 
-cuVS Bench datasets provide the vectors to index, the queries to search, and the exact nearest neighbors used to measure recall. This page explains the expected file layout, supported binary formats, built-in dataset helpers, ground-truth generation, and the YAML descriptors used for custom datasets.
+NVIDIA cuVS Bench datasets provide the vectors to index, the queries to search, and the exact nearest neighbors used to measure recall. This page explains the expected file layout, supported binary formats, built-in dataset helpers, ground-truth generation, and the YAML descriptors used for custom datasets.
 
 ## Dataset files
 
@@ -59,7 +59,7 @@ These datasets include ground truth for 100 neighbors, so benchmark `k` must be 
 
 ## Dataset sources
 
-Million-scale datasets are available from [ann-benchmarks](https://github.com/erikbern/ann-benchmarks#data-sets). Convert the HDF5 files to cuVS Bench binaries with:
+Million-scale datasets are available from [ann-benchmarks](https://github.com/erikbern/ann-benchmarks#data-sets). Convert the HDF5 files to NVIDIA cuVS Bench binaries with:
 
 ```bash
 python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py [-n] <input>.hdf5
@@ -75,7 +75,7 @@ python -m cuvs_bench.split_groundtruth --groundtruth deep_new_groundtruth.public
 
 This produces `groundtruth.neighbors.ibin` and `groundtruth.distances.fbin`.
 
-The `wiki-all` dataset contains 88M 768-dimensional vectors, plus 1M and 10M subsets, for realistic RAG/LLM-scale benchmarking. See the [Wiki-all Dataset Guide](wiki_all_dataset.md) to download it.
+The `wiki-all` dataset contains 88M 768-dimensional vectors, plus 1M and 10M subsets, for realistic RAG/LLM-scale benchmarking. See the [Wiki-all Dataset Guide](/user-guide/benchmarking-guide/cu-vs-bench-tool/wiki-all-dataset) to download it.
 
 ## Generate ground truth
 
@@ -131,4 +131,4 @@ python -m cuvs_bench.run --dataset mydata-1M --dataset-path=/path/to/data/folder
 
 ## Summary
 
-cuVS Bench expects a small set of binary vector and ground-truth files plus a YAML descriptor that tells the benchmark runner where those files live. Built-in helpers can download common datasets, convert HDF5 sources, split ground truth, and generate exact neighbors when needed. For custom datasets, prepare the files, write a descriptor, and pass it with `--dataset-configuration`.
+NVIDIA cuVS Bench expects a small set of binary vector and ground-truth files plus a YAML descriptor that tells the benchmark runner where those files live. Built-in helpers can download common datasets, convert HDF5 sources, split ground truth, and generate exact neighbors when needed. For custom datasets, prepare the files, write a descriptor, and pass it with `--dataset-configuration`.
