@@ -693,16 +693,17 @@ extern "C" cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
                                                      cuvsCagraSearchParams_t params,
                                                      uint32_t num_partitions,
                                                      cuvsCagraIndex_t* indices,
-                                                     DLManagedTensor** queries,
-                                                     DLManagedTensor** neighbors,
-                                                     DLManagedTensor** distances,
+                                                     DLManagedTensor* queries,
+                                                     DLManagedTensor* partition_ids,
+                                                     DLManagedTensor* neighbors,
+                                                     DLManagedTensor* distances,
                                                      cuvsFilter filter)
 {
   return cuvs::core::translate_exceptions([=] {
     RAFT_EXPECTS(num_partitions > 0, "num_partitions must be > 0");
-    RAFT_EXPECTS(indices != nullptr && queries != nullptr && neighbors != nullptr &&
-                   distances != nullptr,
-                 "All pointer arrays must be non-null");
+    RAFT_EXPECTS(indices != nullptr && queries != nullptr && partition_ids != nullptr &&
+                   neighbors != nullptr && distances != nullptr,
+                 "All pointer arguments must be non-null");
 
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto search_params = cuvs::neighbors::cagra::search_params();
@@ -720,22 +721,30 @@ extern "C" cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
     using IndexT    = cuvs::neighbors::cagra::index<T, IdxT>;
 
     std::vector<const IndexT*> idx_vec(num_partitions);
-    std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>> q_vec(num_partitions);
-    std::vector<raft::device_matrix_view<OutIdxT, int64_t, raft::row_major>> n_vec(num_partitions);
-    std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>> d_vec(num_partitions);
-
     for (uint32_t i = 0; i < num_partitions; i++) {
       RAFT_EXPECTS(indices[i] != nullptr && indices[i]->addr != 0,
                    "Index at position %u is null or not built", i);
       idx_vec[i] = reinterpret_cast<const IndexT*>(indices[i]->addr);
-      q_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(q_vec[i])>>(queries[i]);
-      n_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(n_vec[i])>>(neighbors[i]);
-      d_vec[i]   = cuvs::core::from_dlpack<std::remove_reference_t<decltype(d_vec[i])>>(distances[i]);
     }
 
+    using queries_view_t = raft::device_matrix_view<const T, int64_t, raft::row_major>;
+    using pid_view_t     = raft::device_matrix_view<uint32_t, int64_t, raft::row_major>;
+    using nbrs_view_t    = raft::device_matrix_view<OutIdxT, int64_t, raft::row_major>;
+    using dist_view_t    = raft::device_matrix_view<DistanceT, int64_t, raft::row_major>;
+
+    auto queries_view       = cuvs::core::from_dlpack<queries_view_t>(queries);
+    auto partition_ids_view = cuvs::core::from_dlpack<pid_view_t>(partition_ids);
+    auto neighbors_view     = cuvs::core::from_dlpack<nbrs_view_t>(neighbors);
+    auto distances_view     = cuvs::core::from_dlpack<dist_view_t>(distances);
+
     if (filter.type == NO_FILTER) {
-      cuvs::neighbors::cagra::search_multi_partition(
-        *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec);
+      cuvs::neighbors::cagra::search_multi_partition(*res_ptr,
+                                                     search_params,
+                                                     idx_vec,
+                                                     queries_view,
+                                                     partition_ids_view,
+                                                     neighbors_view,
+                                                     distances_view);
     } else if (filter.type == MULTI_PARTITION_BITSET) {
       auto* f = reinterpret_cast<cuvsMultiPartitionBitsetFilter*>(filter.addr);
       RAFT_EXPECTS(f != nullptr, "MULTI_PARTITION_BITSET filter addr must be non-null");
@@ -750,8 +759,14 @@ extern "C" cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
       cuvs::neighbors::filtering::multi_partition_bitset_filter<uint32_t, int64_t> mp_filter(
         combined_bitset_view, offsets_mds.data_handle());
 
-      cuvs::neighbors::cagra::search_multi_partition(
-        *res_ptr, search_params, idx_vec, q_vec, n_vec, d_vec, mp_filter);
+      cuvs::neighbors::cagra::search_multi_partition(*res_ptr,
+                                                     search_params,
+                                                     idx_vec,
+                                                     queries_view,
+                                                     partition_ids_view,
+                                                     neighbors_view,
+                                                     distances_view,
+                                                     mp_filter);
     } else {
       RAFT_FAIL("Unsupported filter type for multi-partition search: %d", (int)filter.type);
     }

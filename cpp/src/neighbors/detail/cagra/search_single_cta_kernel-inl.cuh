@@ -1170,8 +1170,12 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
  *
  * Grid: (1, num_queries, num_partitions).
  * Each CTA handles one (query, partition) pair independently.
+ * Queries and intermediate result buffers are shared across all partitions.
  * The global hashmap (if used) must be laid out as
  *   [num_partitions][num_queries][hashmap::get_size(hash_bitlen)].
+ * The intermediate result buffers are laid out as
+ *   [num_partitions][num_queries][top_k]
+ * so that search_core's natural per-query stride of top_k lands at the correct offset.
  */
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
@@ -1182,6 +1186,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_mp(
   const multi_partition_desc_t<typename DATASET_DESCRIPTOR_T::DATA_T,
                                 typename DATASET_DESCRIPTOR_T::INDEX_T,
                                 typename DATASET_DESCRIPTOR_T::DISTANCE_T>* partitions,
+  const typename DATASET_DESCRIPTOR_T::DATA_T* queries_ptr,
+  typename DATASET_DESCRIPTOR_T::INDEX_T* intermediate_neighbors_ptr,
+  typename DATASET_DESCRIPTOR_T::DISTANCE_T* intermediate_distances_ptr,
   const std::uint32_t top_k,
   const SourceIndexT* source_indices_ptr,
   const unsigned num_distilation,
@@ -1200,7 +1207,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_mp(
   const std::uint32_t small_hash_reset_interval,
   SAMPLE_FILTER_T sample_filter)
 {
-  using INDEX_T = typename DATASET_DESCRIPTOR_T::INDEX_T;
+  using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
+  using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
   const uint32_t query_id = blockIdx.y;
   const uint32_t part_id  = blockIdx.z;
@@ -1215,15 +1223,27 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_mp(
           part_id * static_cast<size_t>(gridDim.y) * hashmap::get_size(hash_bitlen)
       : nullptr;
 
+  // Compute this partition's slice of the intermediate result buffers.
+  // search_core writes results at `topk_indices_ptr + query_id * top_k + j`, so each partition's
+  // slice is laid out as [num_queries, top_k] starting at part_id * num_queries * top_k.
+  const size_t partition_offset = static_cast<size_t>(part_id) * gridDim.y * top_k;
+  INDEX_T* part_result_indices  = intermediate_neighbors_ptr + partition_offset;
+  DISTANCE_T* part_result_distances = intermediate_distances_ptr + partition_offset;
+
+  // Tag the result_indices_ptr with INDEX_T's size per search_core convention.
+  constexpr uintptr_t kTag = raft::Pow2<sizeof(INDEX_T)>::Log2;
+  const uintptr_t tagged_indices_ptr =
+    reinterpret_cast<uintptr_t>(part_result_indices) | kTag;
+
   search_core<TOPK_BY_BITONIC_SORT,
               BITONIC_SORT_AND_MERGE_MULTI_WARPS,
               DATASET_DESCRIPTOR_T,
               SourceIndexT,
-              SAMPLE_FILTER_T>(part.result_indices_ptr,
-                               part.result_distances_ptr,
+              SAMPLE_FILTER_T>(tagged_indices_ptr,
+                               part_result_distances,
                                top_k,
                                part.dataset_desc,
-                               part.queries_ptr,
+                               queries_ptr,
                                part.graph,
                                part.graph_degree,
                                source_indices_ptr,
@@ -2509,10 +2529,15 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
  *
  * Searches all N partitions concurrently in a single kernel launch.  Each CTA (indexed by
  * blockIdx.y = query_id, blockIdx.z = part_id) independently searches one partition for one query.
+ * All partitions share the same `queries_ptr` and write into a single intermediate buffer of
+ * shape [num_partitions, num_queries, topk] (i.e. partition-major).
  *
  * @param partition_descs device pointer to array of num_partitions descriptors
  * @param num_partitions  number of partitions (= gridDim.z)
+ * @param queries_ptr     device pointer to [num_queries, dim] queries, shared across partitions
  * @param num_queries     number of queries (= gridDim.y)
+ * @param intermediate_neighbors_ptr   device buffer [num_partitions, num_queries, topk]
+ * @param intermediate_distances_ptr   device buffer [num_partitions, num_queries, topk]
  * @param ps              search parameters (shared across all partitions)
  * @param topk            number of neighbors to return per partition
  * @param num_itopk_candidates  search_width * max_graph_degree
@@ -2533,7 +2558,10 @@ template <typename DataT,
 void select_and_run_multi_partition(
   const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
   uint32_t num_partitions,
+  const DataT* queries_ptr,
   uint32_t num_queries,
+  IndexT* intermediate_neighbors_ptr,
+  DistanceT* intermediate_distances_ptr,
   const search_params& ps,
   uint32_t topk,
   uint32_t num_itopk_candidates,
@@ -2563,6 +2591,9 @@ void select_and_run_multi_partition(
                  smem_size);
   auto const& kernel_launcher = [&](auto const& kernel) -> void {
     kernel<<<block_dims, thread_dims, smem_size, stream>>>(partition_descs,
+                                                           queries_ptr,
+                                                           intermediate_neighbors_ptr,
+                                                           intermediate_distances_ptr,
                                                            topk,
                                                            nullptr,  // source_indices_ptr
                                                            ps.num_random_samplings,

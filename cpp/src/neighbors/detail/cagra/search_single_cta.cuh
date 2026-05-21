@@ -213,18 +213,28 @@ struct search
   /**
    * @brief Search all partitions concurrently in a single kernel launch.
    *
-   * @param res              RAFT resources (stream is extracted from here)
-   * @param partition_descs  device pointer to [num_partitions] descriptors
-   * @param num_partitions   number of partitions (gridDim.z)
-   * @param num_queries      queries per partition (gridDim.y)
-   * @param topk             neighbors to return per (query, partition)
+   * Queries and intermediate result buffers are shared across partitions. The intermediate
+   * buffers must be laid out as [num_partitions][num_queries][topk]; the caller is responsible
+   * for the post-merge reduction into the user-facing top-k.
+   *
+   * @param res                     RAFT resources (stream is extracted from here)
+   * @param partition_descs         device pointer to [num_partitions] descriptors
+   * @param num_partitions          number of partitions (gridDim.z)
+   * @param queries_ptr             device pointer to [num_queries, dim] queries
+   * @param num_queries             queries per partition (gridDim.y)
+   * @param intermediate_neighbors  device buffer [num_partitions, num_queries, topk]
+   * @param intermediate_distances  device buffer [num_partitions, num_queries, topk]
+   * @param topk                    neighbors to return per (query, partition)
    */
   template <typename SampleFilterT>
   void run_multi_partition(
     raft::resources const& res,
     const multi_partition_desc_t<DATA_T, INDEX_T, DISTANCE_T>* partition_descs,
     uint32_t num_partitions,
+    const DATA_T* queries_ptr,
     uint32_t num_queries,
+    INDEX_T* intermediate_neighbors,
+    DISTANCE_T* intermediate_distances,
     uint32_t topk,
     SampleFilterT sample_filter)
   {
@@ -245,7 +255,10 @@ struct search
     select_and_run_multi_partition<DATA_T, INDEX_T, DISTANCE_T, INDEX_T, SampleFilterT>(
       partition_descs,
       num_partitions,
+      queries_ptr,
       num_queries,
+      intermediate_neighbors,
+      intermediate_distances,
       *this,
       topk,
       num_itopk_candidates,

@@ -48,7 +48,7 @@ public class MultiPartitionSearchResults {
     return ordinals[i];
   }
 
-  /** Raw CAGRA distance for result {@code i} (before score normalization). */
+  /** Post-processed distance for result {@code i} (scaled + metric-transformed). */
   public float getDistance(int i) {
     return distances[i];
   }

@@ -1725,29 +1725,34 @@ void search(raft::resources const& res,
               cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
- * @brief Search multiple CAGRA index partitions concurrently in a single kernel launch.
+ * @brief Search multiple CAGRA index partitions concurrently and return the global top-k per
+ * query.
  *
- * Launches a single SINGLE_CTA kernel grid that covers all partitions, with one CTA per partition.
- * All per-partition results are written into the caller-supplied device buffers on the stream
- * associated with @p res; the call returns when all partitions have been submitted to the stream
- * (not necessarily completed).  Use @c cuvsStreamSync to wait for completion.
+ * For each query row in @p queries, the kernel searches all partitions in parallel into an
+ * internal intermediate buffer, applies per-partition distance post-processing, runs a batched
+ * top-k merge across partitions, and writes the final outputs. The call returns when all work
+ * has been submitted to the stream associated with @p res (not necessarily completed); call
+ * @c raft::resource::sync_stream on @p res to wait for completion.
  *
- * Distance values are comparable across partitions but are not postprocessed (no kScale correction).
- *
- * @param[in]  res        raft resources
- * @param[in]  params     search parameters
- * @param[in]  indices    one index per partition
- * @param[in]  queries    per-partition query matrix [n_queries, dim]
- * @param[out] neighbors  per-partition result neighbors [n_queries, topk]
- * @param[out] distances  per-partition result distances [n_queries, topk]
+ * @param[in]  res            raft resources
+ * @param[in]  params         search parameters (shared across partitions)
+ * @param[in]  indices        CAGRA index objects, one per partition
+ * @param[in]  queries        queries matrix, shape [n_queries, dim]; searched against every
+ *                            partition
+ * @param[out] partition_ids  which partition each neighbor came from, shape [n_queries, k]
+ * @param[out] neighbors      ordinal in the corresponding partition's dataset, shape
+ *                            [n_queries, k]
+ * @param[out] distances      post-processed distance for each (query, neighbor), shape
+ *                            [n_queries, k]
  */
 void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const float, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1755,9 +1760,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const float, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1765,9 +1771,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const half, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1775,9 +1782,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const half, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1785,9 +1793,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const int8_t, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1795,9 +1804,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const int8_t, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1805,9 +1815,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<uint32_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 
@@ -1815,9 +1826,10 @@ void search_multi_partition(
   raft::resources const& res,
   cuvs::neighbors::cagra::search_params const& params,
   const std::vector<const cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
-  const std::vector<raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<int64_t, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<float, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
   const cuvs::neighbors::filtering::base_filter& sample_filter =
     cuvs::neighbors::filtering::none_sample_filter{});
 

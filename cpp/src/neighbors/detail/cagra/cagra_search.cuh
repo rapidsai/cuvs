@@ -29,9 +29,11 @@
 // TODO: This shouldn't be calling spatial/knn apis
 #include "../ann_utils.cuh"
 
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
+#include <raft/matrix/select_k.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -253,15 +255,18 @@ void search_main(raft::resources const& res,
 /** @} */  // end group cagra
 
 /**
- * @brief Search all partitions concurrently for a single query using one kernel launch.
+ * @brief Search all partitions concurrently and return the global top-k per query.
  *
- * Each partition's CTA runs independently (blockIdx.z = partition_id, blockIdx.y = query_id).
- * All partitions must use float32 data with the same search parameters.
+ * For each query row in @p queries, the kernel searches all partitions in parallel
+ * (blockIdx.z = partition_id, blockIdx.y = query_id) into an internal intermediate buffer.
+ * Per-partition distance post-processing is applied, then a batched select_k merges across
+ * partitions and a small decode pass writes the final outputs.
  *
- * @param indices    per-partition indices (strided datasets only for now)
- * @param queries    per-partition query views — same vector repeated for each partition
- * @param neighbors  per-partition output neighbor views — each [num_queries, topk]
- * @param distances  per-partition output distance views — each [num_queries, topk]
+ * @param indices         CAGRA index objects, one per partition (strided datasets only)
+ * @param queries         queries matrix [n_queries, dim]; searched against every partition
+ * @param partition_ids   output: which partition each neighbor came from, shape [n_queries, k]
+ * @param neighbors       output: ordinal in partition[i]'s dataset, shape [n_queries, k]
+ * @param distances       output: post-processed distance, shape [n_queries, k]
  */
 template <typename T,
           typename OutputIdxT         = uint32_t,
@@ -272,9 +277,10 @@ void search_multi_partition(
   raft::resources const& res,
   search_params params,
   const std::vector<const index<T, IdxT>*>& indices,
-  const std::vector<raft::device_matrix_view<const T, int64_t, raft::row_major>>& queries,
-  const std::vector<raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major>>& neighbors,
-  const std::vector<raft::device_matrix_view<DistanceT, int64_t, raft::row_major>>& distances,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
   CagraSampleFilterT sample_filter = CagraSampleFilterT{})
 {
   static_assert(std::is_same_v<IdxT, uint32_t>, "Only uint32_t graph index type is supported");
@@ -282,13 +288,19 @@ void search_multi_partition(
 
   const uint32_t num_partitions = static_cast<uint32_t>(indices.size());
   RAFT_EXPECTS(num_partitions > 0, "At least one partition is required");
-  RAFT_EXPECTS(queries.size() == num_partitions && neighbors.size() == num_partitions &&
-                 distances.size() == num_partitions,
-               "All input vectors must have the same size");
 
-  const int64_t dim        = queries[0].extent(1);
-  const uint32_t topk      = static_cast<uint32_t>(neighbors[0].extent(1));
-  const uint32_t n_queries = static_cast<uint32_t>(queries[0].extent(0));
+  const uint32_t n_queries = static_cast<uint32_t>(queries.extent(0));
+  const int64_t dim        = queries.extent(1);
+  const uint32_t topk      = static_cast<uint32_t>(neighbors.extent(1));
+
+  RAFT_EXPECTS(partition_ids.extent(0) == static_cast<int64_t>(n_queries) &&
+                 partition_ids.extent(1) == static_cast<int64_t>(topk),
+               "partition_ids shape must be [n_queries, k]");
+  RAFT_EXPECTS(neighbors.extent(0) == static_cast<int64_t>(n_queries),
+               "neighbors and queries must have the same number of rows");
+  RAFT_EXPECTS(distances.extent(0) == static_cast<int64_t>(n_queries) &&
+                 distances.extent(1) == static_cast<int64_t>(topk),
+               "distances shape must be [n_queries, k]");
 
   // Find the max graph_degree across all partitions (needed for the shared kernel plan).
   int64_t max_graph_degree = 0;
@@ -331,7 +343,7 @@ void search_multi_partition(
     res, params, *strided_dset0, indices[0]->metric(), dataset_norms_ptr0);
 
   single_cta_search::
-    search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, OutputIdxT>
+    search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, graph_idx_type>
       plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
   // Multi-partition produces the global top-k by merging itopk_size candidates from each partition.
@@ -347,12 +359,12 @@ void search_multi_partition(
                num_partitions,
                topk);
 
-  // Build per-partition descriptors and result pointers on the host.
-  // The device copy is allocated below.
+  cudaStream_t stream = raft::resource::get_cuda_stream(res);
+
+  // Build per-partition descriptors on the host. Queries and result buffers are shared across
+  // partitions and are passed to the kernel as separate parameters.
   using part_desc_t = single_cta_search::multi_partition_desc_t<T, graph_idx_type, DistanceT>;
   std::vector<part_desc_t> host_part_descs(num_partitions);
-
-  cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
   // Collect per-partition dataset descriptors (may trigger lazy device init on `stream`).
   std::vector<dataset_descriptor_host<T, graph_idx_type, DistanceT>> part_dataset_descs;
@@ -376,16 +388,9 @@ void search_multi_partition(
     host_part_descs[i].dataset_desc = part_dataset_descs.back().dev_ptr(stream);
     host_part_descs[i].graph        = indices[i]->graph().data_handle();
     host_part_descs[i].graph_degree = static_cast<uint32_t>(indices[i]->graph().extent(1));
-    host_part_descs[i].queries_ptr  = queries[i].data_handle();
-
-    // Tag the result_indices_ptr with the OutputIdxT size (same convention as select_and_run).
-    constexpr uintptr_t kTag = raft::Pow2<sizeof(OutputIdxT)>::Log2;
-    host_part_descs[i].result_indices_ptr =
-      reinterpret_cast<uintptr_t>(neighbors[i].data_handle()) | kTag;
-    host_part_descs[i].result_distances_ptr = distances[i].data_handle();
   }
 
-  // Upload partition descriptors via workspace pool (no cudaMallocAsync/cudaFreeAsync after warmup).
+  // Upload partition descriptors via workspace pool.
   lightweight_uvector<part_desc_t> dev_part_descs_buf(res);
   dev_part_descs_buf.resize(num_partitions, stream);
   RAFT_CUDA_TRY(cudaMemcpyAsync(dev_part_descs_buf.data(),
@@ -394,43 +399,144 @@ void search_multi_partition(
                                 cudaMemcpyHostToDevice,
                                 stream));
 
+  // Allocate intermediate buffers: [num_partitions, n_queries, topk] (partition-major). This
+  // layout matches search_core's hardcoded per-query stride of topk inside each partition's
+  // contiguous slice.
+  const size_t partition_stride  = static_cast<size_t>(n_queries) * topk;
+  const size_t intermediate_size = static_cast<size_t>(num_partitions) * partition_stride;
+  lightweight_uvector<graph_idx_type> intermediate_neighbors(res);
+  lightweight_uvector<DistanceT> intermediate_distances(res);
+  intermediate_neighbors.resize(intermediate_size, stream);
+  intermediate_distances.resize(intermediate_size, stream);
+
   // Launch all-partition kernel; stream ordering ensures descriptor upload and per-partition
   // dataset_desc device-init complete before the search kernel executes.
-  plan.run_multi_partition(
-    res, dev_part_descs_buf.data(), num_partitions, n_queries, topk, sample_filter);
-  // dev_part_descs_buf destructor returns memory to workspace pool (stream-ordered).
+  plan.run_multi_partition(res,
+                           dev_part_descs_buf.data(),
+                           num_partitions,
+                           queries.data_handle(),
+                           n_queries,
+                           intermediate_neighbors.data(),
+                           intermediate_distances.data(),
+                           topk,
+                           sample_filter);
 
-  // Post-process distances (scale + metric transform) for each partition.
+  // Per-partition distance post-processing (scale + metric transform). Each partition's slice in
+  // intermediate_distances has shape [n_queries, topk] and is contiguous row-major.
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
+
+  // Query norms (used only by CosineExpanded). Queries are shared across partitions, so compute
+  // once. The unconditional allocation is small (n_queries floats) relative to the search.
+  auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, n_queries);
+  {
+    auto scaled_sq_op = raft::compose_op(raft::sq_op{},
+                                         raft::div_const_op<DistanceT>{DistanceT(kScale)},
+                                         raft::cast_op<DistanceT>());
+    raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
+      res,
+      raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+        queries.data_handle(), n_queries, dim),
+      query_norms.view(),
+      (DistanceT)0,
+      false,
+      scaled_sq_op,
+      raft::add_op(),
+      raft::sqrt_op{});
+  }
+
   for (uint32_t i = 0; i < num_partitions; i++) {
-    float* dist_out          = distances[i].data_handle();
-    const DistanceT* dist_in = distances[i].data_handle();
+    DistanceT* slice_ptr =
+      intermediate_distances.data() + static_cast<size_t>(i) * partition_stride;
     if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      auto query_norms  = raft::make_device_vector<DistanceT, int64_t>(res, n_queries);
-      auto scaled_sq_op = raft::compose_op(raft::sq_op{},
-                                           raft::div_const_op<DistanceT>{DistanceT(kScale)},
-                                           raft::cast_op<DistanceT>());
-      raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
-        res,
-        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-          queries[i].data_handle(), n_queries, dim),
-        query_norms.view(),
-        (DistanceT)0,
-        false,
-        scaled_sq_op,
-        raft::add_op(),
-        raft::sqrt_op{});
+      auto slice_view = raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
+        slice_ptr, n_queries, topk);
       raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
         res,
-        raft::make_const_mdspan(distances[i]),
+        raft::make_const_mdspan(slice_view),
         raft::make_const_mdspan(query_norms.view()),
-        distances[i],
+        slice_view,
         raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_checkzero_op{}));
     } else {
       cuvs::neighbors::ivf::detail::postprocess_distances(
-        res, dist_out, dist_in, indices[i]->metric(), n_queries, topk, kScale, true);
+        res, slice_ptr, slice_ptr, indices[i]->metric(), n_queries, topk, kScale, true);
     }
+  }
+
+  // Transpose intermediate_distances from [num_partitions, n_queries, topk] to
+  // [n_queries, num_partitions * topk] so batched select_k can pick global top-k per query.
+  // (raft::matrix::select_k requires row-major contiguous input; a strided view won't suffice.)
+  lightweight_uvector<DistanceT> transposed_distances(res);
+  transposed_distances.resize(intermediate_size, stream);
+  {
+    const DistanceT* src               = intermediate_distances.data();
+    const int64_t row_stride           = static_cast<int64_t>(num_partitions) * topk;
+    const int64_t partition_stride_i64 = static_cast<int64_t>(partition_stride);
+    const int64_t topk_i64             = topk;
+    auto transposed_view = raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
+      transposed_distances.data(), static_cast<int64_t>(n_queries), row_stride);
+    raft::linalg::map_offset(
+      res,
+      transposed_view,
+      [src, row_stride, partition_stride_i64, topk_i64] __device__(int64_t idx) {
+        const int64_t q   = idx / row_stride;
+        const int64_t rem = idx % row_stride;
+        const int64_t p   = rem / topk_i64;
+        const int64_t j   = rem % topk_i64;
+        return src[p * partition_stride_i64 + q * topk_i64 + j];
+      });
+  }
+
+  // Batched select_k: for each query row, find the global top-k across all partition slots.
+  // Writes the final `distances` directly; writes positions in [0, num_partitions * topk) into
+  // `positions_buf` for decoding into partition_ids and neighbors below.
+  lightweight_uvector<uint32_t> positions_buf(res);
+  positions_buf.resize(static_cast<size_t>(n_queries) * topk, stream);
+  auto positions_view = raft::make_device_matrix_view<uint32_t, int64_t, raft::row_major>(
+    positions_buf.data(), n_queries, topk);
+
+  raft::matrix::select_k<DistanceT, uint32_t>(
+    res,
+    raft::make_device_matrix_view<const DistanceT, int64_t, raft::row_major>(
+      transposed_distances.data(),
+      static_cast<int64_t>(n_queries),
+      static_cast<int64_t>(num_partitions) * topk),
+    std::nullopt,
+    distances,
+    positions_view,
+    /*select_min=*/true);
+
+  // Decode positions into partition_ids and neighbors.
+  // positions[q, j_out] ∈ [0, num_partitions * topk) encodes (partition, slot_in_partition):
+  //   partition_ids[q, j_out] = pos / topk
+  //   neighbors[q, j_out]     = intermediate_neighbors[(pos / topk) * partition_stride
+  //                                                    + q * topk + (pos % topk)]
+  {
+    const uint32_t topk_u32 = topk;
+    raft::linalg::map(
+      res,
+      partition_ids,
+      [topk_u32] __device__(uint32_t pos) { return pos / topk_u32; },
+      raft::make_const_mdspan(positions_view));
+  }
+  {
+    const graph_idx_type* intermediate_neighbors_ptr = intermediate_neighbors.data();
+    const uint32_t* positions_ptr                    = positions_buf.data();
+    const int64_t partition_stride_i64               = static_cast<int64_t>(partition_stride);
+    const int64_t topk_i64                           = topk;
+    raft::linalg::map_offset(
+      res,
+      neighbors,
+      [intermediate_neighbors_ptr, positions_ptr, partition_stride_i64, topk_i64] __device__(
+        int64_t idx) {
+        const int64_t q     = idx / topk_i64;
+        const int64_t j_out = idx % topk_i64;
+        const uint32_t pos  = positions_ptr[q * topk_i64 + j_out];
+        const int64_t p     = pos / static_cast<uint32_t>(topk_i64);
+        const int64_t j_in  = pos % static_cast<uint32_t>(topk_i64);
+        return static_cast<OutputIdxT>(
+          intermediate_neighbors_ptr[p * partition_stride_i64 + q * topk_i64 + j_in]);
+      });
   }
 }
 

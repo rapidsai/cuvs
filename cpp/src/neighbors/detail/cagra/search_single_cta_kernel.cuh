@@ -14,17 +14,16 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
  * @brief Per-partition descriptor for the multi-partition CAGRA search kernel.
  *
  * One instance per index partition; the kernel reads this array from device memory using
- * blockIdx.z as the partition index.
+ * blockIdx.z as the partition index. Queries and result buffers are shared across all
+ * partitions, so they are passed to the kernel as separate parameters rather than embedded
+ * in this descriptor.
  */
 template <typename DataT, typename IndexT, typename DistanceT>
 struct alignas(16) multi_partition_desc_t {
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc;
-  const DataT* queries_ptr;         // [num_queries, dim] for this partition
-  const IndexT* graph;              // [dataset_size, graph_degree]
+  const IndexT* graph;  // [dataset_size, graph_degree]
   uint32_t graph_degree;
   uint32_t _pad;
-  uintptr_t result_indices_ptr;     // tagged pointer: [num_queries, top_k]
-  DistanceT* result_distances_ptr;  // [num_queries, top_k]
 };
 
 template <typename DataT,
@@ -63,7 +62,10 @@ template <typename DataT,
 void select_and_run_multi_partition(
   const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
   uint32_t num_partitions,
+  const DataT* queries_ptr,             // [num_queries, dim], shared across partitions
   uint32_t num_queries,
+  IndexT* intermediate_neighbors_ptr,   // [num_queries, num_partitions * topk]
+  DistanceT* intermediate_distances_ptr,// [num_queries, num_partitions * topk]
   const search_params& ps,
   uint32_t topk,
   uint32_t num_itopk_candidates,

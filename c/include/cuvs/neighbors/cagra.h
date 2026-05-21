@@ -713,24 +713,29 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsFilter filter);
 
 /**
- * @brief Search multiple CAGRA index partitions concurrently using a single GPU kernel launch.
+ * @brief Search multiple CAGRA index partitions concurrently and return the global top-k per
+ * query.
  *
- * Launches a single kernel with grid (1, num_queries, num_partitions) so each CTA handles one
- * (query, partition) pair concurrently. All results land in the caller-supplied device buffers
- * on the same CUDA stream, so downstream operations (e.g. selectK) see them via stream ordering
- * with no explicit synchronization needed.
+ * For each query row, the function searches all partitions in parallel into an internal
+ * intermediate buffer, applies per-partition distance post-processing, runs a batched top-k
+ * merge across partitions, and writes the final outputs to the caller-supplied device tensors.
+ * All work is submitted to the CUDA stream associated with @p res; use @c cuvsStreamSync to
+ * wait for completion.
  *
- * Only float32 datasets are currently supported.  Distance values are comparable across partitions
- * (same scale) but are not postprocessed (no kScale correction) — they are suitable for
- * relative comparison (selectK / recall).
+ * Only float32 datasets are currently supported.
  *
  * @param[in]  res            cuvsResources_t opaque C handle
- * @param[in]  params         search parameters
+ * @param[in]  params         search parameters (shared across partitions)
  * @param[in]  num_partitions number of index partitions
  * @param[in]  indices        array of num_partitions cuvsCagraIndex_t pointers
- * @param[in]  queries        array of num_partitions DLManagedTensor* (device, float32, [nq, dim])
- * @param[out] neighbors      array of num_partitions DLManagedTensor* (device, uint32, [nq, topk])
- * @param[out] distances      array of num_partitions DLManagedTensor* (device, float32, [nq, topk])
+ * @param[in]  queries        DLManagedTensor* (device, float32, [n_queries, dim]); the queries
+ *                            matrix is searched against every partition
+ * @param[out] partition_ids  DLManagedTensor* (device, uint32, [n_queries, k]); which partition
+ *                            each returned neighbor came from
+ * @param[out] neighbors      DLManagedTensor* (device, uint32 or int64, [n_queries, k]); ordinal
+ *                            in the corresponding partition's dataset
+ * @param[out] distances      DLManagedTensor* (device, float32, [n_queries, k]); post-processed
+ *                            distance for each (query, neighbor)
  * @param[in]  filter         filter to apply during search; use {.type=NO_FILTER, .addr=0} for
  *                            unfiltered search, or {.type=MULTI_PARTITION_BITSET, .addr=ptr} where
  *                            ptr is a uintptr_t-cast cuvsMultiPartitionBitsetFilter*
@@ -739,9 +744,10 @@ cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
                                           cuvsCagraSearchParams_t params,
                                           uint32_t num_partitions,
                                           cuvsCagraIndex_t* indices,
-                                          DLManagedTensor** queries,
-                                          DLManagedTensor** neighbors,
-                                          DLManagedTensor** distances,
+                                          DLManagedTensor* queries,
+                                          DLManagedTensor* partition_ids,
+                                          DLManagedTensor* neighbors,
+                                          DLManagedTensor* distances,
                                           cuvsFilter filter);
 
 /**
