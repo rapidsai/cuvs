@@ -68,9 +68,9 @@ Use these integrations when data locality, storage throughput, and RAG pipeline 
 
 [NetApp AIPod](https://www.netapp.com/nvidia/) supports NVIDIA AI Data Platform deployments with NetApp ONTAP data management, scalable storage, and NVIDIA accelerated computing. The integration is designed for governed RAG and inference pipelines that scan, index, classify, and retrieve enterprise documents for AI agents. See NetApp's [AI Data Platform announcement](https://www.netapp.com/newsroom/press-releases/news-rel-20250518-700517/) and [AI infrastructure documentation](https://docs.netapp.com/us-en/netapp-solutions-ai/ai-infrastructures/).
 
-### Pure Storage
+### Everpure
 
-[Pure Storage FlashBlade](https://www.purestorage.com/company/newsroom/press-releases/pure-storage-integrates-nvidia-ai-data-platform-into-flashblade.html?Social+Account=Pure+Storage+%28Default%29) integrates with the NVIDIA AI Data Platform reference design for agentic AI, RAG, and inference workflows. Pure Storage positions FlashBlade as a high-throughput storage layer for NVIDIA accelerated compute and NVIDIA AI Enterprise software, while [FlashBlade//EXA](https://www.pure.ai/flashblade-exa.html) targets large-scale AI and HPC workloads that need high metadata performance and low-latency access to multimodal data.
+[Everpure FlashBlade](https://www.purestorage.com/company/newsroom/press-releases/pure-storage-integrates-nvidia-ai-data-platform-into-flashblade.html?Social+Account=Pure+Storage+%28Default%29) integrates with the NVIDIA AI Data Platform reference design for agentic AI, RAG, and inference workflows. Everpure positions FlashBlade as a high-throughput storage layer for NVIDIA accelerated compute and NVIDIA AI Enterprise software, while [FlashBlade//EXA](https://www.pure.ai/flashblade-exa.html) targets large-scale AI and HPC workloads that need high metadata performance and low-latency access to multimodal data.
 
 ### WEKA
 
