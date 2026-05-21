@@ -12,9 +12,3 @@ Use these pages when working on specialized cuVS development topics that need lo
 - [JIT Compilation](jit_compilation.md): understand when cuVS triggers just-in-time compilation, how caches behave, and how to warm up JIT-compiled kernels.
 - [Link-time Optimization](jit_lto_guide.md): use JIT LTO for CUDA compilation, fragment generation, and runtime linking workflows.
 - [UDF Usage](udf_usage.md): supply custom CUDA distance metrics for IVF-flat search (C++ only, experimental).
-
-## User-defined metrics (UDFs)
-
-UDFs are available in the following APIs:
-
-- IVF-flat search (C++ only): experimental custom distance via `search_params.metric_udf`; see [UDF Usage](udf_usage.md).
