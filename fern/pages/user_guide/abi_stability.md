@@ -31,7 +31,7 @@ The NVIDIA cuVS version tells you which release you are using. The ABI version t
 
 ## Release Versioning
 
-NVIDIA cuVS follows the [Calendar Versioning](https://calver.org/overview.html) scheme used by RAPIDS. A NVIDIA cuVS version such as `26.04` means the release was made in April 2026.
+NVIDIA cuVS follows the [Calendar Versioning](https://calver.org/overview.html) scheme used by RAPIDS. An NVIDIA cuVS version such as `26.04` means the release was made in April 2026.
 
 RAPIDS releases are scheduled every even-numbered month. The current release schedule is published in the [RAPIDS Maintainers Docs](https://docs.rapids.ai/maintainers/), and completed release schedules are archived on the [RAPIDS release schedule page](https://docs.rapids.ai/releases/schedule/).
 
@@ -50,7 +50,7 @@ The ABI major version identifies a compatibility family. For example, ABI `1.x` 
 
 ## Compatibility Rule
 
-A NVIDIA cuVS runtime is ABI-compatible with an application when both of these are true:
+An NVIDIA cuVS runtime is ABI-compatible with an application when both of these are true:
 
 1. The runtime has the same ABI major version as the version used when the application was built.
 2. The runtime NVIDIA cuVS version is the same as or newer than the version used when the application was built.

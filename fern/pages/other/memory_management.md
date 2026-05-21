@@ -395,7 +395,7 @@ func main() error {
 
 ## How Memory Management works
 
-RMM separates allocation policy from algorithm code. A NVIDIA cuVS algorithm asks RAFT for memory through the active resource, and the resource decides whether the allocation comes from direct device memory, a pool, managed memory, or a host allocation path.
+RMM separates allocation policy from algorithm code. An NVIDIA cuVS algorithm asks RAFT for memory through the active resource, and the resource decides whether the allocation comes from direct device memory, a pool, managed memory, or a host allocation path.
 
 This design gives users three practical benefits:
 
