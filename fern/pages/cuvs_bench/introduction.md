@@ -1,8 +1,8 @@
-# NVIDIA cuVS Bench
+# cuVS Bench
 
-NVIDIA cuVS Bench is a reproducible benchmarking tool for ANN search implementations. It supports GPU-to-GPU and GPU-to-CPU comparisons, and helps capture index configurations that can be reproduced across on-prem and cloud hardware.
+cuVS Bench is a reproducible benchmarking tool for ANN search implementations. It supports GPU-to-GPU and GPU-to-CPU comparisons, and helps capture index configurations that can be reproduced across on-prem and cloud hardware.
 
-Use NVIDIA cuVS Bench to compare build time, search throughput, latency, and recall; find useful parameter settings for recall buckets; generate consistent plots; and identify optimization opportunities across index parameters, build time, and search performance.
+Use cuVS Bench to compare build time, search throughput, latency, and recall; find useful parameter settings for recall buckets; generate consistent plots; and identify optimization opportunities across index parameters, build time, and search performance.
 
 For dataset file formats, conversion utilities, and ground-truth generation, see [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets).
 

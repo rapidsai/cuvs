@@ -1,6 +1,6 @@
-# Install NVIDIA cuVS Bench
+# Install cuVS Bench
 
-Use these instructions when you want to run NVIDIA cuVS Bench with pre-built packages or containers. Conda is usually the simplest option for local Python workflows, while Docker is useful when you want a reproducible container image with the benchmark environment already included.
+Use these instructions when you want to run cuVS Bench with pre-built packages or containers. Conda is usually the simplest option for local Python workflows, while Docker is useful when you want a reproducible container image with the benchmark environment already included.
 
 There are two main ways pre-compiled benchmarks are distributed:
 
@@ -51,7 +51,7 @@ Exact tags are listed on Docker Hub:
 
 ## Build from Source
 
-Build NVIDIA cuVS Bench from source when you need local benchmark executables that match a development checkout, include custom algorithm targets, or use dependencies that are not available in the pre-built packages.
+Build cuVS Bench from source when you need local benchmark executables that match a development checkout, include custom algorithm targets, or use dependencies that are not available in the pre-built packages.
 
 ### Dependencies
 

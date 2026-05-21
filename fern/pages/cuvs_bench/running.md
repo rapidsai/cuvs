@@ -1,6 +1,6 @@
 # Usage
 
-This page shows how to configure algorithms, run NVIDIA cuVS Bench from the command line, use Docker containers, and read the build and search results. The command-line runner uses the NVIDIA cuVS Bench orchestrator and the default `cpp_gbench` backend, so the end-to-end workflow can stay fully CLI-based. For dataset formats, built-in datasets, custom dataset descriptors, and ground-truth generation, see [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets).
+This page shows how to configure algorithms, run cuVS Bench from the command line, use Docker containers, and read the build and search results. The command-line runner uses the cuVS Bench orchestrator and the default `cpp_gbench` backend, so the end-to-end workflow can stay fully CLI-based. For dataset formats, built-in datasets, custom dataset descriptors, and ground-truth generation, see [Benchmark Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets).
 
 ## Creating and customizing algorithm configurations
 
@@ -67,7 +67,7 @@ Create a custom YAML file with a `base` group to override the default benchmark 
 
 ### Multi-GPU algorithms
 
-NVIDIA cuVS Bench includes single-node multi-GPU versions of IVF-Flat, IVF-PQ, and CAGRA.
+cuVS Bench includes single-node multi-GPU versions of IVF-Flat, IVF-PQ, and CAGRA.
 
 | Index type | Multi-GPU algo name |
 | --- | --- |
@@ -224,4 +224,4 @@ Search benchmarks report:
 
 ## Summary
 
-NVIDIA cuVS Bench usage has three main steps: configure datasets and algorithm sweeps, run build and search through Python or Docker, and compare the reported build and search measurements. Start with built-in datasets for smaller tests, prepare large datasets separately for scale testing, and use the result tables to compare quality, latency, throughput, build time, and resource behavior across parameter settings.
+cuVS Bench usage has three main steps: configure datasets and algorithm sweeps, run build and search through Python or Docker, and compare the reported build and search measurements. Start with built-in datasets for smaller tests, prepare large datasets separately for scale testing, and use the result tables to compare quality, latency, throughput, build time, and resource behavior across parameter settings.

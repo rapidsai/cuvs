@@ -52,11 +52,11 @@ Use these guides when you are ready to apply NVIDIA cuVS APIs, benchmark algorit
 ## Benchmarking Guide
 
 - [Methodologies](/user-guide/benchmarking-guide/methodologies): compare vector indexes fairly with quality buckets, Pareto curves, and consistent reporting.
-- [NVIDIA cuVS Bench Tool](/user-guide/benchmarking-guide/cu-vs-bench-tool): start with the NVIDIA cuVS Bench guide for reproducible benchmark workflows.
-- [NVIDIA cuVS Bench Installation](/user-guide/benchmarking-guide/cu-vs-bench-tool/installation): install NVIDIA cuVS Bench with packages or containers, or build it from source.
-- [NVIDIA cuVS Bench Usage](/user-guide/benchmarking-guide/cu-vs-bench-tool/usage): configure algorithms, run benchmarks, and read build and search results.
-- [NVIDIA cuVS Bench Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets): prepare datasets, ground truth, binary files, and dataset descriptors.
-- [NVIDIA cuVS Bench Backends](/user-guide/benchmarking-guide/cu-vs-bench-tool/backends): understand and extend backend integrations for benchmark execution.
+- [cuVS Bench Tool](/user-guide/benchmarking-guide/cu-vs-bench-tool): start with the cuVS Bench guide for reproducible benchmark workflows.
+- [cuVS Bench Installation](/user-guide/benchmarking-guide/cu-vs-bench-tool/installation): install cuVS Bench with packages or containers, or build it from source.
+- [cuVS Bench Usage](/user-guide/benchmarking-guide/cu-vs-bench-tool/usage): configure algorithms, run benchmarks, and read build and search results.
+- [cuVS Bench Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets): prepare datasets, ground truth, binary files, and dataset descriptors.
+- [cuVS Bench Backends](/user-guide/benchmarking-guide/cu-vs-bench-tool/backends): understand and extend backend integrations for benchmark execution.
 
 ## Compatibility and Integration
 

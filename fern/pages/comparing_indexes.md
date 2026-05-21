@@ -2,7 +2,7 @@
 
 Vector search indexes should be compared by both search quality and performance. A fast index is not useful if it misses too many neighbors, and a high-recall index may not be practical if it is too slow to build or query. For index selection guidance, see [Vector Database](/getting-started/introduction/vector-database).
 
-This page describes how to make benchmark results comparable by using recall buckets, Pareto curves, and consistent reporting for build and search metrics. It also explains how these ideas apply to large datasets and points to NVIDIA cuVS Bench for reproducible benchmark runs.
+This page describes how to make benchmark results comparable by using recall buckets, Pareto curves, and consistent reporting for build and search metrics. It also explains how these ideas apply to large datasets and points to cuVS Bench for reproducible benchmark runs.
 
 ## Pareto curves
 
@@ -55,4 +55,4 @@ For a step-by-step workflow, see [Tuning Indexes](/getting-started/introduction/
 - Generate exact ground truth, sweep or tune build and search parameters, group results into recall buckets, and compare Pareto points within each bucket.
 - Report recall, latency, throughput, build time, and memory (if needed) together so quality and performance are not separated from the cost of achieving them.
 
-NVIDIA cuVS provides [NVIDIA cuVS Bench](/user-guide/benchmarking-guide/cu-vs-bench-tool/introduction) for reproducible benchmarks that follow these methodologies and produce comparable outputs across datasets, algorithms, and hardware.
+NVIDIA cuVS provides [cuVS Bench](/user-guide/benchmarking-guide/cu-vs-bench-tool/introduction) for reproducible benchmarks that follow these methodologies and produce comparable outputs across datasets, algorithms, and hardware.

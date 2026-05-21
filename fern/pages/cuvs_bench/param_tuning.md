@@ -1,6 +1,6 @@
-# NVIDIA cuVS Bench Parameter Tuning Guide
+# cuVS Bench Parameter Tuning Guide
 
-This guide outlines the various parameter settings that can be specified in [NVIDIA cuVS Benchmarks](/user-guide/benchmarking-guide/cu-vs-bench-tool) yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
+This guide outlines the various parameter settings that can be specified in [cuVS Benchmarks](/user-guide/benchmarking-guide/cu-vs-bench-tool) yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
 
 ## Benchmark modes
 

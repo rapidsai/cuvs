@@ -332,7 +332,7 @@ Public APIs need direct test coverage because downstream projects rely on their 
 
 ### Performance Benchmarking
 
-The most important implementation details in NVIDIA cuVS are written in C++ and CUDA, so performance-sensitive changes need benchmarks with clear baselines. Benchmarks should show that regressions have not occurred, intended improvements can be reproduced consistently, and the implementation scales as expected across problem sizes and hardware configurations. For relevant indexing APIs, it is often preferable to use the [NVIDIA cuVS Bench Tool](/user-guide/benchmarking-guide/cu-vs-bench-tool) for reproducible benchmarks.
+The most important implementation details in NVIDIA cuVS are written in C++ and CUDA, so performance-sensitive changes need benchmarks with clear baselines. Benchmarks should show that regressions have not occurred, intended improvements can be reproduced consistently, and the implementation scales as expected across problem sizes and hardware configurations. For relevant indexing APIs, it is often preferable to use the [cuVS Bench Tool](/user-guide/benchmarking-guide/cu-vs-bench-tool) for reproducible benchmarks.
 
 Attach benchmark results to the relevant GitHub pull request so future reviewers and contributors have an audit trail. Pull requests that change performance-critical code should not be merged without proper benchmarks in place.
 
