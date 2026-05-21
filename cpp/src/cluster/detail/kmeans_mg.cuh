@@ -751,41 +751,4 @@ void fit(const raft::resources& handle,
   }
   n_iter[0] = std::min(n_iter[0], static_cast<IndexT>(params.max_iter));
 }
-
-// =========================================================================
-// Streaming / multi-partition fit overloads.
-//
-// These thin wrappers delegate to mnmg_fit() in kmeans_mg_batched.cuh so the
-// device-data fit() above remains the only path that talks directly to
-// raft::comms; streaming and partitioned inputs are funneled through the
-// unified batched implementation.
-// =========================================================================
-
-// MNMG kmeans fit with host data (streaming).
-template <typename DataT, typename IndexT>
-void fit(const raft::resources& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::host_matrix_view<const DataT, IndexT> X,
-         std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
-         raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
-{
-  mnmg_fit<DataT, IndexT>(handle, params, X, sample_weight, centroids, inertia, n_iter);
-}
-
-// MNMG kmeans fit with multiple local data partitions.
-template <typename DataT, typename IndexT, typename Accessor>
-void fit(const raft::resources& handle,
-         const cuvs::cluster::kmeans::params& params,
-         const std::vector<partitioned_matrix_view<DataT, IndexT, Accessor>>& X_parts,
-         const std::optional<std::vector<partitioned_vector_view<DataT, IndexT, Accessor>>>&
-           sample_weight_parts,
-         raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
-{
-  mnmg_fit(handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
-}
-
 };  // namespace cuvs::cluster::kmeans::mg::detail
