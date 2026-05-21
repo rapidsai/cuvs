@@ -1,7 +1,3 @@
----
-slug: developer-guide/advanced-topics/udf-usage
----
-
 # UDF Usage
 
 > **Caution:** Custom distance metrics for IVF-flat search are **experimental**. They live under the `cuvs::neighbors::ivf_flat::experimental::udf` namespace and the associated `CUVS_METRIC` macro. APIs and behavior may change without a major release.
@@ -48,7 +44,7 @@ void run_search(raft::resources const& res,
 }
 ```
 
-## Helpers in `CUVS_METRIC` bodies {#helpers-in-cuvs_metric-bodies}
+## Helpers in `CUVS_METRIC` bodies
 
 Inside `CUVS_METRIC(MyName, { ... })` you write the body of `operator()(AccT& acc, point_type x, point_type y)`. In scope: `acc`, `x`, `y`, template parameters `T`, `AccT`, `Veclen`, and the helpers below. The macro's full argument list and notes live beside `CUVS_METRIC` in `<cuvs/neighbors/ivf_flat.hpp>`.
 
