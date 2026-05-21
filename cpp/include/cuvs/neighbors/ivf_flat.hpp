@@ -3576,4 +3576,5 @@ __device__ __forceinline__ void compute_dist_udf_impl(AccT& acc, AccT x, AccT y)
 
 }  // namespace ivf_flat
 }  // namespace neighbors
+
 }  // namespace CUVS_EXPORT cuvs
