@@ -23,4 +23,4 @@ Use these pages when contributing to cuVS or working on integrations that need t
 
 ## Contributing
 
-- [Contributing](contributing.md): learn how to set up a development environment, submit changes, and work with the project.
+- [Contributing](/developer-guide/contributing): learn how to set up a development environment, submit changes, and work with the project.

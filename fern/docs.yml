@@ -220,7 +220,7 @@ navigation:
           - page: "Link-time Optimization"
             path: "./pages/jit_lto_guide.md"
       - page: "Contributing"
-        path: "./pages/contributing.md"
+        path: "../CONTRIBUTING.md"
   - section: "API Reference"
     contents:
       - section: "C API Documentation"

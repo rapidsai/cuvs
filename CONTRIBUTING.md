@@ -20,7 +20,7 @@ into three categories:
 
 ## Code contributions
 
-Performance-critical changes require [proper benchmarks](cpp_guidelines.md#performance-benchmarking). Pull requests that affect performance-critical paths will not be merged until those benchmarks are produced; there are no exceptions to this rule.
+Performance-critical changes require [proper benchmarks](fern/pages/cpp_guidelines.md#performance-benchmarking). Pull requests that affect performance-critical paths will not be merged until those benchmarks are produced; there are no exceptions to this rule.
 
 ### Your first issue
 

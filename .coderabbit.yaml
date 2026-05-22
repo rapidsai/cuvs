@@ -73,5 +73,5 @@ knowledge_base:
     filePatterns:
       - "cpp/REVIEW_GUIDELINES.md"
       - "python/REVIEW_GUIDELINES.md"
-      - "docs/source/contributing.md"
-      - "docs/source/developer_guide.md"
+      - "CONTRIBUTING.md"
+      - "fern/pages/developer_guide.md"
