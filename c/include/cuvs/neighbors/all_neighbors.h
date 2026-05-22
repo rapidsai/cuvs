@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,12 +12,14 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
+#include <cuvs/core/export.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @defgroup all_neighbors_c_build All-neighbors C-API build
+ * @defgroup all_neighbors_c_params All-neighbors C-API build parameters
  * @{
  *
  * All-neighbors constructs an approximate k-NN graph for all vectors in a dataset.
@@ -67,7 +69,7 @@ typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
  *
  * @return cuvsError_t
  */
-cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
 
 /**
  * @brief Destroy an all-neighbors index parameters struct.
@@ -76,7 +78,14 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
  *
  * @return cuvsError_t
  */
-cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
+
+/** @} */
+
+/**
+ * @defgroup all_neighbors_c_build All-neighbors C-API build
+ * @{
+ */
 
 /**
  * @brief Build an all-neighbors k-NN graph automatically detecting host vs device dataset.
@@ -96,7 +105,7 @@ cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t ind
  * datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored.
  * Outputs always reside in device memory.
  */
-cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
                                   cuvsAllNeighborsIndexParams_t params,
                                   DLManagedTensor* dataset,
                                   DLManagedTensor* indices,

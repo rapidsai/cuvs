@@ -5,7 +5,7 @@
 # cmake-format: on
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
 include(../cmake/rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
@@ -99,6 +99,7 @@ add_library(
   src/neighbors/refine.cpp
   src/neighbors/tiered_index.cpp
   src/neighbors/all_neighbors.cpp
+  src/preprocessing/pca.cpp
   src/preprocessing/quantize/binary.cpp
   src/preprocessing/quantize/pq.cpp
   src/preprocessing/quantize/scalar.cpp
@@ -114,6 +115,8 @@ set_target_properties(
              POSITION_INDEPENDENT_CODE ON
              INTERFACE_POSITION_INDEPENDENT_CODE ON
              EXPORT_NAME c_api
+             CXX_VISIBILITY_PRESET hidden
+             VISIBILITY_INLINES_HIDDEN ON
 )
 
 # Setup the VERSION and SOVERSION of our library

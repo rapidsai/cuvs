@@ -21,6 +21,14 @@ Product Quantizer
     :members:
     :content-only:
 
+PCA (Principal Component Analysis)
+-----------------------------------
+
+.. doxygengroup:: preprocessing_c_pca
+    :project: cuvs
+    :members:
+    :content-only:
+
 Scalar Quantizer
 ----------------
 

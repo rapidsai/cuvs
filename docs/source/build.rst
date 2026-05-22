@@ -48,7 +48,7 @@ C/C++ Package
 .. code-block:: bash
 
    # CUDA 13
-   conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.1
+   conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.2
 
    # CUDA 12
    conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
@@ -59,7 +59,7 @@ Python Package
 .. code-block:: bash
 
    # CUDA 13
-   conda install -c rapidsai -c conda-forge cuvs cuda-version=13.1
+   conda install -c rapidsai -c conda-forge cuvs cuda-version=13.2
 
    # CUDA 12
    conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
@@ -130,7 +130,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-131_arch-$(uname -m).yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-132_arch-$(uname -m).yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
@@ -205,7 +205,7 @@ After building the C and C++ libraries, the Golang library can be built with the
 
     export CUDA_HOME="/usr/local/cuda" # or wherever your CUDA installation is.
     export CGO_CFLAGS="-I${CONDA_PREFIX}/include -I${CUDA_HOME}/include"
-    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
+    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcuvs -lcuvs_c"
     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
     export CC=clang
 
@@ -258,11 +258,6 @@ cuVS has the following configurable cmake flags available:
    - ON, OFF
    - OFF
    - Enable the `-lineinfo` option for nvcc
-
- * - CUDA_STATIC_RUNTIME
-   - ON, OFF
-   - OFF
-   - Statically link the CUDA runtime
 
  * - CUDA_STATIC_MATH_LIBRARIES
    - ON, OFF

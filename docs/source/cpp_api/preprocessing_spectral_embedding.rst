@@ -31,8 +31,8 @@ namespace *cuvs::preprocessing::spectral_embedding*
    :project: cuvs
    :members:
 
-Functions
----------
+Spectral Embedding
+------------------
 
 ``#include <cuvs/preprocessing/spectral_embedding.hpp>``
 

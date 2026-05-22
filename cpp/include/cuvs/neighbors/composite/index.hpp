@@ -9,9 +9,12 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_mdspan.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <vector>
 
-namespace cuvs::neighbors::composite {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace composite {
 
 /**
  * @brief Composite index that searches multiple CAGRA sub-indices and merges results.
@@ -91,4 +94,6 @@ class composite_index {
   std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> children_;
 };
 
-}  // namespace cuvs::neighbors::composite
+}  // namespace composite
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

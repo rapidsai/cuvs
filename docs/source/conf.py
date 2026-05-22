@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 import os
@@ -63,7 +63,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "cuvs"
-copyright = "2024, NVIDIA Corporation"
+copyright = "2024 - 2026, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
 # The version info for the project you're documenting, acts as replacement for

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cuvs/core/c_config.h>
+#include <cuvs/core/export.h>
 #include <cuvs/core/c_api.h>
 
 #include <cuvs/cluster/kmeans.h>
@@ -38,6 +39,7 @@
   #include <cuvs/neighbors/mg_ivf_pq.h>
 #endif
 
+#include <cuvs/preprocessing/pca.h>
 #include <cuvs/preprocessing/quantize/binary.h>
 #include <cuvs/preprocessing/quantize/pq.h>
 #include <cuvs/preprocessing/quantize/scalar.h>

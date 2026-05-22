@@ -11,9 +11,12 @@
 #include <raft/random/rng_state.hpp>
 #include <rapids_logger/logger.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 
-namespace cuvs::cluster::kmeans {
+namespace CUVS_EXPORT cuvs {
+namespace cluster {
+namespace kmeans {
 
 /** Base structure for parameters that are common to all k-means algorithms */
 struct base_params {
@@ -100,15 +103,40 @@ struct params : base_params {
    * useful to optimize/control the memory footprint
    * Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0
    * then don't tile the centroids
+   *
+   * NB: These parameters are unrelated to streaming_batch_size, which controls how many
+   * samples to transfer from host to device per batch when processing out-of-core
+   * data.
    */
   int batch_samples = 1 << 15;
 
   /**
    * if 0 then batch_centroids = n_clusters
    */
-  int batch_centroids = 0;  //
+  int batch_centroids = 0;
 
-  bool inertia_check = false;
+  /**
+   * Number of samples to randomly draw for the KMeansPlusPlus initialization
+   * step. A random subset of this size is used for centroid seeding.
+   *
+   * Only applies when dataset is on host; for device data the full dataset
+   * is always used for seeding and this parameter is ignored.
+   *
+   * When set to 0 (default) with host data uses `min(3 * n_clusters, n_samples)`
+   * as a default.
+   *
+   * Default: 0.
+   */
+  int64_t init_size = 0;
+
+  /**
+   * Number of samples to process per GPU batch when fitting with host data.
+   * When set to 0, defaults to n_samples (process all at once).
+   * Only used by the batched (host-data) code path and ignored by device-data
+   * overloads.
+   * Default: 0 (process all data at once).
+   */
+  int64_t streaming_batch_size = 0;
 };
 
 /**
@@ -140,6 +168,82 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * @defgroup kmeans k-means clustering APIs
  * @{
  */
+
+/**
+ * @brief Find clusters with k-means algorithm using batched processing of host data.
+ *
+ * TODO: Evaluate replacing the extent type with int64_t. Reference issue:
+ * https://github.com/rapidsai/cuvs/issues/1961
+ *
+ * This overload supports out-of-core computation where the dataset resides
+ * on the host. Data is processed in GPU-sized batches, streaming from host to device.
+ * The batch size is controlled by params.streaming_batch_size.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
+ *   using namespace cuvs::cluster;
+ *   ...
+ *   raft::resources handle;
+ *   cuvs::cluster::kmeans::params params;
+ *   params.n_clusters = 100;
+ *   params.streaming_batch_size = 100000;
+ *   float inertia;
+ *   int64_t n_iter;
+ *
+ *   // Data on host
+ *   std::vector<float> h_X(n_samples * n_features);
+ *   auto X = raft::make_host_matrix_view<const float, int64_t>(h_X.data(), n_samples, n_features);
+ *
+ *   // Centroids on device
+ *   auto centroids = raft::make_device_matrix<float, int64_t>(handle, params.n_clusters,
+ * n_features);
+ *
+ *   kmeans::fit(handle,
+ *               params,
+ *               X,
+ *               std::nullopt,
+ *               centroids.view(),
+ *               raft::make_host_scalar_view(&inertia),
+ *               raft::make_host_scalar_view(&n_iter));
+ * @endcode
+ *
+ * @param[in]     handle        The raft handle.
+ * @param[in]     params        Parameters for KMeans model. Batch size is read from
+ *                              params.streaming_batch_size.
+ * @param[in]     X             Training instances on HOST memory. The data must
+ *                              be in row-major format.
+ *                              [dim = n_samples x n_features]
+ * @param[in]     sample_weight Optional weights for each observation in X (on host).
+ *                              [len = n_samples]
+ * @param[inout]  centroids     [in] When init is InitMethod::Array, use
+ *                              centroids as the initial cluster centers.
+ *                              [out] The generated centroids from the
+ *                              kmeans algorithm are stored at the address
+ *                              pointed by 'centroids'.
+ *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
+ * @param[out]    n_iter        Number of iterations run.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const float, int64_t> X,
+         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Find clusters with k-means algorithm using batched processing of host data.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const double, int64_t> X,
+         std::optional<raft::host_vector_view<const double, int64_t>> sample_weight,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
 
 /**
  * @brief Find clusters with k-means algorithm.
@@ -1481,15 +1585,14 @@ void cluster_cost(
  * @}
  */
 
+namespace helpers {
 /**
  * @defgroup kmeans_helpers k-means API helpers
  * @{
  */
 
-namespace helpers {
-
 /**
- * Automatically find the optimal value of k using a binary search.
+ * @brief Automatically find the optimal value of k using a binary search.
  * This method maximizes the Calinski-Harabasz Index while minimizing the per-cluster inertia.
  *
  *  @code{.cpp}
@@ -1534,10 +1637,11 @@ void find_k(raft::resources const& handle,
             int kmin    = 1,
             int maxiter = 100,
             float tol   = 1e-3);
-}  // namespace helpers
-
 /**
  * @}
  */
+}  // namespace helpers
 
-}  // namespace  cuvs::cluster::kmeans
+}  // namespace kmeans
+}  // namespace cluster
+}  // namespace CUVS_EXPORT cuvs

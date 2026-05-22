@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/preprocessing/quantize/pq.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../../preprocessing/quantize/detail/pq_codepacking.cuh"  // pq_bits-bitfield
@@ -20,6 +21,7 @@
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 #include <raft/util/vectorized.cuh>
@@ -56,14 +58,13 @@ auto subsample(raft::resources const& res,
   size_t trainset_ratio = dataset.extent(0) / n_samples;
   auto result = raft::make_device_matrix<value_type, index_type>(res, n_samples, dataset.extent(1));
 
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(result.data_handle(),
-                                  sizeof(value_type) * dim,
-                                  dataset.data_handle(),
-                                  sizeof(value_type) * dim * trainset_ratio,
-                                  sizeof(value_type) * dim,
-                                  n_samples,
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(result.data_handle(),
+                    dim,
+                    dataset.data_handle(),
+                    dim * trainset_ratio,
+                    dim,
+                    n_samples,
+                    raft::resource::get_cuda_stream(res));
   return result;
 }
 
@@ -74,50 +75,49 @@ namespace cuvs::neighbors::detail {
 template <typename MathT, typename IdxT>
 void train_pq_centers(
   const raft::resources& res,
-  const cuvs::neighbors::vpq_params& params,
+  const cuvs::preprocessing::quantize::pq::kmeans_params_variant& kmeans_params,
   const raft::device_matrix_view<const MathT, IdxT, raft::row_major> pq_trainset_view,
   const raft::device_matrix_view<MathT, uint32_t, raft::row_major> pq_centers_view,
   raft::device_vector_view<uint32_t, IdxT> sub_labels_view,
   raft::device_vector_view<uint32_t, IdxT> pq_cluster_sizes_view)
 {
-  if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
-    cuvs::cluster::kmeans::balanced_params kmeans_params;
-    kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-
-    cuvs::cluster::kmeans_balanced::helpers::build_clusters<
-      MathT,
-      MathT,
-      IdxT,
-      uint32_t,
-      uint32_t,
-      cuvs::spatial::knn::detail::utils::mapping<MathT>>(
-      res,
-      kmeans_params,
-      pq_trainset_view,
-      pq_centers_view,
-      sub_labels_view,
-      pq_cluster_sizes_view,
-      cuvs::spatial::knn::detail::utils::mapping<MathT>{});
-  } else {
-    const auto pq_n_centers = pq_centers_view.extent(0);
-    cuvs::cluster::kmeans::params kmeans_params;
-    kmeans_params.n_clusters = pq_n_centers;
-    kmeans_params.max_iter   = params.kmeans_n_iters;
-    kmeans_params.metric     = cuvs::distance::DistanceType::L2Expanded;
-    kmeans_params.init       = cuvs::cluster::kmeans::params::InitMethod::Random;
-
-    std::optional<raft::device_vector_view<const MathT, IdxT>> sample_weight = std::nullopt;
-    MathT inertia;
-    IdxT n_iter;
-    cuvs::cluster::kmeans::fit(res,
-                               kmeans_params,
-                               pq_trainset_view,
-                               sample_weight,
-                               pq_centers_view,
-                               raft::make_host_scalar_view<MathT>(&inertia),
-                               raft::make_host_scalar_view<IdxT>(&n_iter));
-  }
+  std::visit(
+    [&](auto const& base_kmeans_params) {
+      using KP = std::decay_t<decltype(base_kmeans_params)>;
+      if constexpr (std::is_same_v<KP, cuvs::cluster::kmeans::balanced_params>) {
+        auto bal_params   = base_kmeans_params;
+        bal_params.metric = cuvs::distance::DistanceType::L2Expanded;
+        cuvs::cluster::kmeans_balanced::helpers::build_clusters<
+          MathT,
+          MathT,
+          IdxT,
+          uint32_t,
+          uint32_t,
+          cuvs::spatial::knn::detail::utils::mapping<MathT>>(
+          res,
+          bal_params,
+          pq_trainset_view,
+          pq_centers_view,
+          sub_labels_view,
+          pq_cluster_sizes_view,
+          cuvs::spatial::knn::detail::utils::mapping<MathT>{});
+      } else {
+        auto classic_params       = base_kmeans_params;
+        classic_params.n_clusters = pq_centers_view.extent(0);
+        classic_params.metric     = cuvs::distance::DistanceType::L2Expanded;
+        std::optional<raft::device_vector_view<const MathT, IdxT>> sample_weight = std::nullopt;
+        MathT inertia;
+        IdxT n_iter;
+        cuvs::cluster::kmeans::fit(res,
+                                   classic_params,
+                                   pq_trainset_view,
+                                   sample_weight,
+                                   pq_centers_view,
+                                   raft::make_host_scalar_view<MathT>(&inertia),
+                                   raft::make_host_scalar_view<IdxT>(&n_iter));
+      }
+    },
+    kmeans_params);
 }
 
 template <typename DatasetT>
@@ -219,7 +219,7 @@ auto predict_vq(const raft::resources& res,
 
 template <typename MathT, typename DatasetT>
 auto train_pq(const raft::resources& res,
-              const vpq_params& params,
+              const cuvs::preprocessing::quantize::pq::params& params,
               const DatasetT& dataset,
               const raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers)
   -> raft::device_matrix<MathT, uint32_t, raft::row_major>
@@ -230,8 +230,8 @@ auto train_pq(const raft::resources& res,
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
-  const ix_t n_rows_train = std::min((ix_t)(n_rows * params.pq_kmeans_trainset_fraction),
-                                     params.max_train_points_per_pq_code * pq_n_centers);
+  const ix_t n_rows_train =
+    std::min<ix_t>(n_rows, params.max_train_points_per_pq_code * pq_n_centers);
   RAFT_EXPECTS(
     n_rows_train >= pq_n_centers,
     "The number of training samples must be greater than or equal to the number of PQ centers");
@@ -261,8 +261,12 @@ auto train_pq(const raft::resources& res,
     pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
   auto sub_labels       = raft::make_device_vector<uint32_t, ix_t>(res, pq_trainset_view.extent(0));
   auto pq_cluster_sizes = raft::make_device_vector<uint32_t, ix_t>(res, pq_centers.extent(0));
-  train_pq_centers<MathT, ix_t>(
-    res, params, pq_trainset_view, pq_centers.view(), sub_labels.view(), pq_cluster_sizes.view());
+  train_pq_centers<MathT, ix_t>(res,
+                                params.kmeans_params,
+                                pq_trainset_view,
+                                pq_centers.view(),
+                                sub_labels.view(),
+                                pq_cluster_sizes.view());
 
   return pq_centers;
 }
@@ -502,13 +506,15 @@ void process_and_fill_codes(
     return;
   }
 
-  for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator(
-         dataset.data_handle(),
-         n_rows,
-         dim,
-         max_batch_size,
-         stream,
-         rmm::mr::get_current_device_resource())) {
+  auto _vpq_batches_codes = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<data_t>(
+    res,
+    dataset.data_handle(),
+    static_cast<ix_t>(n_rows),
+    static_cast<ix_t>(dim),
+    static_cast<size_t>(max_batch_size),
+    stream,
+    rmm::mr::get_current_device_resource_ref());
+  for (const auto& batch : _vpq_batches_codes) {
     auto batch_view        = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
     auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(nullptr, 0);
     if (inline_vq_labels) {
@@ -895,13 +901,14 @@ void process_and_fill_codes_subspaces(
     enable_prefetch_stream = true;
     copy_stream            = raft::resource::get_stream_from_stream_pool(res);
   }
-  auto vec_batches = cuvs::spatial::knn::detail::utils::batch_load_iterator(
+  auto vec_batches = cuvs::spatial::knn::detail::utils::make_batch_load_iterator<data_t>(
+    res,
     dataset.data_handle(),
-    n_rows,
-    dim,
-    max_batch_size,
+    static_cast<ix_t>(n_rows),
+    static_cast<ix_t>(dim),
+    static_cast<size_t>(max_batch_size),
     copy_stream,
-    raft::resource::get_workspace_resource(res),
+    raft::resource::get_workspace_resource_ref(res),
     enable_prefetch_stream);
   vec_batches.prefetch_next_batch();
   for (const auto& batch : vec_batches) {
