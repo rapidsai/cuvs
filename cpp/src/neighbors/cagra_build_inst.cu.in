@@ -58,8 +58,9 @@ auto build(raft::resources const& handle,
 
 // Definition lives in cagra.cuh; callers that only include cagra.hpp need this symbol in libcuvs.
 // The device_matrix_view overload above may inline the any_dataset_view template, so emit it
-// explicitly.
-template cuvs::neighbors::cagra::index<data_t, index_t> build<data_t, index_t>(
+// explicitly. CUVS_EXPORT required after #2101 (hidden visibility on libcuvs).
+template CUVS_EXPORT cuvs::neighbors::cagra::index<data_t, index_t>
+cuvs::neighbors::cagra::build<data_t, index_t>(
   raft::resources const& res,
   const index_params& params,
   cuvs::neighbors::any_dataset_view<data_t, int64_t> const& dataset);
