@@ -20,6 +20,7 @@
 
 #include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
+#include <cuvs/core/export.hpp>
 #include <raft/core/detail/macros.hpp>
 
 #include <cuda_fp16.h>
@@ -32,7 +33,6 @@
 
 #ifdef __cpp_lib_bitops
 #include <bit>
-#include <cuvs/core/export.hpp>
 #endif
 
 namespace CUVS_EXPORT cuvs {
@@ -1356,11 +1356,11 @@ using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
  *       `cuvs::neighbors::ivf_pq::helpers::resize_list` which handle type casting internally.
  */
 template <typename ListT>
-void resize_list(raft::resources const& res,
-                 std::shared_ptr<ListT>& orig_list,  // NOLINT
-                 const typename ListT::spec_type& spec,
-                 typename ListT::size_type new_used_size,
-                 typename ListT::size_type old_used_size);
+CUVS_EXPORT void resize_list(raft::resources const& res,
+                             std::shared_ptr<ListT>& orig_list,  // NOLINT
+                             const typename ListT::spec_type& spec,
+                             typename ListT::size_type new_used_size,
+                             typename ListT::size_type old_used_size);
 
 /**
  * Serialize a list to an output stream.

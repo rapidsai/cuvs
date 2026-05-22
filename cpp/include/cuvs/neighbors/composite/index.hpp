@@ -41,7 +41,7 @@ namespace composite {
  * @endcode
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class composite_index {
+class CUVS_EXPORT composite_index {
  public:
   using value_type        = T;
   using index_type        = IdxT;
