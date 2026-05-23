@@ -1382,8 +1382,7 @@ cuvs::neighbors::cagra::index<T, IdxT> build_ace(
         ef_construction,
         cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
         params.metric);
-      sub_index_params.attach_dataset_on_build = false;
-      sub_index_params.guarantee_connectivity  = params.guarantee_connectivity;
+      sub_index_params.guarantee_connectivity = params.guarantee_connectivity;
 
       // Copy host partition to device with padding; build_from_device_matrix accepts
       // device_padded_dataset_view.
@@ -1498,29 +1497,6 @@ cuvs::neighbors::cagra::index<T, IdxT> build_ace(
     if (!use_disk_mode) {
       idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
 
-      if (params.attach_dataset_on_build) {
-        try {
-          // Tight row-major [n, dim] device storage is often not 16-byte row-pitched; CAGRA search
-          // expects padded stride (same as make_padded_dataset / make_padded_dataset_view).
-          auto padded = cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(dataset));
-          idx.update_dataset(
-            res, cuvs::neighbors::any_dataset_view<T, int64_t>(padded->as_dataset_view()));
-          RAFT_LOG_WARN(
-            "ACE: `index_params.attach_dataset_on_build` is deprecated for in-memory ACE builds "
-            "that upload a padded device copy. Storage is kept on the index "
-            "(`index_owning_dataset_storage_`). Prefer `attach_dataset_on_build = false` and "
-            "`index.update_dataset(res, ...)` with a padded view or owning dataset you retain.");
-          cuvs::neighbors::cagra::adopt_owning_padded_dataset_into_index(idx, std::move(padded));
-        } catch (std::bad_alloc& e) {
-          RAFT_LOG_WARN(
-            "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
-            "stored.");
-        } catch (raft::logic_error& e) {
-          RAFT_LOG_WARN(
-            "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
-            "stored.");
-        }
-      }
     } else {
       idx.update_dataset(res, std::move(reordered_fd));
       idx.update_graph(res, std::move(graph_fd));
@@ -2318,63 +2294,11 @@ auto build_cagra_host_graph_from_knn_params(raft::resources const& res,
   return cagra_graph;
 }
 
-/** Try `attach_dataset_on_build`: index with padded view + graph. On failure, log and return
- * nullopt. Caller owns the padded device buffer until it is moved into the index (host-matrix
- * `build_from_host_matrix`) or remains external (device-matrix path). */
-template <typename T, typename IdxT>
-auto try_attach_padded_dataset_on_build(
-  raft::resources const& res,
-  index_params const& params,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> cagra_graph_host)
-  -> std::optional<cuvs::neighbors::cagra::index<T, IdxT>>
-{
-  try {
-    return cuvs::neighbors::cagra::index<T, IdxT>(
-      res,
-      params.metric,
-      cuvs::neighbors::any_dataset_view<T, int64_t>(padded),
-      raft::make_const_mdspan(cagra_graph_host));
-  } catch (std::bad_alloc&) {
-    RAFT_LOG_WARN(
-      "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
-      "be added to the index");
-  } catch (raft::logic_error&) {
-    RAFT_LOG_WARN(
-      "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
-      "be added to the index");
-  }
-  return std::nullopt;
-}
-
-/**
- * Deprecated `index_params::compression`: train VPQ on the padded device rows and transfer
- * ownership into the index via `update_dataset(any_owning_dataset&&)` so callers do not hold a
- * separate `vpq_dataset`. Graph build ignores `compression` (no graph code reads it); VPQ runs
- * afterward.
- */
-template <typename T, typename IdxT>
-void attach_deprecated_compression_vpq_to_index_if_set(
-  raft::resources const& res,
-  std::optional<cuvs::neighbors::vpq_params> const& compression,
-  cuvs::distance::DistanceType metric,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded,
-  cuvs::neighbors::cagra::index<T, IdxT>& idx)
-{
-  if (!compression.has_value()) { return; }
-  RAFT_EXPECTS(
-    metric == cuvs::distance::DistanceType::L2Expanded,
-    "cagra build (deprecated index_params::compression / VPQ): metric must be L2Expanded.");
-  auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset(res, *compression, padded.view());
-  idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
-}
-
 /**
  * Build from a host row-major matrix without uploading the full dataset early when IVF-PQ graph
  * construction can consume host batches directly. NN-descent / iterative paths still materialize a
- * padded device copy for graph build. When `attach_dataset_on_build` is true and attach
- * succeeds, the padded copy is moved into `index::index_owning_dataset_storage_` on the index
- * (unless deprecated `compression` replaces the dataset with VPQ first).
+ * padded device copy for graph build. The returned index contains only the optimized graph; call
+ * `index::update_dataset` with a device dataset view before search.
  */
 template <typename T, typename IdxT = uint32_t>
 cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
@@ -2416,41 +2340,8 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  if (params.attach_dataset_on_build) {
-    auto padded = ensure_padded();
-    if (auto attached =
-          try_attach_padded_dataset_on_build<T, IdxT>(res, params, padded, cagra_graph.view())) {
-      auto out = std::move(*attached);
-      RAFT_LOG_WARN(
-        "cagra: `index_params.attach_dataset_on_build` is deprecated for host-matrix builds that "
-        "attach a temporary device copy on the index. Prefer `attach_dataset_on_build = false`, "
-        "then `index.update_dataset(res, ...)` with a `device_padded_dataset_view` / "
-        "`make_padded_dataset_view` for search-time device vectors before calling "
-        "`cuvs::neighbors::cagra::search`. This build path keeps backward compatibility by storing "
-        "the copy on the index when applicable.");
-      if (params.compression.has_value()) {
-        RAFT_EXPECTS(
-          padded_own != nullptr,
-          "cagra::detail::build_from_host_matrix: internal error — padded device storage missing "
-          "after attach_dataset_on_build.");
-        attach_deprecated_compression_vpq_to_index_if_set(
-          res, params.compression, params.metric, padded, out);
-        padded_own.reset();
-      } else {
-        adopt_owning_padded_dataset_into_index(out, std::move(padded_own));
-      }
-      return out;
-    }
-    padded_own.reset();
-  }
-
   cuvs::neighbors::cagra::index<T, IdxT> out(res, params.metric);
   out.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-  if (params.compression.has_value()) {
-    auto const padded_for_vpq = ensure_padded();
-    attach_deprecated_compression_vpq_to_index_if_set(
-      res, params.compression, params.metric, padded_for_vpq, out);
-  }
   padded_own.reset();
   return out;
 }
@@ -2459,8 +2350,8 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
  * Build from `any_dataset_view` after resolving graph vectors to **device** padded storage via
  * `convert_dataset_view_to_padded_for_graph_build`.
  *
- * Supported alternatives include `device_padded_dataset_view`,
- * `strided_dataset_view`, and VPQ (`vpq_f16` / `vpq_f32` view arms in `any_dataset_view`).
+ * Supported alternatives include `device_padded_dataset_view` and VPQ (`vpq_f16` / `vpq_f32` view
+ * arms in `any_dataset_view`).
  * to device padded storage matching \p T; this entry point does **not** accept host-backed bases
  * for graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
  */
@@ -2497,31 +2388,8 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  if (params.attach_dataset_on_build) {
-    if (auto attached =
-          try_attach_padded_dataset_on_build<T, IdxT>(res, params, padded, cagra_graph.view())) {
-      auto out = std::move(*attached);
-      attach_deprecated_compression_vpq_to_index_if_set(
-        res, params.compression, params.metric, padded, out);
-      return out;
-    }
-  }
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-  attach_deprecated_compression_vpq_to_index_if_set(
-    res, params.compression, params.metric, padded, idx);
   return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail
-
-namespace cuvs::neighbors::cagra {
-
-template <typename T, typename IdxT>
-void adopt_owning_padded_dataset_into_index(
-  index<T, IdxT>& idx,
-  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own)
-{
-  idx.index_owning_dataset_storage_ = cuvs::neighbors::wrap_any_owning(std::move(padded_own));
-}
-
-}  // namespace cuvs::neighbors::cagra

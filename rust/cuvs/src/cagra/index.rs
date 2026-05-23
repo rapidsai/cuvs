@@ -262,14 +262,6 @@ mod tests {
         test_cagra(build_params);
     }
 
-    #[test]
-    fn test_cagra_compression() {
-        use crate::cagra::CompressionParams;
-        let build_params =
-            IndexParams::new().unwrap().set_compression(CompressionParams::new().unwrap());
-        test_cagra(build_params);
-    }
-
     /// Test bitset-filtered search: exclude odd-indexed rows, verify they don't appear.
     #[test]
     fn test_cagra_search_with_filter() {

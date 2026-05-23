@@ -68,23 +68,7 @@ void serialize_dataset(raft::resources const& res,
     namespace nb   = cuvs::neighbors;
     using VT       = nb::any_dataset_view_types<T, int64_t>;
     auto const& va = dataset->as_variant();
-    if (std::holds_alternative<typename VT::strided_view>(va)) {
-      auto const& v  = std::get<typename VT::strided_view>(va);
-      auto nrows     = v.n_rows();
-      auto dim       = v.dim();
-      auto stride    = v.stride();
-      auto d_data    = v.view();
-      auto h_dataset = raft::make_host_matrix<T, int64_t>(nrows, dim);
-      raft::copy_matrix(h_dataset.data_handle(),
-                        dim,
-                        d_data.data_handle(),
-                        stride,
-                        dim,
-                        nrows,
-                        raft::resource::get_cuda_stream(res));
-      raft::resource::sync_stream(res);
-      to_file(dataset_base_file, h_dataset);
-    } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+    if (std::holds_alternative<typename VT::padded_view>(va)) {
       auto const& v  = std::get<typename VT::padded_view>(va);
       auto nrows     = v.n_rows();
       auto dim       = v.dim();
@@ -183,17 +167,7 @@ void serialize_sector_aligned(raft::resources const& res,
   namespace nb   = cuvs::neighbors;
   using VT       = nb::any_dataset_view_types<T, int64_t>;
   auto const& va = dataset.as_variant();
-  if (std::holds_alternative<typename VT::strided_view>(va)) {
-    auto const& v = std::get<typename VT::strided_view>(va);
-    auto d_data   = v.view();
-    raft::copy_matrix(h_data.data_handle(),
-                      ndims,
-                      d_data.data_handle(),
-                      v.stride(),
-                      ndims,
-                      npts,
-                      raft::resource::get_cuda_stream(res));
-  } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+  if (std::holds_alternative<typename VT::padded_view>(va)) {
     auto const& v = std::get<typename VT::padded_view>(va);
     auto d_data   = v.view();
     raft::copy_matrix(h_data.data_handle(),

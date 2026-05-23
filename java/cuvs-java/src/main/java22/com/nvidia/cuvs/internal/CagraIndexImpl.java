@@ -545,28 +545,6 @@ public class CagraIndexImpl implements CagraIndex {
     cuvsCagraIndexParams.nn_descent_niter(indexPtr, params.getNNDescentNumIterations());
     cuvsCagraIndexParams.metric(indexPtr, params.getCuvsDistanceType().value);
 
-    CagraCompressionParams cagraCompressionParams = params.getCagraCompressionParams();
-    if (cagraCompressionParams != null) {
-      var compressionParams = createCagraCompressionParams();
-      handles.add(compressionParams);
-      MemorySegment cuvsCagraCompressionParamsMemorySegment = compressionParams.handle();
-      cuvsCagraCompressionParams.pq_bits(
-          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getPqBits());
-      cuvsCagraCompressionParams.pq_dim(
-          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getPqDim());
-      cuvsCagraCompressionParams.vq_n_centers(
-          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getVqNCenters());
-      cuvsCagraCompressionParams.kmeans_n_iters(
-          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getKmeansNIters());
-      cuvsCagraCompressionParams.vq_kmeans_trainset_fraction(
-          cuvsCagraCompressionParamsMemorySegment,
-          cagraCompressionParams.getVqKmeansTrainsetFraction());
-      cuvsCagraCompressionParams.pq_kmeans_trainset_fraction(
-          cuvsCagraCompressionParamsMemorySegment,
-          cagraCompressionParams.getPqKmeansTrainsetFraction());
-      cuvsCagraIndexParams.compression(indexPtr, cuvsCagraCompressionParamsMemorySegment);
-    }
-
     if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.IVF_PQ)) {
 
       var ivfPqIndexParams = createIvfPqIndexParams();

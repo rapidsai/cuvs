@@ -85,28 +85,22 @@ void search_main_core(
   const uint32_t max_queries = plan->max_queries;
   const uint32_t query_dim   = static_cast<uint32_t>(queries.extent(1));
   // Same 16B row-pitch rule as make_padded_dataset. Tight [n,dim] rows can be misaligned between
-  // rows (e.g. float, dim=1) and trigger misaligned access in CAGRA search. make_aligned_dataset
-  // reuses a non-owning strided view when the caller already has correct stride, else copies.
+  // rows (e.g. float, dim=1) and trigger misaligned access in CAGRA search.
   // If query_row_stride>dim, device code still advances with "+= dim*query_id" in setup_workspace;
   // in that case run one query per plan call so every kernel sees query_id==0 and the base pointer
   // selects the row (keeps batched path when stride==dim).
-  auto query_aligned = cuvs::neighbors::make_aligned_dataset(res, queries);
   const DataT* queries_buf{};
   uint32_t query_row_stride{};
-  switch (query_aligned.index()) {
-    case 0: {
-      auto& own        = *std::get<0>(query_aligned);
-      queries_buf      = own.view().data_handle();
-      query_row_stride = own.stride();
-      break;
-    }
-    case 1: {
-      auto const& v    = std::get<1>(query_aligned);
-      queries_buf      = v.view().data_handle();
-      query_row_stride = v.stride();
-      break;
-    }
-    default: RAFT_FAIL("cagra::search: unexpected make_aligned_dataset variant index");
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<DataT, int64_t>> queries_padded_own;
+  if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(queries)) {
+    auto v           = cuvs::neighbors::make_padded_dataset_view(res, queries);
+    queries_buf      = v.view().data_handle();
+    query_row_stride = v.stride();
+  } else {
+    queries_padded_own = cuvs::neighbors::make_padded_dataset(res, queries);
+    auto v             = queries_padded_own->as_dataset_view();
+    queries_buf        = v.view().data_handle();
+    query_row_stride   = v.stride();
   }
   const bool can_batch_n_queries = (query_row_stride == query_dim);
 
@@ -248,8 +242,6 @@ void search_main(raft::resources const& res,
       sample_filter);
   } else if (std::holds_alternative<typename VT::padded_view>(va)) {
     run_strided_like(std::get<typename VT::padded_view>(va));
-  } else if (std::holds_alternative<typename VT::strided_view>(va)) {
-    run_strided_like(std::get<typename VT::strided_view>(va));
   } else {
     RAFT_FAIL("search: unsupported dataset view variant");
   }

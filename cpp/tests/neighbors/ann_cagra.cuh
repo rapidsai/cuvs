@@ -50,8 +50,7 @@ namespace {
 /**
  * If \p ace_host_dataset is set, builds from that host mdspan via `cagra::build` (ACE is selected
  * by `graph_build_params`). Otherwise builds from \p padded via `cagra::build`. When \p
- * params.compression is set (deprecated), the dense `cagra::build` path may train VPQ and store it
- * on the index; ACE may ignore it.
+ * ACE is selected by `graph_build_params`.
  */
 template <typename DataT, typename IdxT>
 void cagra_build_into_index(
@@ -295,7 +294,6 @@ struct AnnCagraInputs {
   // std::optional<double>
   double min_recall;  // = std::nullopt;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
-  std::optional<vpq_params> compression           = std::nullopt;
 
   std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
   cuvs::neighbors::MergeStrategy merge_strategy =
@@ -333,11 +331,6 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
   }
-  if (p.compression.has_value()) {
-    auto vpq = p.compression.value();
-    os << ", pq_bits=" << vpq.pq_bits << ", pq_dim=" << vpq.pq_dim
-       << ", vq_n_centers=" << vpq.vq_n_centers;
-  }
   os << '}' << std::endl;
   return os;
 }
@@ -371,7 +364,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
@@ -434,7 +426,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             break;
         };
 
-        index_params.compression = ps.compression;
         cagra::search_params search_params;
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
@@ -513,20 +504,18 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                   ps.k,
                                   0.003,
                                   min_recall));
-      if (!ps.compression.has_value()) {
-        // Don't evaluate distances for CAGRA-Q for now as the error can be somewhat large
-        EXPECT_TRUE(eval_distances(handle_,
-                                   database.data(),
-                                   search_queries.data(),
-                                   indices_dev.data(),
-                                   distances_dev.data(),
-                                   ps.n_rows,
-                                   ps.dim,
-                                   ps.n_queries,
-                                   ps.k,
-                                   ps.metric,
-                                   1.0e-4));
-      }
+      // Don't evaluate distances for CAGRA-Q for now as the error can be somewhat large
+      EXPECT_TRUE(eval_distances(handle_,
+                                 database.data(),
+                                 search_queries.data(),
+                                 indices_dev.data(),
+                                 distances_dev.data(),
+                                 ps.n_rows,
+                                 ps.dim,
+                                 ps.n_queries,
+                                 ps.k,
+                                 ps.metric,
+                                 1.0e-4));
     }
   }
 
@@ -573,12 +562,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
     }
-    if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -688,9 +675,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         std::size_t row_stride = static_cast<std::size_t>(ps.dim);
         using VTa              = cuvs::neighbors::any_dataset_view_types<DataT, int64_t>;
         auto const& vad        = index.data().as_variant();
-        if (std::holds_alternative<typename VTa::strided_view>(vad)) {
-          row_stride = static_cast<std::size_t>(std::get<typename VTa::strided_view>(vad).stride());
-        } else if (std::holds_alternative<typename VTa::padded_view>(vad)) {
+        if (std::holds_alternative<typename VTa::padded_view>(vad)) {
           row_stride = static_cast<std::size_t>(std::get<typename VTa::padded_view>(vad).stride());
         }
 
@@ -792,7 +777,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
@@ -872,7 +856,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
             break;
         };
 
-        index_params.compression = ps.compression;
         cagra::search_params search_params;
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
@@ -961,20 +944,18 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                   0.003,
                                   min_recall,
                                   false));
-      if (!ps.compression.has_value()) {
-        // Don't evaluate distances for CAGRA-Q for now as the error can be somewhat large
-        EXPECT_TRUE(eval_distances(handle_,
-                                   database.data(),
-                                   search_queries.data(),
-                                   indices_dev.data(),
-                                   distances_dev.data(),
-                                   ps.n_rows,
-                                   ps.dim,
-                                   ps.n_queries,
-                                   ps.k,
-                                   ps.metric,
-                                   1.0e-4));
-      }
+      // Don't evaluate distances for CAGRA-Q for now as the error can be somewhat large
+      EXPECT_TRUE(eval_distances(handle_,
+                                 database.data(),
+                                 search_queries.data(),
+                                 indices_dev.data(),
+                                 distances_dev.data(),
+                                 ps.n_rows,
+                                 ps.dim,
+                                 ps.n_queries,
+                                 ps.k,
+                                 ps.metric,
+                                 1.0e-4));
     }
   }
 
@@ -1026,7 +1007,6 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         GTEST_SKIP();
       }
     }
-    if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -1208,7 +1188,6 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
                                   min_recall));
 
       /* TODO: eval_distances doesn't work, potentially because of id translation mismatch
-      if (!ps.compression.has_value()) {
         EXPECT_TRUE(eval_distances(handle_,
                                    database.data(),
                                    search_queries.data(),
@@ -1273,7 +1252,6 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         GTEST_SKIP();
       }
     }
-    if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -1493,7 +1471,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true, false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
 
@@ -1518,7 +1495,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
@@ -1544,7 +1520,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
@@ -1567,7 +1542,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
@@ -1596,7 +1570,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
@@ -1626,7 +1599,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
@@ -1654,7 +1626,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
@@ -1677,47 +1648,10 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.985},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
-
-  // A few PQ configurations.
-  // Varying dim, vq_n_centers
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000},
-    {64, 128, 192, 256, 512, 1024},  // dim
-    {16},                            // k
-    {graph_build_algo::IVF_PQ},
-    {search_algo::AUTO},
-    {10},
-    {0},
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false},
-    {true},
-    {false},
-    {0.6},
-    {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
-    {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
-     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});  // don't demand high recall
-                                                                // without refinement
-  for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming  soon
-    for (uint32_t vq_n_centers : {100, 1000}) {
-      for (auto input : inputs2) {
-        vpq_params ps{};
-        ps.pq_dim       = input.dim / pq_len;
-        ps.vq_n_centers = vq_n_centers;
-        input.compression.emplace(ps);
-        inputs.push_back(input);
-      }
-    }
-  }
 
   // Refinement options
   // Varying host_dataset, ivf_pq_search_refine_ratio
@@ -1738,7 +1672,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.99},
     {1.0f, 2.0f, 3.0f},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
@@ -1762,7 +1695,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
@@ -1817,39 +1749,9 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
     {false},
     {0.985},
     {std::optional<float>{std::nullopt}},
-    {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
-
-  // a few PQ configurations
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000},
-    {192, 1024},  // dim
-    {16},         // k
-    {graph_build_algo::IVF_PQ},
-    {search_algo::AUTO},
-    {10},
-    {0},
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false},
-    {true},
-    {true},
-    {0.6});                      // don't demand high recall without refinement
-  for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
-    for (uint32_t vq_n_centers : {100}) {
-      for (auto input : inputs2) {
-        vpq_params ps{};
-        ps.pq_dim       = input.dim / pq_len;
-        ps.vq_n_centers = vq_n_centers;
-        input.compression.emplace(ps);
-        inputs.push_back(input);
-      }
-    }
-  }
 
   return inputs;
 }
@@ -1892,35 +1794,6 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {false},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
-
-  // a few PQ configurations
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000},
-    {256},  // dim
-    {16},   // k
-    {graph_build_algo::IVF_PQ},
-    {search_algo::AUTO},
-    {10},
-    {0},
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false},
-    {true},
-    {true},
-    {0.6});                      // don't demand high recall without refinement
-  for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
-    for (uint32_t vq_n_centers : {100}) {
-      for (auto input : inputs2) {
-        vpq_params ps{};
-        ps.pq_dim       = input.dim / pq_len;
-        ps.vq_n_centers = vq_n_centers;
-        input.compression.emplace(ps);
-        inputs.push_back(input);
-      }
-    }
-  }
 
   return inputs;
 }

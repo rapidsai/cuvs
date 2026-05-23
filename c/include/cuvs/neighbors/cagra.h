@@ -212,12 +212,6 @@ struct cuvsCagraIndexParams {
   /** Number of Iterations to run if building with NN_DESCENT */
   size_t nn_descent_niter;
   /**
-   * Optional: specify compression parameters if compression is desired.
-   *
-   * NOTE: this is experimental new API, consider it unsafe.
-   */
-  cuvsCagraCompressionParams_t compression;
-  /**
    * Optional: specify graph build params based on build_algo
    * - IVF_PQ: cuvsIvfPqParams_t
    * - ACE: cuvsAceParams_t

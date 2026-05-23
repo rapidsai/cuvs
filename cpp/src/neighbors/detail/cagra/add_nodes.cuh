@@ -323,7 +323,8 @@ void add_graph_nodes(
     auto graph_view = raft::make_host_matrix_view<const IdxT, std::int64_t>(
       updated_graph_view.data_handle(), initial_dataset_size + additional_dataset_offset, degree);
 
-    internal_index.update_dataset(handle, dataset_view);
+    auto pdv = cuvs::neighbors::make_padded_dataset_view(handle, dataset_view);
+    internal_index.update_dataset(handle, cuvs::neighbors::any_dataset_view<T, int64_t>(pdv));
 
     // Note: The graph is copied to the device memory.
     internal_index.update_graph(handle, graph_view);
@@ -455,15 +456,12 @@ void extend_core(
 
   using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
   auto const& va = index.data().as_variant();
-  if (std::holds_alternative<typename VT::strided_view>(va)) {
-    try_extend(std::get<typename VT::strided_view>(va));
-  } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+  if (std::holds_alternative<typename VT::padded_view>(va)) {
     try_extend(std::get<typename VT::padded_view>(va));
   } else if (std::holds_alternative<typename VT::empty_view>(va)) {
     RAFT_FAIL(
       "cagra::extend only supports an index to which the dataset is attached. Please check if the "
-      "index was built with index_param.attach_dataset_on_build = true, or if a dataset was "
-      "attached after the build.");
+      "index has an empty dataset; attach one with update_dataset before extend.");
   } else {
     RAFT_FAIL("cagra::extend only supports an uncompressed dataset index");
   }

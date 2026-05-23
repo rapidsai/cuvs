@@ -265,27 +265,21 @@ template <typename T>
  * equals dimension) is passed through to training without an extra pack copy; wider row pitch
  * triggers a contiguous dense copy first. Empty sources are rejected.
  *
- * Typical **CAGRA** usage: build the graph on dense vectors, then replace the index dataset with an
- * owning VPQ buffer so search uses compressed storage (metric must remain `L2Expanded` for this
- * path). Train VPQ from the same CAGRA-padded device layout you used for `cagra::build`, then call
- * `cagra::index::update_dataset` with `any_owning_dataset<int64_t>` so the index owns the result.
+ * Typical **CAGRA** usage: build the graph on dense vectors, then attach VPQ for search (metric
+ * must remain `L2Expanded` for this path). Train VPQ from the same CAGRA-padded device layout you
+ * used for graph build, keep the `vpq_dataset` alive, and call `index::update_dataset` with a
+ * non-owning view.
  *
  * @code{.cpp}
  * #include <cuvs/neighbors/cagra.hpp>
  * #include <cuvs/preprocessing/quantize/pq.hpp>
  *
- * // `idx` is a `cagra::index<float, uint32_t>` already built (e.g. via `cagra::build`) on dense
- * // rows. `padded` is a `device_padded_dataset_view<float, int64_t>` view of those same rows.
+ * // `idx` is a `cagra::index<float, uint32_t>` with graph built on dense rows.
+ * // `padded` is a `device_padded_dataset_view<float, int64_t>` view of those same rows.
  * cuvs::neighbors::vpq_params vpq_params{};
  * auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset(res, vpq_params, padded.view());
- * idx.update_dataset(res, cuvs::neighbors::any_owning_dataset<int64_t>(std::move(vpq)));
+ * idx.update_dataset(res, vpq.as_dataset_view());
  * @endcode
- *
- * To keep the `vpq_dataset` in caller scope instead, use a non-owning view and ensure it outlives
- * the index: `idx.update_dataset(res, vpq.as_dataset_view());`
- *
- * When using deprecated `cagra::index_params::compression`, `cagra::build` trains VPQ internally
- * and owns it on the index instead of using this factory.
  */
 template <typename SrcT>
 [[nodiscard]] auto make_vpq_dataset(raft::resources const& res,

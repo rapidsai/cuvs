@@ -195,22 +195,10 @@ struct index : cuvs::neighbors::index {
   {
     RAFT_EXPECTS(dataset.extent(0) == vamana_graph.extent(0),
                  "Dataset and vamana_graph must have equal number of rows");
-    using aligned_owning_t = std::unique_ptr<cuvs::neighbors::strided_owning_dataset<T, int64_t>>;
-    using aligned_view_t   = cuvs::neighbors::strided_dataset_view<T, int64_t>;
-
-    auto aligned = make_aligned_dataset(res, dataset, 16);
-    if (std::holds_alternative<aligned_owning_t>(aligned)) {
-      auto up = std::get<aligned_owning_t>(std::move(aligned));
-      aligned_view_t ds_view(up->view());
-      full_precision_storage_ = std::move(up);
-      dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
-    } else if (std::holds_alternative<aligned_view_t>(aligned)) {
-      aligned_view_t view = std::get<aligned_view_t>(std::move(aligned));
-      dataset_            = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(view);
-      full_precision_storage_ = std::move(view);
-    } else {
-      RAFT_FAIL("vamana::index: unexpected make_aligned_dataset result type");
-    }
+    auto padded_own         = cuvs::neighbors::make_padded_dataset(res, dataset);
+    auto ds_view            = padded_own->as_dataset_view();
+    full_precision_storage_ = std::move(padded_own);
+    dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
     update_graph(res, vamana_graph);
 
     raft::resource::sync_stream(res);
@@ -285,13 +273,8 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
-  /** Owns aligned full-precision storage (`layout_stride`) when `make_aligned_dataset` copies;
-   * otherwise holds the non-owning strided device view (caller keeps underlying allocation alive).
-   */
-  std::variant<std::monostate,
-               std::unique_ptr<cuvs::neighbors::strided_owning_dataset<T, int64_t>>,
-               cuvs::neighbors::strided_dataset_view<T, int64_t>>
-    full_precision_storage_;
+  /** Owns CAGRA-padded full-precision device storage for the index dataset view. */
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> full_precision_storage_;
   std::unique_ptr<cuvs::neighbors::any_dataset_view<T, int64_t>> dataset_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;
   IdxT medoid_id_;

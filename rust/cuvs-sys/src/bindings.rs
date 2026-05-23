@@ -1240,14 +1240,12 @@ pub struct cuvsCagraIndexParams {
     pub build_algo: cuvsCagraGraphBuildAlgo,
     #[doc = " Number of Iterations to run if building with NN_DESCENT"]
     pub nn_descent_niter: usize,
-    #[doc = " Optional: specify compression parameters if compression is desired.\n\n NOTE: this is experimental new API, consider it unsafe."]
-    pub compression: cuvsCagraCompressionParams_t,
     #[doc = " Optional: specify graph build params based on build_algo\n - IVF_PQ: cuvsIvfPqParams_t\n - ACE: cuvsAceParams_t\n - Others: nullptr"]
     pub graph_build_params: *mut ::std::os::raw::c_void,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of cuvsCagraIndexParams"][::std::mem::size_of::<cuvsCagraIndexParams>() - 56usize];
+    ["Size of cuvsCagraIndexParams"][::std::mem::size_of::<cuvsCagraIndexParams>() - 48usize];
     ["Alignment of cuvsCagraIndexParams"][::std::mem::align_of::<cuvsCagraIndexParams>() - 8usize];
     ["Offset of field: cuvsCagraIndexParams::metric"]
         [::std::mem::offset_of!(cuvsCagraIndexParams, metric) - 0usize];
@@ -1259,10 +1257,8 @@ const _: () = {
         [::std::mem::offset_of!(cuvsCagraIndexParams, build_algo) - 24usize];
     ["Offset of field: cuvsCagraIndexParams::nn_descent_niter"]
         [::std::mem::offset_of!(cuvsCagraIndexParams, nn_descent_niter) - 32usize];
-    ["Offset of field: cuvsCagraIndexParams::compression"]
-        [::std::mem::offset_of!(cuvsCagraIndexParams, compression) - 40usize];
     ["Offset of field: cuvsCagraIndexParams::graph_build_params"]
-        [::std::mem::offset_of!(cuvsCagraIndexParams, graph_build_params) - 48usize];
+        [::std::mem::offset_of!(cuvsCagraIndexParams, graph_build_params) - 40usize];
 };
 pub type cuvsCagraIndexParams_t = *mut cuvsCagraIndexParams;
 unsafe extern "C" {

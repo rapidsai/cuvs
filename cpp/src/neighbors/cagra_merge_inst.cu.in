@@ -29,14 +29,5 @@ auto merge(raft::resources const& res,
     res, params, indices, storage, row_filter);
 }
 
-auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::index_params& params,
-           std::vector<cuvs::neighbors::cagra::index<data_t, index_t>*>& indices,
-           const cuvs::neighbors::filtering::base_filter& row_filter)
-  -> cuvs::neighbors::cagra::index<data_t, index_t>
-{
-  return ::cuvs::neighbors::cagra::merge<data_t, index_t>(res, params, indices, row_filter);
-}
-
 CUVS_INST_CAGRA_MERGE(data_t, index_t);
 }  // namespace cuvs::neighbors::cagra

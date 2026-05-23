@@ -146,7 +146,6 @@ enum class MergeStrategy {
 struct empty_dataset_container {};
 struct padded_dataset_container {};
 struct vpq_dataset_container {};
-struct strided_dataset_container {};
 /**
  * Tag for owning dataset unions (`any_owning_dataset<IdxT>`).
  *
@@ -384,69 +383,6 @@ template <typename DataT, typename IdxT>
   return dataset_view<vpq_dataset_container, DataT, IdxT, true, false>(self);
 }
 
-// -----------------------------------------------------------------------------
-// Strided owning device storage (`layout_stride` mdarray)
-// -----------------------------------------------------------------------------
-
-template <typename DataT, typename IdxT>
-struct dataset<strided_dataset_container, DataT, IdxT, true, false> {
-  using index_type   = IdxT;
-  using value_type   = DataT;
-  using view_type    = raft::device_matrix_view<const value_type, index_type, raft::layout_stride>;
-  using storage_type = raft::device_matrix<value_type, index_type, raft::layout_stride>;
-  using mapping_type = typename view_type::mapping_type;
-
-  storage_type data;
-  mapping_type view_mapping;
-
-  dataset(storage_type&& store, mapping_type view_mapping) noexcept
-    : data{std::move(store)}, view_mapping{std::move(view_mapping)}
-  {
-  }
-
-  [[nodiscard]] auto n_rows() const noexcept -> index_type { return view().extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t
-  {
-    return static_cast<uint32_t>(view().extent(1));
-  }
-  [[nodiscard]] constexpr auto stride() const noexcept -> uint32_t
-  {
-    auto v = view();
-    return static_cast<uint32_t>(v.stride(0) > 0 ? v.stride(0) : v.extent(1));
-  }
-  [[nodiscard]] auto view() const noexcept -> view_type
-  {
-    return view_type{data.data_handle(), view_mapping};
-  }
-};
-
-// -----------------------------------------------------------------------------
-// Strided non-owning device view
-// -----------------------------------------------------------------------------
-
-template <typename DataT, typename IdxT>
-struct dataset_view<strided_dataset_container, DataT, IdxT, true, false> {
-  using index_type = IdxT;
-  using value_type = DataT;
-  using view_type  = raft::device_matrix_view<const value_type, index_type, raft::layout_stride>;
-
-  view_type data_;
-
-  explicit dataset_view(view_type v) noexcept : data_(v) {}
-
-  [[nodiscard]] auto n_rows() const noexcept -> index_type { return data_.extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t
-  {
-    return static_cast<uint32_t>(data_.extent(1));
-  }
-  [[nodiscard]] constexpr auto stride() const noexcept -> uint32_t
-  {
-    auto v = data_;
-    return static_cast<uint32_t>(v.stride(0) > 0 ? v.stride(0) : v.extent(1));
-  }
-  [[nodiscard]] auto view() const noexcept -> view_type { return data_; }
-};
-
 /**
  * @brief Aliases for concrete `dataset` / `dataset_view` layouts.
  *
@@ -487,13 +423,6 @@ using vpq_dataset = dataset<vpq_dataset_container, DataT, IdxT, true, false>;
 template <typename DataT, typename IdxT>
 using vpq_dataset_view = dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
 
-template <typename DataT, typename IdxT>
-using strided_owning_dataset = dataset<strided_dataset_container, DataT, IdxT, true, false>;
-
-/** Non-owning strided device rows (`layout_stride`). */
-template <typename DataT, typename IdxT>
-using strided_dataset_view = dataset_view<strided_dataset_container, DataT, IdxT, true, false>;
-
 /**
  * Concrete types held by `any_dataset_view<DataT, IdxT>`'s `std::variant`. Dispatch with
  * `std::holds_alternative<T>` / `std::get<T>` on `view.as_variant()` using these aliases — no
@@ -505,31 +434,22 @@ struct any_dataset_view_types {
   using vpq_f16_view = vpq_dataset_view<half, IdxT>;
   using vpq_f32_view = vpq_dataset_view<float, IdxT>;
   using padded_view  = padded_dataset_view<DataT, IdxT>;
-  using strided_view = strided_dataset_view<DataT, IdxT>;
 };
 
 /**
  * Concrete types held by `any_owning_dataset<IdxT>`'s `std::variant`. Dispatch with
  * `std::holds_alternative<T>` / `std::get<T>` on `dataset.as_variant()`.
  *
- * Strided owning alternatives mirror element widths used for padded/VPQ paths. Blobs tagged
- * `kSerializeStridedDataset` deserialize into `strided_owning_dataset` (same row pitch `stride`
- * as on save when present in the stream). `serialize(any_owning_dataset)` uses the same payload as
- * non-owning `strided_dataset_view` for those variants.
  */
 template <typename IdxT>
 struct any_owning_dataset_types {
-  using empty_owning       = empty_dataset<IdxT>;
-  using padded_f32_owning  = padded_dataset<float, IdxT>;
-  using padded_f16_owning  = padded_dataset<half, IdxT>;
-  using padded_i8_owning   = padded_dataset<int8_t, IdxT>;
-  using padded_u8_owning   = padded_dataset<uint8_t, IdxT>;
-  using strided_f32_owning = strided_owning_dataset<float, IdxT>;
-  using strided_f16_owning = strided_owning_dataset<half, IdxT>;
-  using strided_i8_owning  = strided_owning_dataset<int8_t, IdxT>;
-  using strided_u8_owning  = strided_owning_dataset<uint8_t, IdxT>;
-  using vpq_f32_owning     = vpq_dataset<float, IdxT>;
-  using vpq_f16_owning     = vpq_dataset<half, IdxT>;
+  using empty_owning      = empty_dataset<IdxT>;
+  using padded_f32_owning = padded_dataset<float, IdxT>;
+  using padded_f16_owning = padded_dataset<half, IdxT>;
+  using padded_i8_owning  = padded_dataset<int8_t, IdxT>;
+  using padded_u8_owning  = padded_dataset<uint8_t, IdxT>;
+  using vpq_f32_owning    = vpq_dataset<float, IdxT>;
+  using vpq_f16_owning    = vpq_dataset<half, IdxT>;
 };
 
 // `void` second parameter: no universal row element type for the whole wrapper; each
@@ -542,10 +462,6 @@ struct dataset<any_owning_dataset_container, void, IdxT, false, false> {
                                       typename any_owning_dataset_types<IdxT>::padded_f16_owning,
                                       typename any_owning_dataset_types<IdxT>::padded_i8_owning,
                                       typename any_owning_dataset_types<IdxT>::padded_u8_owning,
-                                      typename any_owning_dataset_types<IdxT>::strided_f32_owning,
-                                      typename any_owning_dataset_types<IdxT>::strided_f16_owning,
-                                      typename any_owning_dataset_types<IdxT>::strided_i8_owning,
-                                      typename any_owning_dataset_types<IdxT>::strided_u8_owning,
                                       typename any_owning_dataset_types<IdxT>::vpq_f32_owning,
                                       typename any_owning_dataset_types<IdxT>::vpq_f16_owning>;
 
@@ -581,18 +497,6 @@ struct dataset<any_owning_dataset_container, void, IdxT, false, false> {
     if (std::holds_alternative<typename OT::padded_u8_owning>(storage_)) {
       return std::get<typename OT::padded_u8_owning>(storage_).n_rows();
     }
-    if (std::holds_alternative<typename OT::strided_f32_owning>(storage_)) {
-      return std::get<typename OT::strided_f32_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::strided_f16_owning>(storage_)) {
-      return std::get<typename OT::strided_f16_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::strided_i8_owning>(storage_)) {
-      return std::get<typename OT::strided_i8_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::strided_u8_owning>(storage_)) {
-      return std::get<typename OT::strided_u8_owning>(storage_).n_rows();
-    }
     if (std::holds_alternative<typename OT::vpq_f32_owning>(storage_)) {
       return std::get<typename OT::vpq_f32_owning>(storage_).n_rows();
     }
@@ -620,18 +524,6 @@ struct dataset<any_owning_dataset_container, void, IdxT, false, false> {
     if (std::holds_alternative<typename OT::padded_u8_owning>(storage_)) {
       return std::get<typename OT::padded_u8_owning>(storage_).dim();
     }
-    if (std::holds_alternative<typename OT::strided_f32_owning>(storage_)) {
-      return std::get<typename OT::strided_f32_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::strided_f16_owning>(storage_)) {
-      return std::get<typename OT::strided_f16_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::strided_i8_owning>(storage_)) {
-      return std::get<typename OT::strided_i8_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::strided_u8_owning>(storage_)) {
-      return std::get<typename OT::strided_u8_owning>(storage_).dim();
-    }
     if (std::holds_alternative<typename OT::vpq_f32_owning>(storage_)) {
       return std::get<typename OT::vpq_f32_owning>(storage_).dim();
     }
@@ -651,20 +543,18 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
   using variant_type = std::variant<typename any_dataset_view_types<DataT, IdxT>::empty_view,
                                     typename any_dataset_view_types<DataT, IdxT>::vpq_f16_view,
                                     typename any_dataset_view_types<DataT, IdxT>::vpq_f32_view,
-                                    typename any_dataset_view_types<DataT, IdxT>::padded_view,
-                                    typename any_dataset_view_types<DataT, IdxT>::strided_view>;
+                                    typename any_dataset_view_types<DataT, IdxT>::padded_view>;
 
   variant_type storage_;
 
   dataset_view() = default;
 
-  /** Non-explicit conversions so `device_padded_dataset_view` / VPQ / strided / empty views bind to
-   *  APIs taking `any_dataset_view` without manual wrapping. */
+  /** Non-explicit conversions so `device_padded_dataset_view` / VPQ / empty views bind to APIs
+   * taking `any_dataset_view` without manual wrapping. */
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::empty_view const& v) : storage_(v) {}
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::vpq_f16_view const& v) : storage_(v) {}
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::vpq_f32_view const& v) : storage_(v) {}
   dataset_view(typename any_dataset_view_types<DataT, IdxT>::padded_view const& v) : storage_(v) {}
-  dataset_view(typename any_dataset_view_types<DataT, IdxT>::strided_view const& v) : storage_(v) {}
 
   template <typename Alt>
   explicit dataset_view(Alt&& alt) : storage_(std::forward<Alt>(alt))
@@ -688,9 +578,6 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
     if (std::holds_alternative<typename VT::padded_view>(storage_)) {
       return std::get<typename VT::padded_view>(storage_).n_rows();
     }
-    if (std::holds_alternative<typename VT::strided_view>(storage_)) {
-      return std::get<typename VT::strided_view>(storage_).n_rows();
-    }
     return IdxT{};
   }
 
@@ -709,9 +596,6 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
     if (std::holds_alternative<typename VT::padded_view>(storage_)) {
       return std::get<typename VT::padded_view>(storage_).dim();
     }
-    if (std::holds_alternative<typename VT::strided_view>(storage_)) {
-      return std::get<typename VT::strided_view>(storage_).dim();
-    }
     return 0;
   }
 
@@ -729,48 +613,6 @@ using any_dataset_view = dataset_view<any_dataset_view_container, DataT, IdxT, t
 /** Owning union for deserialize / transport; see `any_owning_dataset_container`. */
 template <typename IdxT>
 using any_owning_dataset = dataset<any_owning_dataset_container, void, IdxT, false, false>;
-
-// Deprecated spellings (same section for discoverability).
-
-/**
- * @deprecated Use `strided_owning_dataset<DataT, IdxT>` directly.
- *             `LayoutPolicy` / `ContainerPolicy` are legacy parameters and ignored.
- */
-template <typename DataT,
-          typename IdxT,
-          typename LayoutPolicy    = void,
-          typename ContainerPolicy = void>
-using owning_dataset [[deprecated("Use strided_owning_dataset<DataT, IdxT> directly.")]] =
-  strided_owning_dataset<DataT, IdxT>;
-
-/**
- * @deprecated Use `strided_dataset_view<DataT, IdxT>` directly.
- */
-template <typename DataT, typename IdxT>
-using non_owning_dataset [[deprecated("Use strided_dataset_view<DataT, IdxT> directly.")]] =
-  strided_dataset_view<DataT, IdxT>;
-
-/**
- * @deprecated Legacy public spelling; same type as `non_owning_dataset` / `strided_dataset_view`.
- */
-template <typename DataT, typename IdxT>
-using strided_dataset [[deprecated("Use strided_dataset_view<DataT, IdxT> directly.")]] =
-  strided_dataset_view<DataT, IdxT>;
-
-template <typename DatasetT>
-struct is_strided_dataset : std::false_type {};
-
-template <typename DataT, typename IdxT>
-struct is_strided_dataset<strided_dataset_view<DataT, IdxT>> : std::true_type {};
-
-template <typename DataT, typename IdxT>
-struct is_strided_dataset<strided_owning_dataset<DataT, IdxT>> : std::true_type {};
-
-template <typename DatasetT>
-[[deprecated(
-  "Prefer is_padded_dataset_v where applicable; strided layout dataset/view types are "
-  "deprecated.")]]
-inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
 
 template <typename DatasetT>
 struct is_padded_dataset : std::false_type {};
@@ -846,128 +688,6 @@ template <typename DataT, typename IdxT>
   -> std::unique_ptr<any_owning_dataset<IdxT>>
 {
   return std::make_unique<any_owning_dataset<IdxT>>(std::move(*p));
-}
-
-/**
- * @deprecated Prefer `make_padded_dataset` / `make_padded_dataset_view` for CAGRA layout.
- */
-template <typename SrcT>
-[[deprecated("Prefer make_padded_dataset / make_padded_dataset_view for CAGRA-compatible layout.")]]
-auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t required_stride)
-  -> std::variant<
-    std::unique_ptr<strided_owning_dataset<typename SrcT::value_type, typename SrcT::index_type>>,
-    strided_dataset_view<typename SrcT::value_type, typename SrcT::index_type>>
-{
-  using extents_type = typename SrcT::extents_type;
-  using value_type   = typename SrcT::value_type;
-  using index_type   = typename SrcT::index_type;
-  using layout_type  = typename SrcT::layout_type;
-  static_assert(extents_type::rank() == 2, "The input must be a matrix.");
-  static_assert(std::is_same_v<layout_type, raft::layout_right> ||
-                  std::is_same_v<layout_type, raft::layout_right_padded<value_type>> ||
-                  std::is_same_v<layout_type, raft::layout_stride>,
-                "The input must be row-major");
-  RAFT_EXPECTS(src.extent(1) <= required_stride,
-               "The input row length must be not larger than the desired stride.");
-  cudaPointerAttributes ptr_attrs;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
-  auto* device_ptr             = reinterpret_cast<value_type*>(ptr_attrs.devicePointer);
-  const uint32_t src_stride    = src.stride(0) > 0 ? src.stride(0) : src.extent(1);
-  const bool device_accessible = device_ptr != nullptr;
-  const bool row_major         = src.stride(1) <= 1;
-  const bool stride_matches    = required_stride == src_stride;
-
-  if (device_accessible && row_major && stride_matches) {
-    return strided_dataset_view<value_type, index_type>(
-      raft::make_device_strided_matrix_view<const value_type, index_type>(
-        device_ptr, src.extent(0), src.extent(1), required_stride));
-  }
-  auto out_layout = raft::make_strided_layout(
-    raft::matrix_extent<index_type>{src.extent(0), src.extent(1)},
-    cuda::std::array<index_type, 2>{static_cast<index_type>(required_stride), 1});
-  using strided_mat = raft::device_matrix<value_type, index_type, raft::layout_stride>;
-  typename strided_mat::container_policy_type cp{};
-  strided_mat storage(res, out_layout, cp);
-
-  RAFT_CUDA_TRY(cudaMemsetAsync(storage.data_handle(),
-                                0,
-                                storage.size() * sizeof(value_type),
-                                raft::resource::get_cuda_stream(res)));
-  raft::copy_matrix(storage.data_handle(),
-                    required_stride,
-                    src.data_handle(),
-                    src_stride,
-                    src.extent(1),
-                    src.extent(0),
-                    raft::resource::get_cuda_stream(res));
-
-  return std::make_unique<strided_owning_dataset<value_type, index_type>>(std::move(storage),
-                                                                          out_layout);
-}
-
-template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
-[[deprecated("Prefer make_padded_dataset / make_padded_dataset_view for CAGRA-compatible layout.")]]
-auto make_strided_dataset(
-  const raft::resources& res,
-  raft::mdarray<DataT, raft::matrix_extent<IdxT>, LayoutPolicy, ContainerPolicy>&& src,
-  uint32_t required_stride) -> std::unique_ptr<strided_owning_dataset<DataT, IdxT>>
-{
-  using value_type            = DataT;
-  using index_type            = IdxT;
-  using layout_type           = LayoutPolicy;
-  using container_policy_type = ContainerPolicy;
-  static_assert(std::is_same_v<layout_type, raft::layout_right> ||
-                  std::is_same_v<layout_type, raft::layout_right_padded<value_type>> ||
-                  std::is_same_v<layout_type, raft::layout_stride>,
-                "The input must be row-major");
-  RAFT_EXPECTS(src.extent(1) <= required_stride,
-               "The input row length must be not larger than the desired stride.");
-  const uint32_t src_stride = src.stride(0) > 0 ? src.stride(0) : src.extent(1);
-  const bool stride_matches = required_stride == src_stride;
-
-  auto out_layout =
-    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
-
-  using out_mdarray_type          = raft::device_matrix<value_type, index_type>;
-  using out_layout_type           = typename out_mdarray_type::layout_type;
-  using out_container_policy_type = typename out_mdarray_type::container_policy_type;
-  using out_owning_type           = strided_owning_dataset<value_type, index_type>;
-
-  if constexpr (std::is_same_v<layout_type, out_layout_type> &&
-                std::is_same_v<container_policy_type, out_container_policy_type>) {
-    if (stride_matches) { return std::make_unique<out_owning_type>(std::move(src), out_layout); }
-  }
-  using strided_mat = raft::device_matrix<value_type, index_type, raft::layout_stride>;
-  typename strided_mat::container_policy_type cp{};
-  strided_mat storage(res, out_layout, cp);
-
-  RAFT_CUDA_TRY(cudaMemsetAsync(storage.data_handle(),
-                                0,
-                                storage.size() * sizeof(value_type),
-                                raft::resource::get_cuda_stream(res)));
-  raft::copy_matrix(storage.data_handle(),
-                    required_stride,
-                    src.data_handle(),
-                    src_stride,
-                    src.extent(1),
-                    src.extent(0),
-                    raft::resource::get_cuda_stream(res));
-
-  return std::make_unique<out_owning_type>(std::move(storage), out_layout);
-}
-
-template <typename SrcT>
-[[deprecated("Prefer make_padded_dataset / make_padded_dataset_view for CAGRA-compatible layout.")]]
-auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
-  -> decltype(make_strided_dataset(std::declval<raft::resources const&>(),
-                                   std::declval<SrcT>(),
-                                   std::declval<uint32_t>()))
-{
-  using source_type = std::remove_cv_t<std::remove_reference_t<SrcT>>;
-  using value_type  = typename source_type::value_type;
-  uint32_t required_stride =
-    cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
-  return make_strided_dataset(res, std::forward<SrcT>(src), required_stride);
 }
 
 template <typename SrcT>

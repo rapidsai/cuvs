@@ -60,7 +60,7 @@ auto clone_any_dataset_view_for_cagra_index(any_dataset_view<T, IdxT> const& roo
  * @brief Map `any_owning_dataset` storage to `any_dataset_view<T, IdxT>` for CAGRA index
  *        `update_dataset`.
  *
- * Dense padded/strided owning members must match index element type \p T. VPQ owning members are
+ * Dense padded owning members must match index element type \p T. VPQ owning members are
  * tagged by **codebook** element type (`vpq_f32_owning` / `vpq_f16_owning`); they are handled once
  * here for every supported \p T, since `any_dataset_view<T, IdxT>` always carries VPQ as
  * `vpq_f32_view` / `vpq_f16_view` regardless of \p T.
@@ -96,36 +96,20 @@ auto any_owning_dataset_to_index_view(any_owning_dataset<IdxT>& owner) -> any_da
       return any_dataset_view<T, IdxT>(
         std::get<typename OT::padded_f32_owning>(store).as_dataset_view());
     }
-    if (std::holds_alternative<typename OT::strided_f32_owning>(store)) {
-      return any_dataset_view<T, IdxT>(
-        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f32_owning>(store).view()));
-    }
   } else if constexpr (std::is_same_v<T, half>) {
     if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
       return any_dataset_view<T, IdxT>(
         std::get<typename OT::padded_f16_owning>(store).as_dataset_view());
-    }
-    if (std::holds_alternative<typename OT::strided_f16_owning>(store)) {
-      return any_dataset_view<T, IdxT>(
-        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_f16_owning>(store).view()));
     }
   } else if constexpr (std::is_same_v<T, int8_t>) {
     if (std::holds_alternative<typename OT::padded_i8_owning>(store)) {
       return any_dataset_view<T, IdxT>(
         std::get<typename OT::padded_i8_owning>(store).as_dataset_view());
     }
-    if (std::holds_alternative<typename OT::strided_i8_owning>(store)) {
-      return any_dataset_view<T, IdxT>(
-        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_i8_owning>(store).view()));
-    }
   } else if constexpr (std::is_same_v<T, uint8_t>) {
     if (std::holds_alternative<typename OT::padded_u8_owning>(store)) {
       return any_dataset_view<T, IdxT>(
         std::get<typename OT::padded_u8_owning>(store).as_dataset_view());
-    }
-    if (std::holds_alternative<typename OT::strided_u8_owning>(store)) {
-      return any_dataset_view<T, IdxT>(
-        nb::strided_dataset_view<T, IdxT>(std::get<typename OT::strided_u8_owning>(store).view()));
     }
   } else {
     RAFT_FAIL(
@@ -163,15 +147,6 @@ auto convert_dataset_view_to_padded_for_graph_build(any_dataset_view<T, int64_t>
     expect_cagra_row_width_for_graph<T>(v.dim(), static_cast<int64_t>(v.stride()));
     return v;
   }
-  if (std::holds_alternative<typename VT::strided_view>(va)) {
-    auto const& v       = std::get<typename VT::strided_view>(va);
-    auto sv             = v.view();
-    const int64_t pitch = sv.stride(0) > 0 ? sv.stride(0) : sv.extent(1);
-    expect_cagra_row_width_for_graph<T>(v.dim(), pitch);
-    auto rm =
-      raft::make_device_matrix_view<const T, int64_t>(sv.data_handle(), sv.extent(0), pitch);
-    return nb::device_padded_dataset_view<T, int64_t>(rm, v.dim());
-  }
   RAFT_FAIL("cagra::build: unsupported dataset view for graph construction.");
 }
 
@@ -189,9 +164,6 @@ auto any_dataset_view_to_strided_device_matrix(
   namespace nb   = cuvs::neighbors;
   using VT       = nb::any_dataset_view_types<T, int64_t>;
   auto const& va = root.as_variant();
-  if (std::holds_alternative<typename VT::strided_view>(va)) {
-    return std::get<typename VT::strided_view>(va).view();
-  }
   if (std::holds_alternative<typename VT::padded_view>(va)) {
     auto const& v = std::get<typename VT::padded_view>(va);
     return raft::make_device_strided_matrix_view<const T, int64_t>(

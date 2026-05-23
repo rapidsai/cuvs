@@ -42,16 +42,6 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         ITERATIVE_CAGRA_SEARCH
         ACE
 
-    ctypedef struct cuvsCagraCompressionParams:
-        uint32_t pq_bits
-        uint32_t pq_dim
-        uint32_t vq_n_centers
-        uint32_t kmeans_n_iters
-        double vq_kmeans_trainset_fraction
-        double pq_kmeans_trainset_fraction
-
-    ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
-
     ctypedef struct cuvsIvfPqParams:
         cuvsIvfPqIndexParams_t ivf_pq_build_params
         cuvsIvfPqSearchParams_t ivf_pq_search_params
@@ -73,7 +63,6 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         size_t graph_degree
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
-        cuvsCagraCompressionParams_t compression
         void* graph_build_params
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
@@ -114,12 +103,6 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         DLDataType dtype
 
     ctypedef cuvsCagraIndex* cuvsCagraIndex_t
-
-    cuvsError_t cuvsCagraCompressionParamsCreate(
-        cuvsCagraCompressionParams_t* params)
-
-    cuvsError_t cuvsCagraCompressionParamsDestroy(
-        cuvsCagraCompressionParams_t index)
 
     cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
 
@@ -204,7 +187,6 @@ cdef class Index:
 
 cdef class IndexParams:
     cdef cuvsCagraIndexParams* params
-    cdef public object compression
     cdef public object ivf_pq_build_params
     cdef public object ivf_pq_search_params
     cdef public object ace_params

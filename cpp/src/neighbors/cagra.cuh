@@ -49,12 +49,6 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   auto const& va = dataset_->as_variant();
   if (std::holds_alternative<typename VT::padded_view>(va)) {
     rm_dataset = std::get<typename VT::padded_view>(va).view();
-  } else if (std::holds_alternative<typename VT::strided_view>(va)) {
-    auto const& v       = std::get<typename VT::strided_view>(va);
-    auto sv             = v.view();
-    const int64_t pitch = sv.stride(0) > 0 ? sv.stride(0) : static_cast<int64_t>(sv.extent(1));
-    rm_dataset          = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      sv.data_handle(), sv.extent(0), pitch);
   } else if (std::holds_alternative<typename VT::vpq_f16_view>(va) ||
              std::holds_alternative<typename VT::vpq_f32_view>(va)) {
     skip_norms = true;
@@ -321,11 +315,11 @@ index<T, IdxT> build(
 }
 
 /**
- * @brief Build the index from a device `any_dataset_view` (strided, padded, VPQ, or empty).
+ * @brief Build the index from a device `any_dataset_view` (padded, VPQ, or empty).
  *
  * Graph construction uses
  * `convert_dataset_view_to_padded_for_graph_build`. The index
- * stores the original view when `attach_dataset_on_build` is true.
+ * does not attach a dataset; call `index::update_dataset` before search.
  */
 template <typename T, typename IdxT>
 index<T, IdxT> build(raft::resources const& res,
@@ -460,16 +454,6 @@ cuvs::neighbors::cagra::index<T, IdxT> merge(
   return cagra::detail::merge<T, IdxT>(handle, params, indices, storage, row_filter);
 }
 
-template <class T, class IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> merge(
-  raft::resources const& handle,
-  const cagra::index_params& params,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-  const cuvs::neighbors::filtering::base_filter& row_filter)
-{
-  return cagra::merge_owning_deprecated<T, IdxT>(handle, params, indices, row_filter);
-}
-
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
@@ -485,15 +469,4 @@ cuvs::neighbors::cagra::index<T, IdxT> merge(
     const cuvs::neighbors::cagra::index_params& params,                                   \
     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
     cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>& storage,                     \
-    cuvs::neighbors::filtering::base_filter const& row_filter);                           \
-  template cuvs::neighbors::cagra::index<T, IdxT> cuvs::neighbors::cagra::merge<T, IdxT>( \
-    raft::resources const& handle,                                                        \
-    const cuvs::neighbors::cagra::index_params& params,                                   \
-    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
-    cuvs::neighbors::filtering::base_filter const& row_filter);                           \
-  template cuvs::neighbors::cagra::index<T, IdxT>                                         \
-  cuvs::neighbors::cagra::merge_owning_deprecated<T, IdxT>(                               \
-    raft::resources const& handle,                                                        \
-    const cuvs::neighbors::cagra::index_params& params,                                   \
-    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
     cuvs::neighbors::filtering::base_filter const& row_filter);

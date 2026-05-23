@@ -31,39 +31,6 @@ void serialize(const raft::resources& res, std::ostream& os, const empty_dataset
   raft::serialize_scalar(res, os, dataset.suggested_dim);
 }
 
-// Strided: `strided_dataset_view` writes the dense strided payload; owning forwards to `.view()`.
-template <typename DataT, typename IdxT>
-void serialize(const raft::resources& res,
-               std::ostream& os,
-               const strided_dataset_view<DataT, IdxT>& dataset)
-{
-  auto n_rows = dataset.n_rows();
-  auto dim    = dataset.dim();
-  auto stride = dataset.stride();
-  raft::serialize_scalar(res, os, n_rows);
-  raft::serialize_scalar(res, os, dim);
-  raft::serialize_scalar(res, os, stride);
-  auto src = dataset.view();
-  auto dst = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
-  raft::copy_matrix(dst.data_handle(),
-                    dim,
-                    src.data_handle(),
-                    stride,
-                    dim,
-                    n_rows,
-                    raft::resource::get_cuda_stream(res));
-  raft::resource::sync_stream(res);
-  raft::serialize_mdspan(res, os, dst.view());
-}
-
-template <typename DataT, typename IdxT>
-void serialize(const raft::resources& res,
-               std::ostream& os,
-               strided_owning_dataset<DataT, IdxT> const& dataset)
-{
-  serialize(res, os, strided_dataset_view<DataT, IdxT>(dataset.view()));
-}
-
 // Padded: `padded_dataset_view` writes the payload; owning forwards to `as_dataset_view()`.
 template <typename DataT, typename IdxT>
 void serialize(const raft::resources& res,
@@ -141,22 +108,6 @@ void serialize(const raft::resources& res,
     serialize(res, os, std::get<typename OT::padded_u8_owning>(v));
     return;
   }
-  if (std::holds_alternative<typename OT::strided_f32_owning>(v)) {
-    serialize(res, os, std::get<typename OT::strided_f32_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::strided_f16_owning>(v)) {
-    serialize(res, os, std::get<typename OT::strided_f16_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::strided_i8_owning>(v)) {
-    serialize(res, os, std::get<typename OT::strided_i8_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::strided_u8_owning>(v)) {
-    serialize(res, os, std::get<typename OT::strided_u8_owning>(v));
-    return;
-  }
   if (std::holds_alternative<typename OT::vpq_f32_owning>(v)) {
     serialize(res, os, std::get<typename OT::vpq_f32_owning>(v));
     return;
@@ -212,12 +163,6 @@ void serialize(const raft::resources& res,
     serialize(res, os, std::get<typename VT::padded_view>(var));
     return;
   }
-  if (std::holds_alternative<typename VT::strided_view>(var)) {
-    raft::serialize_scalar(res, os, kSerializeStridedDataset);
-    write_row_element_tag();
-    serialize(res, os, std::get<typename VT::strided_view>(var));
-    return;
-  }
   RAFT_FAIL("serialize(any_dataset_view): unsupported view variant");
 }
 
@@ -243,12 +188,6 @@ auto deserialize_strided(raft::resources const& res, std::istream& is)
                static_cast<unsigned>(stride));
   auto host_array = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
   raft::deserialize_mdspan(res, is, host_array.view());
-  // Always rebuild CAGRA's padded device layout from the dense host payload. The on-disk
-  // "stride" is informational; `strided_owning_dataset::dim()` is derived from the strided
-  // mdspan's extent(1), which can disagree with the serialized logical `dim` for some layouts
-  // (notably float16 / layout_stride), corrupting search after load. `make_padded_dataset` uses
-  // the authoritative logical column count from the host view (matches serialize's memcpy2D
-  // width and `padded_dataset_view::dim()`).
   auto padded = cuvs::neighbors::make_padded_dataset(res, host_array.view());
   return cuvs::neighbors::wrap_any_owning(std::move(padded));
 }

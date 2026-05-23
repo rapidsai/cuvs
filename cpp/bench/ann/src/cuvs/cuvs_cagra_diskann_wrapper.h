@@ -173,20 +173,7 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
     namespace nb                                           = cuvs::neighbors;
     using VT                                               = nb::any_dataset_view_types<T, int64_t>;
     auto const& va                                         = idx_ptr->data().as_variant();
-    if (std::holds_alternative<typename VT::strided_view>(va)) {
-      auto const& v    = std::get<typename VT::strided_view>(va);
-      auto n_rows      = v.n_rows();
-      auto logical_dim = static_cast<uint32_t>(idx_ptr->dim());
-      auto stride      = v.stride();
-      h_dataset.emplace(raft::make_host_matrix<T, int64_t>(n_rows, logical_dim));
-      raft::copy_matrix(h_dataset->data_handle(),
-                        logical_dim,
-                        v.view().data_handle(),
-                        stride,
-                        logical_dim,
-                        n_rows,
-                        raft::resource::get_cuda_stream(handle_));
-    } else if (std::holds_alternative<typename VT::padded_view>(va)) {
+    if (std::holds_alternative<typename VT::padded_view>(va)) {
       auto const& v = std::get<typename VT::padded_view>(va);
       auto n_rows   = v.n_rows();
       auto dim      = v.dim();
@@ -200,8 +187,7 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
                         n_rows,
                         raft::resource::get_cuda_stream(handle_));
     } else {
-      RAFT_LOG_DEBUG(
-        "dataset serialization: neither strided dataset_view nor device_padded_dataset_view");
+      RAFT_LOG_DEBUG("dataset serialization: index dataset is not device_padded_dataset_view");
     }
 
     if (h_dataset.has_value()) {
