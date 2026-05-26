@@ -151,7 +151,7 @@ class BloomFilter {
 };
 
 template <typename Index_t>
-struct GnndGraph {
+struct CUVS_EXPORT GnndGraph {
   raft::resources const& res;
   static constexpr int segment_size = 32;
   InternalID_t<Index_t>* h_graph;
@@ -192,7 +192,7 @@ struct GnndGraph {
 };
 
 template <typename Data_t = float, typename Index_t = int>
-class GNND {
+class CUVS_EXPORT GNND {
  public:
   GNND(raft::resources const& res, const BuildConfig& build_config);
   GNND(const GNND&)            = delete;
