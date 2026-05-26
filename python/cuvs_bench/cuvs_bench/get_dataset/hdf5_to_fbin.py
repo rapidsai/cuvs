@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 
@@ -8,15 +8,19 @@ import sys
 import h5py
 import numpy as np
 
+from cuvs_bench._bin_format import write_bin_header
+
 
 def normalize(x):
     norm = np.linalg.norm(x, axis=1)
     return (x.T / norm).T
 
 
-def write_bin(fname, data):
+def write_bin(fname, data, *, force_uint64=False):
     with open(fname, "wb") as f:
-        np.asarray(data.shape, dtype=np.uint32).tofile(f)
+        write_bin_header(
+            f, data.shape[0], data.shape[1], force_uint64=force_uint64
+        )
         data.tofile(f)
 
 

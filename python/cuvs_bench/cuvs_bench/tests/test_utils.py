@@ -6,10 +6,19 @@
 Unit tests for shared backend utilities and Dataset transparent loading.
 """
 
+import struct
+
 import numpy as np
 import pytest
 import yaml
 
+from cuvs_bench._bin_format import (
+    EXTENDED_HEADER_BYTES,
+    LEGACY_HEADER_BYTES,
+    UINT32_MAX,
+    read_bin_header,
+    write_bin_header,
+)
 from cuvs_bench.backends import Dataset
 from cuvs_bench.backends._utils import (
     compute_recall,
@@ -20,10 +29,12 @@ from cuvs_bench.backends._utils import (
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
 
-def _write_test_bin(path, data):
-    """Write a numpy array in big-ann-bench binary format."""
+def _write_test_bin(path, data, *, force_uint64=False):
+    """Write a numpy array in cuvs-bench binary format."""
     with open(path, "wb") as f:
-        np.asarray(data.shape, dtype=np.uint32).tofile(f)
+        write_bin_header(
+            f, data.shape[0], data.shape[1], force_uint64=force_uint64
+        )
         data.tofile(f)
 
 
@@ -170,13 +181,174 @@ class TestLoadVectors:
             np.array([10, 4], dtype=np.uint32).tofile(f)
             np.random.rand(5, 4).astype(np.float32).tofile(f)
 
-        with pytest.raises(ValueError, match="File is truncated"):
+        with pytest.raises(ValueError, match="does not match either"):
             load_vectors(path)
 
     def test_file_not_found(self):
         """Test that missing files raise FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             load_vectors("/nonexistent/path/vectors.fbin")
+
+    def test_load_uint64_header(self, tmp_path):
+        """``load_vectors`` reads files written with the extended uint64 header."""
+        data = np.random.rand(40, 16).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data, force_uint64=True)
+
+        # Sanity check: file really uses the extended layout.
+        assert (
+            tmp_path.joinpath("test.fbin").stat().st_size
+            == EXTENDED_HEADER_BYTES + data.nbytes
+        )
+        loaded = load_vectors(path)
+        np.testing.assert_array_equal(loaded, data)
+
+    def test_load_uint64_header_with_subset(self, tmp_path):
+        """``subset_size`` works regardless of which header layout was used."""
+        data = np.random.rand(50, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data, force_uint64=True)
+
+        loaded = load_vectors(path, subset_size=12)
+        assert loaded.shape == (12, 8)
+        np.testing.assert_array_equal(loaded, data[:12])
+
+    @pytest.mark.parametrize(
+        "ext, dtype, force_uint64",
+        [
+            (".fbin", np.float32, False),
+            (".fbin", np.float32, True),
+            (".ibin", np.int32, False),
+            (".ibin", np.int32, True),
+            (".u8bin", np.uint8, False),
+            (".u8bin", np.uint8, True),
+            (".i8bin", np.int8, False),
+            (".i8bin", np.int8, True),
+        ],
+    )
+    def test_load_roundtrip_all_dtypes(
+        self, tmp_path, ext, dtype, force_uint64
+    ):
+        """Round-trip every supported dtype through both header layouts."""
+        if np.issubdtype(dtype, np.integer):
+            info = np.iinfo(dtype)
+            data = np.random.randint(
+                info.min, info.max, size=(25, 7), dtype=dtype
+            )
+        else:
+            data = np.random.rand(25, 7).astype(dtype)
+        path = str(tmp_path / f"test{ext}")
+        _write_test_bin(path, data, force_uint64=force_uint64)
+
+        loaded = load_vectors(path)
+        np.testing.assert_array_equal(loaded, data)
+
+
+class TestBinHeaderHelpers:
+    """Tests for ``cuvs_bench._bin_format.read_bin_header`` / ``write_bin_header``."""
+
+    def test_write_legacy_returns_8_bytes(self, tmp_path):
+        """Small shapes should write the 8-byte uint32 header by default."""
+        path = tmp_path / "h.bin"
+        with open(path, "wb") as f:
+            n = write_bin_header(f, 7, 3)
+        assert n == LEGACY_HEADER_BYTES
+        assert path.stat().st_size == LEGACY_HEADER_BYTES
+
+    def test_write_force_uint64_returns_16_bytes(self, tmp_path):
+        """``force_uint64=True`` should write the 16-byte uint64 header."""
+        path = tmp_path / "h.bin"
+        with open(path, "wb") as f:
+            n = write_bin_header(f, 7, 3, force_uint64=True)
+        assert n == EXTENDED_HEADER_BYTES
+        assert path.stat().st_size == EXTENDED_HEADER_BYTES
+
+    def test_write_auto_promotes_to_uint64_when_overflowing(self, tmp_path):
+        """Shapes that don't fit in uint32 should auto-promote to uint64."""
+        path = tmp_path / "h.bin"
+        with open(path, "wb") as f:
+            n = write_bin_header(f, UINT32_MAX + 1, 4)
+        assert n == EXTENDED_HEADER_BYTES
+
+    def test_write_negative_raises(self, tmp_path):
+        """Negative dimensions are rejected."""
+        path = tmp_path / "h.bin"
+        with open(path, "wb") as f:
+            with pytest.raises(ValueError, match="non-negative"):
+                write_bin_header(f, -1, 4)
+
+    def test_read_legacy_round_trip(self, tmp_path):
+        """Legacy round-trip: write 8-byte header, read it back."""
+        path = tmp_path / "x.fbin"
+        data = np.random.rand(11, 5).astype(np.float32)
+        with open(path, "wb") as f:
+            write_bin_header(f, data.shape[0], data.shape[1])
+            data.tofile(f)
+        n_rows, n_cols, hbytes = read_bin_header(str(path), itemsize=4)
+        assert (n_rows, n_cols, hbytes) == (11, 5, LEGACY_HEADER_BYTES)
+
+    def test_read_extended_round_trip(self, tmp_path):
+        """Extended round-trip: write 16-byte header, read it back."""
+        path = tmp_path / "x.fbin"
+        data = np.random.rand(11, 5).astype(np.float32)
+        with open(path, "wb") as f:
+            write_bin_header(
+                f, data.shape[0], data.shape[1], force_uint64=True
+            )
+            data.tofile(f)
+        n_rows, n_cols, hbytes = read_bin_header(str(path), itemsize=4)
+        assert (n_rows, n_cols, hbytes) == (11, 5, EXTENDED_HEADER_BYTES)
+
+    def test_read_synthesized_huge_extended_header(self, tmp_path):
+        """A hand-crafted extended-header file with >UINT32_MAX rows reads correctly.
+
+        We can't materialize the data section (>16 GB just for the dummy
+        bytes), so write only the header and pad with the exact number of
+        zero bytes ``read_bin_header`` expects to balance the size equation
+        -- using ``n_cols=0`` so the data section is empty.
+        """
+        path = tmp_path / "huge.fbin"
+        n_rows = UINT32_MAX + 17
+        n_cols = 0
+        with open(path, "wb") as f:
+            write_bin_header(f, n_rows, n_cols)
+        assert path.stat().st_size == EXTENDED_HEADER_BYTES
+
+        got_rows, got_cols, hbytes = read_bin_header(str(path), itemsize=4)
+        assert got_rows == n_rows
+        assert got_cols == n_cols
+        assert hbytes == EXTENDED_HEADER_BYTES
+
+    def test_read_file_too_small_raises(self, tmp_path):
+        """A file shorter than the legacy header raises a clear error."""
+        path = tmp_path / "x.fbin"
+        path.write_bytes(b"\x00\x00\x00")
+        with pytest.raises(ValueError, match="File too small"):
+            read_bin_header(str(path), itemsize=4)
+
+    def test_read_size_mismatch_raises(self, tmp_path):
+        """Header values that don't balance the file size are rejected."""
+        path = tmp_path / "x.fbin"
+        with open(path, "wb") as f:
+            f.write(struct.pack("<II", 10, 4))
+            f.write(b"\x00" * (5 * 4 * 4))
+        with pytest.raises(ValueError, match="does not match either"):
+            read_bin_header(str(path), itemsize=4)
+
+    def test_read_dispatch_prefers_legacy(self, tmp_path):
+        """When the legacy interpretation balances, it wins.
+
+        Guards against accidentally treating a small legacy file as
+        extended (which would silently mis-interpret the first 16 bytes
+        as two uint64s).
+        """
+        path = tmp_path / "x.fbin"
+        data = np.arange(12, dtype=np.float32).reshape(3, 4)
+        with open(path, "wb") as f:
+            write_bin_header(f, 3, 4)
+            data.tofile(f)
+        _, _, hbytes = read_bin_header(str(path), itemsize=4)
+        assert hbytes == LEGACY_HEADER_BYTES
 
 
 class TestDatasetLazyLoading:
