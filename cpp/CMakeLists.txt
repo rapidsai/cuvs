@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
-cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
 include(../cmake/rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
@@ -1072,6 +1072,7 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
                CXX_VISIBILITY_PRESET hidden
+               CUDA_VISIBILITY_PRESET hidden
                VISIBILITY_INLINES_HIDDEN ON
   )
   target_compile_options(
@@ -1145,7 +1146,6 @@ if(NOT BUILD_CPU_ONLY)
                  CXX_STANDARD_REQUIRED ON
                  CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
-                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  POSITION_INDEPENDENT_CODE ON
     )
@@ -1202,7 +1202,6 @@ SECTIONS
                  CXX_STANDARD_REQUIRED ON
                  CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
-                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  EXPORT_NAME cuvs_static

@@ -65,7 +65,7 @@ Conda
    conda activate cuvs_benchmarks
 
    # to install GPU package:
-   conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> cuda-version=13.1*
+   conda install -c rapidsai -c conda-forge cuvs-bench=<rapids_version> cuda-version=13.2*
 
    # to install CPU package for usage in CPU-only systems:
    conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
@@ -88,7 +88,7 @@ The following command pulls the nightly container for Python version 3.13, CUDA 
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs-bench:26.06a-cuda12-py3.13 # substitute cuvs-bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:26.08a-cuda12-py3.13 # substitute cuvs-bench for the exact desired container.
 
 The CUDA and python versions can be changed for the supported values:
 - Supported CUDA versions: 12, 13
@@ -113,9 +113,19 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     # (1) Prepare dataset.
     python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
 
+    # (2) Build and search index.
+    python -m cuvs_bench.run --dataset deep-image-96-inner --algorithms cuvs_cagra --batch-size 10 -k 10 --build --search
+
+    # (3) Export data.
+    python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
+
+    # (4) Plot results.
+    python -m cuvs_bench.plot --dataset deep-image-96-inner
+
+Alternatively, step (2) can be done programmatically using the Python API for more control (e.g., custom workflows, result inspection between runs, or notebook-based exploration):
+
 .. code-block:: python
 
-    # (2) Build and search index.
     from cuvs_bench.orchestrator import BenchmarkOrchestrator
 
     orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
@@ -127,14 +137,6 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
         build=True,
         search=True,
     )
-
-.. code-block:: bash
-
-    # (3) Export data.
-    python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
-
-    # (4) Plot results.
-    python -m cuvs_bench.plot --dataset deep-image-96-inner
 
 .. list-table::
 
@@ -210,9 +212,21 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     python -m cuvs_bench.split_groundtruth --groundtruth datasets/deep-1B/deep_new_groundtruth.public.10K.bin
     # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
 
-.. code-block:: python
+.. code-block:: bash
 
     # (2) Build and search index.
+    python -m cuvs_bench.run --dataset deep-1B --algorithms cuvs_cagra --batch-size 10 -k 10 --build --search
+
+    # (3) Export data.
+    python -m cuvs_bench.run --data-export --dataset deep-1B
+
+    # (4) Plot results.
+    python -m cuvs_bench.plot --dataset deep-1B
+
+Alternatively, step (2) can be done programmatically using the Python API:
+
+.. code-block:: python
+
     from cuvs_bench.orchestrator import BenchmarkOrchestrator
 
     orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
@@ -224,14 +238,6 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
         build=True,
         search=True,
     )
-
-.. code-block:: bash
-
-    # (3) Export data.
-    python -m cuvs_bench.run --data-export --dataset deep-1B
-
-    # (4) Plot results.
-    python -m cuvs_bench.plot --dataset deep-1B
 
 The usage of `python -m cuvs_bench.split_groundtruth` is:
 
@@ -289,7 +295,7 @@ For GPU-enabled systems, the `DATA_FOLDER` variable should be a local folder whe
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run --gpus all --rm -it -u $(id -u)                      \
         -v $DATA_FOLDER:/data/benchmarks                            \
-        rapidsai/cuvs-bench:26.06a-cuda12-py3.13              \
+        rapidsai/cuvs-bench:26.08a-cuda12-py3.13              \
         "--dataset deep-image-96-angular"                           \
         "--normalize"                                               \
         "--algorithms cuvs_cagra,cuvs_ivf_pq --batch-size 10 -k 10" \
@@ -302,7 +308,7 @@ Usage of the above command is as follows:
  * - Argument
    - Description
 
- * - `rapidsai/cuvs-bench:26.06a-cuda12-py3.13`
+ * - `rapidsai/cuvs-bench:26.08a-cuda12-py3.13`
    - Image to use. See "Docker" section for links to lists of available tags.
 
  * - `"--dataset deep-image-96-angular"`
@@ -349,7 +355,7 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         --entrypoint /bin/bash                          \
         --workdir /data/benchmarks                      \
         -v $DATA_FOLDER:/data/benchmarks                \
-        rapidsai/cuvs-bench:26.06a-cuda12-py3.13
+        rapidsai/cuvs-bench:26.08a-cuda12-py3.13
 
 This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the `Running the benchmarks`_ section above:
 

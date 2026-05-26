@@ -12,7 +12,7 @@ dependencies:
 - cuda-nvrtc-dev
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-version=12.9
+- cuda-version=13.2
 - cxx-compiler
 - gcc_linux-aarch64=14.*
 - libcublas-dev
@@ -27,4 +27,4 @@ dependencies:
 - ninja
 - rust
 - sysroot_linux-aarch64==2.28
-name: rust_cuda-129_arch-aarch64
+name: rust_cuda-132_arch-aarch64
