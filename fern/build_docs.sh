@@ -68,6 +68,10 @@ generate_api_reference() {
   python3 "${SCRIPT_DIR}/scripts/generate_api_reference.py"
 }
 
+export_performance_dashboard_data() {
+  python3 "${SCRIPT_DIR}/scripts/export_performance_dashboard_data.py"
+}
+
 run_checks() {
   pushd "${REPO_DIR}" >/dev/null
   run_fern check --warnings
@@ -78,10 +82,12 @@ run_checks() {
 case "${MODE}" in
   check)
     generate_api_reference
+    export_performance_dashboard_data
     run_checks
     ;;
   preview)
     generate_api_reference
+    export_performance_dashboard_data
     run_checks
     pushd "${REPO_DIR}" >/dev/null
     run_fern generate --docs --preview "$@"
@@ -89,6 +95,7 @@ case "${MODE}" in
     ;;
   publish)
     generate_api_reference
+    export_performance_dashboard_data
     run_checks
     pushd "${REPO_DIR}" >/dev/null
     run_fern generate --docs "$@"
@@ -96,6 +103,7 @@ case "${MODE}" in
     ;;
   dev)
     generate_api_reference
+    export_performance_dashboard_data
     pushd "${REPO_DIR}" >/dev/null
     run_fern docs dev "$@"
     popd >/dev/null
