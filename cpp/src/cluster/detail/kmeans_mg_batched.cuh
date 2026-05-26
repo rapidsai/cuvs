@@ -61,16 +61,13 @@ using cuvs::core::detail::mnmg_comms;
  * implementation streams every local partition through Lloyd iterations using
  * batched device-side reductions, allreducing partial centroid sums, weights,
  * convergence state, and clustering cost at the end of each iteration.
- *
- * Best-of-`n_init` is tracked per rank. RAFT comms ranks each write their own
- * caller-provided outputs; SNMG OMP threads share caller-provided outputs, so
- * only rank 0 writes them.
+ * Best-of-`n_init` is tracked per rank. RAFT comms ranks each write their own caller-provided
+ * outputs; SNMG OMP threads share caller-provided outputs, so only rank 0 writes them.
  *
  * @tparam DataT    Data / weight type (float or double)
  * @tparam IndexT   Index type (int or int64_t)
  * @tparam Accessor RAFT mdspan accessor type for the input data and optional
- *                  weights. Host and device accessors are supported, but all
- *                  partitions in one call must use the same accessor.
+ *                  weights.
  *
  * @param[in]  handle        RAFT resources. For Path 1 this is the shared
  *                           clique; for Path 2 this is the per-process handle.
@@ -96,11 +93,6 @@ using cuvs::core::detail::mnmg_comms;
  * @param[out] n_iter        Host scalar receiving the iteration count at which
  *                           the run terminated on all RAFT comms ranks, or
  *                           rank 0 for SNMG.
- * @param[in,out] scaled_weights_cache
- *                           Optional pinned host cache of size equal to the
- *                           rank-local row count. Used only for host weight
- *                           partitions to store globally normalized weights
- *                           before streaming batches to device.
  */
 template <typename DataT, typename IndexT, typename Accessor>
 void mnmg_fit(
@@ -111,8 +103,7 @@ void mnmg_fit(
     sample_weight_parts,
   raft::device_matrix_view<DataT, IndexT> centroids,
   raft::host_scalar_view<DataT> inertia,
-  raft::host_scalar_view<IndexT> n_iter,
-  std::optional<raft::pinned_vector_view<DataT, IndexT>> scaled_weights_cache = std::nullopt)
+  raft::host_scalar_view<IndexT> n_iter)
 {
   using data_part_view_t           = partitioned_matrix_view<DataT, IndexT, Accessor>;
   using weight_part_view_t         = partitioned_vector_view<DataT, IndexT, Accessor>;
@@ -237,34 +228,6 @@ void mnmg_fit(
     if (std::abs(global_wt - global_n_wt) > tol) { weight_scale = global_n_wt / global_wt; }
   }
 
-  std::optional<raft::pinned_vector<DataT, IndexT>> local_scaled_weights;
-  DataT* scaled_host_weights_ptr = nullptr;
-  if (sample_weight_parts.has_value()) {
-    if constexpr (weights_on_device) {
-      RAFT_EXPECTS(!scaled_weights_cache.has_value(),
-                   "scaled_weights_cache is only valid for host sample weights");
-    } else {
-      if (scaled_weights_cache.has_value()) {
-        RAFT_EXPECTS(static_cast<IndexT>(scaled_weights_cache->extent(0)) == n_local,
-                     "scaled_weights_cache must have extent equal to n_local");
-        scaled_host_weights_ptr = scaled_weights_cache->data_handle();
-      } else {
-        local_scaled_weights    = raft::make_pinned_vector<DataT, IndexT>(dev_res, n_local);
-        scaled_host_weights_ptr = local_scaled_weights->data_handle();
-      }
-
-      for (size_t part_idx = 0; part_idx < sample_weight_parts->size(); ++part_idx) {
-        auto const& weights = (*sample_weight_parts)[part_idx];
-        auto part_rows      = static_cast<IndexT>(weights.extent(0));
-        auto* dst           = scaled_host_weights_ptr + part_offsets[part_idx];
-        auto const* src     = weights.data_handle();
-        for (IndexT i = 0; i < part_rows; ++i) {
-          dst[i] = src[i] * weight_scale;
-        }
-      }
-    }
-  }
-
   auto n_init = params.n_init;
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Array && n_init != 1) {
     RAFT_LOG_DEBUG(
@@ -313,13 +276,16 @@ void mnmg_fit(
   auto prepare_batch_weights = [&](size_t part_idx, IndexT batch_offset, IndexT cur_batch_size)
     -> raft::device_vector_view<const DataT, IndexT> {
     if (sample_weight_parts.has_value()) {
+      auto const* src = (*sample_weight_parts)[part_idx].data_handle() + batch_offset;
+
       if constexpr (weights_on_device) {
-        auto const* src = (*sample_weight_parts)[part_idx].data_handle() + batch_offset;
         if (weight_scale == DataT{1}) {
           return raft::make_device_vector_view<const DataT, IndexT>(src, cur_batch_size);
         }
+      }
 
-        raft::copy(batch_weights.data_handle(), src, cur_batch_size, stream);
+      raft::copy(batch_weights.data_handle(), src, cur_batch_size, stream);
+      if (weight_scale != DataT{1}) {
         auto batch_weights_mut =
           raft::make_device_vector_view<DataT, IndexT>(batch_weights.data_handle(), cur_batch_size);
         raft::linalg::map(
@@ -327,11 +293,6 @@ void mnmg_fit(
           batch_weights_mut,
           [weight_scale] __device__(DataT w) { return w * weight_scale; },
           raft::make_const_mdspan(batch_weights_mut));
-      } else {
-        raft::copy(batch_weights.data_handle(),
-                   scaled_host_weights_ptr + part_offsets[part_idx] + batch_offset,
-                   cur_batch_size,
-                   stream);
       }
     }
 
@@ -612,8 +573,7 @@ void mnmg_fit(
   std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
   raft::device_matrix_view<DataT, IndexT> centroids,
   raft::host_scalar_view<DataT> inertia,
-  raft::host_scalar_view<IndexT> n_iter,
-  std::optional<raft::pinned_vector_view<DataT, IndexT>> scaled_weights_cache = std::nullopt)
+  raft::host_scalar_view<IndexT> n_iter)
 {
   std::vector<raft::host_matrix_view<const DataT, IndexT>> X_parts{X_local};
 
@@ -624,8 +584,7 @@ void mnmg_fit(
       std::vector<raft::host_vector_view<const DataT, IndexT>>{sample_weight.value()});
   }
 
-  mnmg_fit(
-    handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter, scaled_weights_cache);
+  mnmg_fit(handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
 template <typename DataT, typename IndexT>
@@ -651,11 +610,6 @@ void batched_fit_omp(const raft::resources& clique,
   raft::resource::get_nccl_comms(clique);
   int num_ranks = raft::resource::get_num_ranks(clique);
 
-  std::optional<raft::pinned_vector<DataT, IndexT>> scaled_weights_cache;
-  if (sample_weight.has_value()) {
-    scaled_weights_cache = raft::make_pinned_vector<DataT, IndexT>(clique, n_samples);
-  }
-
   IndexT base = n_samples / num_ranks;
   IndexT rem  = n_samples % num_ranks;
 
@@ -678,15 +632,12 @@ void batched_fit_omp(const raft::resources& clique,
         X.data_handle() + offset * n_features, n_local, n_features);
 
       std::optional<raft::host_vector_view<const DataT, IndexT>> sw_local;
-      std::optional<raft::pinned_vector_view<DataT, IndexT>> sw_local_cache;
       if (sample_weight.has_value()) {
         sw_local = raft::make_host_vector_view<const DataT, IndexT>(
           sample_weight->data_handle() + offset, n_local);
-        sw_local_cache = raft::make_pinned_vector_view<DataT, IndexT>(
-          scaled_weights_cache->data_handle() + offset, n_local);
       }
 
-      mnmg_fit(clique, params, X_local, sw_local, centroids, inertia, n_iter, sw_local_cache);
+      mnmg_fit(clique, params, X_local, sw_local, centroids, inertia, n_iter);
     }
   }
 
