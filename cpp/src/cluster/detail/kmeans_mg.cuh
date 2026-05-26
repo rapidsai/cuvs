@@ -6,7 +6,6 @@
 #pragma once
 
 #include "../kmeans.cuh"
-#include "kmeans_mg_batched.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/copy.cuh>
@@ -36,9 +35,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <numeric>
-#include <optional>
 #include <random>
-#include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
@@ -751,4 +748,5 @@ void fit(const raft::resources& handle,
   }
   n_iter[0] = std::min(n_iter[0], static_cast<IndexT>(params.max_iter));
 }
+
 };  // namespace cuvs::cluster::kmeans::mg::detail
