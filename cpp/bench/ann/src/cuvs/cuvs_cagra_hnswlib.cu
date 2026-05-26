@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../common/ann_types.hpp"
+#include "../common/conf.hpp"
 #include "cuvs_ann_bench_param_parser.h"
 #include "cuvs_cagra_hnswlib_wrapper.h"
 
@@ -27,6 +28,9 @@ auto parse_build_param(const nlohmann::json& conf) ->
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
     } else if (conf.at("hierarchy") == "gpu") {
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
+    } else if (conf.at("hierarchy") == "gpu_layered_on_disk" ||
+               conf.at("hierarchy") == "gpu_layered" || conf.at("hierarchy") == "layered") {
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU_LAYERED_ON_DISK;
     } else {
       THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
     }
@@ -35,6 +39,11 @@ auto parse_build_param(const nlohmann::json& conf) ->
   }
   if (conf.contains("ef_construction")) {
     hnsw_params.ef_construction = conf.at("ef_construction");
+  }
+  if (conf.contains("dataset_path")) {
+    hnsw_params.dataset_path = conf.at("dataset_path");
+  } else if (hnsw_params.hierarchy == cuvs::neighbors::hnsw::HnswHierarchy::GPU_LAYERED_ON_DISK) {
+    hnsw_params.dataset_path = configuration::singleton().get_dataset_conf().base_file;
   }
   if (conf.contains("num_threads")) { hnsw_params.num_threads = conf.at("num_threads"); }
 
