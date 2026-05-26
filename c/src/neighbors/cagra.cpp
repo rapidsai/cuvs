@@ -225,8 +225,18 @@ void _build(cuvsResources_t res,
     if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
           index_params.graph_build_params)) {
       auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+      std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> padded_owner = nullptr;
+      // In-memory ACE returns a graph-only index; disk ACE attaches dataset via file descriptors.
+      if (index.dim() == 0) {
+        auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+        auto view   = padded->as_dataset_view();
+        index.update_dataset(*res_ptr, view);
+        padded_owner = cuvs::neighbors::wrap_any_owning(std::move(padded));
+      }
       auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-        nullptr, raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr), std::move(index)};
+        std::move(padded_owner),
+        raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
+        std::move(index)};
       assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
     } else {
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);

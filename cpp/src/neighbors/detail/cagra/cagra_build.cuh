@@ -1492,11 +1492,8 @@ cuvs::neighbors::cagra::index<T, IdxT> build_ace(
 
     auto index_creation_start = std::chrono::high_resolution_clock::now();
     index<T, IdxT> idx(res, params.metric);
-    // Only add graph and dataset if not using disk storage. The returned index is empty if using
-    // disk storage. Use the files written to disk for search.
     if (!use_disk_mode) {
       idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
-
     } else {
       idx.update_dataset(res, std::move(reordered_fd));
       idx.update_graph(res, std::move(graph_fd));

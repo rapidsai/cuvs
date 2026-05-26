@@ -1,5 +1,5 @@
 diff --git a/faiss/gpu/GpuResources.h b/faiss/gpu/GpuResources.h
-index 61d9d4dbe..477d27cb2 100644
+index 61d9d4d..477d27c 100644
 --- a/faiss/gpu/GpuResources.h
 +++ b/faiss/gpu/GpuResources.h
 @@ -33,7 +33,8 @@
@@ -22,7 +22,7 @@ index 61d9d4dbe..477d27cb2 100644
  };
 
 diff --git a/faiss/gpu/StandardGpuResources.cpp b/faiss/gpu/StandardGpuResources.cpp
-index 548618262..3be071550 100644
+index 5486182..3be0715 100644
 --- a/faiss/gpu/StandardGpuResources.cpp
 +++ b/faiss/gpu/StandardGpuResources.cpp
 @@ -92,8 +92,8 @@ std::string allocsToString(const std::unordered_map<void*, AllocRequest>& map) {
@@ -80,7 +80,7 @@ index 548618262..3be071550 100644
              FAISS_THROW_MSG("CUDA memory allocation error");
          }
 diff --git a/faiss/gpu/StandardGpuResources.h b/faiss/gpu/StandardGpuResources.h
-index 3ba606606..4c1df7212 100644
+index 3ba6066..4c1df72 100644
 --- a/faiss/gpu/StandardGpuResources.h
 +++ b/faiss/gpu/StandardGpuResources.h
 @@ -25,7 +25,7 @@
@@ -105,11 +105,11 @@ index 3ba606606..4c1df7212 100644
  #endif
 
      /// Pinned memory allocation for use with this GPU
-
 diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.cu
+index b331fdc..f5b295e 100644
 --- a/faiss/gpu/impl/BinaryCuvsCagra.cu
 +++ b/faiss/gpu/impl/BinaryCuvsCagra.cu
-@@ -110,12 +110,14 @@
+@@ -110,12 +110,14 @@ BinaryCuvsCagra::BinaryCuvsCagra(
          auto dataset_mds =
                  raft::make_device_matrix_view<const uint8_t, int64_t>(
                          train_dataset, n, dim / 8);
@@ -125,7 +125,7 @@ diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else if (!distances_on_gpu && !knn_graph_on_gpu) {
          // copy idx_t (int64_t) host knn_graph to uint32_t host knn_graph
-@@ -128,12 +130,14 @@
+@@ -128,12 +130,14 @@ BinaryCuvsCagra::BinaryCuvsCagra(
 
          auto dataset_mds = raft::make_host_matrix_view<const uint8_t, int64_t>(
                  train_dataset, n, dim / 8);
@@ -141,7 +141,7 @@ diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else {
          FAISS_THROW_MSG(
-@@ -212,14 +216,16 @@
+@@ -212,14 +216,18 @@ void BinaryCuvsCagra::search(
 
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
@@ -162,7 +162,7 @@ diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.
          }
          store_dataset_ = true;
      }
-@@ -280,6 +286,7 @@
+@@ -280,6 +288,7 @@ void BinaryCuvsCagra::search(
 
  void BinaryCuvsCagra::reset() {
      cuvs_index.reset();
@@ -171,6 +171,7 @@ diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.
 
  idx_t BinaryCuvsCagra::get_knngraph_degree() const {
 diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cuh b/faiss/gpu/impl/BinaryCuvsCagra.cuh
+index a14480b..7cbfe39 100644
 --- a/faiss/gpu/impl/BinaryCuvsCagra.cuh
 +++ b/faiss/gpu/impl/BinaryCuvsCagra.cuh
 @@ -28,11 +28,13 @@
@@ -187,7 +188,7 @@ diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cuh b/faiss/gpu/impl/BinaryCuvsCagra
 
  namespace faiss {
 
-@@ -115,6 +117,10 @@
+@@ -115,6 +117,10 @@ class BinaryCuvsCagra {
      /// Parameters to build CAGRA graph using NN Descent
      size_t nn_descent_niter_ = 20;
 
@@ -199,9 +200,10 @@ diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cuh b/faiss/gpu/impl/BinaryCuvsCagra
      std::shared_ptr<cuvs::neighbors::cagra::index<uint8_t, uint32_t>>
              cuvs_index{nullptr};
 diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
+index 755817f..0ffdec9 100644
 --- a/faiss/gpu/impl/CuvsCagra.cu
 +++ b/faiss/gpu/impl/CuvsCagra.cu
-@@ -133,12 +133,14 @@
+@@ -133,12 +133,14 @@ CuvsCagra<data_t>::CuvsCagra(
 
          auto dataset_mds = raft::make_device_matrix_view<const data_t, int64_t>(
                  dataset, n, dim);
@@ -217,7 +219,7 @@ diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else if (!dataset_on_gpu && !knn_graph_on_gpu) {
          // copy idx_t (int64_t) host knn_graph to uint32_t host knn_graph
-@@ -151,12 +153,14 @@
+@@ -151,12 +153,14 @@ CuvsCagra<data_t>::CuvsCagra(
 
          auto dataset_mds = raft::make_host_matrix_view<const data_t, int64_t>(
                  dataset, n, dim);
@@ -233,7 +235,7 @@ diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else {
          FAISS_THROW_MSG(
-@@ -248,13 +252,15 @@
+@@ -248,13 +252,17 @@ void CuvsCagra<data_t>::search(
 
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
@@ -253,7 +255,7 @@ diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
          }
          store_dataset_ = true;
      }
-@@ -303,6 +309,7 @@
+@@ -303,6 +311,7 @@ void CuvsCagra<data_t>::search(
  template <typename data_t>
  void CuvsCagra<data_t>::reset() {
      cuvs_index.reset();
@@ -262,6 +264,7 @@ diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
 
  template <typename data_t>
 diff --git a/faiss/gpu/impl/CuvsCagra.cuh b/faiss/gpu/impl/CuvsCagra.cuh
+index a10e9fb..83e03ec 100644
 --- a/faiss/gpu/impl/CuvsCagra.cuh
 +++ b/faiss/gpu/impl/CuvsCagra.cuh
 @@ -27,12 +27,14 @@
@@ -279,7 +282,7 @@ diff --git a/faiss/gpu/impl/CuvsCagra.cuh b/faiss/gpu/impl/CuvsCagra.cuh
 
  namespace faiss {
 
-@@ -147,6 +149,10 @@
+@@ -147,6 +149,10 @@ class CuvsCagra {
      /// Parameter to use MST optimization to guarantee graph connectivity
      bool guarantee_connectivity_ = false;
 
