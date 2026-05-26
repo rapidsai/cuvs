@@ -1,0 +1,27 @@
+---
+slug: developer-guide
+---
+
+# Developer Guide
+
+Use these pages when contributing to cuVS or working on integrations that need to follow cuVS development conventions.
+
+## Coding Guidelines
+
+- [Coding Guidelines](coding_guidelines.md): find language-specific conventions for C, C++, Java, and Python development.
+- [C Guidelines](c_guidelines.md): follow cuVS C API design, ABI-stable handle ownership, and lifecycle conventions.
+- [C++ Guidelines](cpp_guidelines.md): follow cuVS C++ API design, resource-management, and implementation conventions.
+- [Java Guidelines](java_guidelines.md): follow cuVS Java API design, native binding, packaging, and resource-management conventions.
+- [Python Guidelines](python_guidelines.md): follow cuVS Python API, packaging, and binding conventions.
+
+## ABI Stability
+
+- [ABI Stability](../developer_guide/abi_stability.md): understand ABI expectations for developer-facing APIs and downstream integrations.
+
+## Link-time Optimization
+
+- [Link-time Optimization](jit_lto_guide.md): use JIT LTO for CUDA compilation, fragment generation, and runtime linking workflows.
+
+## Contributing
+
+- [Contributing](contributing.md): learn how to set up a development environment, submit changes, and work with the project.

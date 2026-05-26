@@ -137,23 +137,32 @@ using list_data = ivf::list<list_spec, SizeT, CodeT, IdxT>;
  * In the IVF-SQ index, a database vector is first assigned to the nearest cluster center
  * using an inverted file (IVF) structure, and then compressed using scalar quantization (SQ).
  *
- * Scalar quantization independently maps each dimension of the per-cluster residual (the
- * input vector minus its assigned centroid) to a fixed-width integer code. For 8-bit
- * quantization (uint8_t), each residual component r_i = x_i - centroid_i is linearly
- * mapped to an integer in [0, 255] using learned per-dimension minimum (`sq_vmin`) and
- * step-size (`sq_delta`) values:
+ * Scalar quantization independently maps each dimension of the per-cluster residual (the input
+ * vector minus its assigned centroid) to a fixed-width integer code. For 8-bit quantization
+ * (`uint8_t`), each residual component is linearly mapped to an integer in [0, 255] using learned
+ * per-dimension minimum (`sq_vmin`) and step-size (`sq_delta`) values.
  *
- *   code_i = clamp(round((r_i - vmin_i) / delta_i), 0, 255)
+ * For a vector component `x_i`, centroid component `centroid_i`, residual minimum `vmin_i`, and
+ * quantization step `delta_i`, the stored code is:
  *
- * where delta_i is the per-level step size (range divided by 255), so the corresponding
- * reconstruction is x_i ≈ centroid_i + vmin_i + code_i * delta_i.
+ * $$code_i = clamp(round((x_i - centroid_i - vmin_i) / delta_i), 0, 255)$$
+ *
+ * The corresponding reconstructed component is:
+ *
+ * $$x_i \approx centroid_i + vmin_i + code_i \cdot delta_i$$
  *
  * This provides a compact representation (1 byte per dimension) while preserving the relative
  * distances between vectors with high fidelity, offering a good trade-off between index size,
  * search speed, and recall compared to flat (uncompressed) and product-quantized (PQ)
  * representations.
  *
- * @tparam CodeT  SQ code type. Only uint8_t (8-bit, codes in [0,255]) for now.
+ * Note: `CodeT` is the storage type for scalar-quantized residual codes in the inverted lists, not
+ * the input dataset type. The public build and search APIs accept `float` and `half` input vectors,
+ * then store the quantized residual components as `CodeT` inside the index. Currently, IVF-SQ
+ * supports only `uint8_t` codes, so use `CodeT = uint8_t`. Each code uses the full 8-bit range
+ * [0, 255].
+ *
+ * @tparam CodeT SQ code storage type. Must be `uint8_t` in the current implementation.
  *
  */
 template <typename CodeT>
