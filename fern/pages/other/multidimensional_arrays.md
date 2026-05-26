@@ -232,8 +232,8 @@ If you use NVIDIA cuVS from C++, dense inputs and outputs are usually described 
 
 There are two main families:
 
-- Non-owning views, such as `raft::device_matrix_view`, `raft::device_vector_view`, `raft::host_matrix_view`, and `raft::span`. These wrap memory owned somewhere else.
-- Owning arrays, such as `raft::device_matrix`, `raft::device_vector`, `raft::host_matrix`, and `raft::pinned_matrix`. These allocate and free their own storage.
+- Non-owning views, such as `raft::device_matrix_view`, `raft::device_vector_view`, `raft::host_matrix_view`, `raft::pinned_matrix_view`, `raft::managed_mdspan`, and `raft::span`. These wrap memory owned somewhere else.
+- Owning arrays, such as `raft::device_matrix`, `raft::device_vector`, `raft::host_matrix`, `raft::managed_matrix`, and `raft::pinned_matrix`. These allocate and free their own storage.
 
 Use views when your data already exists in memory. Use owning arrays when you want RAFT to allocate storage for an input, output, or staging buffer.
 
@@ -410,7 +410,7 @@ void normalize_ids(int64_t* ids, std::size_t n_ids)
 
 The most important properties are:
 
-- Memory space: device, host, or pinned host.
+- Memory space: device, host, managed, or pinned host.
 - Shape: vector length, matrix rows and columns, or higher-dimensional extents.
 - Layout: usually `raft::row_major` for NVIDIA cuVS matrices unless an API explicitly requests another layout.
 - Constness: read-only inputs should use `const` element types or `raft::make_const_mdspan()`.
@@ -420,12 +420,16 @@ The most important properties are:
 
 | Type | Owns memory? | Typical use |
 | --- | --- | --- |
-| `raft::device_matrix_view` / `raft::device_vector_view` | No | GPU inputs and outputs already allocated by RAFT, RMM, CuPy, or another CUDA-aware library. |
-| `raft::host_matrix_view` / `raft::host_vector_view` | No | CPU-resident buffers that are passed into host-side APIs or copied to device arrays. |
+| `raft::device_matrix_view` / `raft::device_vector_view` / `raft::device_scalar_view` | No | GPU inputs and outputs already allocated by RAFT, RMM, CuPy, or another CUDA-aware library. |
+| `raft::host_matrix_view` / `raft::host_vector_view` / `raft::host_scalar_view` | No | CPU-resident buffers that are passed into host-side APIs or copied to device arrays. |
+| `raft::pinned_matrix_view` / `raft::pinned_vector_view` / `raft::pinned_scalar_view` | No | Existing page-locked host buffers used for transfers or host-device coordination. |
+| `raft::managed_mdspan` | No | Existing CUDA Unified Memory allocations that need a non-owning RAFT view. |
 | `raft::span` | No | One-dimensional utility buffers where matrix shape and memory-space metadata are unnecessary. |
-| `raft::device_matrix` / `raft::device_vector` | Yes | Owning GPU allocations for NVIDIA cuVS C++ inputs, outputs, temporary arrays, and indexes. |
-| `raft::host_matrix` / `raft::host_vector` | Yes | Owning CPU allocations for host data, small results, and CPU-side staging. |
-| `raft::pinned_matrix` / `raft::pinned_vector` | Yes | Owning page-locked host allocations for repeated host-device transfers or host-device coordination. |
+| `raft::device_matrix` / `raft::device_vector` / `raft::device_scalar` | Yes | Owning GPU allocations for NVIDIA cuVS C++ inputs, outputs, temporary arrays, and indexes. |
+| `raft::host_matrix` / `raft::host_vector` / `raft::host_scalar` | Yes | Owning CPU allocations for host data, small results, and CPU-side staging. |
+| `raft::managed_matrix` / `raft::managed_vector` / `raft::managed_scalar` | Yes | Owning CUDA Unified Memory allocations that can be accessed from host and device when that trade-off is useful. |
+| `raft::pinned_matrix` / `raft::pinned_vector` / `raft::pinned_scalar` | Yes | Owning page-locked host allocations for repeated host-device transfers or host-device coordination. |
+| `raft::device_mdarray` / `raft::host_mdarray` / `raft::managed_mdarray` / `raft::pinned_mdarray` | Yes | Generic owning arrays for ranks beyond scalar, vector, and matrix aliases. |
 
 ## Using arrays safely
 

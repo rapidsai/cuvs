@@ -78,11 +78,15 @@ resources.sync()
 </Tab>
 </Tabs>
 
-Use `cuvsMultiGpuResourcesCreateWithDeviceIds()` in C or `MultiGpuResources(device_ids=[...])` in Python when an application should restrict NVIDIA cuVS to a subset of visible GPUs.
+When an application should restrict NVIDIA cuVS to a subset of visible GPUs, use the device-id-specific resource constructor for that language:
+
+- C: `cuvsMultiGpuResourcesCreateWithDeviceIds()`
+- C++: `raft::device_resources_snmg(std::vector<int>{...})`
+- Python: `MultiGpuResources(device_ids=[...])`
 
 ### Multi-node NCCL communicator
 
-Use the multi-node path when each process controls one rank, often one GPU, and the application runtime provides launch, rank assignment, and data placement. The application creates an `ncclComm_t`, attaches it to a RAFT handle, and then passes that handle to NVIDIA cuVS APIs that accept `raft::resources`.
+Use the multi-node path when each process controls one rank, often one GPU, and the application runtime provides launch, rank assignment, and data placement. This API is currently exposed only in C++. The application creates an `ncclComm_t`, attaches it to a RAFT handle, and then passes that handle to NVIDIA cuVS APIs that accept `raft::resources`.
 
 <Tabs>
 <Tab title="C++">
@@ -171,18 +175,11 @@ In practice, the communicator provides:
 
 NCCL is the communicator used for GPU collectives in NVIDIA cuVS. MPI, Ray, Dask, or another framework may still be used to launch workers, distribute data, and exchange the NCCL unique ID before the RAFT handle is initialized.
 
-## Dask and cuML
-
-Dask-cuML distributed algorithms are based on NCCL-backed communication underneath while presenting a Dask-native Python interface. That means users can get multi-GPU and multi-worker execution inside a Dask cluster without manually creating `ncclComm_t` objects in application code.
-
-This is the same design idea: the scheduling framework owns worker lifecycle and data placement, while the algorithm layer uses NCCL-backed collectives for high-throughput GPU communication.
-
 ## Choosing a setup
 
-| Setup | Typical use | Who creates communication state? | NVIDIA cuVS resource |
+| Setup | Languages | Typical use | Who creates communication state? |
 | --- | --- | --- | --- |
-| Single-node multi-GPU | One process uses several GPUs on one machine. | NVIDIA cuVS/RAFT creates resources for the visible devices or requested device ids. | `raft::device_resources_snmg`, `cuvsMultiGpuResourcesCreate`, or `MultiGpuResources`. |
-| Multi-node multi-GPU | Many ranks run across one or more nodes. | The application runtime creates ranks and initializes NCCL. | `raft::handle_t` with NCCL comms attached by `raft::comms::build_comms_nccl_only`. |
-| Dask-cuML | Python users run distributed estimators through Dask. | Dask-cuML and the Dask worker lifecycle manage the NCCL-backed communicator. | cuML distributed estimators call lower-level GPU communication internally. |
+| Single&#8209;node&nbsp;multi&#8209;GPU | C, C++, Python | One process uses several GPUs on one machine. | NVIDIA cuVS/RAFT creates resources for the visible devices or requested device ids. |
+| Multi&#8209;node&nbsp;multi&#8209;GPU | C++ | Many ranks run across one or more nodes. | The application runtime creates ranks and initializes NCCL. |
 
 Use single-node resources when all GPUs are local to one process. Use an explicit NCCL communicator when the work is already distributed across ranks, nodes, or worker processes.
