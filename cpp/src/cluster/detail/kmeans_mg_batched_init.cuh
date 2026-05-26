@@ -33,14 +33,6 @@ namespace cuvs::cluster::kmeans::mg::detail {
 
 using cuvs::core::detail::mnmg_comms;
 
-template <typename DataT, typename IndexT, typename Accessor>
-using partitioned_matrix_view =
-  raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::layout_c_contiguous, Accessor>;
-
-template <typename DataT, typename IndexT, typename Accessor>
-using partitioned_vector_view =
-  raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::layout_c_contiguous, Accessor>;
-
 template <typename IndexT>
 IndexT get_global_kmeanspp_init_sample_size(const cuvs::cluster::kmeans::params& params,
                                             IndexT global_n,
@@ -175,7 +167,8 @@ template <typename DataT, typename IndexT, typename Accessor>
 raft::device_matrix<DataT, IndexT> sample_global_rows(
   raft::resources const& handle,
   const cuvs::cluster::kmeans::params& params,
-  const std::vector<partitioned_matrix_view<DataT, IndexT, Accessor>>& X_parts,
+  const std::vector<
+    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>& X_parts,
   IndexT n_features,
   IndexT sample_size,
   int rank,
@@ -204,7 +197,8 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
       sampled_rows.data_handle() + owned_sample.sample_idx * n_features, n_features);
     auto const* src = X_parts[part_idx].data_handle() + row_in_part * n_features;
 
-    if constexpr (raft::is_device_mdspan_v<partitioned_matrix_view<DataT, IndexT, Accessor>>) {
+    if constexpr (raft::is_device_mdspan_v<
+                    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>) {
       raft::copy(handle, dst, raft::make_device_vector_view<const DataT, IndexT>(src, n_features));
     } else {
       raft::copy(handle, dst, raft::make_host_vector_view<const DataT, IndexT>(src, n_features));
@@ -220,7 +214,8 @@ void init_centroids_for_mg_batched(
   raft::resources const& handle,
   const cuvs::cluster::kmeans::params& params,
   IndexT /*streaming_batch_size*/,
-  const std::vector<partitioned_matrix_view<DataT, IndexT, Accessor>>& X_parts,
+  const std::vector<
+    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>& X_parts,
   IndexT n_features,
   raft::device_matrix_view<const DataT, IndexT> initial_centroids,
   raft::device_matrix_view<DataT, IndexT> centroids,

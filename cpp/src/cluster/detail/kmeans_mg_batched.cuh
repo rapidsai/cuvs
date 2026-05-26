@@ -98,15 +98,19 @@ template <typename DataT, typename IndexT, typename Accessor>
 void mnmg_fit(
   const raft::resources& handle,
   const cuvs::cluster::kmeans::params& params,
-  const std::vector<partitioned_matrix_view<DataT, IndexT, Accessor>>& X_parts,
-  const std::optional<std::vector<partitioned_vector_view<DataT, IndexT, Accessor>>>&
+  const std::vector<
+    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>& X_parts,
+  const std::optional<std::vector<
+    raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::row_major, Accessor>>>&
     sample_weight_parts,
   raft::device_matrix_view<DataT, IndexT> centroids,
   raft::host_scalar_view<DataT> inertia,
   raft::host_scalar_view<IndexT> n_iter)
 {
-  using data_part_view_t           = partitioned_matrix_view<DataT, IndexT, Accessor>;
-  using weight_part_view_t         = partitioned_vector_view<DataT, IndexT, Accessor>;
+  using data_part_view_t =
+    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>;
+  using weight_part_view_t =
+    raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::row_major, Accessor>;
   constexpr bool data_on_device    = raft::is_device_mdspan_v<data_part_view_t>;
   constexpr bool weights_on_device = raft::is_device_mdspan_v<weight_part_view_t>;
 
