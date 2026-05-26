@@ -93,9 +93,9 @@ void deserialize(raft::resources const& res, std::istream& is, index<int64_t>* i
 }  // namespace cuvs::neighbors::ivf_pq
 ```
 
-### Working With Multi-dimensional Arrays
+### Working With Dense Arrays
 
-Use RAFT array types consistently in public C++ APIs and implementation code. For user-facing examples of passing arrays into NVIDIA cuVS APIs, see [Multi-dim Arrays](/user-guide/api-guides/core-types/multi-dim-arrays).
+Use RAFT array types consistently in public C++ APIs and implementation code. For user-facing examples of passing dense arrays into NVIDIA cuVS APIs, see [Dense Arrays](/user-guide/api-guides/core-types/array-types/dense-arrays).
 
 Keep data layout explicit. Most NVIDIA cuVS APIs expect row-major dense matrices unless the API says otherwise.
 

@@ -155,6 +155,8 @@ The C, Java, Rust, and Go examples change the current device resource through th
 
 Use device memory for GPU-resident inputs, outputs, indexes, and scratch buffers. The default RMM device resource allocates CUDA device memory directly. A pool resource can sit above that default resource and serve the same allocations from a cached block of memory.
 
+For examples of passing dense arrays into NVIDIA cuVS APIs across different languages and libraries, see [Using dense arrays in cuVS APIs](/user-guide/api-guides/core-types/array-types/dense-arrays#using-dense-arrays-in-cuvs-ap-is) in the Dense Arrays guide.
+
 <Tabs>
 <Tab title="C">
 
@@ -264,6 +266,34 @@ void allocate_pinned_buffer(std::size_t bytes)
 ```
 
 </Tab>
+<Tab title="Python">
+
+```python
+import ctypes
+
+import cupy as cp
+import numpy as np
+import rmm
+
+n = 1 << 20
+dtype = np.dtype(np.float32)
+nbytes = n * dtype.itemsize
+
+pinned_mr = rmm.mr.PinnedHostMemoryResource()
+ptr = pinned_mr.allocate(nbytes)
+
+try:
+    host_type = ctypes.c_float * n
+    host = np.ctypeslib.as_array(host_type.from_address(ptr))
+    host[:] = np.arange(n, dtype=dtype)
+
+    device = cp.empty(n, dtype=cp.float32)
+    device.set(host)
+finally:
+    pinned_mr.deallocate(ptr, nbytes)
+```
+
+</Tab>
 </Tabs>
 
 Java NVIDIA cuVS resources use pinned host buffers internally for batched transfers. Most Java users should rely on `CuVSResources` and matrix builders instead of managing pinned memory directly.
@@ -314,7 +344,9 @@ void configure_managed_pool()
 <Tab title="Python">
 
 ```python
+import cupy as cp
 import rmm
+from rmm.allocators.cupy import rmm_cupy_allocator
 
 pool = rmm.mr.PoolMemoryResource(
     rmm.mr.ManagedMemoryResource(),
@@ -322,8 +354,11 @@ pool = rmm.mr.PoolMemoryResource(
     maximum_pool_size=8 << 30,
 )
 rmm.mr.set_current_device_resource(pool)
+cp.cuda.set_allocator(rmm_cupy_allocator)
 
-# Allocations now use a managed-memory-backed pool.
+# CuPy arrays now allocate through the RMM managed-memory-backed pool.
+data = cp.empty((1 << 20,), dtype=cp.float32)
+data.fill(1.0)
 ```
 
 </Tab>
@@ -397,7 +432,7 @@ func main() error {
 
 RMM separates allocation policy from algorithm code. An NVIDIA cuVS algorithm asks RAFT for memory through the active resource, and the resource decides whether the allocation comes from direct device memory, a pool, managed memory, or a host allocation path.
 
-This design gives users three practical benefits:
+This design gives users four practical benefits:
 
 - Allocation behavior can be tuned without changing NVIDIA cuVS API calls.
 - NVIDIA cuVS can share memory resources and allocations with other RMM-aware libraries, including RAPIDS libraries, PyTorch, CuPy, Faiss, and TensorFlow.

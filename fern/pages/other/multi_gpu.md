@@ -13,7 +13,7 @@ For multi-GPU vector indexes, see the [Multi-GPU indexing guide](/user-guide/api
 
 ## Example API Usage
 
-[C resources API](/api-reference/c-api-core-c-api#cuvsmultigpuresourcescreate) | [C++ K-Means API](/api-reference/cpp-api-cluster-kmeans) | [Python resources API](/api-reference/python-api-common#multigpuresources)
+[C resources API](/api-reference/c-api-core-c-api#cuvsmultigpuresourcescreate) | [Python resources API](/api-reference/python-api-common#multigpuresources)
 
 The examples below cover the high-level NVIDIA cuVS language surfaces that currently expose multi-GPU resource initialization: C, C++, and Python. Rust, Go, and Java do not currently expose matching high-level multi-GPU resource wrappers.
 

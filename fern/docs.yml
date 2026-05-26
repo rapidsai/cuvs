@@ -117,10 +117,15 @@ navigation:
           - section: "Core Types"
             path: "./pages/core_types.md"
             contents:
+              - section: "Array Types"
+                path: "./pages/other/array_types.md"
+                contents:
+                  - page: "Dense Arrays"
+                    path: "./pages/other/multidimensional_arrays.md"
+                  - page: "Sparse Arrays"
+                    path: "./pages/other/sparse_arrays.md"
               - page: "Memory Management"
                 path: "./pages/other/memory_management.md"
-              - page: "Multi-dim Arrays"
-                path: "./pages/other/multidimensional_arrays.md"
               - page: "Multi-GPU"
                 path: "./pages/other/multi_gpu.md"
               - page: "Resources"
