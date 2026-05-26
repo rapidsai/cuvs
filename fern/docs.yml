@@ -250,6 +250,8 @@ navigation:
             path: "./pages/c_api/c-api-neighbors-ivf-flat.md"
           - page: "Neighbors IVF PQ"
             path: "./pages/c_api/c-api-neighbors-ivf-pq.md"
+          - page: "Neighbors IVF SQ"
+            path: "./pages/c_api/c-api-neighbors-ivf-sq.md"
           - page: "Neighbors Multi GPU Cagra"
             path: "./pages/c_api/c-api-neighbors-mg-cagra.md"
           - page: "Neighbors Multi GPU Common"

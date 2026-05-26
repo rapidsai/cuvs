@@ -13,6 +13,7 @@ These pages are generated from the documented public headers in the cuVS source 
 - [HNSW](/api-reference/c-api-neighbors-hnsw)
 - [IVF Flat](/api-reference/c-api-neighbors-ivf-flat)
 - [IVF PQ](/api-reference/c-api-neighbors-ivf-pq)
+- [IVF SQ](/api-reference/c-api-neighbors-ivf-sq)
 - [Multi-GPU Cagra](/api-reference/c-api-neighbors-mg-cagra)
 - [Multi-GPU Common](/api-reference/c-api-neighbors-mg-common)
 - [Multi-GPU IVF Flat](/api-reference/c-api-neighbors-mg-ivf-flat)
