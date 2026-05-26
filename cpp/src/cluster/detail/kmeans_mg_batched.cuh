@@ -133,7 +133,7 @@ void mnmg_fit(
   mnmg_comms comms{dev_res, use_nccl, nccl_comm};
 
   auto stream     = comms.stream();
-  auto n_features = static_cast<IndexT>(centroids.extent(1));
+  auto n_features = X_parts[0].extent(1);
   auto n_clusters = static_cast<IndexT>(params.n_clusters);
   auto metric     = params.metric;
 
@@ -143,7 +143,7 @@ void mnmg_fit(
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
   RAFT_EXPECTS(static_cast<IndexT>(centroids.extent(0)) == n_clusters,
                "centroids.extent(0) must equal n_clusters");
-  RAFT_EXPECTS(n_features > 0, "centroids.extent(1) must be positive");
+  RAFT_EXPECTS(centroids.extent(1) == n_features, "centroids.extent(1) must equal n_features");
   RAFT_EXPECTS(num_ranks > 0, "num_ranks must be positive");
 
   IndexT n_local       = 0;
@@ -151,6 +151,11 @@ void mnmg_fit(
   std::vector<IndexT> part_offsets;
   part_offsets.reserve(X_parts.size() + 1);
   part_offsets.push_back(IndexT{0});
+  bool sample_weights = sample_weight_parts.has_value();
+  if (sample_weights) {
+    RAFT_EXPECTS(sample_weight_parts->size() == X_parts.size(),
+                 "sample_weight_parts must have one entry per data partition");
+  }
   for (auto const& X_part : X_parts) {
     RAFT_EXPECTS(static_cast<IndexT>(X_part.extent(1)) == n_features,
                  "all partitions must have the same feature count as centroids");
@@ -158,17 +163,14 @@ void mnmg_fit(
     n_local += part_rows;
     max_part_rows = std::max(max_part_rows, part_rows);
     part_offsets.push_back(n_local);
-  }
 
-  if (sample_weight_parts.has_value()) {
-    RAFT_EXPECTS(sample_weight_parts->size() == X_parts.size(),
-                 "sample_weight_parts must have one entry per data partition");
-    for (size_t i = 0; i < X_parts.size(); ++i) {
+    if (sample_weights) {
       RAFT_EXPECTS(static_cast<IndexT>((*sample_weight_parts)[i].extent(0)) ==
                      static_cast<IndexT>(X_parts[i].extent(0)),
                    "each sample_weight partition must match its X partition rows");
-    }
   }
+
+}
 
   auto d_global_n = raft::make_device_scalar<IndexT>(dev_res, n_local);
   comms.allreduce(d_global_n.data_handle(), d_global_n.data_handle(), 1);
@@ -567,28 +569,6 @@ void mnmg_fit(
     n_iter[0]  = local_n_iter;
     raft::resource::sync_stream(dev_res);
   }
-}
-
-template <typename DataT, typename IndexT>
-void mnmg_fit(
-  const raft::resources& handle,
-  const cuvs::cluster::kmeans::params& params,
-  raft::host_matrix_view<const DataT, IndexT> X_local,
-  std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
-  raft::device_matrix_view<DataT, IndexT> centroids,
-  raft::host_scalar_view<DataT> inertia,
-  raft::host_scalar_view<IndexT> n_iter)
-{
-  std::vector<raft::host_matrix_view<const DataT, IndexT>> X_parts{X_local};
-
-  std::optional<std::vector<raft::host_vector_view<const DataT, IndexT>>> sample_weight_parts =
-    std::nullopt;
-  if (sample_weight.has_value()) {
-    sample_weight_parts.emplace(
-      std::vector<raft::host_vector_view<const DataT, IndexT>>{sample_weight.value()});
-  }
-
-  mnmg_fit(handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
 template <typename DataT, typename IndexT>
