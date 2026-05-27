@@ -141,3 +141,27 @@ def test_extend(dtype, serialize):
 @pytest.mark.parametrize("sparsity", [0.5, 0.7, 1.0])
 def test_filtered_ivf_sq(sparsity):
     run_filtered_search_test(ivf_sq, sparsity)
+
+
+def test_untrained_index_accessors_raise():
+    index = ivf_sq.Index()
+
+    with pytest.raises(
+        ValueError, match="Index needs to be built before getting n_lists"
+    ):
+        _ = index.n_lists
+
+    with pytest.raises(
+        ValueError, match="Index needs to be built before getting dim"
+    ):
+        _ = index.dim
+
+    with pytest.raises(
+        ValueError, match="Index needs to be built before getting len"
+    ):
+        len(index)
+
+    with pytest.raises(
+        ValueError, match="Index needs to be built before getting centers"
+    ):
+        _ = index.centers

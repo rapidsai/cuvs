@@ -162,18 +162,24 @@ cdef class Index:
     @property
     def n_lists(self):
         """ The number of inverted lists (clusters) """
+        if self.index == NULL or self.index.addr == 0:
+            raise ValueError("Index needs to be built before getting n_lists")
         cdef int64_t n_lists = 0
-        cuvsIvfSqIndexGetNLists(self.index, &n_lists)
+        check_cuvs(cuvsIvfSqIndexGetNLists(self.index, &n_lists))
         return n_lists
 
     @property
     def dim(self):
         """ dimensionality of the cluster centers """
+        if self.index == NULL or self.index.addr == 0:
+            raise ValueError("Index needs to be built before getting dim")
         cdef int64_t dim = 0
-        cuvsIvfSqIndexGetDim(self.index, &dim)
+        check_cuvs(cuvsIvfSqIndexGetDim(self.index, &dim))
         return dim
 
     def __len__(self):
+        if self.index == NULL or self.index.addr == 0:
+            raise ValueError("Index needs to be built before getting len")
         cdef int64_t size = 0
         check_cuvs(cuvsIvfSqIndexGetSize(self.index, &size))
         return size
@@ -182,7 +188,7 @@ cdef class Index:
     def centers(self):
         """ Get the cluster centers corresponding to the lists in the
         original space """
-        if not self.trained:
+        if self.index == NULL or self.index.addr == 0:
             raise ValueError("Index needs to be built before getting centers")
 
         output = DeviceTensorView()
