@@ -784,8 +784,9 @@ inline auto get_max_fine_batch_size(raft::resources const& res,
   // Use only 40% of the available workspace memory as the coarse batch allocations have not been
   // allocated yet. Also limit the maximum to 1GB to avoid conflicts in case the workspace is shared
   // with the large workspace.
-  auto max_ws_size =
-    std::min<uint32_t>(raft::resource::get_workspace_free_bytes(res) * 0.4, 1 << 30);
+  const auto free_ws_size = raft::resource::get_workspace_free_bytes(res);
+  const auto max_ws_size =
+    std::min<size_t>((free_ws_size * size_t{40}) / size_t{100}, size_t{1} << 30);
   if (ws_size(max_batch_size) > max_ws_size) {
     uint32_t smaller_batch_size = raft::bound_by_power_of_two(max_batch_size);
     // gradually reduce the batch size until we fit into the max size limit.
@@ -846,8 +847,9 @@ inline auto get_max_coarse_batch_size(raft::resources const& res,
   // Use only 40% of the available workspace memory as the fine batch allocations have not been
   // allocated yet. Also limit the maximum to 1GB to avoid conflicts in case the workspace is shared
   // with the large workspace.
-  auto available_ws_size =
-    std::min<uint32_t>(raft::resource::get_workspace_free_bytes(res) * 0.4, 1 << 30);
+  const auto free_ws_size = raft::resource::get_workspace_free_bytes(res);
+  const auto available_ws_size =
+    std::min<size_t>((free_ws_size * size_t{40}) / size_t{100}, size_t{1} << 30);
   auto max_per_ws = available_ws_size / total_per_query;
   return std::max<uint32_t>(
     1,
