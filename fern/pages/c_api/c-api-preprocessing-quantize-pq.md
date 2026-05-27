@@ -14,7 +14,17 @@ _Source header: `cuvs/preprocessing/quantize/pq.h`_
 Product quantizer parameters.
 
 ```c
-struct cuvsProductQuantizerParams { ... };
+struct cuvsProductQuantizerParams {
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+  bool use_subspaces;
+  bool use_vq;
+  uint32_t vq_n_centers;
+  uint32_t kmeans_n_iters;
+  cuvsKMeansType pq_kmeans_type;
+  uint32_t max_train_points_per_pq_code;
+  uint32_t max_train_points_per_vq_cluster;
+};
 ```
 
 **Fields**
@@ -77,7 +87,10 @@ Defines and stores product quantizer upon training
 The quantization is performed by a linear mapping of an interval in the float data type to the full range of the quantized int type.
 
 ```c
-typedef struct { ... } cuvsProductQuantizer;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsProductQuantizer;
 ```
 
 **Fields**

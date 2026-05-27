@@ -367,7 +367,61 @@ func buildIndex(data [][]float32) (*brute_force.BruteForceIndex, error) {
 
 Many NVIDIA cuVS APIs allocate outputs for the caller in higher-level bindings and require explicit output arrays in lower-level bindings. Output arrays should have the expected shape before the API call.
 
+<Note>The Java search APIs currently allocate output storage inside the binding and return `SearchResults`, so this section does not include a Java explicit-output example.</Note>
+
 <Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/brute_force.h>
+#include <dlpack/dlpack.h>
+
+#include <stddef.h>
+#include <stdint.h>
+
+void search_with_outputs(cuvsResources_t res,
+                         cuvsBruteForceIndex_t index,
+                         DLManagedTensor* queries,
+                         int64_t n_queries,
+                         int64_t k)
+{
+  void* neighbors_data = NULL;
+  void* distances_data = NULL;
+  int64_t output_shape[2] = {n_queries, k};
+  size_t neighbors_bytes = (size_t)n_queries * (size_t)k * sizeof(int64_t);
+  size_t distances_bytes = (size_t)n_queries * (size_t)k * sizeof(float);
+
+  cuvsRMMAlloc(res, &neighbors_data, neighbors_bytes);
+  cuvsRMMAlloc(res, &distances_data, distances_bytes);
+
+  DLManagedTensor neighbors = {0};
+  neighbors.dl_tensor.data = neighbors_data;
+  neighbors.dl_tensor.device = (DLDevice){kDLCUDA, 0};
+  neighbors.dl_tensor.ndim = 2;
+  neighbors.dl_tensor.dtype = (DLDataType){kDLInt, 64, 1};
+  neighbors.dl_tensor.shape = output_shape;
+
+  DLManagedTensor distances = {0};
+  distances.dl_tensor.data = distances_data;
+  distances.dl_tensor.device = (DLDevice){kDLCUDA, 0};
+  distances.dl_tensor.ndim = 2;
+  distances.dl_tensor.dtype = (DLDataType){kDLFloat, 32, 1};
+  distances.dl_tensor.shape = output_shape;
+
+  cuvsFilter no_filter = {.addr = 0, .type = NO_FILTER};
+
+  cuvsBruteForceSearch(
+      res, index, queries, &neighbors, &distances, no_filter);
+
+  // Copy or consume neighbors_data and distances_data before freeing them.
+
+  cuvsRMMFree(res, distances_data, distances_bytes);
+  cuvsRMMFree(res, neighbors_data, neighbors_bytes);
+}
+```
+
+</Tab>
 <Tab title="C++">
 
 ```cpp
@@ -395,12 +449,24 @@ brute_force::search(
 <Tab title="Python">
 
 ```python
+import cupy as cp
+
 from cuvs.neighbors import brute_force
 
 queries = load_queries()
+n_queries = queries.shape[0]
 k = 10
 
-distances, neighbors = brute_force.search(index, queries, k)
+neighbors = cp.empty((n_queries, k), dtype=cp.int64)
+distances = cp.empty((n_queries, k), dtype=cp.float32)
+
+distances, neighbors = brute_force.search(
+    index,
+    queries,
+    k,
+    neighbors=neighbors,
+    distances=distances,
+)
 ```
 
 </Tab>
@@ -429,6 +495,73 @@ fn search(
     neighbors.to_host(res, &mut neighbors_host)?;
     distances.to_host(res, &mut distances_host)?;
     Ok(())
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+package main
+
+import (
+	cuvs "github.com/rapidsai/cuvs/go"
+	"github.com/rapidsai/cuvs/go/brute_force"
+)
+
+func searchWithOutputs(
+	resource cuvs.Resource,
+	index *brute_force.BruteForceIndex,
+	queryData [][]float32,
+	k int,
+) error {
+	queries, err := cuvs.NewTensor(queryData)
+	if err != nil {
+		return err
+	}
+	defer queries.Close()
+
+	if _, err = queries.ToDevice(&resource); err != nil {
+		return err
+	}
+
+	nQueries := len(queryData)
+	neighbors, err := cuvs.NewTensorOnDevice[int64](
+		&resource,
+		[]int64{int64(nQueries), int64(k)},
+	)
+	if err != nil {
+		return err
+	}
+	defer neighbors.Close()
+
+	distances, err := cuvs.NewTensorOnDevice[float32](
+		&resource,
+		[]int64{int64(nQueries), int64(k)},
+	)
+	if err != nil {
+		return err
+	}
+	defer distances.Close()
+
+	if err = brute_force.SearchIndex(
+		resource,
+		*index,
+		&queries,
+		&neighbors,
+		&distances,
+	); err != nil {
+		return err
+	}
+
+	if _, err = neighbors.ToHost(&resource); err != nil {
+		return err
+	}
+	if _, err = distances.ToHost(&resource); err != nil {
+		return err
+	}
+
+	return resource.Sync()
 }
 ```
 
@@ -503,9 +636,32 @@ void use_existing_host_buffers(int64_t n_rows, int64_t n_features)
 
 Use `const` element types for read-only inputs. This documents intent and lets C++ APIs reject accidental writes at compile time.
 
+Use `raft::make_const_mdspan()` when you already have a mutable view or owning array and need to pass it to an API as read-only:
+
+```cpp
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/mdspan.hpp>
+#include <raft/core/resources.hpp>
+
+#include <cstdint>
+
+void use_read_only_view(raft::device_resources const& res,
+                        int64_t n_rows,
+                        int64_t n_features)
+{
+  auto dataset = raft::make_device_matrix<float, int64_t>(
+      res, n_rows, n_features);
+
+  auto mutable_view = dataset.view();
+  auto read_only_view = raft::make_const_mdspan(mutable_view);
+
+  // Pass read_only_view to APIs that should not modify the dataset.
+}
+```
+
 ### Creating owning arrays
 
-Use `device_matrix` and `device_vector` when RAFT should allocate GPU memory. Device arrays allocate through the active RMM device resource, so they work with the memory policy described in [Memory Management](/user-guide/api-guides/core-types/memory-management).
+Use `device_matrix` and `device_vector` when RAFT should allocate GPU memory. Use managed arrays when both host and device code need to access the same allocation through CUDA Unified Memory. Device, managed, and pinned arrays work with the memory policies described in [Memory Management](/user-guide/api-guides/core-types/memory-management).
 
 <Tabs>
 <Tab title="Device">
@@ -558,6 +714,35 @@ void allocate_host_arrays(int64_t n_rows, int64_t n_features)
 ```
 
 </Tab>
+<Tab title="Managed">
+
+```cpp
+#include <raft/core/managed_mdarray.hpp>
+#include <raft/core/resources.hpp>
+
+#include <cstdint>
+
+void allocate_managed_arrays(raft::device_resources const& res,
+                             int64_t n_rows,
+                             int64_t n_features,
+                             int64_t k)
+{
+  auto dataset = raft::make_managed_matrix<float, int64_t>(
+      res, n_rows, n_features);
+
+  auto neighbors = raft::make_managed_matrix<int64_t, int64_t>(
+      res, n_rows, k);
+
+  auto distances = raft::make_managed_matrix<float, int64_t>(
+      res, n_rows, k);
+
+  auto dataset_view = dataset.view();
+  auto neighbors_view = neighbors.view();
+  auto distances_view = distances.view();
+}
+```
+
+</Tab>
 <Tab title="Pinned Host">
 
 ```cpp
@@ -587,8 +772,7 @@ An owning `mdarray` should outlive any view created from it. Passing `dataset.vi
 
 Use `raft::span` for simple one-dimensional buffers when the shape does not need matrix or vector metadata. For NVIDIA cuVS public APIs, prefer `device_vector_view` or `host_vector_view` when the memory space matters.
 
-<Tabs>
-<Tab title="C++">
+<Note>For most one-dimensional NVIDIA cuVS API arguments, prefer `device_vector` and `host_vector` types over `span`. Vector aliases provide the best API unity with higher-dimensional RAFT array abstractions.</Note>
 
 ```cpp
 #include <raft/core/span.hpp>
@@ -605,9 +789,6 @@ void normalize_ids(int64_t* ids, std::size_t n_ids)
   }
 }
 ```
-
-</Tab>
-</Tabs>
 
 `span` is one-dimensional and does not encode row count, column count, layout, or memory space. Use it for lightweight buffer utilities, not for matrix-shaped NVIDIA cuVS inputs.
 

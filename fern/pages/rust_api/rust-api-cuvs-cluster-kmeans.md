@@ -57,7 +57,7 @@ params: &Params,
 x: &ManagedTensor,
 sample_weight: &Option<ManagedTensor>,
 centroids: &mut ManagedTensor,
-) -> Result<(f64, i32)> { ... }
+) -> Result<(f64, i32)>
 ```
 
 Find clusters with the k-means algorithm
@@ -84,7 +84,7 @@ sample_weight: &Option<ManagedTensor>,
 centroids: &ManagedTensor,
 labels: &mut ManagedTensor,
 normalize_weight: bool,
-) -> Result<f64> { ... }
+) -> Result<f64>
 ```
 
 Predict clusters with the k-means algorithm
@@ -104,7 +104,7 @@ _Source: `rust/cuvs/src/cluster/kmeans/mod.rs:95`_
 ## cluster_cost
 
 ```rust
-pub fn cluster_cost(res: &Resources, x: &ManagedTensor, centroids: &ManagedTensor) -> Result<f64> { ... }
+pub fn cluster_cost(res: &Resources, x: &ManagedTensor, centroids: &ManagedTensor) -> Result<f64>
 ```
 
 Compute cluster cost given an input matrix and existing centroids

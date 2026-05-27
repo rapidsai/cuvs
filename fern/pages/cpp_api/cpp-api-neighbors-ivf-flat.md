@@ -14,7 +14,10 @@ _Source header: `cuvs/neighbors/ivf_flat.hpp`_
 IVF-Flat index search parameters
 
 ```cpp
-struct search_params : cuvs::neighbors::search_params { ... };
+struct search_params : cuvs::neighbors::search_params {
+  uint32_t n_probes;
+  std::optional<std::string> metric_udf;
+};
 ```
 
 **Fields**
@@ -52,7 +55,7 @@ IVF-flat index.
 
 ```cpp
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index { ... };
+struct index;
 ```
 
 <a id="neighbors-ivf-flat-index-index"></a>
@@ -215,11 +218,7 @@ Accumulated list sizes, sorted in descending order [n_lists + 1].
 auto accum_sorted_sizes() noexcept -> raft::host_vector_view<IdxT, uint32_t>;
 ```
 
-The last value contains the total length of the index. The value at index zero is always zero.
-
-That is, the content of this span is as if the `list_sizes` was sorted and then accumulated.
-
-This span is used during search to estimate the maximum size of the workspace.
+The last value contains the total length of the index. The value at index zero is always zero. That is, the content of this span is as if the `list_sizes` was sorted and then accumulated. This span is used during search to estimate the maximum size of the workspace.
 
 **Returns**
 
@@ -324,9 +323,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -356,9 +353,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -389,9 +384,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -421,9 +414,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -454,9 +445,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -486,9 +475,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -519,9 +506,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -551,9 +536,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -584,11 +567,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -618,11 +597,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -653,11 +628,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -687,11 +658,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -722,11 +689,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -756,11 +719,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -791,11 +750,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -825,11 +780,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -859,9 +810,7 @@ const cuvs::neighbors::ivf_flat::index<float, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<float, int64_t>;
 ```
 
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -914,9 +863,7 @@ const cuvs::neighbors::ivf_flat::index<half, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<half, int64_t>;
 ```
 
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -969,9 +916,7 @@ const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<int8_t, int64_t>;
 ```
 
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -997,7 +942,7 @@ std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* idx);
 ```
 
-Usage example:
+Usage example: If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`.
 
 **Parameters**
 
@@ -1005,7 +950,7 @@ Usage example:
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
-| `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
+| `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
 **Returns**
@@ -1024,9 +969,7 @@ const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
 ```
 
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -1079,11 +1022,7 @@ const cuvs::neighbors::ivf_flat::index<float, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<float, int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -1109,9 +1048,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_flat::index<float, int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1138,11 +1075,7 @@ const cuvs::neighbors::ivf_flat::index<half, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<half, int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -1168,9 +1101,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_flat::index<half, int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1197,11 +1128,7 @@ const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<int8_t, int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -1227,9 +1154,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1256,11 +1181,7 @@ const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
 -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Implementation note: The new data is clustered according to existing kmeans clusters, then the cluster centers are adjusted to match the newly labeled data. Usage example:
 
 **Parameters**
 
@@ -1286,9 +1207,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1708,9 +1627,7 @@ typename list_spec<uint32_t, float, int64_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
-
-Usage example:
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
 
 **Parameters**
 
@@ -1740,9 +1657,7 @@ typename list_spec<uint32_t, half, int64_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
-
-Usage example:
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
 
 **Parameters**
 
@@ -1772,9 +1687,7 @@ typename list_spec<uint32_t, int8_t, int64_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
-
-Usage example:
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
 
 **Parameters**
 
@@ -1804,9 +1717,7 @@ typename list_spec<uint32_t, uint8_t, int64_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
-
-Usage example:
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
 
 **Parameters**
 
@@ -1825,7 +1736,7 @@ Usage example:
 <a id="neighbors-ivf-flat-helpers-codepacker-unpack"></a>
 ### neighbors::ivf_flat::helpers::codepacker::unpack
 
-Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`.
 
 ```cpp
 void unpack(raft::resources const& res,
@@ -1836,8 +1747,6 @@ uint32_t veclen,
 uint32_t offset,
 raft::device_matrix_view<float, uint32_t, raft::row_major> codes);
 ```
-
-starting at given `offset`.
 
 Usage example:
 
@@ -1857,7 +1766,7 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::codepacker::unpack`
 
-Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`.
 
 ```cpp
 void unpack(raft::resources const& res,
@@ -1868,8 +1777,6 @@ uint32_t veclen,
 uint32_t offset,
 raft::device_matrix_view<half, uint32_t, raft::row_major> codes);
 ```
-
-starting at given `offset`.
 
 Usage example:
 
@@ -1889,7 +1796,7 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::codepacker::unpack`
 
-Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`.
 
 ```cpp
 void unpack(raft::resources const& res,
@@ -1900,8 +1807,6 @@ uint32_t veclen,
 uint32_t offset,
 raft::device_matrix_view<int8_t, uint32_t, raft::row_major> codes);
 ```
-
-starting at given `offset`.
 
 Usage example:
 
@@ -1921,7 +1826,7 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::codepacker::unpack`
 
-Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`.
 
 ```cpp
 void unpack(raft::resources const& res,
@@ -1932,8 +1837,6 @@ uint32_t veclen,
 uint32_t offset,
 raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 ```
-
-starting at given `offset`.
 
 Usage example:
 
@@ -2060,13 +1963,11 @@ void unpack_1(const float* block, float* flat_code, uint32_t dim, uint32_t vecle
 
 indicates the id of the record. This function fetches one flat code from an interleaved code.
 
-interleaved format.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `block` | in | `const float*` | interleaved block. The block can be thought of as the whole inverted list in |
+| `block` | in | `const float*` | interleaved block. The block can be thought of as the whole inverted list in interleaved format. |
 | `flat_code` | out | `float*` | output flat code |
 | `dim` | in | `uint32_t` | dimension of the flat code |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
@@ -2086,13 +1987,11 @@ void unpack_1(const half* block, half* flat_code, uint32_t dim, uint32_t veclen,
 
 indicates the id of the record. This function fetches one flat code from an interleaved code.
 
-interleaved format.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `block` | in | `const half*` | interleaved block. The block can be thought of as the whole inverted list in |
+| `block` | in | `const half*` | interleaved block. The block can be thought of as the whole inverted list in interleaved format. |
 | `flat_code` | out | `half*` | output flat code |
 | `dim` | in | `uint32_t` | dimension of the flat code |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
@@ -2113,13 +2012,11 @@ const int8_t* block, int8_t* flat_code, uint32_t dim, uint32_t veclen, uint32_t 
 
 indicates the id of the record. This function fetches one flat code from an interleaved code.
 
-interleaved format.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `block` | in | `const int8_t*` | interleaved block. The block can be thought of as the whole inverted list in |
+| `block` | in | `const int8_t*` | interleaved block. The block can be thought of as the whole inverted list in interleaved format. |
 | `flat_code` | out | `int8_t*` | output flat code |
 | `dim` | in | `uint32_t` | dimension of the flat code |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
@@ -2140,13 +2037,11 @@ const uint8_t* block, uint8_t* flat_code, uint32_t dim, uint32_t veclen, uint32_
 
 indicates the id of the record. This function fetches one flat code from an interleaved code.
 
-interleaved format.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `block` | in | `const uint8_t*` | interleaved block. The block can be thought of as the whole inverted list in |
+| `block` | in | `const uint8_t*` | interleaved block. The block can be thought of as the whole inverted list in interleaved format. |
 | `flat_code` | out | `uint8_t*` | output flat code |
 | `dim` | in | `uint32_t` | dimension of the flat code |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
@@ -2159,13 +2054,11 @@ interleaved format.
 <a id="neighbors-ivf-flat-helpers-reset-index"></a>
 ### neighbors::ivf_flat::helpers::reset_index
 
-Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+Public helper API to reset the data and indices ptrs, and the list sizes. Useful for externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 ```cpp
 void reset_index(const raft::resources& res, index<float, int64_t>* index);
 ```
-
-externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 Usage example:
 
@@ -2182,13 +2075,11 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::reset_index`
 
-Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+Public helper API to reset the data and indices ptrs, and the list sizes. Useful for externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 ```cpp
 void reset_index(const raft::resources& res, index<half, int64_t>* index);
 ```
-
-externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 Usage example:
 
@@ -2205,13 +2096,11 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::reset_index`
 
-Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+Public helper API to reset the data and indices ptrs, and the list sizes. Useful for externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 ```cpp
 void reset_index(const raft::resources& res, index<int8_t, int64_t>* index);
 ```
-
-externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 Usage example:
 
@@ -2228,13 +2117,11 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::reset_index`
 
-Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+Public helper API to reset the data and indices ptrs, and the list sizes. Useful for externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 ```cpp
 void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index);
 ```
-
-externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 Usage example:
 
@@ -2252,13 +2139,11 @@ Usage example:
 <a id="neighbors-ivf-flat-helpers-recompute-internal-state"></a>
 ### neighbors::ivf_flat::helpers::recompute_internal_state
 
-Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+Helper exposing the re-computation of list sizes and related arrays if IVF lists have been modified externally.
 
 ```cpp
 void recompute_internal_state(const raft::resources& res, index<float, int64_t>* index);
 ```
-
-modified externally.
 
 Usage example:
 
@@ -2275,13 +2160,11 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::recompute_internal_state`
 
-Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+Helper exposing the re-computation of list sizes and related arrays if IVF lists have been modified externally.
 
 ```cpp
 void recompute_internal_state(const raft::resources& res, index<half, int64_t>* index);
 ```
-
-modified externally.
 
 Usage example:
 
@@ -2298,13 +2181,11 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::recompute_internal_state`
 
-Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+Helper exposing the re-computation of list sizes and related arrays if IVF lists have been modified externally.
 
 ```cpp
 void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>* index);
 ```
-
-modified externally.
 
 Usage example:
 
@@ -2321,13 +2202,11 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::helpers::recompute_internal_state`
 
-Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+Helper exposing the re-computation of list sizes and related arrays if IVF lists have been modified externally.
 
 ```cpp
 void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t>* index);
 ```
-
-modified externally.
 
 Usage example:
 
@@ -2353,7 +2232,10 @@ For float: trivial wrapper around scalar values For int8/uint8 with Veclen &gt; 
 
 ```cpp
 template <typename T, typename AccT, int Veclen>
-struct point { ... };
+struct point {
+  static constexpr int veclen;
+  storage_type data_;
+};
 ```
 
 **Fields**
@@ -2370,5 +2252,5 @@ Base interface for custom distance metrics.
 
 ```cpp
 template <typename T, typename AccT, int Veclen = 1>
-struct metric_interface { ... };
+struct metric_interface;
 ```

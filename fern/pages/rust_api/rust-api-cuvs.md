@@ -85,10 +85,10 @@ pub use dlpack::ManagedTensor;
 
 _Source: `rust/cuvs/src/lib.rs:24`_
 
-## error:: \{ ... \}
+## error::\{Error, Result\}
 
 ```rust
-pub use error:: { ... }
+pub use error::{Error, Result};
 ```
 
 _Source: `rust/cuvs/src/lib.rs:25`_

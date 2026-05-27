@@ -2,7 +2,7 @@
 slug: user-guide/api-guides/core-types
 ---
 
-# Core Types
+# Common Types
 
 Use these guides to understand the shared resource, memory, and array abstractions used by NVIDIA cuVS APIs.
 

@@ -14,7 +14,10 @@ _Source header: `cuvs/cluster/agglomerative.hpp`_
 Determines the method for computing the minimum spanning tree (MST)
 
 ```cpp
-enum Linkage { ... };
+enum Linkage {
+  PAIRWISE = 0,
+  KNN_GRAPH = 1
+};
 ```
 
 **Values**
@@ -35,7 +38,7 @@ mirrors the trained instance variables populated in Scikit-learn's Agglomerative
 
 ```cpp
 template <typename idx_t>
-class single_linkage_output { ... };
+class single_linkage_output;
 ```
 
 ## single-linkage clustering APIs
@@ -82,7 +85,10 @@ scale the algorithm beyond the n^2 memory consumption of implementations that us
 Specialized parameters to build the KNN graph with regular distances
 
 ```cpp
-struct distance_params { ... };
+struct distance_params {
+  int c;
+  cuvs::cluster::agglomerative::Linkage dist_type;
+};
 ```
 
 **Fields**
@@ -98,7 +104,11 @@ struct distance_params { ... };
 Specialized parameters to build the Mutual Reachability graph
 
 ```cpp
-struct mutual_reachability_params { ... };
+struct mutual_reachability_params {
+  int min_samples;
+  float alpha;
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params:: brute_force_params;
+};
 ```
 
 **Fields**
@@ -128,7 +138,7 @@ raft::device_vector_view<int64_t, int64_t> out_sizes,
 std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 ```
 
-(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram. Reachability space
+(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
 
 **Parameters**
 
@@ -142,7 +152,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
 | `out_distances` | out | `raft::device_vector_view<float, int64_t>` | distances for output |
 | `out_sizes` | out | `raft::device_vector_view<int64_t, int64_t>` | cluster sizes of output |
-| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual |
+| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual Reachability space |
 
 **Returns**
 
@@ -166,7 +176,7 @@ raft::device_vector_view<int64_t, int64_t> out_sizes,
 std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 ```
 
-(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram. Reachability space
+(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
 
 **Parameters**
 
@@ -180,7 +190,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
 | `out_distances` | out | `raft::device_vector_view<float, int64_t>` | distances for output |
 | `out_sizes` | out | `raft::device_vector_view<int64_t, int64_t>` | cluster sizes of output |
-| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual |
+| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual Reachability space |
 
 **Returns**
 
@@ -203,8 +213,6 @@ raft::device_vector_view<int64_t, int64_t> out_size);
 
 This function takes a sorted MST (represented as edges with source, destination, and weights) and constructs a dendrogram (hierarchical clustering tree) on the host.
 
-nnz)
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -214,7 +222,7 @@ nnz)
 | `cols` | in | `raft::device_vector_view<const int64_t, int64_t>` | Destination nodes of the MST edges (device memory, size: nnz) |
 | `data` | in | `raft::device_vector_view<const float, int64_t>` | Edge weights/distances of the MST (device memory, size: nnz) |
 | `children` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | Output dendrogram children array (device memory, size: nnz * 2) Each pair of consecutive elements represents the two children merged at each step of the hierarchy |
-| `out_delta` | out | `raft::device_vector_view<float, int64_t>` | Output distances/heights at which clusters are merged (device memory, size: |
+| `out_delta` | out | `raft::device_vector_view<float, int64_t>` | Output distances/heights at which clusters are merged (device memory, size: nnz) |
 | `out_size` | out | `raft::device_vector_view<int64_t, int64_t>` | Output cluster sizes at each merge step (device memory, size: nnz) |
 
 **Returns**

@@ -14,7 +14,11 @@ _Source header: `cuvs/cluster/kmeans.h`_
 k-means hyperparameters
 
 ```c
-typedef enum { ... } cuvsKMeansInitMethod;
+typedef enum {
+  KMeansPlusPlus = 0,
+  Random = 1,
+  Array = 2
+} cuvsKMeansInitMethod;
 ```
 
 **Values**
@@ -28,12 +32,25 @@ typedef enum { ... } cuvsKMeansInitMethod;
 <a id="cuvskmeansparams"></a>
 ### cuvsKMeansParams
 
-Hyper-parameters for the kmeans algorithm
-
-NB: The inertia_check field is kept for ABI compatibility. Removed in cuvsKMeansParams_v2. TODO: CalVer for the replacement: 26.08
+Hyper-parameters for the kmeans algorithm NB: The inertia_check field is kept for ABI compatibility. Removed in cuvsKMeansParams_v2. TODO: CalVer for the replacement: 26.08
 
 ```c
-struct cuvsKMeansParams { ... };
+struct cuvsKMeansParams {
+  int n_clusters;
+  cuvsKMeansInitMethod init;
+  int max_iter;
+  double tol;
+  int n_init;
+  double oversampling_factor;
+  int batch_samples;
+  int batch_centroids;
+  bool inertia_check;
+  bool hierarchical;
+  int hierarchical_n_iters;
+  int64_t streaming_batch_size;
+  int64_t init_size;
+  cuvsDistanceType metric;
+};
 ```
 
 **Fields**
@@ -58,12 +75,24 @@ struct cuvsKMeansParams { ... };
 <a id="cuvskmeansparams-v2"></a>
 ### cuvsKMeansParams_v2
 
-Hyper-parameters for the kmeans algorithm
-
-TODO: Remove this after cuvsKMeansParams is replaced in ABI 2.0
+Hyper-parameters for the kmeans algorithm TODO: Remove this after cuvsKMeansParams is replaced in ABI 2.0
 
 ```c
-struct cuvsKMeansParams_v2 { ... };
+struct cuvsKMeansParams_v2 {
+  int n_clusters;
+  cuvsKMeansInitMethod init;
+  int max_iter;
+  double tol;
+  int n_init;
+  double oversampling_factor;
+  int batch_samples;
+  int batch_centroids;
+  bool hierarchical;
+  int hierarchical_n_iters;
+  int64_t streaming_batch_size;
+  int64_t init_size;
+  cuvsDistanceType metric;
+};
 ```
 
 **Fields**
@@ -93,7 +122,7 @@ Allocate KMeans params, and populate with default values
 CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 ```
 
-replaced by cuvsKMeansParamsCreate_v2.
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansParamsCreate_v2.
 
 **Parameters**
 
@@ -114,7 +143,7 @@ De-allocate KMeans params
 CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 ```
 
-replaced by cuvsKMeansParamsDestroy_v2.
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansParamsDestroy_v2.
 
 **Parameters**
 
@@ -172,7 +201,10 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params)
 Type of k-means algorithm.
 
 ```c
-typedef enum { ... } cuvsKMeansType;
+typedef enum {
+  CUVS_KMEANS_TYPE_KMEANS = 0,
+  CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
+} cuvsKMeansType;
 ```
 
 **Values**
@@ -199,11 +231,7 @@ double* inertia,
 int* n_iter);
 ```
 
-Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinitialized by choosing new centroids with k-means++ algorithm.
-
-X may reside on either host (CPU) or device (GPU) memory. When X is on the host the data is streamed to the GPU in batches controlled by params-&gt;streaming_batch_size.
-
-replaced by cuvsKMeansFit_v2.
+Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinitialized by choosing new centroids with k-means++ algorithm. X may reside on either host (CPU) or device (GPU) memory. When X is on the host the data is streamed to the GPU in batches controlled by params-&gt;streaming_batch_size. **Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansFit_v2.
 
 **Parameters**
 
@@ -270,7 +298,7 @@ bool normalize_weight,
 double* inertia);
 ```
 
-replaced by cuvsKMeansPredict_v2.
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansPredict_v2.
 
 **Parameters**
 

@@ -102,18 +102,18 @@ pub use index::Index;
 
 _Source: `rust/cuvs/src/cagra/mod.rs:96`_
 
-## index_params:: \{ ... \}
+## index_params::\{BuildAlgo, CompressionParams, IndexParams\}
 
 ```rust
-pub use index_params:: { ... }
+pub use index_params::{BuildAlgo, CompressionParams, IndexParams};
 ```
 
 _Source: `rust/cuvs/src/cagra/mod.rs:97`_
 
-## search_params:: \{ ... \}
+## search_params::\{HashMode, SearchAlgo, SearchParams\}
 
 ```rust
-pub use search_params:: { ... }
+pub use search_params::{HashMode, SearchAlgo, SearchParams};
 ```
 
 _Source: `rust/cuvs/src/cagra/mod.rs:98`_

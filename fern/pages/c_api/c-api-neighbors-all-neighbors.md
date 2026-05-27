@@ -14,7 +14,11 @@ _Source header: `cuvs/neighbors/all_neighbors.h`_
 Graph build algorithm selection.
 
 ```c
-typedef enum { ... } cuvsAllNeighborsAlgo;
+typedef enum {
+  CUVS_ALL_NEIGHBORS_ALGO_BRUTE_FORCE = 0,
+  CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ = 1,
+  CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT = 2
+} cuvsAllNeighborsAlgo;
 ```
 
 **Values**
@@ -31,7 +35,14 @@ typedef enum { ... } cuvsAllNeighborsAlgo;
 Parameters controlling SNMG all-neighbors build.
 
 ```c
-struct cuvsAllNeighborsIndexParams { ... };
+struct cuvsAllNeighborsIndexParams {
+  cuvsAllNeighborsAlgo algo;
+  size_t overlap_factor;
+  size_t n_clusters;
+  cuvsDistanceType metric;
+  cuvsIvfPqIndexParams_t ivf_pq_params;
+  cuvsNNDescentIndexParams_t nn_descent_params;
+};
 ```
 
 **Fields**
@@ -100,13 +111,13 @@ DLManagedTensor* core_distances,
 float alpha);
 ```
 
-resources The function automatically detects whether the dataset is host-resident or device-resident and calls the appropriate implementation. For host datasets, it partitions data into `n_clusters` clusters and assigns each row to `overlap_factor` nearest clusters. For device datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored. Outputs always reside in device memory.
+The function automatically detects whether the dataset is host-resident or device-resident and calls the appropriate implementation. For host datasets, it partitions data into `n_clusters` clusters and assigns each row to `overlap_factor` nearest clusters. For device datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored. Outputs always reside in device memory.
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | Can be a SNMG multi-GPU resources (`cuvsResources_t`) or single-GPU |
+| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | Can be a SNMG multi-GPU resources (`cuvsResources_t`) or single-GPU resources |
 | `params` | in | [`cuvsAllNeighborsIndexParams_t`](/api-reference/c-api-neighbors-all-neighbors#cuvsallneighborsindexparams) | Build parameters (see cuvsAllNeighborsIndexParams) |
 | `dataset` | in | `DLManagedTensor*` | 2D tensor [num_rows x dim] on host or device (auto-detected) |
 | `indices` | out | `DLManagedTensor*` | 2D tensor [num_rows x k] on device (int64) |

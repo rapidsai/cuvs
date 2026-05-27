@@ -22,12 +22,15 @@ graph_build_params::brute_force_params>;
 <a id="neighbors-all-neighbors-all-neighbors-params"></a>
 ### neighbors::all_neighbors::all_neighbors_params
 
-Parameters used to build an all-neighbors graph (find nearest neighbors for all the
-
-training vectors). For scalability, the all-neighbors graph construction algorithm partitions a set of training vectors into overlapping clusters, computes a local knn graph on each cluster, and merges the local graphs into a single global graph. Device memory usage and accuracy can be configured by changing the `overlap_factor` and `n_clusters`. The algorithm used to build each local graph is also configurable.
+Parameters used to build an all-neighbors graph (find nearest neighbors for all the training vectors). For scalability, the all-neighbors graph construction algorithm partitions a set of training vectors into overlapping clusters, computes a local knn graph on each cluster, and merges the local graphs into a single global graph. Device memory usage and accuracy can be configured by changing the `overlap_factor` and `n_clusters`. The algorithm used to build each local graph is also configurable.
 
 ```cpp
-struct all_neighbors_params { ... };
+struct all_neighbors_params {
+  GraphBuildParams graph_build_params;
+  size_t overlap_factor;
+  size_t n_clusters;
+  cuvs::distance::DistanceType metric;
+};
 ```
 
 **Fields**
@@ -44,7 +47,7 @@ struct all_neighbors_params { ... };
 <a id="neighbors-all-neighbors-build"></a>
 ### neighbors::all_neighbors::build
 
-Builds an approximate all-neighbors knn graph  (find nearest neighbors for all the
+Builds an approximate all-neighbors knn graph  (find nearest neighbors for all the training vectors)
 
 ```cpp
 void build(
@@ -57,11 +60,7 @@ std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distance
 float alpha                                                                       = 1.0);
 ```
 
-training vectors)
-
 Usage example:
-
-compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space.
 
 **Parameters**
 
@@ -72,7 +71,7 @@ compute core_distances. If core_distances is given, the resulting indices and di
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, row_major>` | raft::host_matrix_view input dataset expected to be located in host memory |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, row_major>` | nearest neighbor indices of shape [n_row x k] |
 | `distances` | out | `std::optional<raft::device_matrix_view<float, int64_t, row_major>>` | nearest neighbor distances [n_row x k] Default: `std::nullopt`. |
-| `core_distances` | out | `std::optional<raft::device_vector_view<float, int64_t, row_major>>` | array for core distances of size [n_row]. Requires distances matrix to Default: `std::nullopt`. |
+| `core_distances` | out | `std::optional<raft::device_vector_view<float, int64_t, row_major>>` | array for core distances of size [n_row]. Requires distances matrix to compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space. Default: `std::nullopt`. |
 | `alpha` | in | `float` | distance scaling parameter as used in robust single linkage. Default: `1.0`. |
 
 **Returns**
@@ -81,7 +80,7 @@ compute core_distances. If core_distances is given, the resulting indices and di
 
 **Additional overload:** `neighbors::all_neighbors::build`
 
-Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
+Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training vectors) params.n_clusters should be 1 for data on device. To use a larger params.n_clusters for efficient device memory usage, put data on host RAM.
 
 ```cpp
 void build(
@@ -94,11 +93,7 @@ std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distance
 float alpha                                                                       = 1.0);
 ```
 
-vectors) params.n_clusters should be 1 for data on device. To use a larger params.n_clusters for efficient device memory usage, put data on host RAM.
-
 Usage example:
-
-compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space.
 
 **Parameters**
 
@@ -109,7 +104,7 @@ compute core_distances. If core_distances is given, the resulting indices and di
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, row_major>` | raft::device_matrix_view input dataset expected to be located in device memory |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, row_major>` | nearest neighbor indices of shape [n_row x k] |
 | `distances` | out | `std::optional<raft::device_matrix_view<float, int64_t, row_major>>` | nearest neighbor distances [n_row x k] Default: `std::nullopt`. |
-| `core_distances` | out | `std::optional<raft::device_vector_view<float, int64_t, row_major>>` | array for core distances of size [n_row]. Requires distances matrix to Default: `std::nullopt`. |
+| `core_distances` | out | `std::optional<raft::device_vector_view<float, int64_t, row_major>>` | array for core distances of size [n_row]. Requires distances matrix to compute core_distances. If core_distances is given, the resulting indices and distances will be mutual reachability space. Default: `std::nullopt`. |
 | `alpha` | in | `float` | distance scaling parameter as used in robust single linkage. Default: `1.0`. |
 
 **Returns**

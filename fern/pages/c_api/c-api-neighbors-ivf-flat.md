@@ -14,7 +14,16 @@ _Source header: `cuvs/neighbors/ivf_flat.h`_
 Supplemental parameters to build IVF-Flat Index
 
 ```c
-struct cuvsIvfFlatIndexParams { ... };
+struct cuvsIvfFlatIndexParams {
+  cuvsDistanceType metric;
+  float metric_arg;
+  bool add_data_on_build;
+  uint32_t n_lists;
+  uint32_t kmeans_n_iters;
+  double kmeans_trainset_fraction;
+  bool adaptive_centers;
+  bool conservative_memory_allocation;
+};
 ```
 
 **Fields**
@@ -76,7 +85,9 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t i
 Supplemental parameters to search IVF-Flat index
 
 ```c
-struct cuvsIvfFlatSearchParams { ... };
+struct cuvsIvfFlatSearchParams {
+  uint32_t n_probes;
+};
 ```
 
 **Fields**
@@ -131,7 +142,10 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t
 Struct to hold address of cuvs::neighbors::ivf_flat::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsIvfFlatIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsIvfFlatIndex;
 ```
 
 **Fields**
@@ -244,7 +258,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLM
 <a id="cuvsivfflatbuild"></a>
 ### cuvsIvfFlatBuild
 
-Build a IVF-Flat index with a `DLManagedTensor` which has underlying
+Build a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
@@ -252,12 +266,6 @@ cuvsIvfFlatIndexParams_t index_params,
 DLManagedTensor* dataset,
 cuvsIvfFlatIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
-3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -277,7 +285,7 @@ cuvsIvfFlatIndex_t index);
 <a id="cuvsivfflatsearch"></a>
 ### cuvsIvfFlatSearch
 
-Search a IVF-Flat index with a `DLManagedTensor` which has underlying
+Search a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
@@ -288,12 +296,6 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter filter);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
-
-1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
-3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 

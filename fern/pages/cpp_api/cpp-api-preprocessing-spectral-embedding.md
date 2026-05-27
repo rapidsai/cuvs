@@ -16,7 +16,14 @@ Parameters for spectral embedding algorithm
 Spectral embedding is a dimensionality reduction technique that uses the eigenvectors of the graph Laplacian to embed data points into a lower-dimensional space. This technique is particularly useful for non-linear dimensionality reduction and clustering tasks.
 
 ```cpp
-struct params { ... };
+struct params {
+  int n_components;
+  int n_neighbors;
+  bool norm_laplacian;
+  bool drop_first;
+  float tolerance;
+  std::optional<uint64_t> seed;
+};
 ```
 
 **Fields**
@@ -75,9 +82,7 @@ raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
 raft::device_matrix_view<float, int, raft::col_major> embedding);
 ```
 
-This function computes the spectral embedding from a precomputed sparse connectivity graph (e.g., from a k-NN search or custom similarity matrix). This is useful when you want to use a custom graph construction method or when you have a precomputed similarity/affinity matrix.
-
-The function:
+This function computes the spectral embedding from a precomputed sparse connectivity graph (e.g., from a k-NN search or custom similarity matrix). This is useful when you want to use a custom graph construction method or when you have a precomputed similarity/affinity matrix. The function:
 
 1. Converts the COO matrix to the graph Laplacian
 2. Computes eigenvectors of the Laplacian

@@ -14,7 +14,12 @@ _Source header: `cuvs/neighbors/dynamic_batching.hpp`_
 Dynamic Batching index parameters
 
 ```cpp
-struct index_params : cuvs::neighbors::index_params { ... };
+struct index_params : cuvs::neighbors::index_params {
+  int64_t k;
+  int64_t max_batch_size;
+  size_t n_queues;
+  bool conservative_dispatch;
+};
 ```
 
 **Fields**
@@ -34,7 +39,9 @@ struct index_params : cuvs::neighbors::index_params { ... };
 Dynamic Batching search parameters
 
 ```cpp
-struct search_params : cuvs::neighbors::search_params { ... };
+struct search_params : cuvs::neighbors::search_params {
+  double dispatch_timeout_ms;
+};
 ```
 
 **Fields**
@@ -50,19 +57,13 @@ struct search_params : cuvs::neighbors::search_params { ... };
 
 Lightweight dynamic batching index wrapper
 
-One lightweight dynamic batching index manages a single index and a single search parameter set. This structure should be shared among multiple users via copy semantics: access to the underlying implementation is managed via a shared pointer, and concurrent search among the participants is thread-safe.
-
-__Usage example__
-
-__Priority queues__
-
-The dynamic batching index has a limited support for prioritizing individual requests. There's only one pool of queues in the batcher and no functionality to prioritize one bach over the other. The `search_params::dispatch_timeout_ms` parameters passed in each request are aggregated internally and the batch is dispatched no later than any of the timeouts is exceeded. In this logic, a high-priority request can never be processed earlier than any lower-priority requests submitted earlier.
-
-However, dynamic batching indexes are lightweight and do not contain any global or static state. This means it's easy to combine multiple batchers. As an example, you can construct one batching index per priority class:
+One lightweight dynamic batching index manages a single index and a single search parameter set. This structure should be shared among multiple users via copy semantics: access to the underlying implementation is managed via a shared pointer, and concurrent search among the participants is thread-safe. __Usage example__ __Priority queues__ The dynamic batching index has a limited support for prioritizing individual requests. There's only one pool of queues in the batcher and no functionality to prioritize one bach over the other. The `search_params::dispatch_timeout_ms` parameters passed in each request are aggregated internally and the batch is dispatched no later than any of the timeouts is exceeded. In this logic, a high-priority request can never be processed earlier than any lower-priority requests submitted earlier. However, dynamic batching indexes are lightweight and do not contain any global or static state. This means it's easy to combine multiple batchers. As an example, you can construct one batching index per priority class:
 
 ```cpp
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index { ... };
+struct index : cuvs::neighbors::index {
+  std::shared_ptr<detail::batch_runner<T, IdxT>> runner;
+};
 ```
 
 **Fields**
@@ -121,11 +122,7 @@ raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
 raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-The search parameters of the upstream index and the optional filtering function are configured at the dynamic batching index construction time.
-
-Like with many other indexes, the dynamic batching search has the stream-ordered semantics: the host function may return the control before the results are ready. Synchronize with the main CUDA stream in the given resource object to wait for arrival of the search results.
-
-Dynamic batching search is thread-safe: call the search function with copies of the same index in multiple threads to increase the occupancy of the batches.
+The search parameters of the upstream index and the optional filtering function are configured at the dynamic batching index construction time. Like with many other indexes, the dynamic batching search has the stream-ordered semantics: the host function may return the control before the results are ready. Synchronize with the main CUDA stream in the given resource object to wait for arrival of the search results. Dynamic batching search is thread-safe: call the search function with copies of the same index in multiple threads to increase the occupancy of the batches.
 
 **Parameters**
 

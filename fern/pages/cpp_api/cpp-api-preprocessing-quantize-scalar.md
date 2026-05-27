@@ -14,7 +14,9 @@ _Source header: `cuvs/preprocessing/quantize/scalar.hpp`_
 quantizer parameters.
 
 ```cpp
-struct params { ... };
+struct params {
+  float quantile;
+};
 ```
 
 **Fields**
@@ -32,7 +34,10 @@ The quantization is performed by a linear mapping of an interval in the float da
 
 ```cpp
 template <typename T>
-struct quantizer { ... };
+struct quantizer {
+  T min_;
+  T max_;
+};
 ```
 
 **Fields**
@@ -156,9 +161,7 @@ raft::device_matrix_view<const int8_t, int64_t> dataset,
 raft::device_matrix_view<double, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless.
-
-Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
 
 **Parameters**
 
@@ -184,9 +187,7 @@ raft::host_matrix_view<const int8_t, int64_t> dataset,
 raft::host_matrix_view<double, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless.
-
-Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
 
 **Parameters**
 
@@ -312,9 +313,7 @@ raft::device_matrix_view<const int8_t, int64_t> dataset,
 raft::device_matrix_view<float, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless.
-
-Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
 
 **Parameters**
 
@@ -340,9 +339,7 @@ raft::host_matrix_view<const int8_t, int64_t> dataset,
 raft::host_matrix_view<float, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless.
-
-Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
 
 **Parameters**
 
@@ -468,9 +465,7 @@ raft::device_matrix_view<const int8_t, int64_t> dataset,
 raft::device_matrix_view<half, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless.
-
-Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
 
 **Parameters**
 
@@ -496,9 +491,7 @@ raft::host_matrix_view<const int8_t, int64_t> dataset,
 raft::host_matrix_view<half, int64_t> out);
 ```
 
-Note that depending on the chosen data types train dataset the conversion is not lossless.
-
-Usage example:
+Note that depending on the chosen data types train dataset the conversion is not lossless. Usage example:
 
 **Parameters**
 

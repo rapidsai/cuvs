@@ -11,7 +11,9 @@ _Source: `rust/cuvs/src/vamana/index_params.rs`_
 ## IndexParams
 
 ```rust
-pub struct IndexParams(pub ffi::cuvsVamanaIndexParams_t);
+pub struct IndexParams(pub ffi::cuvsVamanaIndexParams_t); {
+    /* private fields */
+}
 ```
 
 **Methods**
@@ -32,7 +34,7 @@ pub struct IndexParams(pub ffi::cuvsVamanaIndexParams_t);
 ### new
 
 ```rust
-pub fn new() -> Result<IndexParams> { ... }
+pub fn new() -> Result<IndexParams>
 ```
 
 Returns a new IndexParams
@@ -42,7 +44,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:15`_
 ### set_metric
 
 ```rust
-pub fn set_metric(self, metric: DistanceType) -> IndexParams { ... }
+pub fn set_metric(self, metric: DistanceType) -> IndexParams
 ```
 
 DistanceType to use for building the index
@@ -52,7 +54,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:24`_
 ### set_graph_degree
 
 ```rust
-pub fn set_graph_degree(self, graph_degree: u32) -> IndexParams { ... }
+pub fn set_graph_degree(self, graph_degree: u32) -> IndexParams
 ```
 
 Maximum degree of output graph corresponds to the R parameter in the original Vamana
@@ -63,7 +65,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:33`_
 ### set_visited_size
 
 ```rust
-pub fn set_visited_size(self, visited_size: u32) -> IndexParams { ... }
+pub fn set_visited_size(self, visited_size: u32) -> IndexParams
 ```
 
 Maximum number of visited nodes per search corresponds to the L parameter in the Vamana
@@ -74,7 +76,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:42`_
 ### set_vamana_iters
 
 ```rust
-pub fn set_vamana_iters(self, vamana_iters: f32) -> IndexParams { ... }
+pub fn set_vamana_iters(self, vamana_iters: f32) -> IndexParams
 ```
 
 Number of Vamana vector insertion iterations (each iteration inserts all vectors).
@@ -84,7 +86,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:50`_
 ### set_alpha
 
 ```rust
-pub fn set_alpha(self, alpha: f32) -> IndexParams { ... }
+pub fn set_alpha(self, alpha: f32) -> IndexParams
 ```
 
 Alpha for pruning parameter
@@ -94,7 +96,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:58`_
 ### set_max_fraction
 
 ```rust
-pub fn set_max_fraction(self, max_fraction: f32) -> IndexParams { ... }
+pub fn set_max_fraction(self, max_fraction: f32) -> IndexParams
 ```
 
 Maximum fraction of dataset inserted per batch.
@@ -105,7 +107,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:67`_
 ### set_batch_base
 
 ```rust
-pub fn set_batch_base(self, batch_base: f32) -> IndexParams { ... }
+pub fn set_batch_base(self, batch_base: f32) -> IndexParams
 ```
 
 Base of growth rate of batch sizes
@@ -115,7 +117,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:75`_
 ### set_queue_size
 
 ```rust
-pub fn set_queue_size(self, queue_size: u32) -> IndexParams { ... }
+pub fn set_queue_size(self, queue_size: u32) -> IndexParams
 ```
 
 Size of candidate queue structure - should be (2^x)-1
@@ -125,7 +127,7 @@ _Source: `rust/cuvs/src/vamana/index_params.rs:83`_
 ### set_reverse_batchsize
 
 ```rust
-pub fn set_reverse_batchsize(self, reverse_batchsize: u32) -> IndexParams { ... }
+pub fn set_reverse_batchsize(self, reverse_batchsize: u32) -> IndexParams
 ```
 
 Max batchsize of reverse edge processing (reduces memory footprint)

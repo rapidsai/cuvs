@@ -14,7 +14,7 @@ _Source header: `cuvs/neighbors/ivf_pq.hpp`_
 A type for specifying how PQ codebooks are created.
 
 ```cpp
-enum class codebook_gen { ... };
+enum class codebook_gen;
 ```
 
 <a id="neighbors-ivf-pq-list-layout"></a>
@@ -23,7 +23,7 @@ enum class codebook_gen { ... };
 A type for specifying the memory layout of PQ codes in IVF lists.
 
 ```cpp
-enum class list_layout { ... };
+enum class list_layout;
 ```
 
 <a id="neighbors-ivf-pq-index-params-from-dataset"></a>
@@ -58,7 +58,14 @@ Usage example:
 IVF-PQ index search parameters
 
 ```cpp
-struct search_params : cuvs::neighbors::search_params { ... };
+struct search_params : cuvs::neighbors::search_params {
+  uint32_t n_probes;
+  cudaDataType_t lut_dtype;
+  cudaDataType_t internal_distance_dtype;
+  double preferred_shmem_carveout;
+  cudaDataType_t coarse_search_dtype;
+  uint32_t max_internal_batch_size;
+};
 ```
 
 **Fields**
@@ -93,7 +100,12 @@ This stores each vector's PQ codes contiguously: [n_rows, bytes_per_vector] wher
 
 ```cpp
 template <typename SizeT, typename IdxT>
-struct list_spec_flat { ... };
+struct list_spec_flat {
+  SizeT align_max;
+  SizeT align_min;
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+};
 ```
 
 **Fields**
@@ -111,7 +123,11 @@ struct list_spec_flat { ... };
 Specialized parameters utilizing IVF-PQ to build knn graph
 
 ```cpp
-struct ivf_pq_params { ... };
+struct ivf_pq_params {
+  cuvs::neighbors::ivf_pq::index_params build_params;
+  cuvs::neighbors::ivf_pq:: search_params;
+  float refinement_rate;
+};
 ```
 
 **Fields**
@@ -129,33 +145,11 @@ struct ivf_pq_params { ... };
 
 IVF-PQ index.
 
-In the IVF-PQ index, a database vector y is approximated with two level quantization:
-
-y = Q_1(y) + Q_2(y - Q_1(y))
-
-The first level quantizer (Q_1), maps the vector y to the nearest cluster center. The number of clusters is n_lists.
-
-The second quantizer encodes the residual, and it is defined as a product quantizer [1].
-
-A product quantizer encodes a `dim` dimensional vector with a `pq_dim` dimensional vector. First we split the input vector into `pq_dim` subvectors (denoted by u), where each u vector contains `pq_len` distinct components of y
-
-y_1, y_2, ... y_\{pq_len\}, y_\{pq_len+1\}, ... y_\{2*pq_len\}, ... y_\{dim-pq_len+1\} ... y_\{dim\} u_1                         u_2                          u_\{pq_dim\}
-
-Then each subvector encoded with a separate quantizer q_i, end the results are concatenated
-
-Q_2(y) = q_1(u_1),q_2(u_2),...,q_\{pq_dim\}(u_pq_dim\})
-
-Each quantizer q_i outputs a code with pq_bit bits. The second level quantizers are also defined by k-means clustering in the corresponding sub-space: the reproduction values are the centroids, and the set of reproduction values is the codebook.
-
-When the data dimensionality `dim` is not multiple of `pq_dim`, the feature space is transformed using a random orthogonal matrix to have `rot_dim = pq_dim * pq_len` dimensions (`rot_dim &gt;= dim`).
-
-The second-level quantizers are trained either for each subspace or for each cluster: (a) codebook_gen::PER_SUBSPACE: creates `pq_dim` second-level quantizers - one for each slice of the data along features; (b) codebook_gen::PER_CLUSTER: creates `n_lists` second-level quantizers - one for each first-level cluster. In either case, the centroids are again found using k-means clustering interpreting the data as having pq_len dimensions.
-
-[1] Product quantization for nearest neighbor search Herve Jegou, Matthijs Douze, Cordelia Schmid
+In the IVF-PQ index, a database vector y is approximated with two level quantization: y = Q_1(y) + Q_2(y - Q_1(y)) The first level quantizer (Q_1), maps the vector y to the nearest cluster center. The number of clusters is n_lists. The second quantizer encodes the residual, and it is defined as a product quantizer [1]. A product quantizer encodes a `dim` dimensional vector with a `pq_dim` dimensional vector. First we split the input vector into `pq_dim` subvectors (denoted by u), where each u vector contains `pq_len` distinct components of y y_1, y_2, ... y_\{pq_len\}, y_\{pq_len+1\}, ... y_\{2*pq_len\}, ... y_\{dim-pq_len+1\} ... y_\{dim\} u_1                         u_2                          u_\{pq_dim\} Then each subvector encoded with a separate quantizer q_i, end the results are concatenated Q_2(y) = q_1(u_1),q_2(u_2),...,q_\{pq_dim\}(u_pq_dim\}) Each quantizer q_i outputs a code with pq_bit bits. The second level quantizers are also defined by k-means clustering in the corresponding sub-space: the reproduction values are the centroids, and the set of reproduction values is the codebook. When the data dimensionality `dim` is not multiple of `pq_dim`, the feature space is transformed using a random orthogonal matrix to have `rot_dim = pq_dim * pq_len` dimensions (`rot_dim &gt;= dim`). The second-level quantizers are trained either for each subspace or for each cluster: (a) codebook_gen::PER_SUBSPACE: creates `pq_dim` second-level quantizers - one for each slice of the data along features; (b) codebook_gen::PER_CLUSTER: creates `n_lists` second-level quantizers - one for each first-level cluster. In either case, the centroids are again found using k-means clustering interpreting the data as having pq_len dimensions. [1] Product quantization for nearest neighbor search Herve Jegou, Matthijs Douze, Cordelia Schmid
 
 ```cpp
 template <typename IdxT>
-class index : public index_iface<IdxT>, cuvs::neighbors::index { ... };
+class index;
 ```
 
 <a id="neighbors-ivf-pq-index-index"></a>
@@ -487,11 +481,7 @@ Accumulated list sizes, sorted in descending order [n_lists + 1].
 raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept override;
 ```
 
-The last value contains the total length of the index. The value at index zero is always zero.
-
-That is, the content of this span is as if the `list_sizes` was sorted and then accumulated.
-
-This span is used during search to estimate the maximum size of the workspace.
+The last value contains the total length of the index. The value at index zero is always zero. That is, the content of this span is as if the `list_sizes` was sorted and then accumulated. This span is used during search to estimate the maximum size of the workspace.
 
 **Returns**
 
@@ -623,9 +613,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -681,9 +669,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -739,9 +725,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -797,9 +781,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -825,9 +807,7 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -857,11 +837,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -887,9 +863,7 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -919,9 +893,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Usage example:
+- CosineExpanded Usage example:
 
 **Parameters**
 
@@ -977,11 +949,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1007,9 +975,7 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1039,11 +1005,7 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded
-
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1073,15 +1035,11 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-This function creates a non-owning index that stores a reference to the provided device data. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index.
-
-The index_params must be consistent with the provided matrices. Specifically:
+This function creates a non-owning index that stores a reference to the provided device data. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index. The index_params must be consistent with the provided matrices. Specifically:
 
 - index_params.codebook_kind determines the expected shape of pq_centers
 - index_params.metric will be stored in the index
 - index_params.conservative_memory_allocation will be stored in the index The function will verify consistency between index_params, dim, and the matrix extents.
-
-dim]
 
 **Parameters**
 
@@ -1093,7 +1051,7 @@ dim]
 | `pq_centers` | in | `raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>` | PQ codebook on device memory with required extents:<br />- codebook_gen::PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]<br />- codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size] |
 | `centers` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Cluster centers in the original space [n_lists, dim_ext] where dim_ext = round_up(dim + 1, 8) |
 | `centers_rot` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Rotated cluster centers [n_lists, rot_dim] where rot_dim = pq_len * pq_dim |
-| `rotation_matrix` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, |
+| `rotation_matrix` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, dim] |
 
 **Returns**
 
@@ -1114,15 +1072,11 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-This function creates a non-owning index that references the provided device data directly. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index.
-
-The index_params must be consistent with the provided matrices. Specifically:
+This function creates a non-owning index that references the provided device data directly. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index. The index_params must be consistent with the provided matrices. Specifically:
 
 - index_params.codebook_kind determines the expected shape of pq_centers
 - index_params.metric will be stored in the index
 - index_params.conservative_memory_allocation will be stored in the index The function will verify consistency between index_params, dim, and the matrix extents.
-
-dim]
 
 **Parameters**
 
@@ -1134,7 +1088,7 @@ dim]
 | `pq_centers` | in | `raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>` | PQ codebook on device memory with required extents:<br />- codebook_gen::PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]<br />- codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size] |
 | `centers` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Cluster centers in the original space [n_lists, dim_ext] where dim_ext = round_up(dim + 1, 8) |
 | `centers_rot` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Rotated cluster centers [n_lists, rot_dim] where rot_dim = pq_len * pq_dim |
-| `rotation_matrix` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, |
+| `rotation_matrix` | in | `raft::device_matrix_view<const float, uint32_t, raft::row_major>` | Transform matrix (original space -&gt; rotated padded space) [rot_dim, dim] |
 | `idx` | out | [`cuvs::neighbors::ivf_pq::index<int64_t>*`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | pointer to ivf_pq::index |
 
 **Returns**
@@ -1433,9 +1387,7 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1461,9 +1413,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1490,9 +1440,7 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1518,9 +1466,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1547,9 +1493,7 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1575,9 +1519,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1604,9 +1546,7 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1632,9 +1572,7 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
-
-Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
 
 **Parameters**
 
@@ -1664,8 +1602,6 @@ raft::device_vector_view<uint32_t, int64_t> output_labels,
 raft::device_matrix_view<uint8_t, int64_t> output_dataset);
 ```
 
-cluster ids (labels) for each vector in the input dataset index.pq_bits(), 8)]] that will get populated with the pq-encoded dataset
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1673,8 +1609,8 @@ cluster ids (labels) for each vector in the input dataset index.pq_bits(), 8)]] 
 | `handle` | in | `raft::resources const&` |  |
 | `index` | in | [`const cuvs::neighbors::ivf_pq::index<int64_t>&`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-index) | ivf-pq constructed index |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, index.dim()] |
-| `output_labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | a device vector view [n_rows] that will get populaterd with the |
-| `output_dataset` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a device matrix view [n_rows, ceildiv(index.pq_dim() * |
+| `output_labels` | out | `raft::device_vector_view<uint32_t, int64_t>` | a device vector view [n_rows] that will get populaterd with the cluster ids (labels) for each vector in the input dataset |
+| `output_dataset` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a device matrix view [n_rows, ceildiv(index.pq_dim() * index.pq_bits(), 8)]] that will get populated with the pq-encoded dataset |
 
 **Returns**
 
@@ -1849,7 +1785,7 @@ cuvs::neighbors::ivf_pq::index<int64_t>* index);
 <a id="neighbors-ivf-pq-helpers-codepacker-unpack"></a>
 ### neighbors::ivf_pq::helpers::codepacker::unpack
 
-Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`.
 
 ```cpp
 void unpack(raft::resources const& res,
@@ -1861,11 +1797,7 @@ uint32_t offset,
 raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 ```
 
-starting at given `offset`.
-
-Bit compression is removed, which means output will have pq_dim dimensional vectors (one code per byte, instead of ceildiv(pq_dim * pq_bits, 8) bytes of pq codes).
-
-Usage example:
+Bit compression is removed, which means output will have pq_dim dimensional vectors (one code per byte, instead of ceildiv(pq_dim * pq_bits, 8) bytes of pq codes). Usage example:
 
 **Parameters**
 
@@ -1884,7 +1816,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-unpack-contiguous"></a>
 ### neighbors::ivf_pq::helpers::codepacker::unpack_contiguous
 
-Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index starting at given `offset`. The output codes of a single vector are contiguous, not expanded to one code per byte, which means the output has ceildiv(pq_dim * pq_bits, 8) bytes per PQ encoded vector.
 
 ```cpp
 void unpack_contiguous(raft::resources const& res,
@@ -1897,8 +1829,6 @@ uint32_t n_rows,
 uint32_t pq_dim,
 uint8_t* codes);
 ```
-
-starting at given `offset`. The output codes of a single vector are contiguous, not expanded to one code per byte, which means the output has ceildiv(pq_dim * pq_bits, 8) bytes per PQ encoded vector.
 
 Usage example:
 
@@ -1933,9 +1863,7 @@ list_spec_interleaved<uint32_t, uint32_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
-
-Usage example:
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
 
 **Parameters**
 
@@ -1968,11 +1896,7 @@ list_spec_interleaved<uint32_t, uint32_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-are contiguous (not expanded to one code per byte).
-
-NB: no memory allocation happens here; the list must fit the data (offset + n_rows records).
-
-Usage example:
+are contiguous (not expanded to one code per byte). NB: no memory allocation happens here; the list must fit the data (offset + n_rows records). Usage example:
 
 **Parameters**
 
@@ -2003,11 +1927,7 @@ uint32_t label,
 uint32_t offset);
 ```
 
-The list is identified by its label.
-
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
-
-Usage example:
+The list is identified by its label. NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
 
 **Parameters**
 
@@ -2037,13 +1957,7 @@ uint32_t label,
 uint32_t offset);
 ```
 
-vectors are PQ encoded and not expanded to one code per byte.
-
-The list is identified by its label.
-
-NB: no memory allocation happens here; the list into which the vectors are packed must fit offset + n_rows rows.
-
-Usage example:
+vectors are PQ encoded and not expanded to one code per byte. The list is identified by its label. NB: no memory allocation happens here; the list into which the vectors are packed must fit offset + n_rows rows. Usage example:
 
 **Parameters**
 
@@ -2063,7 +1977,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-unpack-list-data"></a>
 ### neighbors::ivf_pq::helpers::codepacker::unpack_list_data
 
-Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
+Unpack `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`, one code per byte (independently of pq_bits).
 
 ```cpp
 void unpack_list_data(raft::resources const& res,
@@ -2072,8 +1986,6 @@ raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
 uint32_t label,
 uint32_t offset);
 ```
-
-starting at given `offset`, one code per byte (independently of pq_bits).
 
 Usage example:
 
@@ -2093,7 +2005,7 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_pq::helpers::codepacker::unpack_list_data`
 
-Unpack a series of records of a single list (cluster) in the compressed index
+Unpack a series of records of a single list (cluster) in the compressed index by their in-list offsets, one code per byte (independently of pq_bits).
 
 ```cpp
 void unpack_list_data(raft::resources const& res,
@@ -2102,8 +2014,6 @@ raft::device_vector_view<const uint32_t> in_cluster_indices,
 raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
 uint32_t label);
 ```
-
-by their in-list offsets, one code per byte (independently of pq_bits).
 
 Usage example:
 
@@ -2124,7 +2034,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-unpack-contiguous-list-data"></a>
 ### neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data
 
-Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
+Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the compressed index starting at given `offset`, not expanded to one code per byte. Each code in the output buffer occupies ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes.
 
 ```cpp
 void unpack_contiguous_list_data(raft::resources const& res,
@@ -2134,8 +2044,6 @@ uint32_t n_rows,
 uint32_t label,
 uint32_t offset);
 ```
-
-compressed index starting at given `offset`, not expanded to one code per byte. Each code in the output buffer occupies ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes.
 
 Usage example:
 
@@ -2157,7 +2065,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-reconstruct-list-data"></a>
 ### neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data
 
-Decode `n_take` consecutive records of a single list (cluster) in the compressed index
+Decode `n_take` consecutive records of a single list (cluster) in the compressed index starting at given `offset`.
 
 ```cpp
 void reconstruct_list_data(raft::resources const& res,
@@ -2166,8 +2074,6 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
 uint32_t label,
 uint32_t offset);
 ```
-
-starting at given `offset`.
 
 Usage example:
 
@@ -2187,7 +2093,7 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data`
 
-Decode a series of records of a single list (cluster) in the compressed index
+Decode a series of records of a single list (cluster) in the compressed index by their in-list offsets.
 
 ```cpp
 void reconstruct_list_data(raft::resources const& res,
@@ -2196,8 +2102,6 @@ raft::device_vector_view<const uint32_t> in_cluster_indices,
 raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
 uint32_t label);
 ```
-
-by their in-list offsets.
 
 Usage example:
 
@@ -2218,7 +2122,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-extend-list-with-codes"></a>
 ### neighbors::ivf_pq::helpers::codepacker::extend_list_with_codes
 
-Extend one list of the index in-place, by the list label, skipping the classification and
+Extend one list of the index in-place, by the list label, skipping the classification and encoding steps.
 
 ```cpp
 void extend_list_with_codes(
@@ -2228,8 +2132,6 @@ raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
 raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
 uint32_t label);
 ```
-
-encoding steps.
 
 Usage example:
 
@@ -2250,7 +2152,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-extend-list-with-contiguous-codes"></a>
 ### neighbors::ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes
 
-Extend one list of the index in-place, by the list label, skipping the classification and
+Extend one list of the index in-place, by the list label, skipping the classification and encoding steps. Uses contiguous/packed codes format.
 
 ```cpp
 void extend_list_with_contiguous_codes(
@@ -2261,11 +2163,7 @@ raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
 uint32_t label);
 ```
 
-encoding steps. Uses contiguous/packed codes format.
-
-This is similar to extend_list_with_codes but takes codes in contiguous packed format [n_rows, ceildiv(pq_dim * pq_bits, 8)] instead of unpacked format [n_rows, pq_dim]. This works correctly with any pq_bits value.
-
-Usage example:
+This is similar to extend_list_with_codes but takes codes in contiguous packed format [n_rows, ceildiv(pq_dim * pq_bits, 8)] instead of unpacked format [n_rows, pq_dim]. This works correctly with any pq_bits value. Usage example:
 
 **Parameters**
 
@@ -2284,7 +2182,7 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-codepacker-extend-list"></a>
 ### neighbors::ivf_pq::helpers::codepacker::extend_list
 
-Extend one list of the index in-place, by the list label, skipping the classification
+Extend one list of the index in-place, by the list label, skipping the classification step.
 
 ```cpp
 void extend_list(raft::resources const& res,
@@ -2293,8 +2191,6 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
 raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
 uint32_t label);
 ```
-
-step.
 
 Usage example:
 
@@ -2338,13 +2234,11 @@ Usage example:
 <a id="neighbors-ivf-pq-helpers-reset-index"></a>
 ### neighbors::ivf_pq::helpers::reset_index
 
-Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+Public helper API to reset the data and indices ptrs, and the list sizes. Useful for externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 ```cpp
 void reset_index(const raft::resources& res, index<int64_t>* index);
 ```
-
-externally modifying the index without going through the build stage. The data and indices of the IVF lists will be lost.
 
 Usage example:
 
@@ -2484,13 +2378,11 @@ raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 <a id="neighbors-ivf-pq-helpers-recompute-internal-state"></a>
 ### neighbors::ivf_pq::helpers::recompute_internal_state
 
-Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+Helper exposing the re-computation of list sizes and related arrays if IVF lists have been modified externally.
 
 ```cpp
 void recompute_internal_state(const raft::resources& res, index<int64_t>* index);
 ```
-
-modified externally.
 
 Usage example:
 
@@ -2517,9 +2409,7 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
 bool force_random_rotation);
 ```
 
-This standalone helper generates a rotation matrix without requiring an index object. Users can call this to prepare a rotation matrix before building from precomputed data.
-
-Usage example:
+This standalone helper generates a rotation matrix without requiring an index object. Users can call this to prepare a rotation matrix before building from precomputed data. Usage example:
 
 **Parameters**
 
@@ -2546,9 +2436,7 @@ uint32_t new_used_size,
 uint32_t old_used_size);
 ```
 
-This helper resizes an IVF list that uses the flat (non-interleaved) PQ code layout. If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally.
-
-Usage example:
+This helper resizes an IVF list that uses the flat (non-interleaved) PQ code layout. If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally. Usage example:
 
 **Parameters**
 
@@ -2576,9 +2464,7 @@ uint32_t new_used_size,
 uint32_t old_used_size);
 ```
 
-This helper resizes an IVF list that uses the interleaved PQ code layout (default). If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally.
-
-Usage example:
+This helper resizes an IVF list that uses the interleaved PQ code layout (default). If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally. Usage example:
 
 **Parameters**
 

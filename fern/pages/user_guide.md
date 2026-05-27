@@ -10,9 +10,9 @@ Use these guides when you are ready to apply NVIDIA cuVS APIs, benchmark algorit
 
 - [API Guide](/user-guide/api-guides): find task-focused NVIDIA cuVS API examples for clustering, vector indexing, preprocessing, and supporting routines.
 
-### Core Types
+### Common Types
 
-- [Core Types](/user-guide/api-guides/core-types): learn the shared array, memory, and multi-GPU resource abstractions used by NVIDIA cuVS APIs.
+- [Common Types](/user-guide/api-guides/core-types): learn the shared array, memory, and multi-GPU resource abstractions used by NVIDIA cuVS APIs.
 - [Array Types](/user-guide/api-guides/core-types/array-types): choose between dense arrays and sparse arrays for NVIDIA cuVS APIs.
 - [Dense Arrays](/user-guide/api-guides/core-types/array-types/dense-arrays): pass dense vectors, matrices, and outputs into NVIDIA cuVS APIs across supported languages.
 - [Memory Management](/user-guide/api-guides/core-types/memory-management): configure RMM device, pool, pinned host, host, and managed memory resources for NVIDIA cuVS workflows.

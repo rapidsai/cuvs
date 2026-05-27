@@ -14,7 +14,19 @@ _Source header: `cuvs/neighbors/scann.hpp`_
 ANN parameters used by ScaNN to build index
 
 ```cpp
-struct index_params : cuvs::neighbors::index_params { ... };
+struct index_params : cuvs::neighbors::index_params {
+  uint32_t n_leaves;
+  int64_t kmeans_n_rows_train;
+  uint32_t kmeans_n_iters;
+  float partitioning_eta;
+  float soar_lambda;
+  uint32_t pq_dim;
+  uint32_t pq_bits;
+  int64_t pq_n_rows_train;
+  uint32_t pq_train_iters;
+  bool reordering_bf16;
+  float reordering_noise_shaping_threshold;
+};
 ```
 
 **Fields**
@@ -44,7 +56,7 @@ The index stores the dataset and the ScaNN graph in device memory.
 
 ```cpp
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index { ... };
+struct index;
 ```
 
 <a id="neighbors-experimental-scann-index-metric"></a>
@@ -123,9 +135,7 @@ const std::string& file_prefix,
 const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
 ```
 
-This serializes the index into a list of files for integration into OSS ScaNN for use with search
-
-NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
 
 **Parameters**
 
@@ -151,9 +161,7 @@ const std::string& file_prefix,
 const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
 ```
 
-This serializes the index into a list of files for integration into OSS ScaNN for use with search
-
-NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
 
 **Parameters**
 

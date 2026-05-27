@@ -38,9 +38,6 @@ Use CSR for sparse row-major matrices. CSR stores `n_rows + 1` row offsets, `nnz
 
 #### Owning CSR with known sparsity
 
-<Tabs>
-<Tab title="C++">
-
 ```cpp
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/resources.hpp>
@@ -59,15 +56,9 @@ fill_csr_values_and_structure(csr);
 auto csr_view = csr.view();
 ```
 
-</Tab>
-</Tabs>
-
 #### Owning CSR with sparsity discovered later
 
 Sometimes the shape of a sparse matrix is known, but the exact number of nonzero entries is not known until an algorithm runs. In that case, create the owning matrix with only the logical shape and initialize the sparsity once `nnz` is known.
-
-<Tabs>
-<Tab title="C++">
 
 ```cpp
 #include <raft/core/device_csr_matrix.hpp>
@@ -87,17 +78,11 @@ csr.initialize_sparsity(nnz);
 fill_csr_values_and_structure(csr);
 ```
 
-</Tab>
-</Tabs>
-
 This pattern is important when the caller needs to own the final matrix, but the algorithm is the only code that can know how much sparse storage is needed.
 
 #### CSR view over existing buffers
 
 Use a CSR view when values, row offsets, and column indices are already allocated on the device. The view does not own those buffers.
-
-<Tabs>
-<Tab title="C++">
 
 ```cpp
 #include <raft/core/device_csr_matrix.hpp>
@@ -122,9 +107,6 @@ auto csr = raft::make_device_csr_matrix_view<const float>(
     structure);
 ```
 
-</Tab>
-</Tabs>
-
 ### Creating COO matrices
 
 Use COO for sparse coordinate data. COO stores `nnz` row indices, `nnz` column indices, and `nnz` values.
@@ -132,9 +114,6 @@ Use COO for sparse coordinate data. COO stores `nnz` row indices, `nnz` column i
 #### Owning COO with known sparsity
 
 Use an owning COO matrix when the shape and number of entries are known up front.
-
-<Tabs>
-<Tab title="C++">
 
 ```cpp
 #include <raft/core/device_coo_matrix.hpp>
@@ -154,15 +133,9 @@ fill_coo_values_and_structure(coo);
 auto coo_view = coo.view();
 ```
 
-</Tab>
-</Tabs>
-
 #### Owning COO with sparsity discovered later
 
 Some algorithms produce sparse coordinate data but do not know `nnz` until they run. In those cases, create an owning COO matrix with the logical shape and let the algorithm initialize the sparse structure inside the caller-owned object.
-
-<Tabs>
-<Tab title="C++">
 
 ```cpp
 #include <raft/core/device_coo_matrix.hpp>
@@ -181,15 +154,9 @@ produce_sparse_coordinates(res, coo);
 auto nnz = coo.structure_view().get_nnz();
 ```
 
-</Tab>
-</Tabs>
-
 #### COO view over existing buffers
 
 Use a COO view when row indices, column indices, and values already exist in device memory. The view preserves the existing sparsity ownership.
-
-<Tabs>
-<Tab title="C++">
 
 ```cpp
 #include <raft/core/device_coo_matrix.hpp>
@@ -213,9 +180,6 @@ auto coo = raft::make_device_coo_matrix_view<const float>(
     values,
     structure);
 ```
-
-</Tab>
-</Tabs>
 
 ### Choosing C++ sparse array types
 

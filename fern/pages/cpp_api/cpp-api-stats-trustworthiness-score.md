@@ -23,15 +23,15 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtUnexpa
 int batch_size                      = 512);
 ```
 
-modified.
+**Note:** The constness of the data in X_embedded is currently casted away and the data is slightly modified.
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
-| `X` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | : Data in original dimension |
-| `X_embedded` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | : Data in target dimension (embedding) |
+| `X` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | Data in original dimension |
+| `X_embedded` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | Data in target dimension (embedding) |
 | `n_neighbors` | in | `int` | Number of neighbors considered by trustworthiness score |
 | `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2SqrtUnexpanded`. |
 | `batch_size` | in | `int` | Batch size Default: `512`. |
