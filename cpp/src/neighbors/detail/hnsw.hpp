@@ -389,6 +389,11 @@ inline auto elapsed_ms_since(std::chrono::steady_clock::time_point start) -> int
     .count();
 }
 
+inline auto elapsed_ms(std::chrono::steady_clock::duration elapsed) -> double
+{
+  return std::chrono::duration<double, std::milli>(elapsed).count();
+}
+
 inline auto to_gib(size_t bytes) -> double
 {
   return static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
@@ -397,6 +402,13 @@ inline auto to_gib(size_t bytes) -> double
 inline auto throughput_gib_per_s(size_t bytes, int64_t elapsed_ms) -> double
 {
   return elapsed_ms > 0 ? to_gib(bytes) / (elapsed_ms / 1000.0) : 0.0;
+}
+
+inline auto throughput_gib_per_s(size_t bytes, std::chrono::steady_clock::duration elapsed)
+  -> double
+{
+  const auto elapsed_s = std::chrono::duration<double>(elapsed).count();
+  return elapsed_s > 0.0 ? to_gib(bytes) / elapsed_s : 0.0;
 }
 
 inline auto make_hnsw_level_plan_from_levels(size_t n_rows,
@@ -2039,6 +2051,8 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                               cuvs::distance::DistanceType metric) -> std::unique_ptr<index<T>>
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::deserialize_layered");
+  const auto total_start_time    = std::chrono::steady_clock::now();
+  const auto metadata_start_time = std::chrono::steady_clock::now();
   cuvs::util::file_descriptor artifact_fd(artifact_path, O_RDONLY);
   layered_hnsw_file_header header{};
   cuvs::util::read_large_file(artifact_fd, &header, sizeof(header), 0);
@@ -2055,7 +2069,8 @@ auto deserialize_layered_hnsw(raft::resources const& res,
   std::string metadata_json(header.metadata_size, '\0');
   cuvs::util::read_large_file(
     artifact_fd, metadata_json.data(), metadata_json.size(), header.metadata_offset);
-  const auto metadata = parse_layered_hnsw_metadata(metadata_json);
+  const auto metadata            = parse_layered_hnsw_metadata(metadata_json);
+  const auto metadata_elapsed_ms = elapsed_ms_since(metadata_start_time);
 
   RAFT_EXPECTS(metadata.n_rows > 0, "Layered HNSW artifact must contain at least one row");
   RAFT_EXPECTS(static_cast<size_t>(dim) == metadata.dim,
@@ -2082,8 +2097,15 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                "Layered HNSW artifact is truncated: expected at least %zu bytes, got %zu",
                expected_file_size,
                artifact_size);
+  RAFT_LOG_INFO("Layered HNSW load: metadata read in %ld ms (rows=%zu dim=%zu artifact=%.2f GiB)",
+                metadata_elapsed_ms,
+                metadata.n_rows,
+                metadata.dim,
+                to_gib(artifact_size));
 
-  auto dataset_file = open_layered_dataset_file<T>(params.dataset_path);
+  const auto dataset_open_start_time = std::chrono::steady_clock::now();
+  auto dataset_file                  = open_layered_dataset_file<T>(params.dataset_path);
+  const auto dataset_open_elapsed_ms = elapsed_ms_since(dataset_open_start_time);
 
   RAFT_EXPECTS(dataset_file.shape.size() == 2 && dataset_file.shape[0] == metadata.n_rows &&
                  dataset_file.shape[1] == metadata.dim,
@@ -2102,6 +2124,11 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                metadata.base_degree,
                metadata.maxM0);
 
+  RAFT_LOG_INFO("Layered HNSW load: dataset header validated in %ld ms (%s)",
+                dataset_open_elapsed_ms,
+                params.dataset_path.c_str());
+
+  const auto levels_start_time = std::chrono::steady_clock::now();
   std::vector<uint8_t> levels_u8(metadata.n_rows);
   cuvs::util::read_large_file(artifact_fd, levels_u8.data(), metadata.levels_bytes, levels_offset);
   const auto max_level_in_levels = *std::max_element(levels_u8.begin(), levels_u8.end());
@@ -2109,9 +2136,14 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                "Layered HNSW levels max level (%d) does not match artifact maxlevel (%d)",
                static_cast<int>(max_level_in_levels),
                metadata.maxlevel);
+  const auto levels_elapsed_ms = elapsed_ms_since(levels_start_time);
+  RAFT_LOG_INFO("Layered HNSW load: levels read in %ld ms (%.2f MiB)",
+                levels_elapsed_ms,
+                static_cast<double>(metadata.levels_bytes) / (1024.0 * 1024.0));
 
-  auto hnsw_index = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
-  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+  const auto allocation_start_time = std::chrono::steady_clock::now();
+  auto hnsw_index                  = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
+  auto appr_algo = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     hnsw_index->get_space(), metadata.n_rows, metadata.M, metadata.ef_construction);
   appr_algo->cur_element_count = metadata.n_rows;
   appr_algo->maxlevel_         = metadata.maxlevel;
@@ -2123,6 +2155,12 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                "Layered HNSW upper link row size mismatch");
   RAFT_EXPECTS(appr_algo->maxM0_ == metadata.maxM0 && appr_algo->maxM_ == metadata.maxM,
                "Layered HNSW M parameter mismatch");
+  const auto allocation_elapsed_ms = elapsed_ms_since(allocation_start_time);
+  RAFT_LOG_INFO(
+    "Layered HNSW load: allocated hnswlib storage in %ld ms (base=%.2f GiB upper=%.2f GiB)",
+    allocation_elapsed_ms,
+    to_gib(metadata.n_rows * appr_algo->size_data_per_element_),
+    to_gib(metadata.upper_nodes_count * metadata.upper_link_row_bytes));
 
   auto num_threads =
     params.num_threads == 0 ? cuvs::core::omp::get_max_threads() : params.num_threads;
@@ -2135,18 +2173,31 @@ auto deserialize_layered_hnsw(raft::resources const& res,
     raft::make_host_matrix<T, int64_t>(static_cast<int64_t>(batch_size), metadata.dim);
   std::vector<char> base_link_buffer(batch_size * metadata.base_link_row_bytes);
 
+  const auto base_start_time = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::duration dataset_read_time{};
+  std::chrono::steady_clock::duration base_link_read_time{};
+  std::chrono::steady_clock::duration base_copy_time{};
+  size_t dataset_bytes_read   = 0;
+  size_t base_link_bytes_read = 0;
   for (size_t batch_start = 0; batch_start < metadata.n_rows; batch_start += batch_size) {
     const auto current_batch_size = std::min(batch_size, metadata.n_rows - batch_start);
+    auto batch_timer              = std::chrono::steady_clock::now();
     cuvs::util::read_large_file(dataset_file.fd,
                                 dataset_buffer.data_handle(),
                                 current_batch_size * metadata.dim * sizeof(T),
                                 dataset_file.header_size + batch_start * metadata.dim * sizeof(T));
+    dataset_read_time += std::chrono::steady_clock::now() - batch_timer;
+    dataset_bytes_read += current_batch_size * metadata.dim * sizeof(T);
+    batch_timer = std::chrono::steady_clock::now();
     cuvs::util::read_large_file(artifact_fd,
                                 base_link_buffer.data(),
                                 current_batch_size * metadata.base_link_row_bytes,
                                 base_links_offset + batch_start * metadata.base_link_row_bytes);
+    base_link_read_time += std::chrono::steady_clock::now() - batch_timer;
+    base_link_bytes_read += current_batch_size * metadata.base_link_row_bytes;
 
     bool link_list_allocation_failed = false;
+    batch_timer                      = std::chrono::steady_clock::now();
 #pragma omp parallel for num_threads(num_threads) reduction(|| : link_list_allocation_failed)
     for (int64_t batch_idx = 0; batch_idx < static_cast<int64_t>(current_batch_size); ++batch_idx) {
       const auto i                  = batch_start + static_cast<size_t>(batch_idx);
@@ -2177,10 +2228,30 @@ auto deserialize_layered_hnsw(raft::resources const& res,
       }
       throw std::runtime_error("Not enough memory to allocate HNSW upper linklists");
     }
+    base_copy_time += std::chrono::steady_clock::now() - batch_timer;
   }
+  const auto base_elapsed_ms = elapsed_ms_since(base_start_time);
+  RAFT_LOG_INFO(
+    "Layered HNSW load: base layer initialized in %ld ms "
+    "(dataset read %.2f ms %.2f GiB %.2f GiB/s, links read %.2f ms %.2f GiB %.2f GiB/s, "
+    "copy %.2f ms)",
+    base_elapsed_ms,
+    elapsed_ms(dataset_read_time),
+    to_gib(dataset_bytes_read),
+    throughput_gib_per_s(dataset_bytes_read, dataset_read_time),
+    elapsed_ms(base_link_read_time),
+    to_gib(base_link_bytes_read),
+    throughput_gib_per_s(base_link_bytes_read, base_link_read_time),
+    elapsed_ms(base_copy_time));
 
   RAFT_LOG_INFO("Layered HNSW: loading upper-layer topology");
+  const auto upper_start_time = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::duration upper_read_time{};
+  std::chrono::steady_clock::duration upper_validate_time{};
+  std::chrono::steady_clock::duration upper_copy_time{};
+  size_t upper_bytes_read = 0;
   for (const auto& layer : metadata.layers) {
+    const auto layer_start_time = std::chrono::steady_clock::now();
     RAFT_LOG_INFO("Layered HNSW: loading layer %zu (%zu rows, degree %zu)",
                   layer.level,
                   layer.row_count,
@@ -2190,6 +2261,7 @@ auto deserialize_layered_hnsw(raft::resources const& res,
     std::vector<char> link_buffer(layer_batch_size * metadata.upper_link_row_bytes);
     for (size_t batch_start = 0; batch_start < layer.row_count; batch_start += layer_batch_size) {
       const auto current_batch_size = std::min(layer_batch_size, layer.row_count - batch_start);
+      auto batch_timer              = std::chrono::steady_clock::now();
       cuvs::util::read_large_file(
         artifact_fd,
         node_buffer.data(),
@@ -2200,6 +2272,9 @@ auto deserialize_layered_hnsw(raft::resources const& res,
         link_buffer.data(),
         current_batch_size * metadata.upper_link_row_bytes,
         upper_links_offset + (layer.link_offset + batch_start) * metadata.upper_link_row_bytes);
+      upper_read_time += std::chrono::steady_clock::now() - batch_timer;
+      upper_bytes_read += current_batch_size * (sizeof(uint32_t) + metadata.upper_link_row_bytes);
+      batch_timer = std::chrono::steady_clock::now();
       for (int64_t batch_idx = 0; batch_idx < static_cast<int64_t>(current_batch_size);
            ++batch_idx) {
         const auto node_id = static_cast<size_t>(node_buffer[batch_idx]);
@@ -2211,6 +2286,8 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                      node_id,
                      layer.level);
       }
+      upper_validate_time += std::chrono::steady_clock::now() - batch_timer;
+      batch_timer = std::chrono::steady_clock::now();
 #pragma omp parallel for num_threads(num_threads)
       for (int64_t batch_idx = 0; batch_idx < static_cast<int64_t>(current_batch_size);
            ++batch_idx) {
@@ -2220,10 +2297,26 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                link_buffer.data() + batch_idx * metadata.upper_link_row_bytes,
                metadata.upper_link_row_bytes);
       }
+      upper_copy_time += std::chrono::steady_clock::now() - batch_timer;
     }
+    RAFT_LOG_INFO("Layered HNSW load: layer %zu loaded in %ld ms",
+                  layer.level,
+                  elapsed_ms_since(layer_start_time));
   }
+  const auto upper_elapsed_ms = elapsed_ms_since(upper_start_time);
+  RAFT_LOG_INFO(
+    "Layered HNSW load: upper layers loaded in %ld ms "
+    "(read %.2f ms %.2f GiB %.2f GiB/s, validate %.2f ms, copy %.2f ms)",
+    upper_elapsed_ms,
+    elapsed_ms(upper_read_time),
+    to_gib(upper_bytes_read),
+    throughput_gib_per_s(upper_bytes_read, upper_read_time),
+    elapsed_ms(upper_validate_time),
+    elapsed_ms(upper_copy_time));
 
   hnsw_index->set_index(std::move(appr_algo));
+  RAFT_LOG_INFO("Layered HNSW load: total deserialize completed in %ld ms",
+                elapsed_ms_since(total_start_time));
   return hnsw_index;
 }
 
