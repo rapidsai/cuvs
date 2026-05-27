@@ -64,7 +64,8 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                       IndexT,
                                       DistanceT,
                                       SourceIndexT,
-                                      sample_filter_jit_tag_t<SampleFilterT>>(dataset_desc);
+                                      sample_filter_jit_tag_t<SampleFilterT>>(
+      dataset_desc, make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
 
   if (!launcher) { RAFT_FAIL("Failed to get JIT launcher"); }
 
@@ -142,7 +143,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
       num_executed_iterations,
       static_cast<IndexT>(graph.extent(0)),
       query_id_offset,
-      bf.bitset);
+      bf);
   };
   cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
     multi_cta_search::search_multi_cta_kernel_func_t<DataT, IndexT, DistanceT, SourceIndexT>>(

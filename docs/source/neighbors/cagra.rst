@@ -28,6 +28,10 @@ CAGRA supports filtered search and has improved multi-CTA algorithm in branch-25
 
 To obtain an appropriate recall in filtered search, it is necessary to set search parameters according to the filtering rate, but since it is difficult for users to do this, CAGRA automatically adjusts `itopk_size` internally according to the filtering rate on a heuristic basis. If you want to disable this automatic adjustment, set `filtering_rate`, one of the search parameters, to `0.0`, and `itopk_size` will not be adjusted automatically.
 
+CAGRA accepts bitset filters and JIT-LTO filter UDFs. A `filtering::udf_filter` is useful when the predicate needs device metadata such as per-row tenants, ACLs, or query-specific attributes. If `search_params::filtering_rate` is negative, CAGRA uses `udf_filter::filtering_rate`; if both are negative, it assumes `0.0` because the selectivity cannot be inferred from arbitrary CUDA source.
+
+A filter UDF only decides whether a logical source id is valid for a logical query id. It cannot control CAGRA graph traversal, access PQ/VPQ or graph internals, or change distance computation. Because CAGRA remains an approximate ANN algorithm, filtered results are not guaranteed to match exact brute-force filtered search, especially for very selective predicates without an accurate `filtering_rate`.
+
 Configuration parameters
 ------------------------
 

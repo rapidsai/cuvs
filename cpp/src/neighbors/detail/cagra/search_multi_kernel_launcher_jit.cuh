@@ -142,7 +142,7 @@ void compute_distance_to_child_nodes_jit(
     result_indices_ptr,
     result_distances_ptr,
     ldd,
-    bf.bitset);
+    bf);
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
@@ -160,9 +160,8 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                       cudaStream_t cuda_stream,
                       std::shared_ptr<AlgorithmLauncher> const& launcher)
 {
-  // Note: query_id for the linked filter is the function's `query_id_offset` + query index, not
-  // the wrapper's offset; we only need bitset pointers (same as other JIT launchers).
   const auto bf = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
+  const auto effective_query_id_offset = query_id_offset + bf.query_id_offset;
 
   const std::uint32_t block_size = 256;
   const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);
@@ -181,8 +180,8 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                                                           lds,
                                                           result_buffer_size,
                                                           num_queries,
-                                                          query_id_offset,
-                                                          bf.bitset);
+                                                          effective_query_id_offset,
+                                                          bf);
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
