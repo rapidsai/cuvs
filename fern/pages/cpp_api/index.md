@@ -18,6 +18,7 @@ These pages are generated from the documented public headers in the cuVS source 
 - [HNSW](/api-reference/cpp-api-neighbors-hnsw)
 - [IVF Flat](/api-reference/cpp-api-neighbors-ivf-flat)
 - [IVF PQ](/api-reference/cpp-api-neighbors-ivf-pq)
+- [IVF SQ](/api-reference/cpp-api-neighbors-ivf-sq)
 - [NN Descent](/api-reference/cpp-api-neighbors-nn-descent)
 - [Refine](/api-reference/cpp-api-neighbors-refine)
 - [Scann](/api-reference/cpp-api-neighbors-scann)
