@@ -170,10 +170,7 @@ void mnmg_fit(
     }
   }
 
-  auto d_global_n = raft::make_device_scalar<IndexT>(dev_res, n_local);
-  comms.allreduce(d_global_n.data_handle(), d_global_n.data_handle(), 1);
   IndexT global_n{};
-  raft::copy(&global_n, d_global_n.data_handle(), 1, stream);
 
   RAFT_LOG_DEBUG("MNMG KMeans fit: rank=%d/%d, n_local=%zu, n_features=%zu, n_clusters=%d",
                  rank,
@@ -207,6 +204,9 @@ void mnmg_fit(
 
   auto d_weight_scale = raft::make_device_scalar<DataT>(dev_res, DataT{1});
   if (sample_weights) {
+    auto d_global_n = raft::make_device_scalar<IndexT>(dev_res, n_local);
+    comms.allreduce(d_global_n.data_handle(), d_global_n.data_handle(), 1);
+
     auto d_wt = raft::make_device_scalar<DataT>(dev_res, DataT{0});
     for (auto const& weights : sample_weight_parts.value()) {
       auto n_weights = static_cast<IndexT>(weights.extent(0));
@@ -219,12 +219,14 @@ void mnmg_fit(
 
     comms.allreduce(d_wt.data_handle(), d_wt.data_handle(), 1);
 
-    const auto global_n_wt = static_cast<DataT>(global_n);
-    const DataT* d_wt_ptr  = d_wt.data_handle();
+    const IndexT* d_global_n_ptr = d_global_n.data_handle();
+    const DataT* d_wt_ptr        = d_wt.data_handle();
     raft::linalg::map(
       dev_res,
       d_weight_scale.view(),
-      [global_n_wt, d_wt_ptr] __device__(DataT) { return global_n_wt / *d_wt_ptr; });
+      [d_global_n_ptr, d_wt_ptr] __device__(DataT) {
+        return static_cast<DataT>(*d_global_n_ptr) / *d_wt_ptr;
+      });
   }
 
   auto n_init = params.n_init;
