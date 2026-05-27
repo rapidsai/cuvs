@@ -589,8 +589,8 @@ void batched_fit_omp(const raft::resources& clique,
       std::optional<std::vector<raft::host_vector_view<const DataT, IndexT>>> sw_parts;
       if (sample_weight.has_value()) {
         sw_parts = std::vector<raft::host_vector_view<const DataT, IndexT>>{
-          raft::make_host_vector_view<const DataT, IndexT>(
-            sample_weight->data_handle() + offset, n_local)};
+          raft::make_host_vector_view<const DataT, IndexT>(sample_weight->data_handle() + offset,
+                                                           n_local)};
       }
 
       mnmg_fit(clique, params, X_parts, sw_parts, centroids, inertia, n_iter);

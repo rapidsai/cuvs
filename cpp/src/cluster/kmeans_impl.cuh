@@ -47,8 +47,7 @@ void fit(raft::resources const& handle,
     if (sample_weight) {
       sw_parts = std::vector<raft::device_vector_view<const DataT, IndexT>>{*sample_weight};
     }
-    cuvs::cluster::kmeans::mg::fit(
-      handle, params, X_parts, sw_parts, centroids, inertia, n_iter);
+    cuvs::cluster::kmeans::mg::fit(handle, params, X_parts, sw_parts, centroids, inertia, n_iter);
   } else {
     cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
       handle, params, X, sample_weight, centroids, inertia, n_iter);
