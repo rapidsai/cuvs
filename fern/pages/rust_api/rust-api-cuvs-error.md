@@ -12,7 +12,9 @@ _Source: `rust/cuvs/src/error.rs`_
 
 ```rust
 #[derive(Debug, Clone)]
-pub struct CuvsError { ... }
+pub struct CuvsError {
+    /* private fields */
+}
 ```
 
 _Source: `rust/cuvs/src/error.rs:9`_
@@ -21,7 +23,9 @@ _Source: `rust/cuvs/src/error.rs:9`_
 
 ```rust
 #[derive(Debug, Clone)]
-pub enum Error { ... }
+pub enum Error {
+    /* variants omitted */
+}
 ```
 
 _Source: `rust/cuvs/src/error.rs:15`_
@@ -37,7 +41,7 @@ _Source: `rust/cuvs/src/error.rs:25`_
 ## check_cuvs
 
 ```rust
-pub fn check_cuvs(err: ffi::cuvsError_t) -> Result<()> { ... }
+pub fn check_cuvs(err: ffi::cuvsError_t) -> Result<()>
 ```
 
 Simple wrapper to convert a cuvsError_t into a Result

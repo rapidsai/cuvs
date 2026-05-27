@@ -158,6 +158,70 @@ func buildIvfPqIndex(dataset cuvs.Tensor[float32]) (*ivf_pq.IvfPqIndex, error) {
 </Tab>
 </Tabs>
 
+### Extending an index
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/ivf_pq.h>
+
+cuvsResources_t res;
+cuvsIvfPqIndex_t index;
+DLManagedTensor *new_vectors;
+DLManagedTensor *new_indices;
+
+load_additional_dataset(new_vectors);
+load_additional_indices(new_indices);
+
+cuvsResourcesCreate(&res);
+cuvsIvfPqIndexCreate(&index);
+
+// ... build or load index ...
+cuvsIvfPqExtend(res, new_vectors, new_indices, index);
+
+cuvsIvfPqIndexDestroy(index);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/ivf_pq.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+ivf_pq::index_params index_params;
+auto dataset = load_dataset();
+auto new_vectors = load_additional_dataset();
+auto new_indices = load_additional_indices<int64_t>();
+
+auto index = ivf_pq::build(res, index_params, dataset);
+index = ivf_pq::extend(res, new_vectors, new_indices.view(), index);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import ivf_pq
+
+dataset = load_data()
+new_vectors = load_additional_data()
+new_indices = load_additional_indices()
+
+index = ivf_pq.build(ivf_pq.IndexParams(), dataset)
+index = ivf_pq.extend(index, new_vectors, new_indices)
+```
+
+</Tab>
+</Tabs>
+
+See the [C](/api-reference/c-api-neighbors-ivf-pq#cuvsivfpqextend), [C++](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-extend), and [Python](/api-reference/python-api-neighbors-ivf-pq#extend) API references for the full signatures.
+
 ### Searching an index
 
 <Tabs>
@@ -385,7 +449,7 @@ IVF-PQ combines two ideas:
 1. IVF partitions the dataset into `n_lists` coarse clusters. During search, each query visits only the closest `n_probes` lists.
 2. PQ compresses each vector into a short code. Instead of comparing the query to every original vector value, search compares the query to precomputed codebook entries.
 
-Think of each vector as a long row of numbers. PQ splits that row into smaller chunks, gives each chunk a short code, and stores the codes. At search time, cuVS uses lookup tables to score those codes quickly.
+Think of each vector as a long row of numbers. PQ splits that row into smaller chunks, gives each chunk a short code, and stores the codes. At search time, NVIDIA cuVS uses lookup tables to score those codes quickly.
 
 The compression is lossy, so IVF-PQ trades some recall for a smaller and faster index. Refinement can recover much of that recall when the original vectors are still available.
 
@@ -579,7 +643,7 @@ ivf_pq::search(
 | `kmeans_n_iters` | `20` | Maximum number of k-means iterations used to train the coarse list centers. |
 | `kmeans_trainset_fraction` | `0.5` | Fraction of the dataset used for coarse k-means training. Reducing this can speed up build on very large datasets. |
 | `pq_bits` | `8` | Number of bits used for each PQ code. Smaller values reduce memory and lookup-table size, but can lower recall. |
-| `pq_dim` | `0` | Number of PQ code dimensions. `0` lets cuVS choose a heuristic value. `pq_dim * pq_bits` must be a multiple of 8. |
+| `pq_dim` | `0` | Number of PQ code dimensions. `0` lets NVIDIA cuVS choose a heuristic value. `pq_dim * pq_bits` must be a multiple of 8. |
 | `codebook_kind` | `per_subspace` | Trains one codebook per PQ subspace, or separate codebooks per cluster with `per_cluster`. Per-cluster codebooks can improve recall but use more memory. |
 | `codes_layout` | `interleaved` | Memory layout for compressed list data. `interleaved` is optimized for GPU search. `flat` stores each vector code contiguously. |
 | `force_random_rotation` | `False` | Applies a random rotation even when the input dimension is already compatible with `pq_dim`. Rotation is always needed when the dimension must be padded to a multiple of `pq_dim`. |

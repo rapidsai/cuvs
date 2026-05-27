@@ -14,7 +14,16 @@ _Source header: `cuvs/neighbors/ivf_flat.h`_
 Supplemental parameters to build IVF-Flat Index
 
 ```c
-struct cuvsIvfFlatIndexParams { ... };
+struct cuvsIvfFlatIndexParams {
+  cuvsDistanceType metric;
+  float metric_arg;
+  bool add_data_on_build;
+  uint32_t n_lists;
+  uint32_t kmeans_n_iters;
+  double kmeans_trainset_fraction;
+  bool adaptive_centers;
+  bool conservative_memory_allocation;
+};
 ```
 
 **Fields**
@@ -23,12 +32,12 @@ struct cuvsIvfFlatIndexParams { ... };
 | --- | --- | --- |
 | `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
 | `metric_arg` | `float` | The argument used by some distance metrics. |
-| `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
+| `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br /><br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
 | `n_lists` | `uint32_t` | The number of inverted lists (clusters) |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (index building). |
 | `kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building. |
-| `adaptive_centers` | `bool` | By default (adaptive_centers = false), the cluster centers are trained in `ivf_flat::build`, and never modified in `ivf_flat::extend`. As a result, you may need to retrain the index from scratch after invoking (`ivf_flat::extend`) a few times with new data, the distribution of which is no longer representative of the original training set. The alternative behavior (adaptive_centers = true) is to update the cluster centers for new data when it is added. In this case, `index.centers()` are always exactly the centroids of the data in the corresponding clusters. The drawback of this behavior is that the centroids depend on the order of adding new data (through the classification of the added data); that is, `index.centers()` "drift" together with the changing distribution of the newly added data. |
-| `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
+| `adaptive_centers` | `bool` | By default (adaptive_centers = false), the cluster centers are trained in `ivf_flat::build`, and never modified in `ivf_flat::extend`. As a result, you may need to retrain the index from scratch after invoking (`ivf_flat::extend`) a few times with new data, the distribution of which is no longer representative of the original training set.<br /><br />The alternative behavior (adaptive_centers = true) is to update the cluster centers for new data when it is added. In this case, `index.centers()` are always exactly the centroids of the data in the corresponding clusters. The drawback of this behavior is that the centroids depend on the order of adding new data (through the classification of the added data); that is, `index.centers()` "drift" together with the changing distribution of the newly added data. |
+| `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database).<br /><br />The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
 
 <a id="cuvsivfflatindexparamscreate"></a>
 ### cuvsIvfFlatIndexParamsCreate
@@ -76,7 +85,9 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t i
 Supplemental parameters to search IVF-Flat index
 
 ```c
-struct cuvsIvfFlatSearchParams { ... };
+struct cuvsIvfFlatSearchParams {
+  uint32_t n_probes;
+};
 ```
 
 **Fields**
@@ -131,7 +142,10 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t
 Struct to hold address of cuvs::neighbors::ivf_flat::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsIvfFlatIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsIvfFlatIndex;
 ```
 
 **Fields**
@@ -244,7 +258,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLM
 <a id="cuvsivfflatbuild"></a>
 ### cuvsIvfFlatBuild
 
-Build a IVF-Flat index with a `DLManagedTensor` which has underlying
+Build a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
@@ -252,12 +266,6 @@ cuvsIvfFlatIndexParams_t index_params,
 DLManagedTensor* dataset,
 cuvsIvfFlatIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
-3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -277,7 +285,7 @@ cuvsIvfFlatIndex_t index);
 <a id="cuvsivfflatsearch"></a>
 ### cuvsIvfFlatSearch
 
-Search a IVF-Flat index with a `DLManagedTensor` which has underlying
+Search a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
@@ -288,12 +296,6 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter filter);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
-
-1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
-3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 

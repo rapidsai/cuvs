@@ -1,8 +1,8 @@
 # ScaNN
 
-ScaNN is an experimental cuVS index builder for the open-source ScaNN format. It combines partitioning, residual product quantization, SOAR spilling, and optional bfloat16 reordering data. Think of it as a pipeline that first sorts vectors into buckets, then stores compact shortcuts for the vectors in each bucket, and finally writes those pieces so OSS ScaNN can search them.
+ScaNN is an experimental NVIDIA cuVS index builder for the open-source ScaNN format. It combines partitioning, residual product quantization, SOAR spilling, and optional bfloat16 reordering data. Think of it as a pipeline that first sorts vectors into buckets, then stores compact shortcuts for the vectors in each bucket, and finally writes those pieces so OSS ScaNN can search them.
 
-The cuVS SCaNN API currently builds and serializes indexes from C++. It does not expose a cuVS search API.
+The NVIDIA cuVS SCaNN API currently builds and serializes indexes from C++. It does not expose an NVIDIA cuVS search API.
 
 ## Example API Usage
 
@@ -69,11 +69,11 @@ Serialization writes the files needed by OSS ScaNN, including partition centers,
 
 ### Searching an index
 
-cuVS does not currently provide a SCaNN search API or SCaNN search parameters. To search a SCaNN index, serialize it with cuVS and load the generated files with OSS ScaNN.
+NVIDIA cuVS does not currently provide a SCaNN search API or SCaNN search parameters. To search a SCaNN index, serialize it with NVIDIA cuVS and load the generated files with OSS ScaNN.
 
 ### Loading a serialized index
 
-cuVS does not currently expose a SCaNN deserialization API. The serialized directory is intended to be loaded by OSS ScaNN or another consumer that understands the OSS ScaNN file layout.
+NVIDIA cuVS does not currently expose a SCaNN deserialization API. The serialized directory is intended to be loaded by OSS ScaNN or another consumer that understands the OSS ScaNN file layout.
 
 ## How ScaNN works
 
@@ -83,15 +83,15 @@ Next, SCaNN stores residual product quantization codes. A residual is the leftov
 
 SCaNN also computes SOAR labels. SOAR gives each vector another assignment that can help recover good candidates that would otherwise be missed near partition boundaries.
 
-If `reordering_bf16` is enabled, cuVS also stores a bfloat16 copy of the dataset. OSS ScaNN can use that copy to rerank candidates with more accurate distances after the quantized first stage.
+If `reordering_bf16` is enabled, NVIDIA cuVS also stores a bfloat16 copy of the dataset. OSS ScaNN can use that copy to rerank candidates with more accurate distances after the quantized first stage.
 
 ## When to use ScaNN
 
-Use SCaNN when you want cuVS to build an OSS ScaNN-compatible index from C++ and you are comfortable with an experimental API.
+Use SCaNN when you want NVIDIA cuVS to build an OSS ScaNN-compatible index from C++ and you are comfortable with an experimental API.
 
 Use SCaNN when partitioning plus quantization is a good fit for the dataset and you plan to search with OSS ScaNN.
 
-Use IVF-Flat, IVF-PQ, CAGRA, brute-force, or Vamana instead when you need a cuVS search API, multi-language bindings, or a non-experimental API surface.
+Use IVF-Flat, IVF-PQ, CAGRA, brute-force, or Vamana instead when you need an NVIDIA cuVS search API, multi-language bindings, or a non-experimental API surface.
 
 ## Interoperability with OSS ScaNN
 
@@ -109,7 +109,7 @@ The implementation is experimental. Accuracy and performance are not currently g
 
 ## Using Filters
 
-cuVS SCaNN does not expose a search API, so it does not expose cuVS filtering controls. Apply filtering in the OSS ScaNN search layer after loading the serialized index.
+NVIDIA cuVS SCaNN does not expose a search API, so it does not expose NVIDIA cuVS filtering controls. Apply filtering in the OSS ScaNN search layer after loading the serialized index.
 
 ## Configuration parameters
 
@@ -145,7 +145,7 @@ Enable `reordering_bf16` when final recall needs help and the extra host memory 
 
 ## Memory footprint
 
-SCaNN memory has three main parts: partition metadata, residual PQ codes, and optional reranking data. During build, cuVS also uses temporary training and batch workspaces. These estimates are derived from the current C++ storage layout and are intended for planning, not as exact allocator accounting.
+SCaNN memory has three main parts: partition metadata, residual PQ codes, and optional reranking data. During build, NVIDIA cuVS also uses temporary training and batch workspaces. These estimates are derived from the current C++ storage layout and are intended for planning, not as exact allocator accounting.
 
 To keep the formulas readable, this section uses short symbols. All estimates are in bytes. The examples convert bytes to MiB by dividing by `1024 * 1024`.
 
@@ -340,7 +340,7 @@ $$
 \end{aligned}
 $$
 
-When `pq_bits = 4`, cuVS also unpacks codes before copying them to the host index:
+When `pq_bits = 4`, NVIDIA cuVS also unpacks codes before copying them to the host index:
 
 $$
 \begin{aligned}
@@ -412,4 +412,4 @@ $$
 
 ### Search memory usage
 
-cuVS does not currently search SCaNN indexes. Search memory depends on the OSS ScaNN configuration used after serialization.
+NVIDIA cuVS does not currently search SCaNN indexes. Search memory depends on the OSS ScaNN configuration used after serialization.

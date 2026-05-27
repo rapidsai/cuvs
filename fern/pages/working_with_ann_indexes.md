@@ -1,10 +1,10 @@
-# Using cuVS APIs
+# Using NVIDIA cuVS APIs
 
-cuVS provides APIs for C, C++, Python, Java, Rust, and Go. For CAGRA build and search examples in each language, see the [CAGRA indexing guide](neighbors/cagra.md).
+NVIDIA cuVS provides APIs for C, C++, Python, Java, Rust, and Go. For CAGRA build and search examples in each language, see the [CAGRA indexing guide](/user-guide/api-guides/indexing-guide/cagra).
 
 ## Filtering vector indexes
 
-cuVS supports different types of filtering depending on the vector index being used. The main method used by vector indexes is pre-filtering, which accounts for filtered vectors before computing closest neighbors and avoids unnecessary distance calculations.
+NVIDIA cuVS supports different types of filtering depending on the vector index being used. The main method used by vector indexes is pre-filtering, which accounts for filtered vectors before computing closest neighbors and avoids unnecessary distance calculations.
 
 ### Bitset
 
@@ -12,10 +12,10 @@ A bitset is an array of bits where each bit can have two possible values: `0` an
 
 Bitsets are optimized to use as little memory as possible and are available through RAFT. See the RAFT [bitset API documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitset/) for more information. When calling a search function of an ANN index, the bitset length should match the number of vectors present in the database.
 
-For CAGRA bitset examples, see [Using Filters](neighbors/cagra.md#using-filters).
+For CAGRA bitset examples, see [Using Filters](/user-guide/api-guides/indexing-guide/cagra#using-filters).
 
 ### Bitmap
 
 A bitmap is based on the same principle as a bitset, but in two dimensions. This allows users to provide a different bitset for each query being searched. See the RAFT [bitmap API documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitmap/) for more information.
 
-For Brute-force bitmap examples, see [Using Filters](neighbors/bruteforce.md#using-filters).
+For Brute-force bitmap examples, see [Using Filters](/user-guide/api-guides/indexing-guide/brute-force#using-filters).

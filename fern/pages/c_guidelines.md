@@ -4,19 +4,19 @@ slug: developer-guide/coding-guidelines/c-guidelines
 
 # C Guidelines
 
-This page collects the engineering conventions that keep cuVS C APIs stable, predictable, and easy to use from downstream projects and language bindings. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when designing public C APIs, C wrappers, or C-facing documentation.
+This page collects the engineering conventions that keep NVIDIA cuVS C APIs stable, predictable, and easy to use from downstream projects and language bindings. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when designing public C APIs, C wrappers, or C-facing documentation.
 
 ## Local Development
 
-Most C API changes can be developed directly in this repository. Cross-project work may also require a local RAFT build or a downstream project that consumes the installed cuVS C headers and shared libraries.
+Most C API changes can be developed directly in this repository. Cross-project work may also require a local RAFT build or a downstream project that consumes the installed NVIDIA cuVS C headers and shared libraries.
 
-If source builds are not being used, install the local cuVS C artifacts into the consuming project's environment before testing the downstream change.
+If source builds are not being used, install the local NVIDIA cuVS C artifacts into the consuming project's environment before testing the downstream change.
 
 ## Public Interface
 
 ### General Guidelines
 
-Public C APIs should be thin, ABI-stable wrappers around cuVS implementation code. Keep C headers free of C++ types, templates, namespaces, exceptions, and RAII-only ownership patterns.
+Public C APIs should be thin, ABI-stable wrappers around NVIDIA cuVS implementation code. Keep C headers free of C++ types, templates, namespaces, exceptions, and RAII-only ownership patterns.
 
 Expose only C-compatible types:
 
@@ -29,7 +29,7 @@ Prefer explicit create and destroy functions for every opaque object that owns m
 
 ### API Stability
 
-The C API is the stable boundary used by downstream integrations and cuVS language bindings. Add new functions or fields before removing old ones, avoid changing the meaning of existing parameters, and keep [ABI compatibility](../developer_guide/abi_stability.md) in mind when changing public structs or exported symbols.
+The C API is the stable boundary used by downstream integrations and NVIDIA cuVS language bindings. Add new functions or fields before removing old ones, avoid changing the meaning of existing parameters, and keep [ABI compatibility](/developer-guide/abi-stability) in mind when changing public structs or exported symbols.
 
 ### Stateless C APIs
 
@@ -78,7 +78,7 @@ cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res,
 
 ### Performance
 
-Keep C wrappers thin. Validate inputs and translate handles at the boundary, but leave expensive work in the underlying cuVS implementation.
+Keep C wrappers thin. Validate inputs and translate handles at the boundary, but leave expensive work in the underlying NVIDIA cuVS implementation.
 
 Avoid hidden host-device copies and hidden synchronization. If a wrapper needs to synchronize, document that behavior clearly.
 
@@ -90,7 +90,7 @@ Avoid mutable process-wide state in C wrappers. If shared state is unavoidable, 
 
 ### Asynchronous Operations And Stream Ordering
 
-C APIs should preserve the stream-ordering behavior of the underlying cuVS implementation. Do not add hidden synchronization only to simplify wrapper code.
+C APIs should preserve the stream-ordering behavior of the underlying NVIDIA cuVS implementation. Do not add hidden synchronization only to simplify wrapper code.
 
 When a C function accepts `cuvsResources_t`, use the stream and resources associated with that handle. Work queued by the caller before the API should complete before internal work starts, and work queued by the caller after the API returns should wait for internal work that affects the result.
 
@@ -131,13 +131,13 @@ Single-GPU C APIs should not require communication libraries or multi-GPU setup.
 
 C APIs may call implementations that use JIT link-time optimization, but the C wrapper should not duplicate JIT LTO policy or expose C++ implementation details. Keep runtime behavior documented at the API level when JIT compilation can affect first-call latency or cache behavior.
 
-For runtime and cache behavior, see [JIT Compilation](jit_compilation.md). For implementation guidance, see [Link-time Optimization](jit_lto_guide.md).
+For runtime and cache behavior, see [JIT Compilation](/developer-guide/advanced-topics/jit-compilation). For implementation guidance, see [Link-time Optimization](/developer-guide/link-time-optimization).
 
 ## Coding Style
 
 ### Formatting
 
-cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
+NVIDIA cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
 
 ```bash
 conda install -c conda-forge pre-commit
@@ -163,7 +163,7 @@ pre-commit install
 
 ### Core Hooks
 
-C headers and C wrapper implementation files are checked by the same formatting, spelling, Doxygen, and copyright hooks used by the rest of cuVS.
+C headers and C wrapper implementation files are checked by the same formatting, spelling, Doxygen, and copyright hooks used by the rest of NVIDIA cuVS.
 
 Run Doxygen checks for public C API documentation:
 
@@ -179,7 +179,7 @@ codespell -i 3 -w .
 
 ### Include Style
 
-Use `#include <cuvs/...>` for public cuVS C headers. Keep public C headers minimal and avoid including private C++ implementation headers from the public C interface.
+Use `#include <cuvs/...>` for public NVIDIA cuVS C headers. Keep public C headers minimal and avoid including private C++ implementation headers from the public C interface.
 
 ### Copyright
 

@@ -14,7 +14,11 @@ _Source header: `cuvs/neighbors/tiered_index.h`_
 Enum to hold which ANN algorithm is being used in the tiered index
 
 ```c
-typedef enum { ... } cuvsTieredIndexANNAlgo;
+typedef enum {
+  CUVS_TIERED_INDEX_ALGO_CAGRA = 0,
+  CUVS_TIERED_INDEX_ALGO_IVF_FLAT = 1,
+  CUVS_TIERED_INDEX_ALGO_IVF_PQ = 2
+} cuvsTieredIndexANNAlgo;
 ```
 
 **Values**
@@ -30,12 +34,14 @@ typedef enum { ... } cuvsTieredIndexANNAlgo;
 <a id="cuvstieredindex"></a>
 ### cuvsTieredIndex
 
-Struct to hold address of cuvs::neighbors::tiered_index::index and its active trained
-
-dtype
+Struct to hold address of cuvs::neighbors::tiered_index::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsTieredIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+  cuvsTieredIndexANNAlgo algo;
+} cuvsTieredIndex;
 ```
 
 **Fields**
@@ -92,7 +98,15 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
 Supplemental parameters to build a TieredIndex
 
 ```c
-struct cuvsTieredIndexParams { ... };
+struct cuvsTieredIndexParams {
+  cuvsDistanceType metric;
+  cuvsTieredIndexANNAlgo algo;
+  int64_t min_ann_rows;
+  bool create_ann_index_on_extend;
+  cuvsCagraIndexParams_t cagra_params;
+  cuvsIvfFlatIndexParams_t ivf_flat_params;
+  cuvsIvfPqIndexParams_t ivf_pq_params;
+};
 ```
 
 **Fields**
@@ -150,7 +164,7 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t ind
 <a id="cuvstieredindexbuild"></a>
 ### cuvsTieredIndexBuild
 
-Build a TieredIndex index with a `DLManagedTensor` which has underlying
+Build a TieredIndex index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsTieredIndexBuild(cuvsResources_t res,
@@ -158,11 +172,6 @@ cuvsTieredIndexParams_t index_params,
 DLManagedTensor* dataset,
 cuvsTieredIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 **Parameters**
 
@@ -194,14 +203,12 @@ DLManagedTensor* distances,
 cuvsFilter prefilter);
 ```
 
-cuvsCagraSearchParams_t, cuvsIvfFlatSearchParams_t, cuvsIvfPqSearchParams_t depending on the type of the tiered index used
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
-| `search_params` | in | `void*` | params used to the ANN index, should be one of |
+| `search_params` | in | `void*` | params used to the ANN index, should be one of cuvsCagraSearchParams_t, cuvsIvfFlatSearchParams_t, cuvsIvfPqSearchParams_t depending on the type of the tiered index used |
 | `index` | in | [`cuvsTieredIndex_t`](/api-reference/c-api-neighbors-tiered-index#cuvstieredindex) | cuvsTieredIndex which has been returned by `cuvsTieredIndexBuild` |
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |

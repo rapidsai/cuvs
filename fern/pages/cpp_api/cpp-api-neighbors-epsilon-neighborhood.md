@@ -11,7 +11,7 @@ _Source header: `cuvs/neighbors/epsilon_neighborhood.hpp`_
 <a id="neighbors-epsilon-neighborhood-compute"></a>
 ### neighbors::epsilon_neighborhood::compute
 
-Computes epsilon neighborhood for the given distance metric and ball size.
+Computes epsilon neighborhood for the given distance metric and ball size. The epsilon neighbors is represented by a dense boolean adjacency matrix of size m * n and an array of degrees for each vertex, which can be used as a compressed sparse row (CSR) indptr array.
 
 ```cpp
 template <typename value_t, typename idx_t, typename matrix_idx_t>
@@ -23,8 +23,6 @@ raft::device_vector_view<idx_t, matrix_idx_t> vd,
 value_t eps,
 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
 ```
-
-The epsilon neighbors is represented by a dense boolean adjacency matrix of size m * n and an array of degrees for each vertex, which can be used as a compressed sparse row (CSR) indptr array.
 
 Currently, only L2Unexpanded (L2-squared) distance metric is supported. Other metrics will throw an exception.
 

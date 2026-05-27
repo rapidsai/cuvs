@@ -161,7 +161,7 @@ PQ divides each vector into smaller subvectors. For each subvector position, it 
 
 This turns a high-dimensional floating-point vector into a much shorter code. For example, if `pq_bits = 8` and `pq_dim = 16`, each vector is represented by 16 one-byte codes.
 
-PQ can also be combined with vector quantization. With `use_vq=True`, cuVS first assigns each vector to a coarse VQ centroid, then trains PQ on the residuals. This can improve reconstruction quality when the dataset has strong global structure, at the cost of extra labels and VQ codebook memory.
+PQ can also be combined with vector quantization. With `use_vq=True`, NVIDIA cuVS first assigns each vector to a coarse VQ centroid, then trains PQ on the residuals. This can improve reconstruction quality when the dataset has strong global structure, at the cost of extra labels and VQ codebook memory.
 
 ## When to use Product Quantization
 

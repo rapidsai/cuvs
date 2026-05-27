@@ -14,7 +14,7 @@ _Source header: `cuvs/util/file_io.hpp`_
 Streambuf that reads from a POSIX file descriptor
 
 ```cpp
-class fd_streambuf : public std::streambuf { ... };
+class fd_streambuf;
 ```
 
 <a id="util-fd-istream"></a>
@@ -23,7 +23,7 @@ class fd_streambuf : public std::streambuf { ... };
 Istream that reads from a POSIX file descriptor
 
 ```cpp
-class fd_istream : public std::istream { ... };
+class fd_istream;
 ```
 
 <a id="util-file-descriptor"></a>
@@ -34,7 +34,7 @@ RAII wrapper for POSIX file descriptors
 Manages file descriptor lifecycle with automatic cleanup. Non-copyable, move-only.
 
 ```cpp
-class file_descriptor { ... };
+class file_descriptor;
 ```
 
 <a id="util-buffered-ofstream"></a>
@@ -45,5 +45,5 @@ Buffered output stream wrapper
 Wraps an std::ostream with a buffer to improve write performance by reducing the number of system calls. Automatically flushes on destruction. Non-copyable, non-movable.
 
 ```cpp
-class buffered_ofstream { ... };
+class buffered_ofstream;
 ```

@@ -117,7 +117,7 @@ cuvs::distance::pairwise_distance(
 
 ### Selecting nearest neighbors
 
-Pairwise distance often feeds a selection step. Compute the full matrix when it fits in memory, then use [K-selection](select_k.md) to keep the best values from each query row.
+Pairwise distance often feeds a selection step. Compute the full matrix when it fits in memory, then use [K-selection](/user-guide/api-guides/other-ap-is/k-selection) to keep the best values from each query row.
 
 <Tabs>
 <Tab title="C++">

@@ -135,6 +135,69 @@ func buildIvfFlatIndex(dataset cuvs.Tensor[float32]) (*ivf_flat.IvfFlatIndex, er
 </Tab>
 </Tabs>
 
+### Extending an index
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/neighbors/ivf_flat.h>
+
+cuvsResources_t res;
+cuvsIvfFlatIndex_t index;
+DLManagedTensor *new_vectors;
+DLManagedTensor *new_indices;
+
+load_additional_dataset(new_vectors);
+load_additional_indices(new_indices);
+
+cuvsResourcesCreate(&res);
+cuvsIvfFlatIndexCreate(&index);
+
+// ... build or load index ...
+cuvsIvfFlatExtend(res, new_vectors, new_indices, index);
+
+cuvsIvfFlatIndexDestroy(index);
+cuvsResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources res;
+ivf_flat::index_params index_params;
+auto dataset = load_dataset();
+auto new_vectors = load_additional_dataset();
+auto new_indices = load_additional_indices<int64_t>();
+
+auto index = ivf_flat::build(res, index_params, dataset);
+index = ivf_flat::extend(res, new_vectors, new_indices.view(), index);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+from cuvs.neighbors import ivf_flat
+
+dataset = load_data()
+new_vectors = load_additional_data()
+new_indices = load_additional_indices()
+
+index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+index = ivf_flat.extend(index, new_vectors, new_indices)
+```
+
+</Tab>
+</Tabs>
+
+See the [C](/api-reference/c-api-neighbors-ivf-flat#cuvsivfflatextend), [C++](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-extend), and [Python](/api-reference/python-api-neighbors-ivf-flat#extend) API references for the full signatures.
+
 ### Searching an index
 
 <Tabs>
@@ -371,7 +434,7 @@ Use IVF-PQ instead when the full-precision IVF-Flat index is too large for devic
 
 ## IVF-SQ and scalar quantization
 
-IVF-SQ follows the same partition-first search pattern as IVF-Flat, but stores scalar-quantized vector values inside each partition. cuVS exposes scalar quantization as a preprocessing API rather than a separate standalone IVF-SQ index API.
+IVF-SQ follows the same partition-first search pattern as IVF-Flat, but stores scalar-quantized vector values inside each partition. NVIDIA cuVS exposes scalar quantization as a preprocessing API rather than a separate standalone IVF-SQ index API.
 
 Use this pattern when full-precision IVF-Flat storage is too large, but you want simpler compression than IVF-PQ. Scalar quantization reduces memory bandwidth and index size while usually requiring less tuning than product quantization.
 
