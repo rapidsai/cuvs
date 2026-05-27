@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import os
 import tempfile
 
 import numpy as np
@@ -30,6 +31,8 @@ def run_ivf_sq_build_search_test(
     inplace=True,
     search_params={},
     serialize=False,
+    extend_after_build=False,
+    n_extend_rows=0,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -61,6 +64,22 @@ def run_ivf_sq_build_search_test(
         indices_2_device = device_ndarray(indices_2)
         index = ivf_sq.extend(index, dataset_1_device, indices_1_device)
         index = ivf_sq.extend(index, dataset_2_device, indices_2_device)
+    elif extend_after_build:
+        assert n_extend_rows > 0
+        extend_data = generate_data((n_extend_rows, n_cols), dtype)
+        if metric == "inner_product":
+            extend_data = normalize(extend_data, norm="l2", axis=1)
+
+        extend_indices = np.arange(
+            n_rows, n_rows + n_extend_rows, dtype=np.int64
+        )
+        index = ivf_sq.extend(
+            index,
+            device_ndarray(extend_data),
+            device_ndarray(extend_indices),
+        )
+        dataset = np.concatenate((dataset, extend_data), axis=0)
+        n_rows += n_extend_rows
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.int64)
@@ -105,13 +124,17 @@ def run_ivf_sq_build_search_test(
     recall = calc_recall(out_idx, skl_idx)
     assert recall > 0.7
 
+    assert len(index) == n_rows
+    assert index.dim == n_cols
+    assert index.n_lists == build_params.n_lists
+
     centers = index.centers
     assert centers.shape[0] == build_params.n_lists
     assert centers.shape[1] == n_cols
 
 
 @pytest.mark.parametrize("inplace", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
 @pytest.mark.parametrize(
     "metric", ["sqeuclidean", "inner_product", "euclidean", "cosine"]
 )
@@ -136,6 +159,46 @@ def test_extend(dtype, serialize):
         add_data_on_build=False,
         serialize=serialize,
     )
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
+def test_extend_after_build_with_data(dtype):
+    run_ivf_sq_build_search_test(
+        n_rows=10000,
+        n_cols=10,
+        n_queries=100,
+        k=10,
+        metric="sqeuclidean",
+        dtype=dtype,
+        add_data_on_build=True,
+        extend_after_build=True,
+        n_extend_rows=2000,
+    )
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
+def test_serialization(dtype):
+    n_rows, n_cols = 5000, 16
+    dataset = generate_data((n_rows, n_cols), dtype)
+    index = ivf_sq.build(
+        ivf_sq.IndexParams(metric="sqeuclidean"), device_ndarray(dataset)
+    )
+
+    expected_n_lists = index.n_lists
+    expected_dim = index.dim
+    expected_centers = index.centers.copy_to_host()
+
+    with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+        temp_filename = f.name
+    try:
+        ivf_sq.save(temp_filename, index)
+        loaded = ivf_sq.load(temp_filename)
+    finally:
+        os.unlink(temp_filename)
+
+    assert loaded.n_lists == expected_n_lists
+    assert loaded.dim == expected_dim
+    np.testing.assert_allclose(loaded.centers.copy_to_host(), expected_centers)
 
 
 @pytest.mark.parametrize("sparsity", [0.5, 0.7, 1.0])

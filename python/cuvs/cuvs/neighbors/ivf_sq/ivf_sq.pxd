@@ -84,7 +84,7 @@ cdef extern from "cuvs/neighbors/ivf_sq.h" nogil:
     cuvsError_t cuvsIvfSqExtend(cuvsResources_t res,
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
-                                cuvsIvfSqIndex_t index)
+                                cuvsIvfSqIndex_t index) except +
 
 
 cdef class IndexParams:
