@@ -294,7 +294,7 @@ function ChartPanel({
         },
         scales: {
           x: {
-            title: { display: true, text: "Recall bucket" },
+            title: { display: true, text: "Recall" },
             grid: { display: false },
           },
           y: {
@@ -349,7 +349,7 @@ function ResultsTable({ rows }: { rows: BenchmarkRow[] }) {
 
   return (
     <div className="pd-table-panel">
-      <h3>Filtered rows feeding the charts ({sortedRows.length})</h3>
+      <h3>Raw data ({sortedRows.length})</h3>
       <div className="pd-table-scroll">
         <table>
           <thead>
