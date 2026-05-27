@@ -11,3 +11,15 @@ index d4a2d99fe..3c7e6abfa 100644
  #include <cuvs/neighbors/brute_force.hpp>
  #include <raft/core/device_mdspan.hpp>
  #include <raft/core/logger.hpp>
+diff --git a/faiss/impl/platform_macros.h b/faiss/impl/platform_macros.h
+--- a/faiss/impl/platform_macros.h
++++ b/faiss/impl/platform_macros.h
+@@ -185,7 +185,7 @@
+ #define FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ #endif
+ #endif
+-#elif defined(__GNUC__)
++#elif defined(__GNUC__) && !defined(__NVCC__)
+ // Unfortunately, GCC does not provide a pragma for detecting it.
+ // So, we have to stick to GNUC, which is defined by MANY compilers.
+ // This is why clang/icc needs to be checked first.
