@@ -197,8 +197,9 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
       sampled_rows.data_handle() + owned_sample.sample_idx * n_features, n_features);
     auto const* src = X_parts[part_idx].data_handle() + row_in_part * n_features;
 
-    if constexpr (raft::is_device_mdspan_v<
-                    raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>) {
+    if constexpr (
+      raft::is_device_mdspan_v<
+        raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>>) {
       raft::copy(handle, dst, raft::make_device_vector_view<const DataT, IndexT>(src, n_features));
     } else {
       raft::copy(handle, dst, raft::make_host_vector_view<const DataT, IndexT>(src, n_features));
