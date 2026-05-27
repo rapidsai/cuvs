@@ -309,6 +309,8 @@ navigation:
             path: "./pages/cpp_api/cpp-api-neighbors-ivf-flat.md"
           - page: "Neighbors IVF PQ"
             path: "./pages/cpp_api/cpp-api-neighbors-ivf-pq.md"
+          - page: "Neighbors IVF SQ"
+            path: "./pages/cpp_api/cpp-api-neighbors-ivf-sq.md"
           - page: "Neighbors NN Descent"
             path: "./pages/cpp_api/cpp-api-neighbors-nn-descent.md"
           - page: "Neighbors Refine"

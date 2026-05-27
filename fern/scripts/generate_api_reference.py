@@ -1901,6 +1901,8 @@ def parse_plain_struct_members(
         declaration = strip_member_initializer(declaration)
         if not declaration:
             continue
+        if declaration.startswith((",", ":")):
+            continue
         if not declaration or declaration.startswith(
             (
                 "enum ",
@@ -2511,6 +2513,7 @@ def python_title(module: str) -> str:
         "Mg": "Multi-GPU",
         "Ivf": "IVF",
         "Pq": "PQ",
+        "Sq": "SQ",
         "Pca": "PCA",
         "Hnsw": "HNSW",
         "Nn": "NN",
@@ -3593,6 +3596,7 @@ def api_route_title(slug: str) -> str:
         "nn": "NN",
         "pca": "PCA",
         "pq": "PQ",
+        "sq": "SQ",
         "vq": "VQ",
     }
     words = []
@@ -3703,6 +3707,7 @@ def native_page_title(source: str) -> str:
         "C Api": "C API",
         "Ivf": "IVF",
         "Pq": "PQ",
+        "Sq": "SQ",
         "Pca": "PCA",
         "Hnsw": "HNSW",
         "Nn": "NN",
