@@ -176,8 +176,6 @@ void mnmg_fit(
   comms.allreduce(d_global_n.data_handle(), d_global_n.data_handle(), 1);
   IndexT global_n{};
   raft::copy(&global_n, d_global_n.data_handle(), 1, stream);
-  raft::resource::sync_stream(dev_res);
-  RAFT_EXPECTS(global_n > 0, "at least one sample is required across all ranks");
 
   RAFT_LOG_DEBUG("MNMG KMeans fit: rank=%d/%d, n_local=%zu, n_features=%zu, n_clusters=%d",
                  rank,
