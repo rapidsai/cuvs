@@ -2065,6 +2065,14 @@ auto deserialize_layered_hnsw(raft::resources const& res,
   RAFT_EXPECTS(header.metadata_offset >= sizeof(layered_hnsw_file_header),
                "Invalid layered HNSW metadata offset");
   RAFT_EXPECTS(header.metadata_size > 0, "Invalid layered HNSW metadata size");
+  const auto artifact_size = static_cast<size_t>(std::filesystem::file_size(artifact_path));
+  RAFT_EXPECTS(header.metadata_offset <= artifact_size &&
+                 header.metadata_size <= artifact_size - header.metadata_offset,
+               "Layered HNSW metadata range is outside artifact: offset=%zu size=%zu "
+               "artifact=%zu",
+               static_cast<size_t>(header.metadata_offset),
+               static_cast<size_t>(header.metadata_size),
+               artifact_size);
 
   std::string metadata_json(header.metadata_size, '\0');
   cuvs::util::read_large_file(
@@ -2092,7 +2100,6 @@ auto deserialize_layered_hnsw(raft::resources const& res,
   const auto upper_nodes_offset = base_links_offset + metadata.base_links_bytes;
   const auto upper_links_offset = upper_nodes_offset + metadata.upper_nodes_bytes;
   const auto expected_file_size = upper_links_offset + metadata.upper_links_bytes;
-  const auto artifact_size      = static_cast<size_t>(std::filesystem::file_size(artifact_path));
   RAFT_EXPECTS(artifact_size >= expected_file_size,
                "Layered HNSW artifact is truncated: expected at least %zu bytes, got %zu",
                expected_file_size,
