@@ -14,56 +14,35 @@
 namespace cuvs::cluster::kmeans::mg {
 
 /**
- * @brief MNMG kmeans fit
+ * @brief MNMG/SNMG k-means fit.
  *
- * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
- * @param[in]     X             Training instances to cluster. The data must
- *                              be in row-major format.
- *                              [dim = n_samples x n_features]
- * @param[in]     sample_weight Optional weights for each observation in X.
- *                              [len = n_samples]
- * @param[inout]  centroids     [in] When init is InitMethod::Array, use
- *                              centroids as the initial cluster centers.
- *                              [out] The generated centroids from the
- *                              kmeans algorithm are stored at the address
- *                              pointed by 'centroids'.
- *                              [dim = n_clusters x n_features]
- * @param[out]    inertia       Sum of squared distances of samples to their
- *                              closest cluster center.
- * @param[out]    n_iter        Number of iterations run.
+ * Each rank supplies its local data as one or more partitions. Callers that
+ * already have a single mdspan per rank can pass a one-element vector.
+ *
+ * @param[in]     handle              The raft handle (must have NCCL comms or
+ *                                    SNMG clique resources initialized).
+ * @param[in]     params              K-means parameters.
+ * @param[in]     X_parts             Per-partition local data on this rank.
+ *                                    Each entry is [n_rows_i x n_features].
+ * @param[in]     sample_weight_parts Optional per-partition row weights with
+ *                                    one vector per data partition.
+ * @param[inout]  centroids           Device matrix [n_clusters x n_features].
+ *                                    On entry, used as the initial centers
+ *                                    when params.init == InitMethod::Array.
+ *                                    On return, holds the converged centroids.
+ * @param[out]    inertia             Host scalar receiving the final
+ *                                    clustering cost.
+ * @param[out]    n_iter              Host scalar receiving the iteration
+ *                                    count at which the run terminated.
  */
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
-         raft::device_matrix_view<const float, int> X,
-         std::optional<raft::device_vector_view<const float, int>> sample_weight,
+         const std::vector<raft::device_matrix_view<const float, int>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const float, int>>>&
+           sample_weight_parts,
          raft::device_matrix_view<float, int> centroids,
          raft::host_scalar_view<float> inertia,
          raft::host_scalar_view<int> n_iter);
-
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::device_matrix_view<const float, int64_t> X,
-         std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
-         raft::device_matrix_view<float, int64_t> centroids,
-         raft::host_scalar_view<float> inertia,
-         raft::host_scalar_view<int64_t> n_iter);
-
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::device_matrix_view<const double, int> X,
-         std::optional<raft::device_vector_view<const double, int>> sample_weight,
-         raft::device_matrix_view<double, int> centroids,
-         raft::host_scalar_view<double> inertia,
-         raft::host_scalar_view<int> n_iter);
-
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::device_matrix_view<const double, int64_t> X,
-         std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
-         raft::device_matrix_view<double, int64_t> centroids,
-         raft::host_scalar_view<double> inertia,
-         raft::host_scalar_view<int64_t> n_iter);
 
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
@@ -76,25 +55,20 @@ void fit(raft::resources const& handle,
 
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const double, int>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const double, int>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
          const std::vector<raft::device_matrix_view<const double, int64_t>>& X_parts,
          const std::optional<std::vector<raft::device_vector_view<const double, int64_t>>>&
            sample_weight_parts,
          raft::device_matrix_view<double, int64_t> centroids,
          raft::host_scalar_view<double> inertia,
-         raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief MNMG kmeans fit with host data (streaming).
- *
- * Each rank provides its local host-resident data partition. Data is streamed
- * to the GPU in batches controlled by params.streaming_batch_size.
- */
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::host_matrix_view<const float, int64_t> X,
-         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-         raft::device_matrix_view<float, int64_t> centroids,
-         raft::host_scalar_view<float> inertia,
          raft::host_scalar_view<int64_t> n_iter);
 
 void fit(raft::resources const& handle,
@@ -104,14 +78,6 @@ void fit(raft::resources const& handle,
            sample_weight_parts,
          raft::device_matrix_view<float, int64_t> centroids,
          raft::host_scalar_view<float> inertia,
-         raft::host_scalar_view<int64_t> n_iter);
-
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::host_matrix_view<const double, int64_t> X,
-         std::optional<raft::host_vector_view<const double, int64_t>> sample_weight,
-         raft::device_matrix_view<double, int64_t> centroids,
-         raft::host_scalar_view<double> inertia,
          raft::host_scalar_view<int64_t> n_iter);
 
 void fit(raft::resources const& handle,

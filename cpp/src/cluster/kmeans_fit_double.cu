@@ -11,7 +11,7 @@
 #include <raft/core/resources.hpp>
 
 #ifdef CUVS_BUILD_MG_ALGOS
-#include "detail/kmeans_mg_batched.cuh"
+#include "detail/kmeans_mg.cuh"
 #endif
 
 namespace cuvs::cluster::kmeans {
@@ -83,8 +83,13 @@ void fit(raft::resources const& handle,
     mg::detail::batched_fit_omp<double, int64_t>(
       handle, params, X, sample_weight, centroids, inertia, n_iter);
   } else if (raft::resource::comms_initialized(handle)) {
+    std::vector<raft::host_matrix_view<const double, int64_t>> X_parts{X};
+    std::optional<std::vector<raft::host_vector_view<const double, int64_t>>> sw_parts;
+    if (sample_weight) {
+      sw_parts = std::vector<raft::host_vector_view<const double, int64_t>>{*sample_weight};
+    }
     mg::detail::mnmg_fit<double, int64_t>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
+      handle, params, X_parts, sw_parts, centroids, inertia, n_iter);
   } else
 #else
   if (raft::resource::is_multi_gpu(handle) || raft::resource::comms_initialized(handle)) {

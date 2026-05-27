@@ -7,6 +7,8 @@
 #include "kmeans.cuh"
 #include "kmeans_mg.hpp"
 
+#include <vector>
+
 namespace cuvs::cluster::kmeans {
 
 template <typename DataT, typename IndexT>
@@ -38,7 +40,15 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<IndexT> n_iter)
 {
   if (raft::resource::comms_initialized(handle)) {
-    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
+    // Wrap the single per-rank mdspan into a one-element vector so we can
+    // dispatch through the unified vector-of-partitions MG API.
+    std::vector<raft::device_matrix_view<const DataT, IndexT>> X_parts{X};
+    std::optional<std::vector<raft::device_vector_view<const DataT, IndexT>>> sw_parts;
+    if (sample_weight) {
+      sw_parts = std::vector<raft::device_vector_view<const DataT, IndexT>>{*sample_weight};
+    }
+    cuvs::cluster::kmeans::mg::fit(
+      handle, params, X_parts, sw_parts, centroids, inertia, n_iter);
   } else {
     cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
       handle, params, X, sample_weight, centroids, inertia, n_iter);
@@ -57,23 +67,6 @@ void predict(raft::resources const& handle,
 {
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
-}
-
-template <typename DataT, typename IndexT>
-void fit(raft::resources const& handle,
-         const kmeans::params& params,
-         raft::host_matrix_view<const DataT, IndexT> X,
-         std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
-         raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
-{
-  if (raft::resource::comms_initialized(handle)) {
-    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
-  } else {
-    cuvs::cluster::kmeans::detail::fit<DataT, IndexT>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
-  }
 }
 
 }  // namespace cuvs::cluster::kmeans
