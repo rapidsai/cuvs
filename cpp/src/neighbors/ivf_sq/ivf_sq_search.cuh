@@ -18,6 +18,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/selection/select_k.hpp>
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -33,6 +34,8 @@
 #include <rmm/resource_ref.hpp>
 
 #include <thrust/fill.h>
+
+#include <optional>
 
 namespace cuvs::neighbors::ivf_sq::detail {
 
@@ -364,10 +367,12 @@ void search_impl(raft::resources const& handle,
   std::size_t n_queries_probes = std::size_t(n_queries) * std::size_t(n_probes);
 
   bool needs_query_norms = index.metric() != cuvs::distance::DistanceType::InnerProduct;
-  rmm::device_uvector<float> query_norm_dev(needs_query_norms ? n_queries : 0, stream, search_mr);
-  // Pass nullptr to the kernel for IP, where the empty uvector's data() pointer
-  // is implementation-defined and the kernel's `query_norms` argument is unused.
-  const float* qn_ptr = needs_query_norms ? query_norm_dev.data() : nullptr;
+  std::optional<raft::device_vector<float>> query_norm_dev{std::nullopt};
+  if (needs_query_norms) {
+    query_norm_dev.emplace(
+      raft::make_device_mdarray<float>(handle, search_mr, raft::make_extents<uint32_t>(n_queries)));
+  }
+  const float* qn_ptr = query_norm_dev ? query_norm_dev->data_handle() : nullptr;
   rmm::device_uvector<float> distance_buffer_dev(n_queries * index.n_lists(), stream, search_mr);
   rmm::device_uvector<float> coarse_distances_dev(n_queries_probes, stream, search_mr);
   rmm::device_uvector<uint32_t> coarse_indices_dev(n_queries_probes, stream, search_mr);
@@ -403,12 +408,12 @@ void search_impl(raft::resources const& handle,
     case cuvs::distance::DistanceType::L2SqrtExpanded: {
       alpha = -2.0f;
       beta  = 1.0f;
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev.data(),
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev->data_handle(),
                                                         converted_queries_ptr,
                                                         static_cast<int64_t>(dim),
                                                         static_cast<int64_t>(n_queries),
                                                         stream);
-      utils::outer_add(query_norm_dev.data(),
+      utils::outer_add(query_norm_dev->data_handle(),
                        (int64_t)n_queries,
                        index.center_norms()->data_handle(),
                        (int64_t)index.n_lists(),
@@ -417,7 +422,7 @@ void search_impl(raft::resources const& handle,
       break;
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev.data(),
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev->data_handle(),
                                                         converted_queries_ptr,
                                                         static_cast<int64_t>(dim),
                                                         static_cast<int64_t>(n_queries),
@@ -453,7 +458,7 @@ void search_impl(raft::resources const& handle,
 
   if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
     auto n_lists_local          = index.n_lists();
-    const auto* q_norm_ptr      = query_norm_dev.data();
+    const auto* q_norm_ptr      = query_norm_dev->data_handle();
     const auto* center_norm_ptr = index.center_norms()->data_handle();
     raft::linalg::map_offset(
       handle,
