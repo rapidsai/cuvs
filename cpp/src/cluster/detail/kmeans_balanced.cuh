@@ -204,8 +204,11 @@ auto calc_minibatch_size(const raft::resources& handle,
   // If we need to convert to MathT, space required for the converted batch.
   if (!needs_conversion) { mem_per_row += sizeof(MathT) * dim; }
 
-  // Heuristic: calculate the minibatch size in order to use at most 1GB of memory.
-  IdxT minibatch_size = (1 << 30) / mem_per_row;
+  // Heuristic: calculate the minibatch size in order to use at most 80% or 1GB workspace memory.
+  auto available_ws_size =
+    std::min<uint32_t>(raft::resource::get_workspace_free_bytes(handle) * 0.8, 1 << 30);
+
+  IdxT minibatch_size = available_ws_size / mem_per_row;
   minibatch_size      = 64 * raft::div_rounding_up_safe(minibatch_size, IdxT{64});
   minibatch_size      = std::min<IdxT>(minibatch_size, n_rows);
   return std::make_tuple(minibatch_size, mem_per_row);
