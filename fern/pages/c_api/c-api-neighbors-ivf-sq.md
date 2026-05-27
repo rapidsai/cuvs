@@ -303,7 +303,8 @@ cuvsIvfSqSearchParams_t search_params,
 cuvsIvfSqIndex_t index,
 DLManagedTensor* queries,
 DLManagedTensor* neighbors,
-DLManagedTensor* distances);
+DLManagedTensor* distances,
+cuvsFilter filter);
 ```
 
 `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. Types for input are:
@@ -322,39 +323,7 @@ DLManagedTensor* distances);
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-
-**Returns**
-
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-<a id="cuvsivfsqsearchwithfilter"></a>
-### cuvsIvfSqSearchWithFilter
-
-Search an IVF-SQ index with filtering.
-
-```c
-CUVS_EXPORT cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
-cuvsIvfSqSearchParams_t search_params,
-cuvsIvfSqIndex_t index,
-DLManagedTensor* queries,
-DLManagedTensor* neighbors,
-DLManagedTensor* distances,
-cuvsFilter filter);
-```
-
-Same as cuvsIvfSqSearch, but applies a pre-filter to exclude vectors during search.
-
-**Parameters**
-
-| Name | Direction | Type | Description |
-| --- | --- | --- | --- |
-| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
-| `search_params` | in | [`cuvsIvfSqSearchParams_t`](/api-reference/c-api-neighbors-ivf-sq#cuvsivfsqsearchparams) | cuvsIvfSqSearchParams_t used to search IVF-SQ index |
-| `index` | in | [`cuvsIvfSqIndex_t`](/api-reference/c-api-neighbors-ivf-sq#cuvsivfsqindex) | ivfSqIndex which has been returned by `cuvsIvfSqBuild` |
-| `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
-| `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
-| `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter to filter neighbors based on the given bitset |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
 
 **Returns**
 

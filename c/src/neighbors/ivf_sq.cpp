@@ -259,19 +259,8 @@ extern "C" cuvsError_t cuvsIvfSqSearch(cuvsResources_t res,
                                        cuvsIvfSqIndex_t index_c_ptr,
                                        DLManagedTensor* queries_tensor,
                                        DLManagedTensor* neighbors_tensor,
-                                       DLManagedTensor* distances_tensor)
-{
-  return _cuvsIvfSqSearchImpl(
-    res, params, index_c_ptr, queries_tensor, neighbors_tensor, distances_tensor, nullptr);
-}
-
-extern "C" cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
-                                                  cuvsIvfSqSearchParams_t params,
-                                                  cuvsIvfSqIndex_t index_c_ptr,
-                                                  DLManagedTensor* queries_tensor,
-                                                  DLManagedTensor* neighbors_tensor,
-                                                  DLManagedTensor* distances_tensor,
-                                                  cuvsFilter filter)
+                                       DLManagedTensor* distances_tensor,
+                                       cuvsFilter filter)
 {
   return _cuvsIvfSqSearchImpl(
     res, params, index_c_ptr, queries_tensor, neighbors_tensor, distances_tensor, &filter);

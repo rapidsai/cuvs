@@ -6,12 +6,14 @@
 #include <cuda.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/handle.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/random/rng.cuh>
 
 #include "neighbors/ann_utils.cuh"
 #include <cuvs/neighbors/ivf_sq.h>
 
-extern "C" void run_ivf_sq(int64_t n_rows,
+extern "C" void run_ivf_sq(cuvsResources_t res,
+                           int64_t n_rows,
                            int64_t n_queries,
                            int64_t n_dim,
                            uint32_t n_neighbors,
@@ -24,15 +26,15 @@ extern "C" void run_ivf_sq(int64_t n_rows,
                            size_t n_lists);
 
 template <typename T>
-void generate_random_data(T* devPtr, size_t size)
+void generate_random_data(raft::handle_t const& handle, T* devPtr, size_t size)
 {
-  raft::handle_t handle;
   raft::random::RngState r(1234ULL);
   raft::random::uniform(handle, r, devPtr, size, T(0.1), T(2.0));
 };
 
 template <typename T, typename IdxT>
-void recall_eval(T* query_data,
+void recall_eval(raft::handle_t const& handle,
+                 T* query_data,
                  T* index_data,
                  IdxT* neighbors,
                  T* distances,
@@ -44,7 +46,6 @@ void recall_eval(T* query_data,
                  size_t n_probes,
                  size_t n_lists)
 {
-  raft::handle_t handle;
   auto distances_ref = raft::make_device_matrix<T, IdxT>(handle, n_queries, n_neighbors);
   auto neighbors_ref = raft::make_device_matrix<IdxT, IdxT>(handle, n_queries, n_neighbors);
   cuvs::neighbors::naive_knn<T, T, IdxT>(
@@ -70,6 +71,7 @@ void recall_eval(T* query_data,
   raft::copy(distances_h.data(), distances, size, stream);
   raft::copy(neighbors_ref_h.data(), neighbors_ref.data_handle(), size, stream);
   raft::copy(distances_ref_h.data(), distances_ref.data_handle(), size, stream);
+  raft::resource::sync_stream(handle);
 
   double min_recall = static_cast<double>(n_probes) / static_cast<double>(n_lists);
   ASSERT_TRUE(cuvs::neighbors::eval_neighbours(neighbors_ref_h,
@@ -101,10 +103,15 @@ TEST(IvfSqC, BuildSearch)
   rmm::device_uvector<int64_t> neighbors_data(n_queries * n_neighbors, stream);
   rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
 
-  generate_random_data(index_data.data(), n_rows * n_dim);
-  generate_random_data(query_data.data(), n_queries * n_dim);
+  generate_random_data(handle, index_data.data(), n_rows * n_dim);
+  generate_random_data(handle, query_data.data(), n_queries * n_dim);
 
-  run_ivf_sq(n_rows,
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+  cuvsStreamSet(res, stream);
+
+  run_ivf_sq(res,
+             n_rows,
              n_queries,
              n_dim,
              n_neighbors,
@@ -116,7 +123,8 @@ TEST(IvfSqC, BuildSearch)
              n_probes,
              n_lists);
 
-  recall_eval(query_data.data(),
+  recall_eval(handle,
+              query_data.data(),
               index_data.data(),
               neighbors_data.data(),
               distances_data.data(),
@@ -127,4 +135,6 @@ TEST(IvfSqC, BuildSearch)
               metric,
               n_probes,
               n_lists);
+
+  cuvsResourcesDestroy(res);
 }

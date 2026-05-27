@@ -249,8 +249,8 @@ CUVS_EXPORT cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
  * cuvsError_t params_create_status = cuvsIvfSqSearchParamsCreate(&search_params);
  *
  * // Search the `index` built using `cuvsIvfSqBuild`
- * cuvsError_t search_status = cuvsIvfSqSearch(res, search_params, index, &queries, &neighbors,
- * &distances);
+ * cuvsError_t search_status = cuvsIvfSqSearch(
+ *   res, search_params, index, &queries, &neighbors, &distances, (cuvsFilter){});
  *
  * // de-allocate `search_params` and `res`
  * cuvsError_t params_destroy_status = cuvsIvfSqSearchParamsDestroy(search_params);
@@ -263,34 +263,16 @@ CUVS_EXPORT cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] filter cuvsFilter input filter that can be used
+ *            to filter queries and neighbors based on the given bitset.
  */
 CUVS_EXPORT cuvsError_t cuvsIvfSqSearch(cuvsResources_t res,
                             cuvsIvfSqSearchParams_t search_params,
                             cuvsIvfSqIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
-                            DLManagedTensor* distances);
-
-/**
- * @brief Search an IVF-SQ index with filtering.
- *
- * Same as cuvsIvfSqSearch, but applies a pre-filter to exclude vectors during search.
- *
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] search_params cuvsIvfSqSearchParams_t used to search IVF-SQ index
- * @param[in] index ivfSqIndex which has been returned by `cuvsIvfSqBuild`
- * @param[in] queries DLManagedTensor* queries dataset to search
- * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
- * @param[out] distances DLManagedTensor* output `k` distances for queries
- * @param[in] filter cuvsFilter to filter neighbors based on the given bitset
- */
-CUVS_EXPORT cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
-                                      cuvsIvfSqSearchParams_t search_params,
-                                      cuvsIvfSqIndex_t index,
-                                      DLManagedTensor* queries,
-                                      DLManagedTensor* neighbors,
-                                      DLManagedTensor* distances,
-                                      cuvsFilter filter);
+                            DLManagedTensor* distances,
+                            cuvsFilter filter);
 
 /**
  * @}
