@@ -381,7 +381,7 @@ def search(SearchParams search_params,
         filter = no_filter()
 
     with cuda_interruptible():
-        check_cuvs(cuvsIvfSqSearchWithFilter(
+        check_cuvs(cuvsIvfSqSearch(
             res,
             params,
             index.index,

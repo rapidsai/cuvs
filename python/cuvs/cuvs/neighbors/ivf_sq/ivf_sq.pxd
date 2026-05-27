@@ -70,15 +70,8 @@ cdef extern from "cuvs/neighbors/ivf_sq.h" nogil:
                                 cuvsIvfSqIndex_t index,
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
-                                DLManagedTensor* distances) except +
-
-    cuvsError_t cuvsIvfSqSearchWithFilter(cuvsResources_t res,
-                                          cuvsIvfSqSearchParams* params,
-                                          cuvsIvfSqIndex_t index,
-                                          DLManagedTensor* queries,
-                                          DLManagedTensor* neighbors,
-                                          DLManagedTensor* distances,
-                                          cuvsFilter filter) except +
+                                DLManagedTensor* distances,
+                                cuvsFilter filter) except +
 
     cuvsError_t cuvsIvfSqSerialize(cuvsResources_t res,
                                    const char * filename,
