@@ -16,7 +16,7 @@
 
 #include <cuvs/distance/distance.hpp>
 
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 #include <cuvs/core/export.hpp>
 
 namespace CUVS_EXPORT cuvs {
