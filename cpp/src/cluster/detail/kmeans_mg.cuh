@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
+#include "../kmeans.cuh"
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
 #include "kmeans_mg_batched_init.cuh"
@@ -170,7 +171,7 @@ void mnmg_fit(
     }
   }
 
-  IndexT global_n;
+  IndexT global_n{0};
 
   RAFT_LOG_DEBUG("MNMG KMeans fit: rank=%d/%d, n_local=%zu, n_features=%zu, n_clusters=%d",
                  rank,
@@ -222,9 +223,13 @@ void mnmg_fit(
 
     const IndexT* d_global_n_ptr = d_global_n.data_handle();
     const DataT* d_wt_ptr        = d_wt.data_handle();
-    raft::linalg::map(dev_res, d_weight_scale.view(), [d_global_n_ptr, d_wt_ptr] __device__(DataT) {
-      return static_cast<DataT>(*d_global_n_ptr) / *d_wt_ptr;
-    });
+    raft::linalg::map(
+      dev_res,
+      d_weight_scale.view(),
+      [d_global_n_ptr, d_wt_ptr] __device__(DataT) {
+        return static_cast<DataT>(*d_global_n_ptr) / *d_wt_ptr;
+      },
+      raft::make_const_mdspan(d_weight_scale.view()));
   }
 
   auto n_init = params.n_init;
@@ -270,7 +275,8 @@ void mnmg_fit(
     raft::make_device_vector<DataT, IndexT>(dev_res, (has_data && data_on_device) ? n_local : 0);
   bool norms_cached = false;
 
-  auto prepare_batch_weights = [&](size_t part_idx, IndexT batch_offset, IndexT cur_batch_size)
+  const DataT* d_weight_scale_ptr = d_weight_scale.data_handle();
+  auto prepare_batch_weights      = [&](size_t part_idx, IndexT batch_offset, IndexT cur_batch_size)
     -> raft::device_vector_view<const DataT, IndexT> {
     if (sample_weights) {
       auto const* src = (*sample_weight_parts)[part_idx].data_handle() + batch_offset;
@@ -278,7 +284,10 @@ void mnmg_fit(
       auto batch_weights_mut =
         raft::make_device_vector_view<DataT, IndexT>(batch_weights.data_handle(), cur_batch_size);
       raft::linalg::map(
-        dev_res, batch_weights_mut, raft::mul_const_op<DataT>(d_weight_scale.data_handle()));
+        dev_res,
+        batch_weights_mut,
+        [d_weight_scale_ptr] __device__(DataT w) { return w * (*d_weight_scale_ptr); },
+        raft::make_const_mdspan(batch_weights_mut));
     }
 
     return raft::make_device_vector_view<const DataT, IndexT>(batch_weights.data_handle(),
