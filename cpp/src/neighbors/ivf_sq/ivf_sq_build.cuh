@@ -179,42 +179,6 @@ inline void launch_fused_column_minmax(
   }
 }
 
-template <typename CodeT>
-auto clone(const raft::resources& res, const index<CodeT>& source) -> index<CodeT>
-{
-  auto stream = raft::resource::get_cuda_stream(res);
-
-  index<CodeT> target(
-    res, source.metric(), source.n_lists(), source.dim(), source.conservative_memory_allocation());
-
-  raft::copy(target.list_sizes().data_handle(),
-             source.list_sizes().data_handle(),
-             source.list_sizes().size(),
-             stream);
-  raft::copy(target.centers().data_handle(),
-             source.centers().data_handle(),
-             source.centers().size(),
-             stream);
-  if (source.center_norms().has_value()) {
-    target.allocate_center_norms(res);
-    raft::copy(target.center_norms()->data_handle(),
-               source.center_norms()->data_handle(),
-               source.center_norms()->size(),
-               stream);
-  }
-  raft::copy(target.sq_vmin().data_handle(),
-             source.sq_vmin().data_handle(),
-             source.sq_vmin().size(),
-             stream);
-  raft::copy(target.sq_delta().data_handle(),
-             source.sq_delta().data_handle(),
-             source.sq_delta().size(),
-             stream);
-  target.lists() = source.lists();
-  ivf::detail::recompute_internal_state(res, target);
-  return target;
-}
-
 /**
  * Kernel to compute residuals on the fly and encode them to uint8_t SQ codes
  * interleaved into the target list.
