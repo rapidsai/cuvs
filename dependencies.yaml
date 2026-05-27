@@ -35,6 +35,7 @@ files:
     includes:
       - bench
       - bench_python
+      - bench_python_opensearch
       - build_cython
       - build_py_cuvs
       - clang
@@ -213,6 +214,14 @@ files:
       table: project
     includes:
       - bench_python
+  py_opensearch_cuvs_bench:
+    output: pyproject
+    pyproject_dir: python/cuvs_bench
+    extras:
+      table: project.optional-dependencies
+      key: opensearch
+    includes:
+      - bench_python_opensearch
 channels:
   - rapidsai-nightly
   - rapidsai
@@ -577,6 +586,11 @@ dependencies:
       - output_types: [requirements, pyproject]
         packages:
           - matplotlib>=3.9
+  bench_python_opensearch:
+    common:
+      - output_types: [conda, pyproject]
+        packages:
+          - opensearch-py>=2.4.0
   depends_on_cuda_python:
     specific:
       - output_types: [conda, requirements, pyproject]

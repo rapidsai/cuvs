@@ -491,7 +491,7 @@ def live_remote_build_backend(opensearch_url, remote_build_env):
         _cleanup_backend(backend, index_name)
 
 
-@pytest.mark.integration
+@pytest.mark.opensearch
 class TestOpenSearchBackendIntegration:
     def test_build_and_search(self, live_backend):
         k = 3
@@ -511,7 +511,7 @@ class TestOpenSearchBackendIntegration:
         assert len(search_result.metadata["per_search_param_results"]) == 1
 
 
-@pytest.mark.integration
+@pytest.mark.opensearch
 class TestOpenSearchRemoteIndexBuildIntegration:
     def test_remote_build_and_search(self, live_remote_build_backend):
         k = 3
