@@ -23,7 +23,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtUnexpa
 int batch_size                      = 512);
 ```
 
-**Note:** The constness of the data in X_embedded is currently casted away and the data is slightly modified.
+**Note:** The constness of the data in X_embedded is currently casted away and the data is slightly<br />modified.
 
 **Parameters**
 

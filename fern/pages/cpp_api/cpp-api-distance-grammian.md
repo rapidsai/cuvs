@@ -13,7 +13,9 @@ _Source header: `cuvs/distance/grammian.hpp`_
 
 Base class for general Gram matrices
 
-A Gram matrix is the Hermitian matrix of inner probucts G_ik = &lt;x_i, x_k&gt; Here, the  inner product is evaluated for all elements from vectors sets X1, and X2. To be more precise, on exit the output buffer will store:
+A Gram matrix is the Hermitian matrix of inner probucts G_ik = &lt;x_i, x_k&gt; Here, the  inner product is evaluated for all elements from vectors sets X1, and X2.
+
+To be more precise, on exit the output buffer will store:
 
 - if is_row_major == true: out[j+k*n1] = &lt;x1_j, x2_k&gt;,
 - if is_row_major == false: out[j*n2 + k] = &lt;x1_j, x2_k&gt;, where x1_j is the j-th vector from the x1 set and x2_k is the k-th vector from the x2 set.

@@ -141,7 +141,9 @@ cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
 
-Note: Only contiguous row- or column-major layouts supported currently. Usage example:
+Note: Only contiguous row- or column-major layouts supported currently.
+
+Usage example:
 
 **Parameters**
 
@@ -172,7 +174,9 @@ cuvs::distance::DistanceType metric,
 double metric_arg = 2.0f);
 ```
 
-Note: Only contiguous row- or column-major layouts supported currently. Usage example:
+Note: Only contiguous row- or column-major layouts supported currently.
+
+Usage example:
 
 **Parameters**
 
@@ -203,7 +207,9 @@ cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
 
-Note: Only contiguous row- or column-major layouts supported currently. Usage example:
+Note: Only contiguous row- or column-major layouts supported currently.
+
+Usage example:
 
 **Parameters**
 
@@ -234,7 +240,9 @@ cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
 
-Note: Only contiguous row- or column-major layouts supported currently. Usage example:
+Note: Only contiguous row- or column-major layouts supported currently.
+
+Usage example:
 
 **Parameters**
 
@@ -265,7 +273,9 @@ cuvs::distance::DistanceType metric,
 double metric_arg = 2.0f);
 ```
 
-Note: Only contiguous row- or column-major layouts supported currently. Usage example:
+Note: Only contiguous row- or column-major layouts supported currently.
+
+Usage example:
 
 **Parameters**
 
@@ -296,7 +306,9 @@ cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
 
-Note: Only contiguous row- or column-major layouts supported currently. Usage example:
+Note: Only contiguous row- or column-major layouts supported currently.
+
+Usage example:
 
 **Parameters**
 

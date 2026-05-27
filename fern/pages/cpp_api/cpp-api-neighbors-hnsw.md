@@ -41,7 +41,11 @@ int ef_construction,
 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 ```
 
-* IMPORTANT NOTE * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS. However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the curve). Usage example:
+* IMPORTANT NOTE *
+
+The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS. However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the curve).
+
+Usage example:
 
 **Parameters**
 
@@ -164,7 +168,13 @@ const index_params& params,
 raft::host_matrix_view<const float, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -189,7 +199,13 @@ const index_params& params,
 raft::host_matrix_view<const half, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -214,7 +230,13 @@ const index_params& params,
 raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 
@@ -239,7 +261,13 @@ const index_params& params,
 raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset);
 ```
 
-The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW. The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size. NOTE: This function requires CUDA headers to be available at compile time. Usage example:
+The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph built by the HNSW.
+
+The HNSW index construction parameters `M` and `ef_construction` are the main parameters to control the graph degree and graph quality.  We have additional options that can be used to fine tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+
+NOTE: This function requires CUDA headers to be available at compile time.
+
+Usage example:
 
 **Parameters**
 

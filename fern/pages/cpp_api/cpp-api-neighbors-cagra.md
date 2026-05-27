@@ -28,12 +28,12 @@ struct ace_params {
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build. When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests). If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
-| `ef_construction` | `size_t` | The index quality for the ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
-| `build_dir` | `std::string` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
-| `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
-| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
-| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build.<br /><br />When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory.<br /><br />Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).<br /><br />If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
+| `ef_construction` | `size_t` | The index quality for the ACE build.<br /><br />Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
+| `build_dir` | `std::string` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).<br /><br />Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
+| `use_disk` | `bool` | Whether to use disk-based storage for ACE build.<br /><br />When true, enables disk-based operations for memory-efficient graph construction. |
+| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB.<br /><br />When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB.<br /><br />When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
 
 ## CAGRA index build parameters
 
@@ -60,8 +60,8 @@ struct vpq_params {
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: [4, 5, 6, 7, 8]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ.<br /><br />Possible values: [4, 5, 6, 7, 8].<br /><br />Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic.<br /><br />TODO: at the moment `dim` must be a multiple `pq_dim`. |
 | `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
 | `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). When zero, an optimal value is selected using a heuristic. |
@@ -95,7 +95,11 @@ hnsw_heuristic_type heuristic       = hnsw_heuristic_type::SIMILAR_SEARCH_PERFOR
 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 ```
 
-* IMPORTANT NOTE * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce exactly the same recalls and QPS for the same parameter `ef`. The graphs are different internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve may be shifted along the curve right or left. See the heuristics descriptions for more details. Usage example:
+* IMPORTANT NOTE *
+
+The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce exactly the same recalls and QPS for the same parameter `ef`. The graphs are different internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve may be shifted along the curve right or left. See the heuristics descriptions for more details.
+
+Usage example:
 
 **Parameters**
 
@@ -370,9 +374,16 @@ raft::row_major,
 graph_accessor> knn_graph);
 ```
 
-If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around these that stores a non-owning a reference to the arrays. The constructor also accepts host arrays. In that case they are copied to the device, and the device arrays will be owned by the index. In case the dasates rows are not 16 bytes aligned, then we create a padded copy in device memory to ensure alignment for vectorized load. Usage examples:
+If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around these that stores a non-owning a reference to the arrays.
+
+The constructor also accepts host arrays. In that case they are copied to the device, and the device arrays will be owned by the index.
+
+In case the dasates rows are not 16 bytes aligned, then we create a padded copy in device memory to ensure alignment for vectorized load.
+
+Usage examples:
 
 - Cagra index is normally created by the cagra::build In the above example, we have passed a host dataset to build. The returned index will own a device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a device_mdspan to build, then it will only store a reference to it.
+
 - Constructing index using existing knn-graph
 
 **Parameters**
@@ -398,7 +409,9 @@ void update_dataset(raft::resources const& res,
 raft::device_matrix_view<const T, int64_t, raft::row_major> dataset);
 ```
 
-If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the index. It is expected that the same set of vectors are used for update_dataset and index build. Note: This will clear any precomputed dataset norms.
+If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the index. It is expected that the same set of vectors are used for update_dataset and index build.
+
+Note: This will clear any precomputed dataset norms.
 
 **Parameters**
 
@@ -440,7 +453,9 @@ void update_dataset(raft::resources const& res,
 raft::host_matrix_view<const T, int64_t, raft::row_major> dataset);
 ```
 
-We create a copy of the dataset on the device. The index manages the lifetime of this copy. It is expected that the same set of vectors are used for update_dataset and index build. Note: This will clear any precomputed dataset norms.
+We create a copy of the dataset on the device. The index manages the lifetime of this copy. It is expected that the same set of vectors are used for update_dataset and index build.
+
+Note: This will clear any precomputed dataset norms.
 
 **Parameters**
 
@@ -463,7 +478,9 @@ auto update_dataset(raft::resources const& res, DatasetT&& dataset)
 -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>;
 ```
 
-for update_dataset and index build. Note: This will clear any precomputed dataset norms.
+for update_dataset and index build.
+
+Note: This will clear any precomputed dataset norms.
 
 **Parameters**
 
@@ -643,12 +660,16 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<float, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
 - CosineExpanded
-- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -673,12 +694,16 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<float, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
 - CosineExpanded
-- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -703,12 +728,16 @@ raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<half, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
 - CosineExpanded (dataset norms are computed as float regardless of input data type)
-- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -733,11 +762,15 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<half, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - CosineExpanded (dataset norms are computed as float regardless of input data type)
-- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm) Usage example:
+- L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+
+Usage example:
 
 **Parameters**
 
@@ -762,12 +795,16 @@ raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - CosineExpanded (dataset norms are computed as float regardless of input data type)
 - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
-- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -792,13 +829,17 @@ raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
 - CosineExpanded (dataset norms are computed as float regardless of input data type)
 - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
-- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -823,13 +864,17 @@ raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
 - CosineExpanded (dataset norms are computed as float regardless of input data type)
 - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
-- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -854,13 +899,17 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 ```
 
-The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs. The following distance metrics are supported:
+The build consist of two steps: build an intermediate knn-graph, and optimize it to create the final graph. The index_params struct controls the node degree of these graphs.
+
+The following distance metrics are supported:
 
 - L2
 - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
 - CosineExpanded (dataset norms are computed as float regardless of input data type)
 - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
-- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types) Usage example:
+- BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build algorithm, and only for int8_t and uint8_t data types)
+
+Usage example:
 
 **Parameters**
 
@@ -1569,7 +1618,9 @@ std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dat
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1597,7 +1648,9 @@ std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dat
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1625,7 +1678,9 @@ std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> data
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1653,7 +1708,9 @@ std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> data
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1681,7 +1738,9 @@ std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> da
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1709,7 +1768,9 @@ std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> da
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1737,7 +1798,9 @@ std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> d
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 
@@ -1765,7 +1828,9 @@ std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> d
 std::nullopt);
 ```
 
-NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+
+Experimental, both the API and the serialization format are subject to change.
 
 **Parameters**
 

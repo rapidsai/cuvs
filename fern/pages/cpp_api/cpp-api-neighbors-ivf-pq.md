@@ -73,10 +73,10 @@ struct search_params : cuvs::neighbors::search_params {
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_probes` | `uint32_t` | The number of clusters to search. |
-| `lut_dtype` | `cudaDataType_t` | Data type of look up table to be created dynamically at search time. Possible values: [CUDA_R_32F, CUDA_R_16F, CUDA_R_8U] The use of low-precision types reduces the amount of shared memory required at search time, so fast shared memory kernels can be used even for datasets with large dimansionality. Note that the recall is slightly degraded when low-precision type is selected. |
-| `internal_distance_dtype` | `cudaDataType_t` | Storage data type for distance/similarity computed at search time. Possible values: [CUDA_R_16F, CUDA_R_32F] If the performance limiter at search time is device memory access, selecting FP16 will improve performance slightly. |
-| `preferred_shmem_carveout` | `double` | Preferred fraction of SM's unified memory / L1 cache to be used as shared memory. Possible values: [0.0 - 1.0] as a fraction of the `sharedMemPerMultiprocessor`. One wants to increase the carveout to make sure a good GPU occupancy for the main search kernel, but not to keep it too high to leave some memory to be used as L1 cache. Note, this value is interpreted only as a hint. Moreover, a GPU usually allows only a fixed set of cache configurations, so the provided value is rounded up to the nearest configuration. Refer to the NVIDIA tuning guide for the target GPU architecture. Note, this is a low-level tuning parameter that can have drastic negative effects on the search performance if tweaked incorrectly. |
-| `coarse_search_dtype` | `cudaDataType_t` | [Experimental] The data type to use as the GEMM element type when searching the clusters to probe. Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].<br />- Legacy default: CUDA_R_32F (float)<br />- Recommended for performance: CUDA_R_16F (half)<br />- Experimental/low-precision: CUDA_R_8I (int8_t) (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional) |
+| `lut_dtype` | `cudaDataType_t` | Data type of look up table to be created dynamically at search time.<br /><br />Possible values: [CUDA_R_32F, CUDA_R_16F, CUDA_R_8U]<br /><br />The use of low-precision types reduces the amount of shared memory required at search time, so fast shared memory kernels can be used even for datasets with large dimansionality. Note that the recall is slightly degraded when low-precision type is selected. |
+| `internal_distance_dtype` | `cudaDataType_t` | Storage data type for distance/similarity computed at search time.<br /><br />Possible values: [CUDA_R_16F, CUDA_R_32F]<br /><br />If the performance limiter at search time is device memory access, selecting FP16 will improve performance slightly. |
+| `preferred_shmem_carveout` | `double` | Preferred fraction of SM's unified memory / L1 cache to be used as shared memory.<br /><br />Possible values: [0.0 - 1.0] as a fraction of the `sharedMemPerMultiprocessor`.<br /><br />One wants to increase the carveout to make sure a good GPU occupancy for the main search kernel, but not to keep it too high to leave some memory to be used as L1 cache. Note, this value is interpreted only as a hint. Moreover, a GPU usually allows only a fixed set of cache configurations, so the provided value is rounded up to the nearest configuration. Refer to the NVIDIA tuning guide for the target GPU architecture.<br /><br />Note, this is a low-level tuning parameter that can have drastic negative effects on the search performance if tweaked incorrectly. |
+| `coarse_search_dtype` | `cudaDataType_t` | [Experimental] The data type to use as the GEMM element type when searching the clusters to probe.<br /><br />Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].<br /><br />- Legacy default: CUDA_R_32F (float)<br />- Recommended for performance: CUDA_R_16F (half)<br />- Experimental/low-precision: CUDA_R_8I (int8_t) (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional) |
 | `max_internal_batch_size` | `uint32_t` | Set the internal batch size to improve GPU utilization at the cost of larger memory footprint. |
 
 ## Types
@@ -145,7 +145,29 @@ struct ivf_pq_params {
 
 IVF-PQ index.
 
-In the IVF-PQ index, a database vector y is approximated with two level quantization: y = Q_1(y) + Q_2(y - Q_1(y)) The first level quantizer (Q_1), maps the vector y to the nearest cluster center. The number of clusters is n_lists. The second quantizer encodes the residual, and it is defined as a product quantizer [1]. A product quantizer encodes a `dim` dimensional vector with a `pq_dim` dimensional vector. First we split the input vector into `pq_dim` subvectors (denoted by u), where each u vector contains `pq_len` distinct components of y y_1, y_2, ... y_\{pq_len\}, y_\{pq_len+1\}, ... y_\{2*pq_len\}, ... y_\{dim-pq_len+1\} ... y_\{dim\} u_1                         u_2                          u_\{pq_dim\} Then each subvector encoded with a separate quantizer q_i, end the results are concatenated Q_2(y) = q_1(u_1),q_2(u_2),...,q_\{pq_dim\}(u_pq_dim\}) Each quantizer q_i outputs a code with pq_bit bits. The second level quantizers are also defined by k-means clustering in the corresponding sub-space: the reproduction values are the centroids, and the set of reproduction values is the codebook. When the data dimensionality `dim` is not multiple of `pq_dim`, the feature space is transformed using a random orthogonal matrix to have `rot_dim = pq_dim * pq_len` dimensions (`rot_dim &gt;= dim`). The second-level quantizers are trained either for each subspace or for each cluster: (a) codebook_gen::PER_SUBSPACE: creates `pq_dim` second-level quantizers - one for each slice of the data along features; (b) codebook_gen::PER_CLUSTER: creates `n_lists` second-level quantizers - one for each first-level cluster. In either case, the centroids are again found using k-means clustering interpreting the data as having pq_len dimensions. [1] Product quantization for nearest neighbor search Herve Jegou, Matthijs Douze, Cordelia Schmid
+In the IVF-PQ index, a database vector y is approximated with two level quantization:
+
+y = Q_1(y) + Q_2(y - Q_1(y))
+
+The first level quantizer (Q_1), maps the vector y to the nearest cluster center. The number of clusters is n_lists.
+
+The second quantizer encodes the residual, and it is defined as a product quantizer [1].
+
+A product quantizer encodes a `dim` dimensional vector with a `pq_dim` dimensional vector. First we split the input vector into `pq_dim` subvectors (denoted by u), where each u vector contains `pq_len` distinct components of y
+
+y_1, y_2, ... y_\{pq_len\}, y_\{pq_len+1\}, ... y_\{2*pq_len\}, ... y_\{dim-pq_len+1\} ... y_\{dim\} u_1                         u_2                          u_\{pq_dim\}
+
+Then each subvector encoded with a separate quantizer q_i, end the results are concatenated
+
+Q_2(y) = q_1(u_1),q_2(u_2),...,q_\{pq_dim\}(u_pq_dim\})
+
+Each quantizer q_i outputs a code with pq_bit bits. The second level quantizers are also defined by k-means clustering in the corresponding sub-space: the reproduction values are the centroids, and the set of reproduction values is the codebook.
+
+When the data dimensionality `dim` is not multiple of `pq_dim`, the feature space is transformed using a random orthogonal matrix to have `rot_dim = pq_dim * pq_len` dimensions (`rot_dim &gt;= dim`).
+
+The second-level quantizers are trained either for each subspace or for each cluster: (a) codebook_gen::PER_SUBSPACE: creates `pq_dim` second-level quantizers - one for each slice of the data along features; (b) codebook_gen::PER_CLUSTER: creates `n_lists` second-level quantizers - one for each first-level cluster. In either case, the centroids are again found using k-means clustering interpreting the data as having pq_len dimensions.
+
+[1] Product quantization for nearest neighbor search Herve Jegou, Matthijs Douze, Cordelia Schmid
 
 ```cpp
 template <typename IdxT>
@@ -481,7 +503,11 @@ Accumulated list sizes, sorted in descending order [n_lists + 1].
 raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept override;
 ```
 
-The last value contains the total length of the index. The value at index zero is always zero. That is, the content of this span is as if the `list_sizes` was sorted and then accumulated. This span is used during search to estimate the maximum size of the workspace.
+The last value contains the total length of the index. The value at index zero is always zero.
+
+That is, the content of this span is as if the `list_sizes` was sorted and then accumulated.
+
+This span is used during search to estimate the maximum size of the workspace.
 
 **Returns**
 
@@ -613,7 +639,9 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Usage example:
+- CosineExpanded
+
+Usage example:
 
 **Parameters**
 
@@ -669,7 +697,9 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Usage example:
+- CosineExpanded
+
+Usage example:
 
 **Parameters**
 
@@ -725,7 +755,9 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Usage example:
+- CosineExpanded
+
+Usage example:
 
 **Parameters**
 
@@ -781,7 +813,9 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Usage example:
+- CosineExpanded
+
+Usage example:
 
 **Parameters**
 
@@ -807,7 +841,9 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -837,7 +873,11 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+- CosineExpanded
+
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -863,7 +903,9 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -893,7 +935,9 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Usage example:
+- CosineExpanded
+
+Usage example:
 
 **Parameters**
 
@@ -949,7 +993,11 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+- CosineExpanded
+
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -975,7 +1023,9 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1005,7 +1055,11 @@ NB: Currently, the following distance metrics are supported:
 - L2Expanded
 - L2Unexpanded
 - InnerProduct
-- CosineExpanded Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+- CosineExpanded
+
+Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1035,7 +1089,9 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-This function creates a non-owning index that stores a reference to the provided device data. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index. The index_params must be consistent with the provided matrices. Specifically:
+This function creates a non-owning index that stores a reference to the provided device data. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index.
+
+The index_params must be consistent with the provided matrices. Specifically:
 
 - index_params.codebook_kind determines the expected shape of pq_centers
 - index_params.metric will be stored in the index
@@ -1072,7 +1128,9 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-This function creates a non-owning index that references the provided device data directly. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index. The index_params must be consistent with the provided matrices. Specifically:
+This function creates a non-owning index that references the provided device data directly. All parameters must be provided with correct extents. The caller is responsible for ensuring the lifetime of the input data exceeds the lifetime of the returned index.
+
+The index_params must be consistent with the provided matrices. Specifically:
 
 - index_params.codebook_kind determines the expected shape of pq_centers
 - index_params.metric will be stored in the index
@@ -1387,7 +1445,9 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1413,7 +1473,9 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1440,7 +1502,9 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1466,7 +1530,9 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1493,7 +1559,9 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1519,7 +1587,9 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1546,7 +1616,9 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 -> cuvs::neighbors::ivf_pq::index<int64_t>;
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1572,7 +1644,9 @@ std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
 cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
-Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping. Usage example:
+Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
+
+Usage example:
 
 **Parameters**
 
@@ -1797,7 +1871,9 @@ uint32_t offset,
 raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 ```
 
-Bit compression is removed, which means output will have pq_dim dimensional vectors (one code per byte, instead of ceildiv(pq_dim * pq_bits, 8) bytes of pq codes). Usage example:
+Bit compression is removed, which means output will have pq_dim dimensional vectors (one code per byte, instead of ceildiv(pq_dim * pq_bits, 8) bytes of pq codes).
+
+Usage example:
 
 **Parameters**
 
@@ -1863,7 +1939,9 @@ list_spec_interleaved<uint32_t, uint32_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
+
+Usage example:
 
 **Parameters**
 
@@ -1896,7 +1974,11 @@ list_spec_interleaved<uint32_t, uint32_t>::list_extents,
 raft::row_major> list_data);
 ```
 
-are contiguous (not expanded to one code per byte). NB: no memory allocation happens here; the list must fit the data (offset + n_rows records). Usage example:
+are contiguous (not expanded to one code per byte).
+
+NB: no memory allocation happens here; the list must fit the data (offset + n_rows records).
+
+Usage example:
 
 **Parameters**
 
@@ -1927,7 +2009,11 @@ uint32_t label,
 uint32_t offset);
 ```
 
-The list is identified by its label. NB: no memory allocation happens here; the list must fit the data (offset + n_vec). Usage example:
+The list is identified by its label.
+
+NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
+
+Usage example:
 
 **Parameters**
 
@@ -1957,7 +2043,13 @@ uint32_t label,
 uint32_t offset);
 ```
 
-vectors are PQ encoded and not expanded to one code per byte. The list is identified by its label. NB: no memory allocation happens here; the list into which the vectors are packed must fit offset + n_rows rows. Usage example:
+vectors are PQ encoded and not expanded to one code per byte.
+
+The list is identified by its label.
+
+NB: no memory allocation happens here; the list into which the vectors are packed must fit offset + n_rows rows.
+
+Usage example:
 
 **Parameters**
 
@@ -2163,7 +2255,9 @@ raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
 uint32_t label);
 ```
 
-This is similar to extend_list_with_codes but takes codes in contiguous packed format [n_rows, ceildiv(pq_dim * pq_bits, 8)] instead of unpacked format [n_rows, pq_dim]. This works correctly with any pq_bits value. Usage example:
+This is similar to extend_list_with_codes but takes codes in contiguous packed format [n_rows, ceildiv(pq_dim * pq_bits, 8)] instead of unpacked format [n_rows, pq_dim]. This works correctly with any pq_bits value.
+
+Usage example:
 
 **Parameters**
 
@@ -2409,7 +2503,9 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
 bool force_random_rotation);
 ```
 
-This standalone helper generates a rotation matrix without requiring an index object. Users can call this to prepare a rotation matrix before building from precomputed data. Usage example:
+This standalone helper generates a rotation matrix without requiring an index object. Users can call this to prepare a rotation matrix before building from precomputed data.
+
+Usage example:
 
 **Parameters**
 
@@ -2436,7 +2532,9 @@ uint32_t new_used_size,
 uint32_t old_used_size);
 ```
 
-This helper resizes an IVF list that uses the flat (non-interleaved) PQ code layout. If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally. Usage example:
+This helper resizes an IVF list that uses the flat (non-interleaved) PQ code layout. If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally.
+
+Usage example:
 
 **Parameters**
 
@@ -2464,7 +2562,9 @@ uint32_t new_used_size,
 uint32_t old_used_size);
 ```
 
-This helper resizes an IVF list that uses the interleaved PQ code layout (default). If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally. Usage example:
+This helper resizes an IVF list that uses the interleaved PQ code layout (default). If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally.
+
+Usage example:
 
 **Parameters**
 

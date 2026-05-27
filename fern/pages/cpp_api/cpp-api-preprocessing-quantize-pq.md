@@ -40,12 +40,12 @@ struct params {
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible value range: [4-16]. Hint: the smaller the 'pq_bits', the smaller the index size and the faster the fit/transform time, but the lower the recall. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, dim / 4 is used as default. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ.<br /><br />Possible value range: [4-16].<br /><br />Hint: the smaller the 'pq_bits', the smaller the index size and the faster the fit/transform time, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, dim / 4 is used as default.<br /><br />TODO: at the moment `dim` must be a multiple `pq_dim`. |
 | `use_subspaces` | `bool` | Whether to use subspaces for product quantization (PQ). When true, one PQ codebook is used for each subspace. Otherwise, a single PQ codebook is used. |
 | `use_vq` | `bool` | Whether to use Vector Quantization (KMeans) before product quantization (PQ). When true, VQ is used and PQ is trained on the residuals. |
 | `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. (sqrt(n_rows)) |
-| `kmeans_params` | [`kmeans_params_variant`](/api-reference/cpp-api-preprocessing-quantize-pq#kmeans-params-variant) | K-means parameters for PQ codebook training. Set to cuvs::cluster::kmeans::balanced_params for balanced k-means (default), or cuvs::cluster::kmeans::params for regular k-means. The active variant type selects the algorithm; balanced k-means tends to be faster for PQ training where cluster sizes are approximately equal. Only L2Expanded metric is supported. The number of clusters is always set to 1 &lt;&lt; pq_bits. |
+| `kmeans_params` | [`kmeans_params_variant`](/api-reference/cpp-api-preprocessing-quantize-pq#kmeans-params-variant) | K-means parameters for PQ codebook training.<br /><br />Set to cuvs::cluster::kmeans::balanced_params for balanced k-means (default), or cuvs::cluster::kmeans::params for regular k-means. The active variant type selects the algorithm; balanced k-means tends to be faster for PQ training where cluster sizes are approximately equal. Only L2Expanded metric is supported. The number of clusters is always set to 1 &lt;&lt; pq_bits. |
 | `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. We will use `pq_n_centers * max_train_points_per_pq_code` training points to train each PQ codebook. |
 | `max_train_points_per_vq_cluster` | `uint32_t` | The max number of data points to use per VQ cluster during training. |
 
@@ -116,7 +116,9 @@ const params params,
 raft::device_matrix_view<const float, int64_t> dataset);
 ```
 
-The use of a pool memory resource is recommended for more consistent training performance. Usage example:
+The use of a pool memory resource is recommended for more consistent training performance.
+
+Usage example:
 
 **Parameters**
 

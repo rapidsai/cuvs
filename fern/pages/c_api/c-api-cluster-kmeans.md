@@ -122,7 +122,7 @@ Allocate KMeans params, and populate with default values
 CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 ```
 
-**Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansParamsCreate_v2.
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be<br />replaced by cuvsKMeansParamsCreate_v2.
 
 **Parameters**
 
@@ -143,7 +143,7 @@ De-allocate KMeans params
 CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 ```
 
-**Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansParamsDestroy_v2.
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be<br />replaced by cuvsKMeansParamsDestroy_v2.
 
 **Parameters**
 
@@ -231,7 +231,11 @@ double* inertia,
 int* n_iter);
 ```
 
-Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinitialized by choosing new centroids with k-means++ algorithm. X may reside on either host (CPU) or device (GPU) memory. When X is on the host the data is streamed to the GPU in batches controlled by params-&gt;streaming_batch_size. **Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansFit_v2.
+Initial centroids are chosen with k-means++ algorithm. Empty clusters are reinitialized by choosing new centroids with k-means++ algorithm.
+
+X may reside on either host (CPU) or device (GPU) memory. When X is on the host the data is streamed to the GPU in batches controlled by params-&gt;streaming_batch_size.
+
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be<br />replaced by cuvsKMeansFit_v2.
 
 **Parameters**
 
@@ -298,7 +302,7 @@ bool normalize_weight,
 double* inertia);
 ```
 
-**Note:** In cuVS 26.08 (next ABI major version) this signature will be replaced by cuvsKMeansPredict_v2.
+**Note:** In cuVS 26.08 (next ABI major version) this signature will be<br />replaced by cuvsKMeansPredict_v2.
 
 **Parameters**
 

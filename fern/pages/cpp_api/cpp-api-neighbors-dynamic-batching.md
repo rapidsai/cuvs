@@ -28,8 +28,8 @@ struct index_params : cuvs::neighbors::index_params {
 | --- | --- | --- |
 | `k` | `int64_t` | The number of neighbors to search is fixed at construction time. |
 | `max_batch_size` | `int64_t` | Maximum size of the batch to submit to the upstream index. |
-| `n_queues` | `size_t` | The number of independent request queues. Each queue is associated with a unique CUDA stream and IO device buffers. If the number of concurrent requests is high, using multiple queues allows to fill-in data and prepare the batch while the other queue is busy. Moreover, the queues are submitted concurrently; this allows to better utilize the GPU by hiding the kernel launch latencies, which helps to improve the throughput. |
-| `conservative_dispatch` | `bool` | By default (`conservative_dispatch = false`) the first CPU thread to commit a query to a batch dispatches the upstream search function as soon as possible (before the batch is full). In that case, it does not know the final batch size at the time of calling the upstream search and thus runs the upstream search with the maximum batch size every time, even if only one valid query is present in the batch. This reduces the latency at the cost of wasted GPU resources. The alternative behavaior (`conservative_dispatch = true`) is more conservative: the dispatcher thread starts the kernel that gathers input queries, but waits till the batch is full or the waiting time is exceeded. Only then it acquires the actual batch size and launches the upstream search. As a result, less GPU resources are wasted at the cost of exposing upstream search latency. *Rule of Thumb*: for a large `max_batch_size` set `conservative_dispatch = true`, otherwise keep it disabled. |
+| `n_queues` | `size_t` | The number of independent request queues.<br /><br />Each queue is associated with a unique CUDA stream and IO device buffers. If the number of concurrent requests is high, using multiple queues allows to fill-in data and prepare the batch while the other queue is busy. Moreover, the queues are submitted concurrently; this allows to better utilize the GPU by hiding the kernel launch latencies, which helps to improve the throughput. |
+| `conservative_dispatch` | `bool` | By default (`conservative_dispatch = false`) the first CPU thread to commit a query to a batch dispatches the upstream search function as soon as possible (before the batch is full). In that case, it does not know the final batch size at the time of calling the upstream search and thus runs the upstream search with the maximum batch size every time, even if only one valid query is present in the batch. This reduces the latency at the cost of wasted GPU resources.<br /><br />The alternative behavaior (`conservative_dispatch = true`) is more conservative: the dispatcher thread starts the kernel that gathers input queries, but waits till the batch is full or the waiting time is exceeded. Only then it acquires the actual batch size and launches the upstream search. As a result, less GPU resources are wasted at the cost of exposing upstream search latency.<br /><br />*Rule of Thumb*: for a large `max_batch_size` set `conservative_dispatch = true`, otherwise keep it disabled. |
 
 ## Dynamic Batching search parameters
 
@@ -57,7 +57,15 @@ struct search_params : cuvs::neighbors::search_params {
 
 Lightweight dynamic batching index wrapper
 
-One lightweight dynamic batching index manages a single index and a single search parameter set. This structure should be shared among multiple users via copy semantics: access to the underlying implementation is managed via a shared pointer, and concurrent search among the participants is thread-safe. __Usage example__ __Priority queues__ The dynamic batching index has a limited support for prioritizing individual requests. There's only one pool of queues in the batcher and no functionality to prioritize one bach over the other. The `search_params::dispatch_timeout_ms` parameters passed in each request are aggregated internally and the batch is dispatched no later than any of the timeouts is exceeded. In this logic, a high-priority request can never be processed earlier than any lower-priority requests submitted earlier. However, dynamic batching indexes are lightweight and do not contain any global or static state. This means it's easy to combine multiple batchers. As an example, you can construct one batching index per priority class:
+One lightweight dynamic batching index manages a single index and a single search parameter set. This structure should be shared among multiple users via copy semantics: access to the underlying implementation is managed via a shared pointer, and concurrent search among the participants is thread-safe.
+
+__Usage example__
+
+__Priority queues__
+
+The dynamic batching index has a limited support for prioritizing individual requests. There's only one pool of queues in the batcher and no functionality to prioritize one bach over the other. The `search_params::dispatch_timeout_ms` parameters passed in each request are aggregated internally and the batch is dispatched no later than any of the timeouts is exceeded. In this logic, a high-priority request can never be processed earlier than any lower-priority requests submitted earlier.
+
+However, dynamic batching indexes are lightweight and do not contain any global or static state. This means it's easy to combine multiple batchers. As an example, you can construct one batching index per priority class:
 
 ```cpp
 template <typename T, typename IdxT>
@@ -122,7 +130,11 @@ raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
 raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
-The search parameters of the upstream index and the optional filtering function are configured at the dynamic batching index construction time. Like with many other indexes, the dynamic batching search has the stream-ordered semantics: the host function may return the control before the results are ready. Synchronize with the main CUDA stream in the given resource object to wait for arrival of the search results. Dynamic batching search is thread-safe: call the search function with copies of the same index in multiple threads to increase the occupancy of the batches.
+The search parameters of the upstream index and the optional filtering function are configured at the dynamic batching index construction time.
+
+Like with many other indexes, the dynamic batching search has the stream-ordered semantics: the host function may return the control before the results are ready. Synchronize with the main CUDA stream in the given resource object to wait for arrival of the search results.
+
+Dynamic batching search is thread-safe: call the search function with copies of the same index in multiple threads to increase the occupancy of the batches.
 
 **Parameters**
 

@@ -82,7 +82,9 @@ raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
 raft::device_matrix_view<float, int, raft::col_major> embedding);
 ```
 
-This function computes the spectral embedding from a precomputed sparse connectivity graph (e.g., from a k-NN search or custom similarity matrix). This is useful when you want to use a custom graph construction method or when you have a precomputed similarity/affinity matrix. The function:
+This function computes the spectral embedding from a precomputed sparse connectivity graph (e.g., from a k-NN search or custom similarity matrix). This is useful when you want to use a custom graph construction method or when you have a precomputed similarity/affinity matrix.
+
+The function:
 
 1. Converts the COO matrix to the graph Laplacian
 2. Computes eigenvectors of the Laplacian

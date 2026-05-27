@@ -101,7 +101,9 @@ struct vpq_dataset : public dataset<IdxT> {
 
 Abstract base class for IVF list data.
 
-This allows polymorphic access to list data regardless of the underlying layout. TODO: Make this struct internal (tracking issue: https://github.com/rapidsai/cuvs/issues/1726)
+This allows polymorphic access to list data regardless of the underlying layout.
+
+TODO: Make this struct internal (tracking issue: https://github.com/rapidsai/cuvs/issues/1726)
 
 ```cpp
 template <typename ValueT, typename IdxT, typename SizeT = uint32_t>

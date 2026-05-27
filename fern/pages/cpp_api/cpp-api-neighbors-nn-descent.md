@@ -235,7 +235,9 @@ The following distance metrics are supported:
 - L2SqrtExpanded
 - CosineExpanded
 - InnerProduct
-- L1 Usage example:
+- L1
+
+Usage example:
 
 **Parameters**
 
@@ -268,7 +270,9 @@ The following distance metrics are supported:
 - L2SqrtExpanded
 - CosineExpanded
 - InnerProduct
-- L1 Usage example:
+- L1
+
+Usage example:
 
 **Template Parameters**
 
@@ -308,7 +312,9 @@ The following distance metrics are supported:
 - L2SqrtExpanded
 - CosineExpanded
 - InnerProduct
-- L1 Usage example:
+- L1
+
+Usage example:
 
 **Parameters**
 
@@ -341,7 +347,9 @@ The following distance metrics are supported:
 - L2SqrtExpanded
 - CosineExpanded
 - InnerProduct
-- L1 Usage example:
+- L1
+
+Usage example:
 
 **Template Parameters**
 
@@ -382,7 +390,9 @@ The following distance metrics are supported:
 - CosineExpanded
 - InnerProduct
 - L1
-- BitwiseHamming Usage example:
+- BitwiseHamming
+
+Usage example:
 
 **Parameters**
 
@@ -416,7 +426,9 @@ The following distance metrics are supported:
 - CosineExpanded
 - InnerProduct
 - L1
-- BitwiseHamming Usage example:
+- BitwiseHamming
+
+Usage example:
 
 **Template Parameters**
 
@@ -457,7 +469,9 @@ The following distance metrics are supported:
 - CosineExpanded
 - InnerProduct
 - L1
-- BitwiseHamming Usage example:
+- BitwiseHamming
+
+Usage example:
 
 **Parameters**
 
@@ -491,7 +505,9 @@ The following distance metrics are supported:
 - CosineExpanded
 - InnerProduct
 - L1
-- BitwiseHamming Usage example:
+- BitwiseHamming
+
+Usage example:
 
 **Template Parameters**
 

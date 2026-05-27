@@ -479,7 +479,9 @@ Copy a matrix
 CUVS_EXPORT cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
 ```
 
-This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides. Both src and dst must have the same shape and dtype, but can have different strides and device type. The memory for the output dst tensor must already be allocated and the tensor initialized.
+This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides.
+
+Both src and dst must have the same shape and dtype, but can have different strides and device type. The memory for the output dst tensor must already be allocated and the tensor initialized.
 
 **Parameters**
 

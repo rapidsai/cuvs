@@ -43,7 +43,7 @@ struct index_params : cuvs::neighbors::index_params {
 | `pq_n_rows_train` | `int64_t` | the number of rows for PQ training (internally capped to 100k) * |
 | `pq_train_iters` | `uint32_t` | the max number of iterations for PQ training * |
 | `reordering_bf16` | `bool` | whether to apply bf16 quantization of dataset vectors * |
-| `reordering_noise_shaping_threshold` | `float` | Threshold T for computing AVQ eta = (dim - 1) ( T^2 / \|\| x \|\|^2) / ( 1 - T^2 / \|\| x \|\|^2) When quantizing a vector x to x_q, AVQ minimizes the loss function L(x, x_q) = eta * \|\| r_para \|\|^2 + \|\| r_perp \|\|^2, where r = x - x_q, r_para = &lt;r, x&gt; * x / \|\| x \|\|^2, r_perp = r - r_para Compared to L2 loss, This produces an x_q which better approximates the dot product of a query vector with x If the threshold is NAN, AVQ is not performed during bfloat16 quant |
+| `reordering_noise_shaping_threshold` | `float` | Threshold T for computing AVQ eta = (dim - 1) ( T^2 / \|\| x \|\|^2) / ( 1 - T^2 / \|\| x \|\|^2)<br /><br />When quantizing a vector x to x_q, AVQ minimizes the loss function L(x, x_q) = eta * \|\| r_para \|\|^2 + \|\| r_perp \|\|^2, where r = x - x_q, r_para = &lt;r, x&gt; * x / \|\| x \|\|^2, r_perp = r - r_para<br /><br />Compared to L2 loss, This produces an x_q which better approximates the dot product of a query vector with x<br /><br />If the threshold is NAN, AVQ is not performed during bfloat16 quant |
 
 ## ScaNN index type
 
@@ -135,7 +135,9 @@ const std::string& file_prefix,
 const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
 ```
 
-This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+This serializes the index into a list of files for integration into OSS ScaNN for use with search
+
+NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
 
 **Parameters**
 
@@ -161,7 +163,9 @@ const std::string& file_prefix,
 const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
 ```
 
-This serializes the index into a list of files for integration into OSS ScaNN for use with search NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
+This serializes the index into a list of files for integration into OSS ScaNN for use with search
+
+NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently not subject to comprehensive, automated testing. Accuracy and performance are not guaranteed, and could diverge without warning.
 
 **Parameters**
 

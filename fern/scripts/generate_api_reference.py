@@ -3256,6 +3256,18 @@ def parse_doxygen_entry(
             continue
 
         if not line_text:
+            if active_param is not None:
+                active_param.description = append_doxygen_blank_line(
+                    active_param.description
+                )
+            elif active_detail and details and details[-1].strip():
+                details.append("")
+            elif (
+                not (active_summary or active_returns)
+                and details
+                and details[-1].strip()
+            ):
+                details.append("")
             active_param = None
             active_summary = False
             active_returns = False
@@ -3269,9 +3281,7 @@ def parse_doxygen_entry(
             continue
 
         if active_detail and details:
-            details[-1] = append_sentence(
-                details[-1], clean_doxygen_text(line_text)
-            )
+            details.append(clean_doxygen_text(line_text))
             continue
 
         if active_returns:
@@ -3405,6 +3415,12 @@ def append_doxygen_line(existing: str, addition: str) -> str:
     else:
         lines[-1] = append_sentence(lines[-1], addition)
     return "\n".join(lines)
+
+
+def append_doxygen_blank_line(existing: str) -> str:
+    if not existing or existing.endswith("\n"):
+        return existing
+    return f"{existing}\n"
 
 
 def parse_doxygen_kind(declaration: str) -> str:
@@ -4008,7 +4024,7 @@ def member_description(member: DoxygenEntry) -> str:
     if member.summary:
         lines.append(member.summary)
     lines.extend(member.details)
-    return "\n".join(line for line in lines if line.strip())
+    return "\n".join(trim_blank_lines(lines))
 
 
 def parse_enum_values(signature: str) -> list[dict[str, str]]:
@@ -4345,7 +4361,12 @@ def render_doxygen_details(raw_lines: list[str]) -> list[str]:
     def flush_paragraph() -> None:
         nonlocal paragraph
         if paragraph:
-            lines.append(escape_text(" ".join(paragraph)))
+            if paragraph[0].startswith("**Note:**"):
+                lines.append(
+                    "<br />".join(escape_text(line) for line in paragraph)
+                )
+            else:
+                lines.append(escape_text(" ".join(paragraph)))
             paragraph = []
 
     for raw_line in raw_lines:
