@@ -132,10 +132,6 @@ This overload supports out-of-core computation where the dataset resides on the 
 
 Multi-GPU dispatch is selected automatically based on the handle state:
 
-This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by params.streaming_batch_size. In multi-GPU mode, this is a per-rank batch size.
-
-Multi-GPU dispatch is selected automatically based on the handle state:
-
 - If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X is split across GPUs internally with an OpenMP parallel region and NCCL.
 - If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as this worker's partition, and RAFT communicators are used for collectives.
 - Otherwise: single-GPU batched k-means.

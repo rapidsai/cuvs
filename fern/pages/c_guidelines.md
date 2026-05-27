@@ -29,7 +29,7 @@ Prefer explicit create and destroy functions for every opaque object that owns m
 
 ### API Stability
 
-The C API is the stable boundary used by downstream integrations and NVIDIA cuVS language bindings. Add new functions or fields before removing old ones, avoid changing the meaning of existing parameters, and keep [ABI compatibility](/developer-guide/advanced-topics/abi-stability) in mind when changing public structs or exported symbols.
+The C API is the stable boundary used by downstream integrations and NVIDIA cuVS language bindings. Add new functions or fields before removing old ones, avoid changing the meaning of existing parameters, and keep [ABI compatibility](/developer-guide/abi-stability) in mind when changing public structs or exported symbols.
 
 ### Stateless C APIs
 
@@ -131,7 +131,7 @@ Single-GPU C APIs should not require communication libraries or multi-GPU setup.
 
 C APIs may call implementations that use JIT link-time optimization, but the C wrapper should not duplicate JIT LTO policy or expose C++ implementation details. Keep runtime behavior documented at the API level when JIT compilation can affect first-call latency or cache behavior.
 
-For runtime and cache behavior, see [JIT Compilation](/developer-guide/advanced-topics/jit-compilation). For implementation guidance, see [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization).
+For runtime and cache behavior, see [JIT Compilation](/developer-guide/advanced-topics/jit-compilation). For implementation guidance, see [Link-time Optimization](/developer-guide/link-time-optimization).
 
 ## Coding Style
 

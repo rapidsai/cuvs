@@ -16,7 +16,7 @@ If source builds are not being used, install the local RAFT Python artifacts int
 
 ### Bindings
 
-Python APIs, like all other NVIDIA cuVS language bindings, should wrap the C APIs and should not call C++ or CUDA implementation code directly. The C layer is the ABI-stable boundary for bindings, so ABI compatibility needs to be maintained there. See [ABI Stability](/developer-guide/advanced-topics/abi-stability) for more detail.
+Python APIs, like all other NVIDIA cuVS language bindings, should wrap the C APIs and should not call C++ or CUDA implementation code directly. The C layer is the ABI-stable boundary for bindings, so ABI compatibility needs to be maintained there. See [ABI Stability](/developer-guide/abi-stability) for more detail.
 
 Keep Cython bindings focused on translating Python inputs into NVIDIA cuVS calls and returning Python-friendly outputs. Heavy algorithmic work should stay in C++ or CUDA implementation code.
 
