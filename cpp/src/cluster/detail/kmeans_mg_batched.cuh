@@ -109,12 +109,9 @@ void mnmg_fit(
 {
   using data_part_view_t =
     raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>;
-  using weight_part_view_t =
-    raft::mdspan<const DataT, raft::vector_extent<IndexT>, raft::row_major, Accessor>;
   using data_batch_iterator_t =
     cuvs::spatial::knn::detail::utils::batch_load_iterator<data_part_view_t>;
-  constexpr bool data_on_device    = raft::is_device_mdspan_v<data_part_view_t>;
-  constexpr bool weights_on_device = raft::is_device_mdspan_v<weight_part_view_t>;
+  constexpr bool data_on_device = raft::is_device_mdspan_v<data_part_view_t>;
 
   bool use_nccl = raft::resource::is_multi_gpu(handle);
   int rank, num_ranks;
@@ -153,12 +150,13 @@ void mnmg_fit(
   std::vector<IndexT> part_offsets;
   part_offsets.reserve(X_parts.size() + 1);
   part_offsets.push_back(IndexT{0});
-  bool sample_weights = sample_weight_parts.has_value();
+  const bool sample_weights = sample_weight_parts.has_value();
   if (sample_weights) {
     RAFT_EXPECTS(sample_weight_parts->size() == X_parts.size(),
                  "sample_weight_parts must have one entry per data partition");
   }
-  for (auto const& X_part : X_parts) {
+  for (size_t i = 0; i < X_parts.size(); ++i) {
+    auto const& X_part = X_parts[i];
     RAFT_EXPECTS(static_cast<IndexT>(X_part.extent(1)) == n_features,
                  "all partitions must have the same feature count as centroids");
     auto part_rows = static_cast<IndexT>(X_part.extent(0));
@@ -167,12 +165,10 @@ void mnmg_fit(
     part_offsets.push_back(n_local);
 
     if (sample_weights) {
-      RAFT_EXPECTS(static_cast<IndexT>((*sample_weight_parts)[i].extent(0)) ==
-                     static_cast<IndexT>(X_parts[i].extent(0)),
+      RAFT_EXPECTS(static_cast<IndexT>((*sample_weight_parts)[i].extent(0)) == part_rows,
                    "each sample_weight partition must match its X partition rows");
+    }
   }
-
-}
 
   auto d_global_n = raft::make_device_scalar<IndexT>(dev_res, n_local);
   comms.allreduce(d_global_n.data_handle(), d_global_n.data_handle(), 1);
@@ -209,8 +205,8 @@ void mnmg_fit(
   rmm::device_uvector<char> workspace(0, stream);
   rmm::device_uvector<char> batch_workspace(0, stream);
 
-  DataT weight_scale = DataT{1};
-  if (sample_weight_parts.has_value()) {
+  auto d_weight_scale = raft::make_device_scalar<DataT>(dev_res, DataT{1});
+  if (sample_weights) {
     auto d_wt = raft::make_device_scalar<DataT>(dev_res, DataT{0});
     for (auto const& weights : sample_weight_parts.value()) {
       auto n_weights = static_cast<IndexT>(weights.extent(0));
@@ -223,15 +219,12 @@ void mnmg_fit(
 
     comms.allreduce(d_wt.data_handle(), d_wt.data_handle(), 1);
 
-    DataT global_wt{};
-    raft::copy(&global_wt, d_wt.data_handle(), 1, stream);
-    raft::resource::sync_stream(dev_res);
-
-    RAFT_EXPECTS(std::isfinite(global_wt) && global_wt > DataT{0},
-                 "invalid parameter (sum of sample weights must be finite and positive)");
     const auto global_n_wt = static_cast<DataT>(global_n);
-    const DataT tol        = global_n_wt * std::numeric_limits<DataT>::epsilon();
-    if (std::abs(global_wt - global_n_wt) > tol) { weight_scale = global_n_wt / global_wt; }
+    const DataT* d_wt_ptr  = d_wt.data_handle();
+    raft::linalg::map(
+      dev_res,
+      d_weight_scale.view(),
+      [global_n_wt, d_wt_ptr] __device__(DataT) { return global_n_wt / *d_wt_ptr; });
   }
 
   auto n_init = params.n_init;
@@ -281,25 +274,16 @@ void mnmg_fit(
 
   auto prepare_batch_weights = [&](size_t part_idx, IndexT batch_offset, IndexT cur_batch_size)
     -> raft::device_vector_view<const DataT, IndexT> {
-    if (sample_weight_parts.has_value()) {
+    if (sample_weights) {
       auto const* src = (*sample_weight_parts)[part_idx].data_handle() + batch_offset;
-
-      if constexpr (weights_on_device) {
-        if (weight_scale == DataT{1}) {
-          return raft::make_device_vector_view<const DataT, IndexT>(src, cur_batch_size);
-        }
-      }
-
       raft::copy(batch_weights.data_handle(), src, cur_batch_size, stream);
-      if (weight_scale != DataT{1}) {
-        auto batch_weights_mut =
-          raft::make_device_vector_view<DataT, IndexT>(batch_weights.data_handle(), cur_batch_size);
-        raft::linalg::map(
-          dev_res,
-          batch_weights_mut,
-          [weight_scale] __device__(DataT w) { return w * weight_scale; },
-          raft::make_const_mdspan(batch_weights_mut));
-      }
+      auto batch_weights_mut =
+        raft::make_device_vector_view<DataT, IndexT>(batch_weights.data_handle(), cur_batch_size);
+      raft::linalg::map(
+        dev_res,
+        batch_weights_mut,
+        [d_weight_scale`] __device__(DataT w) { return w * (d_weight_scale.data_handle()); },
+        raft::make_const_mdspan(batch_weights_mut));
     }
 
     return raft::make_device_vector_view<const DataT, IndexT>(batch_weights.data_handle(),
@@ -328,7 +312,7 @@ void mnmg_fit(
 
     comms.bcast(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
-    if (has_data && !sample_weight_parts.has_value()) {
+    if (has_data && !sample_weights) {
       raft::matrix::fill(dev_res, batch_weights.view(), DataT{1});
     }
 
@@ -478,18 +462,16 @@ void mnmg_fit(
 
       raft::linalg::map_offset(
         dev_res,
-        raft::make_device_vector_view<int64_t, int>(d_done_flag.data_handle(), 1),
+        raft::make_device_vector_view<int, int>(d_done_flag.data_handle(), 1),
         [=] __device__(int) {
           cuvs::cluster::kmeans::detail::check_convergence(
             d_cost_view, d_prior_view, d_norm_view, tol, iter, d_done_view);
           return *d_done_view.data_handle();
         });
 
-      comms.allreduce(d_done_flag.data_handle(), d_done_flag.data_handle(), 1);
-
       raft::copy(dev_res,
                  raft::make_pinned_scalar_view(h_done_flag.data_handle()),
-                 raft::make_device_scalar_view<const int64_t>(d_done_flag.data_handle()));
+                 raft::make_device_scalar_view<const int>(d_done_flag.data_handle()));
     }
     local_n_iter = std::min(local_n_iter, static_cast<IndexT>(iter_params.max_iter));
 
@@ -518,7 +500,7 @@ void mnmg_fit(
             data_batch.data(), current_batch_size, n_features);
 
           std::optional<raft::device_vector_view<const DataT, IndexT>> batch_sw = std::nullopt;
-          if (sample_weight_parts.has_value()) {
+          if (sample_weights) {
             batch_sw = prepare_batch_weights(part_idx, batch_offset, current_batch_size);
           }
 
