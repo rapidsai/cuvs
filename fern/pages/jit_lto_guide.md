@@ -524,8 +524,10 @@ The planner is responsible for:
 #pragma once
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include <memory>
 #include <string>
 
 struct SearchPlanner : AlgorithmPlanner {
@@ -553,6 +555,17 @@ struct SearchPlanner : AlgorithmPlanner {
   {
     add_static_fragment<fragment_tag_filter<FilterTag, IndexTag>>();
   }
+
+  // Same as add_fragment(std::move(fragment)); distinct names are for readability at call sites.
+  void add_metric_udf_fragment(std::unique_ptr<UDFFatbinFragment> fragment)
+  {
+    add_fragment(std::move(fragment));
+  }
+
+  void add_filter_udf_fragment(std::unique_ptr<UDFFatbinFragment> fragment)
+  {
+    add_fragment(std::move(fragment));
+  }
 };
 ```
 
@@ -568,8 +581,12 @@ Now we integrate the planner into the actual search function:
 #include "search_planner.hpp"
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include <raft/core/device_resources.hpp>
+#include <type_traits>
 
 namespace example::detail {
+
+enum class DistanceType { Euclidean };
+enum class FilterType { None };
 
 // Type tag helpers
 template <typename T>
@@ -594,12 +611,14 @@ template <DistanceType Metric>
 constexpr auto get_metric_tag() {
   if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
   if constexpr (Metric == DistanceType::InnerProduct) return tag_metric_inner_product{};
+  else static_assert(!sizeof(Metric*), "extend get_metric_tag when adding DistanceType enumerators");
 }
 
 template <FilterType Filter>
 constexpr auto get_filter_tag() {
   if constexpr (Filter == FilterType::None) return tag_filter_none{};
   if constexpr (Filter == FilterType::Bitset) return tag_filter_bitset{};
+  else static_assert(!sizeof(Filter*), "extend get_filter_tag when adding FilterType enumerators");
 }
 
 template <typename T, typename OutT, typename IdxT, DistanceType Metric, FilterType Filter, bool Optimized, int Veclen>
@@ -624,7 +643,6 @@ void search_jit(
   // cannot handle non-type template parameters
   SearchPlanner planner;
 
-  // Add required device function fragments
   planner.add_search_function<data_tag, out_tag, idx_tag, Optimized, Veclen>();
   planner.add_compute_distance_device_function<metric_tag, data_tag>();
   planner.add_filter_device_function<filter_tag, idx_tag>();
@@ -653,6 +671,244 @@ void search_jit(
 
 } // namespace example::detail
 ```
+
+### Step 7b: Example — NVRTC UDFs for `compute_distance` and `apply_filter`
+
+**What you’re building.** The same search kernel as Steps 1–7 still calls `compute_distance` / `apply_filter`, but for a UDF build those symbols are **not** taken from prebuilt matrix fatbins: you compile a small NVRTC program per hook at runtime and register it with the planner so LTO links it next to the entry fragment.
+
+**How the pieces connect** (arrows read left to right):
+
+```text
+flowchart LR
+  subgraph entry["Entry fatbin"]
+    K["Kernel calls templates"]
+    H["Header: declare only"]
+  end
+  subgraph nvrtc["Per-hook NVRTC TU"]
+    M["Macro: device body + string factory"]
+    G["Host glue: forwarding + explicit inst"]
+  end
+  subgraph plan["Planner"]
+    R["add_*_udf_fragment(fatbin)"]
+  end
+  K --> H
+  H --> M
+  M --> G
+  G --> R
+```
+
+**1. Shared header — forward declarations**
+
+The entry TU matches Step 1–7: templates are declared here and defined elsewhere at link time.
+
+```cpp
+namespace example::detail {
+
+template <typename T>
+__device__ float compute_distance(T q, T d);
+
+template <typename IdxT>
+__device__ bool apply_filter(uint32_t query_id, IdxT node_id, void* filter_data);
+
+}  // namespace example::detail
+```
+
+**2. NVRTC source — macros and string factories**
+
+Use **function-like macros** so you edit only the `{ ... }` body; the preprocessor still emits a real `__device__` template for NVCC, and `NAME_udf()` / `NAME_filter_udf()` build the CUDA text NVRTC compiles. The distance macro also emits `compute_distance_udf_impl` calling `NAME_distance`; host-side `instantiate_compute_distance_udf` only appends the forwarding `compute_distance` plus its explicit instantiation (same idea as `instantiate_apply_filter_udf` for `apply_filter<IdxT>`).
+
+**Macro definitions** (shared header; include before the invocations):
+
+```cpp
+#include <sstream>
+#include <string>
+
+#define EXAMPLE_PP_CAT_(a, b) a##b
+#define EXAMPLE_PP_CAT(a, b) EXAMPLE_PP_CAT_(a, b)
+#define EXAMPLE_PP_STR_(x) #x
+#define EXAMPLE_PP_STR(x) EXAMPLE_PP_STR_(x)
+
+// NAME_udf(): NVRTC program defines NAME_distance and compute_distance_udf_impl; host appends
+// instantiate_compute_distance_udf (forwarding compute_distance + explicit inst only).
+#define EXAMPLE_UDF_DISTANCE(NAME, BODY)                                                    \
+  template <typename T>                                                                     \
+  __device__ float EXAMPLE_PP_CAT(NAME, _distance)(T q, T d) BODY                                 \
+                                                                                            \
+  inline std::string EXAMPLE_PP_CAT(NAME, _udf)()                                                 \
+  {                                                                                         \
+    return std::string("#include <cuda_runtime.h>\n"                                      \
+                       "namespace example::detail {\n"                                    \
+                       "template <typename T>\n"                                           \
+                       "__device__ float " EXAMPLE_PP_STR(EXAMPLE_PP_CAT(NAME, _distance))              \
+                       "(T q, T d) ")                                                       \
+         + std::string(#BODY) +                                                            \
+           std::string("\n"                                                                \
+                        "template <typename T>\n"                                          \
+                        "__device__ float compute_distance_udf_impl(T q, T d) {\n"        \
+                        "  return ") +                                                      \
+           std::string(EXAMPLE_PP_STR(EXAMPLE_PP_CAT(NAME, _distance))) +                  \
+           std::string("(q, d);\n"                                                         \
+                        "}\n}\n");                                                        \
+  }
+
+// Forwarding compute_distance + explicit inst only (user metric stays inside NAME_udf()).
+inline std::string instantiate_compute_distance_udf(char const* t_type)
+{
+  std::ostringstream oss;
+  oss << "\nnamespace example::detail {\n"
+      << "template <typename T>\n"
+      << "__device__ float compute_distance(T q, T d) {\n"
+      << "  return compute_distance_udf_impl(q, d);\n"
+      << "}\n"
+      << "template __device__ float compute_distance<" << t_type << ">(" << t_type << ", " << t_type
+      << ");\n"
+      << "}\n";
+  return oss.str();
+}
+
+// Device NAME_filter + filter_udf(); append instantiate_apply_filter_udf for apply_filter<IdxT>.
+#define EXAMPLE_UDF_FILTER(NAME, BODY)                                                      \
+  template <typename IdxT>                                                                  \
+  __device__ bool EXAMPLE_PP_CAT(NAME, _filter)(uint32_t query_id, IdxT node_id, void* filter_data) \
+  BODY                                                                                      \
+                                                                                            \
+  inline std::string EXAMPLE_PP_CAT(NAME, _filter_udf)()                                          \
+  {                                                                                         \
+    return std::string("#include <cuda_runtime.h>\n"                                       \
+                       "namespace example::detail {\n"                                     \
+                       "template <typename IdxT>\n"                                        \
+                       "__device__ bool " EXAMPLE_PP_STR(EXAMPLE_PP_CAT(NAME, _filter))                \
+                       "(uint32_t query_id, IdxT node_id, void* filter_data) ")            \
+         + std::string(#BODY) +                                                             \
+           std::string("\n"                                                                 \
+                        "template <typename IdxT>\n"                                       \
+                        "__device__ bool apply_filter(uint32_t query_id, IdxT node_id, "   \
+                        "void* filter_data) {\n"                                            \
+                        "  return " EXAMPLE_PP_STR(EXAMPLE_PP_CAT(NAME, _filter))                        \
+                        "(query_id, node_id, filter_data);\n"                               \
+                        "}\n"                                                              \
+                        "}\n");                                                           \
+  }
+
+// Call after NAME_filter_udf() string is concatenated, before compile.
+inline std::string instantiate_apply_filter_udf(char const* idx_type)
+{
+  std::ostringstream oss;
+  oss << "\nnamespace example::detail {\n"
+      << "template __device__ bool apply_filter<" << idx_type << ">(uint32_t, " << idx_type
+      << ", void*);\n"
+      << "}\n";
+  return oss.str();
+}
+```
+
+**Invocations** (file scope — each call expands the macro once):
+
+```cpp
+EXAMPLE_UDF_DISTANCE(my_l2, {
+  T diff = q - d;
+  return diff * diff;
+})
+
+EXAMPLE_UDF_FILTER(my_pass, {
+  (void)query_id;
+  (void)node_id;
+  (void)filter_data;
+  return true;
+})
+```
+
+Avoid raw `"` inside `#BODY` unless you splice that part with raw-string concatenation around `#BODY`.
+
+**3. Host — `type_name`, glue, compile, register**
+
+Each full NVRTC program is one string: `*_udf()` plus `instantiate_*` output. `type_name<U>()` must return the **exact** token the entry TU uses (e.g. `float`, `uint32_t`).
+
+```cpp
+#include <type_traits>
+
+template <typename U>
+constexpr const char* type_name()
+{
+  using T = std::remove_cv_t<std::remove_reference_t<U>>;
+  if constexpr (std::is_same_v<T, float>) {
+    return "float";
+  } else if constexpr (std::is_same_v<T, uint32_t>) {
+    return "uint32_t";
+  } else {
+    static_assert(std::is_same_v<T, void>, "add a branch for each concrete T / IdxT you use");
+    return "";
+  }
+}
+```
+
+**4. Planner — extend Step 7 for UDF vs static**
+
+Step 7 used only static fragments. Add `#include <string>`, extend enums/tags/`get_*_tag` as below, keep UDF glue in the same TU as `search_jit`, then swap the two unconditional `add_compute_distance_device_function` / `add_filter_device_function` calls for this block:
+
+```cpp
+// Widen config: static Euclidean vs NVRTC metric, static none vs NVRTC filter.
+// Extend the DistanceType / FilterType enums from Step 7:
+enum class DistanceType { Euclidean, MetricUdf };
+enum class FilterType { None, FilterUdf };
+
+struct tag_metric_custom_udf {};
+struct tag_filter_custom_udf {};
+
+template <DistanceType Metric>
+constexpr auto get_metric_tag() {
+  if constexpr (Metric == DistanceType::Euclidean) {
+    return tag_metric_euclidean{};
+  } else if constexpr (Metric == DistanceType::MetricUdf) {
+    return tag_metric_custom_udf{};
+  } else {
+    static_assert(!sizeof(Metric*), "extend get_metric_tag when adding DistanceType enumerators");
+  }
+}
+
+template <FilterType Filter>
+constexpr auto get_filter_tag() {
+  if constexpr (Filter == FilterType::None) {
+    return tag_filter_none{};
+  } else if constexpr (Filter == FilterType::FilterUdf) {
+    return tag_filter_custom_udf{};
+  } else {
+    static_assert(!sizeof(Filter*), "extend get_filter_tag when adding FilterType enumerators");
+  }
+}
+```
+
+```cpp
+SearchPlanner planner;
+planner.add_search_function<data_tag, out_tag, idx_tag, Optimized, Veclen>();
+
+// Metric: NVRTC TU vs prebuilt matrix fragment (Step 6 helpers).
+if constexpr (std::is_same_v<metric_tag, tag_metric_custom_udf>) {
+  std::string metric_udf_code = my_l2_udf();
+  metric_udf_code += instantiate_compute_distance_udf(type_name<T>());
+  planner.add_metric_udf_fragment(nvrtc_compiler().compile(metric_udf_code, metric_udf_code));
+} else {
+  planner.add_compute_distance_device_function<metric_tag, data_tag>();
+}
+
+if constexpr (std::is_same_v<filter_tag, tag_filter_custom_udf>) {
+  std::string filter_udf_code = my_pass_filter_udf();
+  filter_udf_code += instantiate_apply_filter_udf(type_name<IdxT>());
+  planner.add_filter_udf_fragment(nvrtc_compiler().compile(filter_udf_code, filter_udf_code));
+} else {
+  planner.add_filter_device_function<filter_tag, idx_tag>();
+}
+
+auto launcher = planner.get_launcher();
+```
+
+Use `DistanceType::MetricUdf` / `FilterType::FilterUdf` only when you want the NVRTC branches; otherwise keep `Euclidean` / `None` for the original static path.
+
+> **Pitfalls and constraints**
+>
+> * **Do not** register the same hook through both UDF APIs (`add_metric_udf_fragment` / `add_filter_udf_fragment`) and the Step 6 static helpers (`add_compute_distance_function` / `add_filter_function`): they pull different fatbins and you will duplicate device definitions.
+> * The NVRTC program must **define** every template the entry calls **and** emit matching **`template __device__ ...` explicit instantiations** for each concrete specialization (e.g. `compute_distance<float>`, `apply_filter<uint32_t>`). Prefer small host helpers (`instantiate_*` + `type_name`) for type spellings instead of hard-coding index types inside macro strings.
+> * One NVRTC compile per logical TU; do not concatenate unrelated UDFs into one program string.
 
 ## Key Concepts
 

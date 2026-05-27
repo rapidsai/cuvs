@@ -62,6 +62,15 @@ Use these guides when you are ready to apply NVIDIA cuVS APIs, benchmark algorit
 
 ## Compatibility and Integration
 
-- [Compatibility](/user-guide/compatibility): understand NVIDIA cuVS release compatibility, ABI windows, and stable binary boundaries.
-- [Integration Patterns](/user-guide/integration-patterns): compare direct, offloaded, and service-oriented ways to integrate NVIDIA cuVS into products.
-- [References](/user-guide/references): cite the research papers behind NVIDIA cuVS vector search, preprocessing, clustering, and GPU primitives.
+- [Compatibility](user_guide/abi_stability.md): understand cuVS release compatibility, ABI windows, and stable binary boundaries.
+- [Integration Patterns](user_guide/integration_patterns.md): compare direct, offloaded, and service-oriented ways to integrate cuVS into products.
+
+## Advanced Topics
+
+- [Advanced Topics](advanced_topics.md): find specialized usage topics and low-level implementation guidance.
+- [JIT Compilation](jit_compilation.md): understand when cuVS triggers just-in-time compilation and how runtime caches behave.
+- [UDF Usage](udf_usage.md): supply custom CUDA distance metrics for IVF-flat search (C++ only, experimental).
+
+## References
+
+- [References](references.md): cite the research papers behind cuVS vector search, preprocessing, clustering, and GPU primitives.

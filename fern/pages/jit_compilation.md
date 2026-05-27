@@ -17,4 +17,6 @@ The following NVIDIA cuVS capabilities currently trigger JIT compilation:
 
 - IVF-Flat search APIs: [cuvs::neighbors::ivf_flat::search()](/api-reference/cpp-api-neighbors-ivf-flat)
 
-For implementation details on building JIT LTO kernel fragments and linking them at runtime, see [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization).
+Custom distance metrics (UDFs) for IVF-flat search also use JIT compilation. See [UDF Usage](udf_usage.md).
+
+For implementation details on building JIT LTO kernel fragments and linking them at runtime, see [Link-time Optimization](jit_lto_guide.md).
