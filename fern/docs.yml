@@ -274,6 +274,8 @@ navigation:
             path: "./pages/c_api/c-api-neighbors-ivf-flat.md"
           - page: "Neighbors IVF PQ"
             path: "./pages/c_api/c-api-neighbors-ivf-pq.md"
+          - page: "Neighbors IVF SQ"
+            path: "./pages/c_api/c-api-neighbors-ivf-sq.md"
           - page: "Neighbors NN Descent"
             path: "./pages/c_api/c-api-neighbors-nn-descent.md"
           - page: "Neighbors Refine"

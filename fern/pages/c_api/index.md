@@ -31,6 +31,7 @@ These pages are generated from the documented public headers in the cuVS source 
 - [HNSW](/api-reference/c-api-neighbors-hnsw)
 - [IVF Flat](/api-reference/c-api-neighbors-ivf-flat)
 - [IVF PQ](/api-reference/c-api-neighbors-ivf-pq)
+- [IVF SQ](/api-reference/c-api-neighbors-ivf-sq)
 - [NN Descent](/api-reference/c-api-neighbors-nn-descent)
 - [Refine](/api-reference/c-api-neighbors-refine)
 - [Tiered Index](/api-reference/c-api-neighbors-tiered-index)

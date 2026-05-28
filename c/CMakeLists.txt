@@ -89,6 +89,7 @@ add_library(
   src/neighbors/brute_force.cpp
   src/neighbors/ivf_flat.cpp
   src/neighbors/ivf_pq.cpp
+  src/neighbors/ivf_sq.cpp
   src/neighbors/cagra.cpp
   $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
   $<$<BOOL:${BUILD_MG_ALGOS}>:src/neighbors/mg_ivf_pq.cpp>
