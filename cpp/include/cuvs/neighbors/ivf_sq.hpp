@@ -7,6 +7,7 @@
 
 #include "common.hpp"
 #include <cstdint>
+#include <cuvs/core/export.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -15,7 +16,9 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/util/integer_utils.hpp>
 
-namespace cuvs::neighbors::ivf_sq {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace ivf_sq {
 
 /**
  * @defgroup ivf_sq_cpp_index_params IVF-SQ index build parameters
@@ -86,7 +89,7 @@ static_assert(std::is_aggregate_v<search_params>);
  */
 
 template <typename SizeT, typename CodeT, typename IdxT>
-struct list_spec {
+struct CUVS_EXPORT list_spec {
   static_assert(std::is_same_v<CodeT, uint8_t>, "IVF-SQ code type CodeT must be uint8_t");
 
   using value_type   = CodeT;
@@ -166,7 +169,7 @@ using list_data = ivf::list<list_spec, SizeT, CodeT, IdxT>;
  *
  */
 template <typename CodeT>
-struct index : cuvs::neighbors::index {
+struct CUVS_EXPORT index : cuvs::neighbors::index {
   static_assert(std::is_same_v<CodeT, uint8_t>, "IVF-SQ code type CodeT must be uint8_t for now.");
 
   using index_params_type  = ivf_sq::index_params;
@@ -625,4 +628,6 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
-}  // namespace cuvs::neighbors::ivf_sq
+}  // namespace ivf_sq
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
