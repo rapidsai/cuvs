@@ -7,6 +7,7 @@
 
 #include <cuda_fp16.h>
 
+#include <cuvs/core/export.hpp>
 #include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -21,7 +22,9 @@
 #include <variant>
 #include <vector>
 
-namespace cuvs::neighbors::ivf_rabitq {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace ivf_rabitq {
 
 // forward declaration
 namespace detail {
@@ -300,4 +303,6 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
-}  // namespace cuvs::neighbors::ivf_rabitq
+}  // namespace ivf_rabitq
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
