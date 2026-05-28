@@ -16,7 +16,14 @@ Parameters for spectral embedding algorithm
 Spectral embedding is a dimensionality reduction technique that uses the eigenvectors of the graph Laplacian to embed data points into a lower-dimensional space. This technique is particularly useful for non-linear dimensionality reduction and clustering tasks.
 
 ```cpp
-struct params { ... };
+struct params {
+  int n_components;
+  int n_neighbors;
+  bool norm_laplacian;
+  bool drop_first;
+  float tolerance;
+  std::optional<uint64_t> seed;
+};
 ```
 
 **Fields**

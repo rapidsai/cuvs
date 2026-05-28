@@ -14,7 +14,9 @@ _Source header: `cuvs/preprocessing/quantize/scalar.hpp`_
 quantizer parameters.
 
 ```cpp
-struct params { ... };
+struct params {
+  float quantile;
+};
 ```
 
 **Fields**
@@ -32,7 +34,10 @@ The quantization is performed by a linear mapping of an interval in the float da
 
 ```cpp
 template <typename T>
-struct quantizer { ... };
+struct quantizer {
+  T min_;
+  T max_;
+};
 ```
 
 **Fields**

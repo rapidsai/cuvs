@@ -31,7 +31,7 @@ Images are available for GPU and CPU-only systems:
 
 Nightly images are located on [Docker Hub](https://hub.docker.com/r/rapidsai/cuvs-bench/tags).
 
-The following command pulls the nightly container for Python version 3.13, CUDA version 12.9, and cuVS version 26.06:
+The following command pulls the nightly container for Python version 3.13, CUDA version 12.9, and NVIDIA cuVS version 26.06:
 
 ```bash
 docker pull rapidsai/cuvs-bench:26.06a-cuda12-py3.13 # substitute cuvs-bench for the exact desired container.
@@ -44,8 +44,8 @@ CUDA and Python versions can be changed to supported values:
 
 Exact tags are listed on Docker Hub:
 
-- [cuVS bench images](https://hub.docker.com/r/rapidsai/cuvs-bench/tags)
-- [cuVS bench CPU only images](https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags)
+- [NVIDIA cuVS bench images](https://hub.docker.com/r/rapidsai/cuvs-bench/tags)
+- [NVIDIA cuVS bench CPU only images](https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags)
 
 **Note:** GPU containers use the CUDA toolkit inside the container. The host only needs a compatible driver, so CUDA 12 containers can run on systems with CUDA 13.x-capable drivers. GPU access also requires the NVIDIA Docker runtime from the [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-docker).
 
@@ -57,9 +57,9 @@ Build cuVS Bench from source when you need local benchmark executables that matc
 
 CUDA 12+ and a GPU with Volta architecture or later are required to run the benchmarks.
 
-Please refer to the  [installation docs](../build.md) for the base requirements to build cuVS.
+Please refer to the  [installation docs](/installation) for the base requirements to build NVIDIA cuVS.
 
-In addition to the base requirements for building cuVS, additional dependencies needed to build the ANN benchmarks include:
+In addition to the base requirements for building NVIDIA cuVS, additional dependencies needed to build the ANN benchmarks include:
 
 1. FAISS GPU >= 1.7.1
 2. Google Logging (GLog)
@@ -70,7 +70,7 @@ In addition to the base requirements for building cuVS, additional dependencies 
 
 [rapids-cmake](https://github.com/rapidsai/rapids-cmake) is used to build the ANN benchmarks so the code for dependencies not already supplied in the CUDA toolkit will be downloaded and built automatically.
 
-The easiest and most reproducible way to install the dependencies needed to build the ANN benchmarks is to use the conda environment file located in the `conda/environments` directory of the cuVS repository. The following command will use `mamba` to build and activate a new environment for compiling the benchmarks:
+The easiest and most reproducible way to install the dependencies needed to build the ANN benchmarks is to use the conda environment file located in the `conda/environments` directory of the NVIDIA cuVS repository. The following command will use `mamba` to build and activate a new environment for compiling the benchmarks:
 
 ```bash
 conda env create --name cuvs_benchmarks -f conda/environments/bench_ann_cuda-132_arch-$(uname -m).yaml
@@ -81,7 +81,7 @@ The above conda environment will also reduce the compile times as dependencies l
 
 ### Compiling the Benchmarks
 
-After the needed dependencies are satisfied, the easiest way to compile ANN benchmarks is through the `build.sh` script in the root of the cuVS source code repository. The following will build the executables for all the supported algorithms:
+After the needed dependencies are satisfied, the easiest way to compile ANN benchmarks is through the `build.sh` script in the root of the NVIDIA cuVS source code repository. The following will build the executables for all the supported algorithms:
 
 ```bash
 ./build.sh bench-ann

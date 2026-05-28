@@ -16,7 +16,10 @@ Multi-GPU parameters to build CAGRA Index
 This structure extends the base CAGRA index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuCagraIndexParams { ... };
+struct cuvsMultiGpuCagraIndexParams {
+  cuvsCagraIndexParams_t base_params;
+  cuvsMultiGpuDistributionMode mode;
+};
 ```
 
 **Fields**
@@ -74,7 +77,12 @@ Multi-GPU parameters to search CAGRA index
 This structure extends the base CAGRA search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuCagraSearchParams { ... };
+struct cuvsMultiGpuCagraSearchParams {
+  cuvsCagraSearchParams_t base_params;
+  cuvsMultiGpuReplicatedSearchMode search_mode;
+  cuvsMultiGpuShardedMergeMode merge_mode;
+  int64_t n_rows_per_batch;
+};
 ```
 
 **Fields**
@@ -129,12 +137,13 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSe
 <a id="cuvsmultigpucagraindex"></a>
 ### cuvsMultiGpuCagraIndex
 
-Struct to hold address of cuvs::neighbors::mg_index&lt;cagra::index&gt; and its active trained
-
-dtype
+Struct to hold address of cuvs::neighbors::mg_index&lt;cagra::index&gt; and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsMultiGpuCagraIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsMultiGpuCagraIndex;
 ```
 
 **Fields**

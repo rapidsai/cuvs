@@ -1,6 +1,6 @@
-# NVIDIA cuVS: A Library for Unstructured Data Processing on the GPU
+# NVIDIA cuVS: A library for vector search on the GPU
 
-NVIDIA cuVS is a GPU-accelerated library for nearest neighbors, vector compression, and clustering. It provides both core building blocks for constructing new algorithms and end-to-end algorithms that can be used directly or through a growing list of [integrations](integrations.md).
+NVIDIA cuVS is a GPU-accelerated library for vector search on the GPU. Vector search includes nearest neighbors, vector compression and clustering. It provides both core building blocks for constructing new algorithms and end-to-end algorithms that can be used directly or through a growing list of [integrations](/getting-started/integrations).
 
 ## Useful Resources
 
@@ -14,7 +14,7 @@ NVIDIA cuVS is a GPU-accelerated library for nearest neighbors, vector compressi
 
 ## What is NVIDIA cuVS?
 
-NVIDIA cuVS contains state-of-the-art implementations of several algorithms for running approximate and exact nearest neighbors, vector compression, and clustering on the GPU. It can be used directly or through the various databases and other libraries that have integrated it. The primary goal of NVIDIA cuVS is to simplify the use of GPUs for vector similarity search, preprocessing, and clustering. For a broader introduction, start with the [introductory materials](introduction.md) in Getting Started.
+NVIDIA cuVS contains state-of-the-art implementations of several algorithms for running approximate and exact nearest neighbors, vector compression, and clustering on the GPU. It can be used directly or through the various databases and other libraries that have integrated it. The primary goal of NVIDIA cuVS is to simplify the use of GPUs for vector similarity search, preprocessing, and clustering. For a broader introduction, start with the [introductory materials](/getting-started/introduction) in Getting Started.
 
 Vector search is an information retrieval method for finding semantically similar items in embedding spaces, especially when working with multimedia embeddings created from unstructured data. It is also used in *data mining and machine learning* tasks and comprises an important step in many *clustering* and *visualization* algorithms like [UMAP](https://arxiv.org/abs/2008.00325), [t-SNE](https://lvdmaaten.github.io/tsne/), K-means, and [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html).
 
@@ -22,7 +22,7 @@ Finally, faster vector search enables interactions between dense vectors and gra
 
 ## Where is NVIDIA cuVS used?
 
-These are common places where vector search appears. For more examples, see [Use-cases](use_cases.md) and [Integrations](integrations.md).
+These are common places where vector search appears. For more examples, see [Use-cases](/getting-started/use-cases) and [Integrations](/getting-started/integrations).
 
 ### Semantic search
 - Generative AI: RAG & Agentic AI
@@ -48,7 +48,7 @@ There are several benefits to using NVIDIA cuVS and GPUs for vector search, incl
 
 1. Fast index build
 2. Latency critical and high throughput search
-3. [Parameter tuning](tuning_guide.md)
+3. [Parameter tuning](/getting-started/introduction/tuning-indexes)
 4. Cost savings
 5. Interoperability (build on GPU, deploy on CPU)
 6. Multiple language support

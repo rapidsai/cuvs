@@ -15,9 +15,9 @@ Source builds and package installs require a supported NVIDIA GPU. For current s
 - [C](/installation/c): install or build the C API and `libcuvs_c`.
 - [C++](/installation/cpp): install or build the C++ headers and `libcuvs`.
 - [Python](/installation/python): install Python wheels or conda packages, or build the Python package from source.
-- [Java](/installation/java): build the Java API and connect it to matching native cuVS libraries.
-- [Go](/installation/go): install the Go module and configure CGO against native cuVS libraries.
-- [Rust](/installation/rust): install the Rust crate and configure native cuVS dependencies.
+- [Java](/installation/java): build the Java API and connect it to matching native NVIDIA cuVS libraries.
+- [Go](/installation/go): install the Go module and configure CGO against native NVIDIA cuVS libraries.
+- [Rust](/installation/rust): install the Rust crate and configure native NVIDIA cuVS dependencies.
 
 ## Build From Source
 

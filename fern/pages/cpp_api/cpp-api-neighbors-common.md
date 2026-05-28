@@ -14,7 +14,7 @@ _Source header: `cuvs/neighbors/common.hpp`_
 The base for approximate KNN index structures.
 
 ```cpp
-struct index { ... };
+struct index;
 ```
 
 <a id="neighbors-index-params"></a>
@@ -23,7 +23,10 @@ struct index { ... };
 The base for KNN index parameters.
 
 ```cpp
-struct index_params { ... };
+struct index_params {
+  cuvs::distance::DistanceType metric;
+  float metric_arg;
+};
 ```
 
 **Fields**
@@ -41,7 +44,10 @@ Strategy for merging indices.
 This enum is declared separately to avoid namespace pollution when including common.hpp. It provides a generic merge strategy that can be used across different index types.
 
 ```cpp
-enum class MergeStrategy { ... };
+enum class MergeStrategy {
+  MERGE_STRATEGY_PHYSICAL = 0,
+  MERGE_STRATEGY_LOGICAL = 1
+};
 ```
 
 **Values**
@@ -60,7 +66,7 @@ Two-dimensional dataset; maybe owning, maybe compressed, maybe strided.
 
 ```cpp
 template <typename IdxT>
-struct dataset { ... };
+struct dataset;
 ```
 
 <a id="neighbors-vpq-dataset"></a>
@@ -75,7 +81,11 @@ The dataset is compressed using two level quantization
 
 ```cpp
 template <typename MathT, typename IdxT>
-struct vpq_dataset : public dataset<IdxT> { ... };
+struct vpq_dataset : public dataset<IdxT> {
+  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data;
+};
 ```
 
 **Fields**
@@ -97,7 +107,7 @@ TODO: Make this struct internal (tracking issue: https://github.com/rapidsai/cuv
 
 ```cpp
 template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
-struct list_base { ... };
+struct list_base;
 ```
 
 <a id="neighbors-ivf-list"></a>
@@ -111,7 +121,11 @@ typename SizeT,
 typename... SpecExtraArgs>
 struct list : public list_base<typename SpecT<SizeT, SpecExtraArgs...>::value_type,
 typename SpecT<SizeT, SpecExtraArgs...>::index_type,
-SizeT> { ... };
+SizeT> {
+  raft::device_mdarray<value_type, list_extents, raft::row_major> data;
+  raft::device_mdarray<index_type, raft::extent_1d<size_type>, raft::row_major> indices;
+  std::atomic<size_type> size;
+};
 ```
 
 **Fields**
@@ -130,7 +144,11 @@ SizeT> { ... };
 Filtering for ANN Types
 
 ```cpp
-enum class FilterType { ... };
+enum class FilterType {
+  None,
+  Bitmap,
+  Bitset
+};
 ```
 
 **Values**
@@ -172,13 +190,14 @@ FilterType get_filter_type() const override;
 <a id="neighbors-filtering-ivf-to-sample-filter"></a>
 ### neighbors::filtering::ivf_to_sample_filter
 
-Filter used to convert the cluster index and sample index
-
-of an IVF search into a sample index. This can be used as an intermediate filter.
+Filter used to convert the cluster index and sample index of an IVF search into a sample index. This can be used as an intermediate filter.
 
 ```cpp
 template <typename index_t, typename filter_t>
-struct ivf_to_sample_filter : public base_filter { ... };
+struct ivf_to_sample_filter : public base_filter {
+  const index_t* const* inds_ptrs_;
+  const filter_t next_filter_;
+};
 ```
 
 **Fields**
@@ -216,7 +235,9 @@ Filter an index with a bitmap
 
 ```cpp
 template <typename bitmap_t, typename index_t>
-struct bitmap_filter : public base_filter { ... };
+struct bitmap_filter : public base_filter {
+  const view_t bitmap_view_;
+};
 ```
 
 **Fields**
@@ -258,7 +279,9 @@ Filter an index with a bitset
 
 ```cpp
 template <typename bitset_t, typename index_t>
-struct bitset_filter : public base_filter { ... };
+struct bitset_filter : public base_filter {
+  const view_t bitset_view_;
+};
 ```
 
 **Fields**
@@ -301,7 +324,7 @@ FilterType get_filter_type() const override;
 ### neighbors::distribution_mode
 
 ```cpp
-enum distribution_mode { ... };
+enum distribution_mode;
 ```
 
 <a id="neighbors-mg-index-params"></a>
@@ -309,7 +332,9 @@ enum distribution_mode { ... };
 
 ```cpp
 template <typename Upstream>
-struct mg_index_params : public Upstream { ... };
+struct mg_index_params : public Upstream {
+  cuvs::neighbors::distribution_mode mode;
+};
 ```
 
 **Fields**
@@ -324,7 +349,10 @@ struct mg_index_params : public Upstream { ... };
 ### neighbors::replicated_search_mode
 
 ```cpp
-enum replicated_search_mode { ... };
+enum replicated_search_mode {
+  LOAD_BALANCER,
+  ROUND_ROBIN
+};
 ```
 
 **Values**
@@ -338,7 +366,10 @@ enum replicated_search_mode { ... };
 ### neighbors::sharded_merge_mode
 
 ```cpp
-enum sharded_merge_mode { ... };
+enum sharded_merge_mode {
+  MERGE_ON_ROOT_RANK,
+  TREE_MERGE
+};
 ```
 
 **Values**
@@ -353,7 +384,11 @@ enum sharded_merge_mode { ... };
 
 ```cpp
 template <typename Upstream>
-struct mg_search_params : public Upstream { ... };
+struct mg_search_params : public Upstream {
+  cuvs::neighbors::replicated_search_mode search_mode;
+  cuvs::neighbors::sharded_merge_mode merge_mode;
+  int64_t n_rows_per_batch;
+};
 ```
 
 **Fields**

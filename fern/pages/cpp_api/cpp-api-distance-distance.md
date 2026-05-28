@@ -14,7 +14,29 @@ _Source header: `cuvs/distance/distance.hpp`_
 enum to tell how to compute distance
 
 ```cpp
-enum class DistanceType : int { ... };
+enum class DistanceType : int {
+  L2Expanded = 0,
+  CosineExpanded = 2,
+  L1 = 3,
+  L2Unexpanded = 4,
+  InnerProduct = 6,
+  Linf = 7,
+  Canberra = 8,
+  LpUnexpanded = 9,
+  CorrelationExpanded = 10,
+  JaccardExpanded = 11,
+  HellingerExpanded = 12,
+  Haversine = 13,
+  BrayCurtis = 14,
+  JensenShannon = 15,
+  HammingUnexpanded = 16,
+  KLDivergence = 17,
+  RusselRaoExpanded = 18,
+  DiceExpanded = 19,
+  BitwiseHamming = 20,
+  Precomputed = 100,
+  CustomUDF = 101
+};
 ```
 
 **Values**
@@ -51,7 +73,14 @@ Density kernel type for Kernel Density Estimation.
 These are the smoothing kernels used in KDE — distinct from the dot-product kernels (RBF, Polynomial, etc.) in cuvs::distance::kernels used by SVMs.
 
 ```cpp
-enum class DensityKernelType : int { ... };
+enum class DensityKernelType : int {
+  Gaussian = 0,
+  Tophat = 1,
+  Epanechnikov = 2,
+  Exponential = 3,
+  Linear = 4,
+  Cosine = 5
+};
 ```
 
 **Values**
@@ -78,7 +107,12 @@ The following kernels are implemented:
 - TANH $K(x_1, x_2) = \tanh(\gamma \langle x_1,x_2 \rangle + \mathrm{coef0})$
 
 ```cpp
-struct KernelParams { ... };
+struct KernelParams {
+  KernelType kernel;
+  int degree;
+  double gamma;
+  double coef0;
+};
 ```
 
 **Fields**
@@ -293,7 +327,7 @@ Usage example:
 
 **Additional overload:** `distance::pairwise_distance`
 
-Compute sparse pairwise distances between x and y, using the provided
+Compute sparse pairwise distances between x and y, using the provided input configuration and distance function.
 
 ```cpp
 void pairwise_distance(raft::resources const& handle,
@@ -303,8 +337,6 @@ raft::device_matrix_view<float, int, raft::row_major> dist,
 cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
-
-input configuration and distance function.
 
 **Parameters**
 
@@ -323,7 +355,7 @@ input configuration and distance function.
 
 **Additional overload:** `distance::pairwise_distance`
 
-Compute sparse pairwise distances between x and y, using the provided
+Compute sparse pairwise distances between x and y, using the provided input configuration and distance function.
 
 ```cpp
 void pairwise_distance(raft::resources const& handle,
@@ -333,8 +365,6 @@ raft::device_matrix_view<double, int, raft::row_major> dist,
 cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
-
-input configuration and distance function.
 
 **Parameters**
 

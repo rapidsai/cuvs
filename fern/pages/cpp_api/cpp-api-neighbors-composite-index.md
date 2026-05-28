@@ -19,5 +19,5 @@ Usage example:
 
 ```cpp
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class composite_index { ... };
+class composite_index;
 ```

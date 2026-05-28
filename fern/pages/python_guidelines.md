@@ -4,7 +4,7 @@ slug: developer-guide/coding-guidelines/python-guidelines
 
 # Python Guidelines
 
-This page collects Python-facing conventions for cuVS development. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when changing Python APIs, Cython bindings, Python packaging, or user-facing Python documentation.
+This page collects Python-facing conventions for NVIDIA cuVS development. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when changing Python APIs, Cython bindings, Python packaging, or user-facing Python documentation.
 
 ## Local Development
 
@@ -16,15 +16,15 @@ If source builds are not being used, install the local RAFT Python artifacts int
 
 ### Bindings
 
-Python APIs, like all other cuVS language bindings, should wrap the C APIs and should not call C++ or CUDA implementation code directly. The C layer is the ABI-stable boundary for bindings, so ABI compatibility needs to be maintained there. See [ABI Stability](../developer_guide/abi_stability.md) for more detail.
+Python APIs, like all other NVIDIA cuVS language bindings, should wrap the C APIs and should not call C++ or CUDA implementation code directly. The C layer is the ABI-stable boundary for bindings, so ABI compatibility needs to be maintained there. See [ABI Stability](/developer-guide/abi-stability) for more detail.
 
-Keep Cython bindings focused on translating Python inputs into cuVS calls and returning Python-friendly outputs. Heavy algorithmic work should stay in C++ or CUDA implementation code.
+Keep Cython bindings focused on translating Python inputs into NVIDIA cuVS calls and returning Python-friendly outputs. Heavy algorithmic work should stay in C++ or CUDA implementation code.
 
 ## Coding Style
 
 ### Formatting
 
-cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda or pip:
+NVIDIA cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda or pip:
 
 ```bash
 conda install -c conda-forge pre-commit

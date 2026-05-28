@@ -14,7 +14,10 @@ _Source header: `cuvs/core/c_api.h`_
 An enum denoting error statuses for function calls
 
 ```c
-typedef enum { ... } cuvsError_t;
+typedef enum {
+  CUVS_ERROR = 0,
+  CUVS_SUCCESS = 1
+} cuvsError_t;
 ```
 
 **Values**
@@ -27,13 +30,11 @@ typedef enum { ... } cuvsError_t;
 <a id="cuvsgetlasterrortext"></a>
 ### cuvsGetLastErrorText
 
-Returns a string describing the last seen error on this thread, or
+Returns a string describing the last seen error on this thread, or NULL if the last function succeeded.
 
 ```c
 CUVS_EXPORT const char* cuvsGetLastErrorText();
 ```
-
-NULL if the last function succeeded.
 
 **Returns**
 
@@ -42,13 +43,11 @@ NULL if the last function succeeded.
 <a id="cuvssetlasterrortext"></a>
 ### cuvsSetLastErrorText
 
-Sets a string describing an error seen on the thread. Passing NULL
+Sets a string describing an error seen on the thread. Passing NULL clears any previously seen error message.
 
 ```c
 CUVS_EXPORT void cuvsSetLastErrorText(const char* error);
 ```
-
-clears any previously seen error message.
 
 **Parameters**
 
@@ -68,7 +67,15 @@ clears any previously seen error message.
 An enum denoting log levels
 
 ```c
-typedef enum { ... } cuvsLogLevel_t;
+typedef enum {
+  CUVS_LOG_LEVEL_TRACE = 0,
+  CUVS_LOG_LEVEL_DEBUG = 1,
+  CUVS_LOG_LEVEL_INFO = 2,
+  CUVS_LOG_LEVEL_WARN = 3,
+  CUVS_LOG_LEVEL_ERROR = 4,
+  CUVS_LOG_LEVEL_CRITICAL = 5,
+  CUVS_LOG_LEVEL_OFF = 6
+} cuvsLogLevel_t;
 ```
 
 **Values**
@@ -167,13 +174,11 @@ CUVS_EXPORT cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 <a id="cuvsstreamset"></a>
 ### cuvsStreamSet
 
-Set cudaStream_t on cuvsResources_t to queue CUDA kernels on APIs
+Set cudaStream_t on cuvsResources_t to queue CUDA kernels on APIs that accept a cuvsResources_t handle
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 ```
-
-that accept a cuvsResources_t handle
 
 **Parameters**
 
@@ -248,13 +253,11 @@ CUVS_EXPORT cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 <a id="cuvsmultigpuresourcescreate"></a>
 ### cuvsMultiGpuResourcesCreate
 
-Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
+Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg` for multi-GPU operations
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
 ```
-
-for multi-GPU operations
 
 **Parameters**
 
@@ -269,14 +272,12 @@ for multi-GPU operations
 <a id="cuvsmultigpuresourcescreatewithdeviceids"></a>
 ### cuvsMultiGpuResourcesCreateWithDeviceIds
 
-Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
+Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg` for multi-GPU operations with specific device IDs
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
 DLManagedTensor* device_ids);
 ```
-
-for multi-GPU operations with specific device IDs
 
 **Parameters**
 
@@ -375,7 +376,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes
 <a id="cuvsrmmpoolmemoryresourceenable"></a>
 ### cuvsRMMPoolMemoryResourceEnable
 
-Switches the working memory resource to use the RMM pool memory resource, which will
+Switches the working memory resource to use the RMM pool memory resource, which will bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed.
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
@@ -383,16 +384,12 @@ int max_pool_size_percent,
 bool managed);
 ```
 
-bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed.
-
-available memory available memory
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `initial_pool_size_percent` | in | `int` | The initial pool size as a percentage of the total |
-| `max_pool_size_percent` | in | `int` | The maximum pool size as a percentage of the total |
+| `initial_pool_size_percent` | in | `int` | The initial pool size as a percentage of the total available memory |
+| `max_pool_size_percent` | in | `int` | The maximum pool size as a percentage of the total available memory |
 | `managed` | in | `bool` | Whether to use a managed memory resource as upstream resource or not |
 
 **Returns**

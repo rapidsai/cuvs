@@ -11,19 +11,23 @@ _Source header: `cuvs/neighbors/nn_descent.h`_
 <a id="cuvsnndescentdistcompdtype"></a>
 ### cuvsNNDescentDistCompDtype
 
-Dtype to use for distance computation
+Dtype to use for distance computation - `NND_DIST_COMP_AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions. - `NND_DIST_COMP_FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage. - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
 
 ```c
-typedef enum { ... } cuvsNNDescentDistCompDtype;
+typedef enum {
+  NND_DIST_COMP_AUTO = 0,
+  NND_DIST_COMP_FP32 = 1,
+  NND_DIST_COMP_FP16 = 2
+} cuvsNNDescentDistCompDtype;
 ```
 
 **Values**
 
-| Name | Value | Description |
-| --- | --- | --- |
-| `NND_DIST_COMP_AUTO` | `0` | Automatically determine the best dtype for distance computation based on the dataset dimensions. |
-| `NND_DIST_COMP_FP32` | `1` | Use fp32 distance computation for better precision at the cost of performance and memory usage. |
-| `NND_DIST_COMP_FP16` | `2` | Use fp16 distance computation. |
+| Name | Value |
+| --- | --- |
+| `NND_DIST_COMP_AUTO` | `0` |
+| `NND_DIST_COMP_FP32` | `1` |
+| `NND_DIST_COMP_FP16` | `2` |
 
 ## The nn-descent algorithm parameters.
 
@@ -33,7 +37,16 @@ typedef enum { ... } cuvsNNDescentDistCompDtype;
 Parameters used to build an nn-descent index
 
 ```c
-struct cuvsNNDescentIndexParams { ... };
+struct cuvsNNDescentIndexParams {
+  cuvsDistanceType metric;
+  float metric_arg;
+  size_t graph_degree;
+  size_t intermediate_graph_degree;
+  size_t max_iterations;
+  float termination_threshold;
+  bool return_distances;
+  cuvsNNDescentDistCompDtype dist_comp_dtype;
+};
 ```
 
 **Fields**
@@ -95,7 +108,10 @@ CUVS_EXPORT cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams
 Struct to hold address of cuvs::neighbors::nn_descent::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsNNDescentIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsNNDescentIndex;
 ```
 
 **Fields**
@@ -148,7 +164,7 @@ CUVS_EXPORT cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
 <a id="cuvsnndescentbuild"></a>
 ### cuvsNNDescentBuild
 
-Build a NN-Descent index with a `DLManagedTensor` which has underlying
+Build a NN-Descent index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` 3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
@@ -157,13 +173,6 @@ DLManagedTensor* dataset,
 DLManagedTensor* graph,
 cuvsNNDescentIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
-3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
-4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 

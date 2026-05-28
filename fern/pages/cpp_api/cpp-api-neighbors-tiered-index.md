@@ -15,7 +15,11 @@ Tiered Index class
 
 ```cpp
 template <typename UpstreamT>
-struct index : cuvs::neighbors::index { ... };
+struct index : cuvs::neighbors::index {
+  std::shared_ptr<detail::index_state<UpstreamT>> state;
+  std::mutex write_mutex;
+  mutable std::shared_mutex ann_mutex;
+};
 ```
 
 **Fields**

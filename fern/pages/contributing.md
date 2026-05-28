@@ -1,6 +1,6 @@
 # Contributing
 
-If you are interested in contributing to cuVS, your contributions will fall
+If you are interested in contributing to NVIDIA cuVS, your contributions will fall
 into three categories:
 1. You want to report a bug, feature request, or documentation issue
     - File an [issue](https://github.com/rapidsai/cuvs/issues/new/choose)
@@ -20,7 +20,7 @@ into three categories:
 
 ## Code contributions
 
-Performance-critical changes require [proper benchmarks](cpp_guidelines.md#performance-benchmarking). Pull requests that affect performance-critical paths will not be merged until those benchmarks are produced; there are no exceptions to this rule.
+Performance-critical changes require [proper benchmarks](/developer-guide/coding-guidelines/cpp-guidelines#performance-benchmarking). Pull requests that affect performance-critical paths will not be merged until those benchmarks are produced; there are no exceptions to this rule.
 
 ### Your first issue
 

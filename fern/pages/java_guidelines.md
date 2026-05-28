@@ -4,11 +4,11 @@ slug: developer-guide/coding-guidelines/java-guidelines
 
 # Java Guidelines
 
-This page collects the conventions that keep the cuVS Java APIs predictable, resource-safe, and aligned with the native cuVS API. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when changing Java APIs, Panama bindings, native library loading, Java packaging, or Java-facing documentation.
+This page collects the conventions that keep the NVIDIA cuVS Java APIs predictable, resource-safe, and aligned with the native NVIDIA cuVS API. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when changing Java APIs, Panama bindings, native library loading, Java packaging, or Java-facing documentation.
 
 ## Local Development
 
-Most Java changes can be developed directly in this repository. The Java APIs depend on the native cuVS C library, so local testing usually requires matching native libraries to be built first.
+Most Java changes can be developed directly in this repository. The Java APIs depend on the native NVIDIA cuVS C library, so local testing usually requires matching native libraries to be built first.
 
 Use `./build.sh libcuvs java` from the repository root when the native libraries need to be rebuilt. If matching native libraries are already available, use `./build.sh java` from the repository root or `./build.sh` from the `java` directory.
 
@@ -18,7 +18,7 @@ The Java package uses Maven, JDK 22 for the Panama-backed implementation, and a 
 
 ### General Guidelines
 
-Public Java APIs should be small Java-friendly wrappers around the cuVS C API. The Java layer should translate Java objects into native handles, arrays, matrices, streams, and parameters; heavy algorithmic work should stay in the native cuVS implementation.
+Public Java APIs should be small Java-friendly wrappers around the NVIDIA cuVS C API. The Java layer should translate Java objects into native handles, arrays, matrices, streams, and parameters; heavy algorithmic work should stay in the native NVIDIA cuVS implementation.
 
 Expose predictable Java types:
 
@@ -33,7 +33,7 @@ Keep generated Panama bindings and native `MemorySegment` details out of the pub
 
 Java APIs are consumed by downstream applications and should change carefully. Add new methods or overloads before removing old ones, preserve existing builder behavior where possible, and avoid changing defaults in ways that silently alter search quality, memory use, or native resource ownership.
 
-The Java bindings should call the cuVS C APIs rather than C++ or CUDA implementation details directly. The C layer is the ABI-stable boundary for bindings, so changes that require new native behavior should usually start with the C API. See [ABI Stability](../developer_guide/abi_stability.md) for more detail.
+The Java bindings should call the NVIDIA cuVS C APIs rather than C++ or CUDA implementation details directly. The C layer is the ABI-stable boundary for bindings, so changes that require new native behavior should usually start with the C API. See [ABI Stability](/developer-guide/abi-stability) for more detail.
 
 ### Resource Lifecycle
 
@@ -41,9 +41,10 @@ Use `AutoCloseable` for resources, matrices, indexes, temporary native allocatio
 
 ```java
 try (CuVSResources resources = CuVSResources.create();
+    CuVSMatrix dataset = loadDatasetMatrix();
     CagraIndex index =
         CagraIndex.newBuilder(resources)
-            .withDataset(vectors)
+            .withDataset(dataset)
             .withIndexParams(indexParams)
             .build()) {
   SearchResults results = index.search(query);
@@ -66,7 +67,7 @@ Check every native return code through a shared helper such as `checkCuVSError`.
 
 Avoid hidden copies between Java heap, host memory, and device memory. Prefer `CuVSMatrix` builders or device-backed matrix APIs when callers need to control where data lives. When a convenience API accepts Java arrays, document that it may allocate and copy data into native memory.
 
-Keep Java-side work around native calls light. The Java layer should validate inputs, prepare native views, call the cuVS C API, and return Java objects that own their native results. Do not reimplement vector search, clustering, or preprocessing logic in Java.
+Keep Java-side work around native calls light. The Java layer should validate inputs, prepare native views, call the NVIDIA cuVS C API, and return Java objects that own their native results. Do not reimplement vector search, clustering, or preprocessing logic in Java.
 
 ### Threading Model
 
@@ -90,7 +91,7 @@ When adding a native dependency, update packaging, provider loading, tests, and 
 
 ### Formatting
 
-cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
+NVIDIA cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
 
 ```bash
 conda install -c conda-forge pre-commit
@@ -134,7 +135,7 @@ mvn spotless:apply
 
 Place public API types in `com.nvidia.cuvs`, service-provider types in `com.nvidia.cuvs.spi`, and implementation details in `com.nvidia.cuvs.internal`. Avoid exporting implementation packages from `module-info.java`.
 
-Keep public interfaces and builders readable. Prefer clear Java names over native abbreviations unless the abbreviation is already part of the cuVS API surface.
+Keep public interfaces and builders readable. Prefer clear Java names over native abbreviations unless the abbreviation is already part of the NVIDIA cuVS API surface.
 
 ### Copyright
 
@@ -164,7 +165,7 @@ When a randomized test fails, reproduce it with the reported `tests.seed`.
 
 Validate Java inputs before creating native tensors or launching native work. Use Java exceptions such as `NullPointerException`, `IllegalArgumentException`, `IllegalStateException`, or `LibraryException` where they make the caller problem clear.
 
-Translate native cuVS failures consistently through shared helpers. Do not ignore native return codes, and do not let partially constructed native handles escape without a matching cleanup path.
+Translate native NVIDIA cuVS failures consistently through shared helpers. Do not ignore native return codes, and do not let partially constructed native handles escape without a matching cleanup path.
 
 ### Documentation
 

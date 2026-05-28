@@ -12,7 +12,9 @@ _Source: `rust/cuvs/src/dlpack.rs`_
 
 ```rust
 #[derive(Debug)]
-pub struct ManagedTensor(ffi::DLManagedTensor);
+pub struct ManagedTensor(ffi::DLManagedTensor); {
+    /* private fields */
+}
 ```
 
 ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
@@ -29,7 +31,7 @@ This lets you pass matrices in device or host memory into cuvs.
 ### as_ptr
 
 ```rust
-pub fn as_ptr(&self) -> *mut ffi::DLManagedTensor { ... }
+pub fn as_ptr(&self) -> *mut ffi::DLManagedTensor
 ```
 
 _Source: `rust/cuvs/src/dlpack.rs:21`_
@@ -37,7 +39,7 @@ _Source: `rust/cuvs/src/dlpack.rs:21`_
 ### to_device
 
 ```rust
-pub fn to_device(&self, res: &Resources) -> Result<ManagedTensor> { ... }
+pub fn to_device(&self, res: &Resources) -> Result<ManagedTensor>
 ```
 
 Creates a new ManagedTensor on the current GPU device, and copies
@@ -56,7 +58,7 @@ D: ndarray::Dimension,
 &self,
 res: &Resources,
 arr: &mut ndarray::ArrayBase<S, D>,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Copies data from device memory into host memory
@@ -68,7 +70,9 @@ _Source: `rust/cuvs/src/dlpack.rs:14`_
 ## IntoDtype
 
 ```rust
-pub trait IntoDtype { ... }
+pub trait IntoDtype {
+    /* required methods omitted */
+}
 ```
 
 _Source: `rust/cuvs/src/dlpack.rs:16`_

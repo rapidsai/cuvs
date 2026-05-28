@@ -106,7 +106,7 @@ spectral_embedding::helpers::create_connectivity_graph(
 
 Spectral Embedding turns local neighbor relationships into coordinates. First, it builds or accepts a sparse graph where rows are nodes and edges connect nearby or related rows. Then it builds a graph Laplacian from that connectivity graph. Finally, it computes eigenvectors associated with the smallest eigenvalues and uses those eigenvectors as the embedding coordinates.
 
-The embedding preserves graph structure rather than only preserving global Euclidean variance. This is different from [PCA](pca.md), which is linear and does not build a graph.
+The embedding preserves graph structure rather than only preserving global Euclidean variance. This is different from [PCA](/user-guide/api-guides/preprocessing-guide/pca), which is linear and does not build a graph.
 
 ## When to use Spectral Embedding
 

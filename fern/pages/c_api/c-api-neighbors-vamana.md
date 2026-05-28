@@ -14,7 +14,17 @@ _Source header: `cuvs/neighbors/vamana.h`_
 Supplemental parameters to build Vamana Index
 
 ```c
-struct cuvsVamanaIndexParams { ... };
+struct cuvsVamanaIndexParams {
+  cuvsDistanceType metric;
+  uint32_t graph_degree;
+  uint32_t visited_size;
+  float vamana_iters;
+  float alpha;
+  float max_fraction;
+  float batch_base;
+  uint32_t queue_size;
+  uint32_t reverse_batchsize;
+};
 ```
 
 **Fields**
@@ -77,7 +87,10 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t par
 Struct to hold address of cuvs::neighbors::vamana::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsVamanaIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsVamanaIndex;
 ```
 
 **Fields**

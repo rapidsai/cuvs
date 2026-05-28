@@ -11,12 +11,14 @@ _Source header: `cuvs/preprocessing/quantize/binary.h`_
 <a id="cuvsbinaryquantizerthreshold"></a>
 ### cuvsBinaryQuantizerThreshold
 
-In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in
-
-the dataset vector is greater than the corresponding element in the threshold vector. The mean and sampling_median thresholds are calculated separately for each dimension.
+In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in the dataset vector is greater than the corresponding element in the threshold vector. The mean and sampling_median thresholds are calculated separately for each dimension.
 
 ```c
-enum cuvsBinaryQuantizerThreshold { ... };
+enum cuvsBinaryQuantizerThreshold {
+  ZERO = 0,
+  MEAN = 1,
+  SAMPLING_MEDIAN = 2
+};
 ```
 
 **Values**
@@ -33,7 +35,10 @@ enum cuvsBinaryQuantizerThreshold { ... };
 Binary quantizer parameters.
 
 ```c
-struct cuvsBinaryQuantizerParams { ... };
+struct cuvsBinaryQuantizerParams {
+  /* * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform */ enum cuvsBinaryQuantizerThreshold threshold;
+  /* * specifies the sampling ratio */ float sampling_ratio;
+};
 ```
 
 **Fields**
@@ -89,7 +94,10 @@ Defines and stores threshold for quantization upon training
 The quantization is performed by a linear mapping of an interval in the float data type to the full range of the quantized int type.
 
 ```c
-typedef struct { ... } cuvsBinaryQuantizer;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsBinaryQuantizer;
 ```
 
 **Fields**

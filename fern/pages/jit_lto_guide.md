@@ -1074,7 +1074,7 @@ __device__ bool is_divisible<data_t>(data_t value)
 }
 ```
 
-This is the most common pattern that you will see in cuVS's JIT LTO code. Note that any code that calls `is_divisible()` does not
+This is the most common pattern that you will see in NVIDIA cuVS's JIT LTO code. Note that any code that calls `is_divisible()` does not
 need to know the value of `Divisor`, which allows the caller to be multiplied over fewer dimensions, thus reducing the amount of code
 generated.
 
@@ -1120,7 +1120,7 @@ using data_t = @data_type@;
 template __device__ bool filter<data_t>(data_t value);
 ```
 
-This is another common pattern that you will see in cuVS JIT LTO. Note that the adapter file does not contain any adapter functions,
+This is another common pattern that you will see in NVIDIA cuVS JIT LTO. Note that the adapter file does not contain any adapter functions,
 but merely instantiates a different algorithm function based on which algorithm file is included based on the CMake substitution.
 
 When a piece of algorithm code is used in multiple kernels, it should be split into its own shared fragment. At this point, it
