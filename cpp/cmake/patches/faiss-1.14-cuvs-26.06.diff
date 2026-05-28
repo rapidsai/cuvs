@@ -106,10 +106,18 @@ index 3ba6066..4c1df72 100644
 
      /// Pinned memory allocation for use with this GPU
 diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.cu
-index b331fdc..f5b295e 100644
+index b331fdc..2f536c3 100644
 --- a/faiss/gpu/impl/BinaryCuvsCagra.cu
 +++ b/faiss/gpu/impl/BinaryCuvsCagra.cu
-@@ -110,12 +110,14 @@ BinaryCuvsCagra::BinaryCuvsCagra(
+@@ -58,7 +58,6 @@ BinaryCuvsCagra::BinaryCuvsCagra(
+
+     index_params_.intermediate_graph_degree = intermediate_graph_degree;
+     index_params_.graph_degree = graph_degree;
+-    index_params_.attach_dataset_on_build = store_dataset;
+
+     index_params_.metric = cuvs::distance::DistanceType::BitwiseHamming;
+
+@@ -110,12 +109,14 @@ BinaryCuvsCagra::BinaryCuvsCagra(
          auto dataset_mds =
                  raft::make_device_matrix_view<const uint8_t, int64_t>(
                          train_dataset, n, dim / 8);
@@ -125,7 +133,7 @@ index b331fdc..f5b295e 100644
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else if (!distances_on_gpu && !knn_graph_on_gpu) {
          // copy idx_t (int64_t) host knn_graph to uint32_t host knn_graph
-@@ -128,12 +130,14 @@ BinaryCuvsCagra::BinaryCuvsCagra(
+@@ -128,12 +129,14 @@ BinaryCuvsCagra::BinaryCuvsCagra(
 
          auto dataset_mds = raft::make_host_matrix_view<const uint8_t, int64_t>(
                  train_dataset, n, dim / 8);
@@ -141,7 +149,29 @@ index b331fdc..f5b295e 100644
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else {
          FAISS_THROW_MSG(
-@@ -212,14 +216,18 @@ void BinaryCuvsCagra::search(
+@@ -170,6 +173,7 @@ void BinaryCuvsCagra::train(idx_t n, const uint8_t* x) {
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
+                 cuvs::neighbors::cagra::build(
+                         raft_handle, index_params_, dataset));
++        store_dataset_ = true;
+     } else {
+         auto dataset = raft::make_host_matrix_view<const uint8_t, int64_t>(
+                 x, n, dim_ / 8);
+@@ -177,6 +181,13 @@ void BinaryCuvsCagra::train(idx_t n, const uint8_t* x) {
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
+                 cuvs::neighbors::cagra::build(
+                         raft_handle, index_params_, dataset));
++        if (store_dataset_) {
++            device_dataset_for_host_storage_ =
++                    cuvs::neighbors::make_padded_dataset(raft_handle, dataset);
++            cuvs_index->update_dataset(
++                    raft_handle,
++                    device_dataset_for_host_storage_->as_dataset_view());
++        }
+     }
+ }
+
+@@ -212,14 +223,18 @@ void BinaryCuvsCagra::search(
 
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
@@ -162,7 +192,7 @@ index b331fdc..f5b295e 100644
          }
          store_dataset_ = true;
      }
-@@ -280,6 +288,7 @@ void BinaryCuvsCagra::search(
+@@ -280,6 +295,7 @@ void BinaryCuvsCagra::search(
 
  void BinaryCuvsCagra::reset() {
      cuvs_index.reset();
@@ -200,10 +230,18 @@ index a14480b..7cbfe39 100644
      std::shared_ptr<cuvs::neighbors::cagra::index<uint8_t, uint32_t>>
              cuvs_index{nullptr};
 diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
-index 755817f..0ffdec9 100644
+index 755817f..0ae948e 100644
 --- a/faiss/gpu/impl/CuvsCagra.cu
 +++ b/faiss/gpu/impl/CuvsCagra.cu
-@@ -133,12 +133,14 @@ CuvsCagra<data_t>::CuvsCagra(
+@@ -75,7 +75,6 @@ CuvsCagra<data_t>::CuvsCagra(
+
+     index_params_.intermediate_graph_degree = intermediate_graph_degree;
+     index_params_.graph_degree = graph_degree;
+-    index_params_.attach_dataset_on_build = store_dataset;
+     index_params_.guarantee_connectivity = guarantee_connectivity;
+
+     if (!ivf_pq_search_params_) {
+@@ -133,12 +132,14 @@ CuvsCagra<data_t>::CuvsCagra(
 
          auto dataset_mds = raft::make_device_matrix_view<const data_t, int64_t>(
                  dataset, n, dim);
@@ -219,7 +257,7 @@ index 755817f..0ffdec9 100644
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else if (!dataset_on_gpu && !knn_graph_on_gpu) {
          // copy idx_t (int64_t) host knn_graph to uint32_t host knn_graph
-@@ -151,12 +153,14 @@ CuvsCagra<data_t>::CuvsCagra(
+@@ -151,12 +152,14 @@ CuvsCagra<data_t>::CuvsCagra(
 
          auto dataset_mds = raft::make_host_matrix_view<const data_t, int64_t>(
                  dataset, n, dim);
@@ -235,7 +273,29 @@ index 755817f..0ffdec9 100644
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else {
          FAISS_THROW_MSG(
-@@ -248,13 +252,17 @@ void CuvsCagra<data_t>::search(
+@@ -207,6 +210,7 @@ void CuvsCagra<data_t>::train(idx_t n, const data_t* x) {
+                 cuvs::neighbors::cagra::index<data_t, uint32_t>>(
+                 cuvs::neighbors::cagra::build(
+                         raft_handle, index_params_, dataset));
++        store_dataset_ = true;
+     } else {
+         auto dataset =
+                 raft::make_host_matrix_view<const data_t, int64_t>(x, n, dim_);
+@@ -214,6 +218,13 @@ void CuvsCagra<data_t>::train(idx_t n, const data_t* x) {
+                 cuvs::neighbors::cagra::index<data_t, uint32_t>>(
+                 cuvs::neighbors::cagra::build(
+                         raft_handle, index_params_, dataset));
++        if (store_dataset_) {
++            device_dataset_for_host_storage_ =
++                    cuvs::neighbors::make_padded_dataset(raft_handle, dataset);
++            cuvs_index->update_dataset(
++                    raft_handle,
++                    device_dataset_for_host_storage_->as_dataset_view());
++        }
+     }
+ }
+
+@@ -248,13 +259,17 @@ void CuvsCagra<data_t>::search(
 
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
@@ -255,7 +315,7 @@ index 755817f..0ffdec9 100644
          }
          store_dataset_ = true;
      }
-@@ -303,6 +311,7 @@ void CuvsCagra<data_t>::search(
+@@ -303,6 +318,7 @@ void CuvsCagra<data_t>::search(
  template <typename data_t>
  void CuvsCagra<data_t>::reset() {
      cuvs_index.reset();

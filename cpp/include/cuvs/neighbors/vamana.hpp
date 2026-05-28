@@ -195,10 +195,27 @@ struct index : cuvs::neighbors::index {
   {
     RAFT_EXPECTS(dataset.extent(0) == vamana_graph.extent(0),
                  "Dataset and vamana_graph must have equal number of rows");
-    auto padded_own         = cuvs::neighbors::make_padded_dataset(res, dataset);
-    auto ds_view            = padded_own->as_dataset_view();
-    full_precision_storage_ = std::move(padded_own);
-    dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
+
+    const bool on_device = raft::get_device_for_address(dataset.data_handle()) >= 0;
+    bool use_padded_view = false;
+    if (on_device) {
+      const int64_t row_stride =
+        dataset.stride(0) > 0 ? static_cast<int64_t>(dataset.stride(0)) : dataset.extent(1);
+      auto d_m = raft::make_device_matrix_view<const T, int64_t>(
+        dataset.data_handle(), dataset.extent(0), row_stride);
+      use_padded_view = cuvs::neighbors::device_matrix_row_width_matches_cagra_required(d_m);
+    }
+
+    if (use_padded_view) {
+      auto padded_view = cuvs::neighbors::make_padded_dataset_view(res, dataset);
+      dataset_         = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(
+        cuvs::neighbors::any_dataset_view<T, int64_t>(padded_view));
+    } else {
+      auto padded_own         = cuvs::neighbors::make_padded_dataset(res, dataset);
+      auto ds_view            = padded_own->as_dataset_view();
+      full_precision_storage_ = std::move(padded_own);
+      dataset_ = std::make_unique<cuvs::neighbors::any_dataset_view<T, int64_t>>(ds_view);
+    }
     update_graph(res, vamana_graph);
 
     raft::resource::sync_stream(res);

@@ -1225,10 +1225,10 @@ auto build(raft::resources const& res,
  * @brief Build the index from a device `dataset_view` (non-owning).
  *
  * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The returned index
- * contains only the optimized graph; call `index::update_dataset` with a
- * `device_padded_dataset_view` or `any_dataset_view` (for example from `make_padded_dataset_view`)
- * before search. For VPQ, use `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and
- * `index::update_dataset(res, vpq.as_dataset_view())` while keeping the `vpq_dataset` alive.
+ * includes the graph and a non-owning dataset view (same padded storage used for graph build);
+ * keep that storage alive for search. For VPQ, use
+ * `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and `index::update_dataset(res,
+ * vpq.as_dataset_view())` while keeping the `vpq_dataset` alive.
  */
 template <typename T, typename IdxT = uint32_t>
 auto build(raft::resources const& res,

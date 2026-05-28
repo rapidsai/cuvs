@@ -2387,6 +2387,8 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
 
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+  // Graph build uses \p padded; attach the same view for search (caller keeps storage alive).
+  idx.update_dataset(res, cuvs::neighbors::any_dataset_view<T, int64_t>(padded));
   return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail

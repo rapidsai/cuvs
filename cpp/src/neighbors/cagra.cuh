@@ -319,7 +319,7 @@ index<T, IdxT> build(
  *
  * Graph construction uses
  * `convert_dataset_view_to_padded_for_graph_build`. The index
- * does not attach a dataset; call `index::update_dataset` before search.
+ * attaches the same padded dataset view used for graph build (non-owning; keep storage alive).
  */
 template <typename T, typename IdxT>
 index<T, IdxT> build(raft::resources const& res,

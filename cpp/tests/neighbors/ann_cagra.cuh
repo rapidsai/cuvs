@@ -62,6 +62,10 @@ void cagra_build_into_index(
 {
   if (ace_host_dataset.has_value()) {
     index = cagra::build(res, params, *ace_host_dataset);
+    // In-memory ACE returns graph-only; attach device padded storage for search.
+    if (index.dim() == 0) {
+      index.update_dataset(res, cuvs::neighbors::any_dataset_view<DataT, int64_t>(padded));
+    }
     return;
   }
   index = cagra::build(res, params, cuvs::neighbors::any_dataset_view<DataT, int64_t>(padded));
@@ -881,11 +885,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
           }
         }
         cagra_build_into_index(handle_, index_params, ace_host_dataset, device_padded.view, index);
-
-        if (!ps.include_serialized_dataset) {
-          index.update_dataset(
-            handle_, cuvs::neighbors::any_dataset_view<DataT, int64_t>(device_padded.view));
-        }
 
         if (ps.use_source_indices) {
           auto source_indices =
