@@ -34,11 +34,11 @@ dataset_tensor.dl_tensor.strides            = nullptr;
 cuvsRMMFree(dataset_dev);
 ```
 
-Please refer to [cuVS C API documentation](/api-reference/c-api-documentation) to learn more.
+Please refer to [NVIDIA cuVS C API documentation](/api-reference/c-api-documentation) to learn more.
 
 ## Multi-dimensional span (C++)
 
-cuVS is built on top of the GPU-accelerated machine learning and data mining primitives in the [RAFT](https://github.com/rapidsai/raft) library. Most of the C++ APIs in cuVS accept [mdspan](https://arxiv.org/abs/2010.06474) multi-dimensional array view for representing data in higher dimensions similar to the `ndarray` in the Numpy Python library. RAFT also contains the corresponding owning `mdarray` structure, which simplifies the allocation and management of multi-dimensional data in both host and device (GPU) memory.
+NVIDIA cuVS is built on top of the GPU-accelerated machine learning and data mining primitives in the [RAFT](https://github.com/rapidsai/raft) library. Most of the C++ APIs in NVIDIA cuVS accept [mdspan](https://arxiv.org/abs/2010.06474) multi-dimensional array view for representing data in higher dimensions similar to the `ndarray` in the Numpy Python library. RAFT also contains the corresponding owning `mdarray` structure, which simplifies the allocation and management of multi-dimensional data in both host and device (GPU) memory.
 
 The `mdarray` is an owning object that forms a convenience layer over RMM and can be constructed in RAFT using a number of different helper functions:
 
@@ -102,4 +102,4 @@ Please refer to RAFT's [mdspan documentation](https://docs.rapids.ai/api/raft/st
 
 The Python APIs accept objects that expose the CUDA Array Interface, which enables interoperability with GPU array libraries such as CuPy, Numba, PyTorch, and TensorFlow without copying device memory when compatible layouts are used.
 
-See [Using APIs in Python](working_with_ann_indexes.md#python) for examples of building and searching cuVS indexes from Python arrays.
+See [Using APIs in Python](/getting-started/using-cu-vs-ap-is#python) for examples of building and searching NVIDIA cuVS indexes from Python arrays.

@@ -63,17 +63,20 @@ index = brute_force.build(dataset, metric="sqeuclidean")
 <Tab title="Java">
 
 ```java
-try (CuVSResources resources = CuVSResources.create()) {
+try (CuVSResources resources = CuVSResources.create();
+    CuVSMatrix dataset = loadDatasetMatrix()) {
   BruteForceIndexParams indexParams =
       new BruteForceIndexParams.Builder()
           .withNumWriterThreads(32)
           .build();
 
-  BruteForceIndex index =
+  try (BruteForceIndex index =
       BruteForceIndex.newBuilder(resources)
-          .withDataset(vectors)
+          .withDataset(dataset)
           .withIndexParams(indexParams)
-          .build();
+          .build()) {
+    // Use index for search or serialization.
+  }
 }
 ```
 
@@ -325,11 +328,12 @@ loaded_index = brute_force.load("/tmp/cuvs-bruteforce.bin")
 <Tab title="Java">
 
 ```java
-try (CuVSResources resources = CuVSResources.create()) {
-  BruteForceIndex index =
+try (CuVSResources resources = CuVSResources.create();
+    CuVSMatrix dataset = loadDatasetMatrix();
+    BruteForceIndex index =
       BruteForceIndex.newBuilder(resources)
-          .withDataset(vectors)
-          .build();
+          .withDataset(dataset)
+          .build()) {
 
   try (FileOutputStream output = new FileOutputStream("/tmp/cuvs-bruteforce.bin")) {
     index.serialize(output);
@@ -351,7 +355,13 @@ try (CuVSResources resources = CuVSResources.create()) {
 
 Brute-force stores the vectors and compares each query against every vector in the dataset. There is no partitioning step, graph traversal, or approximation step.
 
-The build step is mostly a data setup step. The search step does the real work: for each query, cuVS computes distances to every vector, keeps the best `k` candidates, and returns exact nearest neighbors.
+The build step is mostly a data setup step. The search step does the real work: for each query, NVIDIA cuVS computes distances to every vector, keeps the best `k` candidates, and returns exact nearest neighbors.
+
+### Stream pools
+
+The brute-force implementation can use the stream pool attached to the underlying resources object when it has independent chunks of work to schedule. A stream pool gives NVIDIA cuVS several CUDA streams to work with, which can improve GPU utilization for larger searches or partitioned inputs.
+
+Stream pools are configured on the resources object, not through `brute_force::search_params`. Most users should start with the default resources behavior and add a small stream pool only after benchmarking shows a benefit. See [Stream pools](/user-guide/api-guides/core-types/resources#stream-pools) in the Resources guide for setup details.
 
 ## When to use Brute-force
 

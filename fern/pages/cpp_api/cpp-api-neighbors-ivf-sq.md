@@ -25,7 +25,13 @@ IVF-SQ index build parameters.
 IVF-SQ currently uses 8-bit scalar quantization, storing one `uint8_t` code per vector dimension.
 
 ```cpp
-struct index_params : cuvs::neighbors::index_params { ... };
+struct index_params : cuvs::neighbors::index_params {
+  uint32_t n_lists;
+  uint32_t kmeans_n_iters;
+  uint32_t max_train_points_per_cluster;
+  bool conservative_memory_allocation;
+  bool add_data_on_build;
+};
 ```
 
 **Fields**
@@ -35,8 +41,8 @@ struct index_params : cuvs::neighbors::index_params { ... };
 | `n_lists` | `uint32_t` | The number of inverted lists (clusters) |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (index building). |
 | `max_train_points_per_cluster` | `uint32_t` | The number of data vectors (per cluster) to use during iterative kmeans building. |
-| `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
-| `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
+| `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database).<br /><br />The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
+| `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br /><br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
 
 ## IVF-SQ index search parameters
 
@@ -46,7 +52,9 @@ struct index_params : cuvs::neighbors::index_params { ... };
 IVF-SQ index search parameters
 
 ```cpp
-struct search_params : cuvs::neighbors::search_params { ... };
+struct search_params : cuvs::neighbors::search_params {
+  uint32_t n_probes;
+};
 ```
 
 **Fields**
@@ -64,7 +72,11 @@ IVF-SQ list storage spec
 
 ```cpp
 template <typename SizeT, typename CodeT, typename IdxT>
-struct list_spec { ... };
+struct list_spec {
+  SizeT align_max;
+  SizeT align_min;
+  uint32_t dim;
+};
 ```
 
 **Fields**
@@ -100,7 +112,7 @@ Note: `CodeT` is the storage type for scalar-quantized residual codes in the inv
 
 ```cpp
 template <typename CodeT>
-struct index : cuvs::neighbors::index { ... };
+struct index;
 ```
 
 ## IVF-SQ index build

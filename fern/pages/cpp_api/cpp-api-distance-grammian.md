@@ -22,7 +22,7 @@ To be more precise, on exit the output buffer will store:
 
 ```cpp
 template <typename math_t>
-class GramMatrixBase { ... };
+class GramMatrixBase;
 ```
 
 <a id="distance-kernels-polynomialkernel"></a>
@@ -32,7 +32,7 @@ Create a kernel matrix using polynomial kernel function.
 
 ```cpp
 template <typename math_t, typename exp_t>
-class PolynomialKernel : public GramMatrixBase<math_t> { ... };
+class PolynomialKernel;
 ```
 
 <a id="distance-kernels-tanhkernel"></a>
@@ -42,7 +42,7 @@ Create a kernel matrix using tanh kernel function.
 
 ```cpp
 template <typename math_t>
-class TanhKernel : public GramMatrixBase<math_t> { ... };
+class TanhKernel;
 ```
 
 <a id="distance-kernels-rbfkernel"></a>
@@ -52,5 +52,5 @@ Create a kernel matrix using RBF kernel function.
 
 ```cpp
 template <typename math_t>
-class RBFKernel : public GramMatrixBase<math_t> { ... };
+class RBFKernel;
 ```

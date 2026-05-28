@@ -1,6 +1,6 @@
 # cuVS Bench Parameter Tuning Guide
 
-This guide outlines the various parameter settings that can be specified in [cuVS Benchmarks](index.md) yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
+This guide outlines the various parameter settings that can be specified in [cuVS Benchmarks](/user-guide/benchmarking-guide/cu-vs-bench-tool) yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
 
 ## Benchmark modes
 
@@ -8,7 +8,7 @@ When you run benchmarks with `BenchmarkOrchestrator.run_benchmark()`, you can ch
 
 **Sweep mode (default)**
 
-Pass `mode="sweep"` or omit `mode`. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see [Creating and customizing algorithm configurations](running.md#creating-and-customizing-algorithm-configurations)). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
+Pass `mode="sweep"` or omit `mode`. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see [Creating and customizing algorithm configurations](/user-guide/benchmarking-guide/cu-vs-bench-tool/usage#creating-and-customizing-algorithm-configurations)). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
 
 **Tune mode**
 
@@ -33,11 +33,11 @@ results = orchestrator.run_benchmark(
 
 The parameter tables below describe the build and search knobs that sweep mode varies and that tune mode can optimize.
 
-## cuVS Indexes
+## NVIDIA cuVS Indexes
 
 ### cuvs_brute_force
 
-Use cuVS brute-force index for exact search. Brute-force has no further build or search parameters.
+Use NVIDIA cuVS brute-force index for exact search. Brute-force has no further build or search parameters.
 
 ### cuvs_ivf_flat
 
@@ -65,7 +65,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
 | `ratio` | `build` | N | Positive integer >0 | 2 | `1/ratio` is the number of training points which should be used to train the clusters. |
 | `pq_dim` | `build` | N | Positive integer. Multiple of 8. | 0 | Dimensionality of the vector after product quantization. When 0, a heuristic is used to select this value. |
 | `pq_bits` | `build` | N | Positive integer [4-8] | 8 | Bit length of the vector element after quantization. |
-| `codebook_kind` | `build` | N | [`cluster`, `subspace`] | `subspace` | Type of codebook. See [IVF-PQ index overview](../neighbors/ivfpq.md) for more detail |
+| `codebook_kind` | `build` | N | [`cluster`, `subspace`] | `subspace` | Type of codebook. See [IVF-PQ index overview](/user-guide/api-guides/indexing-guide/ivf-pq) for more detail |
 | `dataset_memory_type` | `build` | N | [`device`, `host`, `mmap`] | `mmap` | Where should the dataset reside? |
 | `query_memory_type` | `search` | N | [`device`, `host`, `mmap`] | `device` | Where should the queries reside? |
 | `nprobe` | `search` | Y | Positive integer >0 | 20 | The closest number of clusters to search for each query vector. Larger values will improve recall but will search more points in the index. |
@@ -109,7 +109,7 @@ To fine tune CAGRA index building we can customize IVF-PQ index builder options 
 | `ivf_pq_build_ratio` | `build` | N | Positive integer >0 | 10 | `1/ratio` is the number of training points which should be used to train the clusters. |
 | `ivf_pq_pq_dim` | `build` | N | Positive integer. Multiple of 8 | dim/2 rounded up to 8 | Dimensionality of the vector after product quantization. When 0, a heuristic is used to select this value. `pq_dim` * `pq_bits` must be a multiple of 8. |
 | `ivf_pq_build_pq_bits` | `build` | N | Positive integer [4-8] | 8 | Bit length of the vector element after quantization. |
-| `ivf_pq_build_codebook_kind` | `build` | N | [`cluster`, `subspace`] | `subspace` | Type of codebook. See [IVF-PQ index overview](../neighbors/ivfpq.md) for more detail |
+| `ivf_pq_build_codebook_kind` | `build` | N | [`cluster`, `subspace`] | `subspace` | Type of codebook. See [IVF-PQ index overview](/user-guide/api-guides/indexing-guide/ivf-pq) for more detail |
 | `ivf_pq_build_nprobe` | `search` | N | Positive integer >0 | min(2*dim, nlist) | The closest number of clusters to search for each query vector. Larger values will improve recall but will search more points in the index. |
 | `ivf_pq_build_internalDistanceDtype` | `search` | N | [`float`, `half`] | `half` | The precision to use for the distance computations. Lower precision can increase performance at the cost of accuracy. |
 | `ivf_pq_build_smemLutDtype` | `search` | N | [`float`, `half`, `fp8`] | `fp8` | The precision to use for the lookup table in shared memory. Lower precision can increase performance at the cost of accuracy. |
@@ -212,7 +212,7 @@ Use FAISS IVF-PQ index on CPU
 
 ### cuvs_hnsw
 
-cuVS HNSW builds an HNSW index using the ACE (Augmented Core Extraction) algorithm, which enables GPU-accelerated HNSW index construction for datasets too large to fit in GPU memory.
+NVIDIA cuVS HNSW builds an HNSW index using the ACE (Augmented Core Extraction) algorithm, which enables GPU-accelerated HNSW index construction for datasets too large to fit in GPU memory.
 
 | Parameter | Type | Required | Data Type | Default | Description |
 | --- | --- | --- | --- | --- | --- |

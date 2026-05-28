@@ -14,7 +14,10 @@ _Source header: `cuvs/neighbors/cagra.h`_
 Enum to denote which ANN algorithm is used to build CAGRA graph
 
 ```c
-enum cuvsCagraGraphBuildAlgo { ... };
+enum cuvsCagraGraphBuildAlgo {
+  AUTO_SELECT = 0,
+  IVF_PQ = 1
+};
 ```
 
 **Values**
@@ -27,14 +30,12 @@ enum cuvsCagraGraphBuildAlgo { ... };
 <a id="cuvscagrahnswheuristictype"></a>
 ### cuvsCagraHnswHeuristicType
 
-A strategy for selecting the graph build parameters based on similar HNSW index
-
-parameters.
+A strategy for selecting the graph build parameters based on similar HNSW index parameters.
 
 Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
 
 ```c
-enum cuvsCagraHnswHeuristicType { ... };
+enum cuvsCagraHnswHeuristicType;
 ```
 
 <a id="cuvscagracompressionparams"></a>
@@ -43,15 +44,22 @@ enum cuvsCagraHnswHeuristicType { ... };
 Parameters for VPQ compression.
 
 ```c
-struct cuvsCagraCompressionParams { ... };
+struct cuvsCagraCompressionParams {
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+  uint32_t vq_n_centers;
+  uint32_t kmeans_n_iters;
+  double vq_kmeans_trainset_fraction;
+  double pq_kmeans_trainset_fraction;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: [4, 5, 6, 7, 8]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ.<br /><br />Possible values: [4, 5, 6, 7, 8].<br /><br />Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic.<br /><br />TODO: at the moment `dim` must be a multiple `pq_dim`. |
 | `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
 | `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). When zero, an optimal value is selected using a heuristic. |
@@ -69,19 +77,26 @@ ACE enables building indexes for datasets too large to fit in GPU memory by:
 3. Concatenating sub-graphs into a final unified index
 
 ```c
-struct cuvsAceParams { ... };
+struct cuvsAceParams {
+  size_t npartitions;
+  size_t ef_construction;
+  const char* build_dir;
+  bool use_disk;
+  double max_host_memory_gb;
+  double max_gpu_memory_gb;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build. When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests). If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
-| `ef_construction` | `size_t` | The index quality for the ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
-| `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
-| `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
-| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
-| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build.<br /><br />When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory.<br /><br />Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).<br /><br />If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
+| `ef_construction` | `size_t` | The index quality for the ACE build.<br /><br />Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
+| `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).<br /><br />Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
+| `use_disk` | `bool` | Whether to use disk-based storage for ACE build.<br /><br />When true, enables disk-based operations for memory-efficient graph construction. |
+| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB.<br /><br />When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB.<br /><br />When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
 
 <a id="cuvscagraindexparams"></a>
 ### cuvsCagraIndexParams
@@ -89,7 +104,15 @@ struct cuvsAceParams { ... };
 Supplemental parameters to build CAGRA Index
 
 ```c
-struct cuvsCagraIndexParams { ... };
+struct cuvsCagraIndexParams {
+  cuvsDistanceType metric;
+  size_t intermediate_graph_degree;
+  size_t graph_degree;
+  enum cuvsCagraGraphBuildAlgo build_algo;
+  size_t nn_descent_niter;
+  cuvsCagraCompressionParams_t compression;
+  void* graph_build_params;
+};
 ```
 
 **Fields**
@@ -101,7 +124,7 @@ struct cuvsCagraIndexParams { ... };
 | `graph_degree` | `size_t` | Degree of output graph. |
 | `build_algo` | [`enum cuvsCagraGraphBuildAlgo`](/api-reference/c-api-neighbors-cagra#cuvscagragraphbuildalgo) | ANN algorithm to build knn graph. |
 | `nn_descent_niter` | `size_t` | Number of Iterations to run if building with NN_DESCENT |
-| `compression` | [`cuvsCagraCompressionParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagracompressionparams) | Optional: specify compression parameters if compression is desired. NOTE: this is experimental new API, consider it unsafe. |
+| `compression` | [`cuvsCagraCompressionParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagracompressionparams) | Optional: specify compression parameters if compression is desired.<br /><br />NOTE: this is experimental new API, consider it unsafe. |
 | `graph_build_params` | `void*` | Optional: specify graph build params based on build_algo<br />- IVF_PQ: cuvsIvfPqParams_t<br />- ACE: cuvsAceParams_t<br />- Others: nullptr |
 
 <a id="cuvscagraindexparamscreate"></a>
@@ -259,7 +282,9 @@ This factory function creates CAGRA parameters that yield a graph compatible wit
 Supplemental parameters to extend CAGRA Index
 
 ```c
-struct cuvsCagraExtendParams { ... };
+struct cuvsCagraExtendParams {
+  uint32_t max_chunk_size;
+};
 ```
 
 **Fields**
@@ -309,7 +334,7 @@ CUVS_EXPORT cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t par
 <a id="cuvscagraextend"></a>
 ### cuvsCagraExtend
 
-Extend a CAGRA index with a `DLManagedTensor` which has underlying
+Extend a CAGRA index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` 3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsCagraExtend(cuvsResources_t res,
@@ -317,13 +342,6 @@ cuvsCagraExtendParams_t params,
 DLManagedTensor* additional_dataset,
 cuvsCagraIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
-3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
-4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -346,7 +364,12 @@ cuvsCagraIndex_t index);
 Enum to denote algorithm used to search CAGRA Index
 
 ```c
-enum cuvsCagraSearchAlgo { ... };
+enum cuvsCagraSearchAlgo {
+  SINGLE_CTA = 0,
+  MULTI_CTA = 1,
+  MULTI_KERNEL = 2,
+  AUTO = 100
+};
 ```
 
 **Values**
@@ -364,7 +387,11 @@ enum cuvsCagraSearchAlgo { ... };
 Enum to denote Hash Mode used while searching CAGRA index
 
 ```c
-enum cuvsCagraHashMode { ... };
+enum cuvsCagraHashMode {
+  HASH = 0,
+  SMALL = 1,
+  AUTO_HASH = 100
+};
 ```
 
 **Values**
@@ -381,7 +408,24 @@ enum cuvsCagraHashMode { ... };
 Supplemental parameters to search CAGRA index
 
 ```c
-struct cuvsCagraSearchParams { ... };
+struct cuvsCagraSearchParams {
+  size_t max_queries;
+  size_t itopk_size;
+  size_t max_iterations;
+  enum cuvsCagraSearchAlgo algo;
+  size_t team_size;
+  size_t search_width;
+  size_t min_iterations;
+  size_t thread_block_size;
+  enum cuvsCagraHashMode hashmap_mode;
+  size_t hashmap_min_bitlen;
+  float hashmap_max_fill_rate;
+  uint32_t num_random_samplings;
+  uint64_t rand_xor_mask;
+  bool persistent;
+  float persistent_lifetime;
+  float persistent_device_usage;
+};
 ```
 
 **Fields**
@@ -389,7 +433,7 @@ struct cuvsCagraSearchParams { ... };
 | Name | Type | Description |
 | --- | --- | --- |
 | `max_queries` | `size_t` | Maximum number of queries to search at the same time (batch size). Auto select when 0. |
-| `itopk_size` | `size_t` | Number of intermediate search results retained during the search. This is the main knob to adjust trade off between accuracy and search speed. Higher values improve the search accuracy. |
+| `itopk_size` | `size_t` | Number of intermediate search results retained during the search.<br /><br />This is the main knob to adjust trade off between accuracy and search speed. Higher values improve the search accuracy. |
 | `max_iterations` | `size_t` | Upper limit of search iterations. Auto select when 0. |
 | `algo` | [`enum cuvsCagraSearchAlgo`](/api-reference/c-api-neighbors-cagra#cuvscagrasearchalgo) | Which search implementation to use. |
 | `team_size` | `size_t` | Number of threads used to calculate a single distance. 4, 8, 16, or 32. |
@@ -403,7 +447,7 @@ struct cuvsCagraSearchParams { ... };
 | `rand_xor_mask` | `uint64_t` | Bit mask used for initial random seed node selection. |
 | `persistent` | `bool` | Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) |
 | `persistent_lifetime` | `float` | Persistent kernel: time in seconds before the kernel stops if no requests received. |
-| `persistent_device_usage` | `float` | Set the fraction of maximum grid size used by persistent kernel. Value 1.0 means the kernel grid size is maximum possible for the selected device. The value must be greater than 0.0 and not greater than 1.0. One may need to run other kernels alongside this persistent kernel. This parameter can be used to reduce the grid size of the persistent kernel to leave a few SMs idle. Note: running any other work on GPU alongside with the persistent kernel makes the setup fragile.<br />- Running another kernel in another thread usually works, but no progress guaranteed<br />- Any CUDA allocations block the context (this issue may be obscured by using pools)<br />- Memory copies to not-pinned host memory may block the context Even when we know there are no other kernels working at the same time, setting kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care. If you suspect this is an issue, you can reduce this number to ~0.9 without a significant impact on the throughput. |
+| `persistent_device_usage` | `float` | Set the fraction of maximum grid size used by persistent kernel. Value 1.0 means the kernel grid size is maximum possible for the selected device. The value must be greater than 0.0 and not greater than 1.0.<br /><br />One may need to run other kernels alongside this persistent kernel. This parameter can be used to reduce the grid size of the persistent kernel to leave a few SMs idle. Note: running any other work on GPU alongside with the persistent kernel makes the setup fragile.<br />- Running another kernel in another thread usually works, but no progress guaranteed<br />- Any CUDA allocations block the context (this issue may be obscured by using pools)<br />- Memory copies to not-pinned host memory may block the context<br /><br />Even when we know there are no other kernels working at the same time, setting kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care. If you suspect this is an issue, you can reduce this number to ~0.9 without a significant impact on the throughput. |
 
 <a id="cuvscagrasearchparamscreate"></a>
 ### cuvsCagraSearchParamsCreate
@@ -451,7 +495,10 @@ CUVS_EXPORT cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t par
 Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsCagraIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsCagraIndex;
 ```
 
 **Fields**
@@ -612,7 +659,7 @@ Note that the DLManagedTensor graph returned will have an associated 'deleter' f
 <a id="cuvscagrabuild"></a>
 ### cuvsCagraBuild
 
-Build a CAGRA index with a `DLManagedTensor` which has underlying
+Build a CAGRA index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` 3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsCagraBuild(cuvsResources_t res,
@@ -620,13 +667,6 @@ cuvsCagraIndexParams_t params,
 DLManagedTensor* dataset,
 cuvsCagraIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
-3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
-4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 **Parameters**
 
@@ -646,7 +686,7 @@ cuvsCagraIndex_t index);
 <a id="cuvscagrasearch"></a>
 ### cuvsCagraSearch
 
-Search a CAGRA index with a `DLManagedTensor` which has underlying
+Search a CAGRA index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the CAGRA Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsCagraSearch(cuvsResources_t res,
@@ -657,12 +697,6 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter filter);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the CAGRA Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
-
-1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16` c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
-2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64`
-3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 

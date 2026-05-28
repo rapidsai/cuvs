@@ -14,19 +14,26 @@ _Source header: `cuvs/neighbors/cagra.hpp`_
 Specialized parameters for ACE (Augmented Core Extraction) graph build
 
 ```cpp
-struct ace_params { ... };
+struct ace_params {
+  size_t npartitions;
+  size_t ef_construction;
+  std::string build_dir;
+  bool use_disk;
+  double max_host_memory_gb;
+  double max_gpu_memory_gb;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build. When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests). If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
-| `ef_construction` | `size_t` | The index quality for the ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
-| `build_dir` | `std::string` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
-| `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
-| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
-| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `npartitions` | `size_t` | Number of partitions for ACE (Augmented Core Extraction) partitioned build.<br /><br />When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory.<br /><br />Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).<br /><br />If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
+| `ef_construction` | `size_t` | The index quality for the ACE build.<br /><br />Bigger values increase the index quality. At some point, increasing this will no longer improve the quality. |
+| `build_dir` | `std::string` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).<br /><br />Used when `use_disk` is true or when the graph does not fit in host and GPU memory. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping. |
+| `use_disk` | `bool` | Whether to use disk-based storage for ACE build.<br /><br />When true, enables disk-based operations for memory-efficient graph construction. |
+| `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB.<br /><br />When set to 0 (default), uses available host memory. When set to a positive value, limits host memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
+| `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB.<br /><br />When set to 0 (default), uses available GPU memory. When set to a positive value, limits GPU memory usage to the specified amount. Useful for testing or when running alongside other memory-intensive processes. |
 
 ## CAGRA index build parameters
 
@@ -36,15 +43,25 @@ struct ace_params { ... };
 Parameters for VPQ compression.
 
 ```cpp
-struct vpq_params { ... };
+struct vpq_params {
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+  uint32_t vq_n_centers;
+  uint32_t kmeans_n_iters;
+  double vq_kmeans_trainset_fraction;
+  double pq_kmeans_trainset_fraction;
+  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type;
+  uint32_t max_train_points_per_pq_code;
+  uint32_t max_train_points_per_vq_cluster;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: [4, 5, 6, 7, 8]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ.<br /><br />Possible values: [4, 5, 6, 7, 8].<br /><br />Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic.<br /><br />TODO: at the moment `dim` must be a multiple `pq_dim`. |
 | `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
 | `vq_kmeans_trainset_fraction` | `double` | The fraction of data to use during iterative kmeans building (VQ phase). When zero, an optimal value is selected using a heuristic. |
@@ -56,14 +73,12 @@ struct vpq_params { ... };
 <a id="neighbors-cagra-hnsw-heuristic-type"></a>
 ### neighbors::cagra::hnsw_heuristic_type
 
-A strategy for selecting the graph build parameters based on similar HNSW index
-
-parameters.
+A strategy for selecting the graph build parameters based on similar HNSW index parameters.
 
 Define how `cagra::index_params::from_hnsw_params` should construct a graph to construct a graph that is to be converted to (used by) a CPU HNSW index.
 
 ```cpp
-enum class hnsw_heuristic_type : uint32_t { ... };
+enum class hnsw_heuristic_type : uint32_t;
 ```
 
 <a id="neighbors-cagra-index-params-from-hnsw-params"></a>
@@ -108,7 +123,12 @@ Usage example:
 CAGRA index search parameters
 
 ```cpp
-enum class search_algo { ... };
+enum class search_algo {
+  SINGLE_CTA = 0,
+  MULTI_CTA = 1,
+  MULTI_KERNEL = 2,
+  AUTO = 100
+};
 ```
 
 **Values**
@@ -128,7 +148,9 @@ enum class search_algo { ... };
 CAGRA index extend parameters
 
 ```cpp
-struct extend_params { ... };
+struct extend_params {
+  uint32_t max_chunk_size;
+};
 ```
 
 **Fields**
@@ -148,7 +170,7 @@ The index stores the dataset and a kNN graph in device memory.
 
 ```cpp
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index { ... };
+struct index;
 ```
 
 <a id="neighbors-cagra-index-metric"></a>
@@ -323,8 +345,7 @@ Construct an empty index.
 
 ```cpp
 index(raft::resources const& res,
-cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
-: cuvs::neighbors::index(),
+cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 ```
 
 **Parameters**
@@ -350,8 +371,7 @@ raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_access
 raft::mdspan<const graph_index_type,
 raft::matrix_extent<int64_t>,
 raft::row_major,
-graph_accessor> knn_graph)
-: cuvs::neighbors::index(),
+graph_accessor> knn_graph);
 ```
 
 If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around these that stores a non-owning a reference to the arrays.
@@ -923,8 +943,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -933,8 +951,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | additional dataset on device memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -957,8 +975,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -967,8 +983,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -991,8 +1007,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1001,8 +1015,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | additional dataset on device memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<half, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1025,8 +1039,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1035,8 +1047,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<half, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1059,8 +1071,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1069,8 +1079,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | additional dataset on device memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1093,8 +1103,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1103,8 +1111,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1127,8 +1135,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1137,8 +1143,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1161,8 +1167,6 @@ std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view
 
 Usage example:
 
-part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1171,8 +1175,8 @@ part. The data will be copied from the current index in this function. The num r
 | `params` | in | [`const cagra::extend_params&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-extend-params) | extend params |
 | `additional_dataset` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | additional dataset on host memory |
 | `idx` | in,out | [`cuvs::neighbors::cagra::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | CAGRA index |
-| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional Default: `std::nullopt`. |
-| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. Default: `std::nullopt`. |
+| `new_dataset_buffer_view` | out | `std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>` | memory buffer view for the dataset including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets, cols must be the dimension of the dataset, and the stride must be the same as the original index dataset. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the dataset themselves. Default: `std::nullopt`. |
+| `new_graph_buffer_view` | out | `std::optional<raft::device_matrix_view<uint32_t, int64_t>>` | memory buffer view for the graph including the additional part. The data will be copied from the current index in this function. The num rows must be the sum of the original and additional datasets and cols must be the graph degree. This view will be stored in the output index. It is the caller's responsibility to ensure that dataset stays alive as long as the index. This option is useful when users want to manage the memory space for the graph themselves. Default: `std::nullopt`. |
 
 **Returns**
 

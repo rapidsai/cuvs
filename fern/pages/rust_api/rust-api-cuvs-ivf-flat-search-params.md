@@ -11,7 +11,9 @@ _Source: `rust/cuvs/src/ivf_flat/search_params.rs`_
 ## SearchParams
 
 ```rust
-pub struct SearchParams(pub ffi::cuvsIvfFlatSearchParams_t);
+pub struct SearchParams(pub ffi::cuvsIvfFlatSearchParams_t); {
+    /* private fields */
+}
 ```
 
 Supplemental parameters to search IvfFlat index
@@ -26,7 +28,7 @@ Supplemental parameters to search IvfFlat index
 ### new
 
 ```rust
-pub fn new() -> Result<SearchParams> { ... }
+pub fn new() -> Result<SearchParams>
 ```
 
 Returns a new SearchParams object
@@ -36,7 +38,7 @@ _Source: `rust/cuvs/src/ivf_flat/search_params.rs:15`_
 ### set_n_probes
 
 ```rust
-pub fn set_n_probes(self, n_probes: u32) -> SearchParams { ... }
+pub fn set_n_probes(self, n_probes: u32) -> SearchParams
 ```
 
 Supplemental parameters to search IVF-Flat index

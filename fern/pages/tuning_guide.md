@@ -1,8 +1,8 @@
 # Tuning Indexes
 
-Tuning means choosing parameters that meet recall, latency, throughput, memory, freshness, and build-time goals. For cuVS workflows, there are two related problems: tuning a vector search index and tuning a vector database that uses one or more indexes internally.
+Tuning means choosing parameters that meet recall, latency, throughput, memory, freshness, and build-time goals. For NVIDIA cuVS workflows, there are two related problems: tuning a vector search index and tuning a vector database that uses one or more indexes internally.
 
-For background on index choices, see [What is Vector Search?](what_is_vector_search.md). For the difference between an index and a vector database, see [Vector Database](vector_databases_vs_vector_search.md).
+For background on index choices, see [What is Vector Search?](/getting-started/introduction/vector-search). For the difference between an index and a vector database, see [Vector Database](/getting-started/introduction/vector-database).
 
 This page explains how to tune standalone indexes, how that maps to common hyperparameter optimization workflows, and how tuning changes when the index is embedded inside a locally or globally partitioned vector database.
 
@@ -20,7 +20,7 @@ Vector search indexes are tuned much like machine learning models. You define an
 
 Hyperparameter optimization tools such as [Ray Tune](https://medium.com/rapids-ai/30x-faster-hyperparameter-search-with-raytune-and-rapids-403013fbefc5), [Optuna](https://docs.rapids.ai/deployment/stable/examples/rapids-optuna-hpo/notebook/), and similar HPO frameworks can automate random search, Bayesian search, early stopping, and trial tracking. These tools are useful when the search space is large or when recall and performance must be optimized together.
 
-[cuVS Bench](cuvs_bench/introduction.md) also provides a `tune` mode that can perform hyperparameter optimization for benchmark configurations. This is useful when you want the same tool to run reproducible benchmark trials and search for parameter settings that satisfy a recall, latency, throughput, build-time, or memory target.
+[cuVS Bench](/user-guide/benchmarking-guide/cu-vs-bench-tool/introduction) also provides a `tune` mode that can perform hyperparameter optimization for benchmark configurations. This is useful when you want the same tool to run reproducible benchmark trials and search for parameter settings that satisfy a recall, latency, throughput, build-time, or memory target.
 
 This is the same idea as k-fold cross-validation for machine learning models: repeat the experiment across representative splits, tune on one portion of the data, and confirm that the selected parameters generalize to data that was not used during tuning.
 

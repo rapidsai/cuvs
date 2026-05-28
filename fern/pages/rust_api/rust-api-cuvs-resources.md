@@ -12,7 +12,9 @@ _Source: `rust/cuvs/src/resources.rs`_
 
 ```rust
 #[derive(Debug)]
-pub struct Resources(pub ffi::cuvsResources_t);
+pub struct Resources(pub ffi::cuvsResources_t); {
+    /* private fields */
+}
 ```
 
 Resources are objects that are shared between function calls,
@@ -31,7 +33,7 @@ resources that are expensive to create.
 ### new
 
 ```rust
-pub fn new() -> Result<Resources> { ... }
+pub fn new() -> Result<Resources>
 ```
 
 Returns a new Resources object
@@ -41,7 +43,7 @@ _Source: `rust/cuvs/src/resources.rs:17`_
 ### set_cuda_stream
 
 ```rust
-pub fn set_cuda_stream(&self, stream: ffi::cudaStream_t) -> Result<()> { ... }
+pub fn set_cuda_stream(&self, stream: ffi::cudaStream_t) -> Result<()>
 ```
 
 Sets the current cuda stream
@@ -51,7 +53,7 @@ _Source: `rust/cuvs/src/resources.rs:26`_
 ### get_cuda_stream
 
 ```rust
-pub fn get_cuda_stream(&self) -> Result<ffi::cudaStream_t> { ... }
+pub fn get_cuda_stream(&self) -> Result<ffi::cudaStream_t>
 ```
 
 Gets the current cuda stream
@@ -61,7 +63,7 @@ _Source: `rust/cuvs/src/resources.rs:31`_
 ### sync_stream
 
 ```rust
-pub fn sync_stream(&self) -> Result<()> { ... }
+pub fn sync_stream(&self) -> Result<()>
 ```
 
 Syncs the current cuda stream

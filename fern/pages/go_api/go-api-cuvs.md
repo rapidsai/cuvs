@@ -101,7 +101,9 @@ _Source: `go/memory_resource.go:10`_
 ### CuvsPoolMemory
 
 ```go
-type CuvsPoolMemory struct { ... }
+type CuvsPoolMemory struct {
+	// contains filtered or unexported fields
+}
 ```
 
 _Source: `go/memory_resource.go:17`_
@@ -117,7 +119,9 @@ _Source: `go/distance.go:11`_
 ### Resource
 
 ```go
-type Resource struct { ... }
+type Resource struct {
+	Resource C.cuvsResources_t
+}
 ```
 
 Resources are objects that are shared between function calls,
@@ -129,7 +133,9 @@ _Source: `go/resources.go:11`_
 ### Tensor
 
 ```go
-type Tensor[T any] struct { ... }
+type Tensor[T any] struct {
+	C_tensor *C.DLManagedTensor
+}
 ```
 
 ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
@@ -140,7 +146,9 @@ _Source: `go/dlpack.go:21`_
 ### TensorNumberType
 
 ```go
-type TensorNumberType interface { ... }
+type TensorNumberType interface {
+	int64 | uint32 | float32
+}
 ```
 
 _Source: `go/dlpack.go:15`_

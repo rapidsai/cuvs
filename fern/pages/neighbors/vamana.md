@@ -2,7 +2,7 @@
 
 Vamana is a graph-building algorithm used by DiskANN. Think of every vector as a point, and think of the graph as a map that connects each point to nearby points. DiskANN uses that map to search very large indexes efficiently, including indexes that are stored on SSD.
 
-cuVS provides a GPU-accelerated Vamana build path. It builds the graph on the GPU, then serializes it in a format compatible with the open-source [DiskANN](https://github.com/microsoft/DiskANN) library for CPU search.
+NVIDIA cuVS provides a GPU-accelerated Vamana build path. It builds the graph on the GPU, then serializes it in a format compatible with the open-source [DiskANN](https://github.com/microsoft/DiskANN) library for CPU search.
 
 Vamana works well when you want to build large DiskANN-compatible graph indexes quickly on the GPU and use them in CPU or SSD-backed DiskANN search workflows.
 
@@ -10,7 +10,7 @@ Vamana works well when you want to build large DiskANN-compatible graph indexes 
 
 [C API](/api-reference/c-api-neighbors-vamana) | [C++ API](/api-reference/cpp-api-neighbors-vamana) | [Python API](/api-reference/python-api-neighbors-vamana) | [Rust API](/api-reference/rust-api-cuvs-vamana)
 
-Vamana currently supports build and serialize operations in cuVS. Search is performed by loading the serialized index with DiskANN. Java and Go do not currently expose standalone Vamana bindings.
+Vamana currently supports build and serialize operations in NVIDIA cuVS. Search is performed by loading the serialized index with DiskANN. Java and Go do not currently expose standalone Vamana bindings.
 
 ### Building an index
 
@@ -187,7 +187,7 @@ fn build_and_save_vamana_index(dataset: &ndarray::Array2<f32>) -> Result<()> {
 
 ### Loading a serialized index
 
-cuVS Vamana writes DiskANN-compatible files but does not currently expose a Vamana deserialization or search API. Load the serialized output with DiskANN or another DiskANN-compatible search layer.
+NVIDIA cuVS Vamana writes DiskANN-compatible files but does not currently expose a Vamana deserialization or search API. Load the serialized output with DiskANN or another DiskANN-compatible search layer.
 
 ## How Vamana works
 
@@ -209,11 +209,11 @@ Use Vamana when you need a DiskANN-compatible graph and want GPU-accelerated bui
 
 Vamana is a good fit for very large datasets, SSD-backed search workflows, and hybrid workflows where a GPU-built graph is converted to CPU for DiskANN search.
 
-Avoid Vamana when you need an in-cuVS search API today. In that case, use CAGRA for GPU graph search, or use the serialized Vamana output with DiskANN for CPU search.
+Avoid Vamana when you need an in-NVIDIA cuVS search API today. In that case, use CAGRA for GPU graph search, or use the serialized Vamana output with DiskANN for CPU search.
 
 ## Interoperability with CPU DiskANN
 
-The Vamana serialize APIs write files in a DiskANN-compatible format. This lets cuVS build the graph quickly on the GPU, then lets DiskANN load the serialized files for CPU search.
+The Vamana serialize APIs write files in a DiskANN-compatible format. This lets NVIDIA cuVS build the graph quickly on the GPU, then lets DiskANN load the serialized files for CPU search.
 
 Set `include_dataset = true` when the serialized index should include the dataset. Set it to `false` when the dataset is already available in the format expected by the downstream DiskANN workflow, or when writing a sector-aligned index with externally prepared quantized data.
 

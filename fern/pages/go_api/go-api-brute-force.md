@@ -13,7 +13,9 @@ _Sources: `go/brute_force`_
 ### BruteForceIndex
 
 ```go
-type BruteForceIndex struct { ... }
+type BruteForceIndex struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Brute Force KNN Index

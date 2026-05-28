@@ -17,7 +17,14 @@ to their closest landmarks, and the ball radii of each landmark. This class is i
 
 ```cpp
 template <typename idx_t, typename value_t>
-struct index : cuvs::neighbors::index { ... };
+struct index : cuvs::neighbors::index {
+  raft::resources const& handle;
+  int64_t m;
+  int64_t n;
+  int64_t n_landmarks;
+  raft::device_matrix_view<const float, idx_t, raft::row_major> X;
+  cuvs::distance::DistanceType metric;
+};
 ```
 
 **Fields**
@@ -44,14 +51,12 @@ void build(raft::resources const& handle, index<int64_t, float>& index);
 
 Usage example:
 
-cuvs::neighbors::ball_cover::index
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | library resource management handle |
-| `index` | inout | [`index<int64_t, float>&`](/api-reference/cpp-api-neighbors-ball-cover#neighbors-ball-cover-index) | an empty (and not previous built) instance of |
+| `index` | inout | [`index<int64_t, float>&`](/api-reference/cpp-api-neighbors-ball-cover#neighbors-ball-cover-index) | an empty (and not previous built) instance of cuvs::neighbors::ball_cover::index |
 
 **Returns**
 

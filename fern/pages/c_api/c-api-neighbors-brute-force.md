@@ -14,7 +14,10 @@ _Source header: `cuvs/neighbors/brute_force.h`_
 Struct to hold address of cuvs::neighbors::brute_force::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsBruteForceIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsBruteForceIndex;
 ```
 
 **Fields**
@@ -67,7 +70,7 @@ CUVS_EXPORT cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
 <a id="cuvsbruteforcebuild"></a>
 ### cuvsBruteForceBuild
 
-Build a BRUTEFORCE index with a `DLManagedTensor` which has underlying
+Build a BRUTEFORCE index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
@@ -76,11 +79,6 @@ cuvsDistanceType metric,
 float metric_arg,
 cuvsBruteForceIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 **Parameters**
 
@@ -101,7 +99,7 @@ cuvsBruteForceIndex_t index);
 <a id="cuvsbruteforcesearch"></a>
 ### cuvsBruteForceSearch
 
-Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying
+Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the BRUTEFORCE index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or `kDLDataType.bits = 16` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
@@ -111,12 +109,6 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter prefilter);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the BRUTEFORCE index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
-
-1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or `kDLDataType.bits = 16`
-2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
-3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 
