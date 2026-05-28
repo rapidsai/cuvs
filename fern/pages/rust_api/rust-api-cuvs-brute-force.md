@@ -14,7 +14,9 @@ Brute Force KNN
 
 ```rust
 #[derive(Debug)]
-pub struct Index { ... }
+pub struct Index {
+    /* private fields */
+}
 ```
 
 Brute Force KNN Index
@@ -35,7 +37,7 @@ res: &Resources,
 metric: DistanceType,
 metric_arg: Option<f32>,
 dataset: T,
-) -> Result<Index> { ... }
+) -> Result<Index>
 ```
 
 Builds a new Brute Force KNN Index from the dataset for efficient search.
@@ -52,7 +54,7 @@ _Source: `rust/cuvs/src/brute_force.rs:32`_
 ### new
 
 ```rust
-pub fn new() -> Result<Index> { ... }
+pub fn new() -> Result<Index>
 ```
 
 Creates a new empty index
@@ -68,7 +70,7 @@ res: &Resources,
 queries: &ManagedTensor,
 neighbors: &ManagedTensor,
 distances: &ManagedTensor,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Perform a Nearest Neighbors search on the Index

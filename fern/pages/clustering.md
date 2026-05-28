@@ -8,17 +8,17 @@ Clustering is especially important for vectors because vectors do not have a nat
 
 In vector search systems, clustering is often used before search rather than after it. It can summarize data, find structure, create partitions, train quantizers, and make large datasets easier to index. The right clustering method depends on whether you need compact centroids, density-based regions, a hierarchy of connected components, or graph-aware groups.
 
-This page introduces the main clustering methods used around cuVS workflows: K-Means, single-linkage clustering, and spectral clustering. By the end, you should understand why K-Means is often the practical default for vector search at scale and when the other methods are a better fit.
+This page introduces the main clustering methods used around NVIDIA cuVS workflows: K-Means, single-linkage clustering, and spectral clustering. By the end, you should understand why K-Means is often the practical default for vector search at scale and when the other methods are a better fit.
 
 <img alt="A four-panel overview comparing centroid-based, hierarchical, density-based, and graph-based clustering methods." src="/assets/images/clustering_methods_overview.png" />
 
-## Clustering Algorithms in cuVS
+## Clustering Algorithms in NVIDIA cuVS
 
 | Method | How it groups data | Good fit | Main tradeoff |
 | --- | --- | --- | --- |
-| [K-Means](cluster/kmeans.md) | Learns representative centroids and assigns each vector to the nearest centroid | Large-scale partitioning, vector quantization, summarization, and IVF-style workflows | Assumes clusters are reasonably compact around centroids |
-| [Single-linkage](cluster/single_linkage.md) | Builds a hierarchy by repeatedly connecting the closest clusters | Dendrograms, connected components, and chain-like cluster structure | Can merge through thin bridges between groups |
-| [Spectral clustering](cluster/spectral.md) | Builds a graph, embeds the graph with eigenvectors, then clusters the embedding | Curved, connected, or graph-shaped clusters | More expensive because it needs graph and eigensolver work |
+| [K-Means](/user-guide/api-guides/clustering-guide/k-means) | Learns representative centroids and assigns each vector to the nearest centroid | Large-scale partitioning, vector quantization, summarization, and IVF-style workflows | Assumes clusters are reasonably compact around centroids |
+| [Single-linkage](/user-guide/api-guides/clustering-guide/single-linkage) | Builds a hierarchy by repeatedly connecting the closest clusters | Dendrograms, connected components, and chain-like cluster structure | Can merge through thin bridges between groups |
+| [Spectral clustering](/user-guide/api-guides/clustering-guide/spectral-clustering) | Builds a graph, embeds the graph with eigenvectors, then clusters the embedding | Curved, connected, or graph-shaped clusters | More expensive because it needs graph and eigensolver work |
 
 ### K-Means
 
@@ -28,7 +28,7 @@ K-Means is often preferred for vector search at scale because it produces compac
 
 The main limitation is shape. K-Means works best when clusters are roughly compact and centroid-like. If the natural groups are curved, chained, or defined by graph connectivity, K-Means may split one group or merge several groups that should stay separate.
 
-See the [K-Means](cluster/kmeans.md) guide for API examples and memory guidance.
+See the [K-Means](/user-guide/api-guides/clustering-guide/k-means) guide for API examples and memory guidance.
 
 ### Single-Linkage Clustering
 
@@ -38,7 +38,7 @@ This makes single-linkage useful when the hierarchy itself matters or when clust
 
 The same behavior can also be a weakness. Because a single close pair can merge two clusters, single-linkage can chain through sparse bridges and combine groups that should remain separate. It is usually less natural than K-Means for balanced vector-search partitions, especially when the goal is fast assignment and predictable partition sizes.
 
-See the [Single-linkage](cluster/single_linkage.md) guide for API examples and tuning notes.
+See the [Single-linkage](/user-guide/api-guides/clustering-guide/single-linkage) guide for API examples and tuning notes.
 
 ### Spectral Clustering
 
@@ -48,7 +48,7 @@ This is useful when the data has manifold-like structure: points in the same gro
 
 The tradeoff is cost. Spectral clustering needs graph construction and eigenvector computation before the final clustering step. That extra work can be worthwhile for exploratory analysis or graph-shaped data, but it is usually heavier than K-Means for large vector-search indexing pipelines.
 
-See the [Spectral Clustering](cluster/spectral.md) guide for API examples and configuration details.
+See the [Spectral Clustering](/user-guide/api-guides/clustering-guide/spectral-clustering) guide for API examples and configuration details.
 
 ## Why K-Means is common in vector search
 

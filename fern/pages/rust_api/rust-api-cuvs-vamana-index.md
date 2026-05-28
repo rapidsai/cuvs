@@ -12,7 +12,9 @@ _Source: `rust/cuvs/src/vamana/index.rs`_
 
 ```rust
 #[derive(Debug)]
-pub struct Index(ffi::cuvsVamanaIndex_t);
+pub struct Index(ffi::cuvsVamanaIndex_t); {
+    /* private fields */
+}
 ```
 
 Vamana ANN Index
@@ -32,7 +34,7 @@ pub fn build<T: Into<ManagedTensor>>(
 res: &Resources,
 params: &IndexParams,
 dataset: T,
-) -> Result<Index> { ... }
+) -> Result<Index>
 ```
 
 Builds Vamana Index for efficient DiskANN search
@@ -55,7 +57,7 @@ _Source: `rust/cuvs/src/vamana/index.rs:33`_
 ### new
 
 ```rust
-pub fn new() -> Result<Index> { ... }
+pub fn new() -> Result<Index>
 ```
 
 Creates a new empty index
@@ -65,7 +67,7 @@ _Source: `rust/cuvs/src/vamana/index.rs:47`_
 ### serialize
 
 ```rust
-pub fn serialize(self, res: &Resources, filename: &str, include_dataset: bool) -> Result<()> { ... }
+pub fn serialize(self, res: &Resources, filename: &str, include_dataset: bool) -> Result<()>
 ```
 
 Save Vamana index to file

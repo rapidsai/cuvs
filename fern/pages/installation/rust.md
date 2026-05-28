@@ -1,6 +1,6 @@
 # Rust Installation
 
-Use this page when you need the NVIDIA cuVS Rust bindings. The Rust crate depends on the native cuVS C API, so `libcuvs.so` and `libcuvs_c.so` must be available when compiling and running Rust code.
+Use this page when you need the NVIDIA cuVS Rust bindings. The Rust crate depends on the native NVIDIA cuVS C API, so `libcuvs.so` and `libcuvs_c.so` must be available when compiling and running Rust code.
 
 All NVIDIA cuVS routine implementations live in the C++ core. The Rust bindings call into the native C and C++ libraries, so install both `libcuvs_c` and `libcuvs`.
 

@@ -60,7 +60,9 @@ _Source: `go/cagra/index_params.go:21`_
 ### CagraIndex
 
 ```go
-type CagraIndex struct { ... }
+type CagraIndex struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Cagra ANN Index
@@ -70,7 +72,9 @@ _Source: `go/cagra/cagra.go:14`_
 ### CompressionParams
 
 ```go
-type CompressionParams struct { ... }
+type CompressionParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Supplemental parameters to build CAGRA Index
@@ -80,7 +84,9 @@ _Source: `go/cagra/index_params.go:17`_
 ### ExtendParams
 
 ```go
-type ExtendParams struct { ... }
+type ExtendParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Parameters to extend CAGRA Index
@@ -98,7 +104,9 @@ _Source: `go/cagra/search_params.go:26`_
 ### IndexParams
 
 ```go
-type IndexParams struct { ... }
+type IndexParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 _Source: `go/cagra/index_params.go:12`_
@@ -114,7 +122,9 @@ _Source: `go/cagra/search_params.go:17`_
 ### SearchParams
 
 ```go
-type SearchParams struct { ... }
+type SearchParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Supplemental parameters to search CAGRA Index

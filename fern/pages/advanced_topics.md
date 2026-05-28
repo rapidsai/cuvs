@@ -4,9 +4,10 @@ slug: user-guide/advanced-topics
 
 # Advanced Topics
 
-Use these pages when you need lower-level implementation context, runtime behavior, or specialized cuVS features beyond the standard API surface.
+Use these pages when working on specialized NVIDIA cuVS development topics that need lower-level implementation context, runtime behavior, or platform-specific guidance.
 
 ## Topic Guides
 
-- [JIT Compilation](jit_compilation.md): understand when cuVS triggers just-in-time compilation, how caches behave, and how to warm up JIT-compiled kernels.
-- [UDF Usage](udf_usage.md): supply custom CUDA distance metrics for IVF-flat search (C++ only, experimental).
+- [ABI Stability](/developer-guide/abi-stability): understand ABI expectations for developer-facing APIs and downstream integrations.
+- [JIT Compilation](/developer-guide/advanced-topics/jit-compilation): understand when NVIDIA cuVS triggers just-in-time compilation, how caches behave, and how to warm up JIT-compiled kernels.
+- [Link-time Optimization](/developer-guide/link-time-optimization): use JIT LTO for CUDA compilation, fragment generation, and runtime linking workflows.

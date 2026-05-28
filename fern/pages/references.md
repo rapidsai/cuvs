@@ -1,14 +1,14 @@
 # References
 
-Many state-of-the-art implementations of vector search, vector preprocessing, vector compression, and vector clustering algorithms influenced the creation of cuVS. These papers describe core algorithms and GPU primitives used throughout cuVS, from graph-based approximate nearest-neighbor search to clustering, sparse neighborhood methods, top-k selection, and filtered vector search.
+Many state-of-the-art implementations of vector search, vector preprocessing, vector compression, and vector clustering algorithms influenced the creation of NVIDIA cuVS. These papers describe core algorithms and GPU primitives used throughout NVIDIA cuVS, from graph-based approximate nearest-neighbor search to clustering, sparse neighborhood methods, top-k selection, and filtered vector search.
 
-Use this page when citing the research behind cuVS algorithms or when looking for deeper technical background on the methods implemented in the library.
+Use this page when citing the research behind NVIDIA cuVS algorithms or when looking for deeper technical background on the methods implemented in the library.
 
 ## CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search for GPUs
 
 [Paper](https://arxiv.org/abs/2308.15136)
 
-CAGRA introduces a GPU-accelerated graph construction and approximate nearest-neighbor search algorithm. It is the main research foundation for cuVS CAGRA, a graph-based vector search index optimized for fast GPU index build and high-throughput GPU search.
+CAGRA introduces a GPU-accelerated graph construction and approximate nearest-neighbor search algorithm. It is the main research foundation for NVIDIA cuVS CAGRA, a graph-based vector search index optimized for fast GPU index build and high-throughput GPU search.
 
 ```bibtex
 @inproceedings{ootomo2024cagra,
@@ -45,7 +45,7 @@ This paper studies GPU top-k selection and introduces AIR top-K and GridSelect. 
 
 [Paper](https://doi.org/10.1145/3459637.3482344)
 
-This paper adapts NN-Descent to GPU architecture for fast approximate k-nearest-neighbor graph construction. It provides background for cuVS NN-Descent and for workflows that use k-NN graphs as intermediate structures.
+This paper adapts NN-Descent to GPU architecture for fast approximate k-nearest-neighbor graph construction. It provides background for NVIDIA cuVS NN-Descent and for workflows that use k-NN graphs as intermediate structures.
 
 ```bibtex
 @inproceedings{wang2021fastKnnGraph,
@@ -65,7 +65,7 @@ This paper adapts NN-Descent to GPU architecture for fast approximate k-nearest-
 
 [Paper](https://arxiv.org/abs/2306.16354)
 
-cuSLINK reformulates single-linkage agglomerative clustering for the GPU. It connects clustering with nearest-neighbor graph construction, spanning trees, and dendrogram extraction, which makes it relevant to cuVS clustering and graph-building routines.
+cuSLINK reformulates single-linkage agglomerative clustering for the GPU. It connects clustering with nearest-neighbor graph construction, spanning trees, and dendrogram extraction, which makes it relevant to NVIDIA cuVS clustering and graph-building routines.
 
 ```bibtex
 @misc{nolet2023cuslink,
@@ -97,7 +97,7 @@ This paper presents GPU semiring primitives for sparse vector operations and nei
 
 [Paper](https://arxiv.org/abs/2506.00812)
 
-VecFlow studies filtered approximate nearest-neighbor search on GPUs. It is useful background for cuVS filtered-search work and for systems that combine vector indexes with structured metadata filters.
+VecFlow studies filtered approximate nearest-neighbor search on GPUs. It is useful background for NVIDIA cuVS filtered-search work and for systems that combine vector indexes with structured metadata filters.
 
 ```bibtex
 @article{vecflow2025,

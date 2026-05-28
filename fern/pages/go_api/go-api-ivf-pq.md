@@ -64,7 +64,9 @@ _Source: `go/ivf_pq/search_params.go:48`_
 ### IndexParams
 
 ```go
-type IndexParams struct { ... }
+type IndexParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 _Source: `go/ivf_pq/index_params.go:12`_
@@ -72,7 +74,9 @@ _Source: `go/ivf_pq/index_params.go:12`_
 ### IvfPqIndex
 
 ```go
-type IvfPqIndex struct { ... }
+type IvfPqIndex struct {
+	// contains filtered or unexported fields
+}
 ```
 
 IVF PQ Index
@@ -82,7 +86,9 @@ _Source: `go/ivf_pq/ivf_pq.go:14`_
 ### SearchParams
 
 ```go
-type SearchParams struct { ... }
+type SearchParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Supplemental parameters to search IVF PQ Index

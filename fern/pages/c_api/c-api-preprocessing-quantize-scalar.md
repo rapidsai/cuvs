@@ -14,7 +14,7 @@ _Source header: `cuvs/preprocessing/quantize/scalar.h`_
 Scalar quantizer parameters.
 
 ```c
-struct cuvsScalarQuantizerParams { ... };
+struct cuvsScalarQuantizerParams;
 ```
 
 <a id="cuvsscalarquantizerparamscreate"></a>
@@ -63,7 +63,10 @@ Defines and stores scalar for quantisation upon training
 The quantization is performed by a linear mapping of an interval in the float data type to the full range of the quantized int type.
 
 ```c
-typedef struct { ... } cuvsScalarQuantizer;
+typedef struct {
+  double min_;
+  double max_;
+} cuvsScalarQuantizer;
 ```
 
 **Fields**

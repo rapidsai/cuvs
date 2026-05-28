@@ -12,7 +12,9 @@ _Source: `rust/cuvs/src/ivf_flat/index.rs`_
 
 ```rust
 #[derive(Debug)]
-pub struct Index(ffi::cuvsIvfFlatIndex_t);
+pub struct Index(ffi::cuvsIvfFlatIndex_t); {
+    /* private fields */
+}
 ```
 
 Ivf-Flat ANN Index
@@ -32,7 +34,7 @@ pub fn build<T: Into<ManagedTensor>>(
 res: &Resources,
 params: &IndexParams,
 dataset: T,
-) -> Result<Index> { ... }
+) -> Result<Index>
 ```
 
 Builds a new Index from the dataset for efficient search.
@@ -48,7 +50,7 @@ _Source: `rust/cuvs/src/ivf_flat/index.rs:25`_
 ### new
 
 ```rust
-pub fn new() -> Result<Index> { ... }
+pub fn new() -> Result<Index>
 ```
 
 Creates a new empty index
@@ -65,7 +67,7 @@ params: &SearchParams,
 queries: &ManagedTensor,
 neighbors: &ManagedTensor,
 distances: &ManagedTensor,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Perform a Approximate Nearest Neighbors search on the Index

@@ -14,7 +14,14 @@ _Source header: `cuvs/cluster/spectral.hpp`_
 Parameters for spectral clustering
 
 ```cpp
-struct params { ... };
+struct params {
+  int n_clusters;
+  int n_components;
+  int n_init;
+  int n_neighbors;
+  float tolerance;
+  raft::random::RngState rng_state;
+};
 ```
 
 **Fields**
@@ -42,8 +49,6 @@ raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
 raft::device_vector_view<int, int> labels);
 ```
 
-n_clusters-1)
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -51,7 +56,7 @@ n_clusters-1)
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
 | `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cluster-spectral-params) | Spectral clustering parameters |
 | `connectivity_graph` | in | `raft::device_coo_matrix_view<float, int, int, int>` | Sparse COO matrix representing connectivity between data points |
-| `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
+| `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to n_clusters-1) |
 
 **Returns**
 
@@ -68,8 +73,6 @@ raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
 raft::device_vector_view<int, int> labels);
 ```
 
-n_clusters-1)
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -77,7 +80,7 @@ n_clusters-1)
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
 | `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cluster-spectral-params) | Spectral clustering parameters |
 | `connectivity_graph` | in | `raft::device_coo_matrix_view<double, int, int, int>` | Sparse COO matrix representing connectivity between data points |
-| `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
+| `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to n_clusters-1) |
 
 **Returns**
 
@@ -96,8 +99,6 @@ raft::device_vector_view<int, int> labels);
 
 This overload automatically constructs the connectivity graph from the input dataset using k-nearest neighbors.
 
-n_clusters-1)
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -105,7 +106,7 @@ n_clusters-1)
 | `handle` | in | `raft::resources const&` | RAFT resource handle |
 | `config` | in | [`params`](/api-reference/cpp-api-cluster-spectral#cluster-spectral-params) | Spectral clustering parameters |
 | `dataset` | in | `raft::device_matrix_view<float, int, raft::row_major>` | Dense row-major matrix of shape (n_samples, n_features) |
-| `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to |
+| `labels` | out | `raft::device_vector_view<int, int>` | Device vector of size n_samples to store cluster assignments (0 to n_clusters-1) |
 
 **Returns**
 

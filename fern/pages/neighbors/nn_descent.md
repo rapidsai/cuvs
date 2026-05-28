@@ -2,7 +2,7 @@
 
 NN-Descent is a GPU-accelerated graph builder for approximate all-neighbors k-NN graphs. It starts with a rough random graph, repeatedly asks each vector to check its neighbors' neighbors, and keeps better edges as it finds them.
 
-NN-Descent is useful when you need a k-NN graph as an output, or when another cuVS index such as CAGRA needs an approximate graph as an input. It is not a query-time search index for new query vectors.
+NN-Descent is useful when you need a k-NN graph as an output, or when another NVIDIA cuVS index such as CAGRA needs an approximate graph as an input. It is not a query-time search index for new query vectors.
 
 ## Example API Usage
 
@@ -161,11 +161,11 @@ Distances are available only when `return_distances` is enabled during build. If
 
 ### Searching an index
 
-NN-Descent builds a graph over the input dataset. It does not expose a cuVS search API for new query vectors. Use CAGRA, IVF-Flat, IVF-PQ, brute-force, or Vamana when you need query-time search.
+NN-Descent builds a graph over the input dataset. It does not expose an NVIDIA cuVS search API for new query vectors. Use CAGRA, IVF-Flat, IVF-PQ, brute-force, or Vamana when you need query-time search.
 
 ### Saving graph outputs
 
-NN-Descent does not expose cuVS index serialization or deserialization APIs because its output is a graph, not a query-time search index. Persist the returned graph and optional distances with your application's tensor, array, or table storage format, then load those arrays into the downstream workflow that consumes the graph.
+NN-Descent does not expose NVIDIA cuVS index serialization or deserialization APIs because its output is a graph, not a query-time search index. Persist the returned graph and optional distances with your application's tensor, array, or table storage format, then load those arrays into the downstream workflow that consumes the graph.
 
 ## How NN-Descent works
 

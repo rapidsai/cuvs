@@ -69,6 +69,18 @@ API_NAV_SECTIONS = [
         "go-api",
     ),
 ]
+API_INDEX_GROUP_ORDER = [
+    "Cluster",
+    "Common",
+    "Distance",
+    "Multi-GPU Neighbors",
+    "Nearest Neighbors",
+    "Preprocessing",
+    "Selection",
+    "Statistics",
+    "Utilities",
+    "Other",
+]
 
 COMMENT_RE = re.compile(r"/\*\*.*?\*/|(?:///[^\n]*(?:\n|$))+", re.DOTALL)
 DOXYGEN_COMMAND_RE = re.compile(r"[@\\](\w+)\b")
@@ -419,6 +431,28 @@ def is_type_alias_signature(signature: str) -> bool:
     return stripped.startswith("typedef ") or stripped.startswith("using ")
 
 
+def api_index_group_sort_key(group: str) -> tuple[int, str]:
+    try:
+        return API_INDEX_GROUP_ORDER.index(group), group
+    except ValueError:
+        return len(API_INDEX_GROUP_ORDER), group
+
+
+def api_index_label_sort_key(item: tuple[str, str]) -> str:
+    label, _ = item
+    return label.replace("`", "").lower()
+
+
+def append_api_index_groups(
+    index_lines: list[str], grouped: dict[str, list[tuple[str, str]]]
+) -> None:
+    for group in sorted(grouped, key=api_index_group_sort_key):
+        index_lines.extend([f"## {group}", ""])
+        for label, url in sorted(grouped[group], key=api_index_label_sort_key):
+            index_lines.append(f"- [{label}]({url})")
+        index_lines.append("")
+
+
 def is_native_type_entry(entry: DoxygenEntry) -> bool:
     return entry.kind in {"enum", "struct"} or is_type_alias_signature(
         entry.signature
@@ -431,6 +465,145 @@ def synthetic_native_group_name(source: str) -> str:
 
 def is_synthetic_native_group(group_name: str) -> bool:
     return group_name.startswith("__types__:")
+
+
+def cpp_common_type_section_pages() -> list[tuple[str, str]]:
+    return [
+        ("Execution Resources", "execution-resources"),
+        ("Dense Array Views", "dense-array-views"),
+        ("Dense View Factories", "dense-view-factories"),
+        ("Owning Dense Arrays", "owning-dense-arrays"),
+        ("Owning Array Factories", "owning-array-factories"),
+        ("Layouts and Extents", "layouts-and-extents"),
+        ("Sparse Array Types", "sparse-array-types"),
+        (
+            "Copy, Serialization, and Utility APIs",
+            "copy-serialization-and-utility-apis",
+        ),
+        ("Errors and Logging", "errors-and-logging"),
+    ]
+
+
+def is_cpp_common_type_class_method(title: str) -> bool:
+    return (
+        title.startswith("raft::")
+        and title.count("::") >= 2
+        and not title.startswith("raft::resource::")
+    )
+
+
+def cpp_common_type_source_header(title: str) -> str:
+    if title.startswith("raft::device_resources_snmg"):
+        return "raft/core/device_resources_snmg.hpp"
+    if title.startswith("raft::device_resources"):
+        return "raft/core/device_resources.hpp"
+    if title == "raft::resources":
+        return "raft/core/resources.hpp"
+
+    resource_headers = {
+        "get_cuda_stream": "raft/core/resource/cuda_stream.hpp",
+        "sync_stream": "raft/core/resource/cuda_stream.hpp",
+        "set_cuda_stream_pool": "raft/core/resource/cuda_stream_pool.hpp",
+        "get_stream_from_stream_pool": "raft/core/resource/cuda_stream_pool.hpp",
+        "sync_stream_pool": "raft/core/resource/cuda_stream_pool.hpp",
+        "set_workspace_to_pool_resource": "raft/core/resource/workspace_resource.hpp",
+        "comms_initialized": "raft/core/resource/comms.hpp",
+        "is_multi_gpu": "raft/core/resource/comms.hpp",
+    }
+    if title.startswith("raft::resource::"):
+        return resource_headers.get(title.rsplit("::", 1)[-1], "")
+
+    if title.startswith("raft::mdspan"):
+        return "raft/core/mdspan.hpp"
+    if title.startswith("raft::span"):
+        return "raft/core/span.hpp"
+    if title in {
+        "raft::device_mdspan",
+        "raft::device_matrix_view",
+        "raft::device_vector_view",
+        "raft::device_scalar_view",
+        "raft::make_device_matrix_view",
+        "raft::make_device_vector_view",
+    }:
+        return "raft/core/device_mdspan.hpp"
+    if title in {
+        "raft::host_mdspan",
+        "raft::host_matrix_view",
+        "raft::host_vector_view",
+        "raft::host_scalar_view",
+        "raft::make_host_matrix_view",
+        "raft::make_host_vector_view",
+    }:
+        return "raft/core/host_mdspan.hpp"
+    if title == "raft::make_const_mdspan":
+        return "raft/core/mdspan.hpp"
+
+    if title.startswith("raft::mdarray"):
+        return "raft/core/mdarray.hpp"
+    if title in {
+        "raft::device_mdarray",
+        "raft::device_matrix",
+        "raft::device_vector",
+        "raft::make_device_matrix",
+        "raft::make_device_vector",
+    }:
+        return "raft/core/device_mdarray.hpp"
+    if title in {
+        "raft::host_mdarray",
+        "raft::host_matrix",
+        "raft::host_vector",
+        "raft::make_host_matrix",
+        "raft::make_host_vector",
+    }:
+        return "raft/core/host_mdarray.hpp"
+
+    if title in {
+        "raft::row_major",
+        "raft::col_major",
+        "raft::layout_c_contiguous",
+        "raft::layout_f_contiguous",
+        "raft::layout_stride",
+        "raft::scalar_extent",
+        "raft::matrix_extent",
+        "raft::vector_extent",
+        "raft::extents",
+        "raft::dynamic_extent",
+    }:
+        return "raft/core/mdspan_types.hpp"
+
+    if (
+        title.startswith("raft::device_csr_matrix")
+        or title == "raft::make_device_csr_matrix"
+    ):
+        return "raft/core/device_csr_matrix.hpp"
+    if (
+        title.startswith("raft::device_coo_matrix")
+        or title == "raft::make_device_coo_matrix"
+    ):
+        return "raft/core/device_coo_matrix.hpp"
+
+    if title in {
+        "raft::copy",
+        "raft::copy_matrix",
+        "raft::update_device",
+        "raft::update_host",
+    }:
+        return "raft/core/copy.hpp"
+    if title in {"raft::serialize_mdspan", "raft::deserialize_mdspan"}:
+        return "raft/core/serialize.hpp"
+    if title in {"raft::ceildiv", "raft::round_up_safe"}:
+        return "raft/util/integer_utils.hpp"
+
+    if title in {
+        "raft::exception",
+        "RAFT_EXPECTS",
+        "RAFT_FAIL",
+        "RAFT_CUDA_TRY",
+    }:
+        return "raft/core/error.hpp"
+    if title == "RAFT_LOG_DEBUG":
+        return "raft/core/logger.hpp"
+    return ""
 
 
 def generate_native_api_pages(
@@ -450,11 +623,20 @@ def generate_native_api_pages(
         "These pages are generated from the documented public headers in the cuVS source tree.",
         "",
     ]
-    for page in pages:
-        index_lines.append(
-            f"- [{page.title}]({api_doc_url(directory, page.slug)})"
+    grouped: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    if api == "cpp":
+        grouped["Common"].append(
+            ("Common Types", api_doc_url(directory, "common-types"))
         )
+    for page in pages:
+        grouped[native_api_group(page, api)].append(
+            (page.title, api_doc_url(directory, page.slug))
+        )
+    append_api_index_groups(index_lines, grouped)
     write_page(out_dir / "index.md", index_lines)
+
+    if api == "cpp":
+        write_cpp_common_types_page(out_dir)
 
     language = "c" if api == "c" else "cpp"
     for page in pages:
@@ -479,6 +661,1615 @@ def generate_native_api_pages(
             lines.append("")
         write_page(
             out_dir / f"{api_page_route(directory, page.slug)}.md", lines
+        )
+
+
+def native_api_group(page: NativePage, api: str) -> str:
+    source = page.source
+    slug = page.slug
+    if "/cluster/" in source:
+        return "Cluster"
+    if "/core/" in source:
+        return "Common"
+    if "/distance/" in source:
+        return "Distance"
+    if "/neighbors/mg" in source or slug.startswith("neighbors-mg-"):
+        return "Multi-GPU Neighbors"
+    if "/neighbors/" in source:
+        return "Nearest Neighbors"
+    if "/preprocessing/" in source:
+        return "Preprocessing"
+    if "/selection/" in source:
+        return "Selection"
+    if "/stats/" in source:
+        return "Statistics"
+    if "/util/" in source:
+        return "Utilities"
+    return "Other"
+
+
+def write_cpp_common_types_page(out_dir: Path) -> None:
+    def add_symbol(
+        lines: list[str],
+        anchor: str,
+        title: str,
+        description: str,
+        signature: str,
+        parameters: list[tuple[str, str, str]] | None = None,
+        returns: str | None = None,
+        nested: bool = False,
+    ) -> None:
+        is_class_method = is_cpp_common_type_class_method(title)
+        is_nested = nested or is_class_method
+        source_header = (
+            "" if is_class_method else cpp_common_type_source_header(title)
+        )
+        heading_marker = "####" if is_nested else "###"
+        lines.extend(
+            [
+                f'<a id="{anchor}"></a>',
+                f"{heading_marker} {title}",
+                "",
+            ]
+        )
+        if source_header:
+            lines.extend([f"_Source header: `{source_header}`_", ""])
+        lines.extend([description, "", "```cpp", signature, "```", ""])
+        if parameters:
+            lines.extend(
+                [
+                    "**Parameters**",
+                    "",
+                    "| Name | Type | Description |",
+                    "| --- | --- | --- |",
+                ]
+            )
+            for name, type_, desc in parameters:
+                lines.append(f"| `{name}` | `{type_}` | {desc} |")
+            lines.append("")
+        if returns:
+            lines.extend(["**Returns**", "", f"`{returns}`", ""])
+
+    lines: list[str] = [
+        *api_frontmatter(api_page_route("cpp_api", "common-types")),
+        "# Common Types",
+        "",
+        (
+            "This page summarizes public RAFT core types and helper APIs that "
+            "appear in NVIDIA cuVS public C++ headers. Use it as a companion "
+            "to the generated C++ API reference when reading function "
+            "signatures that accept RAFT resources, views, or owning arrays."
+        ),
+        "",
+        "## Execution Resources",
+        "",
+        (
+            "Most NVIDIA cuVS C++ APIs accept `raft::resources const&` as the "
+            "first argument. Resource objects carry execution state such as "
+            "CUDA streams, CUDA library handles, memory resources, stream "
+            "pools, and communication resources."
+        ),
+        "",
+    ]
+    add_symbol(
+        lines,
+        "raft-resources",
+        "raft::resources",
+        (
+            "Primary execution context passed to most NVIDIA cuVS C++ APIs. "
+            "The object gives algorithms access to shared CUDA streams, "
+            "library handles, memory resources, and other lazily-created "
+            "state."
+        ),
+        "class resources;",
+    )
+    add_symbol(
+        lines,
+        "raft-resource-get-cuda-stream",
+        "raft::resource::get_cuda_stream",
+        "Returns the CUDA stream associated with a resources object.",
+        "rmm::cuda_stream_view get_cuda_stream(raft::resources const& res);",
+        [("res", "raft::resources const&", "Resources object to query.")],
+        "rmm::cuda_stream_view",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-sync-stream",
+        "raft::resource::sync_stream",
+        "Synchronizes the CUDA stream associated with a resources object.",
+        (
+            "void sync_stream(raft::resources const& res);\n"
+            "void sync_stream(raft::resources const& res, rmm::cuda_stream_view stream);"
+        ),
+        [
+            (
+                "res",
+                "raft::resources const&",
+                "Resources object to synchronize.",
+            ),
+            (
+                "stream",
+                "rmm::cuda_stream_view",
+                "Optional stream to synchronize instead of the main stream.",
+            ),
+        ],
+        "void",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-set-cuda-stream-pool",
+        "raft::resource::set_cuda_stream_pool",
+        (
+            "Attaches a CUDA stream pool to a resources object so algorithms "
+            "can issue independent work on multiple streams."
+        ),
+        (
+            "void set_cuda_stream_pool(raft::resources const& res,\n"
+            "                          std::shared_ptr<rmm::cuda_stream_pool> pool);"
+        ),
+        [
+            (
+                "res",
+                "raft::resources const&",
+                "Resources object to configure.",
+            ),
+            (
+                "pool",
+                "std::shared_ptr<rmm::cuda_stream_pool>",
+                "Stream pool to attach.",
+            ),
+        ],
+        "void",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-get-stream-from-stream-pool",
+        "raft::resource::get_stream_from_stream_pool",
+        "Returns a stream from the configured stream pool.",
+        "rmm::cuda_stream_view get_stream_from_stream_pool(raft::resources const& res);",
+        [("res", "raft::resources const&", "Resources object to query.")],
+        "rmm::cuda_stream_view",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-sync-stream-pool",
+        "raft::resource::sync_stream_pool",
+        "Synchronizes streams in the configured stream pool.",
+        "void sync_stream_pool(raft::resources const& res);",
+        [
+            (
+                "res",
+                "raft::resources const&",
+                "Resources object to synchronize.",
+            )
+        ],
+        "void",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-set-workspace-to-pool-resource",
+        "raft::resource::set_workspace_to_pool_resource",
+        (
+            "Configures workspace allocation for algorithms that need temporary "
+            "device memory."
+        ),
+        (
+            "void set_workspace_to_pool_resource(\n"
+            "  raft::resources const& res,\n"
+            "  std::optional<std::size_t> allocation_limit = std::nullopt);"
+        ),
+        [
+            (
+                "res",
+                "raft::resources const&",
+                "Resources object to configure.",
+            ),
+            (
+                "allocation_limit",
+                "std::optional<std::size_t>",
+                "Optional temporary workspace allocation limit in bytes.",
+            ),
+        ],
+        "void",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-comms-initialized",
+        "raft::resource::comms_initialized",
+        "Reports whether communication resources have been initialized.",
+        "bool comms_initialized(raft::resources const& res);",
+        [("res", "raft::resources const&", "Resources object to query.")],
+        "bool",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-resource-is-multi-gpu",
+        "raft::resource::is_multi_gpu",
+        "Reports whether a resources object is configured for multi-GPU use.",
+        "bool is_multi_gpu(raft::resources const& res);",
+        [("res", "raft::resources const&", "Resources object to query.")],
+        "bool",
+        nested=True,
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources",
+        "raft::device_resources",
+        (
+            "Convenience `raft::resources` implementation for single-GPU "
+            "applications and examples."
+        ),
+        "class device_resources;",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-device-resources",
+        "raft::device_resources::device_resources",
+        "Constructs a single-GPU resources object.",
+        (
+            "device_resources(\n"
+            "  rmm::cuda_stream_view stream_view = rmm::cuda_stream_per_thread,\n"
+            "  std::shared_ptr<rmm::cuda_stream_pool> stream_pool = nullptr,\n"
+            "  std::shared_ptr<rmm::mr::device_memory_resource> workspace_resource = nullptr,\n"
+            "  std::optional<std::size_t> allocation_limit = std::nullopt);"
+        ),
+        [
+            (
+                "stream_view",
+                "rmm::cuda_stream_view",
+                "Default CUDA stream used by algorithms.",
+            ),
+            (
+                "stream_pool",
+                "std::shared_ptr<rmm::cuda_stream_pool>",
+                "Optional CUDA stream pool.",
+            ),
+            (
+                "workspace_resource",
+                "std::shared_ptr<rmm::mr::device_memory_resource>",
+                "Optional workspace memory resource.",
+            ),
+            (
+                "allocation_limit",
+                "std::optional<std::size_t>",
+                "Optional temporary workspace allocation limit in bytes.",
+            ),
+        ],
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-sync-stream",
+        "raft::device_resources::sync_stream",
+        "Synchronizes either the main stream or a specific CUDA stream.",
+        (
+            "void sync_stream() const;\n"
+            "void sync_stream(rmm::cuda_stream_view stream) const;"
+        ),
+        [
+            (
+                "stream",
+                "rmm::cuda_stream_view",
+                "Stream to synchronize. Omit to synchronize the main stream.",
+            )
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-get-stream",
+        "raft::device_resources::get_stream",
+        "Returns the main CUDA stream associated with the resources object.",
+        "rmm::cuda_stream_view get_stream() const;",
+        returns="rmm::cuda_stream_view",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-is-stream-pool-initialized",
+        "raft::device_resources::is_stream_pool_initialized",
+        "Reports whether a CUDA stream pool is configured.",
+        "bool is_stream_pool_initialized() const;",
+        returns="bool",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-get-stream-pool",
+        "raft::device_resources::get_stream_pool",
+        "Returns the configured CUDA stream pool.",
+        "rmm::cuda_stream_pool const& get_stream_pool() const;",
+        returns="rmm::cuda_stream_pool const&",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-get-stream-from-stream-pool",
+        "raft::device_resources::get_stream_from_stream_pool",
+        "Returns a stream from the configured CUDA stream pool.",
+        (
+            "rmm::cuda_stream_view get_stream_from_stream_pool() const;\n"
+            "rmm::cuda_stream_view get_stream_from_stream_pool(std::size_t stream_idx) const;"
+        ),
+        [
+            (
+                "stream_idx",
+                "std::size_t",
+                "Optional index of the stream in the stream pool.",
+            )
+        ],
+        "rmm::cuda_stream_view",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-get-next-usable-stream",
+        "raft::device_resources::get_next_usable_stream",
+        (
+            "Returns a stream from the pool when one exists; otherwise returns "
+            "the main stream."
+        ),
+        (
+            "rmm::cuda_stream_view get_next_usable_stream() const;\n"
+            "rmm::cuda_stream_view get_next_usable_stream(std::size_t stream_idx) const;"
+        ),
+        [
+            (
+                "stream_idx",
+                "std::size_t",
+                "Optional stream pool index to use when a stream pool is configured.",
+            )
+        ],
+        "rmm::cuda_stream_view",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-sync-stream-pool",
+        "raft::device_resources::sync_stream_pool",
+        "Synchronizes all streams in the pool or a subset of stream indices.",
+        (
+            "void sync_stream_pool() const;\n"
+            "void sync_stream_pool(std::vector<std::size_t> stream_indices) const;"
+        ),
+        [
+            (
+                "stream_indices",
+                "std::vector<std::size_t>",
+                "Optional stream indices to synchronize.",
+            )
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-wait-stream-pool-on-stream",
+        "raft::device_resources::wait_stream_pool_on_stream",
+        "Makes the stream pool wait on work submitted to the main stream.",
+        "void wait_stream_pool_on_stream() const;",
+        returns="void",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-snmg",
+        "raft::device_resources_snmg",
+        (
+            "Single-node multi-GPU resources object used by C++ APIs that "
+            "operate over more than one local GPU."
+        ),
+        "class device_resources_snmg;",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-snmg-device-resources-snmg",
+        "raft::device_resources_snmg::device_resources_snmg",
+        "Constructs single-node multi-GPU resources for all GPUs or a subset.",
+        (
+            "device_resources_snmg();\n"
+            "device_resources_snmg(std::vector<int> const& device_ids);\n"
+            "device_resources_snmg(device_resources_snmg const& world);"
+        ),
+        [
+            (
+                "device_ids",
+                "std::vector<int> const&",
+                "Optional list of local GPU device IDs to use.",
+            ),
+            (
+                "world",
+                "device_resources_snmg const&",
+                "Existing single-node multi-GPU resources object to copy.",
+            ),
+        ],
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-snmg-set-memory-pool",
+        "raft::device_resources_snmg::set_memory_pool",
+        "Configures a memory pool on all GPUs managed by the resources object.",
+        "void set_memory_pool(int percent_of_free_memory);",
+        [
+            (
+                "percent_of_free_memory",
+                "int",
+                "Percentage of free memory to reserve for each memory pool.",
+            )
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-device-resources-snmg-has-resource-factory",
+        "raft::device_resources_snmg::has_resource_factory",
+        "Reports whether a resource factory is registered for a resource type.",
+        "bool has_resource_factory(raft::resource::resource_type resource_type) const;",
+        [
+            (
+                "resource_type",
+                "raft::resource::resource_type",
+                "Resource type to check.",
+            )
+        ],
+        "bool",
+    )
+    lines.extend(
+        [
+            "## Dense Array Views",
+            "",
+            (
+                "Dense array views describe memory owned somewhere else. They "
+                "carry the pointer, shape, layout, memory-space accessor, and "
+                "constness needed by NVIDIA cuVS C++ APIs without allocating "
+                "or freeing data."
+            ),
+            "",
+        ]
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan",
+        "raft::mdspan",
+        "Generic multi-dimensional non-owning view.",
+        (
+            "template <typename ElementType, typename Extents, typename LayoutPolicy,\n"
+            "          typename AccessorPolicy>\n"
+            "class mdspan;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-data-handle",
+        "raft::mdspan::data_handle",
+        "Returns the pointer held by the non-owning view.",
+        "element_type* data_handle() const;",
+        returns="element_type*",
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-extents",
+        "raft::mdspan::extents",
+        "Returns the extents object that describes the view shape.",
+        "extents_type extents() const;",
+        returns="extents_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-extent",
+        "raft::mdspan::extent",
+        "Returns the size of one rank of the view.",
+        "index_type extent(std::size_t r) const noexcept;",
+        [("r", "std::size_t", "Rank to query.")],
+        "index_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-stride",
+        "raft::mdspan::stride",
+        "Returns the stride for one rank of a strided view.",
+        "index_type stride(std::size_t r) const;",
+        [("r", "std::size_t", "Rank to query.")],
+        "index_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-size",
+        "raft::mdspan::size",
+        "Returns the total number of elements described by the view.",
+        "size_type size() const;",
+        returns="size_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-empty",
+        "raft::mdspan::empty",
+        "Reports whether the view describes zero elements.",
+        "bool empty() const;",
+        returns="bool",
+    )
+    add_symbol(
+        lines,
+        "raft-mdspan-operator-call",
+        "raft::mdspan::operator()",
+        "Indexes into the view with one coordinate per rank.",
+        (
+            "template <typename... IndexType>\n"
+            "reference operator()(IndexType... indices) const;"
+        ),
+        [
+            (
+                "indices",
+                "IndexType...",
+                "Coordinates into the view, one per rank.",
+            )
+        ],
+        "reference",
+    )
+    add_symbol(
+        lines,
+        "raft-device-mdspan",
+        "raft::device_mdspan",
+        "Non-owning view over device-accessible memory.",
+        (
+            "template <typename ElementType,\n"
+            "          typename Extents,\n"
+            "          typename LayoutPolicy   = layout_c_contiguous,\n"
+            "          typename AccessorPolicy = cuda::std::default_accessor<ElementType>>\n"
+            "using device_mdspan =\n"
+            "  mdspan<ElementType, Extents, LayoutPolicy, device_accessor<AccessorPolicy>>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-mdspan",
+        "raft::host_mdspan",
+        "Non-owning view over host memory.",
+        (
+            "template <typename ElementType,\n"
+            "          typename Extents,\n"
+            "          typename LayoutPolicy   = layout_c_contiguous,\n"
+            "          typename AccessorPolicy = cuda::std::default_accessor<ElementType>>\n"
+            "using host_mdspan =\n"
+            "  mdspan<ElementType, Extents, LayoutPolicy, host_accessor<AccessorPolicy>>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-matrix-view",
+        "raft::device_matrix_view",
+        "Common device view alias for matrix arguments.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using device_matrix_view =\n"
+            "  device_mdspan<ElementType, matrix_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-vector-view",
+        "raft::device_vector_view",
+        "Common device view alias for vector arguments.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using device_vector_view =\n"
+            "  device_mdspan<ElementType, vector_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-scalar-view",
+        "raft::device_scalar_view",
+        "Common device view alias for scalar arguments.",
+        (
+            "template <typename ElementType, typename IndexType = std::uint32_t>\n"
+            "using device_scalar_view = device_mdspan<ElementType, scalar_extent<IndexType>>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-matrix-view",
+        "raft::host_matrix_view",
+        "Common host view alias for matrix arguments.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using host_matrix_view =\n"
+            "  host_mdspan<ElementType, matrix_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-vector-view",
+        "raft::host_vector_view",
+        "Common host view alias for vector arguments.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using host_vector_view =\n"
+            "  host_mdspan<ElementType, vector_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-scalar-view",
+        "raft::host_scalar_view",
+        "Common host view alias for scalar arguments.",
+        (
+            "template <typename ElementType, typename IndexType = std::uint32_t>\n"
+            "using host_scalar_view = host_mdspan<ElementType, scalar_extent<IndexType>>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-span",
+        "raft::span",
+        (
+            "Lightweight one-dimensional non-owning view. NVIDIA cuVS public "
+            "APIs usually prefer `device_vector_view` and `host_vector_view` "
+            "for one-dimensional buffers."
+        ),
+        "template <typename ElementType, std::size_t Extent>\nclass span;",
+    )
+    add_symbol(
+        lines,
+        "raft-span-data",
+        "raft::span::data",
+        "Returns the pointer held by the span.",
+        "element_type* data() const;",
+        returns="element_type*",
+    )
+    add_symbol(
+        lines,
+        "raft-span-size",
+        "raft::span::size",
+        "Returns the number of elements in the span.",
+        "size_type size() const;",
+        returns="size_type",
+    )
+    add_symbol(
+        lines,
+        "raft-span-empty",
+        "raft::span::empty",
+        "Reports whether the span contains zero elements.",
+        "bool empty() const;",
+        returns="bool",
+    )
+    add_symbol(
+        lines,
+        "raft-span-operator-subscript",
+        "raft::span::operator[]",
+        "Indexes into the span.",
+        "reference operator[](size_type idx) const;",
+        [("idx", "size_type", "Element index.")],
+        "reference",
+    )
+    add_symbol(
+        lines,
+        "raft-span-begin",
+        "raft::span::begin",
+        "Returns an iterator to the first element.",
+        "iterator begin() const;",
+        returns="iterator",
+    )
+    add_symbol(
+        lines,
+        "raft-span-end",
+        "raft::span::end",
+        "Returns an iterator one past the last element.",
+        "iterator end() const;",
+        returns="iterator",
+    )
+
+    lines.extend(["## Dense View Factories", ""])
+    add_symbol(
+        lines,
+        "raft-make-device-matrix-view",
+        "raft::make_device_matrix_view",
+        "Constructs a device matrix view from a pointer and shape.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_device_matrix_view(ElementType* ptr, IndexType rows, IndexType cols);"
+        ),
+        [
+            (
+                "ptr",
+                "ElementType*",
+                "Pointer to device-accessible matrix storage.",
+            ),
+            ("rows", "IndexType", "Number of rows."),
+            ("cols", "IndexType", "Number of columns."),
+        ],
+        "raft::device_matrix_view<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-device-vector-view",
+        "raft::make_device_vector_view",
+        "Constructs a device vector view from a pointer and size.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_device_vector_view(ElementType* ptr, IndexType size);"
+        ),
+        [
+            (
+                "ptr",
+                "ElementType*",
+                "Pointer to device-accessible vector storage.",
+            ),
+            ("size", "IndexType", "Number of elements."),
+        ],
+        "raft::device_vector_view<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-host-matrix-view",
+        "raft::make_host_matrix_view",
+        "Constructs a host matrix view from a pointer and shape.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_host_matrix_view(ElementType* ptr, IndexType rows, IndexType cols);"
+        ),
+        [
+            ("ptr", "ElementType*", "Pointer to host matrix storage."),
+            ("rows", "IndexType", "Number of rows."),
+            ("cols", "IndexType", "Number of columns."),
+        ],
+        "raft::host_matrix_view<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-host-vector-view",
+        "raft::make_host_vector_view",
+        "Constructs a host vector view from a pointer and size.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_host_vector_view(ElementType* ptr, IndexType size);"
+        ),
+        [
+            ("ptr", "ElementType*", "Pointer to host vector storage."),
+            ("size", "IndexType", "Number of elements."),
+        ],
+        "raft::host_vector_view<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-const-mdspan",
+        "raft::make_const_mdspan",
+        "Converts a mutable mdspan-like view into a const view.",
+        "template <typename View>\nauto make_const_mdspan(View view);",
+        [("view", "View", "View to convert to a const view.")],
+        "View with const element type",
+    )
+
+    lines.extend(
+        [
+            "## Owning Dense Arrays",
+            "",
+            (
+                "Owning arrays allocate storage and release it when the object "
+                "is destroyed. They are commonly used in examples, tests, "
+                "index objects, and user code that needs RAFT to allocate "
+                "inputs, outputs, or staging buffers."
+            ),
+            "",
+        ]
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray",
+        "raft::mdarray",
+        "Generic owning multi-dimensional array.",
+        (
+            "template <typename ElementType, typename Extents, typename LayoutPolicy,\n"
+            "          typename ContainerPolicy>\n"
+            "class mdarray;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray-view",
+        "raft::mdarray::view",
+        "Returns an mdspan view over the owned storage.",
+        ("mdspan_type view();\nconst_mdspan_type view() const;"),
+        returns="mdspan_type or const_mdspan_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray-data-handle",
+        "raft::mdarray::data_handle",
+        "Returns the pointer to the owned storage.",
+        (
+            "element_type* data_handle();\n"
+            "element_type const* data_handle() const;"
+        ),
+        returns="element_type* or element_type const*",
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray-extents",
+        "raft::mdarray::extents",
+        "Returns the extents object that describes the array shape.",
+        "extents_type extents() const;",
+        returns="extents_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray-extent",
+        "raft::mdarray::extent",
+        "Returns the size of one rank of the array.",
+        "index_type extent(std::size_t r) const noexcept;",
+        [("r", "std::size_t", "Rank to query.")],
+        "index_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray-size",
+        "raft::mdarray::size",
+        "Returns the total number of elements in the array.",
+        "size_type size() const;",
+        returns="size_type",
+    )
+    add_symbol(
+        lines,
+        "raft-mdarray-operator-call",
+        "raft::mdarray::operator()",
+        (
+            "Indexes into the array. For device arrays, use this sparingly "
+            "because element access may require device-host movement."
+        ),
+        (
+            "template <typename... IndexType>\n"
+            "reference operator()(IndexType... indices);\n"
+            "template <typename... IndexType>\n"
+            "const_reference operator()(IndexType... indices) const;"
+        ),
+        [
+            (
+                "indices",
+                "IndexType...",
+                "Coordinates into the array, one per rank.",
+            )
+        ],
+        "reference or const_reference",
+    )
+    add_symbol(
+        lines,
+        "raft-device-mdarray",
+        "raft::device_mdarray",
+        "Owning array in device-accessible memory.",
+        (
+            "template <typename ElementType, typename Extents,\n"
+            "          typename LayoutPolicy    = layout_c_contiguous,\n"
+            "          typename ContainerPolicy = device_container_policy<ElementType>>\n"
+            "using device_mdarray =\n"
+            "  mdarray<ElementType, Extents, LayoutPolicy, device_accessor<ContainerPolicy>>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-mdarray",
+        "raft::host_mdarray",
+        "Owning array in host memory.",
+        (
+            "template <typename ElementType, typename Extents,\n"
+            "          typename LayoutPolicy    = layout_c_contiguous,\n"
+            "          typename ContainerPolicy = host_container_policy<ElementType>>\n"
+            "using host_mdarray =\n"
+            "  mdarray<ElementType, Extents, LayoutPolicy, host_accessor<ContainerPolicy>>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-matrix",
+        "raft::device_matrix",
+        "Owning device matrix alias used for datasets, outputs, and temporary storage.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using device_matrix = device_mdarray<ElementType, matrix_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-vector",
+        "raft::device_vector",
+        "Owning device vector alias used for outputs and temporary storage.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using device_vector = device_mdarray<ElementType, vector_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-matrix",
+        "raft::host_matrix",
+        "Owning host matrix alias used for CPU-resident data and staging.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using host_matrix = host_mdarray<ElementType, matrix_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-host-vector",
+        "raft::host_vector",
+        "Owning host vector alias used for CPU-resident data and staging.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndexType    = std::uint32_t,\n"
+            "          typename LayoutPolicy = layout_c_contiguous>\n"
+            "using host_vector = host_mdarray<ElementType, vector_extent<IndexType>, LayoutPolicy>;"
+        ),
+    )
+
+    lines.extend(["## Owning Array Factories", ""])
+    add_symbol(
+        lines,
+        "raft-make-device-matrix",
+        "raft::make_device_matrix",
+        "Allocates an owning device matrix.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_device_matrix(raft::resources const& res, IndexType rows, IndexType cols);"
+        ),
+        [
+            (
+                "res",
+                "raft::resources const&",
+                "Resources object used for allocation.",
+            ),
+            ("rows", "IndexType", "Number of rows."),
+            ("cols", "IndexType", "Number of columns."),
+        ],
+        "raft::device_matrix<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-device-vector",
+        "raft::make_device_vector",
+        "Allocates an owning device vector.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_device_vector(raft::resources const& res, IndexType size);"
+        ),
+        [
+            (
+                "res",
+                "raft::resources const&",
+                "Resources object used for allocation.",
+            ),
+            ("size", "IndexType", "Number of elements."),
+        ],
+        "raft::device_vector<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-host-matrix",
+        "raft::make_host_matrix",
+        "Allocates an owning host matrix.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_host_matrix(IndexType rows, IndexType cols);"
+        ),
+        [
+            ("rows", "IndexType", "Number of rows."),
+            ("cols", "IndexType", "Number of columns."),
+        ],
+        "raft::host_matrix<ElementType, IndexType, LayoutPolicy>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-host-vector",
+        "raft::make_host_vector",
+        "Allocates an owning host vector.",
+        (
+            "template <typename ElementType, typename IndexType, typename LayoutPolicy>\n"
+            "auto make_host_vector(IndexType size);"
+        ),
+        [("size", "IndexType", "Number of elements.")],
+        "raft::host_vector<ElementType, IndexType, LayoutPolicy>",
+    )
+
+    lines.extend(
+        [
+            "## Layouts and Extents",
+            "",
+            (
+                "RAFT layout and extent types make array shape and memory "
+                "layout explicit in NVIDIA cuVS public signatures."
+            ),
+            "",
+        ]
+    )
+    add_symbol(
+        lines,
+        "raft-row-major",
+        "raft::row_major",
+        "Matrix layout tag for row-major storage.",
+        "using cuda::std::layout_right;\nusing row_major = layout_right;",
+    )
+    add_symbol(
+        lines,
+        "raft-col-major",
+        "raft::col_major",
+        "Matrix layout tag for column-major storage.",
+        "using cuda::std::layout_left;\nusing col_major = layout_left;",
+    )
+    add_symbol(
+        lines,
+        "raft-layout-c-contiguous",
+        "raft::layout_c_contiguous",
+        "Layout tag for C-contiguous memory.",
+        "using cuda::std::layout_right;\nusing layout_c_contiguous = layout_right;",
+    )
+    add_symbol(
+        lines,
+        "raft-layout-f-contiguous",
+        "raft::layout_f_contiguous",
+        "Layout tag for Fortran-contiguous memory.",
+        "using cuda::std::layout_left;\nusing layout_f_contiguous = layout_left;",
+    )
+    add_symbol(
+        lines,
+        "raft-layout-stride",
+        "raft::layout_stride",
+        "Layout tag for strided memory.",
+        "using cuda::std::layout_stride;",
+    )
+    add_symbol(
+        lines,
+        "raft-scalar-extent",
+        "raft::scalar_extent",
+        "Convenience extent alias for zero-dimensional scalar values.",
+        (
+            "template <typename IndexType>\n"
+            "using scalar_extent = cuda::std::extents<IndexType, 1>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-matrix-extent",
+        "raft::matrix_extent",
+        "Convenience extent alias for two-dimensional matrices.",
+        (
+            "template <typename IndexType>\n"
+            "using matrix_extent = cuda::std::extents<IndexType,\n"
+            "                                         raft::dynamic_extent,\n"
+            "                                         raft::dynamic_extent>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-vector-extent",
+        "raft::vector_extent",
+        "Convenience extent alias for one-dimensional vectors.",
+        (
+            "template <typename IndexType>\n"
+            "using vector_extent = cuda::std::extents<IndexType,\n"
+            "                                         raft::dynamic_extent>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-extents",
+        "raft::extents",
+        "Generic extent descriptor for static and dynamic dimensions.",
+        "using cuda::std::extents;",
+    )
+    add_symbol(
+        lines,
+        "raft-dynamic-extent",
+        "raft::dynamic_extent",
+        "Sentinel used for dimensions whose size is known at runtime.",
+        "using cuda::std::dynamic_extent;",
+    )
+
+    lines.extend(
+        [
+            "## Sparse Array Types",
+            "",
+            (
+                "Sparse RAFT types describe both the sparsity pattern and the "
+                "values for APIs that accept sparse feature matrices or "
+                "graph-style connectivity data."
+            ),
+            "",
+        ]
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix",
+        "raft::device_csr_matrix",
+        "Owning compressed sparse row matrix in device memory.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndptrType,\n"
+            "          typename IndicesType,\n"
+            "          typename NZType,\n"
+            "          template <typename T> typename ContainerPolicy = device_container_policy,\n"
+            "          SparsityType sparsity_type = SparsityType::OWNING>\n"
+            "using device_csr_matrix =\n"
+            "  csr_matrix<ElementType, IndptrType, IndicesType,\n"
+            "             NZType, true, ContainerPolicy, sparsity_type>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-initialize-sparsity",
+        "raft::device_csr_matrix::initialize_sparsity",
+        (
+            "Initializes or changes the number of nonzero entries when the "
+            "matrix owns its sparsity."
+        ),
+        "void initialize_sparsity(NNZType nnz);",
+        [("nnz", "NNZType", "Number of nonzero entries.")],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-get-elements",
+        "raft::device_csr_matrix::get_elements",
+        "Returns a span over the nonzero values.",
+        "raft::device_span<ElementType> get_elements();",
+        returns="raft::device_span<ElementType>",
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-structure-view",
+        "raft::device_csr_matrix::structure_view",
+        (
+            "Returns a non-owning view of the CSR sparsity structure. The "
+            "returned view exposes the row offsets and column indices."
+        ),
+        "structure_view_type structure_view();",
+        returns="structure_view_type",
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-view-method",
+        "raft::device_csr_matrix::view",
+        "Returns a sparsity-preserving non-owning view of the sparse matrix.",
+        "view_type view();",
+        returns="view_type",
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-view",
+        "raft::device_csr_matrix_view",
+        "Non-owning compressed sparse row matrix view over device memory.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndptrType,\n"
+            "          typename IndicesType,\n"
+            "          typename NZType>\n"
+            "using device_csr_matrix_view =\n"
+            "  csr_matrix_view<ElementType, IndptrType, IndicesType, NZType, true>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-view-get-elements",
+        "raft::device_csr_matrix_view::get_elements",
+        "Returns a span over the nonzero values.",
+        "raft::device_span<ElementType> get_elements();",
+        returns="raft::device_span<ElementType>",
+    )
+    add_symbol(
+        lines,
+        "raft-device-csr-matrix-view-structure-view",
+        "raft::device_csr_matrix_view::structure_view",
+        "Returns a non-owning view of the CSR sparsity structure.",
+        "structure_view_type structure_view();",
+        returns="structure_view_type",
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix",
+        "raft::device_coo_matrix",
+        "Owning coordinate sparse matrix in device memory.",
+        (
+            "template <typename ElementType,\n"
+            "          typename RowType,\n"
+            "          typename ColType,\n"
+            "          typename NZType,\n"
+            "          template <typename T> typename ContainerPolicy = device_container_policy,\n"
+            "          SparsityType sparsity_type = SparsityType::OWNING>\n"
+            "using device_coo_matrix =\n"
+            "  coo_matrix<ElementType, RowType, ColType,\n"
+            "             NZType, true, ContainerPolicy, sparsity_type>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-initialize-sparsity",
+        "raft::device_coo_matrix::initialize_sparsity",
+        (
+            "Initializes or changes the number of nonzero entries when the "
+            "matrix owns its sparsity."
+        ),
+        "void initialize_sparsity(NNZType nnz);",
+        [("nnz", "NNZType", "Number of nonzero entries.")],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-get-elements",
+        "raft::device_coo_matrix::get_elements",
+        "Returns a span over the nonzero values.",
+        "raft::device_span<ElementType> get_elements();",
+        returns="raft::device_span<ElementType>",
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-structure-view",
+        "raft::device_coo_matrix::structure_view",
+        (
+            "Returns a non-owning view of the COO sparsity structure. The "
+            "returned view exposes the row and column coordinate arrays."
+        ),
+        "structure_view_type structure_view();",
+        returns="structure_view_type",
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-view-method",
+        "raft::device_coo_matrix::view",
+        "Returns a sparsity-preserving non-owning view of the sparse matrix.",
+        "view_type view();",
+        returns="view_type",
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-view",
+        "raft::device_coo_matrix_view",
+        "Non-owning coordinate sparse matrix view over device memory.",
+        (
+            "template <typename ElementType,\n"
+            "          typename RowType,\n"
+            "          typename ColType,\n"
+            "          typename NZType>\n"
+            "using device_coo_matrix_view =\n"
+            "  coo_matrix_view<ElementType, RowType, ColType, NZType, true>;"
+        ),
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-view-get-elements",
+        "raft::device_coo_matrix_view::get_elements",
+        "Returns a span over the nonzero values.",
+        "raft::device_span<ElementType> get_elements();",
+        returns="raft::device_span<ElementType>",
+    )
+    add_symbol(
+        lines,
+        "raft-device-coo-matrix-view-structure-view",
+        "raft::device_coo_matrix_view::structure_view",
+        "Returns a non-owning view of the COO sparsity structure.",
+        "structure_view_type structure_view();",
+        returns="structure_view_type",
+    )
+    add_symbol(
+        lines,
+        "raft-make-device-csr-matrix",
+        "raft::make_device_csr_matrix",
+        "Allocates an owning CSR matrix.",
+        (
+            "template <typename ElementType,\n"
+            "          typename IndptrType,\n"
+            "          typename IndicesType,\n"
+            "          typename NZType = uint64_t>\n"
+            "auto make_device_csr_matrix(raft::resources const& handle,\n"
+            "                            IndptrType n_rows,\n"
+            "                            IndicesType n_cols,\n"
+            "                            NZType nnz = 0);\n\n"
+            "template <typename ElementType,\n"
+            "          typename IndptrType,\n"
+            "          typename IndicesType,\n"
+            "          typename NZType = uint64_t>\n"
+            "auto make_device_csr_matrix(\n"
+            "  raft::resources const& handle,\n"
+            "  device_compressed_structure_view<IndptrType,\n"
+            "                                   IndicesType,\n"
+            "                                   NZType> structure);"
+        ),
+        [
+            (
+                "handle",
+                "raft::resources const&",
+                "Resources object used for allocation.",
+            ),
+            ("n_rows", "IndptrType", "Number of rows."),
+            ("n_cols", "IndicesType", "Number of columns."),
+            ("nnz", "NZType", "Number of nonzero entries when known."),
+            (
+                "structure",
+                (
+                    "device_compressed_structure_view<IndptrType, IndicesType, NZType>"
+                ),
+                "Existing CSR sparsity structure for sparsity-preserving matrices.",
+            ),
+        ],
+        "raft::device_csr_matrix<ElementType, IndptrType, IndicesType, NZType>",
+    )
+    add_symbol(
+        lines,
+        "raft-make-device-coo-matrix",
+        "raft::make_device_coo_matrix",
+        "Allocates an owning COO matrix.",
+        (
+            "template <typename ElementType,\n"
+            "          typename RowType,\n"
+            "          typename ColType,\n"
+            "          typename NZType>\n"
+            "auto make_device_coo_matrix(raft::resources const& handle,\n"
+            "                            RowType n_rows,\n"
+            "                            ColType n_cols,\n"
+            "                            NZType nnz = 0);\n\n"
+            "template <typename ElementType,\n"
+            "          typename RowType,\n"
+            "          typename ColType,\n"
+            "          typename NZType>\n"
+            "auto make_device_coo_matrix(\n"
+            "  raft::resources const& handle,\n"
+            "  device_coordinate_structure_view<RowType,\n"
+            "                                   ColType,\n"
+            "                                   NZType> structure);"
+        ),
+        [
+            (
+                "handle",
+                "raft::resources const&",
+                "Resources object used for allocation.",
+            ),
+            ("n_rows", "RowType", "Number of rows."),
+            ("n_cols", "ColType", "Number of columns."),
+            ("nnz", "NZType", "Number of nonzero entries when known."),
+            (
+                "structure",
+                ("device_coordinate_structure_view<RowType, ColType, NZType>"),
+                "Existing COO sparsity structure for sparsity-preserving matrices.",
+            ),
+        ],
+        "raft::device_coo_matrix<ElementType, RowType, ColType, NZType>",
+    )
+
+    lines.extend(["## Copy, Serialization, and Utility APIs", ""])
+    add_symbol(
+        lines,
+        "raft-copy",
+        "raft::copy",
+        "Asynchronously copies elements between compatible memory locations.",
+        (
+            "template <typename OutputIterator, typename InputIterator, typename SizeType>\n"
+            "void copy(OutputIterator dst, InputIterator src, SizeType n,\n"
+            "          rmm::cuda_stream_view stream);"
+        ),
+        [
+            ("dst", "OutputIterator", "Destination pointer or iterator."),
+            ("src", "InputIterator", "Source pointer or iterator."),
+            ("n", "SizeType", "Number of elements to copy."),
+            (
+                "stream",
+                "rmm::cuda_stream_view",
+                "CUDA stream used for the copy.",
+            ),
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-copy-matrix",
+        "raft::copy_matrix",
+        "Copies a dense matrix between compatible matrix views.",
+        "template <typename OutputView, typename InputView>\nvoid copy_matrix(OutputView dst, InputView src, rmm::cuda_stream_view stream);",
+        [
+            ("dst", "OutputView", "Destination matrix view."),
+            ("src", "InputView", "Source matrix view."),
+            (
+                "stream",
+                "rmm::cuda_stream_view",
+                "CUDA stream used for the copy.",
+            ),
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-update-device",
+        "raft::update_device",
+        "Convenience helper for copying host data to device memory.",
+        (
+            "template <typename DevicePointer, typename HostPointer, typename SizeType>\n"
+            "void update_device(DevicePointer dst, HostPointer src, SizeType n,\n"
+            "                   rmm::cuda_stream_view stream);"
+        ),
+        [
+            ("dst", "DevicePointer", "Destination device pointer."),
+            ("src", "HostPointer", "Source host pointer."),
+            ("n", "SizeType", "Number of elements to copy."),
+            (
+                "stream",
+                "rmm::cuda_stream_view",
+                "CUDA stream used for the copy.",
+            ),
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-update-host",
+        "raft::update_host",
+        "Convenience helper for copying device data to host memory.",
+        (
+            "template <typename HostPointer, typename DevicePointer, typename SizeType>\n"
+            "void update_host(HostPointer dst, DevicePointer src, SizeType n,\n"
+            "                 rmm::cuda_stream_view stream);"
+        ),
+        [
+            ("dst", "HostPointer", "Destination host pointer."),
+            ("src", "DevicePointer", "Source device pointer."),
+            ("n", "SizeType", "Number of elements to copy."),
+            (
+                "stream",
+                "rmm::cuda_stream_view",
+                "CUDA stream used for the copy.",
+            ),
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-serialize-mdspan",
+        "raft::serialize_mdspan",
+        "Serializes array contents from an mdspan-like view.",
+        "template <typename View>\nvoid serialize_mdspan(std::ostream& os, View view);",
+        [
+            ("os", "std::ostream&", "Output stream."),
+            ("view", "View", "View whose contents should be serialized."),
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-deserialize-mdspan",
+        "raft::deserialize_mdspan",
+        "Deserializes array contents into an mdspan-like view.",
+        "template <typename View>\nvoid deserialize_mdspan(std::istream& is, View view);",
+        [
+            ("is", "std::istream&", "Input stream."),
+            ("view", "View", "Destination view."),
+        ],
+        "void",
+    )
+    add_symbol(
+        lines,
+        "raft-ceildiv",
+        "raft::ceildiv",
+        "Computes integer division rounded up.",
+        "template <typename T>\nT ceildiv(T dividend, T divisor);",
+        [
+            ("dividend", "T", "Dividend."),
+            ("divisor", "T", "Divisor."),
+        ],
+        "T",
+    )
+    add_symbol(
+        lines,
+        "raft-round-up-safe",
+        "raft::round_up_safe",
+        "Rounds an integer value up to a requested multiple.",
+        "template <typename T>\nT round_up_safe(T value, T multiple);",
+        [
+            ("value", "T", "Value to round."),
+            ("multiple", "T", "Multiple to round to."),
+        ],
+        "T",
+    )
+
+    lines.extend(
+        [
+            "## Errors and Logging",
+            "",
+            (
+                "NVIDIA cuVS public headers also use public RAFT error and "
+                "logging facilities in inline code paths."
+            ),
+            "",
+        ]
+    )
+    add_symbol(
+        lines,
+        "raft-exception",
+        "raft::exception",
+        "Exception base used by some NVIDIA cuVS utility errors.",
+        "class exception;",
+    )
+    add_symbol(
+        lines,
+        "raft-expects",
+        "RAFT_EXPECTS",
+        "Validates a condition and raises a RAFT exception if it is false.",
+        "#define RAFT_EXPECTS(condition, reason, ...)",
+    )
+    add_symbol(
+        lines,
+        "raft-fail",
+        "RAFT_FAIL",
+        "Raises a RAFT exception with a formatted message.",
+        "#define RAFT_FAIL(reason, ...)",
+    )
+    add_symbol(
+        lines,
+        "raft-cuda-try",
+        "RAFT_CUDA_TRY",
+        "Checks a CUDA runtime call and raises a RAFT exception on failure.",
+        "#define RAFT_CUDA_TRY(call)",
+    )
+    add_symbol(
+        lines,
+        "raft-log-debug",
+        "RAFT_LOG_DEBUG",
+        "Emits a debug log message through RAFT logging.",
+        "#define RAFT_LOG_DEBUG(message, ...)",
+    )
+
+    first_section = next(
+        idx for idx, line in enumerate(lines) if line.startswith("## ")
+    )
+    intro_lines = lines[:first_section]
+    sections: dict[str, list[str]] = {}
+    current_title = ""
+    current_lines: list[str] = []
+    for line in lines[first_section:]:
+        if line.startswith("## "):
+            if current_title:
+                sections[current_title] = trim_blank_lines(current_lines)
+            current_title = line.removeprefix("## ").strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+    if current_title:
+        sections[current_title] = trim_blank_lines(current_lines)
+
+    landing_lines = [
+        *intro_lines,
+        "## Sections",
+        "",
+    ]
+    for title, slug in cpp_common_type_section_pages():
+        landing_lines.append(
+            f"- [{title}]({api_doc_url('cpp_api', f'common-types-{slug}')})"
+        )
+    write_page(
+        out_dir / f"{api_page_route('cpp_api', 'common-types')}.md",
+        landing_lines,
+    )
+
+    for title, slug in cpp_common_type_section_pages():
+        section_lines = sections.get(title, [])
+        page_lines = [
+            *api_frontmatter(
+                api_page_route("cpp_api", f"common-types-{slug}")
+            ),
+            f"# {title}",
+            "",
+        ]
+        page_lines.extend(section_lines)
+        write_page(
+            out_dir
+            / f"{api_page_route('cpp_api', f'common-types-{slug}')}.md",
+            page_lines,
         )
 
 
@@ -737,7 +2528,7 @@ def render_native_compound(
     lines.extend(
         [
             f"```{language}",
-            compact_compound_signature(entry.signature),
+            render_compound_signature(entry, members, values),
             "```",
             "",
         ]
@@ -1108,16 +2899,12 @@ def generate_java_api_pages() -> None:
         "These pages are generated from the Java source files in `java/cuvs-java/src/main`.",
         "",
     ]
-    by_package: dict[str, list[JavaClass]] = defaultdict(list)
+    grouped: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for klass in classes:
-        by_package[klass.package].append(klass)
-    for package in sorted(by_package):
-        index_lines.extend([f"## `{package}`", ""])
-        for klass in sorted(by_package[package], key=lambda item: item.name):
-            index_lines.append(
-                f"- [{klass.name}]({api_doc_url('java_api', java_slug(klass))})"
-            )
-        index_lines.append("")
+        grouped[java_api_group(klass)].append(
+            (klass.name, api_doc_url("java_api", java_slug(klass)))
+        )
+    append_api_index_groups(index_lines, grouped)
     write_page(out_dir / "index.md", index_lines)
 
     for klass in classes:
@@ -1161,6 +2948,24 @@ def generate_java_api_pages() -> None:
             out_dir / f"{api_page_route('java_api', java_slug(klass))}.md",
             lines,
         )
+
+
+def java_api_group(klass: JavaClass) -> str:
+    name = klass.name.lower()
+    if any(
+        token in name
+        for token in (
+            "bruteforce",
+            "cagra",
+            "hnsw",
+            "ivf",
+            "tiered",
+            "searchresults",
+            "aceparams",
+        )
+    ):
+        return "Nearest Neighbors"
+    return "Common"
 
 
 def collect_java_classes() -> list[JavaClass]:
@@ -1349,6 +3154,9 @@ def parse_doxygen_entry(
     code_blocks: list[tuple[str, list[str]]] = []
     active_code: tuple[str, list[str]] | None = None
     active_param: DoxygenParam | None = None
+    active_summary = False
+    active_returns = False
+    active_detail = False
 
     for raw_line in comment.splitlines():
         line_text = raw_line.strip()
@@ -1364,6 +3172,9 @@ def parse_doxygen_entry(
         if code_match:
             active_code = (code_match.group(1) or "", [])
             active_param = None
+            active_summary = False
+            active_returns = False
+            active_detail = False
             continue
 
         if re.match(
@@ -1375,12 +3186,18 @@ def parse_doxygen_entry(
             "\\}",
         }:
             active_param = None
+            active_summary = False
+            active_returns = False
+            active_detail = False
             continue
 
         brief = consume_command(line_text, "brief")
         if brief is not None:
             summary = append_sentence(summary, clean_doxygen_text(brief))
             active_param = None
+            active_summary = True
+            active_returns = False
+            active_detail = False
             continue
 
         param_match = re.match(
@@ -1394,6 +3211,9 @@ def parse_doxygen_entry(
                 param_match.group("direction") or "",
             )
             params.append(active_param)
+            active_summary = False
+            active_returns = False
+            active_detail = False
             continue
 
         tparam_match = re.match(r"[@\\]tparam\s+(\w+)\s*(.*)", line_text)
@@ -1403,6 +3223,9 @@ def parse_doxygen_entry(
                 clean_doxygen_text(tparam_match.group(2)),
             )
             tparams.append(active_param)
+            active_summary = False
+            active_returns = False
+            active_detail = False
             continue
 
         return_text = consume_command(line_text, "return") or consume_command(
@@ -1411,22 +3234,69 @@ def parse_doxygen_entry(
         if return_text is not None:
             returns = append_sentence(returns, clean_doxygen_text(return_text))
             active_param = None
+            active_summary = False
+            active_returns = True
+            active_detail = False
+            continue
+
+        note_text = consume_command(line_text, "note")
+        if note_text is not None:
+            details.append(f"**Note:** {clean_doxygen_text(note_text)}")
+            active_param = None
+            active_summary = False
+            active_returns = False
+            active_detail = True
             continue
 
         if line_text.startswith(("@", "\\")):
             active_param = None
+            active_summary = False
+            active_returns = False
+            active_detail = False
             continue
 
-        if active_param is not None and (
-            raw_line.startswith((" ", "\t")) or not line_text
-        ):
+        if not line_text:
+            if active_param is not None:
+                active_param.description = append_doxygen_blank_line(
+                    active_param.description
+                )
+            elif active_detail and details and details[-1].strip():
+                details.append("")
+            elif (
+                not (active_summary or active_returns)
+                and details
+                and details[-1].strip()
+            ):
+                details.append("")
+            active_param = None
+            active_summary = False
+            active_returns = False
+            active_detail = False
+            continue
+
+        if active_param is not None:
             active_param.description = append_doxygen_line(
                 active_param.description, clean_doxygen_text(line_text)
             )
             continue
 
+        if active_detail and details:
+            details.append(clean_doxygen_text(line_text))
+            continue
+
+        if active_returns:
+            returns = append_sentence(returns, clean_doxygen_text(line_text))
+            continue
+
+        if active_summary:
+            summary = append_sentence(summary, clean_doxygen_text(line_text))
+            continue
+
         details.append(clean_doxygen_text(raw_line.rstrip()))
         active_param = None
+        active_summary = False
+        active_returns = False
+        active_detail = False
 
     if active_code is not None:
         code_blocks.append(active_code)
@@ -1460,12 +3330,13 @@ def parse_doxygen_entry(
 
 
 def consume_command(line: str, command: str) -> str | None:
-    match = re.match(rf"[@\\]{command}\b\s*(.*)", line)
+    match = re.match(rf"[@\\]{command}\b:?\s*(.*)", line)
     return match.group(1).strip() if match else None
 
 
 def clean_doxygen_text(text: str) -> str:
     text = text.strip()
+    text = re.sub(r"^:\s*", "", text)
     text = re.sub(r"[@\\](?:p|c|a)\s+([\w:]+)", r"`\1`", text)
     text = re.sub(
         r"[@\\]ref\s+([\w:]+)(?:\s+\"([^\"]+)\")?",
@@ -1544,6 +3415,12 @@ def append_doxygen_line(existing: str, addition: str) -> str:
     else:
         lines[-1] = append_sentence(lines[-1], addition)
     return "\n".join(lines)
+
+
+def append_doxygen_blank_line(existing: str) -> str:
+    if not existing or existing.endswith("\n"):
+        return existing
+    return f"{existing}\n"
 
 
 def parse_doxygen_kind(declaration: str) -> str:
@@ -1742,8 +3619,10 @@ def is_public_cpp_member_context(prefix: str) -> bool:
 
 def normalize_entry_signature(declaration: str, kind: str) -> str:
     signature = normalize_signature(declaration)
-    if kind == "function" and "{" in signature:
-        signature = signature.split("{", 1)[0].rstrip()
+    if kind == "function":
+        if "{" in signature:
+            signature = signature.split("{", 1)[0].rstrip()
+        signature = strip_cpp_constructor_initializer(signature)
         if not signature.endswith(";"):
             signature = f"{signature};"
     return signature
@@ -1756,18 +3635,103 @@ def normalize_signature(declaration: str) -> str:
     ).strip()
 
 
-def compact_compound_signature(signature: str) -> str:
+def strip_cpp_constructor_initializer(signature: str) -> str:
+    paren_idx = signature.find("(")
+    if paren_idx == -1:
+        return signature
+    depth = 0
+    close_idx = -1
+    for idx in range(paren_idx, len(signature)):
+        char = signature[idx]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                close_idx = idx
+                break
+    if close_idx == -1:
+        return signature
+    tail = signature[close_idx + 1 :].lstrip()
+    if not tail.startswith(":"):
+        return signature
+    return signature[: close_idx + 1].rstrip()
+
+
+def compound_prefix_and_suffix(signature: str) -> tuple[str, str]:
     signature = signature.strip()
     if "{" not in signature:
-        return signature.splitlines()[0] if signature else ""
+        return signature.rstrip(";"), ";"
     prefix = "\n".join(
         line.rstrip() for line in signature.split("{", 1)[0].splitlines()
     ).strip()
-    suffix = signature.rsplit("}", 1)[1].strip() if "}" in signature else ""
-    if suffix:
-        separator = "" if suffix.startswith(";") else " "
-        return f"{prefix} {{ ... }}{separator}{suffix}".strip()
-    return f"{prefix} {{ ... }};"
+    suffix = signature.rsplit("}", 1)[1].strip() if "}" in signature else ";"
+    return prefix, suffix or ";"
+
+
+def compound_closing_line(suffix: str) -> str:
+    suffix = suffix.strip()
+    if not suffix or suffix == ";":
+        return "};"
+    if suffix.startswith(";"):
+        return f"}}{suffix}"
+    return f"}} {suffix}"
+
+
+def strip_compound_inheritance(prefix: str) -> str:
+    lines = prefix.splitlines()
+    if not lines:
+        return prefix
+    lines[-1] = re.sub(
+        r"^((?:typedef\s+)?(?:struct|class)\s+[A-Za-z_]\w*)\s*:.*$",
+        r"\1",
+        lines[-1].strip(),
+    )
+    return "\n".join(lines).strip()
+
+
+def forward_compound_signature(signature: str) -> str:
+    prefix, suffix = compound_prefix_and_suffix(signature)
+    prefix = strip_compound_inheritance(prefix)
+    if re.match(r"^\s*typedef\s+(?:struct|class)\s*$", prefix) and suffix:
+        alias = suffix.strip().rstrip(";")
+        if alias:
+            return f"{prefix} {alias} {alias};"
+    if prefix.endswith(";"):
+        return prefix
+    return f"{prefix};"
+
+
+def render_compound_signature(
+    entry: DoxygenEntry,
+    members: list[DoxygenEntry],
+    values: list[dict[str, str]],
+) -> str:
+    prefix, suffix = compound_prefix_and_suffix(entry.signature)
+    if entry.kind == "enum":
+        if not values:
+            return forward_compound_signature(entry.signature)
+        lines = [f"{prefix} {{"]
+        for idx, value in enumerate(values):
+            item = f"  {value['name']}"
+            if value.get("value"):
+                item = f"{item} = {value['value']}"
+            if idx < len(values) - 1:
+                item = f"{item},"
+            lines.append(item)
+        lines.append(compound_closing_line(suffix))
+        return "\n".join(lines)
+    if members:
+        lines = [f"{prefix} {{"]
+        for member in members:
+            c_type = member_c_type(member)
+            member_decl = f"{c_type} {member.name}".strip()
+            if not member_decl.endswith(";"):
+                member_decl = f"{member_decl};"
+            lines.append(f"  {member_decl}")
+        lines.append(compound_closing_line(suffix))
+        return "\n".join(lines)
+    return forward_compound_signature(entry.signature)
 
 
 def parse_function_params(signature: str) -> list[FunctionParam]:
@@ -2062,7 +4026,7 @@ def member_description(member: DoxygenEntry) -> str:
     if member.summary:
         lines.append(member.summary)
     lines.extend(member.details)
-    return "\n".join(line for line in lines if line.strip())
+    return "\n".join(trim_blank_lines(lines))
 
 
 def parse_enum_values(signature: str) -> list[dict[str, str]]:
@@ -2399,7 +4363,12 @@ def render_doxygen_details(raw_lines: list[str]) -> list[str]:
     def flush_paragraph() -> None:
         nonlocal paragraph
         if paragraph:
-            lines.append(escape_text(" ".join(paragraph)))
+            if paragraph[0].startswith("**Note:**"):
+                lines.append(
+                    "<br />".join(escape_text(line) for line in paragraph)
+                )
+            else:
+                lines.append(escape_text(" ".join(paragraph)))
             paragraph = []
 
     for raw_line in raw_lines:
@@ -2503,7 +4472,11 @@ def group_python_pages(pages: list[PythonPage]) -> dict[str, list[PythonPage]]:
     grouped: dict[str, list[PythonPage]] = defaultdict(list)
     for page in pages:
         grouped[python_group(page.module)].append(page)
-    return dict(sorted(grouped.items()))
+    return dict(
+        sorted(
+            grouped.items(), key=lambda item: api_index_group_sort_key(item[0])
+        )
+    )
 
 
 def python_title(module: str) -> str:
@@ -2931,6 +4904,9 @@ def is_public_rust_function(stripped: str) -> bool:
 def collect_rust_signature(
     lines: list[str], start: int
 ) -> tuple[str, int, bool]:
+    if lines[start].strip().startswith("pub use "):
+        return collect_rust_reexport_signature(lines, start)
+
     chunks: list[str] = []
     paren_depth = 0
     bracket_depth = 0
@@ -2966,11 +4942,25 @@ def collect_rust_signature(
     return normalize_rust_signature("\n".join(chunks)), idx - 1, False
 
 
+def collect_rust_reexport_signature(
+    lines: list[str], start: int
+) -> tuple[str, int, bool]:
+    chunks: list[str] = []
+    idx = start
+    while idx < len(lines):
+        stripped = lines[idx].strip()
+        chunks.append(stripped)
+        if ";" in stripped:
+            return normalize_rust_signature("\n".join(chunks)), idx, False
+        idx += 1
+    return normalize_rust_signature("\n".join(chunks)), idx - 1, False
+
+
 def normalize_rust_signature(signature: str) -> str:
     signature = "\n".join(line.rstrip() for line in signature.splitlines())
     signature = re.sub(r"\s+\{$", " {", signature)
     if signature.endswith("{"):
-        signature = f"{signature[:-1].rstrip()} {{ ... }}"
+        signature = signature[:-1].rstrip()
     return signature.strip()
 
 
@@ -3044,9 +5034,9 @@ def clean_rust_doc(lines: list[str]) -> str:
 def render_rust_item(item: RustItem) -> list[str]:
     lines = [f"## {heading_text(item.name)}", ""]
     signature_lines = (
-        [*item.attributes, item.signature]
+        [*item.attributes, render_rust_signature(item)]
         if item.attributes
-        else [item.signature]
+        else [render_rust_signature(item)]
     )
     lines.extend(["```rust", "\n".join(signature_lines), "```", ""])
     if item.doc:
@@ -3062,9 +5052,9 @@ def render_rust_item(item: RustItem) -> list[str]:
         for member in item.members:
             lines.extend([f"### {heading_text(member.name)}", ""])
             member_signature = (
-                [*member.attributes, member.signature]
+                [*member.attributes, render_rust_signature(member)]
                 if member.attributes
-                else [member.signature]
+                else [render_rust_signature(member)]
             )
             lines.extend(["```rust", "\n".join(member_signature), "```", ""])
             if member.doc:
@@ -3075,11 +5065,26 @@ def render_rust_item(item: RustItem) -> list[str]:
     return trim_blank_lines(lines)
 
 
+def render_rust_signature(item: RustItem) -> str:
+    signature = item.signature.strip()
+    if item.kind == "struct" and "{" not in signature:
+        return f"{signature} {{\n    /* private fields */\n}}"
+    if item.kind == "enum" and "{" not in signature:
+        return f"{signature} {{\n    /* variants omitted */\n}}"
+    if item.kind == "trait" and "{" not in signature:
+        return f"{signature} {{\n    /* required methods omitted */\n}}"
+    return signature
+
+
 def group_rust_pages(pages: list[RustPage]) -> dict[str, list[RustPage]]:
     grouped: dict[str, list[RustPage]] = defaultdict(list)
     for page in pages:
         grouped[rust_group(page.module)].append(page)
-    return dict(sorted(grouped.items()))
+    return dict(
+        sorted(
+            grouped.items(), key=lambda item: api_index_group_sort_key(item[0])
+        )
+    )
 
 
 def rust_group(module: str) -> str:
@@ -3098,7 +5103,7 @@ def rust_group(module: str) -> str:
         )
     ):
         return "Nearest Neighbors"
-    return "Core"
+    return "Common"
 
 
 def rust_module_name(path: Path) -> str:
@@ -3133,10 +5138,12 @@ def generate_go_api_pages() -> None:
         "These pages are generated from the Go source files under `go`.",
         "",
     ]
+    grouped: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for page in pages:
-        index_lines.append(
-            f"- [`{page.package}`]({api_doc_url('go_api', page.slug)})"
+        grouped[go_api_group(page)].append(
+            (f"`{page.package}`", api_doc_url("go_api", page.slug))
         )
+    append_api_index_groups(index_lines, grouped)
     write_page(out_dir / "index.md", index_lines)
 
     for page in pages:
@@ -3157,6 +5164,14 @@ def generate_go_api_pages() -> None:
         write_page(
             out_dir / f"{api_page_route('go_api', page.slug)}.md", lines
         )
+
+
+def go_api_group(page: GoPage) -> str:
+    if page.package in {"brute_force", "cagra", "ivf_flat", "ivf_pq"}:
+        return "Nearest Neighbors"
+    if page.package == "cuvs":
+        return "Common"
+    return "Other"
 
 
 def collect_go_pages() -> list[GoPage]:
@@ -3333,10 +5348,34 @@ def collect_go_brace_block(lines: list[str], start: int) -> tuple[str, int]:
 
 
 def compact_go_type_signature(signature: str) -> str:
-    first_line = signature.splitlines()[0]
-    if first_line.endswith("{"):
-        return f"{first_line[:-1].rstrip()} {{ ... }}"
+    lines = [line.strip() for line in signature.splitlines()]
+    first_line = lines[0] if lines else ""
+    if not first_line.endswith("{"):
+        return signature
+    if " struct {" in first_line or first_line.endswith(" struct {"):
+        body = go_exported_struct_fields(lines[1:-1])
+        if not body:
+            body = ["// contains filtered or unexported fields"]
+        return "\n".join([first_line, *[f"\t{line}" for line in body], "}"])
+    if " interface {" in first_line or first_line.endswith(" interface {"):
+        body = [line for line in lines[1:-1] if line]
+        if not body:
+            body = ["// no exported methods"]
+        return "\n".join([first_line, *[f"\t{line}" for line in body], "}"])
     return signature
+
+
+def go_exported_struct_fields(lines: list[str]) -> list[str]:
+    fields: list[str] = []
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("//"):
+            continue
+        name = line.split(None, 1)[0]
+        name = name.lstrip("*[]")
+        if name and name[0].isupper():
+            fields.append(line)
+    return fields
 
 
 def normalize_go_signature(signature: str) -> str:
@@ -3519,12 +5558,32 @@ def update_api_navigation() -> None:
             ]
         )
         for slug in read_api_index_slugs(FERN_PAGES / directory / "index.md"):
-            lines.extend(
-                [
-                    f'          - page: "{api_nav_page_title(directory, slug)}"',
-                    f'            path: "./pages/{directory}/{api_page_route(directory, slug)}.md"',
-                ]
-            )
+            if directory == "cpp_api" and slug == "common-types":
+                lines.extend(
+                    [
+                        '          - section: "Common Types"',
+                        f'            path: "./pages/{directory}/{api_page_route(directory, slug)}.md"',
+                        "            contents:",
+                    ]
+                )
+                for (
+                    section_title,
+                    section_slug,
+                ) in cpp_common_type_section_pages():
+                    child_slug = f"common-types-{section_slug}"
+                    lines.extend(
+                        [
+                            f'              - page: "{section_title}"',
+                            f'                path: "./pages/{directory}/{api_page_route(directory, child_slug)}.md"',
+                        ]
+                    )
+            else:
+                lines.extend(
+                    [
+                        f'          - page: "{api_nav_page_title(directory, slug)}"',
+                        f'            path: "./pages/{directory}/{api_page_route(directory, slug)}.md"',
+                    ]
+                )
 
     replacement = "\n".join(lines) + "\n"
     docs_yml.write_text(
