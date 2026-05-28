@@ -15,7 +15,6 @@
 #include <cuda_runtime.h>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
-namespace {
 
 static constexpr int BITS_PER_CHUNK = 4;
 static constexpr int LUT_SIZE       = (1 << BITS_PER_CHUNK);  // 16
@@ -73,5 +72,4 @@ __device__ inline uint32_t extract_code(const uint8_t* codes, size_t d, size_t E
   return (v >> shift) & ((1u << EX_BITS) - 1);
 }
 
-}  // namespace
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
