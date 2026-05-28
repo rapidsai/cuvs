@@ -14,7 +14,7 @@ _Source header: `cuvs/neighbors/mg_common.h`_
 Distribution mode for multi-GPU indexes
 
 ```c
-typedef enum { ... } cuvsMultiGpuDistributionMode;
+typedef enum;
 ```
 
 <a id="cuvsmultigpureplicatedsearchmode"></a>
@@ -23,7 +23,10 @@ typedef enum { ... } cuvsMultiGpuDistributionMode;
 Search mode when using a replicated index
 
 ```c
-typedef enum { ... } cuvsMultiGpuReplicatedSearchMode;
+typedef enum {
+  CUVS_NEIGHBORS_MG_LOAD_BALANCER = 0,
+  CUVS_NEIGHBORS_MG_ROUND_ROBIN = 1
+} cuvsMultiGpuReplicatedSearchMode;
 ```
 
 **Values**
@@ -39,7 +42,10 @@ typedef enum { ... } cuvsMultiGpuReplicatedSearchMode;
 Merge mode when using a sharded index
 
 ```c
-typedef enum { ... } cuvsMultiGpuShardedMergeMode;
+typedef enum {
+  CUVS_NEIGHBORS_MG_MERGE_ON_ROOT_RANK = 0,
+  CUVS_NEIGHBORS_MG_TREE_MERGE = 1
+} cuvsMultiGpuShardedMergeMode;
 ```
 
 **Values**

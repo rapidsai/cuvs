@@ -212,7 +212,7 @@ Device-resident datasets require `n_clusters = 1`. Put the dataset in host memor
 
 ### Saving graph outputs
 
-All-neighbors does not expose cuVS index serialization or deserialization APIs because the graph arrays are the output. Persist `indices`, `distances`, and `core_distances` if used with your application's tensor, array, or table storage format, then load those arrays into the downstream graph-processing workflow.
+All-neighbors does not expose NVIDIA cuVS index serialization or deserialization APIs because the graph arrays are the output. Persist `indices`, `distances`, and `core_distances` if used with your application's tensor, array, or table storage format, then load those arrays into the downstream graph-processing workflow.
 
 ### Mutual-reachability distances
 
@@ -263,7 +263,7 @@ All-neighbors does not build a reusable search index. It writes k-NN graph outpu
 
 When `n_clusters = 1`, all-neighbors builds one k-NN graph over the whole dataset using the selected local graph builder.
 
-When `n_clusters > 1`, all-neighbors first trains cluster centroids from a sample of the host dataset. Then it assigns each row to the `overlap_factor` nearest clusters. Each cluster builds a local k-NN graph, and cuVS merges those local graphs back into one global graph.
+When `n_clusters > 1`, all-neighbors first trains cluster centroids from a sample of the host dataset. Then it assigns each row to the `overlap_factor` nearest clusters. Each cluster builds a local k-NN graph, and NVIDIA cuVS merges those local graphs back into one global graph.
 
 The local graph builder can be brute-force, IVF-PQ, or NN-Descent. Brute-force is exact when `n_clusters = 1`. With batching, even brute-force becomes approximate because each row only compares against rows in its assigned clusters.
 

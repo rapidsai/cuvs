@@ -14,7 +14,11 @@ _Source header: `cuvs/neighbors/common.h`_
 Enum to denote filter type.
 
 ```c
-enum cuvsFilterType { ... };
+enum cuvsFilterType {
+  NO_FILTER = 0,
+  BITSET = 1,
+  BITMAP = 2
+};
 ```
 
 **Values**
@@ -31,7 +35,9 @@ enum cuvsFilterType { ... };
 Struct to hold address of cuvs::neighbors::prefilter and its type
 
 ```c
-typedef struct { ... } cuvsFilter;
+typedef struct {
+  uintptr_t addr;
+} cuvsFilter;
 ```
 
 **Fields**
@@ -48,7 +54,10 @@ typedef struct { ... } cuvsFilter;
 Strategy for merging indices.
 
 ```c
-typedef enum { ... } cuvsMergeStrategy;
+typedef enum {
+  MERGE_STRATEGY_PHYSICAL = 0,
+  MERGE_STRATEGY_LOGICAL = 1
+} cuvsMergeStrategy;
 ```
 
 **Values**

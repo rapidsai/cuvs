@@ -17,7 +17,7 @@ The index stores the dataset and norms for the dataset in device memory.
 
 ```cpp
 template <typename T, typename DistT = T>
-struct index : cuvs::neighbors::index { ... };
+struct index;
 ```
 
 <a id="neighbors-brute-force-index-index"></a>
@@ -473,7 +473,7 @@ Sparse Brute Force index.
 
 ```cpp
 template <typename T, typename IdxT>
-struct sparse_index { ... };
+struct sparse_index;
 ```
 
 <a id="neighbors-brute-force-sparse-index-sparse-index"></a>
@@ -535,7 +535,7 @@ T metric_arg() const noexcept;
 Sparse Brute Force index search
 
 ```cpp
-struct sparse_search_params { ... };
+struct sparse_search_params;
 ```
 
 ## Bruteforce index serialize functions
@@ -554,8 +554,6 @@ bool include_dataset = true);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-output
-
 **Template Parameters**
 
 | Name | Type | Description |
@@ -569,7 +567,7 @@ output
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
 | `index` | in | [`const cuvs::neighbors::brute_force::index<half, float>&`](/api-reference/cpp-api-neighbors-brute-force#neighbors-brute-force-index) | brute force index |
-| `include_dataset` | in | `bool` | whether to include the dataset in the serialized Default: `true`. |
+| `include_dataset` | in | `bool` | whether to include the dataset in the serialized output Default: `true`. |
 
 **Returns**
 
@@ -588,8 +586,6 @@ bool include_dataset = true);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-output
-
 **Template Parameters**
 
 | Name | Type | Description |
@@ -603,7 +599,7 @@ output
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
 | `index` | in | [`const cuvs::neighbors::brute_force::index<float, float>&`](/api-reference/cpp-api-neighbors-brute-force#neighbors-brute-force-index) | brute force index |
-| `include_dataset` | in | `bool` | whether to include the dataset in the serialized Default: `true`. |
+| `include_dataset` | in | `bool` | whether to include the dataset in the serialized output Default: `true`. |
 
 **Returns**
 

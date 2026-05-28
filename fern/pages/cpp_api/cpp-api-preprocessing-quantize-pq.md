@@ -24,19 +24,28 @@ std::variant<cuvs::cluster::kmeans::balanced_params, cuvs::cluster::kmeans::para
 Product Quantizer parameters.
 
 ```cpp
-struct params { ... };
+struct params {
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+  bool use_subspaces;
+  bool use_vq;
+  uint32_t vq_n_centers;
+  kmeans_params_variant kmeans_params;
+  uint32_t max_train_points_per_pq_code;
+  uint32_t max_train_points_per_vq_cluster;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible value range: [4-16]. Hint: the smaller the 'pq_bits', the smaller the index size and the faster the fit/transform time, but the lower the recall. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, dim / 4 is used as default. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ.<br /><br />Possible value range: [4-16].<br /><br />Hint: the smaller the 'pq_bits', the smaller the index size and the faster the fit/transform time, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, dim / 4 is used as default.<br /><br />TODO: at the moment `dim` must be a multiple `pq_dim`. |
 | `use_subspaces` | `bool` | Whether to use subspaces for product quantization (PQ). When true, one PQ codebook is used for each subspace. Otherwise, a single PQ codebook is used. |
 | `use_vq` | `bool` | Whether to use Vector Quantization (KMeans) before product quantization (PQ). When true, VQ is used and PQ is trained on the residuals. |
 | `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. (sqrt(n_rows)) |
-| `kmeans_params` | [`kmeans_params_variant`](/api-reference/cpp-api-preprocessing-quantize-pq#kmeans-params-variant) | K-means parameters for PQ codebook training. Set to cuvs::cluster::kmeans::balanced_params for balanced k-means (default), or cuvs::cluster::kmeans::params for regular k-means. The active variant type selects the algorithm; balanced k-means tends to be faster for PQ training where cluster sizes are approximately equal. Only L2Expanded metric is supported. The number of clusters is always set to 1 &lt;&lt; pq_bits. |
+| `kmeans_params` | [`kmeans_params_variant`](/api-reference/cpp-api-preprocessing-quantize-pq#kmeans-params-variant) | K-means parameters for PQ codebook training.<br /><br />Set to cuvs::cluster::kmeans::balanced_params for balanced k-means (default), or cuvs::cluster::kmeans::params for regular k-means. The active variant type selects the algorithm; balanced k-means tends to be faster for PQ training where cluster sizes are approximately equal. Only L2Expanded metric is supported. The number of clusters is always set to 1 &lt;&lt; pq_bits. |
 | `max_train_points_per_pq_code` | `uint32_t` | The max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. We will use `pq_n_centers * max_train_points_per_pq_code` training points to train each PQ codebook. |
 | `max_train_points_per_vq_cluster` | `uint32_t` | The max number of data points to use per VQ cluster during training. |
 
@@ -55,8 +64,7 @@ uint32_t kmeans_n_iters,
 cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
 cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
 uint32_t max_train_points_per_pq_code    = 256,
-uint32_t max_train_points_per_vq_cluster = 1024)
-: pq_bits(pq_bits),
+uint32_t max_train_points_per_vq_cluster = 1024);
 ```
 
 **Parameters**
@@ -84,7 +92,10 @@ Defines and stores VPQ codebooks upon training
 
 ```cpp
 template <typename T>
-struct quantizer { ... };
+struct quantizer {
+  params params_quantizer;
+  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
+};
 ```
 
 **Fields**
@@ -156,8 +167,6 @@ std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::null
 
 Usage example:
 
-used, optional
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -166,7 +175,7 @@ used, optional
 | `quant` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-pq#preprocessing-quantize-pq-quantizer) | a product quantizer |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device or host |
 | `codes_out` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a row-major matrix view on device containing the PQ codes |
-| `vq_labels` | out | `std::optional<raft::device_vector_view<uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is Default: `std::nullopt`. |
+| `vq_labels` | out | `std::optional<raft::device_vector_view<uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is used, optional Default: `std::nullopt`. |
 
 **Returns**
 

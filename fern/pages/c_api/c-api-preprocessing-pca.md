@@ -14,7 +14,10 @@ _Source header: `cuvs/preprocessing/pca.h`_
 Solver algorithm for PCA eigen decomposition.
 
 ```c
-enum cuvsPcaSolver { ... };
+enum cuvsPcaSolver {
+  CUVS_PCA_COV_EIG_DQ = 0,
+  CUVS_PCA_COV_EIG_JACOBI = 1
+};
 ```
 
 **Values**
@@ -30,7 +33,14 @@ enum cuvsPcaSolver { ... };
 Parameters for PCA decomposition.
 
 ```c
-struct cuvsPcaParams { ... };
+struct cuvsPcaParams {
+  int n_components;
+  bool copy;
+  bool whiten;
+  enum cuvsPcaSolver algorithm;
+  float tol;
+  int n_iterations;
+};
 ```
 
 **Fields**

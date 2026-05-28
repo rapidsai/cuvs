@@ -16,7 +16,10 @@ Multi-GPU parameters to build IVF-PQ Index
 This structure extends the base IVF-PQ index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfPqIndexParams { ... };
+struct cuvsMultiGpuIvfPqIndexParams {
+  cuvsIvfPqIndexParams_t base_params;
+  cuvsMultiGpuDistributionMode mode;
+};
 ```
 
 **Fields**
@@ -74,7 +77,12 @@ Multi-GPU parameters to search IVF-PQ index
 This structure extends the base IVF-PQ search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuIvfPqSearchParams { ... };
+struct cuvsMultiGpuIvfPqSearchParams {
+  cuvsIvfPqSearchParams_t base_params;
+  cuvsMultiGpuReplicatedSearchMode search_mode;
+  cuvsMultiGpuShardedMergeMode merge_mode;
+  int64_t n_rows_per_batch;
+};
 ```
 
 **Fields**
@@ -129,12 +137,13 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSe
 <a id="cuvsmultigpuivfpqindex"></a>
 ### cuvsMultiGpuIvfPqIndex
 
-Struct to hold address of cuvs::neighbors::mg_index&lt;ivf_pq::index&gt; and its active trained
-
-dtype
+Struct to hold address of cuvs::neighbors::mg_index&lt;ivf_pq::index&gt; and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsMultiGpuIvfPqIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsMultiGpuIvfPqIndex;
 ```
 
 **Fields**

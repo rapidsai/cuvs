@@ -75,7 +75,7 @@ python -m cuvs_bench.split_groundtruth --groundtruth deep_new_groundtruth.public
 
 This produces `groundtruth.neighbors.ibin` and `groundtruth.distances.fbin`.
 
-The `wiki-all` dataset contains 88M 768-dimensional vectors, plus 1M and 10M subsets, for realistic RAG/LLM-scale benchmarking. See the [Wiki-all Dataset Guide](wiki_all_dataset.md) to download it.
+The `wiki-all` dataset contains 88M 768-dimensional vectors, plus 1M and 10M subsets, for realistic RAG/LLM-scale benchmarking. See the [Wiki-all Dataset Guide](/user-guide/benchmarking-guide/cu-vs-bench-tool/wiki-all-dataset) to download it.
 
 ## Generate ground truth
 

@@ -1,6 +1,6 @@
 # Go Installation
 
-Use this page when you need the NVIDIA cuVS Go bindings. The Go bindings use CGO and require the native cuVS C and C++ libraries.
+Use this page when you need the NVIDIA cuVS Go bindings. The Go bindings use CGO and require the native NVIDIA cuVS C and C++ libraries.
 
 All NVIDIA cuVS routine implementations live in the C++ core. The Go bindings call into the native C and C++ libraries, so install both `libcuvs_c` and `libcuvs`.
 

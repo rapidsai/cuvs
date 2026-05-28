@@ -14,7 +14,15 @@ _Source header: `cuvs/neighbors/ivf_sq.h`_
 Supplemental parameters to build IVF-SQ Index
 
 ```c
-struct cuvsIvfSqIndexParams { ... };
+struct cuvsIvfSqIndexParams {
+  cuvsDistanceType metric;
+  float metric_arg;
+  bool add_data_on_build;
+  uint32_t n_lists;
+  uint32_t kmeans_n_iters;
+  uint32_t max_train_points_per_cluster;
+  bool conservative_memory_allocation;
+};
 ```
 
 **Fields**
@@ -23,11 +31,11 @@ struct cuvsIvfSqIndexParams { ... };
 | --- | --- | --- |
 | `metric` | [`cuvsDistanceType`](/api-reference/c-api-distance-distance#cuvsdistancetype) | Distance type. |
 | `metric_arg` | `float` | The argument used by some distance metrics. |
-| `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
+| `add_data_on_build` | `bool` | Whether to add the dataset content to the index, i.e.:<br /><br />- `true` means the index is filled with the dataset vectors and ready to search after calling `build`.<br />- `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but the index is left empty; you'd need to call `extend` on the index afterwards to populate it. |
 | `n_lists` | `uint32_t` | The number of inverted lists (clusters) |
 | `kmeans_n_iters` | `uint32_t` | The number of iterations searching for kmeans centers (index building). |
 | `max_train_points_per_cluster` | `uint32_t` | The number of data vectors per cluster to use during iterative kmeans building. The index uses at most `n_lists * max_train_points_per_cluster` rows for training. |
-| `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
+| `conservative_memory_allocation` | `bool` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database).<br /><br />The alternative is the conservative allocation behavior; when enabled, the algorithm always allocates the minimum amount of memory required to store the given number of records. Set this flag to `true` if you prefer to use as little GPU memory for the database as possible. |
 
 <a id="cuvsivfsqindexparamscreate"></a>
 ### cuvsIvfSqIndexParamsCreate
@@ -75,7 +83,9 @@ CUVS_EXPORT cuvsError_t cuvsIvfSqIndexParamsDestroy(cuvsIvfSqIndexParams_t index
 Supplemental parameters to search IVF-SQ index
 
 ```c
-struct cuvsIvfSqSearchParams { ... };
+struct cuvsIvfSqSearchParams {
+  uint32_t n_probes;
+};
 ```
 
 **Fields**
@@ -130,7 +140,10 @@ CUVS_EXPORT cuvsError_t cuvsIvfSqSearchParamsDestroy(cuvsIvfSqSearchParams_t par
 Struct to hold address of cuvs::neighbors::ivf_sq::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsIvfSqIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsIvfSqIndex;
 ```
 
 **Fields**
@@ -263,7 +276,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfSqIndexGetCenters(cuvsIvfSqIndex_t index, DLManag
 <a id="cuvsivfsqbuild"></a>
 ### cuvsIvfSqBuild
 
-Build an IVF-SQ index with a `DLManagedTensor` which has underlying
+Build an IVF-SQ index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsIvfSqBuild(cuvsResources_t res,
@@ -271,11 +284,6 @@ cuvsIvfSqIndexParams_t index_params,
 DLManagedTensor* dataset,
 cuvsIvfSqIndex_t index);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
-
-1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
-2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 **Parameters**
 
@@ -295,7 +303,7 @@ cuvsIvfSqIndex_t index);
 <a id="cuvsivfsqsearch"></a>
 ### cuvsIvfSqSearch
 
-Search an IVF-SQ index with a `DLManagedTensor` which has underlying
+Search an IVF-SQ index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or 16 2. `neighbors`: `kDLDataType.code == kDLInt` and `kDLDataType.bits = 64` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
 CUVS_EXPORT cuvsError_t cuvsIvfSqSearch(cuvsResources_t res,
@@ -306,12 +314,6 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter filter);
 ```
-
-`DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. Types for input are:
-
-1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or 16
-2. `neighbors`: `kDLDataType.code == kDLInt` and `kDLDataType.bits = 64`
-3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 **Parameters**
 

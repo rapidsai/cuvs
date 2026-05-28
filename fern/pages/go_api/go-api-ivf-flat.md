@@ -13,7 +13,9 @@ _Sources: `go/ivf_flat`_
 ### IndexParams
 
 ```go
-type IndexParams struct { ... }
+type IndexParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 Supplemental parameters to build IVF Flat Index
@@ -23,7 +25,9 @@ _Source: `go/ivf_flat/index_params.go:13`_
 ### IvfFlatIndex
 
 ```go
-type IvfFlatIndex struct { ... }
+type IvfFlatIndex struct {
+	// contains filtered or unexported fields
+}
 ```
 
 IVF Flat Index
@@ -33,7 +37,9 @@ _Source: `go/ivf_flat/ivf_flat.go:14`_
 ### SearchParams
 
 ```go
-type SearchParams struct { ... }
+type SearchParams struct {
+	// contains filtered or unexported fields
+}
 ```
 
 _Source: `go/ivf_flat/search_params.go:10`_

@@ -11,12 +11,14 @@ _Source header: `cuvs/preprocessing/quantize/binary.hpp`_
 <a id="preprocessing-quantize-binary-bit-threshold"></a>
 ### preprocessing::quantize::binary::bit_threshold
 
-quantizer algorithms. The mean and sampling_median thresholds are calculated separately
-
-for each dimension.
+quantizer algorithms. The mean and sampling_median thresholds are calculated separately for each dimension.
 
 ```cpp
-enum class bit_threshold { ... };
+enum class bit_threshold {
+  zero,
+  mean,
+  sampling_median
+};
 ```
 
 **Values**
@@ -33,7 +35,10 @@ enum class bit_threshold { ... };
 quantizer parameters.
 
 ```cpp
-struct params { ... };
+struct params {
+  bit_threshold threshold;
+  float sampling_ratio;
+};
 ```
 
 **Fields**
@@ -46,13 +51,13 @@ struct params { ... };
 <a id="preprocessing-quantize-binary-quantizer"></a>
 ### preprocessing::quantize::binary::quantizer
 
-Store the threshold vector for quantization. In the binary::transform function, a bit is
-
-set if the corresponding element in the dataset vector is greater than the corresponding element in the threshold vector.
+Store the threshold vector for quantization. In the binary::transform function, a bit is set if the corresponding element in the dataset vector is greater than the corresponding element in the threshold vector.
 
 ```cpp
 template <typename T>
-struct quantizer { ... };
+struct quantizer {
+  raft::device_vector<T, int64_t> threshold;
+};
 ```
 
 **Fields**
@@ -67,7 +72,7 @@ struct quantizer { ... };
 Construct a quantizer with an empty threshold vector.
 
 ```cpp
-quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, int64_t>(res, 0));
+quantizer(raft::resources const& res);
 ```
 
 **Parameters**
@@ -132,7 +137,7 @@ Usage example:
 <a id="preprocessing-quantize-binary-transform"></a>
 ### preprocessing::quantize::binary::transform
 
-Applies binary quantization transform to given dataset. If a dataset element is positive,
+Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 void transform(raft::resources const& res,
@@ -140,8 +145,6 @@ const quantizer<double>& quantizer,
 raft::device_matrix_view<const double, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
-
-set the corresponding bit to 1.
 
 Usage example:
 
@@ -160,7 +163,7 @@ Usage example:
 
 **Additional overload:** `preprocessing::quantize::binary::transform`
 
-Applies binary quantization transform to given dataset. If a dataset element is positive,
+Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 void transform(raft::resources const& res,
@@ -168,8 +171,6 @@ const quantizer<double>& quantizer,
 raft::host_matrix_view<const double, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
-
-set the corresponding bit to 1.
 
 Usage example:
 
@@ -236,7 +237,7 @@ Usage example:
 
 **Additional overload:** `preprocessing::quantize::binary::transform`
 
-Applies binary quantization transform to given dataset. If a dataset element is positive,
+Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 void transform(raft::resources const& res,
@@ -244,8 +245,6 @@ const quantizer<float>& quantizer,
 raft::device_matrix_view<const float, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
-
-set the corresponding bit to 1.
 
 Usage example:
 
@@ -264,7 +263,7 @@ Usage example:
 
 **Additional overload:** `preprocessing::quantize::binary::transform`
 
-Applies binary quantization transform to given dataset. If a dataset element is positive,
+Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 void transform(raft::resources const& res,
@@ -272,8 +271,6 @@ const quantizer<float>& quantizer,
 raft::host_matrix_view<const float, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
-
-set the corresponding bit to 1.
 
 Usage example:
 
@@ -393,7 +390,7 @@ Usage example:
 <a id="preprocessing-quantize-binary-deprecated"></a>
 ### preprocessing::quantize::binary::[[deprecated
 
-[deprecated] Applies binary quantization transform to given dataset. If a dataset element
+[deprecated] Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 [[deprecated("please create and specify a quantizer")]] void transform(
@@ -402,8 +399,6 @@ raft::device_matrix_view<const double, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
 
-is positive, set the corresponding bit to 1.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -416,7 +411,7 @@ is positive, set the corresponding bit to 1.
 
 **Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
-[deprecated] Applies binary quantization transform to given dataset. If a dataset element
+[deprecated] Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 [[deprecated("please create and specify a quantizer")]] void transform(
@@ -425,8 +420,6 @@ raft::host_matrix_view<const double, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
 
-is positive, set the corresponding bit to 1.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -439,7 +432,7 @@ is positive, set the corresponding bit to 1.
 
 **Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
-[deprecated] Applies binary quantization transform to given dataset. If a dataset element
+[deprecated] Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 [[deprecated("please create and specify a quantizer")]] void transform(
@@ -448,8 +441,6 @@ raft::device_matrix_view<const float, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
 
-is positive, set the corresponding bit to 1.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -462,7 +453,7 @@ is positive, set the corresponding bit to 1.
 
 **Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
-[deprecated] Applies binary quantization transform to given dataset. If a dataset element
+[deprecated] Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 [[deprecated("please create and specify a quantizer")]] void transform(
@@ -471,8 +462,6 @@ raft::host_matrix_view<const float, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
 
-is positive, set the corresponding bit to 1.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -485,7 +474,7 @@ is positive, set the corresponding bit to 1.
 
 **Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
-[deprecated] Applies binary quantization transform to given dataset. If a dataset element
+[deprecated] Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 [[deprecated("please create and specify a quantizer")]] void transform(
@@ -494,8 +483,6 @@ raft::device_matrix_view<const half, int64_t> dataset,
 raft::device_matrix_view<uint8_t, int64_t> out);
 ```
 
-is positive, set the corresponding bit to 1.
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -508,7 +495,7 @@ is positive, set the corresponding bit to 1.
 
 **Additional overload:** `preprocessing::quantize::binary::[[deprecated`
 
-[deprecated] Applies binary quantization transform to given dataset. If a dataset element
+[deprecated] Applies binary quantization transform to given dataset. If a dataset element is positive, set the corresponding bit to 1.
 
 ```cpp
 [[deprecated("please create and specify a quantizer")]] void transform(
@@ -516,8 +503,6 @@ raft::resources const& res,
 raft::host_matrix_view<const half, int64_t> dataset,
 raft::host_matrix_view<uint8_t, int64_t> out);
 ```
-
-is positive, set the corresponding bit to 1.
 
 **Parameters**
 

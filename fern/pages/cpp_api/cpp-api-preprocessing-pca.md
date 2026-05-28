@@ -11,12 +11,17 @@ _Source header: `cuvs/preprocessing/pca.hpp`_
 <a id="preprocessing-pca-params"></a>
 ### preprocessing::pca::params
 
-Parameters for PCA decomposition. Ref:
-
-http://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
+Parameters for PCA decomposition. Ref: http://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
 
 ```cpp
-struct params { ... };
+struct params {
+  int n_components;
+  bool copy;
+  bool whiten;
+  solver algorithm;
+  float tol;
+  int n_iterations;
+};
 ```
 
 **Fields**
@@ -129,15 +134,13 @@ raft::device_matrix_view<float, int64_t, raft::col_major> trans_input);
 
 Transforms the input data into the eigenspace using previously computed principal components.
 
-(mean-centered then restored).
-
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | raft resource handle |
 | `config` | in | [`const params&`](/api-reference/cpp-api-preprocessing-pca#preprocessing-pca-params) | PCA parameters |
-| `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | data to transform [n_rows x n_cols] (col-major). Modified temporarily |
+| `input` | inout | `raft::device_matrix_view<float, int64_t, raft::col_major>` | data to transform [n_rows x n_cols] (col-major). Modified temporarily (mean-centered then restored). |
 | `components` | in | `raft::device_matrix_view<float, int64_t, raft::col_major>` | principal components [n_components x n_cols] (col-major) |
 | `singular_vals` | in | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |
 | `mu` | in | `raft::device_vector_view<float, int64_t>` | column means [n_cols] |
