@@ -424,9 +424,9 @@ template <typename DataT, typename IdxT>
 using vpq_dataset_view = dataset_view<vpq_dataset_container, DataT, IdxT, true, false>;
 
 /**
- * Concrete types held by `any_dataset_view<DataT, IdxT>`'s `std::variant`. Dispatch with
- * `std::holds_alternative<T>` / `std::get<T>` on `view.as_variant()` using these aliases — no
- * parallel numeric tags.
+ * Concrete types held by `any_dataset_view<DataT, IdxT>`'s `std::variant`. `n_rows()` / `dim()` use
+ * `std::visit`; for other dispatch use `std::holds_alternative<T>` / `std::get<T>` on
+ * `view.as_variant()` with these aliases.
  */
 template <typename DataT, typename IdxT>
 struct any_dataset_view_types {
@@ -437,8 +437,9 @@ struct any_dataset_view_types {
 };
 
 /**
- * Concrete types held by `any_owning_dataset<IdxT>`'s `std::variant`. Dispatch with
- * `std::holds_alternative<T>` / `std::get<T>` on `dataset.as_variant()`.
+ * Concrete types held by `any_owning_dataset<IdxT>`'s `std::variant`. `n_rows()` / `dim()` use
+ * `std::visit`; otherwise dispatch with `std::holds_alternative<T>` / `std::get<T>` on
+ * `dataset.as_variant()`.
  *
  */
 template <typename IdxT>
@@ -481,56 +482,12 @@ struct dataset<any_owning_dataset_container, void, IdxT, false, false> {
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type
   {
-    using OT = any_owning_dataset_types<IdxT>;
-    if (std::holds_alternative<typename OT::empty_owning>(storage_)) {
-      return std::get<typename OT::empty_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::padded_f32_owning>(storage_)) {
-      return std::get<typename OT::padded_f32_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::padded_f16_owning>(storage_)) {
-      return std::get<typename OT::padded_f16_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::padded_i8_owning>(storage_)) {
-      return std::get<typename OT::padded_i8_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::padded_u8_owning>(storage_)) {
-      return std::get<typename OT::padded_u8_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::vpq_f32_owning>(storage_)) {
-      return std::get<typename OT::vpq_f32_owning>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename OT::vpq_f16_owning>(storage_)) {
-      return std::get<typename OT::vpq_f16_owning>(storage_).n_rows();
-    }
-    return IdxT{};
+    return std::visit([](auto const& alt) noexcept { return alt.n_rows(); }, storage_);
   }
 
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
-    using OT = any_owning_dataset_types<IdxT>;
-    if (std::holds_alternative<typename OT::empty_owning>(storage_)) {
-      return std::get<typename OT::empty_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::padded_f32_owning>(storage_)) {
-      return std::get<typename OT::padded_f32_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::padded_f16_owning>(storage_)) {
-      return std::get<typename OT::padded_f16_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::padded_i8_owning>(storage_)) {
-      return std::get<typename OT::padded_i8_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::padded_u8_owning>(storage_)) {
-      return std::get<typename OT::padded_u8_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::vpq_f32_owning>(storage_)) {
-      return std::get<typename OT::vpq_f32_owning>(storage_).dim();
-    }
-    if (std::holds_alternative<typename OT::vpq_f16_owning>(storage_)) {
-      return std::get<typename OT::vpq_f16_owning>(storage_).dim();
-    }
-    return 0;
+    return std::visit([](auto const& alt) noexcept { return alt.dim(); }, storage_);
   }
 
   [[nodiscard]] owning_variant const& as_variant() const noexcept { return storage_; }
@@ -565,38 +522,12 @@ struct dataset_view<any_dataset_view_container, DataT, IdxT, true, false> {
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type
   {
-    using VT = any_dataset_view_types<DataT, IdxT>;
-    if (std::holds_alternative<typename VT::empty_view>(storage_)) {
-      return std::get<typename VT::empty_view>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename VT::vpq_f16_view>(storage_)) {
-      return std::get<typename VT::vpq_f16_view>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename VT::vpq_f32_view>(storage_)) {
-      return std::get<typename VT::vpq_f32_view>(storage_).n_rows();
-    }
-    if (std::holds_alternative<typename VT::padded_view>(storage_)) {
-      return std::get<typename VT::padded_view>(storage_).n_rows();
-    }
-    return IdxT{};
+    return std::visit([](auto const& alt) noexcept { return alt.n_rows(); }, storage_);
   }
 
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
-    using VT = any_dataset_view_types<DataT, IdxT>;
-    if (std::holds_alternative<typename VT::empty_view>(storage_)) {
-      return std::get<typename VT::empty_view>(storage_).dim();
-    }
-    if (std::holds_alternative<typename VT::vpq_f16_view>(storage_)) {
-      return std::get<typename VT::vpq_f16_view>(storage_).dim();
-    }
-    if (std::holds_alternative<typename VT::vpq_f32_view>(storage_)) {
-      return std::get<typename VT::vpq_f32_view>(storage_).dim();
-    }
-    if (std::holds_alternative<typename VT::padded_view>(storage_)) {
-      return std::get<typename VT::padded_view>(storage_).dim();
-    }
-    return 0;
+    return std::visit([](auto const& alt) noexcept { return alt.dim(); }, storage_);
   }
 
   [[nodiscard]] variant_type const& as_variant() const noexcept { return storage_; }
