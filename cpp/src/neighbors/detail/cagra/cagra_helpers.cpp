@@ -12,19 +12,22 @@
 namespace cuvs::neighbors::cagra::helpers {
 // Calculate CAGRA optimize workspace memory requirements.
 // This is the working memory on top of the input/output memory usage.
-std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
-                                                  size_t graph_degree,
-                                                  size_t intermediate_degree,
-                                                  size_t index_size,
-                                                  bool mst_optimize)
-                                                  {
+std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows,
+                                                                   size_t graph_degree,
+                                                                   size_t intermediate_degree,
+                                                                   size_t index_size,
+                                                                   bool mst_optimize)
+{
   // MST optimization memory (host only)
-  size_t mst_host = n_rows * index_size;  // mst_graph_num_edges
+  size_t mst_host       = 0;
+  size_t mst_host_fixed = 0;
   if (mst_optimize) {
+    mst_host = n_rows * index_size;                  // mst_graph_num_edges
     mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in optimize
     mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in mst_optimize
     mst_host += n_rows * index_size * 7;             // vectors with _max_edges suffix
-    mst_host += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
+    mst_host_fixed += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
+    mst_host += mst_host_fixed;
   }
 
   // batchsize for both prune and combine stages
@@ -32,10 +35,12 @@ std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
 
   // Prune stage memory
   // We neglect 8 bytes (both on host and device) for stats
-  size_t prune_dev = batch_size * intermediate_degree * 1;  // detour count (uint8_t)
-  prune_dev += batch_size * sizeof(uint32_t);               // d_num_detour_edges
-  prune_dev += n_rows * intermediate_degree * index_size;   // d_input_graph
-  prune_dev += 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
+  size_t prune_dev_fixed = batch_size * intermediate_degree * 1;  // detour count (uint8_t)
+  prune_dev_fixed += batch_size * sizeof(uint32_t);               // d_num_detour_edges
+  prune_dev_fixed += 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
+
+  size_t prune_dev = n_rows * intermediate_degree * index_size;  // d_input_graph
+  prune_dev += prune_dev_fixed;
 
   // Reverse graph stage memory
   size_t rev_dev = n_rows * graph_degree * index_size;  // d_rev_graph
@@ -43,20 +48,24 @@ std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
   rev_dev += n_rows * index_size;                       // d_dest_nodes
 
   // Memory for merging graphs (host only optional)
-  size_t combine_host =
-    n_rows * sizeof(uint32_t) + graph_degree * sizeof(uint32_t);  // in_edge_count + hist
+  size_t combine_host_fixed = graph_degree * sizeof(uint32_t);  // histogram
+  size_t combine_host       = n_rows * sizeof(uint32_t);        // n_edge_count
+  combine_host += combine_host_fixed;
 
   // additional memory for combine stage on device (3 batches)
-  size_t combine_dev = 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
+  size_t combine_dev_fixed = 2 * batch_size * graph_degree * index_size;  // d_output_graph(2*batch)
   if (mst_optimize) {
-    combine_dev += 2 * batch_size * graph_degree * index_size;  // d_mst_graph(2*batch)
-    combine_dev += 2 * batch_size * sizeof(uint32_t);           // d_mst_graph_num_edges(2*batch)
+    combine_dev_fixed += 2 * batch_size * graph_degree * index_size;  // d_mst_graph(2*batch)
+    combine_dev_fixed += 2 * batch_size * sizeof(uint32_t);  // d_mst_graph_num_edges(2*batch)
   }
+  size_t combine_dev = combine_dev_fixed;
 
-  size_t total_host = mst_host + combine_host;
-  size_t total_dev  = std::max(prune_dev, rev_dev + combine_dev);
+  size_t total_host       = mst_host + combine_host;
+  size_t total_host_fixed = mst_host_fixed + combine_host_fixed;
+  size_t total_dev        = std::max(prune_dev, rev_dev + combine_dev);
+  size_t total_dev_fixed  = std::max(prune_dev_fixed, combine_dev_fixed);
 
-  return std::make_pair(total_host, total_dev);
+  return std::make_tuple(total_host, total_dev, total_host_fixed, total_dev_fixed);
 }
 
 // All sizes are in bytes
@@ -75,7 +84,10 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
     cuvs::neighbors::ivf_pq::helpers::compressed_dataset_size(res, dataset, params.build_params);
   size_t graph_host_mem = n_rows * (graph_degree + intermediate_graph_degree) * sizeof(uint32_t);
 
-  auto [host_workspace_size, gpu_workspace_size] =
+  auto [host_workspace_size,
+        gpu_workspace_size,
+        host_workspace_size_fixed,
+        gpu_workspace_size_fixed] =
     cuvs::neighbors::cagra::helpers::optimize_workspace_size(
       n_rows, graph_degree, intermediate_graph_degree, sizeof(uint32_t));
   float host_workspace_gb = host_workspace_size / 1e9;
