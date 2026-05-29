@@ -14,12 +14,13 @@ Use these pages when contributing to NVIDIA cuVS or working on integrations that
 - [Java Guidelines](/developer-guide/coding-guidelines/java-guidelines): follow NVIDIA cuVS Java API design, native binding, packaging, and resource-management conventions.
 - [Python Guidelines](/developer-guide/coding-guidelines/python-guidelines): follow NVIDIA cuVS Python API, packaging, and binding conventions.
 
-## ABI Stability
+## Advanced Topics
 
-- [Advanced Topics](/user-guide/advanced-topics): find specialized development topics and low-level implementation guidance.
-- [ABI Stability](/developer-guide/abi-stability): understand ABI expectations for developer-facing APIs and downstream integrations.
+- [Advanced Topics](/developer-guide/advanced-topics): find specialized development topics and low-level implementation guidance.
+- [ABI Stability](/developer-guide/advanced-topics/abi-stability): understand ABI expectations for developer-facing APIs and downstream integrations.
 - [JIT Compilation](/developer-guide/advanced-topics/jit-compilation): understand when NVIDIA cuVS triggers just-in-time compilation and how runtime caches behave.
-- [Link-time Optimization](/developer-guide/link-time-optimization): use JIT LTO for CUDA compilation and linking workflows.
+- [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization): use JIT LTO for CUDA compilation and linking workflows.
+- [UDF Usage](/developer-guide/advanced-topics/udf-usage): supply custom CUDA distance metrics for IVF-flat search.
 
 ## Contributing
 

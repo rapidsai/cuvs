@@ -256,7 +256,7 @@ void foo(raft::resources const& res)
 
 NVIDIA cuVS is moving new kernels toward JIT link-time optimization. Instead of compiling every kernel variant into the binary, JIT LTO compiles fragments and links the needed combination at runtime.
 
-This helps reduce binary size and enables user-defined functions in NVIDIA cuVS CUDA kernels. For runtime and cache behavior, see [JIT Compilation](/developer-guide/advanced-topics/jit-compilation). For implementation guidance, see [Link-time Optimization](/developer-guide/link-time-optimization).
+This helps reduce binary size and enables user-defined functions in NVIDIA cuVS CUDA kernels. For runtime and cache behavior, see [JIT Compilation](/developer-guide/advanced-topics/jit-compilation). For implementation guidance, see [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization).
 
 ## Coding Style
 
