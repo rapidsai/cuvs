@@ -16,7 +16,6 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/util/host_memory.hpp>
 
-#include <rmm/mr/device_memory_resource.hpp>
 #include <rmm/mr/pool_memory_resource.hpp>
 
 #include "common.cuh"
