@@ -327,8 +327,8 @@ if(BUILD_MG_ALGOS)
   )
 
   ConfigureTest(
-    NAME CLUSTER_KMEANS_MG_BATCHED_TEST
-    PATH cluster/kmeans_mg_batched.cu
+    NAME CLUSTER_KMEANS_MG_TEST
+    PATH cluster/kmeans_mg.cu
     GPUS 1
     PERCENT 100
     ADDITIONAL_DEP NCCL::NCCL
