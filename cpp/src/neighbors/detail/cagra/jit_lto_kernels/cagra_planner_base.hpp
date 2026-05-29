@@ -64,8 +64,8 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                            uint32_t dataset_block_dim,
                                            uint32_t pq_len)
   {
-    if (pq_len != 2 && pq_len != 4) {
-      RAFT_FAIL("CAGRA JIT VPQ setup_workspace expects pq_len in {2,4} (matrix uses pq_bits=8)");
+    if (pq_len != 2 && pq_len != 4 && pq_len != 8) {
+      RAFT_FAIL("CAGRA JIT VPQ setup_workspace expects pq_len in {2,4,8} (matrix uses pq_bits=8)");
     }
     auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
       this->add_static_fragment<fragment_tag_setup_workspace<DataTag,
@@ -82,8 +82,10 @@ struct CagraPlannerBase : AlgorithmPlanner {
       team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
         if (pq_len == 2) {
           add.template operator()<TeamSz, Dim, 8u, 2u>();
-        } else {
+        } else if (pq_len == 4) {
           add.template operator()<TeamSz, Dim, 8u, 4u>();
+        } else {
+          add.template operator()<TeamSz, Dim, 8u, 8u>();
         }
       });
   }
@@ -120,8 +122,8 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                             uint32_t dataset_block_dim,
                                             uint32_t pq_len)
   {
-    if (pq_len != 2 && pq_len != 4) {
-      RAFT_FAIL("CAGRA JIT VPQ compute_distance expects pq_len in {2,4} (matrix uses pq_bits=8)");
+    if (pq_len != 2 && pq_len != 4 && pq_len != 8) {
+      RAFT_FAIL("CAGRA JIT VPQ compute_distance expects pq_len in {2,4,8} (matrix uses pq_bits=8)");
     }
     auto add = [&]<uint32_t TeamSz, uint32_t Dim, uint32_t PqBitsV, uint32_t PqLenV>() {
       this->add_static_fragment<fragment_tag_compute_distance<DataTag,
@@ -138,8 +140,10 @@ struct CagraPlannerBase : AlgorithmPlanner {
       team_size, dataset_block_dim, [&add, pq_len]<uint32_t TeamSz, uint32_t Dim>() {
         if (pq_len == 2) {
           add.template operator()<TeamSz, Dim, 8u, 2u>();
-        } else {
+        } else if (pq_len == 4) {
           add.template operator()<TeamSz, Dim, 8u, 4u>();
+        } else {
+          add.template operator()<TeamSz, Dim, 8u, 8u>();
         }
       });
   }
@@ -219,6 +223,12 @@ struct CagraPlannerBase : AlgorithmPlanner {
   static void dispatch_cagra_team_dim(uint32_t team_size, uint32_t dataset_block_dim, Lambda&& l)
   {
     switch (team_size) {
+      case 4:
+        switch (dataset_block_dim) {
+          case 128: std::forward<Lambda>(l).template operator()<4u, 128u>(); return;
+          default: break;
+        }
+        break;
       case 8:
         switch (dataset_block_dim) {
           case 128: std::forward<Lambda>(l).template operator()<8u, 128u>(); return;
@@ -240,6 +250,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
           case 128: std::forward<Lambda>(l).template operator()<32u, 128u>(); return;
           case 256: std::forward<Lambda>(l).template operator()<32u, 256u>(); return;
           case 512: std::forward<Lambda>(l).template operator()<32u, 512u>(); return;
+          case 1024: std::forward<Lambda>(l).template operator()<32u, 1024u>(); return;
           default: break;
         }
         break;
