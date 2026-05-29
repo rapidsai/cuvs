@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
+#include <cuvs/core/export.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/logger.hpp>
@@ -258,10 +259,10 @@ bool index<T, IdxT>::binary_index() const noexcept
   return binary_index_;
 }
 
-template struct index<float, uint32_t>;  // Used for refine function
-template struct index<float, int64_t>;
-template struct index<half, int64_t>;
-template struct index<int8_t, int64_t>;
-template struct index<uint8_t, int64_t>;
+template struct CUVS_EXPORT index<float, uint32_t>;  // Used for refine function
+template struct CUVS_EXPORT index<float, int64_t>;
+template struct CUVS_EXPORT index<half, int64_t>;
+template struct CUVS_EXPORT index<int8_t, int64_t>;
+template struct CUVS_EXPORT index<uint8_t, int64_t>;
 
 }  // namespace cuvs::neighbors::ivf_flat

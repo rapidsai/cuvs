@@ -28,6 +28,7 @@ Important Notes
    - CAGRA (Graph-based ANN)
    - IVF-Flat (Inverted File with Flat storage)
    - IVF-PQ (Inverted File with Product Quantization)
+   - All-neighbors (multi-GPU is built into its unified API via ``MultiGpuResources``)
 
 Configuration Options
 ---------------------
@@ -111,6 +112,7 @@ Algorithm-Specific Documentation
    :maxdepth: 2
    :caption: Multi-GPU Algorithms:
 
+   neighbors_all_neighbors.rst
    neighbors_mg_cagra.rst
    neighbors_mg_ivf_flat.rst
    neighbors_mg_ivf_pq.rst

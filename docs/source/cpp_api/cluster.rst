@@ -9,6 +9,6 @@ Cluster
    :maxdepth: 2
    :caption: Contents:
 
-   cluster_kmeans.rst
    cluster_agglomerative.rst
+   cluster_kmeans.rst
    cluster_spectral.rst

@@ -155,7 +155,7 @@ void build_knn_graph(
  * @tparam DataT data element type
  * @tparam IdxT type of the dataset vector indices
  * @tparam accessor host or device accessor_type for the dataset
- * @param[in] res raft::resources is an object mangaging resources
+ * @param[in] res raft::resources is an object managing resources
  * @param[in] dataset input raft::host/device_matrix_view that can be located in
  *                in host or device memory
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]

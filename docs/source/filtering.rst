@@ -5,7 +5,7 @@ Filtering vector indexes
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 cuVS supports different type of filtering depending on the vector index being used. The main method used in all of the vector indexes
-is pre-filtering, which is a technique that will into account the filtering of the vectors before computing it's closest neighbors, saving
+is pre-filtering, which is a technique that will take into account the filtering of the vectors before computing its closest neighbors, saving
 some computation from calculating distances.
 
 Bitset
