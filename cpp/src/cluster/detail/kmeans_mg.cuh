@@ -185,6 +185,15 @@ void mnmg_fit(
     streaming_batch_size = std::max(max_part_rows, IndexT{1});
   }
 
+  if (data_on_device && has_data && streaming_batch_size < max_part_rows) {
+    RAFT_LOG_WARN(
+      "MNMG KMeans: streaming_batch_size (%zu) ignored when partitions reside on device; using "
+      "max partition size (%zu)",
+      static_cast<size_t>(streaming_batch_size),
+      static_cast<size_t>(max_part_rows));
+    streaming_batch_size = max_part_rows;
+  }
+
   bool has_data = (n_local > 0);
 
   auto rank_centroids = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
