@@ -300,7 +300,7 @@ mod tests {
         let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
 
         let k = 10;
-        let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
+        let neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
         let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
         let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
