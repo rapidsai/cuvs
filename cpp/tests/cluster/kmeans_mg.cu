@@ -110,7 +110,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
                  d_centroids_snmg.data_handle(),
                  n_clusters * n_features,
                  stream);
-      raft::resource::sync_stream(clique_, stream);
     }
 
     auto const mode = testparams_.weight_mode;
@@ -142,8 +141,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
                                raft::make_host_scalar_view(&snmg_inertia),
                                raft::make_host_scalar_view(&snmg_n_iter));
 
-    raft::resource::sync_stream(clique_, stream);
-
     raft::resources sg_handle;
     auto sg_stream = raft::resource::get_cuda_stream(sg_handle);
 
@@ -153,7 +150,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
                  d_centroids_ref.data_handle(),
                  n_clusters * n_features,
                  sg_stream);
-      raft::resource::sync_stream(sg_handle, sg_stream);
     }
 
     cuvs::cluster::kmeans::params sg_params = snmg_params;
@@ -168,8 +164,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
                                d_centroids_sg.view(),
                                raft::make_host_scalar_view(&sg_inertia),
                                raft::make_host_scalar_view(&sg_n_iter));
-
-    raft::resource::sync_stream(sg_handle, sg_stream);
 
     rmm::device_uvector<int> d_labels_snmg(n_samples, sg_stream);
     rmm::device_uvector<int> d_labels_sg(n_samples, sg_stream);
@@ -220,15 +214,11 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
       true,
       raft::make_host_scalar_view(&pred_inertia_sg));
 
-    raft::resource::sync_stream(sg_handle, sg_stream);
-
     ari_vs_ref_ = raft::stats::adjusted_rand_index(
       d_labels_ref.data(), d_labels_snmg.data(), n_samples, sg_stream);
 
     ari_vs_sg_ = raft::stats::adjusted_rand_index(
       d_labels_sg.data(), d_labels_snmg.data(), n_samples, sg_stream);
-
-    raft::resource::sync_stream(sg_handle, sg_stream);
 
     snmg_inertia_ = snmg_inertia;
     sg_inertia_   = sg_inertia;
@@ -520,8 +510,6 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
           }
         }
 
-        raft::resource::sync_stream(rank_handle);
-
         // Trailing partitions get 0 rows when K > rank_n (empty-partition path).
         std::vector<raft::device_matrix_view<const T, int64_t>> X_parts;
         X_parts.reserve(static_cast<size_t>(partitions_per_rank));
@@ -552,7 +540,6 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
                               h_initial_centroids.data(),
                               d_rank_centroids.size(),
                               rank_stream);
-          raft::resource::sync_stream(rank_handle);
         }
 
         cuvs::cluster::kmeans::params kp;
@@ -613,7 +600,6 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
     if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
       raft::update_device(
         d_sg_centroids.data(), h_initial_centroids.data(), d_sg_centroids.size(), sg_stream);
-      raft::resource::sync_stream(sg_handle);
     }
 
     cuvs::cluster::kmeans::params skp;
@@ -635,7 +621,6 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
       raft::make_device_matrix_view<T, int>(d_sg_centroids.data(), n_clusters, n_features),
       raft::make_host_scalar_view(&sg_inertia),
       raft::make_host_scalar_view(&sg_n_iter));
-    raft::resource::sync_stream(sg_handle);
 
     rmm::device_uvector<T> d_mg_centroids(static_cast<size_t>(n_clusters) * n_features, sg_stream);
     raft::update_device(
@@ -675,7 +660,6 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
       d_labels_ref.data(), d_labels_mg.data(), n_samples, sg_stream);
     ari_vs_sg_ = raft::stats::adjusted_rand_index(
       d_labels_sg.data(), d_labels_mg.data(), n_samples, sg_stream);
-    raft::resource::sync_stream(sg_handle);
 
     mg_inertia_ = mg_inertia;
     mg_n_iter_  = mg_n_iter;
