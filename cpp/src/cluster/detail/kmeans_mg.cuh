@@ -185,7 +185,7 @@ void mnmg_fit(
     streaming_batch_size = std::max(max_part_rows, IndexT{1});
   }
 
-  if (data_on_device && has_data && streaming_batch_size < max_part_rows) {
+  if (data_on_device && streaming_batch_size < max_part_rows) {
     RAFT_LOG_WARN(
       "MNMG KMeans: streaming_batch_size (%zu) ignored when partitions reside on device; using "
       "max partition size (%zu)",
@@ -194,8 +194,6 @@ void mnmg_fit(
     streaming_batch_size = max_part_rows;
   }
 
-  bool has_data = (n_local > 0);
-
   auto rank_centroids = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
   auto new_centroids  = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
   auto centroid_sums  = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
@@ -203,7 +201,7 @@ void mnmg_fit(
   auto clustering_cost       = raft::make_device_vector<DataT, IndexT>(dev_res, 1);
   auto batch_clustering_cost = raft::make_device_vector<DataT, IndexT>(dev_res, 1);
   auto sqrd_norm_error_dev   = raft::make_device_scalar<DataT>(dev_res, DataT{0});
-  IndexT alloc_batch_size    = has_data ? streaming_batch_size : IndexT{1};
+  IndexT alloc_batch_size    = streaming_batch_size;
   auto batch_weights         = raft::make_device_vector<DataT, IndexT>(dev_res, alloc_batch_size);
   auto minClusterAndDistance =
     raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(dev_res, alloc_batch_size);
@@ -279,9 +277,9 @@ void mnmg_fit(
   auto h_done_flag  = raft::make_pinned_scalar<int>(dev_res, 0);
 
   auto h_norm_cache =
-    raft::make_pinned_vector<DataT, IndexT>(dev_res, (has_data && !data_on_device) ? n_local : 0);
+    raft::make_pinned_vector<DataT, IndexT>(dev_res, !data_on_device ? n_local : IndexT{0});
   auto d_norms =
-    raft::make_device_vector<DataT, IndexT>(dev_res, (has_data && data_on_device) ? n_local : 0);
+    raft::make_device_vector<DataT, IndexT>(dev_res, data_on_device ? n_local : IndexT{0});
   bool norms_cached = false;
 
   const DataT* d_weight_scale_ptr = d_weight_scale.data_handle();
@@ -325,9 +323,7 @@ void mnmg_fit(
 
     comms.bcast(rank_centroids.data_handle(), n_clusters * n_features, 0);
 
-    if (has_data && !sample_weights) {
-      raft::matrix::fill(dev_res, batch_weights.view(), DataT{1});
-    }
+    if (!sample_weights) { raft::matrix::fill(dev_res, batch_weights.view(), DataT{1}); }
 
     raft::matrix::fill(dev_res, d_prior_cost.view(), DataT{0});
     *h_done_flag.data_handle() = 0;
