@@ -12,6 +12,7 @@
 #include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../utils/memory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"
+#include "jit_lto_dispatch.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
@@ -741,8 +742,15 @@ void SearcherGPU::SearchClusterQueryPairs(
     };
     cudaKernel_t cuda_kernel;
     RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
-      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    if (!use_block_sort && use_jit_lto_search()) {
+      // TODO(jit_lto_pilot): replace with JIT-LTO launcher dispatch for
+      // computeInnerProductsWithLUT<true>. For now identical to the legacy path below.
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    } else {
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    }
   } else {
     auto kernel = use_block_sort ? computeInnerProductsWithLUTBlockSort<false>
                                  : computeInnerProductsWithLUT<false>;
@@ -755,8 +763,15 @@ void SearcherGPU::SearchClusterQueryPairs(
     };
     cudaKernel_t cuda_kernel;
     RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
-      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    if (!use_block_sort && use_jit_lto_search()) {
+      // TODO(jit_lto_pilot): replace with JIT-LTO launcher dispatch for
+      // computeInnerProductsWithLUT<false>. For now identical to the legacy path below.
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    } else {
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    }
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
