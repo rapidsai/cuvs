@@ -458,6 +458,86 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/post_process"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
+  set(ivf_sq_ns "cuvs::neighbors::ivf_sq::detail")
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_sq_scan_capacity_@capacity@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/scan_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/scan_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_sq_ns}::fragment_tag_ivf_sq_scan<@capacity@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_sq/scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_sq/scan"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_sq_setup_invariant_smem_metric_@metric_name@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/setup_invariant_smem_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/setup_invariant_smem_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_sq_ns}::fragment_tag_setup_invariant_smem<${ivf_sq_ns}::tag_metric_@metric_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_sq/scan_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_sq/setup_invariant_smem"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_sq_setup_per_probe_smem_metric_@metric_name@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/setup_per_probe_smem_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/setup_per_probe_smem_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_sq_ns}::fragment_tag_setup_per_probe_smem<${ivf_sq_ns}::tag_metric_@metric_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_sq/scan_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_sq/setup_per_probe_smem"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_sq_accumulate_distance_metric_@metric_name@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/accumulate_distance_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/accumulate_distance_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_sq_ns}::fragment_tag_accumulate_distance<${ivf_sq_ns}::tag_metric_@metric_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_sq/scan_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_sq/accumulate_distance"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_sq_finalize_distance_metric_@metric_name@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/finalize_distance_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/finalize_distance_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_sq_ns}::fragment_tag_finalize_distance<${ivf_sq_ns}::tag_metric_@metric_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_sq/scan_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_sq/finalize_distance"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_sq_filter_@filter_name@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/filter_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_sq/detail/jit_lto_kernels/filter_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_sq_ns}::fragment_tag_ivf_sq_filter<${neighbors_ns}::tag_filter_@filter_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_sq/scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/common_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_sq/filter"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
   set(ivf_pq_ns "cuvs::neighbors::ivf_pq::detail")
   generate_jit_lto_kernels(
     jit_lto_files
@@ -1033,6 +1113,11 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     ${ivf_pq_search_inst_files}
     ${ivf_pq_transform_inst_files}
+    src/neighbors/ivf_sq_index.cpp
+    src/neighbors/ivf_sq/ivf_sq_build_extend_float_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_build_extend_half_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_serialize_uint8_t.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     ${nn_descent_inst_files}
