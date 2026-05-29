@@ -19,4 +19,5 @@ Currently, the following capabilities will trigger a JIT compilation:
 .. toctree::
    :maxdepth: 2
 
+   abi_stability
    jit_lto_guide
