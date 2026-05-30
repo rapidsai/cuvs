@@ -1,0 +1,25 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/ivf_rabitq/jit_lto_kernels/device_functions.cuh>
+
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
+// Non-inline __device__ definition. Other JIT-LTO fragments declare this
+// function via device_functions.cuh and reference it across fragments; nvJitLink
+// resolves the reference at link time. Keep in sync with the inline definition
+// in searcher_gpu_common.cuh that legacy (non-JIT) TUs use.
+__device__ uint32_t extract_code(const uint8_t* codes, size_t d, size_t EX_BITS)
+{
+  size_t bitPos    = d * EX_BITS;
+  size_t byteIdx   = bitPos >> 3;
+  size_t bitOffset = bitPos & 7;
+  uint32_t v       = codes[byteIdx] << 8;
+  if (bitOffset + EX_BITS > 8) { v |= codes[byteIdx + 1]; }
+  int shift = 16 - (bitOffset + EX_BITS);
+  return (v >> shift) & ((1u << EX_BITS) - 1);
+}
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

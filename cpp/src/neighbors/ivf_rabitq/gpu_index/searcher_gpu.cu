@@ -735,12 +735,12 @@ void SearcherGPU::SearchClusterQueryPairs(
   kernelParams.d_query_write_counters = d_query_write_counters.data();
 
   if (cur_ivf.get_ex_bits() != 0) {
-    auto kernel = use_block_sort ? computeInnerProductsWithLUTBlockSort<true>
-                                 : computeInnerProductsWithLUT<true>;
     size_t shared_mem_size =
       num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + queue_buffer_smem_bytes;
-    if (!use_block_sort && use_jit_lto_search()) {
-      auto jit_launcher           = make_compute_inner_products_with_lut_launcher(/*with_ex=*/true);
+    if (use_jit_lto_search()) {
+      auto jit_launcher =
+        use_block_sort ? make_compute_inner_products_with_lut_block_sort_launcher(/*with_ex=*/true)
+                       : make_compute_inner_products_with_lut_launcher(/*with_ex=*/true);
       auto const& kernel_launcher = [&]() -> void {
         jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
           stream_, gridDim, blockDim, shared_mem_size, kernelParams);
@@ -749,6 +749,8 @@ void SearcherGPU::SearchClusterQueryPairs(
         compute_inner_products_with_lut_func_t>(
         static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
     } else {
+      auto kernel                 = use_block_sort ? computeInnerProductsWithLUTBlockSort<true>
+                                                   : computeInnerProductsWithLUT<true>;
       auto const& kernel_launcher = [&]() -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };
@@ -758,14 +760,14 @@ void SearcherGPU::SearchClusterQueryPairs(
         static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     }
   } else {
-    auto kernel = use_block_sort ? computeInnerProductsWithLUTBlockSort<false>
-                                 : computeInnerProductsWithLUT<false>;
     size_t shared_mem_size =
       max(num_chunks * LUT_SIZE * sizeof(float) +
             (use_block_sort ? max_cluster_size * (sizeof(float) + sizeof(int)) : 0),
           (size_t)queue_buffer_smem_bytes);
-    if (!use_block_sort && use_jit_lto_search()) {
-      auto jit_launcher = make_compute_inner_products_with_lut_launcher(/*with_ex=*/false);
+    if (use_jit_lto_search()) {
+      auto jit_launcher =
+        use_block_sort ? make_compute_inner_products_with_lut_block_sort_launcher(/*with_ex=*/false)
+                       : make_compute_inner_products_with_lut_launcher(/*with_ex=*/false);
       auto const& kernel_launcher = [&]() -> void {
         jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
           stream_, gridDim, blockDim, shared_mem_size, kernelParams);
@@ -774,6 +776,8 @@ void SearcherGPU::SearchClusterQueryPairs(
         compute_inner_products_with_lut_func_t>(
         static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
     } else {
+      auto kernel                 = use_block_sort ? computeInnerProductsWithLUTBlockSort<false>
+                                                   : computeInnerProductsWithLUT<false>;
       auto const& kernel_launcher = [&]() -> void {
         kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
       };

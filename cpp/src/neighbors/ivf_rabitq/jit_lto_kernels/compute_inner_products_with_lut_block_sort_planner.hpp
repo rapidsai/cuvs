@@ -11,18 +11,18 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-struct ComputeInnerProductsWithLutPlanner : AlgorithmPlanner {
+struct ComputeInnerProductsWithLutBlockSortPlanner : AlgorithmPlanner {
   inline static LauncherJitCache launcher_jit_cache{};
 
-  ComputeInnerProductsWithLutPlanner()
-    : AlgorithmPlanner("compute_inner_products_with_lut", launcher_jit_cache)
+  ComputeInnerProductsWithLutBlockSortPlanner()
+    : AlgorithmPlanner("compute_inner_products_with_lut_block_sort", launcher_jit_cache)
   {
   }
 
   template <bool WithEx>
   void add_entrypoint()
   {
-    this->add_static_fragment<fragment_tag_compute_inner_products_with_lut<WithEx>>();
+    this->add_static_fragment<fragment_tag_compute_inner_products_with_lut_block_sort<WithEx>>();
   }
 
   void add_extract_code_device_function()

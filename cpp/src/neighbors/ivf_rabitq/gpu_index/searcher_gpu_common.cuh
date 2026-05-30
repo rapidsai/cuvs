@@ -62,7 +62,18 @@ struct ComputeInnerProductsKernelParams {
   uint32_t num_words          = 0;  // approx. D/32
 };
 
-// function to extract long codes
+// extract_code: bit-level extraction helper.
+//
+// Two consumers:
+//   - Legacy (non-JIT) TUs that include this header: get the inline definition
+//     below, inlined into each TU's device code.
+//   - JIT-LTO consumer fragments: `#define IVF_RABITQ_JIT_LTO_FRAGMENT` before
+//     including, suppressing the inline definition. They include
+//     jit_lto_kernels/device_functions.cuh separately for the extern
+//     declaration, and the body lives in the extract_code JIT-LTO fragment
+//     (resolved at nvJitLink time). Keep the body here in sync with the
+//     definition in jit_lto_kernels/extract_code_kernel.cu.in.
+#ifndef IVF_RABITQ_JIT_LTO_FRAGMENT
 __device__ inline uint32_t extract_code(const uint8_t* codes, size_t d, size_t EX_BITS)
 {
   size_t bitPos    = d * EX_BITS;
@@ -73,5 +84,6 @@ __device__ inline uint32_t extract_code(const uint8_t* codes, size_t d, size_t E
   int shift = 16 - (bitOffset + EX_BITS);
   return (v >> shift) & ((1u << EX_BITS) - 1);
 }
+#endif
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -645,6 +645,32 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_lut"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_lut_block_sort_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut_block_sort_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut_block_sort_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_lut_block_sort<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_lut_block_sort"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_extract_code"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/extract_code_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/extract_code_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_extract_code"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/extract_code"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
   set(cagra_ns "cuvs::neighbors::cagra::detail")
   generate_jit_lto_kernels(
     jit_lto_files
