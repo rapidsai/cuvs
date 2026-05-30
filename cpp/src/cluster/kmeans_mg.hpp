@@ -4,6 +4,7 @@
  */
 #pragma once
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/core/export.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
@@ -11,7 +12,10 @@
 #include <optional>
 #include <vector>
 
-namespace cuvs::cluster::kmeans::mg {
+namespace CUVS_EXPORT cuvs {
+namespace cluster {
+namespace kmeans {
+namespace mg {
 
 /**
  * @brief MNMG/SNMG k-means fit.
@@ -89,4 +93,7 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<double> inertia,
          raft::host_scalar_view<int64_t> n_iter);
 
-}  // namespace cuvs::cluster::kmeans::mg
+}  // namespace mg
+}  // namespace kmeans
+}  // namespace cluster
+}  // namespace CUVS_EXPORT cuvs

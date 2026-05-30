@@ -8,10 +8,8 @@
 #include "kmeans_test_blobs.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
-#include <raft/comms/std_comms.hpp>
 #include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
@@ -23,7 +21,6 @@
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
-#include <nccl.h>
 #include <omp.h>
 
 #include <algorithm>
@@ -37,14 +34,6 @@ namespace cuvs {
 namespace {
 
 constexpr int kMaxRanksForNcclTest = 4;
-
-#define CUVS_NCCL_CHECK(cmd)                                                                    \
-  do {                                                                                          \
-    ncclResult_t res = cmd;                                                                     \
-    if (res != ncclSuccess) {                                                                   \
-      FAIL() << "NCCL error " << __FILE__ << ":" << __LINE__ << " " << ncclGetErrorString(res); \
-    }                                                                                           \
-  } while (0)
 
 }  // namespace
 
@@ -264,8 +253,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
     ASSERT_GT(snmg_n_iter_, int64_t{0});
     ASSERT_LE(snmg_n_iter_, static_cast<int64_t>(testparams_.max_iter));
 
-    if (isTinyEmptyRankSmokeTest()) { return; }
-
     ASSERT_GE(ari_vs_ref_, 0.94);
     ASSERT_GE(ari_vs_sg_, 0.94);
     if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
@@ -278,13 +265,6 @@ class KmeansSNMGTest : public ::testing::TestWithParam<KmeansSNMGInputs<T>> {
       EXPECT_LT(max_centroid_rel_diff_, 0.02)
         << "SNMG vs SG centroid max relative diff = " << max_centroid_rel_diff_;
     }
-  }
-
-  bool isTinyEmptyRankSmokeTest() const
-  {
-    return testparams_.n_row == 3 && testparams_.n_clusters == 2 &&
-           testparams_.weight_mode == kmeans_weight_mode::none &&
-           testparams_.init == cuvs::cluster::kmeans::params::Array;
   }
 
   raft::device_resources_snmg clique_;
@@ -407,14 +387,26 @@ struct KmeansMGNcclInputs {
 template <typename T>
 class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> {
  protected:
+  KmeansMGNcclTest() : clique_(make_clique_device_ids()) { clique_.set_memory_pool(50); }
+
+  static std::vector<int> make_clique_device_ids()
+  {
+    int num_devices = 0;
+    RAFT_CUDA_TRY(cudaGetDeviceCount(&num_devices));
+    int n = std::min(num_devices, kMaxRanksForNcclTest);
+    std::vector<int> ids(n);
+    for (int i = 0; i < n; ++i) {
+      ids[i] = i;
+    }
+    return ids;
+  }
+
   void runTest()
   {
     testparams_ = ::testing::TestWithParam<KmeansMGNcclInputs<T>>::GetParam();
 
-    int num_devices = 0;
-    RAFT_CUDA_TRY(cudaGetDeviceCount(&num_devices));
-    if (num_devices < 1) { GTEST_SKIP() << "No CUDA devices available."; }
-    const int num_ranks = std::min(num_devices, kMaxRanksForNcclTest);
+    const int num_ranks = raft::resource::get_num_ranks(clique_);
+    if (num_ranks < 1) { GTEST_SKIP() << "No CUDA devices available."; }
 
     const int n_samples           = testparams_.n_row;
     const int n_features          = testparams_.n_col;
@@ -462,13 +454,6 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
       }
     }
 
-    std::vector<ncclComm_t> nccl_comms(num_ranks);
-    std::vector<int> devs(num_ranks);
-    for (int i = 0; i < num_ranks; ++i) {
-      devs[i] = i;
-    }
-    CUVS_NCCL_CHECK(ncclCommInitAll(nccl_comms.data(), num_ranks, devs.data()));
-
     std::vector<T> h_mg_centroids(static_cast<size_t>(n_clusters) * n_features, T{0});
     T mg_inertia       = T{0};
     int64_t mg_n_iter  = 0;
@@ -481,12 +466,9 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
         actual_threads = omp_get_num_threads();
       }
       if (actual_threads == num_ranks) {
-        const int r = omp_get_thread_num();
-        RAFT_CUDA_TRY(cudaSetDevice(r));
-
-        raft::resources rank_handle;
-        auto rank_stream = raft::resource::get_cuda_stream(rank_handle);
-        raft::comms::build_comms_nccl_only(&rank_handle, nccl_comms[r], num_ranks, r);
+        const int r          = omp_get_thread_num();
+        auto const& rank_res = raft::resource::set_current_device_to_rank(clique_, r);
+        auto rank_stream     = raft::resource::get_cuda_stream(rank_res);
 
         const int base     = n_samples / num_ranks;
         const int rem      = n_samples % num_ranks;
@@ -554,7 +536,7 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
         T local_inertia      = T{0};
         int64_t local_n_iter = 0;
 
-        cuvs::cluster::kmeans::mg::fit(rank_handle,
+        cuvs::cluster::kmeans::mg::fit(clique_,
                                        kp,
                                        X_parts,
                                        sw_parts,
@@ -567,14 +549,11 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
           // `mnmg_fit` writes outputs only on rank 0.
           raft::update_host(
             h_mg_centroids.data(), d_rank_centroids.data(), h_mg_centroids.size(), rank_stream);
-          raft::resource::sync_stream(rank_handle);
+          raft::resource::sync_stream(rank_res);
           mg_inertia = local_inertia;
           mg_n_iter  = local_n_iter;
         }
       }
-    }
-    for (auto& c : nccl_comms) {
-      ncclCommDestroy(c);
     }
     ASSERT_EQ(actual_threads, num_ranks)
       << "MG NCCL test required " << num_ranks << " OMP threads but got " << actual_threads;
@@ -696,6 +675,7 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
     }
   }
 
+  raft::device_resources_snmg clique_;
   KmeansMGNcclInputs<T> testparams_;
   double ari_vs_ref_ = 0;
   double ari_vs_sg_  = 0;
