@@ -10,6 +10,8 @@
 // This file implements `SearcherGPU::SearchClusterQueryPairs`.
 #include "../../detail/smem_utils.cuh"
 #include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
+#include "../jit_lto_kernels/kernel_def.hpp"
+#include "../jit_lto_kernels/launcher_factory.hpp"
 #include "../utils/memory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"
 #include "jit_lto_dispatch.hpp"
@@ -737,17 +739,21 @@ void SearcherGPU::SearchClusterQueryPairs(
                                  : computeInnerProductsWithLUT<true>;
     size_t shared_mem_size =
       num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + queue_buffer_smem_bytes;
-    auto const& kernel_launcher = [&]() -> void {
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
-    };
-    cudaKernel_t cuda_kernel;
-    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
     if (!use_block_sort && use_jit_lto_search()) {
-      // TODO(jit_lto_pilot): replace with JIT-LTO launcher dispatch for
-      // computeInnerProductsWithLUT<true>. For now identical to the legacy path below.
-      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
-        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+      auto jit_launcher           = make_compute_inner_products_with_lut_launcher(/*with_ex=*/true);
+      auto const& kernel_launcher = [&]() -> void {
+        jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
+          stream_, gridDim, blockDim, shared_mem_size, kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+        compute_inner_products_with_lut_func_t>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
     } else {
+      auto const& kernel_launcher = [&]() -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
       cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
         static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     }
@@ -758,17 +764,21 @@ void SearcherGPU::SearchClusterQueryPairs(
       max(num_chunks * LUT_SIZE * sizeof(float) +
             (use_block_sort ? max_cluster_size * (sizeof(float) + sizeof(int)) : 0),
           (size_t)queue_buffer_smem_bytes);
-    auto const& kernel_launcher = [&]() -> void {
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
-    };
-    cudaKernel_t cuda_kernel;
-    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
     if (!use_block_sort && use_jit_lto_search()) {
-      // TODO(jit_lto_pilot): replace with JIT-LTO launcher dispatch for
-      // computeInnerProductsWithLUT<false>. For now identical to the legacy path below.
-      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
-        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+      auto jit_launcher = make_compute_inner_products_with_lut_launcher(/*with_ex=*/false);
+      auto const& kernel_launcher = [&]() -> void {
+        jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
+          stream_, gridDim, blockDim, shared_mem_size, kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+        compute_inner_products_with_lut_func_t>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
     } else {
+      auto const& kernel_launcher = [&]() -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
       cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
         static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
     }
