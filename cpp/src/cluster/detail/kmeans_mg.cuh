@@ -274,10 +274,8 @@ void mnmg_fit(
 
   auto d_prior_cost = raft::make_device_scalar<DataT>(dev_res, DataT{0});
   auto d_done_flag  = raft::make_device_scalar<int>(dev_res, 0);
-  auto h_done_flag  = raft::make_pinned_scalar<int>(dev_res, 0);
-
-  auto h_norm_cache =
-    raft::make_pinned_vector<DataT, IndexT>(dev_res, !data_on_device ? n_local : IndexT{0});
+  auto h_done_flag  = raft::make_host_scalar<int>(0);
+  auto h_norm_cache = raft::make_host_vector<DataT, IndexT>(!data_on_device ? n_local : IndexT{0});
   auto d_norms =
     raft::make_device_vector<DataT, IndexT>(dev_res, data_on_device ? n_local : IndexT{0});
   bool norms_cached = false;
@@ -470,7 +468,7 @@ void mnmg_fit(
         });
 
       raft::copy(dev_res,
-                 raft::make_pinned_scalar_view(h_done_flag.data_handle()),
+                 h_done_flag.view(),
                  raft::make_device_scalar_view<const int>(d_done_flag.data_handle()));
     }
     local_n_iter = std::min(local_n_iter, static_cast<IndexT>(iter_params.max_iter));

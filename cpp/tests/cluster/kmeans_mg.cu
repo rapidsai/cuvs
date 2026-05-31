@@ -12,6 +12,7 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
+#include <raft/core/resource/nccl_comm.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -407,6 +408,8 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
 
     const int num_ranks = raft::resource::get_num_ranks(clique_);
     if (num_ranks < 1) { GTEST_SKIP() << "No CUDA devices available."; }
+
+    raft::resource::get_nccl_comms(clique_);
 
     const int n_samples           = testparams_.n_row;
     const int n_features          = testparams_.n_col;
