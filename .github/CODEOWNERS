@@ -44,3 +44,6 @@ pyproject.toml           @rapidsai/packaging-codeowners
 python/setup.py          @rapidsai/packaging-codeowners
 build.sh                 @rapidsai/packaging-codeowners
 **/build.sh              @rapidsai/packaging-codeowners
+
+# Ops code owners
+/SECURITY.md             @rapidsai/ops-codeowners
