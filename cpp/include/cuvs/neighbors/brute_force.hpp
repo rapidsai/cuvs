@@ -12,7 +12,7 @@
 #include <raft/core/handle.hpp>
 #include <raft/core/host_mdspan.hpp>
 
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 #include <cuvs/core/export.hpp>
 
 namespace CUVS_EXPORT cuvs {
@@ -35,7 +35,7 @@ struct search_params : cuvs::neighbors::search_params {};
  * @tparam T data element type
  */
 template <typename T, typename DistT = T>
-struct index : cuvs::neighbors::index {
+struct CUVS_EXPORT index : cuvs::neighbors::index {
   using index_params_type  = brute_force::index_params;
   using search_params_type = brute_force::search_params;
   using index_type         = int64_t;
@@ -166,6 +166,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view_;
   DistT metric_arg_;
 };
+
 /**
  * @}
  */
