@@ -6,7 +6,6 @@
 
 #include "../../core/mnmg_comms.cuh"
 #include "kmeans.cuh"
-#include "kmeans_mg.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -31,6 +30,19 @@
 #include <vector>
 
 namespace cuvs::cluster::kmeans::mg::detail {
+
+#define CUVS_LOG_KMEANS(handle, fmt, ...)                    \
+  do {                                                       \
+    bool isRoot = true;                                      \
+    if (raft::resource::comms_initialized(handle)) {         \
+      const auto& comm  = raft::resource::get_comms(handle); \
+      const int my_rank = comm.get_rank();                   \
+      isRoot            = my_rank == 0;                      \
+    }                                                        \
+    if (isRoot) { RAFT_LOG_DEBUG(fmt, ##__VA_ARGS__); }      \
+  } while (0)
+
+#define KMEANS_COMM_ROOT 0
 
 using cuvs::core::detail::mnmg_comms;
 

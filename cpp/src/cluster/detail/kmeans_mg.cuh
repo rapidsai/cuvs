@@ -50,19 +50,6 @@
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
-#define CUVS_LOG_KMEANS(handle, fmt, ...)                    \
-  do {                                                       \
-    bool isRoot = true;                                      \
-    if (raft::resource::comms_initialized(handle)) {         \
-      const auto& comm  = raft::resource::get_comms(handle); \
-      const int my_rank = comm.get_rank();                   \
-      isRoot            = my_rank == 0;                      \
-    }                                                        \
-    if (isRoot) { RAFT_LOG_DEBUG(fmt, ##__VA_ARGS__); }      \
-  } while (0)
-
-#define KMEANS_COMM_ROOT 0
-
 using cuvs::core::detail::mnmg_comms;
 
 /**
@@ -207,10 +194,12 @@ void mnmg_fit(
     streaming_batch_size = max_part_rows;
   }
 
-  auto rank_centroids =
-    use_nccl ? raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features) : centroids;
-  auto new_centroids = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
-  auto centroid_sums = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
+  auto rank_centroids_arr =
+    use_nccl ? raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features)
+             : raft::make_device_matrix<DataT, IndexT>(dev_res, 0, 0);
+  auto rank_centroids = use_nccl ? rank_centroids_arr.view() : centroids;
+  auto new_centroids  = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
+  auto centroid_sums  = raft::make_device_matrix<DataT, IndexT>(dev_res, n_clusters, n_features);
   auto weight_per_cluster    = raft::make_device_vector<DataT, IndexT>(dev_res, n_clusters);
   auto clustering_cost       = raft::make_device_vector<DataT, IndexT>(dev_res, 1);
   auto batch_clustering_cost = raft::make_device_vector<DataT, IndexT>(dev_res, 1);
@@ -319,6 +308,7 @@ void mnmg_fit(
     return raft::make_device_vector_view<const DataT, IndexT>(batch_weights.data_handle(),
                                                               cur_batch_size);
   };
+  auto rank_centroids_const = raft::make_const_mdspan(rank_centroids);
 
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = params;
@@ -333,7 +323,7 @@ void mnmg_fit(
                                                            X_parts,
                                                            n_features,
                                                            input_centroids_const,
-                                                           rank_centroids.view(),
+                                                           rank_centroids,
                                                            workspace,
                                                            rank_counts,
                                                            global_n,
@@ -362,8 +352,6 @@ void mnmg_fit(
       raft::matrix::fill(dev_res, centroid_sums.view(), DataT{0});
       raft::matrix::fill(dev_res, weight_per_cluster.view(), DataT{0});
       raft::matrix::fill(dev_res, clustering_cost.view(), DataT{0});
-
-      auto rank_centroids_const = raft::make_const_mdspan(rank_centroids.view());
 
       for (size_t part_idx = 0; part_idx < X_parts.size(); ++part_idx) {
         auto const& X_part = X_parts[part_idx];

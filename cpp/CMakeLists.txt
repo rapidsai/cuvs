@@ -1031,8 +1031,6 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
     src/cluster/kmeans_cluster_cost.cu
-    src/cluster/kmeans_fit_mg_float.cu
-    src/cluster/kmeans_fit_mg_double.cu
     src/cluster/kmeans_fit_double.cu
     src/cluster/kmeans_fit_float.cu
     src/cluster/kmeans_auto_find_k_float.cu
@@ -1209,6 +1207,10 @@ if(NOT BUILD_CPU_ONLY)
     target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
 
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
+
+    target_sources(
+      cuvs_objs PRIVATE src/cluster/kmeans_fit_mg_float.cu src/cluster/kmeans_fit_mg_double.cu
+    )
   endif()
 
   set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
