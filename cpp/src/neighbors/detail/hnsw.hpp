@@ -1264,7 +1264,14 @@ std::unique_ptr<index<T>> from_cagra(
     size_t required_host = static_cast<size_t>(n_rows) * dummy_algo->size_data_per_element_;
     required_host += required_host / 8;
 
-    size_t available_host = get_available_memory().first;
+    // Honor an explicit host-memory limit from ACE params (if configured), mirroring
+    // hnsw::build. This also makes the spill branch deterministically testable.
+    std::optional<double> max_host_memory_gb = std::nullopt;
+    if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+      const auto& ace = std::get<graph_build_params::ace_params>(params.graph_build_params);
+      if (ace.max_host_memory_gb > 0) { max_host_memory_gb = ace.max_host_memory_gb; }
+    }
+    size_t available_host = get_available_memory(max_host_memory_gb).first;
 
     RAFT_LOG_INFO(
       "hnsw::from_cagra - in-memory HNSW requires ~%4.1f GB host mem, available %4.1f GB",
@@ -1478,7 +1485,11 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::build<ACE>");
 
   cuvs::neighbors::cagra::index_params cagra_params;
-  bool use_ace = false;
+
+  // If the user explicitly configured ACE, honor it. Otherwise (default params) apply a
+  // heuristic that falls back to ACE only when an in-memory CAGRA build would not fit in
+  // the available host/device memory.
+  bool use_ace = std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params);
 
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     cagra_params = cagra::index_params::from_hnsw_params(
