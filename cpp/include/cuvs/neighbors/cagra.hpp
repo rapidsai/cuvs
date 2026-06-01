@@ -3248,6 +3248,7 @@ namespace helpers {
  * @param[in] graph_degree degree of the output graph
  * @param[in] intermediate_graph_degree degree of the input graph for the optimization process
  * @param[in] index_size
+ * @param[in] mst_optimize whether to use MST optimization
  * @return tuple of [host_size, device_size, host_fixed_size, device_fixed_size] memory sizes in
  * bytes
  */

@@ -236,9 +236,10 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
       ace_params.ef_construction = ps.ef_construction;
       ace_params.build_dir       = temp_dir;
       ace_params.use_disk        = false;  // Not explicitly requesting disk mode
-      // Set tiny memory limits (0.001 GiB = ~1 MB) to force disk mode
+
       // Add 2GB to the limits to account for static memory overhead limits
       // Input GiB values * 80% usage factor --> requires 2GB static memory overhead
+      // Selected host memory limit should enforce disk mode
       ace_params.max_host_memory_gb  = 2.329;
       ace_params.max_gpu_memory_gb   = 3.0;
       hnsw_params.graph_build_params = ace_params;
@@ -344,6 +345,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
 
       auto hnsw_index = hnsw::from_cagra(handle_, hnsw_params, idx, dataset_arg);
       EXPECT_NE(hnsw_index, nullptr);
+      if (hnsw_index == nullptr) { return {}; }
 
       // The returned index must be disk-backed (lazily loaded on search).
       std::string expected_file = (std::filesystem::path(temp_dir) / "hnsw_index.bin").string();

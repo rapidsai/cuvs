@@ -988,7 +988,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       usable_cpu_memory_fraction * mem.available_host_memory - disk_mode_host_static;
 
     RAFT_EXPECTS(available_for_scaling > 0,
-                 "ACE: Host memory insufficient even for constant overhead (labels + id_mapping). "
+                 "ACE: Host memory insufficient even for constant overhead (labels + id_mapping + "
+                 "static workspace). "
                  "Required: %.2f GiB, available: %.2f GiB",
                  to_gib(disk_mode_host_static),
                  to_gib(usable_cpu_memory_fraction * mem.available_host_memory));
@@ -1020,6 +1021,12 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
     size_t disk_mode_gpu_dynamic = disk_mode_gpu_required - disk_mode_gpu_static;
     double available_for_scaling =
       usable_gpu_memory_fraction * mem.available_gpu_memory - disk_mode_gpu_static;
+
+    RAFT_EXPECTS(available_for_scaling > 0,
+                 "ACE: GPU memory insufficient even for constant overhead. Required: %.2f GiB, "
+                 "available: %.2f GiB",
+                 to_gib(disk_mode_gpu_static),
+                 to_gib(usable_gpu_memory_fraction * mem.available_gpu_memory));
 
     gpu_suggested_partitions =
       static_cast<size_t>(std::ceil(disk_mode_gpu_dynamic * n_partitions / available_for_scaling));

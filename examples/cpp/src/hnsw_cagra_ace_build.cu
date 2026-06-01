@@ -17,7 +17,6 @@
 
 #include <rmm/mr/pool_memory_resource.hpp>
 
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>  // for exit
 #include <fcntl.h>
@@ -85,7 +84,7 @@ std::string detect_dtype(const std::string& filename)
 }
 
 template <typename T>
-auto cagra_build_ace(raft::resources const& res, const app_args& args) -> int
+auto hnsw_build_example(raft::resources const& res, const app_args& args) -> int
 {
   using namespace cuvs::neighbors;
 
@@ -149,9 +148,8 @@ int main(int argc, char** argv)
   raft::resources res;
 
   // // Set pool memory resource with 1 GiB initial pool size. All allocations use the same pool.
-  // rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-  //   rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  // rmm::mr::set_current_device_resource(&pool_mr);
+  // rmm::mr::pool_memory_resource pool_mr(rmm::mr::get_current_device_resource_ref(), 1024 * 1024 *
+  // 1024ull); rmm::mr::set_current_device_resource(pool_mr);
 
   // Alternatively, one could define a pool allocator for temporary arrays (used within RAFT
   // algorithms). In that case only the internal arrays would use the pool, any other allocation
@@ -162,13 +160,15 @@ int main(int argc, char** argv)
   raft::memory_tracking_resources tracked(res, args.stats_path, std::chrono::milliseconds(1));
 
   auto dtype = detect_dtype(args.base_path);
+  int result = 0;
   if (dtype == "float") {
-    cagra_build_ace<float>(tracked, args);
+    result = hnsw_build_example<float>(tracked, args);
   } else if (dtype == "half") {
-    cagra_build_ace<half>(tracked, args);
+    result = hnsw_build_example<half>(tracked, args);
   } else if (dtype == "uint8") {
-    cagra_build_ace<uint8_t>(tracked, args);
+    result = hnsw_build_example<uint8_t>(tracked, args);
   } else if (dtype == "int8") {
-    cagra_build_ace<int8_t>(tracked, args);
+    result = hnsw_build_example<int8_t>(tracked, args);
   }
+  return result;
 }

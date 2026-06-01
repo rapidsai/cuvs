@@ -18,6 +18,10 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
                                                                    size_t index_size,
                                                                    bool mst_optimize)
 {
+  RAFT_EXPECTS(graph_degree > 0, "graph_degree must be greater than 0");
+  RAFT_EXPECTS(intermediate_degree >= graph_degree,
+               "intermediate_degree must be greater than or equal to graph_degree");
+
   // MST optimization memory (host only)
   size_t mst_host       = 0;
   size_t mst_host_fixed = 0;

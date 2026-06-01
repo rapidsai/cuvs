@@ -1193,6 +1193,9 @@ inline std::pair<size_t, size_t> get_available_memory(
     available_host_memory = static_cast<size_t>(max_host_memory_gb.value() * (1ULL << 30));
     RAFT_LOG_INFO("ACE: Using overridden host memory limit: %.2f GiB", max_host_memory_gb.value());
   }
+  // Note: We use total device memory rather than free memory because RMM pools
+  // and other allocators may report artificially low free memory. The assumption
+  // is that the full device memory will be available for the build operation.
   size_t available_device_memory = rmm::available_device_memory().second;
   if (max_gpu_memory_gb.has_value() && max_gpu_memory_gb.value() > 0) {
     available_device_memory = static_cast<size_t>(max_gpu_memory_gb.value() * (1ULL << 30));
@@ -1523,10 +1526,13 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
         ? std::get<graph_build_params::ace_params>(params.graph_build_params)
         : graph_build_params::ace_params{};
 
-    // Create CAGRA index parameters from HNSW parameters
-    cagra_params.metric                    = params.metric;
-    cagra_params.intermediate_graph_degree = params.M * 3;
-    cagra_params.graph_degree              = params.M * 2;
+    // Only override CAGRA params if user explicitly provided ACE params;
+    // otherwise preserve the values from from_hnsw_params computed above.
+    if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+      cagra_params.metric                    = params.metric;
+      cagra_params.intermediate_graph_degree = params.M * 3;
+      cagra_params.graph_degree              = params.M * 2;
+    }
 
     // Configure ACE parameters for CAGRA
     cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;
@@ -1540,8 +1546,8 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
     RAFT_LOG_INFO(
       "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",
-      ace_params.npartitions,
-      ace_params.ef_construction);
+      cagra_ace_params.npartitions,
+      cagra_ace_params.ef_construction);
   }
   // Build CAGRA index optionally using ACE
   auto cagra_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);

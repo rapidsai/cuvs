@@ -56,12 +56,9 @@ int cagra_build_search_ace(raft::resources const& res)
     close(fd);
     return EXIT_FAILURE;
   }
-  uint32_t n_rows = shape[0];
-  // n_rows = 1000000;
+  uint32_t n_rows        = shape[0];
   auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
     reinterpret_cast<float*>(dataset_ptr + header_size), n_rows, shape[1]);
-
-  // int64_t topk = 12;
 
   // HNSW index parameters
   hnsw::index_params params;
