@@ -6,6 +6,7 @@
 
 #include "../../core/mnmg_comms.cuh"
 #include "kmeans.cuh"
+#include "kmeans_mg.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -125,7 +126,6 @@ std::vector<IndexT> broadcast_sampled_global_indices(raft::resources const& hand
                                                      IndexT global_n,
                                                      IndexT sample_size,
                                                      int rank,
-                                                     int root,
                                                      const mnmg_comms& comms)
 {
   RAFT_EXPECTS(sample_size > 0, "global initialization sample size must be positive");
@@ -136,7 +136,7 @@ std::vector<IndexT> broadcast_sampled_global_indices(raft::resources const& hand
 
   auto d_sample_ids = raft::make_device_vector<IndexT, IndexT>(handle, sample_size);
   std::vector<IndexT> h_sample_ids(static_cast<std::size_t>(sample_size));
-  if (rank == root) {
+  if (rank == KMEANS_COMM_ROOT) {
     h_sample_ids = sample_unique_global_indices(global_n, sample_size, seed);
     raft::copy(
       handle,
@@ -144,7 +144,7 @@ std::vector<IndexT> broadcast_sampled_global_indices(raft::resources const& hand
       raft::make_host_vector_view<const IndexT, IndexT>(h_sample_ids.data(), sample_size));
   }
 
-  comms.bcast(d_sample_ids.data_handle(), static_cast<size_t>(sample_size), root);
+  comms.bcast(d_sample_ids.data_handle(), static_cast<size_t>(sample_size), KMEANS_COMM_ROOT);
 
   raft::copy(
     handle,
@@ -172,13 +172,12 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
   IndexT n_features,
   IndexT sample_size,
   int rank,
-  int root,
   const std::vector<IndexT>& rank_counts,
   IndexT global_n,
   const mnmg_comms& comms)
 {
   auto sample_ids = broadcast_sampled_global_indices(
-    handle, params.rng_state.seed, global_n, sample_size, rank, root, comms);
+    handle, params.rng_state.seed, global_n, sample_size, rank, comms);
   auto owned_samples = get_owned_sample_indices(sample_ids, rank_counts, rank);
 
   std::vector<IndexT> part_offsets;
@@ -226,12 +225,11 @@ void init_centroids_for_mg_batched(
   int rank,
   const mnmg_comms& comms)
 {
-  constexpr int root = 0;
-  auto stream        = comms.stream();
-  auto n_clusters    = static_cast<IndexT>(params.n_clusters);
+  auto stream     = comms.stream();
+  auto n_clusters = static_cast<IndexT>(params.n_clusters);
 
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
-    if (rank == root) {
+    if (rank == KMEANS_COMM_ROOT) {
       raft::copy(centroids.data_handle(),
                  initial_centroids.data_handle(),
                  static_cast<size_t>(n_clusters) * n_features,
@@ -242,22 +240,14 @@ void init_centroids_for_mg_batched(
 
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
     auto sampled_rows = sample_global_rows<DataT, IndexT, Accessor>(
-      handle, params, X_parts, n_features, n_clusters, rank, root, rank_counts, global_n, comms);
+      handle, params, X_parts, n_features, n_clusters, rank, rank_counts, global_n, comms);
     raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
     IndexT init_sample_size = get_global_kmeanspp_init_sample_size(params, global_n, n_clusters);
-    auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(handle,
-                                                                   params,
-                                                                   X_parts,
-                                                                   n_features,
-                                                                   init_sample_size,
-                                                                   rank,
-                                                                   root,
-                                                                   rank_counts,
-                                                                   global_n,
-                                                                   comms);
+    auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(
+      handle, params, X_parts, n_features, init_sample_size, rank, rank_counts, global_n, comms);
 
-    if (rank == root) {
+    if (rank == KMEANS_COMM_ROOT) {
       auto init_view = raft::make_const_mdspan(init_sample.view());
       if (params.oversampling_factor == 0) {
         cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(

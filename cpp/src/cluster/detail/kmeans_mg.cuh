@@ -50,6 +50,8 @@
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
+#define KMEANS_COMM_ROOT 0
+
 using cuvs::core::detail::mnmg_comms;
 
 /**
