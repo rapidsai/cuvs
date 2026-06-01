@@ -151,11 +151,7 @@ class DataQuantizerGPU {
   double FAC_ERR;
   float const_scaling_factor;
   FastQuantizeFactors fast_quantize_factors;
-#if defined(HIGH_ACC_FAST_SCAN)
   static constexpr size_t NUM_SHORT_FACTORS = 1;
-#else
-  static constexpr size_t NUM_SHORT_FACTORS = 4;
-#endif
 
   // RAFT resources
   raft::resources const& handle_;  // reusable resource handle

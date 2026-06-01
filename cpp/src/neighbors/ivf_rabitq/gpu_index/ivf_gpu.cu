@@ -366,7 +366,7 @@ void IVFGPU::save(const char* filename) const
   raft::copy(h_cluster_meta.data(), cluster_meta_.data_handle(), num_centroids, stream_);
   std::vector<size_t> cluster_sizes(num_centroids);
   raft::resource::sync_stream(handle_);
-  for (int i = 0; i < num_centroids; i++) {
+  for (size_t i = 0; i < num_centroids; i++) {
     cluster_sizes[i] = h_cluster_meta[i].num;
   }
   write_exact(cluster_sizes.data(), sizeof(size_t) * num_centroids);
@@ -807,7 +807,7 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
     // Use OpenMP parallel region to leverage persistent thread pool across batches
 #pragma omp parallel num_threads(num_threads)
     {
-      int tid           = omp_get_thread_num();
+      size_t tid        = omp_get_thread_num();
       size_t chunk_size = batch_vectors / num_threads;
       size_t start      = tid * chunk_size;
       size_t end        = (tid == num_threads - 1) ? batch_vectors : start + chunk_size;
