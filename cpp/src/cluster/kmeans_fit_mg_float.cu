@@ -4,7 +4,8 @@
  */
 
 #include "./detail/kmeans_mg.cuh"
-#include "kmeans_mg.hpp"
+
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/resources.hpp>
 
 namespace cuvs::cluster::kmeans::mg {

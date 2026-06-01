@@ -13,6 +13,7 @@
 
 #include <cuvs/core/export.hpp>
 #include <optional>
+#include <vector>
 
 namespace CUVS_EXPORT cuvs {
 namespace cluster {
@@ -1606,6 +1607,122 @@ void cluster_cost(
 /**
  * @}
  */
+
+namespace mg {
+/**
+ * @defgroup kmeans_mg Multi-GPU / out-of-core k-means fit
+ * @{
+ */
+
+/**
+ * @brief Multi-GPU k-means fit with one or more local data
+ *        partitions per rank.
+ *
+ * Each rank supplies its local training data as a vector of partitions. The
+ * implementation streams every partition through Lloyd iterations using
+ * `params.streaming_batch_size`.
+ *
+ * The active backend is selected by the resources attached to
+ * `handle`:
+ *   - When `raft::resource::is_multi_gpu(handle)` is true (SNMG clique), the
+ *     call must be issued from inside an OpenMP region with one thread per
+ *     rank in the clique.
+ *   - Otherwise, multi-process NCCL comms must be initialized on the handle
+ *     (`raft::resource::comms_initialized(handle)`); each process supplies its
+ *     own local partitions.
+ *
+ * @param[in]     handle              The raft handle. Must have NCCL comms or
+ *                                    a SNMG clique initialized.
+ * @param[in]     params              K-means parameters. The streaming batch
+ *                                    size is read from
+ *                                    `params.streaming_batch_size`.
+ * @param[in]     X_parts             Per-partition local data on this rank.
+ *                                    Each entry is [n_rows_i x n_features].
+ * @param[in]     sample_weight_parts Optional per-partition row weights with
+ *                                    one vector per data partition.
+ * @param[inout]  centroids           Device matrix [n_clusters x n_features].
+ *                                    On entry, used as the initial centers
+ *                                    when `params.init == InitMethod::Array`.
+ *                                    On return, holds the converged
+ *                                    centroids.
+ * @param[out]    inertia             Host scalar receiving the final
+ *                                    clustering cost.
+ * @param[out]    n_iter              Host scalar receiving the iteration
+ *                                    count at which the run terminated.
+ */
+void fit(
+  raft::resources const& handle,
+  const cuvs::cluster::kmeans::params& params,
+  const std::vector<raft::device_matrix_view<const float, int>>& X_parts,
+  const std::optional<std::vector<raft::device_vector_view<const float, int>>>& sample_weight_parts,
+  raft::device_matrix_view<float, int> centroids,
+  raft::host_scalar_view<float> inertia,
+  raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const float, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const float, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const double, int>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const double, int>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const double, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const double, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::host_matrix_view<const float, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::host_vector_view<const float, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::host_matrix_view<const double, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::host_vector_view<const double, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @}
+ */
+}  // namespace mg
 
 namespace helpers {
 /**

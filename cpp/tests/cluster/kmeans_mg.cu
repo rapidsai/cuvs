@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "../../src/cluster/kmeans_mg.hpp"
 #include "../test_utils.cuh"
 #include "kmeans_test_blobs.cuh"
 
