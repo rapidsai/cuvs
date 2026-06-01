@@ -133,7 +133,7 @@ void mnmg_fit(
   mnmg_comms comms{dev_res, use_nccl, nccl_comm};
 
   auto stream     = comms.stream();
-  auto n_features = X_parts[0].extent(1);
+  auto n_features = centroids.extent(1);
   auto n_clusters = static_cast<IndexT>(params.n_clusters);
   auto metric     = params.metric;
 
