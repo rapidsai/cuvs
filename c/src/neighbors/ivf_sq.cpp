@@ -339,6 +339,8 @@ extern "C" cuvsError_t cuvsIvfSqExtend(cuvsResources_t res,
 extern "C" cuvsError_t cuvsIvfSqIndexGetNLists(cuvsIvfSqIndex_t index, int64_t* n_lists)
 {
   return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(index != nullptr, "index cannot be null");
+    RAFT_EXPECTS(index->addr != 0, "index must be built before getting n_lists");
     auto index_ptr =
       reinterpret_cast<cuvs::neighbors::ivf_sq::index<uint8_t>*>(index->addr);
     *n_lists = index_ptr->n_lists();
@@ -348,6 +350,8 @@ extern "C" cuvsError_t cuvsIvfSqIndexGetNLists(cuvsIvfSqIndex_t index, int64_t* 
 extern "C" cuvsError_t cuvsIvfSqIndexGetDim(cuvsIvfSqIndex_t index, int64_t* dim)
 {
   return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(index != nullptr, "index cannot be null");
+    RAFT_EXPECTS(index->addr != 0, "index must be built before getting dim");
     auto index_ptr =
       reinterpret_cast<cuvs::neighbors::ivf_sq::index<uint8_t>*>(index->addr);
     *dim = index_ptr->dim();
@@ -357,6 +361,8 @@ extern "C" cuvsError_t cuvsIvfSqIndexGetDim(cuvsIvfSqIndex_t index, int64_t* dim
 extern "C" cuvsError_t cuvsIvfSqIndexGetSize(cuvsIvfSqIndex_t index, int64_t* size)
 {
   return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(index != nullptr, "index cannot be null");
+    RAFT_EXPECTS(index->addr != 0, "index must be built before getting size");
     auto index_ptr =
       reinterpret_cast<cuvs::neighbors::ivf_sq::index<uint8_t>*>(index->addr);
     *size = index_ptr->size();
