@@ -23,16 +23,16 @@
 //   index_dir/hnsw_index.cuvs
 //     fixed header + metadata JSON
 //     levels: uint8 [N], max HNSW level for each original row id
-//     base links: hnswlib-ready [count + uint32 neighbors padded to maxM0]
+//     base nodes + base links: uint32 node ids with hnswlib-ready link rows
 //     upper nodes + upper links: hnswlib-ready upper-layer topology
 //
 // The transferred index artifact is topology-only. The dataset is loaded locally during
 // deserialization from hnsw::index_params::dataset_path. The loader supports .npy and ANN benchmark
 // *.bin datasets; this example writes a local dataset .npy only to make the demo self-contained.
 //
-// Layer 0 rows and neighbor IDs are original dataset row IDs. Upper layers are generated with the
-// same level/order/KNN logic as serialize_to_hnswlib_from_disk, then stored as hnswlib-ready link
-// rows so deserialization does no graph remapping or link padding on the search node.
+// Layer 0 node IDs and neighbor IDs are original dataset row IDs. Upper layers are generated with
+// the same level/order/KNN logic as serialize_to_hnswlib_from_disk, then stored as hnswlib-ready
+// link rows so deserialization does no graph remapping or link padding on the search node.
 
 #include <algorithm>
 #include <cstdint>
