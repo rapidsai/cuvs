@@ -10,7 +10,10 @@
 // This file implements `SearcherGPU::SearchClusterQueryPairsQuantizeQuery`.
 #include "../../detail/smem_utils.cuh"
 #include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
+#include "../jit_lto_kernels/kernel_def.hpp"
+#include "../jit_lto_kernels/launcher_factory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"
+#include "jit_lto_dispatch.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
@@ -962,7 +965,22 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   kernelParams.num_bits               = num_bits;
   kernelParams.num_words              = num_words;
 
-  if (!use_4bit) {
+  const int num_bits_for_dispatch = use_4bit ? 4 : 8;
+  const bool with_ex              = (cur_ivf.get_ex_bits() != 0);
+  if (use_jit_lto_search()) {
+    auto jit_launcher           = use_block_sort
+                                    ? make_compute_inner_products_with_bitwise_block_sort_launcher(
+                              num_bits_for_dispatch, with_ex)
+                                    : make_compute_inner_products_with_bitwise_launcher(with_ex);
+    auto const& kernel_launcher = [&]() -> void {
+      jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
+        stream_, gridDim, blockDim, shared_mem_size, kernelParams);
+    };
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+      compute_inner_products_with_lut_func_t>(
+      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+  } else if (!use_4bit) {
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseBlockSort<8, true>
                                    : computeInnerProductsWithBitwise<true>;

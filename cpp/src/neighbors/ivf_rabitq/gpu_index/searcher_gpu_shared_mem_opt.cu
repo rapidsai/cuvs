@@ -10,7 +10,10 @@
 // This file implements `SearcherGPU::SearchClusterQueryPairsSharedMemOpt`.
 #include "../../detail/smem_utils.cuh"
 #include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
+#include "../jit_lto_kernels/kernel_def.hpp"
+#include "../jit_lto_kernels/launcher_factory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"
+#include "jit_lto_dispatch.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
@@ -677,15 +680,29 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
     size_t shared_mem_size =
       max(first_part_shared_mem + second_part_shared_mem + third_part_shared_mem,
           (size_t)queue_buffer_smem_bytes);
-    auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort<true>
-                                                 : computeInnerProductsWithLUT16Opt<true>;
-    auto const& kernel_launcher = [&]() -> void {
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
-    };
-    cudaKernel_t cuda_kernel;
-    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
-      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    if (use_jit_lto_search()) {
+      auto jit_launcher =
+        use_block_sort
+          ? make_compute_inner_products_with_lut16_opt_block_sort_launcher(/*with_ex=*/true)
+          : make_compute_inner_products_with_lut16_opt_launcher(/*with_ex=*/true);
+      auto const& kernel_launcher = [&]() -> void {
+        jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
+          stream_, gridDim, blockDim, shared_mem_size, kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+        compute_inner_products_with_lut_func_t>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
+    } else {
+      auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort<true>
+                                                   : computeInnerProductsWithLUT16Opt<true>;
+      auto const& kernel_launcher = [&]() -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    }
   } else {
     size_t first_part_shared_mem = lut_size / num_queries;
     size_t second_part_shared_mem =
@@ -693,15 +710,29 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
     // queue buffer reuses first 2 parts
     size_t shared_mem_size =
       max(first_part_shared_mem + second_part_shared_mem, (size_t)queue_buffer_smem_bytes);
-    auto kernel                 = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort<false>
-                                                 : computeInnerProductsWithLUT16Opt<false>;
-    auto const& kernel_launcher = [&]() -> void {
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
-    };
-    cudaKernel_t cuda_kernel;
-    RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
-      static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    if (use_jit_lto_search()) {
+      auto jit_launcher =
+        use_block_sort
+          ? make_compute_inner_products_with_lut16_opt_block_sort_launcher(/*with_ex=*/false)
+          : make_compute_inner_products_with_lut16_opt_launcher(/*with_ex=*/false);
+      auto const& kernel_launcher = [&]() -> void {
+        jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
+          stream_, gridDim, blockDim, shared_mem_size, kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<
+        compute_inner_products_with_lut_func_t>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, jit_launcher->get_kernel());
+    } else {
+      auto kernel = use_block_sort ? computeInnerProductsWithLUT16OptBlockSort<false>
+                                   : computeInnerProductsWithLUT16Opt<false>;
+      auto const& kernel_launcher = [&]() -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cudaKernel_t cuda_kernel;
+      RAFT_CUDA_TRY(cudaGetKernel(&cuda_kernel, reinterpret_cast<const void*>(kernel)));
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size<std::decay_t<decltype(kernel)>>(
+        static_cast<std::uint32_t>(shared_mem_size), kernel_launcher, cuda_kernel);
+    }
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 

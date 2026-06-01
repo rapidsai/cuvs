@@ -13,6 +13,18 @@ struct fragment_tag_compute_inner_products_with_lut {};
 template <bool WithEx>
 struct fragment_tag_compute_inner_products_with_lut_block_sort {};
 
+template <bool WithEx>
+struct fragment_tag_compute_inner_products_with_lut16_opt {};
+
+template <bool WithEx>
+struct fragment_tag_compute_inner_products_with_lut16_opt_block_sort {};
+
+template <bool WithEx>
+struct fragment_tag_compute_inner_products_with_bitwise {};
+
+template <int NumBits, bool WithEx>
+struct fragment_tag_compute_inner_products_with_bitwise_block_sort {};
+
 struct fragment_tag_extract_code {};
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
