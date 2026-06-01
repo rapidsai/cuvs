@@ -229,12 +229,9 @@ void init_centroids_for_mg_batched(
   auto n_clusters = static_cast<IndexT>(params.n_clusters);
 
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
-    if (rank == KMEANS_COMM_ROOT) {
-      raft::copy(centroids.data_handle(),
-                 initial_centroids.data_handle(),
-                 static_cast<size_t>(n_clusters) * n_features,
-                 stream);
-    }
+    CUVS_LOG_KMEANS(handle,
+                    "KMeans.fit: initialize cluster centers from the ndarray array input "
+                    "passed to init argument.\n");
     return;
   }
 
@@ -257,6 +254,8 @@ void init_centroids_for_mg_batched(
           handle, params, init_view, centroids, workspace);
       }
     }
+    comms.bcast(
+      centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
   } else {
     THROW("unknown initialization method to select initial centers");
   }
