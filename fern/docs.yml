@@ -409,6 +409,8 @@ navigation:
             path: "./pages/python_api/python-api-neighbors-ivf-flat.md"
           - page: "Neighbors IVF PQ"
             path: "./pages/python_api/python-api-neighbors-ivf-pq.md"
+          - page: "Neighbors IVF SQ"
+            path: "./pages/python_api/python-api-neighbors-ivf-sq.md"
           - page: "Neighbors NN Descent"
             path: "./pages/python_api/python-api-neighbors-nn-descent.md"
           - page: "Neighbors"
