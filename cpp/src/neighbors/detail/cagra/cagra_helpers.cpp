@@ -88,8 +88,6 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
         gpu_workspace_size_fixed] =
     cuvs::neighbors::cagra::helpers::optimize_workspace_size(
       n_rows, graph_degree, intermediate_graph_degree, sizeof(uint32_t));
-  float host_workspace_gb = host_workspace_size / 1e9;
-  float gpu_workspace_gb  = gpu_workspace_size / 1e9;
 
   // The kmeans trainset is a large temporary float buffer allocated during IVF-PQ training.
   // It is freed before the extend phase, so peak GPU = max(training_peak, extend_peak).

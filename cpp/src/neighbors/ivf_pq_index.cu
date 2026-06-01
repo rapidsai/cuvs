@@ -828,6 +828,7 @@ size_t compressed_dataset_size(raft::resources const& res,
   constexpr static uint32_t kIndexGroupSize   = 32;
   constexpr static uint32_t kIndexGroupVecLen = 16;
 
+  size_t pq_chunk   = (kIndexGroupVecLen * 8) / params.pq_bits;
   size_t pq_centers = idx.pq_len() * pq_book_size * params.pq_dim * sizeof(float);
   size_t pq_dataset = raft::ceildiv<size_t>(dataset.extent(0), kIndexGroupSize) * kIndexGroupSize *
                       raft::ceildiv<size_t>(params.pq_dim, pq_chunk) * kIndexGroupVecLen;

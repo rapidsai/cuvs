@@ -1618,7 +1618,7 @@ void build_knn_graph(
     return std::string(model_name);
   }();
 
-  RAFT_LOG_INFO("# Building IVF-PQ index %s", model_name.c_str());
+  RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
   auto index = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
 
   //
@@ -1677,7 +1677,7 @@ void build_knn_graph(
     use_large_workspace ? raft::resource::get_large_workspace_resource_ref(res)
                         : raft::resource::get_workspace_resource_ref(res);
 
-  RAFT_LOG_INFO(
+  RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
     node_degree,
     top_k,
@@ -1825,7 +1825,7 @@ void build_knn_graph(
       const auto throughput = num_queries_done / time;
       last_tick             = end_clock;
 
-      RAFT_LOG_INFO(
+      RAFT_LOG_DEBUG(
         "# Search %12lu / %12lu (%3.2f %%), %e queries/sec, %.2f minutes ETA, self included = "
         "%3.2f %%    \r",
         num_queries_done,
