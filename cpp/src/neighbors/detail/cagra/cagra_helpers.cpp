@@ -78,8 +78,6 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
 {
   size_t n_rows = dataset.extent(0);
 
-  std::cout << "Graph degree " << graph_degree << ", intermediate graph degree "
-            << intermediate_graph_degree << std::endl;
   size_t dataset_gpu_mem =
     cuvs::neighbors::ivf_pq::helpers::compressed_dataset_size(res, dataset, params.build_params);
   size_t graph_host_mem = n_rows * (graph_degree + intermediate_graph_degree) * sizeof(uint32_t);
@@ -106,13 +104,6 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
     graph_host_mem + host_workspace_size + 2e9;  // added 2 GB extra workspace (IVF-PQ search)
   size_t total_dev = std::max({kmeans_gpu_mem, dataset_gpu_mem, gpu_workspace_size}) + 1e9;
 
-  std::cout << "IVF-PQ build memory requirements" << std::endl;
-  std::cout << "kmeans trainset_gpu " << kmeans_gpu_mem / 1e9 << " GB"
-            << " (" << kmeans_n_rows << " rows)" << std::endl;
-  std::cout << "dataset_gpu " << dataset_gpu_mem / 1e9 << " GB" << std::endl;
-  std::cout << "graph_host_mem " << graph_host_mem / 1e9 << " GB" << ", workspace "
-            << host_workspace_gb << " GB" << std::endl;
-  std::cout << "gpu mem" << gpu_workspace_gb << " GB" << std::endl;
   return std::make_pair(total_host, total_dev);
 }
 

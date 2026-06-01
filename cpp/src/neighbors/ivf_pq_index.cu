@@ -828,15 +828,6 @@ size_t compressed_dataset_size(raft::resources const& res,
   constexpr static uint32_t kIndexGroupSize   = 32;
   constexpr static uint32_t kIndexGroupVecLen = 16;
 
-  std::cout << "pq_dim " << params.pq_dim << ", pq_bits " << params.pq_bits << ", n_lists"
-            << params.n_lists << std::endl;
-  std::cout << "pq_len " << idx.pq_len() << ", dim_ext" << idx.dim_ext() << ", rot_dim"
-            << idx.rot_dim() << std::endl;
-  std::cout << "pq_book_size" << pq_book_size << ", kIndexGroupSize " << kIndexGroupSize
-            << ", kIndexGroupVecLen " << kIndexGroupVecLen << std::endl;
-  size_t pq_chunk = (kIndexGroupVecLen * 8) / params.pq_bits;
-  std::cout << "PQ chunk" << pq_chunk << std::endl;
-
   size_t pq_centers = idx.pq_len() * pq_book_size * params.pq_dim * sizeof(float);
   size_t pq_dataset = raft::ceildiv<size_t>(dataset.extent(0), kIndexGroupSize) * kIndexGroupSize *
                       raft::ceildiv<size_t>(params.pq_dim, pq_chunk) * kIndexGroupVecLen;
@@ -847,10 +838,6 @@ size_t compressed_dataset_size(raft::resources const& res,
   size_t centers         = params.n_lists * idx.dim_ext() * sizeof(float);
   size_t centers_rot     = params.n_lists * idx.rot_dim() * sizeof(float);
 
-  std::cout << pq_dataset / 1e9 << ", " << indices / 1e9 << std::endl;
-  std::cout << centers / 1e9 << ", " << centers_rot / 1e9 << std::endl;
-  std::cout << pq_centers / 1e9 << ", " << rotation_matrix / 1e9 << ", " << list_offsets / 1e9
-            << ", " << list_sizes / 1e9 << std::endl;
   return pq_centers + pq_dataset + indices + rotation_matrix + list_offsets + list_sizes + centers +
          centers_rot;
 }
