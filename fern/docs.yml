@@ -225,10 +225,10 @@ navigation:
       - section: "Field Guide"
         path: "./pages/advanced_topics.md"
         contents:
-          - page: "Integration Patterns"
-            path: "./pages/user_guide/integration_patterns.md"
           - page: "Compatibility"
             path: "./pages/user_guide/abi_stability.md"
+          - page: "Integration Patterns"
+            path: "./pages/user_guide/integration_patterns.md"
           - page: "JIT Compilation"
             path: "./pages/jit_compilation.md"
           - page: "UDF Usage"
