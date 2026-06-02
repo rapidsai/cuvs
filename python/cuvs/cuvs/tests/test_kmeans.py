@@ -15,6 +15,19 @@ from cuvs.cluster.kmeans import (
 from cuvs.distance import pairwise_distance
 
 
+def make_well_separated_kmeans_input(rng, n_rows, n_cols, n_clusters, dtype):
+    labels = np.arange(n_rows) % n_clusters
+    centers = rng.normal(
+        loc=0.0, scale=10.0, size=(n_clusters, n_cols)
+    ).astype(dtype)
+    noise = rng.normal(loc=0.0, scale=0.01, size=(n_rows, n_cols)).astype(
+        dtype
+    )
+    X = centers[labels] + noise
+    initial_centroids = X[np.arange(n_clusters)].copy()
+    return np.ascontiguousarray(X), initial_centroids
+
+
 @pytest.mark.parametrize("n_rows", [100])
 @pytest.mark.parametrize("n_cols", [5, 25])
 @pytest.mark.parametrize("n_clusters", [5, 15])
@@ -80,7 +93,7 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 @pytest.mark.parametrize("n_cols", [10, 100])
 @pytest.mark.parametrize("n_clusters", [8, 16])
 @pytest.mark.parametrize("streaming_batch_size", [0, 100, 239, 500])
-@pytest.mark.parametrize("dtype", [np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
 @pytest.mark.parametrize("weighted", [False, True])
 def test_fit_host_matches_fit_device(
     n_rows, n_cols, n_clusters, streaming_batch_size, dtype, weighted
@@ -91,10 +104,9 @@ def test_fit_host_matches_fit_device(
     Optionally tests with non-uniform sample weights.
     """
     rng = np.random.default_rng(99)
-    X_host = rng.random((n_rows, n_cols)).astype(dtype)
-
-    centroid_indices = rng.choice(n_rows, size=n_clusters, replace=False)
-    initial_centroids_host = X_host[centroid_indices].copy()
+    X_host, initial_centroids_host = make_well_separated_kmeans_input(
+        rng, n_rows, n_cols, n_clusters, dtype
+    )
 
     if weighted:
         sample_weights_host = rng.uniform(0.5, 2.0, size=n_rows).astype(dtype)
@@ -136,6 +148,15 @@ def test_fit_host_matches_fit_device(
         centroids_regular, centroids_batched, rtol=1e-3, atol=1e-3
     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
 
+    if dtype == np.float32:
+        # Weighted float32 inertia is sensitive to L2Expanded cancellation and
+        # reduction order. Centroids remain the primary parity check here.
+        inertia_tol = 1e-1 if weighted else 5e-2
+    else:
+        inertia_tol = 1e-3
     assert np.allclose(
-        inertia_regular, inertia_batched, rtol=1e-3, atol=1e-3
+        inertia_regular,
+        inertia_batched,
+        rtol=inertia_tol,
+        atol=inertia_tol,
     ), f"max diff: {np.max(np.abs(inertia_regular - inertia_batched))}"

@@ -70,3 +70,7 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                                       DLManagedTensor* X,
                                       DLManagedTensor* centroids,
                                       double* cost)
+
+
+cdef class KMeansParams:
+    cdef cuvsKMeansParams* params
