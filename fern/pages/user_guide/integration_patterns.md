@@ -1,3 +1,7 @@
+---
+slug: user-guide/field-guide/integration-patterns
+---
+
 # Integration Patterns
 
 NVIDIA cuVS is used in several different ways across vector databases, search engines, data platforms, and application libraries. Some products call NVIDIA cuVS directly inside the same process. Others offload expensive index builds to a separate service, container, or serverless worker, then load the resulting index back into the serving system.

@@ -60,13 +60,10 @@ Use these guides when you are ready to apply NVIDIA cuVS APIs, benchmark algorit
 - [cuVS Bench Datasets](/user-guide/benchmarking-guide/cu-vs-bench-tool/datasets): prepare datasets, ground truth, binary files, and dataset descriptors.
 - [cuVS Bench Backends](/user-guide/benchmarking-guide/cu-vs-bench-tool/backends): understand and extend backend integrations for benchmark execution.
 
-## Integration
-
-- [Integration Patterns](user_guide/integration_patterns.md): compare direct, offloaded, and service-oriented ways to integrate cuVS into products.
-
 ## Field Guide
 
 - [Field Guide](advanced_topics.md): find compatibility, runtime compilation, and specialized extension topics.
+- [Integration Patterns](/user-guide/field-guide/integration-patterns): compare direct, offloaded, and service-oriented ways to integrate cuVS into products.
 - [Compatibility](user_guide/abi_stability.md): understand cuVS release compatibility, ABI windows, and stable binary boundaries.
 - [JIT Compilation](jit_compilation.md): understand when cuVS triggers just-in-time compilation and how runtime caches behave.
 - [UDF Usage](udf_usage.md): supply custom CUDA distance metrics for IVF-flat search (C++ only, experimental).
