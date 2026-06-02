@@ -34,6 +34,11 @@ struct ComputeInnerProductsWithLutBlockSortPlanner : AlgorithmPlanner {
   {
     this->add_static_fragment<fragment_tag_compute_ip2_from_long_codes_warp>();
   }
+
+  void add_compute_lut_ip_for_vec_device_function()
+  {
+    this->add_static_fragment<fragment_tag_compute_lut_ip_for_vec<tag_lut_dtype_f32>>();
+  }
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

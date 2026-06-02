@@ -22,6 +22,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_l
   bool with_ex)
 {
   ComputeInnerProductsWithLutPlanner planner;
+  planner.add_compute_lut_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
@@ -36,6 +37,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_b
   bool with_ex)
 {
   ComputeInnerProductsWithLutBlockSortPlanner planner;
+  planner.add_compute_lut_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
@@ -50,6 +52,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut16
   bool with_ex)
 {
   ComputeInnerProductsWithLut16OptPlanner planner;
+  planner.add_compute_lut_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
@@ -64,6 +67,7 @@ inline std::shared_ptr<AlgorithmLauncher>
 make_compute_inner_products_with_lut16_opt_block_sort_launcher(bool with_ex)
 {
   ComputeInnerProductsWithLut16OptBlockSortPlanner planner;
+  planner.add_compute_lut_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();

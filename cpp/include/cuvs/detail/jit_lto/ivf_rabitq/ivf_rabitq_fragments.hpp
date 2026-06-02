@@ -29,4 +29,10 @@ struct fragment_tag_extract_code {};
 
 struct fragment_tag_compute_ip2_from_long_codes_warp {};
 
+struct tag_lut_dtype_f32 {};
+struct tag_lut_dtype_f16 {};
+
+template <typename LutDtypeTag>
+struct fragment_tag_compute_lut_ip_for_vec {};
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

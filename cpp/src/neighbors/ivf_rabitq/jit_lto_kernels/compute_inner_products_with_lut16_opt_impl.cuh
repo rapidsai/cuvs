@@ -82,7 +82,6 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
     }
 
     const uint32_t short_code_length = params.D / 32;
-    const uint32_t chunks_per_uint32 = 32 / BITS_PER_CHUNK;
 
     __shared__ int probe_slot;
     if (tid == 0) {
@@ -98,19 +97,12 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
       size_t vec_idx = vec_base + tid;
       if (vec_idx >= num_vectors_in_cluster) break;
 
-      float ip = 0.0f;
-      for (uint32_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-        size_t short_code_offset =
-          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-        for (int chunk_in_uint32 = 0; chunk_in_uint32 < chunks_per_uint32; chunk_in_uint32++) {
-          int shift              = 28 - (chunk_in_uint32 * BITS_PER_CHUNK);
-          int pattern            = (short_code_chunk >> shift) & 0xF;
-          uint32_t lut_chunk_idx = uint32_idx * chunks_per_uint32 + chunk_in_uint32;
-          uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
-          ip += __half2float(shared_lut_fp16[lut_offset]);
-        }
-      }
+      float ip = compute_lut_ip_for_vec<__half>(params.d_short_data,
+                                                shared_lut_fp16,
+                                                cluster_start_index,
+                                                num_vectors_in_cluster,
+                                                vec_idx,
+                                                short_code_length);
 
       float ip2             = shared_ip2_results[vec_idx];
       size_t global_vec_idx = cluster_start_index + vec_idx;
@@ -138,7 +130,6 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
     float q_k1xsumq = params.d_G_k1xSumq[query_idx];
 
     const uint32_t short_code_length = params.D / 32;
-    const uint32_t chunks_per_uint32 = 32 / BITS_PER_CHUNK;
 
     __shared__ int probe_slot;
     if (tid == 0) {
@@ -156,19 +147,12 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
       float f_add          = factors.x;
       float f_rescale      = factors.y;
 
-      float ip = 0.0f;
-      for (uint32_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-        size_t short_code_offset =
-          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-        for (int chunk_in_uint32 = 0; chunk_in_uint32 < chunks_per_uint32; chunk_in_uint32++) {
-          int shift              = 28 - (chunk_in_uint32 * BITS_PER_CHUNK);
-          int pattern            = (short_code_chunk >> shift) & 0xF;
-          uint32_t lut_chunk_idx = uint32_idx * chunks_per_uint32 + chunk_in_uint32;
-          uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
-          ip += __half2float(shared_lut_fp16[lut_offset]);
-        }
-      }
+      float ip = compute_lut_ip_for_vec<__half>(params.d_short_data,
+                                                shared_lut_fp16,
+                                                cluster_start_index,
+                                                num_vectors_in_cluster,
+                                                vec_idx,
+                                                short_code_length);
 
       params.d_topk_dists[output_offset + vec_idx] = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
       params.d_topk_pids[output_offset + vec_idx]  = params.d_pids[cluster_start_index + vec_idx];

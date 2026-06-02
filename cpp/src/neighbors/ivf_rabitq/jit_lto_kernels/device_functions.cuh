@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
@@ -18,5 +19,17 @@ __device__ uint32_t extract_code(const uint8_t* codes, size_t d, size_t EX_BITS)
 
 __device__ float compute_ip2_from_long_codes_warp(
   const uint8_t* vec_long_code, const float* shared_query, size_t D, size_t EX_BITS, int lane_id);
+
+// Primary template; explicit instantiations live in the
+// compute_lut_ip_for_vec_kernel.cu.in fragment, one per @lut_dtype@ substitution
+// (float and __half today). Consumers call the specialization matching the
+// element type of their `shared_lut`.
+template <typename LutT>
+__device__ float compute_lut_ip_for_vec(const uint32_t* d_short_data,
+                                        const LutT* shared_lut,
+                                        size_t cluster_start_index,
+                                        size_t num_vectors_in_cluster,
+                                        size_t vec_idx,
+                                        size_t short_code_length);
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
