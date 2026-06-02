@@ -166,15 +166,8 @@ __device__ void compute_inner_products_with_lut16_opt_block_sort_impl(
         for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
           size_t global_vec_idx        = cluster_start_index + shared_candidate_indices[cand_idx];
           const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-          float ip2                    = 0.0f;
-          for (uint32_t d = lane_id; d < params.D; d += raft::WarpSize) {
-            uint32_t code_val = extract_code(vec_long_code, d, params.ex_bits);
-            ip2 += shared_query[d] * (float)code_val;
-          }
-#pragma unroll
-          for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-            ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
-          }
+          float ip2                    = compute_ip2_from_long_codes_warp(
+            vec_long_code, shared_query, params.D, params.ex_bits, lane_id);
           if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
         }
         __syncthreads();

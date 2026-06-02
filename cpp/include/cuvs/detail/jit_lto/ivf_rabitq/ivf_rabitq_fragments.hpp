@@ -27,4 +27,6 @@ struct fragment_tag_compute_inner_products_with_bitwise_block_sort {};
 
 struct fragment_tag_extract_code {};
 
+struct fragment_tag_compute_ip2_from_long_codes_warp {};
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -16,4 +16,7 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // adds them via add_*_device_function().
 __device__ uint32_t extract_code(const uint8_t* codes, size_t d, size_t EX_BITS);
 
+__device__ float compute_ip2_from_long_codes_warp(
+  const uint8_t* vec_long_code, const float* shared_query, size_t D, size_t EX_BITS, int lane_id);
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -25,6 +25,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_l
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
+    planner.add_compute_ip2_from_long_codes_warp_device_function();
   } else {
     planner.add_entrypoint<false>();
   }
@@ -38,6 +39,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_b
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
+    planner.add_compute_ip2_from_long_codes_warp_device_function();
   } else {
     planner.add_entrypoint<false>();
   }
@@ -51,6 +53,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut16
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
+    planner.add_compute_ip2_from_long_codes_warp_device_function();
   } else {
     planner.add_entrypoint<false>();
   }
@@ -64,6 +67,7 @@ make_compute_inner_products_with_lut16_opt_block_sort_launcher(bool with_ex)
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
+    planner.add_compute_ip2_from_long_codes_warp_device_function();
   } else {
     planner.add_entrypoint<false>();
   }
@@ -77,6 +81,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_bitwi
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
+    planner.add_compute_ip2_from_long_codes_warp_device_function();
   } else {
     planner.add_entrypoint<false>();
   }
@@ -91,6 +96,7 @@ make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool 
     if (with_ex) {
       planner.add_entrypoint<4, true>();
       planner.add_extract_code_device_function();
+      planner.add_compute_ip2_from_long_codes_warp_device_function();
     } else {
       planner.add_entrypoint<4, false>();
     }
@@ -98,6 +104,7 @@ make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool 
     if (with_ex) {
       planner.add_entrypoint<8, true>();
       planner.add_extract_code_device_function();
+      planner.add_compute_ip2_from_long_codes_warp_device_function();
     } else {
       planner.add_entrypoint<8, false>();
     }

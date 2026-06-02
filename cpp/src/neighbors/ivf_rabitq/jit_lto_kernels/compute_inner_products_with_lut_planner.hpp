@@ -29,6 +29,11 @@ struct ComputeInnerProductsWithLutPlanner : AlgorithmPlanner {
   {
     this->add_static_fragment<fragment_tag_extract_code>();
   }
+
+  void add_compute_ip2_from_long_codes_warp_device_function()
+  {
+    this->add_static_fragment<fragment_tag_compute_ip2_from_long_codes_warp>();
+  }
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
