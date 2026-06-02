@@ -318,11 +318,29 @@ void search_multi_partition(
       std::min<size_t>(static_cast<size_t>(n_queries), deviceProp.maxGridSize[1]);
   }
 
-  // Multi-partition uses a regular (non-persistent) single-CTA kernel launch.
-  // MULTI_CTA requires a different plan type (multi_cta_search::search) and is not supported here.
-  // AUTO could resolve to MULTI_CTA for large itopk_size, so force SINGLE_CTA unconditionally.
+  // Persistent kernels are not used in multi-partition search regardless of which algo runs.
   params.persistent = false;
-  params.algo       = search_algo::SINGLE_CTA;
+
+  // MULTI_CTA requires a different plan type (multi_cta_search::search) and a different result
+  // layout; the multi-partition merge below assumes a single contiguous per-partition output
+  // slice. Reject it explicitly rather than silently rewriting.
+  if (params.algo == search_algo::MULTI_CTA) {
+    RAFT_FAIL("MULTI_CTA is not supported for multi-partition search");
+  }
+
+  // AUTO resolution. SINGLE_CTA's itopk_size hard cap is 512; above that the search would
+  // fail at plan construction, so AUTO routes to MULTI_KERNEL instead (which allows
+  // itopk_size beyond 512). The threshold uses params.itopk_size pre-adjustment, before
+  // adjust_search_params() runs inside the plan constructor — it's a routing heuristic, not
+  // a hard correctness check.
+  if (params.algo == search_algo::AUTO) {
+    params.algo = (params.itopk_size > 512) ? search_algo::MULTI_KERNEL : search_algo::SINGLE_CTA;
+  }
+
+  // MULTI_KERNEL multi-partition is staged and not yet implemented.
+  if (params.algo == search_algo::MULTI_KERNEL) {
+    RAFT_FAIL("MULTI_KERNEL multi-partition search is not yet implemented");
+  }
 
   // Build a single search plan sized for the maximum graph_degree across all partitions.
   // For the first partition's descriptor type (strided float): use it to init the plan.
@@ -338,7 +356,8 @@ void search_multi_partition(
   if (indices[0]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
     dataset_norms_ptr0 = indices[0]->dataset_norms().value().data_handle();
   }
-  // Use the first partition's descriptor to construct the plan (smem layout is type-dependent only).
+  // Use the first partition's descriptor to construct the plan (smem layout is type-dependent
+  // only).
   auto plan_desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
     res, params, *strided_dset0, indices[0]->metric(), dataset_norms_ptr0);
 
@@ -430,9 +449,8 @@ void search_multi_partition(
   // once. The unconditional allocation is small (n_queries floats) relative to the search.
   auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, n_queries);
   {
-    auto scaled_sq_op = raft::compose_op(raft::sq_op{},
-                                         raft::div_const_op<DistanceT>{DistanceT(kScale)},
-                                         raft::cast_op<DistanceT>());
+    auto scaled_sq_op = raft::compose_op(
+      raft::sq_op{}, raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::cast_op<DistanceT>());
     raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
       res,
       raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
