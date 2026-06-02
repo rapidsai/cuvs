@@ -17,8 +17,8 @@ IVF-SQ index build parameters
 constexpr static uint32_t kIndexGroupSize = 32;
 ```
 
-<a id="cuvs-neighbors-ivf-sq-index-params"></a>
-### cuvs::neighbors::ivf_sq::index_params
+<a id="neighbors-ivf-sq-index-params"></a>
+### neighbors::ivf_sq::index_params
 
 IVF-SQ index build parameters.
 
@@ -46,8 +46,8 @@ struct index_params : cuvs::neighbors::index_params {
 
 ## IVF-SQ index search parameters
 
-<a id="cuvs-neighbors-ivf-sq-search-params"></a>
-### cuvs::neighbors::ivf_sq::search_params
+<a id="neighbors-ivf-sq-search-params"></a>
+### neighbors::ivf_sq::search_params
 
 IVF-SQ index search parameters
 
@@ -65,8 +65,8 @@ struct search_params : cuvs::neighbors::search_params {
 
 ## IVF-SQ list storage spec
 
-<a id="cuvs-neighbors-ivf-sq-list-spec"></a>
-### cuvs::neighbors::ivf_sq::list_spec
+<a id="neighbors-ivf-sq-list-spec"></a>
+### neighbors::ivf_sq::list_spec
 
 IVF-SQ list storage spec
 
@@ -89,8 +89,8 @@ struct list_spec {
 
 ## IVF-SQ index
 
-<a id="cuvs-neighbors-ivf-sq-index"></a>
-### cuvs::neighbors::ivf_sq::index
+<a id="neighbors-ivf-sq-index"></a>
+### neighbors::ivf_sq::index
 
 IVF-SQ index.
 
@@ -117,8 +117,8 @@ struct index;
 
 ## IVF-SQ index build
 
-<a id="cuvs-neighbors-ivf-sq-build"></a>
-### cuvs::neighbors::ivf_sq::build
+<a id="neighbors-ivf-sq-build"></a>
+### neighbors::ivf_sq::build
 
 Build the index from the dataset for efficient search.
 
@@ -143,14 +143,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index-params) | configure the index building |
+| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index-params) | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device pointer to a row-major matrix [n_rows, dim] |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index)
+[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_sq::build`
+**Additional overload:** `neighbors::ivf_sq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -168,14 +168,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index-params) | configure the index building |
+| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index-params) | configure the index building |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | a device pointer to a row-major matrix [n_rows, dim] |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index)
+[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_sq::build`
+**Additional overload:** `neighbors::ivf_sq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -193,14 +193,14 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index-params) | configure the index building |
+| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index-params) | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a host pointer to a row-major matrix [n_rows, dim] |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index)
+[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index)
 
-**Additional overload:** `cuvs::neighbors::ivf_sq::build`
+**Additional overload:** `neighbors::ivf_sq::build`
 
 Build the index from the dataset for efficient search.
 
@@ -218,17 +218,17 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index-params) | configure the index building |
+| `index_params` | in | [`const cuvs::neighbors::ivf_sq::index_params&`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index-params) | configure the index building |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | a host pointer to a row-major matrix [n_rows, dim] |
 
 **Returns**
 
-[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index)
+[`cuvs::neighbors::ivf_sq::index<uint8_t>`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index)
 
 ## IVF-SQ index extend
 
-<a id="cuvs-neighbors-ivf-sq-extend"></a>
-### cuvs::neighbors::ivf_sq::extend
+<a id="neighbors-ivf-sq-extend"></a>
+### neighbors::ivf_sq::extend
 
 Extend the index with the new data in-place.
 
@@ -248,13 +248,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index) | pointer to ivf_sq::index |
+| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index) | pointer to ivf_sq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_sq::extend`
+**Additional overload:** `neighbors::ivf_sq::extend`
 
 Extend the index with the new data in-place.
 
@@ -274,13 +274,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | a device matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | a device vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index) | pointer to ivf_sq::index |
+| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index) | pointer to ivf_sq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_sq::extend`
+**Additional overload:** `neighbors::ivf_sq::extend`
 
 Extend the index with the new data in-place.
 
@@ -300,13 +300,13 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index) | pointer to ivf_sq::index |
+| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index) | pointer to ivf_sq::index |
 
 **Returns**
 
 `void`
 
-**Additional overload:** `cuvs::neighbors::ivf_sq::extend`
+**Additional overload:** `neighbors::ivf_sq::extend`
 
 Extend the index with the new data in-place.
 
@@ -326,7 +326,7 @@ Usage example:
 | `handle` | in | `raft::resources const&` |  |
 | `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | a host matrix view to a row-major matrix [n_rows, idx.dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | a host vector view to a vector of indices [n_rows]. If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
-| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index) | pointer to ivf_sq::index |
+| `idx` | inout | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index) | pointer to ivf_sq::index |
 
 **Returns**
 
@@ -334,8 +334,8 @@ Usage example:
 
 ## IVF-SQ index serialize
 
-<a id="cuvs-neighbors-ivf-sq-serialize"></a>
-### cuvs::neighbors::ivf_sq::serialize
+<a id="neighbors-ivf-sq-serialize"></a>
+### neighbors::ivf_sq::serialize
 
 Save the index to file.
 
@@ -353,14 +353,14 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
-| `index` | in | [`const cuvs::neighbors::ivf_sq::index<uint8_t>&`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index) | IVF-SQ index |
+| `index` | in | [`const cuvs::neighbors::ivf_sq::index<uint8_t>&`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index) | IVF-SQ index |
 
 **Returns**
 
 `void`
 
-<a id="cuvs-neighbors-ivf-sq-deserialize"></a>
-### cuvs::neighbors::ivf_sq::deserialize
+<a id="neighbors-ivf-sq-deserialize"></a>
+### neighbors::ivf_sq::deserialize
 
 Load index from file.
 
@@ -378,7 +378,7 @@ Experimental, both the API and the serialization format are subject to change.
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the name of the file that stores the index |
-| `index` | out | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#cuvs-neighbors-ivf-sq-index) | IVF-SQ index |
+| `index` | out | [`cuvs::neighbors::ivf_sq::index<uint8_t>*`](/api-reference/cpp-api-neighbors-ivf-sq#neighbors-ivf-sq-index) | IVF-SQ index |
 
 **Returns**
 

@@ -14,7 +14,7 @@ _Source header: `cuvs/neighbors/refine.h`_
 Refine nearest neighbor search.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRefine(cuvsResources_t res,
+cuvsError_t cuvsRefine(cuvsResources_t res,
 DLManagedTensor* dataset,
 DLManagedTensor* queries,
 DLManagedTensor* candidates,
@@ -39,4 +39,4 @@ Refinement is an operation that follows an approximate NN search. The approximat
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

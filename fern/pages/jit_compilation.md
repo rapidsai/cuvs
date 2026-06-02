@@ -20,14 +20,6 @@ The following public NVIDIA cuVS C++ APIs currently trigger JIT compilation. The
 - [cuvs::neighbors::ivf_pq::search()](/api-reference/cpp-api-neighbors-ivf-pq)
 - [cuvs::neighbors::ivf_sq::search()](/api-reference/cpp-api-neighbors-ivf-sq)
 
-The following C++ APIs can also trigger JIT compilation when they call one of the search paths above internally:
-
-- [cuvs::neighbors::cagra::build()](/api-reference/cpp-api-neighbors-cagra) when graph construction uses `graph_build_params::ivf_pq_params` or `graph_build_params::iterative_search_params`
-- [cuvs::neighbors::cagra::extend()](/api-reference/cpp-api-neighbors-cagra) when adding nodes, because the extension path searches the existing CAGRA graph
-- [cuvs::neighbors::composite::composite_index::search()](/api-reference/cpp-api-neighbors-composite-index) when the composite index searches its CAGRA child indexes
-- [cuvs::neighbors::tiered_index::search()](/api-reference/cpp-api-neighbors-tiered-index) when the tiered index is backed by CAGRA, IVF-Flat, or IVF-PQ
-- [cuvs::neighbors::all_neighbors::build()](/api-reference/cpp-api-neighbors-all-neighbors) when `graph_build_params` uses IVF-PQ
-
 Custom distance metrics (UDFs) for IVF-flat search also use JIT compilation. See [UDF Usage](/user-guide/field-guide/udf-usage).
 
 For implementation details on building JIT LTO kernel fragments and linking them at runtime, see [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization).

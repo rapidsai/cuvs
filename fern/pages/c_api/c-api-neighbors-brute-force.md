@@ -33,7 +33,7 @@ typedef struct {
 Allocate BRUTEFORCE index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
+cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 ```
 
 **Parameters**
@@ -44,7 +44,7 @@ CUVS_EXPORT cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbruteforceindexdestroy"></a>
 ### cuvsBruteForceIndexDestroy
@@ -52,7 +52,7 @@ CUVS_EXPORT cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 De-allocate BRUTEFORCE index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
+cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
 ```
 
 **Parameters**
@@ -63,17 +63,20 @@ CUVS_EXPORT cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Bruteforce index build
 
 <a id="cuvsbruteforcebuild"></a>
 ### cuvsBruteForceBuild
 
-Build a BRUTEFORCE index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+Build a BRUTEFORCE index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
+cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
 DLManagedTensor* dataset,
 cuvsDistanceType metric,
 float metric_arg,
@@ -92,17 +95,21 @@ cuvsBruteForceIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Bruteforce index search
 
 <a id="cuvsbruteforcesearch"></a>
 ### cuvsBruteForceSearch
 
-Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the BRUTEFORCE index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or `kDLDataType.bits = 16` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the BRUTEFORCE index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
+
+1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or `kDLDataType.bits = 16`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
+cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
 cuvsBruteForceIndex_t index,
 DLManagedTensor* queries,
 DLManagedTensor* neighbors,
@@ -123,7 +130,7 @@ cuvsFilter prefilter);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## BRUTEFORCE C-API serialize functions
 
@@ -133,7 +140,7 @@ cuvsFilter prefilter);
 Save the index to file.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
+cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
 const char* filename,
 cuvsBruteForceIndex_t index);
 ```
@@ -150,7 +157,7 @@ The serialization format can be subject to changes, therefore loading an index s
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsbruteforcedeserialize"></a>
 ### cuvsBruteForceDeserialize
@@ -158,7 +165,7 @@ The serialization format can be subject to changes, therefore loading an index s
 Load index from file.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
+cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
 const char* filename,
 cuvsBruteForceIndex_t index);
 ```
@@ -175,4 +182,4 @@ The serialization format can be subject to changes, therefore loading an index s
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

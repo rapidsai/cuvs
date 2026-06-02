@@ -223,7 +223,7 @@ navigation:
                 hidden: true
                 path: "./pages/cuvs_bench/wiki_all_dataset.md"
       - section: "Field Guide"
-        path: "./pages/advanced_topics.md"
+        path: "./pages/field_guide.md"
         contents:
           - page: "Compatibility"
             path: "./pages/user_guide/abi_stability.md"

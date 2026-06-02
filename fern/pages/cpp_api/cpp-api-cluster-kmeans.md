@@ -61,10 +61,10 @@ struct params : base_params {
 | `rng_state` | `raft::random::RngState` | Seed to the random number generator. |
 | `n_init` | `int` | Number of instance k-means algorithm will be run with different seeds. |
 | `oversampling_factor` | `double` | Oversampling factor for use in the k-means\|\| algorithm |
-| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids<br /><br />NB: These parameters are unrelated to streaming_batch_size, which controls how many samples to transfer from host to device per batch when processing out-of-core data. |
+| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint<br />Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids<br /><br />NB: These parameters are unrelated to streaming_batch_size, which controls how many samples to transfer from host to device per batch when processing out-of-core data. |
 | `batch_centroids` | `int` | if 0 then batch_centroids = n_clusters |
 | `init_size` | `int64_t` | Number of samples to randomly draw for the KMeansPlusPlus initialization step. A random subset of this size is used for centroid seeding.<br /><br />Only applies when dataset is on host; for device data the full dataset is always used for seeding and this parameter is ignored.<br /><br />When set to 0 (default) with host data uses `min(3 * n_clusters, n_samples)` as a default.<br /><br />In Batched multi-GPU host-data fits, the effective KMeansPlusPlus initialization sample is materialized on device on every rank. Every rank must have enough GPU memory for this sample, and rank 0 must also have enough GPU memory for the seeding workspace.<br /><br />Default: 0. |
-| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. When set to 0, defaults to n_samples (process all at once). Only used by the batched (host-data) code path and ignored by device-data overloads.<br /><br />In multi-GPU mode, this is a per-rank batch size. Each rank processes up to this many local samples per batch, clamped to that rank's local sample count. Default: 0 (process all data at once). |
+| `streaming_batch_size` | `int64_t` | Number of samples to process per GPU batch when fitting with host data. When set to 0, defaults to n_samples (process all at once). Only used by the batched (host-data) code path and ignored by device-data overloads.<br /><br />In multi-GPU mode, this is a per-rank batch size. Each rank processes up to this many local samples per batch, clamped to that rank's local sample count.<br />Default: 0 (process all data at once). |
 
 <a id="cluster-kmeans-balanced-params"></a>
 ### cluster::kmeans::balanced_params
@@ -354,7 +354,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | out | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
-| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
+| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center.<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -380,7 +380,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const int8_t, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
-| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
+| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center.<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -406,7 +406,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const half, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
-| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
+| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center.<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -432,7 +432,7 @@ std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 | `params` | in | [`cuvs::cluster::kmeans::balanced_params const&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-balanced-params) | Parameters for KMeans model. |
 | `X` | in | `raft::device_matrix_view<const uint8_t, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | inout | `raft::device_matrix_view<float, int64_t>` | [out] The generated centroids from the kmeans algorithm are stored at the address pointed by 'centroids'. [dim = n_clusters x n_features] |
-| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center. Default: `std::nullopt`. |
+| `inertia` | out | `std::optional<raft::host_scalar_view<float>>` | Sum of squared distances of samples to their closest cluster center.<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -979,7 +979,7 @@ std::optional<raft::device_vector_view<const float, int>> sample_weight = std::n
 | `X` | in | `raft::device_matrix_view<const float, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `cost` | out | `raft::host_scalar_view<float>` | Resulting cluster cost |
-| `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int>>` | Optional per-sample weights. [len = n_samples] Default: `std::nullopt`. |
+| `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int>>` | Optional per-sample weights. [len = n_samples]<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1006,7 +1006,7 @@ std::optional<raft::device_vector_view<const double, int>> sample_weight = std::
 | `X` | in | `raft::device_matrix_view<const double, int>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const double, int>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `cost` | out | `raft::host_scalar_view<double>` | Resulting cluster cost |
-| `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int>>` | Optional per-sample weights. [len = n_samples] Default: `std::nullopt`. |
+| `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int>>` | Optional per-sample weights. [len = n_samples]<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1033,7 +1033,7 @@ std::optional<raft::device_vector_view<const float, int64_t>> sample_weight = st
 | `X` | in | `raft::device_matrix_view<const float, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const float, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `cost` | out | `raft::host_scalar_view<float>` | Resulting cluster cost |
-| `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int64_t>>` | Optional per-sample weights. [len = n_samples] Default: `std::nullopt`. |
+| `sample_weight` | in | `std::optional<raft::device_vector_view<const float, int64_t>>` | Optional per-sample weights. [len = n_samples]<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1060,7 +1060,7 @@ std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = s
 | `X` | in | `raft::device_matrix_view<const double, int64_t>` | Training instances to cluster. The data must be in row-major format. [dim = n_samples x n_features] |
 | `centroids` | in | `raft::device_matrix_view<const double, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `cost` | out | `raft::host_scalar_view<double>` | Resulting cluster cost |
-| `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int64_t>>` | Optional per-sample weights. [len = n_samples] Default: `std::nullopt`. |
+| `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int64_t>>` | Optional per-sample weights. [len = n_samples]<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -1095,9 +1095,9 @@ float tol   = 1e-3);
 | `inertia` |  | `raft::host_scalar_view<float>` | inertia of best k found |
 | `n_iter` |  | `raft::host_scalar_view<int>` | number of iterations used to find best k |
 | `kmax` |  | `int` | maximum k to try in search |
-| `kmin` |  | `int` | minimum k to try in search (should be &gt;= 1) Default: `1`. |
-| `maxiter` |  | `int` | maximum number of iterations to run Default: `100`. |
-| `tol` |  | `float` | tolerance for early stopping convergence Default: `1e-3`. |
+| `kmin` |  | `int` | minimum k to try in search (should be &gt;= 1)<br />Default: `1`. |
+| `maxiter` |  | `int` | maximum number of iterations to run<br />Default: `100`. |
+| `tol` |  | `float` | tolerance for early stopping convergence<br />Default: `1e-3`. |
 
 **Returns**
 
