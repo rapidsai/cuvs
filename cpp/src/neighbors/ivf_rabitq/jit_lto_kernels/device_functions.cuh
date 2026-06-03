@@ -40,4 +40,13 @@ __device__ float compute_bitwise_1bit_ip_for_vec(const uint32_t* d_short_data,
                                                  size_t short_code_length,
                                                  size_t D);
 
+__device__ void update_threshold_atomicmin(const float* d_topk_dists,
+                                           const float* d_threshold,
+                                           uint32_t query_idx,
+                                           uint32_t topk,
+                                           uint32_t nprobe,
+                                           int probe_slot,
+                                           float threshold,
+                                           int tid);
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

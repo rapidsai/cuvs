@@ -38,6 +38,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_b
 {
   ComputeInnerProductsWithLutBlockSortPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
+  planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
@@ -68,6 +69,7 @@ make_compute_inner_products_with_lut16_opt_block_sort_launcher(bool with_ex)
 {
   ComputeInnerProductsWithLut16OptBlockSortPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
+  planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
@@ -98,6 +100,7 @@ make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool 
 {
   ComputeInnerProductsWithBitwiseBlockSortPlanner planner;
   planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
+  planner.add_update_threshold_atomicmin_device_function();
   if (num_bits == 4) {
     if (with_ex) {
       planner.add_entrypoint<4, true>();

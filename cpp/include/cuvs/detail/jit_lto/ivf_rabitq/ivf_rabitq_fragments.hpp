@@ -37,4 +37,6 @@ struct fragment_tag_compute_lut_ip_for_vec {};
 
 struct fragment_tag_compute_bitwise_1bit_ip_for_vec {};
 
+struct fragment_tag_update_threshold_atomicmin {};
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

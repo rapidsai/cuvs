@@ -219,20 +219,14 @@ __device__ void compute_inner_products_with_lut16_opt_block_sort_impl(
     }
 
     if (num_candidates >= params.topk) {
-      float max_topk_dist;
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-      __syncthreads();
-
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        atomicMin(threshold_ptr, __float_as_int(max_topk_dist));
-      }
+      update_threshold_atomicmin(params.d_topk_dists,
+                                 params.d_threshold,
+                                 query_idx,
+                                 params.topk,
+                                 params.nprobe,
+                                 probe_slot,
+                                 threshold,
+                                 tid);
     }
   }
 }
