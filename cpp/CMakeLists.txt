@@ -635,24 +635,24 @@ if(NOT BUILD_CPU_ONLY)
   )
   generate_jit_lto_kernels(
     jit_lto_files
-    NAME_FORMAT "ivf_rabitq_extract_code"
+    NAME_FORMAT "ivf_rabitq_extract_code_@ex_bits@bit"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/extract_code_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/extract_code_kernel.cu.in"
-    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_extract_code"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_extract_code<@ex_bits@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/extract_code"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
     jit_lto_files
-    NAME_FORMAT "ivf_rabitq_compute_ip2_from_long_codes_warp"
+    NAME_FORMAT "ivf_rabitq_compute_ip2_from_long_codes_warp_@ex_bits@bit"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_ip2_from_long_codes_warp_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_ip2_from_long_codes_warp_kernel.cu.in"
-    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_compute_ip2_from_long_codes_warp"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_compute_ip2_from_long_codes_warp<@ex_bits@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
     OUTPUT_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_ip2_from_long_codes_warp"

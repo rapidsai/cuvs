@@ -968,10 +968,11 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   const int num_bits_for_dispatch = use_4bit ? 4 : 8;
   const bool with_ex              = (cur_ivf.get_ex_bits() != 0);
   if (use_jit_lto_search()) {
-    auto jit_launcher           = use_block_sort
-                                    ? make_compute_inner_products_with_bitwise_block_sort_launcher(
-                              num_bits_for_dispatch, with_ex)
-                                    : make_compute_inner_products_with_bitwise_launcher(with_ex);
+    auto jit_launcher =
+      use_block_sort
+        ? make_compute_inner_products_with_bitwise_block_sort_launcher(
+            num_bits_for_dispatch, cur_ivf.get_ex_bits(), with_ex)
+        : make_compute_inner_products_with_bitwise_launcher(cur_ivf.get_ex_bits(), with_ex);
     auto const& kernel_launcher = [&]() -> void {
       jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
         stream_, gridDim, blockDim, shared_mem_size, kernelParams);

@@ -148,8 +148,8 @@ __device__ void compute_inner_products_with_lut_block_sort_impl(
         size_t global_vec_idx        = cluster_start_index + local_vec_idx;
         const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
 
-        float ip2 = compute_ip2_from_long_codes_warp(
-          vec_long_code, shared_query, params.D, params.ex_bits, lane_id);
+        float ip2 =
+          compute_ip2_from_long_codes_warp(vec_long_code, shared_query, params.D, lane_id);
         if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
       }
       __syncthreads();

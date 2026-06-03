@@ -5,44 +5,41 @@
 
 #include <neighbors/ivf_rabitq/jit_lto_kernels/device_functions.cuh>
 
+namespace {
+
+constexpr int ex_bits = @ex_bits@;
+
+}  // namespace
+
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-// Templated __device__ definition. EX_BITS is a compile-time constant in the
-// JIT-LTO path, letting the compiler emit specialized fast paths (notably the
-// EX_BITS=8 single-byte load and the EX_BITS=4 nibble extract) and eliminate
-// the spanning-byte branch for EX_BITS values that never span a byte boundary.
-// Explicit instantiations at the bottom cover the full bits_per_dim range
-// supported by the public API (bits_per_dim in [1, 9] -> ex_bits in [1, 8];
-// ex_bits = 0 routes through the WithEx=false code path, which doesn't call
-// this function). Keep in sync with the non-templated inline definition in
-// searcher_gpu_common.cuh used by the legacy __global__ kernels.
-template <int EX_BITS>
+// Non-inline __device__ definition. ex_bits is captured from the matrix.json
+// axis into a constexpr so the compiler can constant-fold the bit-extraction
+// arithmetic, eliminate the spanning-byte branch when impossible (ex_bits in
+// {1, 2, 4, 8}), and collapse the function to a single byte load for
+// ex_bits=8. Each matrix.json value produces a separate fragment with the
+// same mangled C++ symbol; the planner adds exactly one via
+// add_extract_code_device_function<ex_bits>(), so nvJitLink resolves consumer
+// calls to the matching specialization with no runtime dispatch. Keep in sync
+// with the non-templated inline definition in searcher_gpu_common.cuh used by
+// the legacy __global__ kernels.
 __device__ uint32_t extract_code(const uint8_t* codes, size_t d)
 {
-  if constexpr (EX_BITS == 8) {
+  if constexpr (ex_bits == 8) {
     return codes[d];
-  } else if constexpr (EX_BITS == 4) {
+  } else if constexpr (ex_bits == 4) {
     return (codes[d >> 1] >> (4 * (1 - (d & 1)))) & 0xF;
   } else {
-    size_t bitPos    = d * EX_BITS;
+    size_t bitPos    = d * ex_bits;
     size_t byteIdx   = bitPos >> 3;
     size_t bitOffset = bitPos & 7;
     uint32_t v       = codes[byteIdx] << 8;
-    if constexpr (EX_BITS != 1 && EX_BITS != 2) {
-      if (bitOffset + EX_BITS > 8) { v |= codes[byteIdx + 1]; }
+    if constexpr (ex_bits != 1 && ex_bits != 2) {
+      if (bitOffset + ex_bits > 8) { v |= codes[byteIdx + 1]; }
     }
-    int shift = 16 - (bitOffset + EX_BITS);
-    return (v >> shift) & ((1u << EX_BITS) - 1);
+    int shift = 16 - (bitOffset + ex_bits);
+    return (v >> shift) & ((1u << ex_bits) - 1);
   }
 }
-
-template __device__ uint32_t extract_code<1>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<2>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<3>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<4>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<5>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<6>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<7>(const uint8_t*, size_t);
-template __device__ uint32_t extract_code<8>(const uint8_t*, size_t);
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

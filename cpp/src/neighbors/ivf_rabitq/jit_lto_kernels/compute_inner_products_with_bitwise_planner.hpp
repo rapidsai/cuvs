@@ -25,14 +25,16 @@ struct ComputeInnerProductsWithBitwisePlanner : AlgorithmPlanner {
     this->add_static_fragment<fragment_tag_compute_inner_products_with_bitwise<WithEx>>();
   }
 
+  template <int EX_BITS>
   void add_extract_code_device_function()
   {
-    this->add_static_fragment<fragment_tag_extract_code>();
+    this->add_static_fragment<fragment_tag_extract_code<EX_BITS>>();
   }
 
+  template <int EX_BITS>
   void add_compute_ip2_from_long_codes_warp_device_function()
   {
-    this->add_static_fragment<fragment_tag_compute_ip2_from_long_codes_warp>();
+    this->add_static_fragment<fragment_tag_compute_ip2_from_long_codes_warp<EX_BITS>>();
   }
 
   void add_compute_bitwise_1bit_ip_for_vec_device_function()

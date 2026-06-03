@@ -738,9 +738,10 @@ void SearcherGPU::SearchClusterQueryPairs(
     size_t shared_mem_size =
       num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + queue_buffer_smem_bytes;
     if (use_jit_lto_search()) {
-      auto jit_launcher =
-        use_block_sort ? make_compute_inner_products_with_lut_block_sort_launcher(/*with_ex=*/true)
-                       : make_compute_inner_products_with_lut_launcher(/*with_ex=*/true);
+      auto jit_launcher = use_block_sort ? make_compute_inner_products_with_lut_block_sort_launcher(
+                                             cur_ivf.get_ex_bits(), /*with_ex=*/true)
+                                         : make_compute_inner_products_with_lut_launcher(
+                                             cur_ivf.get_ex_bits(), /*with_ex=*/true);
       auto const& kernel_launcher = [&]() -> void {
         jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
           stream_, gridDim, blockDim, shared_mem_size, kernelParams);
@@ -765,9 +766,10 @@ void SearcherGPU::SearchClusterQueryPairs(
             (use_block_sort ? max_cluster_size * (sizeof(float) + sizeof(int)) : 0),
           (size_t)queue_buffer_smem_bytes);
     if (use_jit_lto_search()) {
-      auto jit_launcher =
-        use_block_sort ? make_compute_inner_products_with_lut_block_sort_launcher(/*with_ex=*/false)
-                       : make_compute_inner_products_with_lut_launcher(/*with_ex=*/false);
+      auto jit_launcher = use_block_sort ? make_compute_inner_products_with_lut_block_sort_launcher(
+                                             /*ex_bits=*/0, /*with_ex=*/false)
+                                         : make_compute_inner_products_with_lut_launcher(
+                                             /*ex_bits=*/0, /*with_ex=*/false);
       auto const& kernel_launcher = [&]() -> void {
         jit_launcher->dispatch<compute_inner_products_with_lut_func_t>(
           stream_, gridDim, blockDim, shared_mem_size, kernelParams);

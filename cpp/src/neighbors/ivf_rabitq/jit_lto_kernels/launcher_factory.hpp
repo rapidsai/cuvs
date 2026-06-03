@@ -14,19 +14,63 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 
+#include <cassert>
 #include <memory>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
+namespace {
+
+template <typename Planner>
+inline void add_ex_bits_device_functions(Planner& planner, int ex_bits)
+{
+  switch (ex_bits) {
+    case 1:
+      planner.template add_extract_code_device_function<1>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<1>();
+      break;
+    case 2:
+      planner.template add_extract_code_device_function<2>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<2>();
+      break;
+    case 3:
+      planner.template add_extract_code_device_function<3>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<3>();
+      break;
+    case 4:
+      planner.template add_extract_code_device_function<4>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<4>();
+      break;
+    case 5:
+      planner.template add_extract_code_device_function<5>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<5>();
+      break;
+    case 6:
+      planner.template add_extract_code_device_function<6>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<6>();
+      break;
+    case 7:
+      planner.template add_extract_code_device_function<7>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<7>();
+      break;
+    case 8:
+      planner.template add_extract_code_device_function<8>();
+      planner.template add_compute_ip2_from_long_codes_warp_device_function<8>();
+      break;
+    default: assert(false);
+  }
+}
+
+}  // namespace
+
 inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_launcher(
-  bool with_ex)
+  int ex_bits, bool with_ex)
 {
   ComputeInnerProductsWithLutPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
-    planner.add_extract_code_device_function();
-    planner.add_compute_ip2_from_long_codes_warp_device_function();
+    add_ex_bits_device_functions(planner, ex_bits);
   } else {
     planner.add_entrypoint<false>();
   }
@@ -34,15 +78,14 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_l
 }
 
 inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_block_sort_launcher(
-  bool with_ex)
+  int ex_bits, bool with_ex)
 {
   ComputeInnerProductsWithLutBlockSortPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
   planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
-    planner.add_extract_code_device_function();
-    planner.add_compute_ip2_from_long_codes_warp_device_function();
+    add_ex_bits_device_functions(planner, ex_bits);
   } else {
     planner.add_entrypoint<false>();
   }
@@ -50,14 +93,13 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_b
 }
 
 inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut16_opt_launcher(
-  bool with_ex)
+  int ex_bits, bool with_ex)
 {
   ComputeInnerProductsWithLut16OptPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
-    planner.add_extract_code_device_function();
-    planner.add_compute_ip2_from_long_codes_warp_device_function();
+    add_ex_bits_device_functions(planner, ex_bits);
   } else {
     planner.add_entrypoint<false>();
   }
@@ -65,15 +107,14 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut16
 }
 
 inline std::shared_ptr<AlgorithmLauncher>
-make_compute_inner_products_with_lut16_opt_block_sort_launcher(bool with_ex)
+make_compute_inner_products_with_lut16_opt_block_sort_launcher(int ex_bits, bool with_ex)
 {
   ComputeInnerProductsWithLut16OptBlockSortPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
   planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
-    planner.add_extract_code_device_function();
-    planner.add_compute_ip2_from_long_codes_warp_device_function();
+    add_ex_bits_device_functions(planner, ex_bits);
   } else {
     planner.add_entrypoint<false>();
   }
@@ -81,14 +122,13 @@ make_compute_inner_products_with_lut16_opt_block_sort_launcher(bool with_ex)
 }
 
 inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_bitwise_launcher(
-  bool with_ex)
+  int ex_bits, bool with_ex)
 {
   ComputeInnerProductsWithBitwisePlanner planner;
   planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
-    planner.add_extract_code_device_function();
-    planner.add_compute_ip2_from_long_codes_warp_device_function();
+    add_ex_bits_device_functions(planner, ex_bits);
   } else {
     planner.add_entrypoint<false>();
   }
@@ -96,7 +136,9 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_bitwi
 }
 
 inline std::shared_ptr<AlgorithmLauncher>
-make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool with_ex)
+make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits,
+                                                             int ex_bits,
+                                                             bool with_ex)
 {
   ComputeInnerProductsWithBitwiseBlockSortPlanner planner;
   planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
@@ -108,8 +150,7 @@ make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool 
   planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
-    planner.add_extract_code_device_function();
-    planner.add_compute_ip2_from_long_codes_warp_device_function();
+    add_ex_bits_device_functions(planner, ex_bits);
   } else {
     planner.add_entrypoint<false>();
   }

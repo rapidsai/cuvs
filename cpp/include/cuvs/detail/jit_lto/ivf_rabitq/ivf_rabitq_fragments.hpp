@@ -25,8 +25,10 @@ struct fragment_tag_compute_inner_products_with_bitwise {};
 template <bool WithEx>
 struct fragment_tag_compute_inner_products_with_bitwise_block_sort {};
 
+template <int EX_BITS>
 struct fragment_tag_extract_code {};
 
+template <int EX_BITS>
 struct fragment_tag_compute_ip2_from_long_codes_warp {};
 
 struct tag_lut_dtype_f32 {};
