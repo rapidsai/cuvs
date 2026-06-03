@@ -82,6 +82,7 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_bitwi
   bool with_ex)
 {
   ComputeInnerProductsWithBitwisePlanner planner;
+  planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     planner.add_extract_code_device_function();
@@ -96,6 +97,7 @@ inline std::shared_ptr<AlgorithmLauncher>
 make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool with_ex)
 {
   ComputeInnerProductsWithBitwiseBlockSortPlanner planner;
+  planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
   if (num_bits == 4) {
     if (with_ex) {
       planner.add_entrypoint<4, true>();

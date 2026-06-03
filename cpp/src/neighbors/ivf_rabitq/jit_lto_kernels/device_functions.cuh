@@ -32,4 +32,12 @@ __device__ float compute_lut_ip_for_vec(const uint32_t* d_short_data,
                                         size_t vec_idx,
                                         size_t short_code_length);
 
+__device__ float compute_bitwise_1bit_ip_for_vec(const uint32_t* d_short_data,
+                                                 const float* shared_query,
+                                                 size_t cluster_start_index,
+                                                 size_t num_vectors_in_cluster,
+                                                 size_t vec_idx,
+                                                 size_t short_code_length,
+                                                 size_t D);
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

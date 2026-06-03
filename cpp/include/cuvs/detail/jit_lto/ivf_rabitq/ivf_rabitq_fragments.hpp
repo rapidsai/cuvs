@@ -35,4 +35,6 @@ struct tag_lut_dtype_f16 {};
 template <typename LutDtypeTag>
 struct fragment_tag_compute_lut_ip_for_vec {};
 
+struct fragment_tag_compute_bitwise_1bit_ip_for_vec {};
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

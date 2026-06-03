@@ -35,6 +35,11 @@ struct ComputeInnerProductsWithBitwiseBlockSortPlanner : AlgorithmPlanner {
   {
     this->add_static_fragment<fragment_tag_compute_ip2_from_long_codes_warp>();
   }
+
+  void add_compute_bitwise_1bit_ip_for_vec_device_function()
+  {
+    this->add_static_fragment<fragment_tag_compute_bitwise_1bit_ip_for_vec>();
+  }
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

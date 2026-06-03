@@ -84,19 +84,13 @@ __device__ void compute_inner_products_with_bitwise_impl(
       size_t vec_idx = vec_base + tid;
       if (vec_idx >= num_vectors_in_cluster) break;
 
-      float exact_ip = 0.0f;
-      for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-        size_t short_code_offset =
-          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-#pragma unroll 8
-        for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-          size_t dim = uint32_idx * 32 + bit_idx;
-          if (dim < params.D) {
-            if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
-          }
-        }
-      }
+      float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
+                                                       shared_query,
+                                                       cluster_start_index,
+                                                       num_vectors_in_cluster,
+                                                       vec_idx,
+                                                       short_code_length,
+                                                       params.D);
 
       float ip2             = shared_ip2_results[vec_idx];
       size_t global_vec_idx = cluster_start_index + vec_idx;
@@ -122,19 +116,13 @@ __device__ void compute_inner_products_with_bitwise_impl(
       float f_rescale      = factors.y;
       size_t global_vec_idx = cluster_start_index + vec_idx;
 
-      float exact_ip = 0.0f;
-      for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-        size_t short_code_offset =
-          cluster_start_index * short_code_length + uint32_idx * num_vectors_in_cluster + vec_idx;
-        uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-#pragma unroll 8
-        for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-          size_t dim = uint32_idx * 32 + bit_idx;
-          if (dim < params.D) {
-            if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
-          }
-        }
-      }
+      float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
+                                                       shared_query,
+                                                       cluster_start_index,
+                                                       num_vectors_in_cluster,
+                                                       vec_idx,
+                                                       short_code_length,
+                                                       params.D);
 
       params.d_topk_dists[output_offset + vec_idx] =
         f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);

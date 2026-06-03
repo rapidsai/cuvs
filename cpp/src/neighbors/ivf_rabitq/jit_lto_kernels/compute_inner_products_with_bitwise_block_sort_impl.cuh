@@ -135,21 +135,14 @@ __device__ void compute_inner_products_with_bitwise_block_sort_impl(
       for (int c = 0; c < candidates_per_thread; ++c) {
         int cand_idx = tid + c * num_threads;
         if (cand_idx < num_candidates) {
-          int vec_idx    = shared_candidate_indices[cand_idx];
-          float exact_ip = 0.0f;
-
-          for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-            size_t short_code_offset = cluster_start_index * short_code_length +
-                                       uint32_idx * num_vectors_in_cluster + vec_idx;
-            uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-#pragma unroll 8
-            for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-              size_t dim = uint32_idx * 32 + bit_idx;
-              if (dim < params.D) {
-                if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
-              }
-            }
-          }
+          int vec_idx                    = shared_candidate_indices[cand_idx];
+          float exact_ip                 = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
+                                                           shared_query,
+                                                           cluster_start_index,
+                                                           num_vectors_in_cluster,
+                                                           vec_idx,
+                                                           short_code_length,
+                                                           params.D);
           shared_candidate_ips[cand_idx] = exact_ip;
         }
       }
@@ -235,21 +228,15 @@ __device__ void compute_inner_products_with_bitwise_block_sort_impl(
           float f_rescale = factors.y;
           size_t global_vec_idx = cluster_start_index + vec_idx;
 
-          float exact_ip = 0.0f;
-          for (size_t uint32_idx = 0; uint32_idx < short_code_length; uint32_idx++) {
-            size_t short_code_offset = cluster_start_index * short_code_length +
-                                       uint32_idx * num_vectors_in_cluster + vec_idx;
-            uint32_t short_code_chunk = params.d_short_data[short_code_offset];
-#pragma unroll 8
-            for (int bit_idx = 0; bit_idx < 32; bit_idx++) {
-              size_t dim = uint32_idx * 32 + bit_idx;
-              if (dim < params.D) {
-                if ((short_code_chunk >> (31 - bit_idx)) & 0x1) { exact_ip += shared_query[dim]; }
-              }
-            }
-          }
-          final_dist = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
-          final_pid  = (uint32_t)params.d_pids[global_vec_idx];
+          float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
+                                                           shared_query,
+                                                           cluster_start_index,
+                                                           num_vectors_in_cluster,
+                                                           vec_idx,
+                                                           short_code_length,
+                                                           params.D);
+          final_dist     = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
+          final_pid      = (uint32_t)params.d_pids[global_vec_idx];
         } else {
           final_dist = INFINITY;
           final_pid  = 0;

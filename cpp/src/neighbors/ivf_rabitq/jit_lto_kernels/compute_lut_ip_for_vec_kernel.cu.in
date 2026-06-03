@@ -11,12 +11,19 @@
 
 #include <type_traits>
 
+namespace {
+
+using lut_t = @lut_dtype@;
+
+}  // namespace
+
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 // Primary template definition. The fragment is built once per @lut_dtype@
 // value declared in compute_lut_ip_for_vec_matrix.json; the explicit
-// instantiation at the bottom emits one specialization per build, and
-// nvJitLink resolves consumer calls to the matching specialization.
+// instantiation at the bottom emits one specialization (via the lut_t alias)
+// per build, and nvJitLink resolves consumer calls to the matching
+// specialization.
 template <typename LutT>
 __device__ float compute_lut_ip_for_vec(const uint32_t* d_short_data,
                                         const LutT* shared_lut,
@@ -46,7 +53,7 @@ __device__ float compute_lut_ip_for_vec(const uint32_t* d_short_data,
   return ip;
 }
 
-template __device__ float compute_lut_ip_for_vec<@lut_dtype@>(
-  const uint32_t*, const@lut_dtype@*, size_t, size_t, size_t, size_t);
+template __device__ float compute_lut_ip_for_vec<lut_t>(
+  const uint32_t*, const lut_t*, size_t, size_t, size_t, size_t);
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
