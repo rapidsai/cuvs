@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define IVF_RABITQ_JIT_LTO_FRAGMENT
 #include <neighbors/ivf_rabitq/gpu_index/searcher_gpu_common.cuh>
 #include <neighbors/ivf_rabitq/jit_lto_kernels/device_functions.cuh>
 

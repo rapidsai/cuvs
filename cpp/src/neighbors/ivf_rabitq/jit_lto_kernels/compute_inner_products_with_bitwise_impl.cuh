@@ -5,10 +5,6 @@
 
 #pragma once
 
-// Suppress the inline `extract_code` definition in searcher_gpu_common.cuh;
-// device_functions.cuh provides the extern declaration and the body lives in
-// the extract_code JIT-LTO fragment.
-#define IVF_RABITQ_JIT_LTO_FRAGMENT
 #include "../gpu_index/searcher_gpu_common.cuh"
 #include "device_functions.cuh"
 

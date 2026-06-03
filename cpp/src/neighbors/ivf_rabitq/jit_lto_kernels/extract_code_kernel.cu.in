@@ -20,9 +20,7 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // ex_bits=8. Each matrix.json value produces a separate fragment with the
 // same mangled C++ symbol; the planner adds exactly one via
 // add_extract_code_device_function<ex_bits>(), so nvJitLink resolves consumer
-// calls to the matching specialization with no runtime dispatch. Keep in sync
-// with the non-templated inline definition in searcher_gpu_common.cuh used by
-// the legacy __global__ kernels.
+// calls to the matching specialization with no runtime dispatch.
 __device__ uint32_t extract_code(const uint8_t* codes, size_t d)
 {
   if constexpr (ex_bits == 8) {
