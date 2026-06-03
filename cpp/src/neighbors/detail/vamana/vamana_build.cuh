@@ -49,9 +49,9 @@ static const int maxBlocks = 10000;
 
 // generate random permutation of inserts on device
 template <typename IdxT>
-void create_insert_permutation(
-  raft::resources const& res,
-  raft::device_vector_view<IdxT, uint32_t> insert_order uint64_t seed = 0)
+void create_insert_permutation(raft::resources const& res,
+                               raft::device_vector_view<IdxT, uint32_t> insert_order,
+                               uint64_t seed = 0)
 {
   uint32_t N = insert_order.extent(0);
   auto exec  = raft::resource::get_thrust_policy(res);
@@ -59,7 +59,7 @@ void create_insert_permutation(
   thrust::sequence(exec, insert_order.data_handle(), insert_order.data_handle() + N, IdxT{0});
 
   auto keys = raft::make_device_vector<float>(res, N);
-  raft::random::RngState rng(seed != 0 ? seed : static_cast<uint64_t>(std::rand()));
+  raft::random::RngState rng(seed);
   raft::random::uniform(res, rng, keys.data_handle(), N, 0.0, 1.0);
 
   thrust::sort_by_key(exec, keys.data_handle(), keys.data_handle() + N, insert_order.data_handle());
