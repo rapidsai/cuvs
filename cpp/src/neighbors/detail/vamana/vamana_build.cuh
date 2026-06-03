@@ -60,7 +60,7 @@ void create_insert_permutation(raft::resources const& res,
 
   auto keys = raft::make_device_vector<float>(res, N);
   raft::random::RngState rng(seed);
-  raft::random::uniform(res, rng, keys.data_handle(), N, 0.0, 1.0);
+  raft::random::uniform(res, rng, keys.data_handle(), N, 0.0f, 1.0f);
 
   thrust::sort_by_key(exec, keys.data_handle(), keys.data_handle() + N, insert_order.data_handle());
 }
