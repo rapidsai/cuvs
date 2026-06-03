@@ -8,6 +8,7 @@
 #include <dlpack/dlpack.h>
 #include <memory>
 #include <optional>
+#include <variant>
 
 #include <raft/core/copy.hpp>
 #include <raft/core/error.hpp>
@@ -22,6 +23,7 @@
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 
 #include "../core/exceptions.hpp"
 #include "../core/interop.hpp"
@@ -33,21 +35,30 @@ namespace {
 
 /**
  * Heap-allocated bundle for the C API: owns `cagra::index` and any co-owned device storage
- * (padded dataset copy, merge/de-serialize/extend buffers) when the index is not standalone.
- * Padded dataset bytes for non-owning index views live in `padded_dataset_owner`, not in the index.
- * Lives behind `cuvsCagraIndex::addr` via `cagra_c_api_index_box`. Used for merge, build,
- * deserialize, from_args, extend.
+ * when the index is not standalone. Lives behind `cuvsCagraIndex::addr` via `cagra_c_api_index_box`.
  */
-template <typename T>
+template <typename T, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 struct cuvs_cagra_c_api_lifetime_holder {
-  /** Non-ACE host build / deserialize: owns padded (or other) device dataset backing the index when
-   *  the index holds a non-owning view into this storage. */
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> padded_dataset_owner{nullptr};
+  /** Owns padded device dataset bytes when `DatasetViewT` is padded and the index is non-owning. */
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_dataset_owner{
+    nullptr};
   raft::device_matrix<T, int64_t, raft::row_major> dataset;
-  cuvs::neighbors::cagra::index<T, uint32_t> idx;
+  cuvs::neighbors::cagra::index<T, uint32_t, DatasetViewT> idx;
   /** Physical merge: owns merge buffers viewed by `idx` after `cagra::merge`. */
   std::optional<cuvs::neighbors::cagra::merged_dataset_storage<T, uint32_t>> merge_storage{};
 };
+
+template <typename T>
+static std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
+take_padded_from_any_owning(std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> box)
+{
+  using padded_t = cuvs::neighbors::device_padded_dataset<T, int64_t>;
+  auto& variant  = box->as_variant();
+  if (std::holds_alternative<padded_t>(variant)) {
+    return std::make_unique<padded_t>(std::move(std::get<padded_t>(variant)));
+  }
+  RAFT_FAIL("CAGRA C API deserialize: expected a padded dataset in the serialized index");
+}
 
 /** Owns how to delete co-located index storage; `cuvsCagraIndex::addr` points here. */
 struct cagra_c_api_index_box {
@@ -57,43 +68,43 @@ struct cagra_c_api_index_box {
   void* (*try_lifetime_holder_for_extend)(void* owner);
 };
 
-template <typename T>
+template <typename T, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 static void destroy_standalone_cagra_index(void* owner)
 {
-  delete reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(owner);
+  delete reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t, DatasetViewT>*>(owner);
 }
 
-template <typename T>
+template <typename T, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 static void destroy_c_api_holder(void* owner)
 {
-  delete reinterpret_cast<cuvs_cagra_c_api_lifetime_holder<T>*>(owner);
+  delete reinterpret_cast<cuvs_cagra_c_api_lifetime_holder<T, DatasetViewT>*>(owner);
 }
 
 static void* extend_holder_none(void*) { return nullptr; }
 
 static void* extend_holder_self(void* owner) { return owner; }
 
-template <typename T>
+template <typename T, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 static void assign_standalone_index(cuvsCagraIndex_t out,
                                     DLDataType dtype,
-                                    cuvs::neighbors::cagra::index<T, uint32_t>* raw)
+                                    cuvs::neighbors::cagra::index<T, uint32_t, DatasetViewT>* raw)
 {
   auto* box = new cagra_c_api_index_box{raw,
                                          raw,
-                                         &destroy_standalone_cagra_index<T>,
+                                         &destroy_standalone_cagra_index<T, DatasetViewT>,
                                          &extend_holder_none};
   out->addr = reinterpret_cast<uintptr_t>(box);
   out->dtype  = dtype;
 }
 
-template <typename T>
+template <typename T, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 static void assign_lifetime_holder(cuvsCagraIndex_t out,
                                    DLDataType dtype,
-                                   cuvs_cagra_c_api_lifetime_holder<T>* holder)
+                                   cuvs_cagra_c_api_lifetime_holder<T, DatasetViewT>* holder)
 {
   auto* box = new cagra_c_api_index_box{&holder->idx,
                                          holder,
-                                         &destroy_c_api_holder<T>,
+                                         &destroy_c_api_holder<T, DatasetViewT>,
                                          &extend_holder_self};
   out->addr = reinterpret_cast<uintptr_t>(box);
   out->dtype  = dtype;
@@ -205,17 +216,17 @@ void _build(cuvsResources_t res,
     if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
       auto view  = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
       auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
-      auto* raw = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(index));
-      assign_standalone_index<T>(output_index, output_index->dtype, raw);
+      auto* raw = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(std::move(index));
+      assign_standalone_index<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, raw);
     } else {
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
       auto view   = padded->as_dataset_view();
       auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
-      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-        cuvs::neighbors::wrap_any_owning(std::move(padded)),
+      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
+        std::move(padded),
         raft::device_matrix<T, int64_t>(*res_ptr),
         std::move(index)};
-      assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+      assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
     }
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
@@ -223,28 +234,28 @@ void _build(cuvsResources_t res,
     if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
           index_params.graph_build_params)) {
       auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
-      std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> padded_owner = nullptr;
+      std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_owner = nullptr;
       // In-memory ACE returns a graph-only index; disk ACE attaches dataset via file descriptors.
       if (index.dim() == 0) {
         auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
         auto view   = padded->as_dataset_view();
         index.update_dataset(*res_ptr, view);
-        padded_owner = cuvs::neighbors::wrap_any_owning(std::move(padded));
+        padded_owner = std::move(padded);
       }
-      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
+      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
         std::move(padded_owner),
         raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
         std::move(index)};
-      assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+      assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
     } else {
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
       auto view   = padded->as_dataset_view();
       auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
-      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-        cuvs::neighbors::wrap_any_owning(std::move(padded)),
+      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
+        std::move(padded),
         raft::device_matrix<T, int64_t>(*res_ptr),
         std::move(index)};
-      assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+      assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
     }
   }
 }
@@ -270,21 +281,21 @@ void _from_args(cuvsResources_t res,
       if (cuvs::core::is_dlpack_device_compatible(graph)) {
         using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
         auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-        raw = new cuvs::neighbors::cagra::index<T, uint32_t>(
+        raw = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(
           *res_ptr, metric, dataset_view, graph_mds);
       } else {
         using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
         auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-        raw = new cuvs::neighbors::cagra::index<T, uint32_t>(
+        raw = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(
           *res_ptr, metric, dataset_view, graph_mds);
       }
-      assign_standalone_index<T>(output_index,
+      assign_standalone_index<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index,
                                  output_index->dtype,
-                                 reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(raw));
+                                 reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(raw));
     } else {
       // Same as host path and cagra::_build: row pitch must be CAGRA-aligned; copy into a holder.
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
-      auto idx    = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
+      auto idx    = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(*res_ptr, metric);
       idx->update_dataset(*res_ptr, padded->as_dataset_view());
       if (cuvs::core::is_dlpack_device_compatible(graph)) {
         using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
@@ -295,12 +306,12 @@ void _from_args(cuvsResources_t res,
         auto graph_mds = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
         idx->update_graph(*res_ptr, graph_mds);
       }
-      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-        cuvs::neighbors::wrap_any_owning(std::move(padded)),
+      auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
+        std::move(padded),
         raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
         std::move(*idx)};
       delete idx;
-      assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+      assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
     }
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
@@ -308,7 +319,7 @@ void _from_args(cuvsResources_t res,
     // Match build(): rows must be padded to CAGRA's alignment (see make_padded_dataset); a tight
     // row-major copy (dim * sizeof(T) not a multiple of 16) misaligns vectorized distance loads.
     auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
-    auto idx    = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
+    auto idx    = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(*res_ptr, metric);
     idx->update_dataset(*res_ptr, padded->as_dataset_view());
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
       using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
@@ -319,12 +330,12 @@ void _from_args(cuvsResources_t res,
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
       idx->update_graph(*res_ptr, graph_mds);
     }
-    auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
-      cuvs::neighbors::wrap_any_owning(std::move(padded)),
+    auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
+      std::move(padded),
       raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
       std::move(*idx)};
     delete idx;
-    assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+    assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
   }
 }
 
@@ -335,7 +346,7 @@ void _extend(cuvsResources_t res,
              DLManagedTensor* additional_dataset_tensor)
 {
   auto dataset   = additional_dataset_tensor->dl_tensor;
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
     cuvs::neighbors::cagra::cagra_c_api_index_ptr(&index));
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
 
@@ -388,10 +399,10 @@ void _extend(cuvsResources_t res,
                "cuvsCagraExtend: extended dataset storage must be kept alive via the lifetime-holder "
                "build path (e.g. host dataset or device dataset copied to a padded buffer).");
 
-  auto* holder = reinterpret_cast<cuvs_cagra_c_api_lifetime_holder<T>*>(holder_void);
+  auto* holder = reinterpret_cast<cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>*>(holder_void);
   auto extended_owning = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
     std::move(extended_storage), index_ptr->dim());
-  holder->padded_dataset_owner = cuvs::neighbors::wrap_any_owning(std::move(extended_owning));
+  holder->padded_dataset_owner = std::move(extended_owning);
 }
 
 template <typename T, typename IdxT>
@@ -404,7 +415,7 @@ void _search(cuvsResources_t res,
              cuvsFilter filter)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
     cuvs::neighbors::cagra::cagra_c_api_index_ptr(&index));
 
   auto search_params = cuvs::neighbors::cagra::search_params();
@@ -467,7 +478,7 @@ void _serialize(cuvsResources_t res,
                 bool include_dataset)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
     cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
   cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
 }
@@ -476,7 +487,7 @@ template <typename T>
 void _serialize_to_hnswlib(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
     cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
   cuvs::neighbors::cagra::serialize_to_hnswlib(*res_ptr, std::string(filename), *index_ptr);
 }
@@ -485,13 +496,13 @@ template <typename T>
 void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t output_index)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
+  auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
     nullptr,
     raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
-    cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr)};
+    cuvs::neighbors::cagra::padded_index<T, uint32_t>(*res_ptr)};
   std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> out_dataset;
   cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), &holder->idx, &out_dataset);
-  holder->padded_dataset_owner = std::move(out_dataset);
+  holder->padded_dataset_owner = take_padded_from_any_owning<T>(std::move(out_dataset));
 
   // Deserialized strided layout often matches logical dim (tight rows). CAGRA search requires the
   // same row width as device builds (see `device_matrix_row_width_matches_cagra_required` / `update_dataset`).
@@ -500,10 +511,10 @@ void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t ou
     auto padded =
       cuvs::neighbors::make_padded_dataset(*res_ptr, ds);
     holder->idx.update_dataset(*res_ptr, padded->as_dataset_view());
-    holder->padded_dataset_owner = cuvs::neighbors::wrap_any_owning(std::move(padded));
+    holder->padded_dataset_owner = std::move(padded);
   }
 
-  assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+  assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
 }
 
 template <typename T>
@@ -527,12 +538,12 @@ void _merge(cuvsResources_t res,
   int64_t dim        = 0;
   if (params.build_algo == cuvsCagraGraphBuildAlgo::IVF_PQ) {
     auto first_idx_ptr =
-      reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+      reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
         cuvs::neighbors::cagra::cagra_c_api_index_ptr(indices[0]));
     dim = first_idx_ptr->dim();
     for (size_t i = 0; i < num_indices; ++i) {
       auto idx_ptr =
-        reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+        reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
           cuvs::neighbors::cagra::cagra_c_api_index_ptr(indices[i]));
       total_size += idx_ptr->size();
     }
@@ -544,10 +555,10 @@ void _merge(cuvsResources_t res,
                           total_size,
                           dim);
 
-  std::vector<cuvs::neighbors::cagra::index<T, uint32_t>*> index_ptrs;
+  std::vector<cuvs::neighbors::cagra::padded_index<T, uint32_t>*> index_ptrs;
   index_ptrs.reserve(num_indices);
   for (size_t i = 0; i < num_indices; ++i) {
-    auto idx_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(
+    auto idx_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(
       cuvs::neighbors::cagra::cagra_c_api_index_ptr(indices[i]));
     index_ptrs.push_back(idx_ptr);
   }
@@ -557,10 +568,10 @@ void _merge(cuvsResources_t res,
       cuvs::neighbors::cagra::make_merged_dataset(*res_ptr, index_ptrs);
     auto merged_idx =
       cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs, merge_storage);
-    auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
+    auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
       nullptr, raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr), std::move(merged_idx)};
     holder->merge_storage = std::move(merge_storage);
-    assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+    assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
   } else if (filter.type == BITSET) {
     int64_t merged_row_count = 0;
     for (auto* idx_ptr : index_ptrs) {
@@ -578,10 +589,10 @@ void _merge(cuvsResources_t res,
       cuvs::neighbors::cagra::make_merged_dataset(*res_ptr, index_ptrs, bitset_filter_obj);
     auto merged_idx = cuvs::neighbors::cagra::merge(
       *res_ptr, params_cpp, index_ptrs, merge_storage, bitset_filter_obj);
-    auto* holder = new cuvs_cagra_c_api_lifetime_holder<T>{
+    auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
       nullptr, raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr), std::move(merged_idx)};
     holder->merge_storage = std::move(merge_storage);
-    assign_lifetime_holder<T>(output_index, output_index->dtype, holder);
+    assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
   } else {
     RAFT_FAIL("Unsupported filter type: BITMAP");
   }
@@ -590,7 +601,7 @@ void _merge(cuvsResources_t res,
 template <typename T, typename IdxT>
 void get_dataset_view(cuvsCagraIndex_t index, DLManagedTensor* dataset)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, IdxT>*>(
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, IdxT>*>(
     cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
   cuvs::core::to_dlpack(index_ptr->dataset(), dataset);
 }
@@ -598,7 +609,7 @@ void get_dataset_view(cuvsCagraIndex_t index, DLManagedTensor* dataset)
 template <typename T, typename IdxT>
 void get_graph_view(cuvsCagraIndex_t index, DLManagedTensor* graph)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, IdxT>*>(
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, IdxT>*>(
     cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
   cuvs::core::to_dlpack(index_ptr->graph(), graph);
 }
@@ -731,7 +742,7 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
 extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<float>*>(
       cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
     *dim           = index_ptr->dim();
   });
@@ -740,7 +751,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* di
 extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<float>*>(
       cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
     *size          = index_ptr->size();
   });
@@ -749,7 +760,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* si
 extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::padded_index<float>*>(
       cuvs::neighbors::cagra::cagra_c_api_index_ptr(index));
     *graph_degree  = index_ptr->graph_degree();
   });

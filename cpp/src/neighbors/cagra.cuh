@@ -23,19 +23,19 @@
 #include <cuvs/neighbors/cagra.hpp>
 
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
 
 #include <memory>
 #include <optional>
 #include <type_traits>
-#include <variant>
 
 namespace cuvs::neighbors::cagra {
 
 // Member function implementations for cagra::index
-template <typename T, typename IdxT>
-void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
+template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
+void index<T, IdxT, DatasetViewT>::compute_dataset_norms_(raft::resources const& res)
 {
   // raft::linalg::reduce wants row-major with leading dim = row pitch in elements. Prefer padded
   // storage's native row-major view; for strided non-owning rows use the mdspan stride, not only
@@ -45,12 +45,9 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   bool skip_norms = false;
   std::optional<raft::device_matrix_view<const T, int64_t, raft::row_major>> rm_dataset;
 
-  using VT       = nb::any_dataset_view_types<T, int64_t>;
-  auto const& va = dataset_->as_variant();
-  if (std::holds_alternative<typename VT::padded_view>(va)) {
-    rm_dataset = std::get<typename VT::padded_view>(va).view();
-  } else if (std::holds_alternative<typename VT::vpq_f16_view>(va) ||
-             std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+  if constexpr (nb::is_padded_dataset_view_v<DatasetViewT>) {
+    rm_dataset = dataset_.view();
+  } else if constexpr (nb::is_vpq_dataset_view_v<DatasetViewT>) {
     skip_norms = true;
   }
 
@@ -115,8 +112,8 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
  *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
  *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
- *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
- *                                      optimized_graph.view());
+ *   auto index = cagra::index<T, IdxT, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(
+ *     res, build_params.metric(), dataset, optimized_graph.view());
  * @endcode
  *
  * @tparam DataT data element type
@@ -173,8 +170,8 @@ void build_knn_graph(
  *   auto optimized_gaph      = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), 64);
  *   cagra::optimize(res, dataset, nn_descent_index.graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
- *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
- * optimized_graph.view());
+ *   auto index = cagra::padded_index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                           optimized_graph.view());
  * @endcode
  *
  * @tparam DataT data element type
@@ -219,8 +216,8 @@ void build_knn_graph(
  *   // optimize graph
  *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
- *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
- *                                      optimized_graph.view());
+ *   auto index = cagra::index<T, IdxT, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(
+ *     res, build_params.metric(), dataset, optimized_graph.view());
  * @endcode
  *
  * @tparam DataT type of the data in the source dataset
@@ -293,7 +290,7 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<T, IdxT> build(
+cuvs::neighbors::cagra::padded_index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
@@ -315,18 +312,21 @@ index<T, IdxT> build(
 }
 
 /**
- * @brief Build the index from a device `any_dataset_view` (padded, VPQ, or empty).
+ * @brief Build the index from a device `dataset_view` (padded or VPQ).
  *
- * Graph construction uses
- * `convert_dataset_view_to_padded_for_graph_build`. The index
- * attaches the same padded dataset view used for graph build (non-owning; keep storage alive).
+ * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The index attaches the
+ * same padded dataset view used for graph build (non-owning; keep storage alive).
  */
-template <typename T, typename IdxT>
-index<T, IdxT> build(raft::resources const& res,
-                     const index_params& params,
-                     cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
+template <typename DatasetViewT>
+  requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t> &&
+           !cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>)
+auto build(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)
+  -> cuvs::neighbors::cagra::padded_index<cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>>
 {
-  return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(res, params, dataset);
+  using T    = cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>;
+  using IdxT = uint32_t;
+  return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
+    res, params, dataset);
 }
 
 /**
@@ -368,10 +368,14 @@ index<T, IdxT> build(raft::resources const& res,
  * k]
  * @param[in] sample_filter a device filter function that greenlights samples for a given query
  */
-template <typename T, typename IdxT, typename CagraSampleFilterT, typename OutputIdxT = IdxT>
+template <typename T,
+          typename IdxT,
+          typename CagraSampleFilterT,
+          typename OutputIdxT,
+          cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void search_with_filtering(raft::resources const& res,
                            const search_params& params,
-                           const index<T, IdxT>& idx,
+                           const index<T, IdxT, DatasetViewT>& idx,
                            raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                            raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
                            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -386,14 +390,17 @@ void search_with_filtering(raft::resources const& res,
   RAFT_EXPECTS(queries.extent(1) == idx.dim(),
                "Number of query dimensions should equal number of dimensions in the index.");
 
-  return cagra::detail::search_main<T, OutputIdxT, CagraSampleFilterT, IdxT>(
+  return cagra::detail::search_main<T, OutputIdxT, CagraSampleFilterT, IdxT, float, DatasetViewT>(
     res, params, idx, queries, neighbors, distances, sample_filter);
 }
 
-template <typename T, typename IdxT, typename OutputIdxT = IdxT>
+template <typename T,
+          typename IdxT,
+          cuvs::neighbors::cagra_dataset_view DatasetViewT,
+          typename OutputIdxT>
 void search(raft::resources const& res,
             const search_params& params,
-            const index<T, IdxT>& idx,
+            const index<T, IdxT, DatasetViewT>& idx,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -405,7 +412,7 @@ void search(raft::resources const& res,
     search_params params_copy = params;
     if (params.filtering_rate < 0.0) { params_copy.filtering_rate = 0.0; }
     auto sample_filter_copy = sample_filter;
-    return search_with_filtering<T, IdxT, none_filter_type, OutputIdxT>(
+    return search_with_filtering<T, IdxT, none_filter_type, OutputIdxT, DatasetViewT>(
       res, params_copy, idx, queries, neighbors, distances, sample_filter_copy);
   } catch (const std::bad_cast&) {
   }
@@ -424,49 +431,50 @@ void search(raft::resources const& res,
         std::min(std::max(filtering_rate, min_filtering_rate), max_filtering_rate);
     }
     auto sample_filter_copy = sample_filter;
-    return search_with_filtering<T, IdxT, decltype(sample_filter_copy), OutputIdxT>(
+    return search_with_filtering<T, IdxT, decltype(sample_filter_copy), OutputIdxT, DatasetViewT>(
       res, params_copy, idx, queries, neighbors, distances, sample_filter_copy);
   } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type");
   }
 }
 
-template <class T, class IdxT, class Accessor>
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT, class Accessor>
 void extend(
   raft::resources const& handle,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
-  cuvs::neighbors::cagra::index<T, IdxT>& index,
+  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& index,
   const cagra::extend_params& params,
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> ndv,
   std::optional<raft::device_matrix_view<IdxT, int64_t>> ngv)
 {
-  cagra::extend_core<T, IdxT, Accessor>(handle, additional_dataset, index, params, ndv, ngv);
+  extend_core<T, IdxT, DatasetViewT, Accessor>(handle, additional_dataset, index, params, ndv, ngv);
 }
 
-template <class T, class IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> merge(
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
+cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> merge(
   raft::resources const& handle,
   const cagra::index_params& params,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*>& indices,
   merged_dataset_storage<T, IdxT>& storage,
   const cuvs::neighbors::filtering::base_filter& row_filter)
 {
-  return cagra::detail::merge<T, IdxT>(handle, params, indices, storage, row_filter);
+  return cagra::detail::merge<T, IdxT, DatasetViewT>(handle, params, indices, storage, row_filter);
 }
 
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
 
-#define CUVS_INST_CAGRA_MERGE(T, IdxT)                                                    \
-  template CUVS_EXPORT cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>            \
-  cuvs::neighbors::cagra::make_merged_dataset<T, IdxT>(                                   \
-    raft::resources const& handle,                                                        \
-    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> const& indices,                  \
-    cuvs::neighbors::filtering::base_filter const& row_filter);                           \
-  template cuvs::neighbors::cagra::index<T, IdxT> cuvs::neighbors::cagra::merge<T, IdxT>( \
-    raft::resources const& handle,                                                        \
-    const cuvs::neighbors::cagra::index_params& params,                                   \
-    std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,                        \
-    cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>& storage,                     \
+#define CUVS_INST_CAGRA_MERGE(T, IdxT, DatasetViewT)                                   \
+  template CUVS_EXPORT cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>         \
+  cuvs::neighbors::cagra::make_merged_dataset<T, IdxT, DatasetViewT>(                  \
+    raft::resources const& handle,                                                     \
+    std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices, \
+    cuvs::neighbors::filtering::base_filter const& row_filter);                        \
+  template CUVS_EXPORT cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>            \
+  cuvs::neighbors::cagra::merge<T, IdxT, DatasetViewT>(                                \
+    raft::resources const& handle,                                                     \
+    const cuvs::neighbors::cagra::index_params& params,                                \
+    std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*>& indices,       \
+    cuvs::neighbors::cagra::merged_dataset_storage<T, IdxT>& storage,                  \
     cuvs::neighbors::filtering::base_filter const& row_filter);

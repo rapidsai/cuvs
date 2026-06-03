@@ -21,6 +21,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
@@ -30,14 +31,13 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <class T, class IdxT>
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 merged_dataset compute_merged_dataset_layout(
   raft::resources const& handle,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> const& indices,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices,
   cuvs::neighbors::filtering::base_filter const& row_filter)
 {
-  using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
-  using ds_idx_type   = typename cagra_index_t::dataset_index_type;
+  using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>;
 
   std::size_t dim              = 0;
   std::size_t new_dataset_size = 0;
@@ -49,10 +49,13 @@ merged_dataset compute_merged_dataset_layout(
   for (cagra_index_t* index : indices) {
     RAFT_EXPECTS(index != nullptr,
                  "Null pointer detected in 'indices'. Ensure all elements are valid before usage.");
-    using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
-    auto const& va = index->data().as_variant();
-    if (std::holds_alternative<typename VT::padded_view>(va)) {
-      auto const& v = std::get<typename VT::padded_view>(va);
+    auto const& v = index->data();
+    if constexpr (cuvs::neighbors::is_padded_dataset_view_v<decltype(v)>) {
+      if (v.n_rows() == 0) {
+        RAFT_FAIL(
+          "cagra::merge only supports an index to which the dataset is attached. Please check if "
+          "the index has an empty dataset; attach one with update_dataset before merge.");
+      }
       if (dim == 0) {
         dim    = index->dim();
         stride = static_cast<int64_t>(v.stride());
@@ -62,12 +65,8 @@ merged_dataset compute_merged_dataset_layout(
                      "Row stride of datasets in indices must be equal.");
       }
       new_dataset_size += index->size();
-    } else if (std::holds_alternative<typename VT::empty_view>(va)) {
-      RAFT_FAIL(
-        "cagra::merge only supports an index to which the dataset is attached. Please check if the "
-        "index has an empty dataset; attach one with update_dataset before merge.");
     } else {
-      RAFT_FAIL("cagra::merge only supports an uncompressed dataset index");
+      RAFT_FAIL("cagra::merge only supports an uncompressed padded dataset index");
     }
   }
 
@@ -87,18 +86,18 @@ merged_dataset compute_merged_dataset_layout(
   return layout;
 }
 
-template <class T, class IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> merge(
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
+cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> merge(
   raft::resources const& handle,
   const cagra::index_params& params,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*>& indices,
   merged_dataset_storage<T, IdxT>& storage,
   const cuvs::neighbors::filtering::base_filter& row_filter)
 {
-  using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
-  using ds_idx_type   = typename cagra_index_t::dataset_index_type;
+  using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>;
 
-  auto const expected = compute_merged_dataset_layout<T, IdxT>(handle, indices, row_filter);
+  auto const expected =
+    compute_merged_dataset_layout<T, IdxT, DatasetViewT>(handle, indices, row_filter);
   RAFT_EXPECTS(expected.merged_rows == storage.layout.merged_rows &&
                  expected.filtered_rows == storage.layout.filtered_rows &&
                  expected.stride_elements == storage.layout.stride_elements &&
@@ -141,12 +140,10 @@ cuvs::neighbors::cagra::index<T, IdxT> merge(
     for (cagra_index_t* index : indices) {
       const T* src_ptr   = nullptr;
       std::size_t n_rows = 0;
-      using VTm          = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
-      auto const& vam    = index->data().as_variant();
-      if (std::holds_alternative<typename VTm::padded_view>(vam)) {
-        auto const& v = std::get<typename VTm::padded_view>(vam);
-        src_ptr       = v.view().data_handle();
-        n_rows        = static_cast<std::size_t>(v.n_rows());
+      auto const& v      = index->data();
+      if constexpr (cuvs::neighbors::is_padded_dataset_view_v<decltype(v)>) {
+        src_ptr = v.view().data_handle();
+        n_rows  = static_cast<std::size_t>(v.n_rows());
       } else {
         RAFT_FAIL("cagra::merge: unexpected dataset type while copying rows");
       }
@@ -194,18 +191,18 @@ cuvs::neighbors::cagra::index<T, IdxT> merge(
 
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
       raft::make_const_mdspan(filtered_storage), storage.layout.dim);
-    auto index = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
-      handle, params, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
-    index.update_dataset(handle, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
+    auto index =
+      ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(handle, params, dv);
+    index.update_dataset(handle, dv);
     RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
     return index;
   }
 
   cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
     raft::make_const_mdspan(merged_storage), storage.layout.dim);
-  auto index = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
-    handle, params, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
-  index.update_dataset(handle, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
+  auto index =
+    ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(handle, params, dv);
+  index.update_dataset(handle, dv);
   RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
   return index;
 }
@@ -214,10 +211,10 @@ cuvs::neighbors::cagra::index<T, IdxT> merge(
 
 namespace cuvs::neighbors::cagra {
 
-template <class T, class IdxT>
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 merged_dataset_storage<T, IdxT> make_merged_dataset(
   raft::resources const& res,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> const& indices,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices,
   cuvs::neighbors::filtering::base_filter const& row_filter)
 {
   merged_dataset layout = detail::compute_merged_dataset_layout<T, IdxT>(res, indices, row_filter);

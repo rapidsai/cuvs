@@ -19,6 +19,7 @@
 #include <cuvs/distance/distance.hpp>
 
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 
 // TODO: Fix these when ivf methods are moved over
 #include "../../ivf_common.cuh"
@@ -178,10 +179,11 @@ template <typename T,
           typename OutputIdxT,
           typename CagraSampleFilterT,
           typename IdxT      = uint32_t,
-          typename DistanceT = float>
+          typename DistanceT = float,
+          cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void search_main(raft::resources const& res,
                  search_params params,
-                 const index<T, IdxT>& index,
+                 const index<T, IdxT, DatasetViewT>& index,
                  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
@@ -192,8 +194,6 @@ void search_main(raft::resources const& res,
                "Use cuvs::neighbors::hnsw::from_cagra() to convert the index and "
                "cuvs::neighbors::hnsw::deserialize() to load it into memory before searching.");
 
-  // n_rows has the same type as the dataset index (the array extents type)
-  using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;
 
   auto run_strided_like = [&](auto const& row_dataset) {
@@ -219,15 +219,13 @@ void search_main(raft::resources const& res,
       sample_filter);
   };
 
-  using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
-  auto const& va = index.data().as_variant();
-  if (std::holds_alternative<typename VT::empty_view>(va)) {
+  if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
     RAFT_FAIL(
       "Attempted to search without a dataset. Please call index.update_dataset(...) first.");
-  } else if (std::holds_alternative<typename VT::vpq_f32_view>(va)) {
+  } else if constexpr (cuvs::neighbors::is_vpq_f32_dataset_view_v<DatasetViewT>) {
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
-  } else if (std::holds_alternative<typename VT::vpq_f16_view>(va)) {
-    auto const& vv = std::get<typename VT::vpq_f16_view>(va);
+  } else if constexpr (cuvs::neighbors::is_vpq_f16_dataset_view_v<DatasetViewT>) {
+    auto const& vv = index.data();
     auto desc      = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, vv.dset(), index.metric(), nullptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
@@ -240,10 +238,10 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
-  } else if (std::holds_alternative<typename VT::padded_view>(va)) {
-    run_strided_like(std::get<typename VT::padded_view>(va));
+  } else if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
+    run_strided_like(index.data());
   } else {
-    RAFT_FAIL("search: unsupported dataset view variant");
+    static_assert(sizeof(DatasetViewT) == 0, "search: unsupported dataset view type");
   }
 
   static_assert(std::is_same_v<DistanceT, float>,

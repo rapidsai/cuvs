@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,13 +13,13 @@ namespace cuvs::neighbors::dynamic_batching {
 
 using cagra_F32 = dynamic_batching_test<float,
                                         uint32_t,
-                                        cagra::index<float, uint32_t>,
+                                        cagra::padded_index<float, uint32_t>,
                                         cagra::build,
                                         cagra::search>;
 
 using cagra_U8 = dynamic_batching_test<uint8_t,
                                        uint32_t,
-                                       cagra::index<uint8_t, uint32_t>,
+                                       cagra::padded_index<uint8_t, uint32_t>,
                                        cagra::build,
                                        cagra::search>;
 

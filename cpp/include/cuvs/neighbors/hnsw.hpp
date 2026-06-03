@@ -474,7 +474,7 @@ std::unique_ptr<index<int8_t>> build(
 std::unique_ptr<index<float>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::padded_index<float, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
     std::nullopt);
 
@@ -510,7 +510,7 @@ std::unique_ptr<index<float>> from_cagra(
 std::unique_ptr<index<half>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<half, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::padded_index<half, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> dataset =
     std::nullopt);
 
@@ -546,7 +546,7 @@ std::unique_ptr<index<half>> from_cagra(
 std::unique_ptr<index<uint8_t>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::padded_index<uint8_t, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
     std::nullopt);
 
@@ -582,7 +582,7 @@ std::unique_ptr<index<uint8_t>> from_cagra(
 std::unique_ptr<index<int8_t>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::padded_index<int8_t, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
     std::nullopt);
 

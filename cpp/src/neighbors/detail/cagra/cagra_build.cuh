@@ -23,6 +23,8 @@
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/cagra_dataset_view_dispatch.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
@@ -1099,11 +1101,11 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   }
 }
 
-template <typename T, typename IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
-  raft::resources const& res,
-  const index_params& params,
-  cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset);
+template <typename T, typename IdxT, typename DatasetViewT>
+  requires cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>
+cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_device_matrix(raft::resources const& res,
+                                                                       const index_params& params,
+                                                                       DatasetViewT const& dataset);
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
 // ACE enables building indexes for datasets too large to fit in GPU memory by:
@@ -1115,7 +1117,7 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
-cuvs::neighbors::cagra::index<T, IdxT> build_ace(
+cuvs::neighbors::cagra::padded_index<T, IdxT> build_ace(
   raft::resources const& res,
   const index_params& params,
   raft::host_matrix_view<const T, int64_t, row_major> dataset)
@@ -1389,9 +1391,7 @@ cuvs::neighbors::cagra::index<T, IdxT> build_ace(
       auto sub_dataset_dev =
         cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(sub_dataset.view()));
       auto sub_index = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
-        res,
-        sub_index_params,
-        cuvs::neighbors::any_dataset_view<T, int64_t>(sub_dataset_dev->as_dataset_view()));
+        res, sub_index_params, sub_dataset_dev->as_dataset_view());
 
       auto optimize_end = std::chrono::high_resolution_clock::now();
       auto optimize_elapsed =
@@ -1491,7 +1491,7 @@ cuvs::neighbors::cagra::index<T, IdxT> build_ace(
     }
 
     auto index_creation_start = std::chrono::high_resolution_clock::now();
-    index<T, IdxT> idx(res, params.metric);
+    cuvs::neighbors::cagra::padded_index<T, IdxT> idx(res, params.metric);
     if (!use_disk_mode) {
       idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
     } else {
@@ -2093,10 +2093,8 @@ auto iterative_build_graph(raft::resources const& res,
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> sub_padded(dev_dataset_view,
                                                                        logical_dim);
 
-    auto idx = index<T, IdxT>(res,
-                              params.metric,
-                              cuvs::neighbors::any_dataset_view<T, int64_t>(sub_padded),
-                              raft::make_const_mdspan(cagra_graph.view()));
+    auto idx = cuvs::neighbors::cagra::padded_index<T, IdxT>(
+      res, params.metric, sub_padded, raft::make_const_mdspan(cagra_graph.view()));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
@@ -2298,7 +2296,7 @@ auto build_cagra_host_graph_from_knn_params(raft::resources const& res,
  * `index::update_dataset` with a device dataset view before search.
  */
 template <typename T, typename IdxT = uint32_t>
-cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
+cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_host_matrix(
   raft::resources const& res,
   const index_params& params,
   raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset)
@@ -2337,26 +2335,25 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_host_matrix(
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  cuvs::neighbors::cagra::index<T, IdxT> out(res, params.metric);
+  cuvs::neighbors::cagra::padded_index<T, IdxT> out(res, params.metric);
   out.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   padded_own.reset();
   return out;
 }
 
 /**
- * Build from `any_dataset_view` after resolving graph vectors to **device** padded storage via
- * `convert_dataset_view_to_padded_for_graph_build`.
+ * Build from a concrete `dataset_view` after resolving graph vectors to **device** padded storage
+ * via `convert_dataset_view_to_padded_for_graph_build`.
  *
- * Supported alternatives include `device_padded_dataset_view` and VPQ (`vpq_f16` / `vpq_f32` view
- * arms in `any_dataset_view`).
- * to device padded storage matching \p T; this entry point does **not** accept host-backed bases
- * for graph construction (see `build_from_host_matrix`). Also used from ACE sub-builds and merge.
+ * Supported inputs include `device_padded_dataset_view` and VPQ views (graph build rejects VPQ).
+ * This entry point does **not** accept host-backed bases for graph construction (see
+ * `build_from_host_matrix`). Also used from ACE sub-builds and merge.
  */
-template <typename T, typename IdxT = uint32_t>
-cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
-  raft::resources const& res,
-  const index_params& params,
-  cuvs::neighbors::any_dataset_view<T, int64_t> const& dataset)
+template <typename T, typename IdxT, typename DatasetViewT>
+  requires cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>
+cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_device_matrix(raft::resources const& res,
+                                                                       const index_params& params,
+                                                                       DatasetViewT const& dataset)
 {
   const auto padded = convert_dataset_view_to_padded_for_graph_build<T>(dataset);
 
@@ -2385,10 +2382,10 @@ cuvs::neighbors::cagra::index<T, IdxT> build_from_device_matrix(
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  index<T, IdxT> idx(res, params.metric);
+  cuvs::neighbors::cagra::padded_index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   // Graph build uses \p padded; attach the same view for search (caller keeps storage alive).
-  idx.update_dataset(res, cuvs::neighbors::any_dataset_view<T, int64_t>(padded));
+  idx.update_dataset(res, padded);
   return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail

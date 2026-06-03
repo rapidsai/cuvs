@@ -26,13 +26,7 @@ constexpr dataset_instance_tag kSerializeEmptyDataset   = 1;
 constexpr dataset_instance_tag kSerializeStridedDataset = 2;
 constexpr dataset_instance_tag kSerializeVPQDataset     = 3;
 
-template <typename IdxT>
-void serialize(const raft::resources& res, std::ostream& os, const empty_dataset<IdxT>& dataset)
-{
-  raft::serialize_scalar(res, os, dataset.suggested_dim);
-}
-
-// Padded: `padded_dataset_view` writes the payload; owning forwards to `as_dataset_view()`.
+// Padded: `padded_dataset_view` writes the payload.
 template <typename DataT, typename IdxT>
 void serialize(const raft::resources& res,
                std::ostream& os,
@@ -57,113 +51,25 @@ void serialize(const raft::resources& res,
   raft::serialize_mdspan(res, os, dst.view());
 }
 
+/** Write CAGRA index dataset blob (tag + element dtype + padded payload). */
 template <typename DataT, typename IdxT>
-void serialize(const raft::resources& res,
-               std::ostream& os,
-               padded_dataset<DataT, IdxT> const& dataset)
+void serialize_cagra_padded_dataset(const raft::resources& res,
+                                    std::ostream& os,
+                                    const padded_dataset_view<DataT, IdxT>& dataset)
 {
-  serialize(res, os, dataset.as_dataset_view());
-}
-
-template <typename DataT, typename IdxT>
-void serialize(const raft::resources& res,
-               std::ostream& os,
-               const vpq_dataset<DataT, IdxT>& dataset)
-{
-  raft::serialize_scalar(res, os, dataset.n_rows());
-  raft::serialize_scalar(res, os, dataset.dim());
-  raft::serialize_scalar(res, os, dataset.vq_n_centers());
-  raft::serialize_scalar(res, os, dataset.pq_n_centers());
-  raft::serialize_scalar(res, os, dataset.pq_len());
-  raft::serialize_scalar(res, os, dataset.encoded_row_length());
-  raft::serialize_mdspan(res, os, make_const_mdspan(dataset.vq_code_book.view()));
-  raft::serialize_mdspan(res, os, make_const_mdspan(dataset.pq_code_book.view()));
-  raft::serialize_mdspan(res, os, make_const_mdspan(dataset.data.view()));
-}
-
-template <typename IdxT>
-void serialize(const raft::resources& res,
-               std::ostream& os,
-               const any_owning_dataset<IdxT>& dataset)
-{
-  using OT      = any_owning_dataset_types<IdxT>;
-  auto const& v = dataset.as_variant();
-  if (std::holds_alternative<typename OT::empty_owning>(v)) {
-    serialize(res, os, std::get<typename OT::empty_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::padded_f32_owning>(v)) {
-    serialize(res, os, std::get<typename OT::padded_f32_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::padded_f16_owning>(v)) {
-    serialize(res, os, std::get<typename OT::padded_f16_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::padded_i8_owning>(v)) {
-    serialize(res, os, std::get<typename OT::padded_i8_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::padded_u8_owning>(v)) {
-    serialize(res, os, std::get<typename OT::padded_u8_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::vpq_f32_owning>(v)) {
-    serialize(res, os, std::get<typename OT::vpq_f32_owning>(v));
-    return;
-  }
-  if (std::holds_alternative<typename OT::vpq_f16_owning>(v)) {
-    serialize(res, os, std::get<typename OT::vpq_f16_owning>(v));
-    return;
-  }
-  RAFT_FAIL("serialize(any_owning_dataset): unsupported owning variant (internal error)");
-}
-
-template <typename T, typename IdxT>
-void serialize(const raft::resources& res,
-               std::ostream& os,
-               const any_dataset_view<T, IdxT>& dataset)
-{
-  auto write_row_element_tag = [&]() {
-    if constexpr (std::is_same_v<T, float>) {
-      raft::serialize_scalar(res, os, CUDA_R_32F);
-    } else if constexpr (std::is_same_v<T, half>) {
-      raft::serialize_scalar(res, os, CUDA_R_16F);
-    } else if constexpr (std::is_same_v<T, int8_t>) {
-      raft::serialize_scalar(res, os, CUDA_R_8I);
-    } else if constexpr (std::is_same_v<T, uint8_t>) {
-      raft::serialize_scalar(res, os, CUDA_R_8U);
-    } else {
-      static_assert(!std::is_same_v<T, T>, "unsupported T for CAGRA serialize");
-    }
-  };
-
-  using VT        = any_dataset_view_types<T, IdxT>;
-  auto const& var = dataset.as_variant();
-  if (std::holds_alternative<typename VT::empty_view>(var)) {
-    raft::serialize_scalar(res, os, kSerializeEmptyDataset);
-    raft::serialize_scalar(res, os, std::get<typename VT::empty_view>(var).dim());
-    return;
-  }
-  if (std::holds_alternative<typename VT::vpq_f16_view>(var)) {
-    raft::serialize_scalar(res, os, kSerializeVPQDataset);
-    raft::serialize_scalar(res, os, CUDA_R_16F);
-    serialize(res, os, std::get<typename VT::vpq_f16_view>(var).dset());
-    return;
-  }
-  if (std::holds_alternative<typename VT::vpq_f32_view>(var)) {
-    raft::serialize_scalar(res, os, kSerializeVPQDataset);
+  raft::serialize_scalar(res, os, kSerializeStridedDataset);
+  if constexpr (std::is_same_v<DataT, float>) {
     raft::serialize_scalar(res, os, CUDA_R_32F);
-    serialize(res, os, std::get<typename VT::vpq_f32_view>(var).dset());
-    return;
+  } else if constexpr (std::is_same_v<DataT, half>) {
+    raft::serialize_scalar(res, os, CUDA_R_16F);
+  } else if constexpr (std::is_same_v<DataT, int8_t>) {
+    raft::serialize_scalar(res, os, CUDA_R_8I);
+  } else if constexpr (std::is_same_v<DataT, uint8_t>) {
+    raft::serialize_scalar(res, os, CUDA_R_8U);
+  } else {
+    static_assert(!std::is_same_v<DataT, DataT>, "unsupported element type for CAGRA serialize");
   }
-  if (std::holds_alternative<typename VT::padded_view>(var)) {
-    raft::serialize_scalar(res, os, kSerializeStridedDataset);
-    write_row_element_tag();
-    serialize(res, os, std::get<typename VT::padded_view>(var));
-    return;
-  }
-  RAFT_FAIL("serialize(any_dataset_view): unsupported view variant");
+  serialize(res, os, dataset);
 }
 
 template <typename IdxT>

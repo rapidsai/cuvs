@@ -210,7 +210,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
       cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> cagra_base(handle_,
                                                                               database_view);
-      auto cagra_index = cagra::index<DataT, IdxT>(
+      auto cagra_index = cagra::padded_index<DataT, IdxT>(
         handle_, ps.metric, cagra_base.view, raft::make_const_mdspan(graph_valid.view()));
 
       cagra::search_params search_params;

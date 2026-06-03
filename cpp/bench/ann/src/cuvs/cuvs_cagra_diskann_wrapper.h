@@ -16,7 +16,7 @@
 #include "../common/ann_types.hpp"
 #include "../diskann/diskann_wrapper.h"
 #include "cuvs_ann_bench_utils.h"
-#include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 #include <cuvs/neighbors/vamana.hpp>
 #include <utils.h>
 
@@ -170,11 +170,9 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
   try {
     auto const* idx_ptr                                    = cagra_build_.get_index();
     std::optional<raft::host_matrix<T, int64_t>> h_dataset = std::nullopt;
-    namespace nb                                           = cuvs::neighbors;
-    using VT                                               = nb::any_dataset_view_types<T, int64_t>;
-    auto const& va                                         = idx_ptr->data().as_variant();
-    if (std::holds_alternative<typename VT::padded_view>(va)) {
-      auto const& v = std::get<typename VT::padded_view>(va);
+    auto const& data_view                                  = idx_ptr->data();
+    if constexpr (cuvs::neighbors::is_padded_dataset_view_v<std::decay_t<decltype(data_view)>>) {
+      auto const& v = data_view;
       auto n_rows   = v.n_rows();
       auto dim      = v.dim();
       auto stride   = v.stride();

@@ -5,6 +5,7 @@
 #include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/mdspan_types.hpp>
@@ -20,10 +21,10 @@
 
 namespace cuvs::neighbors::cagra {
 
-template <class T, class IdxT, class Accessor>
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT, class Accessor>
 void add_node_core(
   raft::resources const& handle,
-  const cuvs::neighbors::cagra::index<T, IdxT>& idx,
+  const cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& idx,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_stride, Accessor>
     additional_dataset_view,
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph,
@@ -276,11 +277,11 @@ void add_node_core(
   }
 }
 
-template <class T, class IdxT>
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void add_graph_nodes(
   raft::resources const& handle,
   raft::device_matrix_view<const T, int64_t, raft::layout_stride> input_updated_dataset_view,
-  const neighbors::cagra::index<T, IdxT>& index,
+  const neighbors::cagra::index<T, IdxT, DatasetViewT>& index,
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,
   const cagra::extend_params& params)
 {
@@ -301,14 +302,13 @@ void add_graph_nodes(
     updated_graph_view.data_handle(), initial_dataset_size, degree);
   raft::copy(handle, updated_graph_prefix, raft::make_const_mdspan(index.graph()));
 
-  auto empty_data_view = raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim);
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(empty_data_view);
+  using padded_view_t = cuvs::neighbors::padded_dataset_view_t<T, int64_t>;
+  auto zero_row       = raft::make_device_matrix_view<const T, int64_t>(
+    static_cast<const T*>(nullptr), int64_t{0}, static_cast<uint32_t>(dim));
+  padded_view_t empty_dataset_view(zero_row, static_cast<uint32_t>(dim));
   auto empty_graph_view = raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
-  neighbors::cagra::index<T, IdxT> internal_index(
-    handle,
-    index.metric(),
-    cuvs::neighbors::any_dataset_view<T, int64_t>(empty_dataset_view),
-    empty_graph_view);
+  neighbors::cagra::index<T, IdxT, padded_view_t> internal_index(
+    handle, index.metric(), empty_dataset_view, empty_graph_view);
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
        additional_dataset_offset += max_chunk_size_) {
@@ -324,7 +324,7 @@ void add_graph_nodes(
       updated_graph_view.data_handle(), initial_dataset_size + additional_dataset_offset, degree);
 
     auto pdv = cuvs::neighbors::make_padded_dataset_view(handle, dataset_view);
-    internal_index.update_dataset(handle, cuvs::neighbors::any_dataset_view<T, int64_t>(pdv));
+    internal_index.update_dataset(handle, pdv);
 
     // Note: The graph is copied to the device memory.
     internal_index.update_graph(handle, graph_view);
@@ -341,21 +341,23 @@ void add_graph_nodes(
       dim,
       stride);
 
-    neighbors::cagra::add_node_core<T, IdxT>(
+    neighbors::cagra::add_node_core<T, IdxT, padded_view_t>(
       handle, internal_index, additional_dataset_view, updated_graph, params);
     raft::resource::sync_stream(handle);
   }
 }
 
-template <class T, class IdxT, class Accessor>
+template <class T, class IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT, class Accessor>
 void extend_core(
   raft::resources const& handle,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
-  cuvs::neighbors::cagra::index<T, IdxT>& index,
+  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& index,
   const cagra::extend_params& params,
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view,
   std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view)
 {
+  static_assert(cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>,
+                "cagra::extend requires a padded dataset view index type");
   RAFT_EXPECTS(!index.dataset_fd().has_value(),
                "Cannot extend a disk-backed CAGRA index. Convert it with "
                "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
@@ -391,8 +393,6 @@ void extend_core(
       initial_dataset_size,
       num_new_nodes);
   }
-
-  using ds_idx_type = decltype(index.data().n_rows());
 
   auto try_extend = [&](auto const& leaf) {
     // Allocate memory space for updated graph on host
@@ -439,7 +439,7 @@ void extend_core(
                                     updated_dataset_view.extent(0),
                                     updated_dataset_view.stride(0)),
       dim);
-    index.update_dataset(handle, cuvs::neighbors::any_dataset_view<T, int64_t>(dv));
+    index.update_dataset(handle, dv);
 
     // Update index graph
     if (new_graph_buffer_view.has_value()) {
@@ -454,11 +454,10 @@ void extend_core(
     }
   };
 
-  using VT       = cuvs::neighbors::any_dataset_view_types<T, ds_idx_type>;
-  auto const& va = index.data().as_variant();
-  if (std::holds_alternative<typename VT::padded_view>(va)) {
-    try_extend(std::get<typename VT::padded_view>(va));
-  } else if (std::holds_alternative<typename VT::empty_view>(va)) {
+  auto const& leaf = index.data();
+  if constexpr (cuvs::neighbors::is_padded_dataset_view_v<std::decay_t<decltype(leaf)>>) {
+    try_extend(leaf);
+  } else if constexpr (cuvs::neighbors::is_empty_dataset_view_v<std::decay_t<decltype(leaf)>>) {
     RAFT_FAIL(
       "cagra::extend only supports an index to which the dataset is attached. Please check if the "
       "index has an empty dataset; attach one with update_dataset before extend.");

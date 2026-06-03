@@ -32,10 +32,11 @@ namespace cuvs::neighbors::tiered_index {
 auto build(raft::resources const& res,
            const index_params<cagra::index_params>& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> tiered_index::index<cagra::index<float, uint32_t>>
+  -> tiered_index::index<cagra::padded_index<float, uint32_t>>
 {
-  auto state = detail::build<cagra::index<float, uint32_t>>(res, params, cagra::build, dataset);
-  return cuvs::neighbors::tiered_index::index<cagra::index<float, uint32_t>>(state);
+  auto state =
+    detail::build<cagra::padded_index<float, uint32_t>>(res, params, cagra::build, dataset);
+  return cuvs::neighbors::tiered_index::index<cagra::padded_index<float, uint32_t>>(state);
 }
 
 auto build(raft::resources const& res,
@@ -60,7 +61,7 @@ auto build(raft::resources const& res,
 
 void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
-            tiered_index::index<cagra::index<float, uint32_t>>* idx)
+            tiered_index::index<cagra::padded_index<float, uint32_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
   auto next_state = detail::extend(res, *idx->state, new_vectors);
@@ -104,7 +105,8 @@ void extend(raft::resources const& res,
   idx->state      = next_state;
 }
 
-void compact(raft::resources const& res, tiered_index::index<cagra::index<float, uint32_t>>* idx)
+void compact(raft::resources const& res,
+             tiered_index::index<cagra::padded_index<float, uint32_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
   auto next_state = detail::compact(res, *idx->state);
@@ -128,7 +130,7 @@ void compact(raft::resources const& res,
 
 void search(raft::resources const& res,
             const cagra::search_params& search_params,
-            const tiered_index::index<cagra::index<float, uint32_t>>& index,
+            const tiered_index::index<cagra::padded_index<float, uint32_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -167,11 +169,11 @@ void search(raft::resources const& res,
 
 auto merge(raft::resources const& res,
            const index_params<cagra::index_params>& index_params,
-           const std::vector<tiered_index::index<cagra::index<float, uint32_t>>*>& indices)
-  -> tiered_index::index<cagra::index<float, uint32_t>>
+           const std::vector<tiered_index::index<cagra::padded_index<float, uint32_t>>*>& indices)
+  -> tiered_index::index<cagra::padded_index<float, uint32_t>>
 {
   auto state = detail::merge(res, index_params, indices);
-  return cuvs::neighbors::tiered_index::index<cagra::index<float, uint32_t>>(state);
+  return cuvs::neighbors::tiered_index::index<cagra::padded_index<float, uint32_t>>(state);
 }
 
 auto merge(raft::resources const& res,
@@ -204,7 +206,7 @@ int64_t index<UpstreamT>::dim() const noexcept
   return state->dim();
 }
 
-template struct index<cagra::index<float, uint32_t>>;
+template struct index<cagra::padded_index<float, uint32_t>>;
 template struct index<ivf_flat::index<float, int64_t>>;
 template struct index<ivf_pq::typed_index<float, int64_t>>;
 

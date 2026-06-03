@@ -10,8 +10,9 @@
 
 namespace {
 
-using data_t  = @data_type@;
-using index_t = @index_type@;
+using data_t             = @data_type@;
+using index_t            = @index_type@;
+using inst_padded_view_t = cuvs::neighbors::padded_dataset_view_t<data_t, int64_t>;
 
 }  // namespace
 
@@ -20,23 +21,21 @@ namespace cuvs::neighbors::cagra {
 void extend(raft::resources const& handle,
             const cagra::extend_params& params,
             raft::device_matrix_view<const data_t, int64_t, raft::row_major> additional_dataset,
-            cuvs::neighbors::cagra::index<data_t, index_t>& idx,
+            cuvs::neighbors::cagra::index<data_t, index_t, inst_padded_view_t>& idx,
             std::optional<raft::device_matrix_view<data_t, int64_t, raft::layout_stride>> ndv,
             std::optional<raft::device_matrix_view<index_t, int64_t>> ngv)
 {
-  cuvs::neighbors::cagra::extend<data_t, index_t>(
-    handle, additional_dataset, idx, params, ndv, ngv);
+  extend<data_t, index_t, inst_padded_view_t>(handle, additional_dataset, idx, params, ndv, ngv);
 }
 
 void extend(raft::resources const& handle,
             const cagra::extend_params& params,
             raft::host_matrix_view<const data_t, int64_t, raft::row_major> additional_dataset,
-            cuvs::neighbors::cagra::index<data_t, index_t>& idx,
+            cuvs::neighbors::cagra::index<data_t, index_t, inst_padded_view_t>& idx,
             std::optional<raft::device_matrix_view<data_t, int64_t, raft::layout_stride>> ndv,
             std::optional<raft::device_matrix_view<index_t, int64_t>> ngv)
 {
-  cuvs::neighbors::cagra::extend<data_t, index_t>(
-    handle, additional_dataset, idx, params, ndv, ngv);
+  extend<data_t, index_t, inst_padded_view_t>(handle, additional_dataset, idx, params, ndv, ngv);
 }
 
 }  // namespace cuvs::neighbors::cagra
