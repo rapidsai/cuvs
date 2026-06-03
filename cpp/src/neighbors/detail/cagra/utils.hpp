@@ -206,7 +206,7 @@ class device_matrix_view_from_host {
       // live on stack and not returned to a user.
       // The user may opt to set this resource to managed memory to allow large allocations.
       device_mem_.emplace(raft::make_device_mdarray<T, IdxT>(
-        res, raft::resource::get_large_workspace_resource(res), host_view.extents()));
+        res, raft::resource::get_large_workspace_resource_ref(res), host_view.extents()));
       raft::copy(res, device_mem_->view(), host_view);
       device_ptr = device_mem_->data_handle();
     }
@@ -292,7 +292,7 @@ void copy_with_padding(
   raft::resources const& res,
   raft::device_matrix<T, int64_t, raft::row_major>& dst,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> src,
-  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
+  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource_ref())
 {
   size_t padded_dim = raft::round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
 
@@ -402,13 +402,13 @@ class batched_device_view_from_host {
       try {
         device_mem_[0].emplace(raft::make_device_mdarray<T, IdxT>(
           res,
-          raft::resource::get_workspace_resource(res),
+          raft::resource::get_workspace_resource_ref(res),
           raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
         device_ptr[0] = device_mem_[0]->data_handle();
         if (batch_size < static_cast<uint64_t>(host_view.extent(0))) {
           device_mem_[1].emplace(raft::make_device_mdarray<T, IdxT>(
             res,
-            raft::resource::get_workspace_resource(res),
+            raft::resource::get_workspace_resource_ref(res),
             raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
           device_ptr[1] = device_mem_[1]->data_handle();
         }
@@ -417,7 +417,7 @@ class batched_device_view_from_host {
           num_buffers_ = 3;
           device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
             res,
-            raft::resource::get_workspace_resource(res),
+            raft::resource::get_workspace_resource_ref(res),
             raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
           device_ptr[2] = device_mem_[2]->data_handle();
         }

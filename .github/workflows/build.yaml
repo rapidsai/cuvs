@@ -44,51 +44,65 @@ jobs:
       script: ci/build_cpp.sh
       sha: ${{ inputs.sha }}
 
+  rocky8-clib-standalone-build-matrix:
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
   rocky8-clib-standalone-build:
+    needs: rocky8-clib-standalone-build-matrix
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - &latest_cuda12 '12.9.1'
-          - &latest_cuda13 '13.1.1'
-        arch:
-          - amd64
-          - arm64
+      matrix: ${{ fromJSON(needs.rocky8-clib-standalone-build-matrix.outputs.matrix) }}
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
-      arch: "${{matrix.arch}}"
+      arch: "${{matrix.ARCH}}"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-wheel:26.06-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
+      container_image: "rapidsai/ci-wheel:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       node_type: "cpu16"
       requires_license_builder: true
       script: "ci/build_standalone_c.sh"
-      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
+      artifact-name: "libcuvs_c_${{ matrix.CUDA_VER }}_${{ matrix.ARCH }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
-  rust-build:
+  rust-build-matrix:
     needs: cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
+      matrix_filter: map(select(.ARCH == "amd64"))
+  rust-build:
+    needs: rust-build-matrix
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
+      matrix: ${{ fromJSON(needs.rust-build-matrix.outputs.matrix) }}
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
+  go-build-matrix:
+    needs: cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
+      matrix_filter: map(select(.ARCH == "amd64"))
   go-build:
     needs: cpp-build
     secrets: inherit
@@ -97,19 +111,24 @@ jobs:
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
+      matrix: ${{ fromJSON(needs.go-build-matrix.outputs.matrix) }}
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
+  java-build-matrix:
+    needs: cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    with:
+      build_type: pull-request
+      matrix_name: conda-cpp-build
+      matrix_filter: map(select(.ARCH == "amd64"))
   java-build:
     needs: cpp-build
     secrets: inherit
@@ -118,18 +137,15 @@ jobs:
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
       fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
+      matrix: ${{ fromJSON(needs.java-build-matrix.outputs.matrix) }}
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
       script: "ci/build_java.sh"
-      artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
+      artifact-name: "cuvs-java-cuda${{ matrix.CUDA_VER }}"
       file_to_upload: "java/cuvs-java/target/"
       sha: ${{ inputs.sha }}
   python-build:

@@ -83,7 +83,7 @@ void select_residuals(raft::resources const& handle,
                       const float* center,           // [dim]
                       const T* dataset,              // [.., dim]
                       const IdxT* row_ids,           // [n_rows]
-                      rmm::mr::device_memory_resource* device_memory
+                      rmm::device_async_resource_ref device_memory
 
 )
 {
@@ -326,7 +326,7 @@ void train_per_subset(raft::resources const& handle,
                       uint32_t max_train_points_per_pq_code)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
-  auto device_memory = raft::resource::get_workspace_resource(handle);
+  auto device_memory = raft::resource::get_workspace_resource_ref(handle);
 
   rmm::device_uvector<float> pq_centers_tmp(impl->pq_centers().size(), stream, device_memory);
   // Subsampling the train set for codebook generation based on max_train_points_per_pq_code.
@@ -408,7 +408,7 @@ void train_per_cluster(raft::resources const& handle,
                        uint32_t max_train_points_per_pq_code)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
-  auto device_memory = raft::resource::get_workspace_resource(handle);
+  auto device_memory = raft::resource::get_workspace_resource_ref(handle);
   // NB: Managed memory is used for small arrays accessed from both device and host. There's no
   // performance reasoning behind this, just avoiding the boilerplate of explicit copies.
   rmm::mr::managed_memory_resource managed_memory;
@@ -588,7 +588,7 @@ void reconstruct_list_data(raft::resources const& res,
 
   auto tmp =
     raft::make_device_mdarray<float>(res,
-                                     raft::resource::get_workspace_resource(res),
+                                     raft::resource::get_workspace_resource_ref(res),
                                      raft::make_extents<uint32_t>(n_rows, index.rot_dim()));
 
   constexpr uint32_t kBlockSize = 256;
@@ -615,7 +615,7 @@ void reconstruct_list_data(raft::resources const& res,
 
   float* out_float_ptr = nullptr;
   rmm::device_uvector<float> out_float_buf(
-    0, raft::resource::get_cuda_stream(res), raft::resource::get_workspace_resource(res));
+    0, raft::resource::get_cuda_stream(res), raft::resource::get_workspace_resource_ref(res));
   if constexpr (std::is_same_v<T, float>) {
     out_float_ptr = out_vectors.data_handle();
   } else {
@@ -698,7 +698,7 @@ void encode_list_data(raft::resources const& res,
   auto n_rows = new_vectors.extent(0);
   if (n_rows == 0) { return; }
 
-  auto mr = raft::resource::get_workspace_resource(res);
+  auto mr = raft::resource::get_workspace_resource_ref(res);
 
   auto new_vectors_residual = raft::make_device_mdarray<float>(
     res, mr, raft::make_extents<uint32_t>(n_rows, index->rot_dim()));
@@ -989,9 +989,9 @@ void extend(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
-  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource_ref(handle);
   rmm::device_async_resource_ref large_memory =
-    raft::resource::get_large_workspace_resource(handle);
+    raft::resource::get_large_workspace_resource_ref(handle);
 
   // Try to allocate an index with the same parameters and the projected new size
   // (which can be slightly larger than index->size() + n_rows, due to padding for interleaved).
@@ -1255,13 +1255,14 @@ auto build(raft::resources const& handle,
       size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, impl->n_lists()));
     size_t n_rows_train = n_rows / trainset_ratio;
 
-    rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+    rmm::device_async_resource_ref device_memory =
+      raft::resource::get_workspace_resource_ref(handle);
 
     // If the trainset is small enough to comfortably fit into device memory, put it there.
     // Otherwise, use the managed memory.
     constexpr size_t kTolerableRatio = 4;
     rmm::device_async_resource_ref big_memory_resource =
-      raft::resource::get_large_workspace_resource(handle);
+      raft::resource::get_large_workspace_resource_ref(handle);
     if (sizeof(float) * n_rows_train * impl->dim() * kTolerableRatio <
         raft::resource::get_workspace_free_bytes(handle)) {
       big_memory_resource = device_memory;

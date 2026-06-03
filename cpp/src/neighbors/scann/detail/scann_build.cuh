@@ -87,7 +87,7 @@ index<T, IdxT> build(
   raft::device_vector_view<uint32_t, int64_t> labels_view = idx.labels();
 
   // setup batching for kmeans prediction + quantization
-  auto* device_memory = raft::resource::get_workspace_resource(res);
+  auto device_memory = raft::resource::get_workspace_resource_ref(res);
 
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size = std::min<size_t>(dataset.extent(0), kReasonableMaxBatchSize);

@@ -4,12 +4,12 @@
  */
 #pragma once
 
-#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_for_cagra/topk.h"  //todo replace with raft kernel
 #include "utils.hpp"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
@@ -832,7 +832,8 @@ struct search
                                             result_buffer_allocation_size,
                                             hashmap.data(),
                                             hash_bitlen,
-                                            stream);
+                                            stream,
+                                            static_cast<IndexT>(this->dataset_size));
 
     unsigned iter = 0;
     while (1) {

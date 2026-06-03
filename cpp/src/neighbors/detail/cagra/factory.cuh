@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include "compute_distance-ext.cuh"
 #include "search_multi_cta.cuh"
 #include "search_multi_kernel.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <raft/core/resource/custom_resource.hpp>
 #include <raft/util/cache.hpp>

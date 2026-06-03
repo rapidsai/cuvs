@@ -22,9 +22,9 @@ Here's an example of configuring RMM to use a pool allocator in C++ (derived fro
     // Construct a resource that uses a coalescing best-fit pool allocator
     // With the pool initially half of available device memory
     auto initial_size = rmm::percent_of_free_device_memory(50);
-    rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource> pool_mr{&cuda_mr, initial_size};
-    rmm::mr::set_current_device_resource(&pool_mr); // Updates the current device resource pointer to `pool_mr`
-    rmm::mr::device_memory_resource* mr = rmm::mr::get_current_device_resource(); // Points to `pool_mr`
+    rmm::mr::pool_memory_resource pool_mr{cuda_mr, initial_size};
+    rmm::mr::set_current_device_resource(pool_mr);
+    auto mr = rmm::mr::get_current_device_resource_ref();
 
 Python
 ^^^^^^

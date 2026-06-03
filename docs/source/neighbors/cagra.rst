@@ -109,15 +109,15 @@ The baseline memory footprint after index construction:
 
 .. math::
 
-   \text{dataset\_size (device)}
+   \text{dataset_size (device)}
    \;=\;
-   \text{number\_vectors} \times \text{vector\_dimension} \times \text{bytes\_per\_dimension}
+   \text{number_vectors} \times \text{vector_dimension} \times \text{bytes_per_dimension}
 
 .. math::
 
-   \text{graph\_size (host)}
+   \text{graph_size (host)}
    \;=\;
-   \text{number\_vectors} \times \text{graph\_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
+   \text{number_vectors} \times \text{graph_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
 
 Note: The dataset must be in GPU memory during index build, but can be detached afterward if not needed for search.
 
@@ -133,8 +133,8 @@ Index build has two phases: (1) construct a knn graph, then (2) optimize it to r
 The initial knn graph can be built with IVF-PQ or nn-descent. IVF-PQ has the additional benefit that it supports out-of-core construction, allowing CAGRA to be trained on datasets larger than available GPU memory.
 The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured RMM memory resource.
 
-knn graph build phase
-~~~~~~~~~~~~~~~~~~~~~
+knn graph build phase using IVF-PQ
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The knn graph can be constructed using the IVF-PQ algorithm, which works in two stages: first, an IVF-PQ index is trained on a subset of vectors to learn cluster centroids; then, the full dataset is queried against this index in batches to find approximate nearest neighbors for each vector.
 
@@ -142,13 +142,13 @@ The knn graph can be constructed using the IVF-PQ algorithm, which works in two 
 
 .. math::
 
-   \text{IVFPQ\_build\_peak}
+   \text{IVFPQ_build_peak}
    \;=\;
-   \frac{n\_{\text{vectors}}}{\text{train\_set\_ratio}} \times \text{dim} \times 4
+   \frac{n_{\text{vectors}}}{\text{train_set_ratio}} \times \text{dim} \times 4
    \;+\;
-   n\_{\text{clusters}} \times \text{dim} \times 4
+   n_{\text{clusters}} \times \text{dim} \times 4
    \;+\;
-   \frac{n\_{\text{vectors}}}{\text{train\_set\_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
+   \frac{n_{\text{vectors}}}{\text{train_set_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
 
 **Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): 395.01 MB
 
@@ -156,15 +156,45 @@ The knn graph can be constructed using the IVF-PQ algorithm, which works in two 
 
 .. math::
 
-   \text{IVFPQ\_search\_peak}
+   \text{IVFPQ_search_peak}
    \;=\;
-   \text{batch\_size} \times \text{dim} \times 4
+   \text{batch_size} \times \text{dim} \times 4
    \;+\;
-   \text{batch\_size} \times \text{intermediate\_degree} \times \operatorname{sizeof}(\mathrm{uint32\_t})
+   \text{batch_size} \times \text{intermediate_degree} \times \operatorname{sizeof}(\mathrm{uint32\_t})
    \;+\;
-   \text{batch\_size} \times \text{intermediate\_degree} \times 4
+   \text{batch_size} \times \text{intermediate_degree} \times 4
 
 **Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): 5.00 MB
+
+knn graph build phase using NN-DESCENT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Peak device memory:**
+
+.. math::
+
+   \text{NND_device_peak}
+   \;=\;
+   n_\text{vectors} \times (n_\text{dims} \times 2 + 276)
+
+- Data vectors (transferred to device and stored as fp16): :math:`n_\text{dims} \times 2` bytes per vector
+- Small working graph, locks, edge counters: 276 bytes per vector (fixed)
+- Additional :math:`4` bytes per vector when using L2 metric (for precomputed norms)
+
+**Peak host memory:**
+
+.. math::
+
+   \text{NND_host_peak}
+   \;=\;
+   n_\text{vectors} \times (13 \times \text{intermediate_graph_degree} + 912)
+
+- Full graph with distances (~1.3x overallocation): :math:`1.3 \times 8 \times \text{intermediate_graph_degree}` bytes per vector
+- Bloom filter for sampling: :math:`1.3 \times 2 \times \text{intermediate_graph_degree}` bytes per vector
+- 5 sample buffers (degree 32 each): 640 bytes per vector
+- Graph update buffer (degree 32): 256 bytes per vector
+- Edge counters: 16 bytes per vector
+
 
 Optimize phase
 ~~~~~~~~~~~~~~
@@ -173,10 +203,10 @@ Pruning/reordering the intermediate graph; peak scales linearly with intermediat
 
 .. math::
 
-   \text{optimize\_peak}
+   \text{optimize_peak}
    \;=\;
-   n\_{\text{vectors}} \times
-   \Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate\_degree} \Big)
+   n_{\text{vectors}} \times
+   \Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate_degree} \Big)
 
 **Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): 614.17 MB
 Out-of-core CAGRA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimization. Note that these steps are performed sequentially, so they are not additive.
@@ -186,15 +216,29 @@ Overall Build Peak Memory Usage
 
 The overall peak memory footprint on the device is the maximum allocation across each sequential step, since RMM's ``device_memory_resource`` releases memory between steps.
 
+**Using IVF-PQ:**
+
 .. math::
 
-   \text{build\_peak}
+   \text{build_peak}
    \;=\;
-   \text{dataset\_size}
+   \text{dataset_size}
    \;+\;
-   \max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
+   \max\!\big(\text{IVFPQ_build_peak},\ \text{IVFPQ_search_peak},\ \text{optimize_peak}\big)
 
 **Example:** 3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB
+
+**Using NN-Descent:**
+
+.. math::
+
+   \text{build_peak}
+   \;=\;
+   \text{dataset_size}^{*}
+   \;+\;
+   \max\!\big(\text{NND_device_peak},\ \text{optimize_peak}\big)
+
+:math:`\text{dataset_size}^{*}` applies only when the user passes data residing in device memory; NN-Descent internally copies the dataset to the device as fp16, so host-memory inputs do not add this term.
 
 Search peak memory usage
 ------------------------
@@ -205,23 +249,23 @@ The below memory estimate assumes just one batch of queries being run at a time 
 
 .. math::
 
-   \text{search\_memory}
+   \text{search_memory}
    \;=\;
-   \text{dataset\_size} + \text{graph\_size} + \text{workspace\_size}
+   \text{dataset_size} + \text{graph_size} + \text{workspace_size}
 
 Where ``workspace_size`` is the temporary memory used for query vectors and result storage:
 
 .. math::
 
-   \text{query\_size}
+   \text{query_size}
    \;=\;
-   \text{batch\_size} \times \text{dim} \times \operatorname{sizeof}(\mathrm{float})
+   \text{batch_size} \times \text{dim} \times \operatorname{sizeof}(\mathrm{float})
 
 .. math::
 
-   \text{result\_size}
+   \text{result_size}
    \;=\;
-   \text{batch\_size} \times \text{topk} \times
+   \text{batch_size} \times \text{topk} \times
    \big(\operatorname{sizeof}(\mathrm{IdxT}) + \operatorname{sizeof}(\mathrm{float})\big)
 
 **Example** (dim = 1024, batch\_size = 100, topk = 10, IdxT = int32):

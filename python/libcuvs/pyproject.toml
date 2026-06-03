@@ -19,7 +19,7 @@ authors = [
 license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = [
-    "cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*",
+    "cuda-toolkit[cublas,curand,cusolver,cusparse,nvrtc]==13.*",
     "libraft==26.6.*,>=0.0.0a0",
     "librmm==26.6.*,>=0.0.0a0",
     "nvidia-nvjitlink>=13.0,<14",
