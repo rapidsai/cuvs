@@ -19,11 +19,11 @@ struct ComputeInnerProductsWithBitwiseBlockSortPlanner : AlgorithmPlanner {
   {
   }
 
-  template <int NumBits, bool WithEx>
+  template <bool WithEx>
   void add_entrypoint()
   {
-    this->add_static_fragment<
-      fragment_tag_compute_inner_products_with_bitwise_block_sort<NumBits, WithEx>>();
+    this
+      ->add_static_fragment<fragment_tag_compute_inner_products_with_bitwise_block_sort<WithEx>>();
   }
 
   void add_extract_code_device_function()
@@ -44,6 +44,12 @@ struct ComputeInnerProductsWithBitwiseBlockSortPlanner : AlgorithmPlanner {
   void add_update_threshold_atomicmin_device_function()
   {
     this->add_static_fragment<fragment_tag_update_threshold_atomicmin>();
+  }
+
+  template <int NumBits>
+  void add_compute_bitwise_quantized_ip_for_vec_device_function()
+  {
+    this->add_static_fragment<fragment_tag_compute_bitwise_quantized_ip_for_vec<NumBits>>();
   }
 };
 

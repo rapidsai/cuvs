@@ -50,4 +50,11 @@ __device__ void update_threshold_atomicmin(const float* d_topk_dists,
                                            float threshold,
                                            int tid);
 
+__device__ int32_t compute_bitwise_quantized_ip_for_vec(const uint32_t* d_short_data,
+                                                        const uint32_t* shared_packed_query,
+                                                        size_t cluster_start_index,
+                                                        size_t num_vectors_in_cluster,
+                                                        size_t vec_idx,
+                                                        uint32_t num_words);
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

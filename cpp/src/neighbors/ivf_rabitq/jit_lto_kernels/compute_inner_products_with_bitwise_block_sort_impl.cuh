@@ -21,8 +21,11 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 // Unified kernel template using BlockSort.
-// NumBits=4 or 8; WithEx=true adds warp-level IP2 refinement with long codes.
-template <int NumBits, bool WithEx>
+// WithEx=true adds warp-level IP2 refinement with long codes. The
+// num_bits-dependent popc inner-product loop is dispatched at runtime through
+// the compute_bitwise_quantized_ip_for_vec JIT-LTO fragment, so this kernel is
+// not templated on num_bits.
+template <bool WithEx>
 __device__ void compute_inner_products_with_bitwise_block_sort_impl(
   const ComputeInnerProductsKernelParams params)
 {
@@ -83,20 +86,12 @@ __device__ void compute_inner_products_with_bitwise_block_sort_impl(
       float f_rescale      = factors.y;
       float f_error        = factors.z;
 
-      int32_t accumulator = 0;
-      for (int word = 0; word < params.num_words; ++word) {
-        size_t data_offset =
-          cluster_start_index * params.num_words + word * num_vectors_in_cluster + vec_idx;
-        uint32_t data_word = params.d_short_data[data_offset];
-
-#pragma unroll
-        for (int b = 0; b < NumBits - 1; b++) {
-          accumulator += __popc(shared_packed_query[b * params.num_words + word] & data_word) << b;
-        }
-        accumulator -=
-          __popc(shared_packed_query[(NumBits - 1) * params.num_words + word] & data_word)
-          << (NumBits - 1);
-      }
+      int32_t accumulator = compute_bitwise_quantized_ip_for_vec(params.d_short_data,
+                                                                 shared_packed_query,
+                                                                 cluster_start_index,
+                                                                 num_vectors_in_cluster,
+                                                                 vec_idx,
+                                                                 params.num_words);
 
       float ip       = (float)accumulator * query_width;
       float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);

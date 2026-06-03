@@ -100,23 +100,18 @@ make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits, bool 
 {
   ComputeInnerProductsWithBitwiseBlockSortPlanner planner;
   planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
-  planner.add_update_threshold_atomicmin_device_function();
   if (num_bits == 4) {
-    if (with_ex) {
-      planner.add_entrypoint<4, true>();
-      planner.add_extract_code_device_function();
-      planner.add_compute_ip2_from_long_codes_warp_device_function();
-    } else {
-      planner.add_entrypoint<4, false>();
-    }
+    planner.add_compute_bitwise_quantized_ip_for_vec_device_function<4>();
   } else {
-    if (with_ex) {
-      planner.add_entrypoint<8, true>();
-      planner.add_extract_code_device_function();
-      planner.add_compute_ip2_from_long_codes_warp_device_function();
-    } else {
-      planner.add_entrypoint<8, false>();
-    }
+    planner.add_compute_bitwise_quantized_ip_for_vec_device_function<8>();
+  }
+  planner.add_update_threshold_atomicmin_device_function();
+  if (with_ex) {
+    planner.add_entrypoint<true>();
+    planner.add_extract_code_device_function();
+    planner.add_compute_ip2_from_long_codes_warp_device_function();
+  } else {
+    planner.add_entrypoint<false>();
   }
   return planner.get_launcher();
 }

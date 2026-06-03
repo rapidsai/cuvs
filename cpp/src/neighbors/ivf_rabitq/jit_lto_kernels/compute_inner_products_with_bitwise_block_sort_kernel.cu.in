@@ -8,7 +8,6 @@
 
 namespace {
 
-constexpr int num_bits = @num_bits@;
 constexpr bool with_ex = @with_ex_value@;
 
 }  // namespace
@@ -18,7 +17,7 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 extern "C" __global__ void compute_inner_products_with_bitwise_block_sort(
   const ComputeInnerProductsKernelParams params)
 {
-  compute_inner_products_with_bitwise_block_sort_impl<num_bits, with_ex>(params);
+  compute_inner_products_with_bitwise_block_sort_impl<with_ex>(params);
 }
 
 static_assert(std::is_same_v<decltype(compute_inner_products_with_bitwise_block_sort),
