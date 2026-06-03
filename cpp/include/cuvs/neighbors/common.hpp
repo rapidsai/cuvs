@@ -370,8 +370,14 @@ struct dataset_view<vpq_dataset_container, DataT, IdxT, true, false> {
     RAFT_EXPECTS(ptr != nullptr, "vpq_dataset_view: null target");
   }
 
-  [[nodiscard]] auto n_rows() const noexcept -> index_type { return target_->n_rows(); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t { return target_->dim(); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type
+  {
+    return target_ != nullptr ? target_->n_rows() : index_type{0};
+  }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t
+  {
+    return target_ != nullptr ? target_->dim() : uint32_t{0};
+  }
   [[nodiscard]] target_type const& dset() const noexcept { return *target_; }
 };
 

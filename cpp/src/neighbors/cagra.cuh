@@ -314,14 +314,14 @@ cuvs::neighbors::cagra::padded_index<T, IdxT> build(
 /**
  * @brief Build the index from a device `dataset_view` (padded or VPQ).
  *
- * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The index attaches the
- * same padded dataset view used for graph build (non-owning; keep storage alive).
+ * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The returned index
+ * contains only the optimized graph; call `index::update_dataset(res, dataset)` before search.
  */
 template <typename DatasetViewT>
   requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t> &&
            !cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>)
 auto build(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)
-  -> cuvs::neighbors::cagra::padded_index<cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>>
+  -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
 {
   using T    = cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>;
   using IdxT = uint32_t;

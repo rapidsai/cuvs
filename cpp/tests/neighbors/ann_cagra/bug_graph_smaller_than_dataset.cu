@@ -77,6 +77,7 @@ class cagra_graph_smaller_than_dataset_test : public ::testing::Test {
     cuvs::neighbors::test::padded_device_matrix_for_cagra<data_type> padded_small(
       res, small_dataset_view);
     auto small_index = cagra::build(res, small_index_params, padded_small.view);
+    small_index.update_dataset(res, padded_small.view);
     raft::resource::sync_stream(res);
 
     // Step 2: Update to FULL dataset (1000 points) but keep small graph (500 nodes)

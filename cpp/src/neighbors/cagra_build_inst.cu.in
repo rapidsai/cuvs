@@ -61,8 +61,7 @@ auto build(raft::resources const& handle,
   template CUVS_EXPORT auto cuvs::neighbors::cagra::build<DatasetViewT>( \
     raft::resources const& res,                                          \
     const cuvs::neighbors::cagra::index_params& params,                  \
-    DatasetViewT const& dataset) -> cuvs::neighbors::cagra::             \
-    padded_index<cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>, index_t>
+    DatasetViewT const& dataset) -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
 
 CUVS_INST_CAGRA_BUILD(inst_padded_view_t);
 CUVS_INST_CAGRA_BUILD(inst_vpq_f16_view_t);

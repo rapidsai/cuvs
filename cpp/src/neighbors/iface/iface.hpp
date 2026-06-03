@@ -84,6 +84,7 @@ void cagra_build_from_device_dataset(
     m.data_handle(), m.extent(0), m.extent(1), stride);
   auto padded = cuvs::neighbors::make_padded_dataset_view(h, dview);
   auto index  = cuvs::neighbors::cagra::build(h, cagra_params, padded);
+  index.update_dataset(h, padded);
   interface.cagra_owned_dataset_.reset();
   interface.index_.emplace(std::move(index));
 }

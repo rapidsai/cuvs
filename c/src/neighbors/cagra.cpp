@@ -216,12 +216,14 @@ void _build(cuvsResources_t res,
     if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
       auto view  = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
       auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
+      index.update_dataset(*res_ptr, view);
       auto* raw = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(std::move(index));
       assign_standalone_index<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, raw);
     } else {
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
       auto view   = padded->as_dataset_view();
       auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
+      index.update_dataset(*res_ptr, view);
       auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
         std::move(padded),
         raft::device_matrix<T, int64_t>(*res_ptr),
@@ -251,6 +253,7 @@ void _build(cuvsResources_t res,
       auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
       auto view   = padded->as_dataset_view();
       auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
+      index.update_dataset(*res_ptr, view);
       auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
         std::move(padded),
         raft::device_matrix<T, int64_t>(*res_ptr),

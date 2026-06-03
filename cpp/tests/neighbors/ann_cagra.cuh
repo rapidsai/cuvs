@@ -53,13 +53,13 @@ namespace {
  * by `graph_build_params`). Otherwise builds from \p padded via `cagra::build`. When \p
  * ACE is selected by `graph_build_params`.
  */
-template <typename DataT, typename IdxT>
+template <typename DataT>
 void cagra_build_into_index(
   raft::resources const& res,
   cagra::index_params const& params,
   std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host_dataset,
   cuvs::neighbors::device_padded_dataset_view<DataT, int64_t> const& padded,
-  cagra::padded_index<DataT, IdxT>& index)
+  cagra::padded_index<DataT>& index)
 {
   if (ace_host_dataset.has_value()) {
     index = cagra::build(res, params, *ace_host_dataset);
@@ -68,6 +68,7 @@ void cagra_build_into_index(
     return;
   }
   index = cagra::build(res, params, padded);
+  index.update_dataset(res, padded);
 }
 
 struct test_cagra_sample_filter {

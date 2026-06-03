@@ -1103,9 +1103,10 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
 template <typename T, typename IdxT, typename DatasetViewT>
   requires cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>
-cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_device_matrix(raft::resources const& res,
-                                                                       const index_params& params,
-                                                                       DatasetViewT const& dataset);
+auto build_from_device_matrix(raft::resources const& res,
+                              const index_params& params,
+                              DatasetViewT const& dataset)
+  -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>;
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
 // ACE enables building indexes for datasets too large to fit in GPU memory by:
@@ -2296,10 +2297,10 @@ auto build_cagra_host_graph_from_knn_params(raft::resources const& res,
  * `index::update_dataset` with a device dataset view before search.
  */
 template <typename T, typename IdxT = uint32_t>
-cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_host_matrix(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset)
+auto build_from_host_matrix(raft::resources const& res,
+                            const index_params& params,
+                            raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset)
+  -> cuvs::neighbors::cagra::padded_index<T, IdxT>
 {
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own{};
 
@@ -2347,13 +2348,15 @@ cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_host_matrix(
  *
  * Supported inputs include `device_padded_dataset_view` and VPQ views (graph build rejects VPQ).
  * This entry point does **not** accept host-backed bases for graph construction (see
- * `build_from_host_matrix`). Also used from ACE sub-builds and merge.
+ * `build_from_host_matrix`). Also used from ACE sub-builds and merge. The returned index
+ * contains only the optimized graph; call `index::update_dataset` before search.
  */
 template <typename T, typename IdxT, typename DatasetViewT>
   requires cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>
-cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_device_matrix(raft::resources const& res,
-                                                                       const index_params& params,
-                                                                       DatasetViewT const& dataset)
+auto build_from_device_matrix(raft::resources const& res,
+                              const index_params& params,
+                              DatasetViewT const& dataset)
+  -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>
 {
   const auto padded = convert_dataset_view_to_padded_for_graph_build<T>(dataset);
 
@@ -2382,10 +2385,8 @@ cuvs::neighbors::cagra::padded_index<T, IdxT> build_from_device_matrix(raft::res
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  cuvs::neighbors::cagra::padded_index<T, IdxT> idx(res, params.metric);
+  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-  // Graph build uses \p padded; attach the same view for search (caller keeps storage alive).
-  idx.update_dataset(res, padded);
   return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail

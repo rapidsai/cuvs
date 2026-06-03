@@ -379,6 +379,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded(clique_, index_dataset);
         auto index = cuvs::neighbors::cagra::build(clique_, index_params, padded.view);
+        index.update_dataset(clique_, padded.view);
         cuvs::neighbors::cagra::serialize(clique_, index_file.filename, index);
       }
 

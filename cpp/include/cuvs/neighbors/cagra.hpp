@@ -466,18 +466,21 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
   /** Construct a graph-only index with a zero-row dataset view placeholder. */
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
-    requires(cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT> ||
-             cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>)
+    requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>)
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
       dataset_([] {
         if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
           return DatasetViewT{0};
-        } else {
+        } else if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
           auto v = raft::make_device_matrix_view<const T, int64_t>(
             static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
           return DatasetViewT(v, uint32_t{0});
+        } else if constexpr (cuvs::neighbors::is_vpq_dataset_view_v<DatasetViewT>) {
+          return DatasetViewT{};
+        } else {
+          static_assert(sizeof(DatasetViewT) == 0, "index: unsupported dataset view type");
         }
       }()),
       dataset_norms_(std::nullopt)
@@ -791,6 +794,12 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
 /** CAGRA index with the usual padded device dataset view (graph build output type). */
 template <typename T, typename IdxT = uint32_t>
 using padded_index = index<T, IdxT, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>;
+
+/** Index type returned by `cagra::build(res, params, dataset_view)`. */
+template <typename DatasetViewT>
+using cagra_index_t = index<cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>,
+                            uint32_t,
+                            cuvs::neighbors::dataset_view_type_t<DatasetViewT>>;
 
 /**
  * @}
@@ -1212,18 +1221,16 @@ auto build(raft::resources const& res,
  * @brief Build the index from a device `dataset_view` (non-owning).
  *
  * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The returned index
- * includes the graph and a non-owning dataset view (same padded storage used for graph build);
- * keep that storage alive for search. For VPQ, use
- * `cuvs::preprocessing::quantize::pq::make_vpq_dataset` and `index::update_dataset(res,
- * vpq.as_dataset_view())` while keeping the `vpq_dataset` alive.
+ * contains only the optimized graph; call `index::update_dataset(res, dataset)` with the same
+ * view type before search (keep underlying storage alive). For VPQ search, attach a
+ * `vpq_dataset_view` after building on padded rows.
  */
 template <typename DatasetViewT>
   requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t> &&
            !cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>)
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
-           DatasetViewT const& dataset)
-  -> cuvs::neighbors::cagra::padded_index<cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>>;
+           DatasetViewT const& dataset) -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>;
 
 /**
  * @}

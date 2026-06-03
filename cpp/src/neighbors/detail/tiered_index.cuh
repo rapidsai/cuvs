@@ -135,6 +135,7 @@ struct index_state {
             std::move(own));
         auto index =
           cuvs::neighbors::cagra::build(res, tiered_params, ann_build_pad->as_dataset_view());
+        index.update_dataset(res, ann_build_pad->as_dataset_view());
         return std::make_shared<UpstreamT>(std::move(index));
       }
     }
