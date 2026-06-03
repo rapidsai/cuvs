@@ -373,14 +373,10 @@ void search_multi_partition(
       search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, graph_idx_type>
         plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
-    // SINGLE_CTA caps the per-partition output at itopk_size. The merge below assumes each
-    // partition can supply enough refined candidates for the global top-k; without this lower
-    // bound the merge fills the output with sentinels from partitions that ran out.
-    RAFT_EXPECTS(static_cast<uint64_t>(plan.itopk_size) * num_partitions >= topk,
-                 "itopk_size (%lu) * num_partitions (%u) must be >= topk (%u).",
-                 plan.itopk_size,
-                 num_partitions,
-                 topk);
+    RAFT_EXPECTS(topk <= plan.itopk_size,
+                 "topk = %u must be smaller than itopk_size = %lu",
+                 topk,
+                 plan.itopk_size);
 
     // Build per-partition descriptors on the host. Queries and result buffers are shared
     // across partitions and are passed to the kernel as separate parameters.
