@@ -184,7 +184,7 @@ void batched_insert_vamana(
 
   // Create random permutation for order of node inserts into graph
   auto insert_order = raft::make_device_vector<IdxT, uint32_t>(res, N);
-  create_insert_permutation(res, insert_order.view(), static_cast<uint32_t>(N));
+  create_insert_permutation(res, insert_order.view());
 
   // Calculate the shared memory sizes of each kernel
   int sort_smem_size = 0;
