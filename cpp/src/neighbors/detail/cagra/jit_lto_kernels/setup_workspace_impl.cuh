@@ -84,8 +84,8 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq_impl(
   constexpr auto kDatasetBlockDim    = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS             = DescriptorT::kPqBits;
   constexpr auto PQ_LEN              = DescriptorT::kPqLen;
-  constexpr auto EnableFP8           = DescriptorT::kEnableFP8;
-  using smem_val_config              = vpq_smem_value_config<PQ_LEN, EnableFP8>;
+  constexpr auto SmemDType           = DescriptorT::kSmemDType;
+  using smem_val_config              = vpq_smem_value_config<PQ_LEN, SmemDType>;
   using smem_val_t                   = typename smem_val_config::smem_val_t;
   using smem_val_pack_t              = typename smem_val_config::smem_val_pack_t;
   using smem_val_pack_uint_t         = typename smem_val_config::smem_val_pack_uint_t;
@@ -186,7 +186,7 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT,
-          bool EnableFP8>
+          cuvs::neighbors::cagra::internal_dtype SmemDType>
 __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_impl(
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
   void* smem,
@@ -211,7 +211,7 @@ __device__ const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_work
                                                       IndexT,
                                                       DistanceT,
                                                       QueryT,
-                                                      EnableFP8>;
+                                                      SmemDType>;
     const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
 
     const desc_t* result = setup_workspace_vpq_impl<desc_t>(desc, smem, queries, query_id);

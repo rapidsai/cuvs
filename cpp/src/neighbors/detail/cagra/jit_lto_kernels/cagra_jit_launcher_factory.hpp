@@ -60,11 +60,11 @@ std::shared_ptr<AlgorithmLauncher> build_single_cta_launcher(
     planner.add_setup_workspace_device_function(dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim,
                                                 dataset_desc.pq_len,
-                                                dataset_desc.enable_fp8);
+                                                dataset_desc.smem_dtype);
     planner.add_compute_distance_device_function(dataset_desc.team_size,
                                                  dataset_desc.dataset_block_dim,
                                                  dataset_desc.pq_len,
-                                                 dataset_desc.enable_fp8);
+                                                 dataset_desc.smem_dtype);
   } else {
     planner.add_setup_workspace_device_function(dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim);
@@ -109,11 +109,11 @@ std::shared_ptr<AlgorithmLauncher> build_multi_cta_launcher(
     planner.add_setup_workspace_device_function(dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim,
                                                 dataset_desc.pq_len,
-                                                dataset_desc.enable_fp8);
+                                                dataset_desc.smem_dtype);
     planner.add_compute_distance_device_function(dataset_desc.team_size,
                                                  dataset_desc.dataset_block_dim,
                                                  dataset_desc.pq_len,
-                                                 dataset_desc.enable_fp8);
+                                                 dataset_desc.smem_dtype);
   } else {
     planner.add_setup_workspace_device_function(dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim);
@@ -158,11 +158,11 @@ std::shared_ptr<AlgorithmLauncher> build_multi_kernel_launcher(
     planner.add_setup_workspace_device_function(dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim,
                                                 dataset_desc.pq_len,
-                                                dataset_desc.enable_fp8);
+                                                dataset_desc.smem_dtype);
     planner.add_compute_distance_device_function(dataset_desc.team_size,
                                                  dataset_desc.dataset_block_dim,
                                                  dataset_desc.pq_len,
-                                                 dataset_desc.enable_fp8);
+                                                 dataset_desc.smem_dtype);
   } else {
     planner.add_setup_workspace_device_function(dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim);

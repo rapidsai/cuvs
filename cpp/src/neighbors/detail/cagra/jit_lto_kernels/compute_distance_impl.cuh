@@ -100,10 +100,10 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
-  constexpr auto EnableFP8       = DescriptorT::kEnableFP8;
+  constexpr auto SmemDType       = DescriptorT::kSmemDType;
   using PQ_CODEBOOK_LOAD_T       = uint32_t;
 
-  using smem_val_config                  = vpq_smem_value_config<PQ_LEN, EnableFP8>;
+  using smem_val_config                  = vpq_smem_value_config<PQ_LEN, SmemDType>;
   using smem_val_pack_t                  = typename smem_val_config::smem_val_pack_t;
   using smem_val_pack_uint_t             = typename smem_val_config::smem_val_pack_uint_t;
   constexpr uint32_t num_packed_elements = smem_val_config::num_packed_elements;
@@ -271,7 +271,7 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT,
-          bool EnableFP8>
+          cuvs::neighbors::cagra::internal_dtype SmemDType>
 __device__ DistanceT compute_distance_impl(
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
   IndexT dataset_index)
@@ -291,7 +291,7 @@ __device__ DistanceT compute_distance_impl(
                                                 IndexT,
                                                 DistanceT,
                                                 QueryT,
-                                                EnableFP8>;
+                                                SmemDType>;
     return compute_distance_vpq_impl<desc_t>(args, dataset_index);
   } else {
     static_assert(sizeof(TeamSize) == 0,

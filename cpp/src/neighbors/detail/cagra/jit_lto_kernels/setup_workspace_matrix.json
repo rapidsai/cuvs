@@ -84,7 +84,7 @@
     ],
     "_smem": [
       {
-        "enable_fp8": "false",
+        "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::F16",
         "smem_abbrev": "f16"
       }
     ]
@@ -158,11 +158,11 @@
     ],
     "_smem": [
       {
-        "enable_fp8": "false",
+        "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::F16",
         "smem_abbrev": "f16"
       },
       {
-        "enable_fp8": "true",
+        "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::E5M2",
         "smem_abbrev": "e5m2"
       }
     ]
@@ -238,11 +238,11 @@
     ],
     "_smem": [
       {
-        "enable_fp8": "false",
+        "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::F16",
         "smem_abbrev": "f16"
       },
       {
-        "enable_fp8": "true",
+        "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::E5M2",
         "smem_abbrev": "e5m2"
       }
     ]

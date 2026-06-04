@@ -27,6 +27,7 @@
 #include <raft/linalg/normalize.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/random/rng.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/itertools.hpp>
 
 #include <rmm/device_buffer.hpp>
@@ -276,6 +277,7 @@ struct AnnCagraInputs {
   std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
   cuvs::neighbors::MergeStrategy merge_strategy =
     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+  cuvs::neighbors::cagra::internal_dtype smem_dtype = cuvs::neighbors::cagra::internal_dtype::AUTO;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -299,6 +301,14 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     {search_algo::AUTO, "auto"}                   //
   };
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
+  const auto smem_dtype_str           = [](cuvs::neighbors::cagra::internal_dtype dtype) {
+    switch (dtype) {
+      case cuvs::neighbors::cagra::internal_dtype::F16: return "F16";
+      case cuvs::neighbors::cagra::internal_dtype::E5M2: return "E5M2";
+      case cuvs::neighbors::cagra::internal_dtype::AUTO: return "AUTO";
+    }
+    return "Unknown";
+  };
   std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo_name[p.algo] << ", max_queries=" << p.max_queries
@@ -312,7 +322,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
   if (p.compression.has_value()) {
     auto vpq = p.compression.value();
     os << ", pq_bits=" << vpq.pq_bits << ", pq_dim=" << vpq.pq_dim
-       << ", vq_n_centers=" << vpq.vq_n_centers;
+       << ", vq_n_centers=" << vpq.vq_n_centers << ", smem_dtype=" << smem_dtype_str(p.smem_dtype);
   }
   os << '}' << std::endl;
   return os;
@@ -346,6 +356,10 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::L1 &&
         ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
+    if (ps.smem_dtype == cuvs::neighbors::cagra::internal_dtype::E5M2 &&
+        raft::getComputeCapability().first < 9) {
+      GTEST_SKIP() << "CAGRA VPQ E5M2 smem dtype requires native FP8 support on SM90+";
+    }
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
@@ -415,6 +429,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
         search_params.team_size   = ps.team_size;
+        search_params.smem_dtype  = ps.smem_dtype;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -1701,7 +1716,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
         ps.pq_dim       = input.dim / pq_len;
         ps.vq_n_centers = vq_n_centers;
         input.compression.emplace(ps);
+        input.smem_dtype = cuvs::neighbors::cagra::internal_dtype::AUTO;
         inputs.push_back(input);
+        if (pq_len >= 4 && vq_n_centers == 100) {
+          input.smem_dtype = cuvs::neighbors::cagra::internal_dtype::E5M2;
+          inputs.push_back(input);
+        }
       }
     }
   }

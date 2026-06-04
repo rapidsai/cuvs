@@ -65,7 +65,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
   void add_setup_workspace_device_function(uint32_t team_size,
                                            uint32_t dataset_block_dim,
                                            uint32_t pq_len,
-                                           bool enable_fp8)
+                                           cuvs::neighbors::cagra::internal_dtype smem_dtype)
   {
     if (pq_len != 2 && pq_len != 4 && pq_len != 8) {
       RAFT_FAIL("CAGRA JIT VPQ setup_workspace expects pq_len in {2,4,8} (matrix uses pq_bits=8)");
@@ -92,11 +92,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
           add.template operator()<TeamSz, Dim, PqBitsV, PqLenV, SmemTag>();
         });
     };
-    if (enable_fp8) {
-      dispatch_smem.template operator()<tag_smem_e5m2>();
-    } else {
-      dispatch_smem.template operator()<tag_smem_f16>();
-    }
+    dispatch_cagra_smem_dtype(smem_dtype, dispatch_smem);
   }
 
   /// Registers dist_op + normalization + `compute_distance` for standard layout.
@@ -132,7 +128,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
   void add_compute_distance_device_function(uint32_t team_size,
                                             uint32_t dataset_block_dim,
                                             uint32_t pq_len,
-                                            bool enable_fp8)
+                                            cuvs::neighbors::cagra::internal_dtype smem_dtype)
   {
     if (pq_len != 2 && pq_len != 4 && pq_len != 8) {
       RAFT_FAIL("CAGRA JIT VPQ compute_distance expects pq_len in {2,4,8} (matrix uses pq_bits=8)");
@@ -159,14 +155,26 @@ struct CagraPlannerBase : AlgorithmPlanner {
           add.template operator()<TeamSz, Dim, PqBitsV, PqLenV, SmemTag>();
         });
     };
-    if (enable_fp8) {
-      dispatch_smem.template operator()<tag_smem_e5m2>();
-    } else {
-      dispatch_smem.template operator()<tag_smem_f16>();
-    }
+    dispatch_cagra_smem_dtype(smem_dtype, dispatch_smem);
   }
 
  private:
+  template <typename Lambda>
+  static void dispatch_cagra_smem_dtype(cuvs::neighbors::cagra::internal_dtype smem_dtype,
+                                        Lambda&& l)
+  {
+    switch (smem_dtype) {
+      case cuvs::neighbors::cagra::internal_dtype::F16:
+        std::forward<Lambda>(l).template operator()<tag_smem_f16>();
+        return;
+      case cuvs::neighbors::cagra::internal_dtype::E5M2:
+        std::forward<Lambda>(l).template operator()<tag_smem_e5m2>();
+        return;
+      default: break;
+    }
+    RAFT_FAIL("Unsupported CAGRA JIT smem_dtype: %u", static_cast<unsigned>(smem_dtype));
+  }
+
   template <typename Lambda>
   static void dispatch_cagra_standard_team_dim(uint32_t team_size,
                                                uint32_t dataset_block_dim,

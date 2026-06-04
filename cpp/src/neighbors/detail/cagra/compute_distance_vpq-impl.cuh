@@ -15,21 +15,24 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <uint32_t PQ_LEN, bool EnableFP8, class Enable = void>
+template <uint32_t PQ_LEN, cuvs::neighbors::cagra::internal_dtype SmemDType, class Enable = void>
 struct vpq_smem_value_config;
 
-template <uint32_t PQ_LEN, bool EnableFP8>
-struct vpq_smem_value_config<PQ_LEN, EnableFP8, std::enable_if_t<PQ_LEN == 2 || !EnableFP8>> {
+template <uint32_t PQ_LEN, cuvs::neighbors::cagra::internal_dtype SmemDType>
+struct vpq_smem_value_config<
+  PQ_LEN,
+  SmemDType,
+  std::enable_if_t<PQ_LEN == 2 || SmemDType == cuvs::neighbors::cagra::internal_dtype::F16>> {
   using smem_val_pack_t                         = half2;
   using smem_val_t                              = half;
   using smem_val_pack_uint_t                    = uint32_t;
   static constexpr uint32_t num_packed_elements = 2;
 };
 
-template <uint32_t PQ_LEN, bool EnableFP8>
+template <uint32_t PQ_LEN>
 struct vpq_smem_value_config<PQ_LEN,
-                             EnableFP8,
-                             std::enable_if_t<(PQ_LEN == 4 || PQ_LEN == 8) && EnableFP8>> {
+                             cuvs::neighbors::cagra::internal_dtype::E5M2,
+                             std::enable_if_t<PQ_LEN == 4 || PQ_LEN == 8>> {
   using smem_val_pack_t                         = device::fp8xN<PQ_LEN, 5>;
   using smem_val_t                              = typename smem_val_pack_t::unit_t;
   using smem_val_pack_uint_t                    = typename smem_val_pack_t::uint_t;
@@ -45,7 +48,7 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename QueryT,
-          bool EnableFP8>
+          cuvs::neighbors::cagra::internal_dtype SmemDType>
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
@@ -61,7 +64,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
   constexpr static inline auto kPqLen           = PQ_LEN;
-  constexpr static inline auto kEnableFP8       = EnableFP8;
+  constexpr static inline auto kSmemDType       = SmemDType;
 
   static_assert(std::is_same_v<CODE_BOOK_T, half>, "Only CODE_BOOK_T = `half` is supported now");
 
@@ -104,7 +107,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     return args.extra_word1;
   }
 
-  using smem_val_config = vpq_smem_value_config<PQ_LEN, EnableFP8>;
+  using smem_val_config = vpq_smem_value_config<PQ_LEN, SmemDType>;
 
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN * utils::size_of<typename smem_val_config::smem_val_pack_uint_t>() /
@@ -152,7 +155,7 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          bool EnableFP8>
+          cuvs::neighbors::cagra::internal_dtype SmemDType>
 RAFT_KERNEL __launch_bounds__(1, 1)
   vpq_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
                                      const std::uint8_t* encoded_dataset_ptr,
@@ -171,7 +174,7 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                                  IndexT,
                                                  DistanceT,
                                                  half,
-                                                 EnableFP8>;
+                                                 SmemDType>;
   new (out) desc_type(
     encoded_dataset_ptr, encoded_dataset_dim, vq_code_book_ptr, pq_code_book_ptr, size, dim);
 }
@@ -185,7 +188,7 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          bool EnableFP8>
+          cuvs::neighbors::cagra::internal_dtype SmemDType>
 dataset_descriptor_host<DataT, IndexT, DistanceT>
 vpq_descriptor_spec<Metric,
                     TeamSize,
@@ -196,7 +199,7 @@ vpq_descriptor_spec<Metric,
                     DataT,
                     IndexT,
                     DistanceT,
-                    EnableFP8>::init_(const cagra::search_params& params,
+                    SmemDType>::init_(const cagra::search_params& params,
                                       const std::uint8_t* encoded_dataset_ptr,
                                       uint32_t encoded_dataset_dim,
                                       const CodebookT* vq_code_book_ptr,
@@ -213,7 +216,7 @@ vpq_descriptor_spec<Metric,
                                                  IndexT,
                                                  DistanceT,
                                                  half,
-                                                 EnableFP8>;
+                                                 SmemDType>;
 
   return host_type{
     desc_type{
@@ -229,7 +232,7 @@ vpq_descriptor_spec<Metric,
                                          DataT,
                                          IndexT,
                                          DistanceT,
-                                         EnableFP8><<<1, 1, 0, stream>>>(dev_ptr,
+                                         SmemDType><<<1, 1, 0, stream>>>(dev_ptr,
                                                                          encoded_dataset_ptr,
                                                                          encoded_dataset_dim,
                                                                          vq_code_book_ptr,
@@ -243,7 +246,7 @@ vpq_descriptor_spec<Metric,
     true,        // is_vpq
     PqBits,      // pq_bits
     PqLen,       // pq_len
-    EnableFP8};  // enable_fp8
+    SmemDType};  // smem_dtype
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

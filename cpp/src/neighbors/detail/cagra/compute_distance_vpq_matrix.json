@@ -97,8 +97,14 @@
   "metric": [
     "L2Expanded"
   ],
-  "enable_fp8": [
-    "true",
-    "false"
+  "_smem": [
+    {
+      "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::E5M2",
+      "smem_abbrev": "e5m2"
+    },
+    {
+      "smem_dtype": "cuvs::neighbors::cagra::internal_dtype::F16",
+      "smem_abbrev": "f16"
+    }
   ]
 }

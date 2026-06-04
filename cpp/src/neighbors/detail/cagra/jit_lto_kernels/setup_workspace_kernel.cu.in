@@ -12,7 +12,7 @@ constexpr uint32_t k_team_size         = @team_size@u;
 constexpr uint32_t k_dataset_block_dim = @dataset_block_dim@u;
 constexpr uint32_t k_pq_bits           = @pq_bits@u;
 constexpr uint32_t k_pq_len            = @pq_len@u;
-constexpr bool k_enable_fp8            = @enable_fp8@;
+constexpr auto k_smem_dtype            = @smem_dtype@;
 
 using data_t     = @data_type@;
 using index_t    = @index_type@;
@@ -41,7 +41,7 @@ setup_workspace<data_t, index_t, distance_t>(
                               index_t,
                               distance_t,
                               query_t,
-                              k_enable_fp8>(desc, smem, queries, query_id);
+                              k_smem_dtype>(desc, smem, queries, query_id);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
