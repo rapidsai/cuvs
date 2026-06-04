@@ -79,6 +79,8 @@ cagra_sample_filter<SourceIndexT> extract_cagra_sample_filter(const SampleFilter
   return out;
 }
 
+/// Host: find UDF compile/link metadata only. Query offsets stay in the runtime payload produced
+/// by @ref extract_cagra_sample_filter and are applied before calling the linked sample_filter.
 template <typename SampleFilterT>
 const ::cuvs::neighbors::filtering::udf_filter* get_cagra_udf_filter(
   const SampleFilterT& sample_filter)
