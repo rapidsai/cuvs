@@ -11,7 +11,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 #include <cuvs/core/export.hpp>
 
 namespace CUVS_EXPORT cuvs {
