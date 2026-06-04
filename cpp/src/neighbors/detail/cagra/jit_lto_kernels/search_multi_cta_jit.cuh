@@ -261,7 +261,7 @@ __device__ void search_kernel_jit(
         const auto parent_id = result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
         if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
-                                         get_cagra_sample_filter_data(filter_payload))) {
+                                         filter_payload.sample_filter_data())) {
           // If the parent must not be in the resulting top-k list, remove from the parent list
           result_distances_buffer[parent_indices_buffer[p]] = utils::get_max_value<DISTANCE_T>();
           result_indices_buffer[parent_indices_buffer[p]]   = invalid_index;
@@ -280,7 +280,7 @@ __device__ void search_kernel_jit(
     index &= ~index_msb_1_mask;
     if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                      to_source_index(index),
-                                     get_cagra_sample_filter_data(filter_payload))) {
+                                     filter_payload.sample_filter_data())) {
       result_indices_buffer[i]   = invalid_index;
       result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
     }

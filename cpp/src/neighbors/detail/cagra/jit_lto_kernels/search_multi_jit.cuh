@@ -170,7 +170,7 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
                                ? static_cast<SourceIndexT>(parent_index)
                                : static_cast<SourceIndexT>(source_indices_ptr[parent_index]);
   if (!sample_filter<SourceIndexT>(
-        filter_query_id, node_id, get_cagra_sample_filter_data(filter_payload))) {
+        filter_query_id, node_id, filter_payload.sample_filter_data())) {
     parent_candidates_ptr[parent_list_index + (lds * local_query_id)] =
       utils::get_max_value<INDEX_T>();
     parent_distance_ptr[parent_list_index + (lds * local_query_id)] =
@@ -206,7 +206,7 @@ __device__ void apply_filter_kernel_jit(
                              : source_indices_ptr[result_indices_ptr[index]];
 
     if (!sample_filter<SourceIndexT>(
-          query_id_offset + j, node_id, get_cagra_sample_filter_data(filter_payload))) {
+          query_id_offset + j, node_id, filter_payload.sample_filter_data())) {
       result_indices_ptr[index]   = utils::get_max_value<IndexT>();
       result_distances_ptr[index] = utils::get_max_value<DistanceT>();
     }

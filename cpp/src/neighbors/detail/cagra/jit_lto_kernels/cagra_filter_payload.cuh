@@ -21,6 +21,16 @@ struct cagra_sample_filter {
   cagra_filter_data_storage<SourceIndexT> filter_data_storage{};
   void* filter_data{nullptr};
   std::uint32_t query_id_offset{0};
+
+  __device__ __forceinline__ void* sample_filter_data()
+  {
+    if (filter_data != nullptr) { return filter_data; }
+    if (filter_data_storage.bitset_ptr != nullptr) {
+      // The payload is passed by value to kernels; take the embedded storage address on device.
+      return &filter_data_storage;
+    }
+    return nullptr;
+  }
 };
 
 template <typename T>
@@ -81,18 +91,6 @@ const ::cuvs::neighbors::filtering::udf_filter* get_cagra_udf_filter(
   } else {
     return nullptr;
   }
-}
-
-template <typename SourceIndexT>
-__device__ __forceinline__ void* get_cagra_sample_filter_data(
-  cagra_sample_filter<SourceIndexT>& payload)
-{
-  if (payload.filter_data != nullptr) { return payload.filter_data; }
-  if (payload.filter_data_storage.bitset_ptr != nullptr) {
-    // The payload is passed by value to kernels; take the embedded storage address on device.
-    return &payload.filter_data_storage;
-  }
-  return nullptr;
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
