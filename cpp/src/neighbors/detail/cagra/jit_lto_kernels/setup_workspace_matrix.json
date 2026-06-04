@@ -121,6 +121,7 @@
       }
     ],
     "team_size": [
+      "4",
       "8",
       "16",
       "32"
@@ -128,7 +129,8 @@
     "dataset_block_dim": [
       "128",
       "256",
-      "512"
+      "512",
+      "1024"
     ],
     "_pq": [
       {
@@ -142,6 +144,12 @@
         "pq_bits": "8",
         "pq_prefix": "_vpq",
         "pq_suffix": "_8pq_4subd"
+      },
+      {
+        "pq_len": "8",
+        "pq_bits": "8",
+        "pq_prefix": "_vpq",
+        "pq_suffix": "_8pq_8subd"
       }
     ],
     "_codebook": [

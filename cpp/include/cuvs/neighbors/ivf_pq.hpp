@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 
 #include <cuvs/neighbors/common.hpp>
 

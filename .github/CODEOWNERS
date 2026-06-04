@@ -20,6 +20,7 @@ examples/rust/     @rapidsai/cuvs-rust-codeowners
 
 #docs code owners
 docs/              @rapidsai/cuvs-docs-codeowners
+fern/              @rapidsai/cuvs-docs-codeowners
 
 #cmake code owners
 CMakeLists.txt                  @rapidsai/cuvs-cmake-codeowners
@@ -43,3 +44,6 @@ pyproject.toml           @rapidsai/packaging-codeowners
 python/setup.py          @rapidsai/packaging-codeowners
 build.sh                 @rapidsai/packaging-codeowners
 **/build.sh              @rapidsai/packaging-codeowners
+
+# Ops code owners
+/SECURITY.md             @rapidsai/ops-codeowners

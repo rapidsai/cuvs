@@ -13,7 +13,12 @@ use crate::resources::Resources;
 
 /// Brute Force KNN Index
 #[derive(Debug)]
-pub struct Index(ffi::cuvsBruteForceIndex_t);
+pub struct Index {
+    inner: ffi::cuvsBruteForceIndex_t,
+    // cuVS brute_force::index stores a non-owning view into the dataset.
+    // Keep the Rust tensor alive for as long as the C++ index may read it.
+    _dataset: Option<ManagedTensor>,
+}
 
 impl Index {
     /// Builds a new Brute Force KNN Index from the dataset for efficient search.
@@ -31,16 +36,17 @@ impl Index {
         dataset: T,
     ) -> Result<Index> {
         let dataset: ManagedTensor = dataset.into();
-        let index = Index::new()?;
+        let mut index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsBruteForceBuild(
                 res.0,
                 dataset.as_ptr(),
                 metric,
                 metric_arg.unwrap_or(2.0),
-                index.0,
+                index.inner,
             ))?;
         }
+        index._dataset = Some(dataset);
         Ok(index)
     }
 
@@ -49,7 +55,7 @@ impl Index {
         unsafe {
             let mut index = std::mem::MaybeUninit::<ffi::cuvsBruteForceIndex_t>::uninit();
             check_cuvs(ffi::cuvsBruteForceIndexCreate(index.as_mut_ptr()))?;
-            Ok(Index(index.assume_init()))
+            Ok(Index { inner: index.assume_init(), _dataset: None })
         }
     }
 
@@ -73,7 +79,7 @@ impl Index {
 
             check_cuvs(ffi::cuvsBruteForceSearch(
                 res.0,
-                self.0,
+                self.inner,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
@@ -85,7 +91,7 @@ impl Index {
 
 impl Drop for Index {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.0) }) {
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.inner) }) {
             write!(stderr(), "failed to call bruteForceIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
@@ -95,7 +101,6 @@ impl Drop for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mark_flaky_tests::flaky;
     use ndarray::s;
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::Uniform;
@@ -159,15 +164,8 @@ mod tests {
         }
     */
 
-    #[flaky]
+    #[test]
     fn test_l2() {
         test_bfknn(DistanceType::L2Expanded);
     }
-
-    // NOTE: brute_force multiple-search test is omitted here because the C++
-    // brute_force::index stores a non-owning view into the dataset. Building
-    // from device data via `build()` drops the ManagedTensor after the call,
-    // leaving a dangling pointer. A follow-up PR will add dataset lifetime
-    // enforcement (DatasetOwnership<'a>) to make this safe.
-    // See: https://github.com/rapidsai/cuvs/issues/1838
 }
