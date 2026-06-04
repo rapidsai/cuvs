@@ -79,12 +79,16 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq_impl(
   const typename DescriptorT::DATA_T* queries_ptr,
   uint32_t query_id) -> const DescriptorT*
 {
-  using QUERY_T                   = typename DescriptorT::QUERY_T;
-  using CODE_BOOK_T               = typename DescriptorT::CODE_BOOK_T;
-  using word_type                 = uint32_t;
-  constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
-  constexpr auto PQ_BITS          = DescriptorT::kPqBits;
-  constexpr auto PQ_LEN           = DescriptorT::kPqLen;
+  using QUERY_T                      = typename DescriptorT::QUERY_T;
+  using word_type                    = uint32_t;
+  constexpr auto kDatasetBlockDim    = DescriptorT::kDatasetBlockDim;
+  constexpr auto PQ_BITS             = DescriptorT::kPqBits;
+  constexpr auto PQ_LEN              = DescriptorT::kPqLen;
+  using smem_val_config              = vpq_smem_value_config<PQ_LEN>;
+  using smem_val_t                   = typename smem_val_config::smem_val_t;
+  using smem_val_pack_t              = typename smem_val_config::smem_val_pack_t;
+  using smem_val_pack_uint_t         = typename smem_val_config::smem_val_pack_uint_t;
+  constexpr auto num_packed_elements = smem_val_config::num_packed_elements;
 
   auto* r = reinterpret_cast<DescriptorT*>(smem_ptr);
 
@@ -105,18 +109,22 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq_impl(
     }
     __syncthreads();
 
-    for (unsigned i = threadIdx.x * 2; i < (1 << PQ_BITS) * PQ_LEN; i += blockDim.x * 2) {
-      half2 buf2;
-      buf2.x = r->pq_code_book_ptr()[i];
-      buf2.y = r->pq_code_book_ptr()[i + 1];
+    for (unsigned i = threadIdx.x * num_packed_elements; i < (1 << PQ_BITS) * PQ_LEN;
+         i += blockDim.x * num_packed_elements) {
+      constexpr auto num_elements_per_bank =
+        num_packed_elements / (utils::size_of<smem_val_pack_uint_t>() / utils::size_of<uint32_t>());
 
-      constexpr auto num_elements_per_bank  = 4 / utils::size_of<CODE_BOOK_T>();
-      constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
-      const auto j                          = i / num_elements_per_bank;
-      const auto smem_index =
-        (j / num_banks_per_subspace) + (j % num_banks_per_subspace) * (1 << PQ_BITS);
+      if constexpr (PQ_LEN >= num_elements_per_bank) {
+        constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
+        const auto j                          = i / num_elements_per_bank;
+        const auto smem_index =
+          (j / num_banks_per_subspace) + (j % num_banks_per_subspace) * (1 << PQ_BITS);
 
-      device::sts(codebook_buf + smem_index * sizeof(half2), buf2);
+        smem_val_pack_t buf;
+        buf.x = r->pq_code_book_ptr()[i];
+        buf.y = r->pq_code_book_ptr()[i + 1];
+        device::sts(codebook_buf + smem_index * sizeof(smem_val_pack_t), buf);
+      }
     }
   }
 
@@ -125,19 +133,21 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq_impl(
 
   constexpr cuvs::spatial::knn::detail::utils::mapping<QUERY_T> mapping{};
   auto smem_query_ptr =
-    reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
-                               DescriptorT::kSMemCodeBookSizeInBytes);
-  for (unsigned i = threadIdx.x * 2; i < dim; i += blockDim.x * 2) {
-    half2 buf2{0, 0};
-    if (i < dim) { buf2.x = mapping(queries_ptr[i]); }
-    if (i + 1 < dim) { buf2.y = mapping(queries_ptr[i + 1]); }
-    if constexpr ((PQ_BITS == 8) && (PQ_LEN % 2 == 0)) {
+    reinterpret_cast<smem_val_t*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
+                                  DescriptorT::kSMemCodeBookSizeInBytes);
+  for (unsigned i = threadIdx.x * num_packed_elements; i < dim;
+       i += blockDim.x * num_packed_elements) {
+    smem_val_pack_t buf{0, 0};
+    if (i < dim) { buf.x = mapping(queries_ptr[i]); }
+    if (i + 1 < dim) { buf.y = mapping(queries_ptr[i + 1]); }
+    if constexpr ((PQ_BITS == 8) && (PQ_LEN % num_packed_elements == 0)) {
       constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
-      constexpr auto kStride  = vlen * PQ_LEN / 2;
-      reinterpret_cast<half2*>(smem_query_ptr)[transpose<kDatasetBlockDim / 2, kStride>(i / 2)] =
-        buf2;
+      constexpr auto kStride  = vlen * PQ_LEN / num_packed_elements;
+      reinterpret_cast<smem_val_pack_t*>(
+        smem_query_ptr)[transpose<kDatasetBlockDim / num_packed_elements, kStride>(
+        i / num_packed_elements)] = buf;
     } else {
-      (reinterpret_cast<half2*>(smem_query_ptr + i))[0] = buf2;
+      (reinterpret_cast<smem_val_pack_t*>(smem_query_ptr + i))[0] = buf;
     }
   }
 

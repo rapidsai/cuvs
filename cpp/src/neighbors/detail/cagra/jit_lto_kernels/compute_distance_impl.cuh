@@ -100,10 +100,16 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
+  using PQ_CODEBOOK_LOAD_T       = uint32_t;
+
+  using smem_val_config                  = vpq_smem_value_config<PQ_LEN>;
+  using smem_val_pack_t                  = typename smem_val_config::smem_val_pack_t;
+  using smem_val_pack_uint_t             = typename smem_val_config::smem_val_pack_uint_t;
+  constexpr uint32_t num_packed_elements = smem_val_config::num_packed_elements;
 
   const uint32_t query_ptr = pq_codebook_ptr + DescriptorT::kSMemCodeBookSizeInBytes;
   static_assert(PQ_BITS == 8, "Only pq_bits == 8 is supported at the moment.");
-  constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
+  constexpr uint32_t vlen = utils::size_of<PQ_CODEBOOK_LOAD_T>() / utils::size_of<uint8_t>();
   constexpr uint32_t nelem =
     raft::div_rounding_up_unsafe<uint32_t>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
 
@@ -115,12 +121,17 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
   DISTANCE_T norm       = 0;
   for (uint32_t elem_offset = 0; elem_offset * PQ_LEN < dim;
        elem_offset += DatasetBlockDim / PQ_LEN) {
-    uint32_t pq_codes[nelem];
+    PQ_CODEBOOK_LOAD_T pq_codes[nelem];
 #pragma unroll
     for (std::uint32_t e = 0; e < nelem; e++) {
       const std::uint32_t k = e * kTeamVLen + elem_offset + laneId * vlen;
       if (k >= n_subspace) break;
-      device::ldg_cg(pq_codes[e], reinterpret_cast<const std::uint32_t*>(dataset_ptr + 4 + k));
+      if constexpr (std::is_same_v<PQ_CODEBOOK_LOAD_T, uint32_t>) {
+        device::ldg_cg(pq_codes[e],
+                       reinterpret_cast<const PQ_CODEBOOK_LOAD_T*>(dataset_ptr + 4 + k));
+      } else {
+        pq_codes[e] = *reinterpret_cast<const PQ_CODEBOOK_LOAD_T*>(dataset_ptr + 4 + k);
+      }
     }
     //
     if constexpr (PQ_LEN % 2 == 0) {
@@ -135,23 +146,30 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
           if (d >= dim) break;
           device::ldg_ca(vq_vals[m], vq_code_book_ptr + d);
         }
-        std::uint32_t pq_code = pq_codes[e];
+        PQ_CODEBOOK_LOAD_T pq_code = pq_codes[e];
 #pragma unroll
         for (std::uint32_t v = 0; v < vlen; v++) {
           if (PQ_LEN * (v + k) >= dim) break;
 #pragma unroll
-          for (std::uint32_t m = 0; m < PQ_LEN / 2; m++) {
-            constexpr auto kQueryBlock = DatasetBlockDim / (vlen * PQ_LEN);
-            const std::uint32_t d1     = m + (PQ_LEN / 2) * v;
-            const std::uint32_t d =
-              d1 * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
-            half2 q2, c2;
-            device::lds(q2, query_ptr + sizeof(half2) * d);
+          for (std::uint32_t m = 0; m < PQ_LEN / num_packed_elements; m++) {
+            constexpr uint32_t vq_val_pack_num_elements = 2;
+            constexpr auto kQueryBlock                  = DatasetBlockDim / (vlen * PQ_LEN);
+            const std::uint32_t vq_half2_index =
+              m * (num_packed_elements / vq_val_pack_num_elements) + (PQ_LEN / 2) * v;
+
+            static_assert(num_packed_elements == 2,
+                          "CAGRA JIT VPQ currently stores pq_len=8 in half2 shared-memory packs");
+            const uint32_t query_val_index =
+              vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
+
+            smem_val_pack_t q2, c2;
+            device::lds(q2, query_ptr + sizeof(smem_val_pack_t) * query_val_index);
             device::lds(c2,
                         pq_codebook_ptr +
-                          sizeof(CODE_BOOK_T) * ((1 << PQ_BITS) * 2 * m + (2 * (pq_code & 0xff))));
-            auto dist = q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
-            dist      = dist * dist;
+                          sizeof(smem_val_pack_uint_t) * ((1 << PQ_BITS) * m + (pq_code & 0xff)));
+            auto dist =
+              q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
+            dist = dist * dist;
             norm += static_cast<DISTANCE_T>(dist.x + dist.y);
           }
           pq_code >>= 8;

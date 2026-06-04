@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -69,6 +69,12 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
     // Match codebook params
     if (dataset.pq_bits() != PqBits) { return -1.0; }
     if (dataset.pq_len() != PqLen) { return -1.0; }
+    // Keep auto-selection on the tuned VPQ diagonal while allowing explicit team_size requests to
+    // use the expanded team_size / dataset_block_dim grid.
+    constexpr std::uint32_t auto_dataset_block_dim_per_team = PqLen == 8 ? 32 : 16;
+    if (params.team_size == 0 && DatasetBlockDim != TeamSize * auto_dataset_block_dim_per_team) {
+      return -1.0;
+    }
     // Otherwise, favor the closest dataset dimensionality.
     constexpr std::uint32_t preferred_load_elmes_per_thread =
       16; /*magic number that is good based on experiments.*/

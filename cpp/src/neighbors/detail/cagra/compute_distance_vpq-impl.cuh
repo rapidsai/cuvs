@@ -14,6 +14,14 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+template <uint32_t PQ_LEN>
+struct vpq_smem_value_config {
+  using smem_val_pack_t                         = half2;
+  using smem_val_t                              = half;
+  using smem_val_pack_uint_t                    = uint32_t;
+  static constexpr uint32_t num_packed_elements = 2;
+};
+
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -80,8 +88,11 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     return args.extra_word1;
   }
 
+  using smem_val_config = vpq_smem_value_config<PQ_LEN>;
+
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
-    (1 << PQ_BITS) * PQ_LEN * utils::size_of<CODE_BOOK_T>();
+    (1 << PQ_BITS) * PQ_LEN * utils::size_of<typename smem_val_config::smem_val_pack_uint_t>() /
+    smem_val_config::num_packed_elements;
 
   _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(const std::uint8_t* encoded_dataset_ptr,
                                                  std::uint32_t encoded_dataset_dim,
@@ -108,7 +119,9 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
       3. Queries (smem_query_buffer_length elems)
     */
     return sizeof(cagra_q_dataset_descriptor_t) + kSMemCodeBookSizeInBytes +
-           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
+           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) *
+             utils::size_of<typename smem_val_config::smem_val_pack_uint_t>() /
+             smem_val_config::num_packed_elements;
   }
 
  private:
