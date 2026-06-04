@@ -80,8 +80,6 @@ std::unique_ptr<UDFFatbinFragment> make_cagra_sample_filter_udf_fragment(
   std::string key = "cagra_sample_filter_udf:";
   key += cagra_udf_source_index_type_name<SourceIndexT>();
   key += ":";
-  key += udf->cache_key.empty() ? udf->source : udf->cache_key;
-  key += ":";
   key += udf->function_name;
   key += ":";
   key += code;

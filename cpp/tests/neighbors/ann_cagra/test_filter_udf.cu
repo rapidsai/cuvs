@@ -174,8 +174,7 @@ TEST_P(CagraUdfFilterTest, AcceptAllMatchesNoFilter)
   cuvs::neighbors::filtering::none_sample_filter no_filter;
   auto expected = search(no_filter, 0.0f);
 
-  cuvs::neighbors::filtering::udf_filter udf_filter(
-    accept_all_udf_source(), nullptr, 0.0f, "cagra-accept-all-filter");
+  cuvs::neighbors::filtering::udf_filter udf_filter(accept_all_udf_source(), nullptr, 0.0f);
   auto actual = search(udf_filter);
 
   expect_same_results(expected, actual);
@@ -183,8 +182,7 @@ TEST_P(CagraUdfFilterTest, AcceptAllMatchesNoFilter)
 
 TEST_P(CagraUdfFilterTest, RejectAllReturnsNoValidNeighbors)
 {
-  cuvs::neighbors::filtering::udf_filter udf_filter(
-    reject_all_udf_source(), nullptr, 0.999f, "cagra-reject-all-filter");
+  cuvs::neighbors::filtering::udf_filter udf_filter(reject_all_udf_source(), nullptr, 0.999f);
   auto result = search(udf_filter);
 
   // CAGRA algorithms do not all normalize empty-result sentinels the same way. Single-CTA
@@ -199,8 +197,7 @@ TEST_P(CagraUdfFilterTest, HighFilteringRateReturnsOnlyValidNeighbors)
 {
   cuvs::neighbors::filtering::udf_filter udf_filter(high_filtering_rate_udf_source(),
                                                     nullptr,
-                                                    high_filtering_rate,
-                                                    "cagra-high-filtering-rate-filter");
+                                                    high_filtering_rate);
   auto result = search(udf_filter);
 
   for (auto source_id : result.neighbors) {
@@ -210,10 +207,9 @@ TEST_P(CagraUdfFilterTest, HighFilteringRateReturnsOnlyValidNeighbors)
   }
 }
 
-TEST_P(CagraUdfFilterTest, RepeatedUdfSearchWithSameCacheKeyMatches)
+TEST_P(CagraUdfFilterTest, RepeatedUdfSearchWithSameSourceMatches)
 {
-  cuvs::neighbors::filtering::udf_filter udf_filter(
-    accept_all_udf_source(), nullptr, 0.0f, "cagra-repeat-cache-filter");
+  cuvs::neighbors::filtering::udf_filter udf_filter(accept_all_udf_source(), nullptr, 0.0f);
 
   auto first  = search(udf_filter);
   auto second = search(udf_filter);
@@ -224,7 +220,7 @@ TEST_P(CagraUdfFilterTest, RepeatedUdfSearchWithSameCacheKeyMatches)
 TEST_P(CagraUdfFilterTest, InvalidSourceThrows)
 {
   cuvs::neighbors::filtering::udf_filter udf_filter(
-    "this is not valid cuda source", nullptr, 0.0f, "cagra-invalid-filter");
+    "this is not valid cuda source", nullptr, 0.0f);
 
   EXPECT_THROW(search(udf_filter), std::exception);
 }
@@ -245,7 +241,7 @@ TEST_P(CagraUdfFilterTest, ThresholdMatchesEquivalentBitset)
   auto expected              = search(bitset_filter, filtering_rate);
 
   cuvs::neighbors::filtering::udf_filter udf_filter(
-    threshold_udf_source(), nullptr, filtering_rate, "cagra-threshold-filter");
+    threshold_udf_source(), nullptr, filtering_rate);
   auto actual = search(udf_filter, filtering_rate);
 
   expect_same_results(expected, actual);
@@ -276,7 +272,7 @@ TEST_P(CagraUdfFilterTest, TenantContextHonorsQuerySpecificMetadata)
   raft::resource::sync_stream(res);
 
   cuvs::neighbors::filtering::udf_filter udf_filter(
-    tenant_udf_source(), context.data_handle(), 2.0f / 3.0f, "cagra-tenant-filter");
+    tenant_udf_source(), context.data_handle(), 2.0f / 3.0f);
   auto result = search(udf_filter);
 
   for (int64_t q = 0; q < n_queries; ++q) {

@@ -215,7 +215,7 @@ int main()
   auto run_filter =
     [&](char const* label, char const* function_name, float filtering_rate, auto is_valid) {
       auto filter = cuvs::neighbors::filtering::udf_filter(
-        source, context_device.data_handle(), filtering_rate, label, function_name);
+        source, context_device.data_handle(), filtering_rate, function_name);
       cuvs::neighbors::cagra::search(res,
                                      search_params,
                                      index,

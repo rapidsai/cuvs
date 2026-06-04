@@ -69,7 +69,6 @@ std::uint64_t cagra_udf_source_hash(const SampleFilterT& sample_filter)
   if (const auto* udf = get_cagra_udf_filter(sample_filter); udf != nullptr) {
     std::uint64_t seed = 0;
     seed               = cagra_hash_combine(seed, std::hash<std::string>{}(udf->source));
-    seed               = cagra_hash_combine(seed, std::hash<std::string>{}(udf->cache_key));
     seed               = cagra_hash_combine(seed, std::hash<std::string>{}(udf->function_name));
     return seed;
   }

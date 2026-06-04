@@ -638,22 +638,18 @@ struct udf_filter : public base_filter {
   void* filter_data = nullptr;
   /** Estimated fraction of rows rejected by the predicate, or negative if unknown. */
   float filtering_rate = -1.0f;
-  /** Optional stable cache key for equivalent generated source. */
-  std::string cache_key;
   /** Device function name to call from the generated CAGRA sample filter. */
   std::string function_name = "cuvs_filter_udf";
 
   udf_filter() = default;
 
-  udf_filter(std::string source,
-             void* filter_data = nullptr,
-             float filtering_rate = -1.0f,
-             std::string cache_key = {},
-             std::string function_name = "cuvs_filter_udf")
+  explicit udf_filter(std::string source,
+                      void* filter_data = nullptr,
+                      float filtering_rate = -1.0f,
+                      std::string function_name = "cuvs_filter_udf")
     : source(std::move(source)),
       filter_data(filter_data),
       filtering_rate(filtering_rate),
-      cache_key(std::move(cache_key)),
       function_name(std::move(function_name))
   {
   }
