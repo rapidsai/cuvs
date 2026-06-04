@@ -44,11 +44,12 @@ void fill_cagra_sample_filter(cagra_sample_filter<SourceIndexT>& out, const Filt
 {
   using DecayedFilter = std::decay_t<FilterT>;
   if constexpr (is_bitset_filter<DecayedFilter>::value) {
-    const auto bitset_view                 = filter.view();
-    out.filter_data_storage.bitset_ptr     = const_cast<std::uint32_t*>(bitset_view.data());
-    out.filter_data_storage.bitset_len     = static_cast<SourceIndexT>(bitset_view.size());
-    out.filter_data_storage.original_nbits = static_cast<SourceIndexT>(
-      bitset_view.get_original_nbits());
+    const auto bitset_view = filter.view();
+    out.filter_data_storage =
+      cagra_filter_data_storage<SourceIndexT>{const_cast<std::uint32_t*>(bitset_view.data()),
+                                              static_cast<SourceIndexT>(bitset_view.size()),
+                                              static_cast<SourceIndexT>(
+                                                bitset_view.get_original_nbits())};
     out.filter_kind = cagra_filter_kind::bitset;
   } else if constexpr (is_udf_filter<DecayedFilter>::value) {
     out.filter_data = filter.filter_data;
@@ -93,6 +94,7 @@ __device__ __forceinline__ void* get_cagra_sample_filter_data(
 {
   if (payload.filter_kind == cagra_filter_kind::udf) { return payload.filter_data; }
   if (payload.filter_kind == cagra_filter_kind::bitset) {
+    // The payload is passed by value to kernels; take the embedded storage address on device.
     return &payload.filter_data_storage;
   }
   return nullptr;
