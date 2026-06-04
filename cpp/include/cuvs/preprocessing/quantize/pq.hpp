@@ -148,7 +148,7 @@ struct quantizer {
   /** Parameters used to build this quantizer. */
   params params_quantizer;
   /** VPQ codebooks produced during training. */
-  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
+  cuvs::neighbors::device_vpq_dataset<T, int64_t> vpq_codebooks;
 };
 
 /**
@@ -247,7 +247,7 @@ void inverse_transform(
 namespace detail {
 
 template <typename T>
-[[nodiscard]] cuvs::neighbors::vpq_dataset<half, int64_t> vpq_train_from_device_rows(
+[[nodiscard]] cuvs::neighbors::device_vpq_dataset<half, int64_t> vpq_train_from_device_rows(
   raft::resources const& res,
   cuvs::neighbors::vpq_params const& params,
   T const* src_ptr,
@@ -261,14 +261,14 @@ template <typename T>
  * @brief Train VPQ storage (codebooks + encoded rows) from a device row-major mdspan/matrix.
  *
  * Accepts any device-accessible mdspan with `value_type`, `extent`, `stride`, and `data_handle`
- * (same pattern as `cuvs::neighbors::make_padded_dataset`). Row-major tight storage (logical stride
- * equals dimension) is passed through to training without an extra pack copy; wider row pitch
- * triggers a contiguous dense copy first. Empty sources are rejected.
+ * (same pattern as `cuvs::neighbors::make_device_padded_dataset`). Row-major tight storage (logical
+ * stride equals dimension) is passed through to training without an extra pack copy; wider row
+ * pitch triggers a contiguous dense copy first. Empty sources are rejected.
  *
  * Typical **CAGRA** usage: build the graph on dense vectors, then attach VPQ for search (metric
  * must remain `L2Expanded` for this path). Train VPQ from the same CAGRA-padded device layout you
- * used for graph build, keep the `vpq_dataset` alive, and call `index::update_dataset` with a
- * non-owning view.
+ * used for graph build, keep the `device_vpq_dataset` alive, and call `index::update_dataset` with
+ * a non-owning view.
  *
  * @code{.cpp}
  * #include <cuvs/neighbors/cagra.hpp>
@@ -284,7 +284,8 @@ template <typename T>
 template <typename SrcT>
 [[nodiscard]] auto make_vpq_dataset(raft::resources const& res,
                                     cuvs::neighbors::vpq_params const& params,
-                                    SrcT const& src) -> cuvs::neighbors::vpq_dataset<half, int64_t>
+                                    SrcT const& src)
+  -> cuvs::neighbors::device_vpq_dataset<half, int64_t>
 {
   using T = typename SrcT::value_type;
   RAFT_EXPECTS(src.extent(0) > 0, "make_vpq_dataset: dataset is empty");

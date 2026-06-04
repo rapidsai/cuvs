@@ -7,12 +7,8 @@
 
 #pragma once
 
-#include "common.hpp"
-
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
-
-#include "cagra.hpp"
 #include <raft/core/host_mdspan.hpp>
 
 #include <sys/types.h>

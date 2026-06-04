@@ -32,10 +32,10 @@ template <typename DataT, typename IdxT>
 using padded_dataset_view_t = device_padded_dataset_view<DataT, IdxT>;
 
 template <typename MathT, typename IdxT>
-using vpq_dataset_view_t = vpq_dataset_view<MathT, IdxT>;
+using vpq_dataset_view_t = device_vpq_dataset_view<MathT, IdxT>;
 
 template <typename IdxT>
-using empty_dataset_view_t = empty_dataset_view<IdxT>;
+using empty_dataset_view_t = device_empty_dataset_view<IdxT>;
 
 enum class dataset_view_kind {
   empty,
@@ -48,22 +48,22 @@ template <typename V>
 struct dataset_view_kind_of;
 
 template <typename IdxT>
-struct dataset_view_kind_of<empty_dataset_view<IdxT>> {
+struct dataset_view_kind_of<device_empty_dataset_view<IdxT>> {
   static constexpr dataset_view_kind value = dataset_view_kind::empty;
 };
 
 template <typename DataT, typename IdxT>
-struct dataset_view_kind_of<padded_dataset_view<DataT, IdxT>> {
+struct dataset_view_kind_of<device_padded_dataset_view<DataT, IdxT>> {
   static constexpr dataset_view_kind value = dataset_view_kind::padded;
 };
 
 template <typename IdxT>
-struct dataset_view_kind_of<vpq_dataset_view<half, IdxT>> {
+struct dataset_view_kind_of<device_vpq_dataset_view<half, IdxT>> {
   static constexpr dataset_view_kind value = dataset_view_kind::vpq_f16;
 };
 
 template <typename IdxT>
-struct dataset_view_kind_of<vpq_dataset_view<float, IdxT>> {
+struct dataset_view_kind_of<device_vpq_dataset_view<float, IdxT>> {
   static constexpr dataset_view_kind value = dataset_view_kind::vpq_f32;
 };
 

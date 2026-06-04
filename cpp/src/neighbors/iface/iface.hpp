@@ -59,11 +59,11 @@ void cagra_attach_dataset_for_search(
       m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0)) : static_cast<uint32_t>(m.extent(1));
     auto d_m = raft::make_device_strided_matrix_view<T const, int64_t, row_major>(
       devp, m.extent(0), m.extent(1), s_stride);
-    auto padded = cuvs::neighbors::make_padded_dataset_view(h, d_m);
+    auto padded = cuvs::neighbors::make_device_padded_dataset_view(h, d_m);
     index.update_dataset(h, padded);
     interface.cagra_owned_dataset_.reset();
   } else {
-    auto padded_r = cuvs::neighbors::make_padded_dataset(h, m);
+    auto padded_r = cuvs::neighbors::make_device_padded_dataset(h, m);
     auto view     = padded_r->as_dataset_view();
     index.update_dataset(h, view);
     interface.cagra_owned_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(padded_r));
@@ -82,7 +82,7 @@ void cagra_build_from_device_dataset(
     m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0)) : static_cast<uint32_t>(m.extent(1));
   auto dview = raft::make_device_strided_matrix_view<const T, int64_t, row_major>(
     m.data_handle(), m.extent(0), m.extent(1), stride);
-  auto padded = cuvs::neighbors::make_padded_dataset_view(h, dview);
+  auto padded = cuvs::neighbors::make_device_padded_dataset_view(h, dview);
   auto index  = cuvs::neighbors::cagra::build(h, cagra_params, padded);
   index.update_dataset(h, padded);
   interface.cagra_owned_dataset_.reset();
@@ -235,7 +235,7 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::padded_index<T, IdxT>>::value) {
     cagra::padded_index<T, IdxT> idx(handle);
-    std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> out_dataset;
+    std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> out_dataset;
     cagra::deserialize(handle, is, &idx, &out_dataset);
     if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);
@@ -265,7 +265,7 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::padded_index<T, IdxT>>::value) {
     cagra::padded_index<T, IdxT> idx(handle);
-    std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> out_dataset;
+    std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> out_dataset;
     cagra::deserialize(handle, is, &idx, &out_dataset);
     if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);

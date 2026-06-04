@@ -85,20 +85,20 @@ void search_main_core(
   RAFT_LOG_DEBUG("Cagra search");
   const uint32_t max_queries = plan->max_queries;
   const uint32_t query_dim   = static_cast<uint32_t>(queries.extent(1));
-  // Same 16B row-pitch rule as make_padded_dataset. Tight [n,dim] rows can be misaligned between
-  // rows (e.g. float, dim=1) and trigger misaligned access in CAGRA search.
-  // If query_row_stride>dim, device code still advances with "+= dim*query_id" in setup_workspace;
-  // in that case run one query per plan call so every kernel sees query_id==0 and the base pointer
+  // Same 16B row-pitch rule as make_device_padded_dataset. Tight [n,dim] rows can be misaligned
+  // between rows (e.g. float, dim=1) and trigger misaligned access in CAGRA search. If
+  // query_row_stride>dim, device code still advances with "+= dim*query_id" in setup_workspace; in
+  // that case run one query per plan call so every kernel sees query_id==0 and the base pointer
   // selects the row (keeps batched path when stride==dim).
   const DataT* queries_buf{};
   uint32_t query_row_stride{};
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<DataT, int64_t>> queries_padded_own;
-  if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(queries)) {
-    auto v           = cuvs::neighbors::make_padded_dataset_view(res, queries);
+  if (cuvs::neighbors::matrix_row_width_matches_cagra_required(queries)) {
+    auto v           = cuvs::neighbors::make_device_padded_dataset_view(res, queries);
     queries_buf      = v.view().data_handle();
     query_row_stride = v.stride();
   } else {
-    queries_padded_own = cuvs::neighbors::make_padded_dataset(res, queries);
+    queries_padded_own = cuvs::neighbors::make_device_padded_dataset(res, queries);
     auto v             = queries_padded_own->as_dataset_view();
     queries_buf        = v.view().data_handle();
     query_row_stride   = v.stride();

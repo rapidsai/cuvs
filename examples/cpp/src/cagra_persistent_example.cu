@@ -69,7 +69,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
   cagra::index_params index_params;
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto padded = cuvs::neighbors::make_padded_dataset_view(res, dataset);
+  auto padded = cuvs::neighbors::make_device_padded_dataset_view(res, dataset);
   auto index  = cagra::build(res, index_params, padded);
   index.update_dataset(res, padded);
 

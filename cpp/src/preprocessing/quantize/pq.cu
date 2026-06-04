@@ -84,7 +84,8 @@ auto vpq_train_from_device_rows(raft::resources const& res,
                                 T const* src_ptr,
                                 int64_t n_rows,
                                 int64_t dim,
-                                int64_t stride) -> cuvs::neighbors::vpq_dataset<half, int64_t>
+                                int64_t stride)
+  -> cuvs::neighbors::device_vpq_dataset<half, int64_t>
 {
   auto stream = raft::resource::get_cuda_stream(res);
   if (stride != dim) {
@@ -100,33 +101,33 @@ auto vpq_train_from_device_rows(raft::resources const& res,
 
 }  // namespace detail
 
-template cuvs::neighbors::vpq_dataset<half, int64_t> detail::vpq_train_from_device_rows<float>(
-  raft::resources const&,
-  cuvs::neighbors::vpq_params const&,
-  float const*,
-  int64_t,
-  int64_t,
-  int64_t);
-template cuvs::neighbors::vpq_dataset<half, int64_t> detail::vpq_train_from_device_rows<half>(
-  raft::resources const&,
-  cuvs::neighbors::vpq_params const&,
-  half const*,
-  int64_t,
-  int64_t,
-  int64_t);
-template cuvs::neighbors::vpq_dataset<half, int64_t> detail::vpq_train_from_device_rows<int8_t>(
-  raft::resources const&,
-  cuvs::neighbors::vpq_params const&,
-  int8_t const*,
-  int64_t,
-  int64_t,
-  int64_t);
-template cuvs::neighbors::vpq_dataset<half, int64_t> detail::vpq_train_from_device_rows<uint8_t>(
-  raft::resources const&,
-  cuvs::neighbors::vpq_params const&,
-  uint8_t const*,
-  int64_t,
-  int64_t,
-  int64_t);
+template cuvs::neighbors::device_vpq_dataset<half, int64_t>
+detail::vpq_train_from_device_rows<float>(raft::resources const&,
+                                          cuvs::neighbors::vpq_params const&,
+                                          float const*,
+                                          int64_t,
+                                          int64_t,
+                                          int64_t);
+template cuvs::neighbors::device_vpq_dataset<half, int64_t>
+detail::vpq_train_from_device_rows<half>(raft::resources const&,
+                                         cuvs::neighbors::vpq_params const&,
+                                         half const*,
+                                         int64_t,
+                                         int64_t,
+                                         int64_t);
+template cuvs::neighbors::device_vpq_dataset<half, int64_t>
+detail::vpq_train_from_device_rows<int8_t>(raft::resources const&,
+                                           cuvs::neighbors::vpq_params const&,
+                                           int8_t const*,
+                                           int64_t,
+                                           int64_t,
+                                           int64_t);
+template cuvs::neighbors::device_vpq_dataset<half, int64_t>
+detail::vpq_train_from_device_rows<uint8_t>(raft::resources const&,
+                                            cuvs::neighbors::vpq_params const&,
+                                            uint8_t const*,
+                                            int64_t,
+                                            int64_t,
+                                            int64_t);
 
 }  // namespace cuvs::preprocessing::quantize::pq

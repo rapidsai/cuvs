@@ -12,8 +12,9 @@
 namespace cuvs::neighbors::test {
 
 /**
- * Prepares a device_padded_dataset_view for cagra::build: uses make_padded_dataset_view when the
- * source row stride already matches alignment, otherwise make_padded_dataset and keeps the copy in
+ * Prepares a device_padded_dataset_view for cagra::build: uses make_device_padded_dataset_view when
+ * the source row stride already matches alignment, otherwise make_device_padded_dataset and keeps
+ * the copy in
  * \p owned. The caller must keep this object alive for the lifetime of any index that only holds a
  * view over the data.
  */
@@ -45,10 +46,10 @@ struct padded_device_matrix_for_cagra {
     -> build_result
   {
     using namespace cuvs::neighbors;
-    if (device_matrix_row_width_matches_cagra_required(src)) {
-      return build_result{nullptr, make_padded_dataset_view(res, src)};
+    if (matrix_row_width_matches_cagra_required(src)) {
+      return build_result{nullptr, make_device_padded_dataset_view(res, src)};
     } else {
-      auto own = make_padded_dataset(res, src);
+      auto own = make_device_padded_dataset(res, src);
       auto vw  = own->as_dataset_view();
       return build_result{std::move(own), vw};
     }

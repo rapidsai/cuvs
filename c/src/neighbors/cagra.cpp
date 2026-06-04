@@ -50,7 +50,7 @@ struct cuvs_cagra_c_api_lifetime_holder {
 
 template <typename T>
 static std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
-take_padded_from_any_owning(std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> box)
+take_padded_from_any_owning(std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> box)
 {
   using padded_t = cuvs::neighbors::device_padded_dataset<T, int64_t>;
   auto& variant  = box->as_variant();
@@ -212,15 +212,15 @@ void _build(cuvsResources_t res,
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     // Device `cagra::build` requires a row stride compatible with 16-byte alignment; bare DLPack
-    // buffers (e.g. small dim) are often tightly packed and must be copied via `make_padded_dataset`.
-    if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
-      auto view  = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
+    // buffers (e.g. small dim) are often tightly packed and must be copied via `make_device_padded_dataset`.
+    if (cuvs::neighbors::matrix_row_width_matches_cagra_required(mds)) {
+      auto view  = cuvs::neighbors::make_device_padded_dataset_view(*res_ptr, mds);
       auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
       index.update_dataset(*res_ptr, view);
       auto* raw = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(std::move(index));
       assign_standalone_index<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, raw);
     } else {
-      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);
       auto view   = padded->as_dataset_view();
       auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
       index.update_dataset(*res_ptr, view);
@@ -239,7 +239,7 @@ void _build(cuvsResources_t res,
       std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_owner = nullptr;
       // In-memory ACE returns a graph-only index; disk ACE attaches dataset via file descriptors.
       if (index.dim() == 0) {
-        auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+        auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);
         auto view   = padded->as_dataset_view();
         index.update_dataset(*res_ptr, view);
         padded_owner = std::move(padded);
@@ -250,7 +250,7 @@ void _build(cuvsResources_t res,
         std::move(index)};
       assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
     } else {
-      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);
       auto view   = padded->as_dataset_view();
       auto index  = cuvs::neighbors::cagra::build(*res_ptr, index_params, view);
       index.update_dataset(*res_ptr, view);
@@ -278,8 +278,8 @@ void _from_args(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    if (cuvs::neighbors::device_matrix_row_width_matches_cagra_required(mds)) {
-      auto dataset_view = cuvs::neighbors::make_padded_dataset_view(*res_ptr, mds);
+    if (cuvs::neighbors::matrix_row_width_matches_cagra_required(mds)) {
+      auto dataset_view = cuvs::neighbors::make_device_padded_dataset_view(*res_ptr, mds);
       void* raw         = nullptr;
       if (cuvs::core::is_dlpack_device_compatible(graph)) {
         using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
@@ -297,7 +297,7 @@ void _from_args(cuvsResources_t res,
                                  reinterpret_cast<cuvs::neighbors::cagra::padded_index<T, uint32_t>*>(raw));
     } else {
       // Same as host path and cagra::_build: row pitch must be CAGRA-aligned; copy into a holder.
-      auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+      auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);
       auto idx    = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(*res_ptr, metric);
       idx->update_dataset(*res_ptr, padded->as_dataset_view());
       if (cuvs::core::is_dlpack_device_compatible(graph)) {
@@ -319,9 +319,9 @@ void _from_args(cuvsResources_t res,
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    // Match build(): rows must be padded to CAGRA's alignment (see make_padded_dataset); a tight
+    // Match build(): rows must be padded to CAGRA's alignment (see make_device_padded_dataset); a tight
     // row-major copy (dim * sizeof(T) not a multiple of 16) misaligns vectorized distance loads.
-    auto padded = cuvs::neighbors::make_padded_dataset(*res_ptr, mds);
+    auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);
     auto idx    = new cuvs::neighbors::cagra::padded_index<T, uint32_t>(*res_ptr, metric);
     idx->update_dataset(*res_ptr, padded->as_dataset_view());
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
@@ -503,16 +503,16 @@ void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t ou
     nullptr,
     raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
     cuvs::neighbors::cagra::padded_index<T, uint32_t>(*res_ptr)};
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> out_dataset;
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> out_dataset;
   cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), &holder->idx, &out_dataset);
   holder->padded_dataset_owner = take_padded_from_any_owning<T>(std::move(out_dataset));
 
   // Deserialized strided layout often matches logical dim (tight rows). CAGRA search requires the
-  // same row width as device builds (see `device_matrix_row_width_matches_cagra_required` / `update_dataset`).
+  // same row width as device builds (see `matrix_row_width_matches_cagra_required` / `update_dataset`).
   auto ds = holder->idx.dataset();
-  if (ds.extent(0) > 0 && !cuvs::neighbors::device_matrix_row_width_matches_cagra_required(ds)) {
+  if (ds.extent(0) > 0 && !cuvs::neighbors::matrix_row_width_matches_cagra_required(ds)) {
     auto padded =
-      cuvs::neighbors::make_padded_dataset(*res_ptr, ds);
+      cuvs::neighbors::make_device_padded_dataset(*res_ptr, ds);
     holder->idx.update_dataset(*res_ptr, padded->as_dataset_view());
     holder->padded_dataset_owner = std::move(padded);
   }

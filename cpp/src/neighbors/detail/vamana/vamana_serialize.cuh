@@ -59,14 +59,14 @@ void to_file(const std::string& dataset_base_file, raft::host_matrix<T, int64_t>
  */
 template <typename T>
 void serialize_dataset(raft::resources const& res,
-                       const cuvs::neighbors::any_dataset_view<T, int64_t>* dataset,
+                       const cuvs::neighbors::device_any_dataset_view<T, int64_t>* dataset,
                        const std::string& dataset_base_file)
 {
   if (dataset == nullptr) { return; }
   // try allocating a buffer for the dataset on host
   try {
     namespace nb   = cuvs::neighbors;
-    using VT       = nb::any_dataset_view_types<T, int64_t>;
+    using VT       = nb::device_any_dataset_view_types<T, int64_t>;
     auto const& va = dataset->as_variant();
     if (std::holds_alternative<typename VT::padded_view>(va)) {
       auto const& v  = std::get<typename VT::padded_view>(va);
@@ -126,7 +126,7 @@ void serialize_dataset(raft::resources const& res,
 template <typename T, typename IdxT, typename HostMatT>
 void serialize_sector_aligned(raft::resources const& res,
                               const HostMatT& h_graph,
-                              const cuvs::neighbors::any_dataset_view<T, int64_t>& dataset,
+                              const cuvs::neighbors::device_any_dataset_view<T, int64_t>& dataset,
                               const uint64_t medoid,
                               std::ofstream& output_writer)
 {
@@ -165,7 +165,7 @@ void serialize_sector_aligned(raft::resources const& res,
   // copy dataset to host
   auto h_data    = raft::make_host_matrix<T, int64_t>(npts, ndims);
   namespace nb   = cuvs::neighbors;
-  using VT       = nb::any_dataset_view_types<T, int64_t>;
+  using VT       = nb::device_any_dataset_view_types<T, int64_t>;
   auto const& va = dataset.as_variant();
   if (std::holds_alternative<typename VT::padded_view>(va)) {
     auto const& v = std::get<typename VT::padded_view>(va);

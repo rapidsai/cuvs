@@ -115,8 +115,8 @@ struct index_state {
 
   /**
    * When row pitch is not CAGRA-aligned, `cagra::build(res, params, device_matrix_view)` calls
-   * `make_padded_dataset_view` and throws. For `cagra::index<float,uint32_t>` we keep an owning
-   * padded copy in \p ann_build_pad and call `cagra::build` on `device_padded_dataset_view`.
+   * `make_device_padded_dataset_view` and throws. For `cagra::index<float,uint32_t>` we keep an
+   * owning padded copy in \p ann_build_pad and call `cagra::build` on `device_padded_dataset_view`.
    */
   template <typename BuildFn, typename DatasetView>
   [[nodiscard]] static auto build_upstream_ann(
@@ -127,9 +127,9 @@ struct index_state {
     std::shared_ptr<cuvs::neighbors::device_padded_dataset<value_type, int64_t>>& ann_build_pad)
     -> std::shared_ptr<UpstreamT>
   {
-    if (!cuvs::neighbors::device_matrix_row_width_matches_cagra_required(dataset)) {
+    if (!cuvs::neighbors::matrix_row_width_matches_cagra_required(dataset)) {
       if constexpr (std::is_same_v<UpstreamT, cuvs::neighbors::cagra::padded_index<float>>) {
-        auto own = cuvs::neighbors::make_padded_dataset(res, dataset);
+        auto own = cuvs::neighbors::make_device_padded_dataset(res, dataset);
         ann_build_pad =
           std::shared_ptr<cuvs::neighbors::device_padded_dataset<value_type, int64_t>>(
             std::move(own));
@@ -143,7 +143,7 @@ struct index_state {
     ann_build_pad.reset();
     auto index = std::forward<BuildFn>(build_fn)(res, tiered_params, dataset);
     if constexpr (std::is_same_v<UpstreamT, cuvs::neighbors::cagra::padded_index<float>>) {
-      index.update_dataset(res, cuvs::neighbors::make_padded_dataset_view(res, dataset));
+      index.update_dataset(res, cuvs::neighbors::make_device_padded_dataset_view(res, dataset));
     }
     return std::make_shared<UpstreamT>(std::move(index));
   }
@@ -322,10 +322,10 @@ inline void update_cagra_ann_dataset_for_stride(
   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
   std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>& ann_build_pad)
 {
-  if (!cuvs::neighbors::device_matrix_row_width_matches_cagra_required(dataset)) {
+  if (!cuvs::neighbors::matrix_row_width_matches_cagra_required(dataset)) {
     // Keep the new buffer alive locally, repoint the index first, then replace ann_build_pad.
     // Otherwise assigning to ann_build_pad can destroy the dataset the index still views.
-    auto new_pad = cuvs::neighbors::make_padded_dataset(res, dataset);
+    auto new_pad = cuvs::neighbors::make_device_padded_dataset(res, dataset);
     ann_index.update_dataset(res, new_pad->as_dataset_view());
     ann_build_pad =
       std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(new_pad));

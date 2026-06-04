@@ -1389,8 +1389,8 @@ cuvs::neighbors::cagra::padded_index<T, IdxT> build_ace(
 
       // Copy host partition to device with padding; build_from_device_matrix accepts
       // device_padded_dataset_view.
-      auto sub_dataset_dev =
-        cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(sub_dataset.view()));
+      auto sub_dataset_dev = cuvs::neighbors::make_device_padded_dataset(
+        res, raft::make_const_mdspan(sub_dataset.view()));
       auto sub_index = ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
         res, sub_index_params, sub_dataset_dev->as_dataset_view());
 
@@ -1989,9 +1989,10 @@ auto iterative_build_graph(raft::resources const& res,
 
   // Iteratively improve the accuracy of the graph by repeatedly running
   // CAGRA's search() and optimize(). Dataset is already on device with correct
-  // stride (caller uses make_padded_dataset_view or make_padded_dataset()->as_dataset_view()).
-  // As for the size of the graph, instead of targeting all nodes from the beginning, the number
-  // of nodes is initially small, and the number of nodes is doubled with each iteration.
+  // stride (caller uses make_device_padded_dataset_view or
+  // make_device_padded_dataset()->as_dataset_view()). As for the size of the graph, instead of
+  // targeting all nodes from the beginning, the number of nodes is initially small, and the number
+  // of nodes is doubled with each iteration.
   RAFT_LOG_INFO("Iteratively creating/improving graph index using CAGRA's search() and optimize()");
 
   auto dev_dataset     = dataset.view();
@@ -2212,8 +2213,8 @@ inline void validate_cagra_knn_graph_build_constraints(index_params const& param
 /**
  * Iterative / IVF-PQ / NN-descent KNN graph construction and `optimize` → final host CAGRA graph.
  *
- * @param ensure_padded_for_iterative_and_nn  Host path: lazy `make_padded_dataset`; device path:
- *        return existing padded view (cheap). Used for iterative and NN-descent only.
+ * @param ensure_padded_for_iterative_and_nn  Host path: lazy `make_device_padded_dataset`; device
+ * path: return existing padded view (cheap). Used for iterative and NN-descent only.
  * @param ivf_pq_graph_dataset  IVF-PQ `build_knn_graph` dataset (host mdspan or device padded
  * view).
  */
@@ -2305,7 +2306,9 @@ auto build_from_host_matrix(raft::resources const& res,
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own{};
 
   auto ensure_padded = [&]() -> cuvs::neighbors::device_padded_dataset_view<T, int64_t> {
-    if (!padded_own) { padded_own = cuvs::neighbors::make_padded_dataset(res, host_dataset); }
+    if (!padded_own) {
+      padded_own = cuvs::neighbors::make_device_padded_dataset(res, host_dataset);
+    }
     return padded_own->as_dataset_view();
   };
 

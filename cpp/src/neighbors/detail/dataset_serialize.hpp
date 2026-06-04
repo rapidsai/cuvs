@@ -26,11 +26,11 @@ constexpr dataset_instance_tag kSerializeEmptyDataset   = 1;
 constexpr dataset_instance_tag kSerializeStridedDataset = 2;
 constexpr dataset_instance_tag kSerializeVPQDataset     = 3;
 
-// Padded: `padded_dataset_view` writes the payload.
+// Padded: `device_padded_dataset_view` writes the payload.
 template <typename DataT, typename IdxT>
 void serialize(const raft::resources& res,
                std::ostream& os,
-               const padded_dataset_view<DataT, IdxT>& dataset)
+               const device_padded_dataset_view<DataT, IdxT>& dataset)
 {
   auto n_rows = dataset.n_rows();
   auto dim    = dataset.dim();
@@ -55,7 +55,7 @@ void serialize(const raft::resources& res,
 template <typename DataT, typename IdxT>
 void serialize_cagra_padded_dataset(const raft::resources& res,
                                     std::ostream& os,
-                                    const padded_dataset_view<DataT, IdxT>& dataset)
+                                    const device_padded_dataset_view<DataT, IdxT>& dataset)
 {
   raft::serialize_scalar(res, os, kSerializeStridedDataset);
   if constexpr (std::is_same_v<DataT, float>) {
@@ -74,16 +74,16 @@ void serialize_cagra_padded_dataset(const raft::resources& res,
 
 template <typename IdxT>
 auto deserialize_empty(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
 {
   auto suggested_dim = raft::deserialize_scalar<uint32_t>(res, is);
-  auto v             = empty_dataset<IdxT>(suggested_dim);
-  return std::make_unique<any_owning_dataset<IdxT>>(std::move(v));
+  auto v             = device_empty_dataset<IdxT>(suggested_dim);
+  return std::make_unique<device_any_owning_dataset<IdxT>>(std::move(v));
 }
 
 template <typename DataT, typename IdxT>
 auto deserialize_strided(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
 {
   auto n_rows = raft::deserialize_scalar<IdxT>(res, is);
   auto dim    = raft::deserialize_scalar<uint32_t>(res, is);
@@ -94,13 +94,13 @@ auto deserialize_strided(raft::resources const& res, std::istream& is)
                static_cast<unsigned>(stride));
   auto host_array = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
   raft::deserialize_mdspan(res, is, host_array.view());
-  auto padded = cuvs::neighbors::make_padded_dataset(res, host_array.view());
+  auto padded = cuvs::neighbors::make_device_padded_dataset(res, host_array.view());
   return cuvs::neighbors::wrap_any_owning(std::move(padded));
 }
 
 template <typename DataT, typename IdxT>
 auto deserialize_vpq(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
 {
   auto n_rows             = raft::deserialize_scalar<IdxT>(res, is);
   auto dim                = raft::deserialize_scalar<uint32_t>(res, is);
@@ -120,13 +120,14 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, pq_code_book.view());
   raft::deserialize_mdspan(res, is, data.view());
 
-  vpq_dataset<DataT, IdxT> vpq{std::move(vq_code_book), std::move(pq_code_book), std::move(data)};
-  return std::make_unique<any_owning_dataset<IdxT>>(std::move(vpq));
+  device_vpq_dataset<DataT, IdxT> vpq{
+    std::move(vq_code_book), std::move(pq_code_book), std::move(data)};
+  return std::make_unique<device_any_owning_dataset<IdxT>>(std::move(vpq));
 }
 
 template <typename IdxT>
 auto deserialize_dataset(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
 {
   const auto tag = raft::deserialize_scalar<dataset_instance_tag>(res, is);
   switch (tag) {

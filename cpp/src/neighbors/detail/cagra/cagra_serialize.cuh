@@ -34,9 +34,9 @@ namespace {
 template <typename T, typename IdxT>
 void attach_any_owning_to_padded_index(raft::resources const& res,
                                        cuvs::neighbors::cagra::padded_index<T, IdxT>* index,
-                                       cuvs::neighbors::any_owning_dataset<int64_t>& owner)
+                                       cuvs::neighbors::device_any_owning_dataset<int64_t>& owner)
 {
-  using OT    = cuvs::neighbors::any_owning_dataset_types<int64_t>;
+  using OT    = cuvs::neighbors::device_any_owning_dataset_types<int64_t>;
   auto& store = owner.as_variant();
   if (std::holds_alternative<typename OT::empty_owning>(store)) {
     auto const& e = std::get<typename OT::empty_owning>(store);
@@ -310,7 +310,7 @@ void deserialize(
   raft::resources const& res,
   std::istream& is,
   cuvs::neighbors::cagra::padded_index<T, IdxT>* index_,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr)
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
@@ -374,7 +374,7 @@ void deserialize(
   raft::resources const& res,
   const std::string& filename,
   cuvs::neighbors::cagra::padded_index<T, IdxT>* index_,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr)
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 

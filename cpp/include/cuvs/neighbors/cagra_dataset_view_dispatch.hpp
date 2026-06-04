@@ -27,7 +27,8 @@ void expect_cagra_row_width_for_graph(uint32_t logical_dim, int64_t pitch)
     pitch == static_cast<int64_t>(need),
     "convert_dataset_view_to_padded_for_graph_build: row width in elements (pitch) must match "
     "CAGRA's required width for this element type and logical dimension (expected %u, got %ld; "
-    "logical dim %u). Use make_padded_dataset_view() or make_padded_dataset() with the same "
+    "logical dim %u). Use make_device_padded_dataset_view() or make_device_padded_dataset() with "
+    "the same "
     "default alignment as CAGRA graph build.",
     static_cast<unsigned>(need),
     static_cast<long>(pitch),

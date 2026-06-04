@@ -193,8 +193,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>
     sub_dataset_buffers_ =
       std::make_shared<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>();
-  std::shared_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> deserialized_dataset_;
-  std::vector<std::shared_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>>
+  std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> deserialized_dataset_;
+  std::vector<std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>>
     sub_deserialized_datasets_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
@@ -226,14 +226,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
     if (use_ace_host) {
       auto ace_index = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
       if (ace_index.dim() == 0) {
-        auto padded = cuvs::neighbors::make_padded_dataset(handle_, dataset_view_host);
+        auto padded = cuvs::neighbors::make_device_padded_dataset(handle_, dataset_view_host);
         ace_index.update_dataset(handle_, padded->as_dataset_view());
         *dataset_ = std::move(padded->data_);
       }
       index_ = std::make_shared<index_type>(std::move(ace_index));
     } else {
       // Non-ACE CAGRA build must use cagra::build(res, params, dataset_view) from
-      // make_padded_dataset / make_padded_dataset_view; the host mdspan and raw
+      // make_device_padded_dataset / make_device_padded_dataset_view; the host mdspan and raw
       // device mdspan entry points are not valid for these graph types.
       // Host + non-ACE: copy to a device buffer first, then use the same path
       // as a native device pointer.
@@ -262,14 +262,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       // `std::move(index)` moves (a const `index` would try to copy the deleted
       // cagra::index copy ctor).
       if (device_src && src_stride == required_stride) {
-        auto const pdv    = cuvs::neighbors::make_padded_dataset_view(handle_, mds);
+        auto const pdv    = cuvs::neighbors::make_device_padded_dataset_view(handle_, mds);
         *input_dataset_v_ = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
           mds.data_handle(), static_cast<int64_t>(nrow), static_cast<int64_t>(dim_));
         auto index = cuvs::neighbors::cagra::build(handle_, params, pdv);
         index.update_dataset(handle_, pdv);
         index_ = std::make_shared<index_type>(std::move(index));
       } else {
-        auto padded = cuvs::neighbors::make_padded_dataset(handle_, mds);
+        auto padded = cuvs::neighbors::make_device_padded_dataset(handle_, mds);
         auto view   = padded->as_dataset_view();
         auto index  = cuvs::neighbors::cagra::build(handle_, params, view);
         index.update_dataset(handle_, view);
@@ -310,7 +310,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
         if (use_ace_host) {
           auto ace_index = cuvs::neighbors::cagra::build(handle_, params, sub_host);
           if (ace_index.dim() == 0) {
-            auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, sub_host);
+            auto padded_sub = cuvs::neighbors::make_device_padded_dataset(handle_, sub_host);
             ace_index.update_dataset(handle_, padded_sub->as_dataset_view());
             sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
           }
@@ -332,11 +332,11 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
           RAFT_CUDA_TRY(cudaPointerGetAttributes(&sub_attrs, mds_sub.data_handle()));
           const bool sub_device = (reinterpret_cast<T const*>(sub_attrs.devicePointer) != nullptr);
           if (sub_device && src_sub == req_sub) {
-            auto pdv_sub = cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub);
+            auto pdv_sub = cuvs::neighbors::make_device_padded_dataset_view(handle_, mds_sub);
             sub_index    = cuvs::neighbors::cagra::build(handle_, params, pdv_sub);
             sub_index.update_dataset(handle_, pdv_sub);
           } else {
-            auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, mds_sub);
+            auto padded_sub = cuvs::neighbors::make_device_padded_dataset(handle_, mds_sub);
             auto view       = padded_sub->as_dataset_view();
             auto index      = cuvs::neighbors::cagra::build(handle_, params, view);
             index.update_dataset(handle_, view);
@@ -353,11 +353,11 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
           RAFT_CUDA_TRY(cudaPointerGetAttributes(&sub_attrs, mds_sub.data_handle()));
           const bool sub_device = (reinterpret_cast<T const*>(sub_attrs.devicePointer) != nullptr);
           if (sub_device && src_sub == req_sub) {
-            auto pdv_sub = cuvs::neighbors::make_padded_dataset_view(handle_, mds_sub);
+            auto pdv_sub = cuvs::neighbors::make_device_padded_dataset_view(handle_, mds_sub);
             sub_index    = cuvs::neighbors::cagra::build(handle_, params, pdv_sub);
             sub_index.update_dataset(handle_, pdv_sub);
           } else {
-            auto padded_sub = cuvs::neighbors::make_padded_dataset(handle_, mds_sub);
+            auto padded_sub = cuvs::neighbors::make_device_padded_dataset(handle_, mds_sub);
             auto view       = padded_sub->as_dataset_view();
             auto index      = cuvs::neighbors::cagra::build(handle_, params, view);
             index.update_dataset(handle_, view);
@@ -570,19 +570,19 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
     for (size_t i = 0; i < count; ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
       auto sub_index      = std::make_shared<index_type>(handle_);
-      std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> tmp_ds;
+      std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> tmp_ds;
       cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get(), &tmp_ds);
       sub_deserialized_datasets_[i] =
-        std::shared_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>(std::move(tmp_ds));
+        std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>(std::move(tmp_ds));
       sub_indices_.push_back(std::move(sub_index));
     }
   } else {
     index_ = std::make_shared<index_type>(handle_);
     deserialized_dataset_.reset();
-    std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>> tmp_ds;
+    std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> tmp_ds;
     cuvs::neighbors::cagra::deserialize(handle_, file, index_.get(), &tmp_ds);
     deserialized_dataset_ =
-      std::shared_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>(std::move(tmp_ds));
+      std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>(std::move(tmp_ds));
   }
 }
 

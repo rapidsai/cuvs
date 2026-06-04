@@ -305,10 +305,10 @@ void add_graph_nodes(
   using padded_view_t = cuvs::neighbors::padded_dataset_view_t<T, int64_t>;
   auto zero_row       = raft::make_device_matrix_view<const T, int64_t>(
     static_cast<const T*>(nullptr), int64_t{0}, static_cast<uint32_t>(dim));
-  padded_view_t empty_dataset_view(zero_row, static_cast<uint32_t>(dim));
+  padded_view_t device_empty_dataset_view(zero_row, static_cast<uint32_t>(dim));
   auto empty_graph_view = raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
   neighbors::cagra::index<T, IdxT, padded_view_t> internal_index(
-    handle, index.metric(), empty_dataset_view, empty_graph_view);
+    handle, index.metric(), device_empty_dataset_view, empty_graph_view);
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
        additional_dataset_offset += max_chunk_size_) {
@@ -323,7 +323,7 @@ void add_graph_nodes(
     auto graph_view = raft::make_host_matrix_view<const IdxT, std::int64_t>(
       updated_graph_view.data_handle(), initial_dataset_size + additional_dataset_offset, degree);
 
-    auto pdv = cuvs::neighbors::make_padded_dataset_view(handle, dataset_view);
+    auto pdv = cuvs::neighbors::make_device_padded_dataset_view(handle, dataset_view);
     internal_index.update_dataset(handle, pdv);
 
     // Note: The graph is copied to the device memory.

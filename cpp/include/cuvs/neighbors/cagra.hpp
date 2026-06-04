@@ -492,21 +492,22 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
    * Stores a shallow copy of the dataset view. The index stores a **non-owning** view; the caller
    * must keep underlying device storage alive for the index lifetime.
    *
-   * Example — **non-owning** `make_padded_dataset_view` (wraps an existing device matrix; that
-   * matrix must outlive the index):
+   * Example — **non-owning** `make_device_padded_dataset_view` (wraps an existing device matrix;
+   * that matrix must outlive the index):
    * @code{.cpp}
    *   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset = ...;
-   *   auto view = cuvs::neighbors::make_padded_dataset_view(res, dataset);
+   *   auto view = cuvs::neighbors::make_device_padded_dataset_view(res, dataset);
    *   auto graph = raft::make_device_matrix_view<const uint32_t, int64_t>(...);
    *   cuvs::neighbors::cagra::padded_index<float> idx(res, metric, view,
    *                                                       raft::make_const_mdspan(graph));
    * @endcode
    *
-   * Example — **owning** `make_padded_dataset` returns owning storage (`std::unique_ptr`). You must
+   * Example — **owning** `make_device_padded_dataset` returns owning storage (`std::unique_ptr`).
+   * You must
    * **keep that object alive** (e.g. hold the `unique_ptr` in a variable or member) for as long as
    * the index uses the dataset; the index does not take ownership of the buffer.
    * @code{.cpp}
-   *   auto padded_owner = cuvs::neighbors::make_padded_dataset(res, dataset_mdspan);
+   *   auto padded_owner = cuvs::neighbors::make_device_padded_dataset(res, dataset_mdspan);
    *   auto view         = padded_owner->as_dataset_view();
    *   cuvs::neighbors::cagra::padded_index<float> idx(res, metric, view,
    *                                                       raft::make_const_mdspan(graph));
@@ -564,7 +565,7 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view)
   {
     if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
-      dataset_ = cuvs::neighbors::make_padded_dataset_view(res, dataset_view);
+      dataset_ = cuvs::neighbors::make_device_padded_dataset_view(res, dataset_view);
       dataset_norms_.reset();
       if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
         if (dataset_.n_rows() > 0) { compute_dataset_norms_(res); }
@@ -874,12 +875,12 @@ struct merged_dataset_storage {
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset_view` / `make_device_padded_dataset` for the view. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
-  "make_padded_dataset; matrix overloads do not support VPQ.")]]
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset_view / "
+  "make_device_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
@@ -920,12 +921,13 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE from host, set `graph_build_params`
- *             to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset` for host uploads. For ACE from host, set
+ * `graph_build_params` to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; for ACE use "
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset / view; for ACE "
+  "use "
   "cagra::build(res, params, host_view) with ace_params; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
@@ -967,12 +969,12 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset_view` / `make_device_padded_dataset` for the view. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
-  "make_padded_dataset; matrix overloads do not support VPQ.")]]
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset_view / "
+  "make_device_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
@@ -1012,12 +1014,13 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE from host, set `graph_build_params`
- *             to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset` for host uploads. For ACE from host, set
+ * `graph_build_params` to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; for ACE use "
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset / view; for ACE "
+  "use "
   "cagra::build(res, params, host_view) with ace_params; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
@@ -1060,12 +1063,12 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset_view` / `make_device_padded_dataset` for the view. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
-  "make_padded_dataset; matrix overloads do not support VPQ.")]]
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset_view / "
+  "make_device_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
@@ -1108,12 +1111,13 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE from host, set `graph_build_params`
- *             to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset` for host uploads. For ACE from host, set
+ * `graph_build_params` to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; for ACE use "
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset / view; for ACE "
+  "use "
   "cagra::build(res, params, host_view) with ace_params; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
@@ -1157,12 +1161,12 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset_view` / `make_padded_dataset` for the view. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset_view` / `make_device_padded_dataset` for the view. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset_view / "
-  "make_padded_dataset; matrix overloads do not support VPQ.")]]
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset_view / "
+  "make_device_padded_dataset; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
@@ -1205,12 +1209,13 @@ auto build(raft::resources const& res,
  * @return the constructed cagra index
  *
  * @deprecated Prefer `cagra::build(res, params, dataset_view)` returning `cagra::index`, using
- *             `make_padded_dataset` for host uploads. For ACE from host, set `graph_build_params`
- *             to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix overloads do
- *             not support VPQ compression.
+ *             `make_device_padded_dataset` for host uploads. For ACE from host, set
+ * `graph_build_params` to `ace_params` and use `cagra::build(res, params, host_view)`. Matrix
+ * overloads do not support VPQ compression.
  */
 [[deprecated(
-  "Prefer cagra::build(res, params, dataset_view) with make_padded_dataset / view; for ACE use "
+  "Prefer cagra::build(res, params, dataset_view) with make_device_padded_dataset / view; for ACE "
+  "use "
   "cagra::build(res, params, host_view) with ace_params; matrix overloads do not support VPQ.")]]
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
@@ -1223,7 +1228,7 @@ auto build(raft::resources const& res,
  * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The returned index
  * contains only the optimized graph; call `index::update_dataset(res, dataset)` with the same
  * view type before search (keep underlying storage alive). For VPQ search, attach a
- * `vpq_dataset_view` after building on padded rows.
+ * `device_vpq_dataset_view` after building on padded rows.
  */
 template <typename DatasetViewT>
   requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t> &&
@@ -1711,7 +1716,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::padded_index<float>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1768,7 +1773,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::padded_index<float>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 /**
  * Save the index to file.
  *
@@ -1826,7 +1831,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::padded_index<half>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1883,7 +1888,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::padded_index<half>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -1941,7 +1946,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::padded_index<int8_t>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1998,7 +2003,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::padded_index<int8_t>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -2056,7 +2061,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::padded_index<uint8_t>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2113,7 +2118,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::padded_index<uint8_t>* index,
-  std::unique_ptr<cuvs::neighbors::any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
