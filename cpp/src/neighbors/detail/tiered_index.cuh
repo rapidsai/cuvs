@@ -141,8 +141,11 @@ struct index_state {
     }
 
     ann_build_pad.reset();
-    return std::make_shared<UpstreamT>(
-      std::forward<BuildFn>(build_fn)(res, tiered_params, dataset));
+    auto index = std::forward<BuildFn>(build_fn)(res, tiered_params, dataset);
+    if constexpr (std::is_same_v<UpstreamT, cuvs::neighbors::cagra::padded_index<float>>) {
+      index.update_dataset(res, cuvs::neighbors::make_padded_dataset_view(res, dataset));
+    }
+    return std::make_shared<UpstreamT>(std::move(index));
   }
 
   index_state(const index_state<UpstreamT>& other)
