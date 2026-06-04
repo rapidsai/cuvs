@@ -29,11 +29,11 @@ from cuvs_bench.backends._utils import (
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
 
-def _write_test_bin(path, data, *, force_uint64=False):
+def _write_test_bin(path, data, *, size_dtype=np.uint32):
     """Write a numpy array in cuvs-bench binary format."""
     with open(path, "wb") as f:
         write_bin_header(
-            f, data.shape[0], data.shape[1], force_uint64=force_uint64
+            f, data.shape[0], data.shape[1], size_dtype=size_dtype
         )
         data.tofile(f)
 
@@ -193,7 +193,7 @@ class TestLoadVectors:
         """``load_vectors`` reads files written with the extended uint64 header."""
         data = np.random.rand(40, 16).astype(np.float32)
         path = str(tmp_path / "test.fbin")
-        _write_test_bin(path, data, force_uint64=True)
+        _write_test_bin(path, data, size_dtype=np.uint64)
 
         # Sanity check: file really uses the extended layout.
         assert (
@@ -207,28 +207,26 @@ class TestLoadVectors:
         """``subset_size`` works regardless of which header layout was used."""
         data = np.random.rand(50, 8).astype(np.float32)
         path = str(tmp_path / "test.fbin")
-        _write_test_bin(path, data, force_uint64=True)
+        _write_test_bin(path, data, size_dtype=np.uint64)
 
         loaded = load_vectors(path, subset_size=12)
         assert loaded.shape == (12, 8)
         np.testing.assert_array_equal(loaded, data[:12])
 
     @pytest.mark.parametrize(
-        "ext, dtype, force_uint64",
+        "ext, dtype, size_dtype",
         [
-            (".fbin", np.float32, False),
-            (".fbin", np.float32, True),
-            (".ibin", np.int32, False),
-            (".ibin", np.int32, True),
-            (".u8bin", np.uint8, False),
-            (".u8bin", np.uint8, True),
-            (".i8bin", np.int8, False),
-            (".i8bin", np.int8, True),
+            (".fbin", np.float32, np.uint32),
+            (".fbin", np.float32, np.uint64),
+            (".ibin", np.int32, np.uint32),
+            (".ibin", np.int32, np.uint64),
+            (".u8bin", np.uint8, np.uint32),
+            (".u8bin", np.uint8, np.uint64),
+            (".i8bin", np.int8, np.uint32),
+            (".i8bin", np.int8, np.uint64),
         ],
     )
-    def test_load_roundtrip_all_dtypes(
-        self, tmp_path, ext, dtype, force_uint64
-    ):
+    def test_load_roundtrip_all_dtypes(self, tmp_path, ext, dtype, size_dtype):
         """Round-trip every supported dtype through both header layouts."""
         if np.issubdtype(dtype, np.integer):
             info = np.iinfo(dtype)
@@ -238,7 +236,7 @@ class TestLoadVectors:
         else:
             data = np.random.rand(25, 7).astype(dtype)
         path = str(tmp_path / f"test{ext}")
-        _write_test_bin(path, data, force_uint64=force_uint64)
+        _write_test_bin(path, data, size_dtype=size_dtype)
 
         loaded = load_vectors(path)
         np.testing.assert_array_equal(loaded, data)
@@ -255,11 +253,11 @@ class TestBinHeaderHelpers:
         assert n == LEGACY_HEADER_BYTES
         assert path.stat().st_size == LEGACY_HEADER_BYTES
 
-    def test_write_force_uint64_returns_16_bytes(self, tmp_path):
-        """``force_uint64=True`` should write the 16-byte uint64 header."""
+    def test_write_size_dtype_uint64_returns_16_bytes(self, tmp_path):
+        """``size_dtype=np.uint64`` should write the 16-byte uint64 header."""
         path = tmp_path / "h.bin"
         with open(path, "wb") as f:
-            n = write_bin_header(f, 7, 3, force_uint64=True)
+            n = write_bin_header(f, 7, 3, size_dtype=np.uint64)
         assert n == EXTENDED_HEADER_BYTES
         assert path.stat().st_size == EXTENDED_HEADER_BYTES
 
@@ -293,7 +291,7 @@ class TestBinHeaderHelpers:
         data = np.random.rand(11, 5).astype(np.float32)
         with open(path, "wb") as f:
             write_bin_header(
-                f, data.shape[0], data.shape[1], force_uint64=True
+                f, data.shape[0], data.shape[1], size_dtype=np.uint64
             )
             data.tofile(f)
         n_rows, n_cols, hbytes = read_bin_header(str(path), itemsize=4)

@@ -97,7 +97,9 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
     """
     dtype = dtype_from_filename(path)
     itemsize = np.dtype(dtype).itemsize
-    if subset_size is not None and subset_size < 1:
+    if subset_size is not None and (
+        isinstance(subset_size, float) or subset_size < 1
+    ):
         raise ValueError(
             f"subset_size must be a positive integer, got {subset_size}"
         )

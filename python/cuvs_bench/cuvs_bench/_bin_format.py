@@ -37,6 +37,8 @@ import os
 import struct
 from typing import BinaryIO, Tuple
 
+import numpy as np
+
 UINT32_MAX = (1 << 32) - 1
 
 LEGACY_HEADER_BYTES = 8
@@ -75,6 +77,10 @@ def read_bin_header(path: str, itemsize: int) -> Tuple[int, int, int]:
     FileNotFoundError
         If ``path`` does not exist.
     """
+    if itemsize < 1:
+        raise ValueError(
+            f"itemsize must be a positive integer, got {itemsize!r}"
+        )
     file_size = os.path.getsize(path)
     with open(path, "rb") as f:
         head = f.read(EXTENDED_HEADER_BYTES)
@@ -110,13 +116,13 @@ def write_bin_header(
     n_rows: int,
     n_cols: int,
     *,
-    force_uint64: bool = False,
+    size_dtype=np.uint32,
 ) -> int:
     """Write the canonical cuvs-bench binary header at the current position.
 
     The legacy 8-byte uint32 layout is used whenever both ``n_rows`` and
     ``n_cols`` fit in a ``uint32``. The 16-byte uint64 layout is used
-    otherwise, or when explicitly requested via ``force_uint64=True``.
+    otherwise, or when explicitly requested via ``size_dtype=np.uint64``.
 
     Parameters
     ----------
@@ -124,9 +130,9 @@ def write_bin_header(
         Open binary file handle, positioned where the header should go.
     n_rows, n_cols : int
         Header values to write. Must be non-negative.
-    force_uint64 : bool
-        If ``True``, always write the 16-byte uint64 layout regardless of
-        whether the values fit in ``uint32``. Defaults to ``False``.
+    size_dtype : numpy dtype
+        ``np.uint32`` for the legacy 8-byte header (default), or
+        ``np.uint64`` to force the extended 16-byte header.
 
     Returns
     -------
@@ -137,7 +143,12 @@ def write_bin_header(
         raise ValueError(
             f"n_rows and n_cols must be non-negative, got ({n_rows}, {n_cols})"
         )
-    if force_uint64 or n_rows > UINT32_MAX or n_cols > UINT32_MAX:
+    use_uint64 = (
+        np.dtype(size_dtype) == np.uint64
+        or n_rows > UINT32_MAX
+        or n_cols > UINT32_MAX
+    )
+    if use_uint64:
         f.write(struct.pack("<QQ", int(n_rows), int(n_cols)))
         return EXTENDED_HEADER_BYTES
     f.write(struct.pack("<II", int(n_rows), int(n_cols)))
