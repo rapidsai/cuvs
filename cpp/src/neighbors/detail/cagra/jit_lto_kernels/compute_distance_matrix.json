@@ -81,6 +81,12 @@
         "codebook_type": "void",
         "codebook_abbrev": "none"
       }
+    ],
+    "_smem": [
+      {
+        "enable_fp8": "false",
+        "smem_abbrev": "f16"
+      }
     ]
   },
   {
@@ -148,6 +154,16 @@
       {
         "codebook_type": "half",
         "codebook_abbrev": "half"
+      }
+    ],
+    "_smem": [
+      {
+        "enable_fp8": "false",
+        "smem_abbrev": "f16"
+      },
+      {
+        "enable_fp8": "true",
+        "smem_abbrev": "e5m2"
       }
     ]
   },
@@ -218,6 +234,16 @@
       {
         "dataset_block_dim": "1024",
         "team_size": "32"
+      }
+    ],
+    "_smem": [
+      {
+        "enable_fp8": "false",
+        "smem_abbrev": "f16"
+      },
+      {
+        "enable_fp8": "true",
+        "smem_abbrev": "e5m2"
       }
     ]
   }

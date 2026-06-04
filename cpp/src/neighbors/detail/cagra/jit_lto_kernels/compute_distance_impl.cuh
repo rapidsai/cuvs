@@ -100,9 +100,10 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
+  constexpr auto EnableFP8       = DescriptorT::kEnableFP8;
   using PQ_CODEBOOK_LOAD_T       = uint32_t;
 
-  using smem_val_config                  = vpq_smem_value_config<PQ_LEN>;
+  using smem_val_config                  = vpq_smem_value_config<PQ_LEN, EnableFP8>;
   using smem_val_pack_t                  = typename smem_val_config::smem_val_pack_t;
   using smem_val_pack_uint_t             = typename smem_val_config::smem_val_pack_uint_t;
   constexpr uint32_t num_packed_elements = smem_val_config::num_packed_elements;
@@ -154,23 +155,55 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
           for (std::uint32_t m = 0; m < PQ_LEN / num_packed_elements; m++) {
             constexpr uint32_t vq_val_pack_num_elements = 2;
             constexpr auto kQueryBlock                  = DatasetBlockDim / (vlen * PQ_LEN);
-            const std::uint32_t vq_half2_index =
+            std::uint32_t vq_half2_index =
               m * (num_packed_elements / vq_val_pack_num_elements) + (PQ_LEN / 2) * v;
 
-            static_assert(num_packed_elements == 2,
-                          "CAGRA JIT VPQ currently stores pq_len=8 in half2 shared-memory packs");
-            const uint32_t query_val_index =
-              vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
+            uint32_t query_val_index;
+            if constexpr (num_packed_elements == 2) {
+              query_val_index =
+                vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
+            } else if constexpr (PQ_LEN == num_packed_elements) {
+              query_val_index = elem_offset + v * (DatasetBlockDim / (num_packed_elements * vlen)) +
+                                e * TeamSize + laneId;
+            } else {
+              const uint32_t query_vec_element_id =
+                (elem_offset + e * vlen * TeamSize + v + laneId * vlen) * PQ_LEN /
+                num_packed_elements;
+              constexpr auto kStride = vlen * PQ_LEN / num_packed_elements;
+              query_val_index =
+                transpose<DatasetBlockDim / num_packed_elements, kStride>(query_vec_element_id);
+            }
 
-            smem_val_pack_t q2, c2;
-            device::lds(q2, query_ptr + sizeof(smem_val_pack_t) * query_val_index);
-            device::lds(c2,
-                        pq_codebook_ptr +
-                          sizeof(smem_val_pack_uint_t) * ((1 << PQ_BITS) * m + (pq_code & 0xff)));
-            auto dist =
-              q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
-            dist = dist * dist;
-            norm += static_cast<DISTANCE_T>(dist.x + dist.y);
+            if constexpr (num_packed_elements == 2) {
+              smem_val_pack_t q2, c2;
+              device::lds(q2, query_ptr + sizeof(smem_val_pack_t) * query_val_index);
+              device::lds(c2,
+                          pq_codebook_ptr +
+                            sizeof(smem_val_pack_uint_t) * ((1 << PQ_BITS) * m + (pq_code & 0xff)));
+              auto dist =
+                q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
+              dist = dist * dist;
+              norm += static_cast<DISTANCE_T>(dist.x + dist.y);
+            } else if constexpr (num_packed_elements == 4 || num_packed_elements == 8) {
+              smem_val_pack_t q_vec, c_vec;
+              device::lds(q_vec.as_uint(),
+                          query_ptr + sizeof(smem_val_pack_uint_t) * query_val_index);
+              device::lds(c_vec.as_uint(),
+                          pq_codebook_ptr +
+                            sizeof(smem_val_pack_uint_t) * ((1 << PQ_BITS) * m + (pq_code & 0xff)));
+
+              half2 q2, c2;
+#pragma unroll
+              for (uint32_t bi = 0; bi < num_packed_elements / 2; bi++) {
+                q2 = q_vec.as_half2(bi);
+                c2 = c_vec.as_half2(bi);
+                auto dist =
+                  q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
+                dist = dist * dist;
+                norm += static_cast<DISTANCE_T>(dist.x + dist.y);
+                vq_half2_index += 1;
+              }
+            }
           }
           pq_code >>= 8;
         }
@@ -237,7 +270,8 @@ template <uint32_t TeamSize,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename QueryT>
+          typename QueryT,
+          bool EnableFP8>
 __device__ DistanceT compute_distance_impl(
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
   IndexT dataset_index)
@@ -256,7 +290,8 @@ __device__ DistanceT compute_distance_impl(
                                                 DataT,
                                                 IndexT,
                                                 DistanceT,
-                                                QueryT>;
+                                                QueryT,
+                                                EnableFP8>;
     return compute_distance_vpq_impl<desc_t>(args, dataset_index);
   } else {
     static_assert(sizeof(TeamSize) == 0,

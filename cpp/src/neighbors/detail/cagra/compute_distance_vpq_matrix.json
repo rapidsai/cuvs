@@ -96,5 +96,9 @@
   ],
   "metric": [
     "L2Expanded"
+  ],
+  "enable_fp8": [
+    "true",
+    "false"
   ]
 }
