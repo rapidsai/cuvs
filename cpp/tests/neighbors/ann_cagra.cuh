@@ -1711,15 +1711,15 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                                 // without refinement
   for (uint32_t pq_len : {2, 4, 8}) {
     for (uint32_t vq_n_centers : {100, 1000}) {
-      for (auto input : inputs2) {
-        vpq_params ps{};
-        ps.pq_dim       = input.dim / pq_len;
-        ps.vq_n_centers = vq_n_centers;
-        input.compression.emplace(ps);
-        input.smem_dtype = cuvs::neighbors::cagra::internal_dtype::AUTO;
-        inputs.push_back(input);
-        if (pq_len >= 4 && vq_n_centers == 100) {
-          input.smem_dtype = cuvs::neighbors::cagra::internal_dtype::E5M2;
+      for (auto internal_smem_dtype : {cuvs::neighbors::cagra::internal_dtype::E5M2,
+                                       cuvs::neighbors::cagra::internal_dtype::F16,
+                                       cuvs::neighbors::cagra::internal_dtype::AUTO}) {
+        for (auto input : inputs2) {
+          vpq_params ps{};
+          ps.pq_dim       = input.dim / pq_len;
+          ps.vq_n_centers = vq_n_centers;
+          input.compression.emplace(ps);
+          input.smem_dtype = internal_smem_dtype;
           inputs.push_back(input);
         }
       }
