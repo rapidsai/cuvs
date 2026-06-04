@@ -75,11 +75,26 @@ std::uint64_t cagra_udf_source_hash(const SampleFilterT& sample_filter)
   return 0;
 }
 
+template <typename SampleFilterT>
+std::uint64_t cagra_sample_filter_type_id(const SampleFilterT& sample_filter)
+{
+  using DecayedFilter = std::decay_t<SampleFilterT>;
+  if constexpr (is_udf_filter<DecayedFilter>::value) {
+    return 2;
+  } else if constexpr (is_bitset_filter<DecayedFilter>::value) {
+    return 1;
+  } else if constexpr (requires { sample_filter.filter; }) {
+    return cagra_sample_filter_type_id(sample_filter.filter);
+  } else {
+    return 0;
+  }
+}
+
 template <typename SourceIndexT, typename SampleFilterT>
 std::uint64_t cagra_sample_filter_hash(const SampleFilterT& sample_filter)
 {
   const auto payload = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  std::uint64_t seed = static_cast<std::uint64_t>(payload.filter_kind);
+  std::uint64_t seed = cagra_sample_filter_type_id(sample_filter);
   seed               = cagra_hash_combine(
     seed,
     static_cast<std::uint64_t>(

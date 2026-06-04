@@ -15,14 +15,11 @@ namespace cuvs::neighbors::cagra::detail {
 template <typename SourceIndexT>
 using cagra_filter_data_storage = ::cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT>;
 
-enum class cagra_filter_kind : std::uint32_t { none = 0, bitset = 1, udf = 2 };
-
 /// Host/device payload for linked CAGRA sample filters plus query offset for wrapped filters.
 template <typename SourceIndexT>
 struct cagra_sample_filter {
   cagra_filter_data_storage<SourceIndexT> filter_data_storage{};
   void* filter_data{nullptr};
-  cagra_filter_kind filter_kind{cagra_filter_kind::none};
   std::uint32_t query_id_offset{0};
 };
 
@@ -50,10 +47,8 @@ void fill_cagra_sample_filter(cagra_sample_filter<SourceIndexT>& out, const Filt
                                               static_cast<SourceIndexT>(bitset_view.size()),
                                               static_cast<SourceIndexT>(
                                                 bitset_view.get_original_nbits())};
-    out.filter_kind = cagra_filter_kind::bitset;
   } else if constexpr (is_udf_filter<DecayedFilter>::value) {
     out.filter_data = filter.filter_data;
-    out.filter_kind = cagra_filter_kind::udf;
   }
 }
 
@@ -92,8 +87,8 @@ template <typename SourceIndexT>
 __device__ __forceinline__ void* get_cagra_sample_filter_data(
   cagra_sample_filter<SourceIndexT>& payload)
 {
-  if (payload.filter_kind == cagra_filter_kind::udf) { return payload.filter_data; }
-  if (payload.filter_kind == cagra_filter_kind::bitset) {
+  if (payload.filter_data != nullptr) { return payload.filter_data; }
+  if (payload.filter_data_storage.bitset_ptr != nullptr) {
     // The payload is passed by value to kernels; take the embedded storage address on device.
     return &payload.filter_data_storage;
   }
