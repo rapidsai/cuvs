@@ -59,16 +59,13 @@ def read_bin_header(path: str, itemsize: int) -> Tuple[int, int, int]:
         Path to the binary file.
     itemsize : int
         Per-element size in bytes (e.g. ``4`` for ``float32``, ``1`` for
-        ``int8``). Used purely for the size-equation check; the file
-        contents are not inspected.
+        ``int8``) used for the size-equation check.
 
     Returns
     -------
     (n_rows, n_cols, header_bytes) : Tuple[int, int, int]
         Row count, column count, and the number of bytes the header
-        occupies on disk (``8`` for legacy, ``16`` for extended). Callers
-        seeking to the data start should use ``header_bytes`` rather than
-        a hardcoded offset.
+        occupies on disk (``8`` for legacy, ``16`` for extended).
 
     Raises
     ------
