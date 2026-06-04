@@ -394,7 +394,7 @@ static_assert(std::is_aggregate_v<search_params>);
  *
  */
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index {
+struct CUVS_EXPORT index : cuvs::neighbors::index {
   using index_params_type  = cagra::index_params;
   using search_params_type = cagra::search_params;
   using index_type         = IdxT;
@@ -886,6 +886,7 @@ struct index : cuvs::neighbors::index {
   size_t dim_          = 0;
   size_t graph_degree_ = 0;
 };
+
 /**
  * @}
  */
