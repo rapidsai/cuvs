@@ -221,9 +221,9 @@ This constructor creates an owning index with the given parameters.
 | `codebook_kind` |  | [`codebook_gen`](/api-reference/cpp-api-neighbors-ivf-pq#neighbors-ivf-pq-codebook-gen) | How PQ codebooks are created |
 | `n_lists` |  | `uint32_t` | Number of inverted lists (clusters) |
 | `dim` |  | `uint32_t` | Dimensionality of the input data |
-| `pq_bits` |  | `uint32_t` | Bit length of vector elements after PQ compression Default: `8`. |
-| `pq_dim` |  | `uint32_t` | Dimensionality after PQ compression (0 = auto-select) Default: `0`. |
-| `conservative_memory_allocation` |  | `bool` | Memory allocation strategy Default: `false`. |
+| `pq_bits` |  | `uint32_t` | Bit length of vector elements after PQ compression<br />Default: `8`. |
+| `pq_dim` |  | `uint32_t` | Dimensionality after PQ compression (0 = auto-select)<br />Default: `0`. |
+| `conservative_memory_allocation` |  | `bool` | Memory allocation strategy<br />Default: `false`. |
 
 **Returns**
 

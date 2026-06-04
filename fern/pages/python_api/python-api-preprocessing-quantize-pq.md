@@ -82,13 +82,13 @@ Parameters for product quantization
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `int` | specifies the bit length of the vector element after compression by PQ possible values: within [4, 16] |
+| `pq_bits` | `int` | specifies the bit length of the vector element after compression by PQ<br />possible values: within [4, 16] |
 | `pq_dim` | `int` | specifies the dimensionality of the vector after compression by PQ |
 | `use_subspaces` | `bool` | specifies whether to use subspaces for product quantization (PQ). When true, one PQ codebook is used for each subspace. Otherwise, a single PQ codebook is used. |
 | `use_vq` | `bool` | specifies whether to use Vector Quantization (KMeans) before product quantization (PQ). |
 | `vq_n_centers` | `int` | specifies the number of centers for the vector quantizer. When zero, an optimal value is selected using a heuristic. When one, only product quantization is used. |
 | `kmeans_n_iters` | `int` | specifies the number of iterations searching for kmeans centers |
-| `pq_kmeans_type` | `str` | specifies the type of kmeans algorithm to use for PQ training possible values: "kmeans", "kmeans_balanced" |
+| `pq_kmeans_type` | `str` | specifies the type of kmeans algorithm to use for PQ training<br />possible values: "kmeans", "kmeans_balanced" |
 | `max_train_points_per_pq_code` | `int` | specifies the max number of data points to use per PQ code during PQ codebook training. Using more data points per PQ code may increase the quality of PQ codebook but may also increase the build time. |
 | `max_train_points_per_vq_cluster` | `int` | specifies the max number of data points to use per VQ cluster. |
 
