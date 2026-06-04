@@ -12,7 +12,7 @@
 #include <cuvs/neighbors/common.hpp>
 
 #include "../compute_distance.hpp"  // dataset_descriptor_base_t
-#include "cagra_bitset.cuh"
+#include "cagra_filter_payload.cuh"
 #include "search_single_cta_device_helpers.cuh"
 
 namespace cuvs::neighbors::cagra::detail {

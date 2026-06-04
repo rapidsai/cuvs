@@ -81,9 +81,14 @@ std::uint64_t cagra_sample_filter_hash(const SampleFilterT& sample_filter)
   const auto payload = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
   std::uint64_t seed = static_cast<std::uint64_t>(payload.filter_kind);
   seed               = cagra_hash_combine(
-    seed, static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(payload.bitset.bitset_ptr)));
-  seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(payload.bitset.bitset_len));
-  seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(payload.bitset.original_nbits));
+    seed,
+    static_cast<std::uint64_t>(
+      reinterpret_cast<std::uintptr_t>(payload.filter_data_storage.bitset_ptr)));
+  seed = cagra_hash_combine(seed,
+                            static_cast<std::uint64_t>(payload.filter_data_storage.bitset_len));
+  seed = cagra_hash_combine(seed,
+                            static_cast<std::uint64_t>(
+                              payload.filter_data_storage.original_nbits));
   seed = cagra_hash_combine(
     seed, static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(payload.filter_data)));
   seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(payload.query_id_offset));

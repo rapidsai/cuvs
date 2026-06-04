@@ -13,7 +13,7 @@
 #include "jit_lto_kernels/kernel_def.hpp"
 #include "jit_lto_kernels/search_multi_kernel_planner.hpp"
 #include "search_plan.cuh"          // For search_params
-#include "shared_launcher_jit.hpp"  // cagra_bitset / cagra_sample_filter, sample_filter_jit_tag_t, tags
+#include "shared_launcher_jit.hpp"  // sample-filter payload helpers and JIT tags
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>

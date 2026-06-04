@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "cagra_bitset.cuh"
+#include "cagra_filter_payload.cuh"
 
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 #include <raft/core/error.hpp>

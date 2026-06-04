@@ -29,7 +29,7 @@
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
-#include "cagra_bitset.cuh"
+#include "cagra_filter_payload.cuh"
 #include "extern_device_functions.cuh"
 // Include shared JIT device functions
 #include "device_common_jit.cuh"

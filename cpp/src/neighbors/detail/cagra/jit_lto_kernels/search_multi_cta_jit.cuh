@@ -20,7 +20,7 @@
 #include <cstdio>
 #endif
 
-#include "cagra_bitset.cuh"
+#include "cagra_filter_payload.cuh"
 #include "device_common_jit.cuh"
 #include "extern_device_functions.cuh"
 
