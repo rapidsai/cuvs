@@ -26,7 +26,11 @@ from cuvs_bench.backends._utils import (
     expand_param_grid,
     load_vectors,
 )
-from cuvs_bench.generate_groundtruth.utils import memmap_bin_file
+from cuvs_bench.generate_groundtruth.utils import (
+    groundtruth_neighbors_filename,
+    memmap_bin_file,
+    neighbor_index_dtype,
+)
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
 
@@ -53,6 +57,10 @@ class TestDtypeFromFilename:
     def test_ibin(self):
         """Test .ibin maps to int32."""
         assert dtype_from_filename("groundtruth.ibin") == np.int32
+
+    def test_u64bin(self):
+        """Test .u64bin maps to uint64."""
+        assert dtype_from_filename("groundtruth.neighbors.u64bin") == np.uint64
 
     def test_u8bin(self):
         """Test .u8bin maps to uint8."""
@@ -223,6 +231,8 @@ class TestLoadVectors:
             (".f16bin", np.float16, np.uint64),
             (".ibin", np.int32, np.uint32),
             (".ibin", np.int32, np.uint64),
+            (".u64bin", np.uint64, np.uint32),
+            (".u64bin", np.uint64, np.uint64),
             (".u8bin", np.uint8, np.uint32),
             (".u8bin", np.uint8, np.uint64),
             (".i8bin", np.int8, np.uint32),
@@ -236,6 +246,8 @@ class TestLoadVectors:
             data = np.random.randint(
                 info.min, info.max, size=(25, 7), dtype=dtype
             )
+            if dtype == np.uint64:
+                data[0, 0] = np.iinfo(np.int32).max + 42
         else:
             data = np.random.rand(25, 7).astype(dtype)
         path = str(tmp_path / f"test{ext}")
@@ -243,6 +255,38 @@ class TestLoadVectors:
 
         loaded = load_vectors(path)
         np.testing.assert_array_equal(loaded, data)
+
+
+class TestGroundtruthNeighborFormat:
+    """Tests for large-base ground-truth neighbor index format selection."""
+
+    def test_neighbor_index_dtype_small_base(self):
+        assert neighbor_index_dtype(1_000_000) == np.int32
+
+    def test_neighbor_index_dtype_large_base(self):
+        assert neighbor_index_dtype(np.iinfo(np.int32).max + 1) == np.uint64
+
+    def test_groundtruth_neighbors_filename_small_base(self):
+        assert (
+            groundtruth_neighbors_filename(1_000_000)
+            == "groundtruth.neighbors.ibin"
+        )
+
+    def test_groundtruth_neighbors_filename_large_base(self):
+        assert (
+            groundtruth_neighbors_filename(np.iinfo(np.int32).max + 1)
+            == "groundtruth.neighbors.u64bin"
+        )
+
+    def test_load_u64bin_preserves_large_indices(self, tmp_path):
+        """uint64 GT files preserve neighbor IDs above INT32_MAX."""
+        large_id = np.iinfo(np.int32).max + 12345
+        indices = np.array([[large_id, 0, 1]], dtype=np.uint64)
+        path = str(tmp_path / "gt.u64bin")
+        _write_test_bin(path, indices)
+
+        loaded = load_vectors(path)
+        np.testing.assert_array_equal(loaded, indices)
 
 
 class TestBinHeaderHelpers:

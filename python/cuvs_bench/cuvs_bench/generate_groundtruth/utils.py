@@ -18,6 +18,8 @@ def dtype_from_filename(filename):
         return np.float16
     elif ext == ".ibin":
         return np.int32
+    elif ext == ".u64bin":
+        return np.uint64
     elif ext == ".u8bin":
         return np.ubyte
     elif ext == ".i8bin":
@@ -33,12 +35,28 @@ def suffix_from_dtype(dtype):
         return ".hbin"
     elif dtype == np.int32:
         return ".ibin"
+    elif dtype == np.uint64:
+        return ".u64bin"
     elif dtype == np.ubyte:
         return ".u8bin"
     elif dtype == np.byte:
         return ".i8bin"
     else:
         raise RuntimeError("Not supported dtype extension" + dtype)
+
+
+def neighbor_index_dtype(n_base: int) -> np.dtype:
+    """Return the dtype used to store neighbor row IDs for a base set size."""
+    if n_base > np.iinfo(np.int32).max:
+        return np.uint64
+    return np.int32
+
+
+def groundtruth_neighbors_filename(n_base: int) -> str:
+    """Return the ground-truth neighbors filename for a base set size."""
+    if n_base > np.iinfo(np.int32).max:
+        return "groundtruth.neighbors.u64bin"
+    return "groundtruth.neighbors.ibin"
 
 
 def memmap_bin_file(

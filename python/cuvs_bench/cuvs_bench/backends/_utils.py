@@ -55,6 +55,8 @@ def dtype_from_filename(filename):
         return np.float16
     elif ext == ".ibin":
         return np.int32
+    elif ext == ".u64bin":
+        return np.uint64
     elif ext == ".u8bin":
         return np.ubyte
     elif ext == ".i8bin":
@@ -78,7 +80,7 @@ def load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
     path : str
         Path to the binary file. The dtype is inferred from the extension:
         ``.fbin`` (float32), ``.f16bin`` (float16), ``.u8bin`` (uint8),
-        ``.i8bin`` (int8), ``.ibin`` (int32).
+        ``.i8bin`` (int8), ``.ibin`` (int32), ``.u64bin`` (uint64).
     subset_size : Optional[int]
         If provided, only the first ``subset_size`` rows are loaded.
 

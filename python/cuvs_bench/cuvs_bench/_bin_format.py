@@ -12,7 +12,7 @@ array of the dtype implied by the file extension. Two layouts are supported:
 
 - **Legacy**:  ``[uint32 n_rows, uint32 n_cols, data ...]``  (8-byte header).
   This is what every existing ``.fbin`` / ``.ibin`` / ``.u8bin`` / ``.i8bin``
-  / ``.f16bin`` / ``.hbin`` file on disk uses today.
+  / ``.f16bin`` / ``.hbin`` / ``.u64bin`` file on disk uses today.
 
 - **Extended**: ``[uint64 n_rows, uint64 n_cols, data ...]``  (16-byte header).
   For datasets whose ``n_rows`` or ``n_cols`` exceeds ``UINT32_MAX`` (~4.29B).
