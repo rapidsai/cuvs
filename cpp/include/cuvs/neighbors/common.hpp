@@ -644,8 +644,8 @@ struct udf_filter : public base_filter {
   udf_filter() = default;
 
   explicit udf_filter(std::string source,
-                      void* filter_data = nullptr,
-                      float filtering_rate = -1.0f,
+                      void* filter_data         = nullptr,
+                      float filtering_rate      = -1.0f,
                       std::string function_name = "cuvs_filter_udf")
     : source(std::move(source)),
       filter_data(filter_data),

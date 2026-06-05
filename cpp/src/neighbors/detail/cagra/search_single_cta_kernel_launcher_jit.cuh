@@ -94,17 +94,18 @@ template <typename SourceIndexT, typename SampleFilterT>
 std::uint64_t cagra_sample_filter_hash(const SampleFilterT& sample_filter)
 {
   const auto payload_owner = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  std::uint64_t seed = cagra_sample_filter_type_id(sample_filter);
+  std::uint64_t seed       = cagra_sample_filter_type_id(sample_filter);
   if (const auto* storage = payload_owner.storage_owner.host_payload(); storage != nullptr) {
     seed = cagra_hash_combine(
       seed, static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(storage->bitset_ptr)));
     seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(storage->bitset_len));
     seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(storage->original_nbits));
   }
-  seed = cagra_hash_combine(
-    seed,
-    static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(payload_owner.payload.filter_data)));
-  seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(payload_owner.payload.query_id_offset));
+  seed = cagra_hash_combine(seed,
+                            static_cast<std::uint64_t>(
+                              reinterpret_cast<std::uintptr_t>(payload_owner.payload.filter_data)));
+  seed =
+    cagra_hash_combine(seed, static_cast<std::uint64_t>(payload_owner.payload.query_id_offset));
   seed = cagra_hash_combine(seed, cagra_udf_source_hash(sample_filter));
   return seed;
 }

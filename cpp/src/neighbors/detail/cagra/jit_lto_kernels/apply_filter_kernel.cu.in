@@ -8,9 +8,9 @@
 
 namespace {
 
-using index_t        = @index_type@;
-using distance_t     = @distance_type@;
-using source_index_t = @source_index_type@;
+using index_t               = @index_type@;
+using distance_t            = @distance_type@;
+using source_index_t        = @source_index_type@;
 using cagra_sample_filter_t = cuvs::neighbors::cagra::detail::cagra_sample_filter<source_index_t>;
 
 }  // namespace

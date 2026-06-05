@@ -7,10 +7,10 @@
 
 #include "../compute_distance.hpp"
 #include "../shared_launcher_jit.hpp"
+#include "sample_filter_udf.cuh"
 #include "search_multi_cta_planner.hpp"
 #include "search_multi_kernel_planner.hpp"
 #include "search_single_cta_planner.hpp"
-#include "sample_filter_udf.cuh"
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
@@ -337,7 +337,7 @@ std::shared_ptr<AlgorithmLauncher> make_cagra_multi_cta_jit_launcher(
                                                                      IndexT,
                                                                      DistanceT,
                                                                      SourceIndexT>(
-      dataset_desc, std::move(sample_filter_udf_fragment));
+    dataset_desc, std::move(sample_filter_udf_fragment));
 }
 
 /// Build a JIT AlgorithmLauncher for multi-kernel CAGRA helpers that need `setup_workspace` and

@@ -8,7 +8,7 @@
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 #include <cuvs/detail/jit_lto/common_fragments.hpp>
 
-#include "../../sample_filter.cuh"           // For none_sample_filter, bitset_filter
+#include "../../sample_filter.cuh"                   // For none_sample_filter, bitset_filter
 #include "jit_lto_kernels/cagra_filter_payload.cuh"  // sample-filter payload helpers
 
 #include <cstdint>
@@ -106,7 +106,8 @@ struct sample_filter_jit_tag {
         using InnerFilter = decltype(std::declval<U>().filter);
         if constexpr (is_bitset_filter<std::decay_t<InnerFilter>>::value ||
                       std::is_same_v<std::decay_t<InnerFilter>, bitset_filter<uint32_t, int64_t>> ||
-                      std::is_same_v<std::decay_t<InnerFilter>, bitset_filter<uint32_t, uint32_t>>) {
+                      std::is_same_v<std::decay_t<InnerFilter>,
+                                     bitset_filter<uint32_t, uint32_t>>) {
           return cuvs::neighbors::detail::tag_filter_bitset{};
         } else if constexpr (is_udf_filter<std::decay_t<InnerFilter>>::value) {
           return cuvs::neighbors::detail::tag_filter_udf{};

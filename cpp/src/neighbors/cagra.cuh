@@ -392,11 +392,11 @@ void search(raft::resources const& res,
     if (params.filtering_rate < 0.0) {
       const float min_filtering_rate = 0.0f;
       const float max_filtering_rate = 0.999f;
-      params_copy.filtering_rate    = sample_filter.filtering_rate < 0.0f
-                                      ? 0.0f
-                                      : std::min(std::max(sample_filter.filtering_rate,
-                                                          min_filtering_rate),
-                                                 max_filtering_rate);
+      params_copy.filtering_rate =
+        sample_filter.filtering_rate < 0.0f
+          ? 0.0f
+          : std::min(std::max(sample_filter.filtering_rate, min_filtering_rate),
+                     max_filtering_rate);
     }
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, decltype(sample_filter_copy), OutputIdxT>(

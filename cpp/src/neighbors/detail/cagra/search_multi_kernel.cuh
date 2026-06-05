@@ -617,8 +617,7 @@ struct search
                                              DISTANCE_T,
                                              SourceIndexT,
                                              sample_filter_jit_tag_t<SAMPLE_FILTER_T>>(
-          dataset_desc,
-          make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
+          dataset_desc, make_cagra_sample_filter_udf_fragment<SourceIndexT>(sample_filter));
 
       apply_filter_jit<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
         source_indices_ptr,

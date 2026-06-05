@@ -81,13 +81,10 @@ struct cagra_device_payload_owner {
       std::lock_guard<std::mutex> lock(mutex);
       if (device_payload == nullptr) {
         RAFT_CUDA_TRY(cudaGetDevice(&device));
-        RAFT_CUDA_TRY(
-          cudaMallocAsync(reinterpret_cast<void**>(&device_payload), sizeof(PayloadT), cuda_stream));
-        RAFT_CUDA_TRY(cudaMemcpyAsync(device_payload,
-                                      &host_payload,
-                                      sizeof(PayloadT),
-                                      cudaMemcpyHostToDevice,
-                                      cuda_stream));
+        RAFT_CUDA_TRY(cudaMallocAsync(
+          reinterpret_cast<void**>(&device_payload), sizeof(PayloadT), cuda_stream));
+        RAFT_CUDA_TRY(cudaMemcpyAsync(
+          device_payload, &host_payload, sizeof(PayloadT), cudaMemcpyHostToDevice, cuda_stream));
         RAFT_CUDA_TRY(cudaEventCreateWithFlags(&ready_event, cudaEventDisableTiming));
         RAFT_CUDA_TRY(cudaEventRecord(ready_event, cuda_stream));
         stream = cuda_stream;
@@ -119,8 +116,7 @@ struct cagra_device_payload_owner {
 
   cagra_device_payload_owner() = default;
 
-  explicit cagra_device_payload_owner(PayloadT payload)
-    : state_{std::make_shared<state>(payload)}
+  explicit cagra_device_payload_owner(PayloadT payload) : state_{std::make_shared<state>(payload)}
   {
   }
 
@@ -198,12 +194,11 @@ void fill_cagra_sample_filter(cagra_sample_filter_payload<SourceIndexT>& out, co
   using DecayedFilter = std::decay_t<FilterT>;
   if constexpr (is_bitset_filter<DecayedFilter>::value) {
     const auto bitset_view = filter.view();
-    out.storage_owner =
-      cagra_device_payload_owner<cagra_filter_data_storage<SourceIndexT>>{
-        cagra_filter_data_storage<SourceIndexT>{const_cast<std::uint32_t*>(bitset_view.data()),
-                                                static_cast<SourceIndexT>(bitset_view.size()),
-                                                static_cast<SourceIndexT>(
-                                                  bitset_view.get_original_nbits())}};
+    out.storage_owner      = cagra_device_payload_owner<cagra_filter_data_storage<SourceIndexT>>{
+      cagra_filter_data_storage<SourceIndexT>{
+        const_cast<std::uint32_t*>(bitset_view.data()),
+        static_cast<SourceIndexT>(bitset_view.size()),
+        static_cast<SourceIndexT>(bitset_view.get_original_nbits())}};
   } else if constexpr (is_udf_filter<DecayedFilter>::value) {
     out.payload.filter_data = filter.filter_data;
   }

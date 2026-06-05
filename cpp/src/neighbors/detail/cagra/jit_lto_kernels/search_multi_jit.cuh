@@ -113,8 +113,8 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
   // Get team_size_bits directly from base descriptor
   uint32_t team_size_bits = dataset_desc->team_size_bitshift();
 
-  const auto team_size      = 1u << team_size_bits;
-  const uint32_t ldb        = hashmap::get_size(hash_bitlen);
+  const auto team_size       = 1u << team_size_bits;
+  const uint32_t ldb         = hashmap::get_size(hash_bitlen);
   const auto tid             = threadIdx.x + blockDim.x * blockIdx.x;
   const auto global_team_id  = tid >> team_size_bits;
   const auto local_query_id  = blockIdx.y;
@@ -133,8 +133,7 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
   if (parent_list_index == utils::get_max_value<INDEX_T>()) { return; }
 
   constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-  const auto raw_parent_index =
-    parent_candidates_ptr[parent_list_index + (lds * local_query_id)];
+  const auto raw_parent_index = parent_candidates_ptr[parent_list_index + (lds * local_query_id)];
 
   if (raw_parent_index == utils::get_max_value<INDEX_T>()) {
     result_distances_ptr[ldd * local_query_id + global_team_id] =
@@ -167,10 +166,9 @@ __device__ void compute_distance_to_child_nodes_kernel_jit(
   }
 
   const SourceIndexT node_id = source_indices_ptr == nullptr
-                               ? static_cast<SourceIndexT>(parent_index)
-                               : static_cast<SourceIndexT>(source_indices_ptr[parent_index]);
-  if (!sample_filter<SourceIndexT>(
-        filter_query_id, node_id, filter_payload.sample_filter_data())) {
+                                 ? static_cast<SourceIndexT>(parent_index)
+                                 : static_cast<SourceIndexT>(source_indices_ptr[parent_index]);
+  if (!sample_filter<SourceIndexT>(filter_query_id, node_id, filter_payload.sample_filter_data())) {
     parent_candidates_ptr[parent_list_index + (lds * local_query_id)] =
       utils::get_max_value<INDEX_T>();
     parent_distance_ptr[parent_list_index + (lds * local_query_id)] =

@@ -195,9 +195,8 @@ TEST_P(CagraUdfFilterTest, RejectAllReturnsNoValidNeighbors)
 
 TEST_P(CagraUdfFilterTest, HighFilteringRateReturnsOnlyValidNeighbors)
 {
-  cuvs::neighbors::filtering::udf_filter udf_filter(high_filtering_rate_udf_source(),
-                                                    nullptr,
-                                                    high_filtering_rate);
+  cuvs::neighbors::filtering::udf_filter udf_filter(
+    high_filtering_rate_udf_source(), nullptr, high_filtering_rate);
   auto result = search(udf_filter);
 
   for (auto source_id : result.neighbors) {
@@ -219,8 +218,7 @@ TEST_P(CagraUdfFilterTest, RepeatedUdfSearchWithSameSourceMatches)
 
 TEST_P(CagraUdfFilterTest, InvalidSourceThrows)
 {
-  cuvs::neighbors::filtering::udf_filter udf_filter(
-    "this is not valid cuda source", nullptr, 0.0f);
+  cuvs::neighbors::filtering::udf_filter udf_filter("this is not valid cuda source", nullptr, 0.0f);
 
   EXPECT_THROW(search(udf_filter), std::exception);
 }
