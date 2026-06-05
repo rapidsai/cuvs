@@ -426,61 +426,60 @@ void search_multi_partition(
                              topk,
                              sample_filter);
   } else /* MULTI_KERNEL */ {
-    if constexpr (!std::is_same_v<CagraSampleFilterT,
-                                  cuvs::neighbors::filtering::none_sample_filter>) {
-      RAFT_FAIL("MULTI_KERNEL multi-partition with sample filtering is not yet implemented");
-    } else {
-      // MULTI_KERNEL produces top-k per partition via iterative refinement of an
-      // itopk_size-sized candidate pool, so each partition's output must already hold topk
-      // valid candidates. Compared against params.itopk_size pre-adjustment; the per-partition
-      // plan's adjust_search_params() only rounds up to a multiple of 32, so the effective
-      // bound is monotonic.
-      RAFT_EXPECTS(static_cast<uint64_t>(topk) <= static_cast<uint64_t>(params.itopk_size),
-                   "topk (%u) must be <= itopk_size (%lu) for MULTI_KERNEL multi-partition.",
-                   topk,
-                   params.itopk_size);
+    multi_kernel_search::
+      search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, graph_idx_type>
+        plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
-      // Construct a fresh multi_kernel plan per partition so each partition's distance
-      // computations use its own dataset descriptor and dataset_size. The plan's internal
-      // result/hashmap buffers are sized from the partition's graph_degree and dataset.
-      for (uint32_t i = 0; i < num_partitions; i++) {
-        auto* strided_dset = dynamic_cast<const strided_dataset<T, int64_t>*>(&indices[i]->data());
-        RAFT_EXPECTS(strided_dset != nullptr,
-                     "All partitions must have strided (non-compressed) datasets");
-        const float* norms_ptr = nullptr;
-        if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-          RAFT_EXPECTS(indices[i]->dataset_norms().has_value(),
-                       "Dataset norms required for CosineExpanded metric (partition %u)",
-                       i);
-          norms_ptr = indices[i]->dataset_norms().value().data_handle();
-        }
-        auto part_desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-          res, params, *strided_dset, indices[i]->metric(), norms_ptr);
+    RAFT_EXPECTS(topk <= plan.itopk_size,
+                 "topk = %u must be smaller than itopk_size = %lu",
+                 topk,
+                 plan.itopk_size);
 
-        multi_kernel_search::
-          search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, graph_idx_type>
-            part_plan(res,
-                      params,
-                      part_desc,
-                      dim,
-                      indices[i]->data().n_rows(),
-                      static_cast<int64_t>(indices[i]->graph().extent(1)),
-                      topk);
+    // Build per-partition descriptors. Each partition supplies its own dataset_desc, graph
+    // pointer, and graph_degree; the _mp kernels read this array by blockIdx.z.
+    using mp_part_desc_t =
+      multi_kernel_search::multi_partition_desc_t<T, graph_idx_type, DistanceT>;
+    std::vector<mp_part_desc_t> host_part_descs(num_partitions);
 
-        const size_t offset = static_cast<size_t>(i) * n_queries * topk;
-        part_plan(res,
-                  indices[i]->graph(),
-                  /* source_indices */ std::nullopt,
-                  intermediate_neighbors.data() + offset,
-                  intermediate_distances.data() + offset,
-                  queries.data_handle(),
-                  n_queries,
-                  /* dev_seed_ptr */ nullptr,
-                  /* num_executed_iterations */ nullptr,
-                  topk,
-                  sample_filter);
+    std::vector<dataset_descriptor_host<T, graph_idx_type, DistanceT>> part_dataset_descs;
+    part_dataset_descs.reserve(num_partitions);
+
+    for (uint32_t i = 0; i < num_partitions; i++) {
+      auto* strided_dset = dynamic_cast<const strided_dataset<T, int64_t>*>(&indices[i]->data());
+      RAFT_EXPECTS(strided_dset != nullptr,
+                   "All partitions must have strided (non-compressed) datasets");
+      const float* norms_ptr = nullptr;
+      if (indices[i]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+        RAFT_EXPECTS(indices[i]->dataset_norms().has_value(),
+                     "Dataset norms required for CosineExpanded metric (partition %u)",
+                     i);
+        norms_ptr = indices[i]->dataset_norms().value().data_handle();
       }
+      part_dataset_descs.push_back(dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+        res, params, *strided_dset, indices[i]->metric(), norms_ptr));
+
+      host_part_descs[i].dataset_desc = part_dataset_descs.back().dev_ptr(stream);
+      host_part_descs[i].graph        = indices[i]->graph().data_handle();
+      host_part_descs[i].graph_degree = static_cast<uint32_t>(indices[i]->graph().extent(1));
     }
+
+    lightweight_uvector<mp_part_desc_t> dev_part_descs_buf(res);
+    dev_part_descs_buf.resize(num_partitions, stream);
+    RAFT_CUDA_TRY(cudaMemcpyAsync(dev_part_descs_buf.data(),
+                                  host_part_descs.data(),
+                                  num_partitions * sizeof(mp_part_desc_t),
+                                  cudaMemcpyHostToDevice,
+                                  stream));
+
+    plan.run_multi_partition(res,
+                             dev_part_descs_buf.data(),
+                             num_partitions,
+                             queries.data_handle(),
+                             n_queries,
+                             intermediate_neighbors.data(),
+                             intermediate_distances.data(),
+                             topk,
+                             sample_filter);
   }
 
   // Per-partition distance post-processing (scale + metric transform). Each partition's slice in

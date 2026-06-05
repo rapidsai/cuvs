@@ -304,20 +304,22 @@ void random_pickup_mp(const multi_partition_desc_t<DataT, IndexT, DistanceT>* pa
                        static_cast<unsigned>(num_queries),
                        num_partitions);
 
-  random_pickup_mp_kernel<<<grid_size, block_size, smem_ws_size_in_bytes, cuda_stream>>>(
-    partition_descs,
-    queries_ptr,
-    static_cast<uint32_t>(num_queries),
-    num_pickup,
-    num_distilation,
-    rand_xor_mask,
-    seed_ptr,
-    num_seeds,
-    result_indices_ptr,
-    result_distances_ptr,
-    static_cast<uint32_t>(ldr),
-    visited_hashmap_ptr,
-    hash_bitlen);
+  random_pickup_mp_kernel<dataset_descriptor_base_t<DataT, IndexT, DistanceT>>
+    <<<grid_size, block_size, smem_ws_size_in_bytes, cuda_stream>>>(
+      partition_descs,
+      queries_ptr,
+      static_cast<uint32_t>(num_queries),
+      num_pickup,
+      num_distilation,
+      rand_xor_mask,
+      seed_ptr,
+      num_seeds,
+      result_indices_ptr,
+      result_distances_ptr,
+      static_cast<uint32_t>(ldr),
+      visited_hashmap_ptr,
+      hash_bitlen);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 template <class INDEX_T>
@@ -521,6 +523,7 @@ void pickup_next_parents_mp(INDEX_T* const parent_candidates_ptr,
                                                 ldd,
                                                 parent_list_size,
                                                 terminate_flag);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 template <class DATASET_DESCRIPTOR_T,
@@ -787,23 +790,23 @@ void compute_distance_to_child_nodes_mp(
                        num_queries,
                        num_partitions);
 
-  compute_distance_to_child_nodes_mp_kernel<<<grid_size,
-                                              block_size,
-                                              smem_ws_size_in_bytes,
-                                              cuda_stream>>>(parent_node_list,
-                                                             parent_candidates_ptr,
-                                                             parent_distance_ptr,
-                                                             lds,
-                                                             search_width,
-                                                             partition_descs,
-                                                             query_ptr,
-                                                             num_queries,
-                                                             visited_hashmap_ptr,
-                                                             hash_bitlen,
-                                                             result_indices_ptr,
-                                                             result_distances_ptr,
-                                                             ldd,
-                                                             sample_filter);
+  compute_distance_to_child_nodes_mp_kernel<dataset_descriptor_base_t<DataT, IndexT, DistanceT>,
+                                            SAMPLE_FILTER_T>
+    <<<grid_size, block_size, smem_ws_size_in_bytes, cuda_stream>>>(parent_node_list,
+                                                                    parent_candidates_ptr,
+                                                                    parent_distance_ptr,
+                                                                    lds,
+                                                                    search_width,
+                                                                    partition_descs,
+                                                                    query_ptr,
+                                                                    num_queries,
+                                                                    visited_hashmap_ptr,
+                                                                    hash_bitlen,
+                                                                    result_indices_ptr,
+                                                                    result_distances_ptr,
+                                                                    ldd,
+                                                                    sample_filter);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 template <class INDEX_T>
@@ -869,6 +872,7 @@ void remove_parent_bit_mp(const std::uint32_t num_queries,
   const std::size_t block_size = 256;
   remove_parent_bit_mp_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
     num_queries, num_topk, topk_indices_ptr, ld);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 // This function called after the `remove_parent_bit` function
@@ -1398,6 +1402,198 @@ struct search
       }
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
+  }
+
+  // Fused multi-partition search. Drives the _mp expansion kernels in a single iteration loop
+  // across (query, partition) work units. Per-(query, partition) state lives in two ping-pong
+  // buffers sized [num_queries * num_partitions, result_buffer_size]; the input/output buffer
+  // role swaps each iteration. Top-k selection uses cuvs::selection::select_k throughout.
+  template <typename SAMPLE_FILTER_T_>
+  void run_multi_partition(
+    raft::resources const& res,
+    const multi_partition_desc_t<DATA_T, INDEX_T, DISTANCE_T>* partition_descs,
+    uint32_t num_partitions,
+    const DATA_T* queries_ptr,
+    uint32_t num_queries,
+    INDEX_T* intermediate_neighbors_ptr,     // [num_partitions, num_queries, topk]
+    DISTANCE_T* intermediate_distances_ptr,  // [num_partitions, num_queries, topk]
+    uint32_t topk,
+    SAMPLE_FILTER_T_ sample_filter)
+  {
+    cudaStream_t stream       = raft::resource::get_cuda_stream(res);
+    const uint32_t total_rows = num_queries * num_partitions;
+    const uint32_t hash_size  = hashmap::get_size(hash_bitlen);
+
+    // Scale plan's persistent per-row buffers from max_queries to (num_queries * num_partitions).
+    parent_node_list.resize(static_cast<size_t>(total_rows) * search_width, stream);
+    hashmap.resize(static_cast<size_t>(total_rows) * hash_size, stream);
+
+    // Ping-pong result buffers, [total_rows, result_buffer_size]. Each iter reads from one and
+    // writes to the other; pointers swap each iteration.
+    lightweight_uvector<INDEX_T> buf_a_idx(res);
+    lightweight_uvector<INDEX_T> buf_b_idx(res);
+    lightweight_uvector<DISTANCE_T> buf_a_dist(res);
+    lightweight_uvector<DISTANCE_T> buf_b_dist(res);
+    const size_t buf_elems = static_cast<size_t>(total_rows) * result_buffer_size;
+    buf_a_idx.resize(buf_elems, stream);
+    buf_b_idx.resize(buf_elems, stream);
+    buf_a_dist.resize(buf_elems, stream);
+    buf_b_dist.resize(buf_elems, stream);
+
+    // select_k requires contiguous [batch, k] output. The ping-pong buffers have row stride
+    // result_buffer_size (not itopk_size), so select_k cannot write into them directly without
+    // misaligning row 1 onward. Use a per-iter temp contiguous output, then batched_memcpy
+    // into the [0..itopk_size) slot of each row in the ping-pong buffer.
+    lightweight_uvector<INDEX_T> selectk_out_idx(res);
+    lightweight_uvector<DISTANCE_T> selectk_out_dist(res);
+    selectk_out_idx.resize(static_cast<size_t>(total_rows) * itopk_size, stream);
+    selectk_out_dist.resize(static_cast<size_t>(total_rows) * itopk_size, stream);
+
+    // Initialize both distance buffers to max so per-row slots not written by
+    // compute_distance_to_child_nodes_mp (when a partition's graph_degree is smaller than the
+    // plan's max graph_degree) are treated as invalid by select_k.
+    set_value<DISTANCE_T>(buf_a_dist.data(), utils::get_max_value<DISTANCE_T>(), buf_elems, stream);
+    set_value<DISTANCE_T>(buf_b_dist.data(), utils::get_max_value<DISTANCE_T>(), buf_elems, stream);
+
+    // Init hashmap (one slot per (query, partition)).
+    set_value_batch(
+      hashmap.data(), hash_size, utils::get_max_value<INDEX_T>(), hash_size, total_rows, stream);
+
+    // team_size and smem layout are type-dependent only; the plan's dataset_desc is
+    // representative for the launch parameters of every partition's kernels.
+    const uint32_t team_size           = dataset_desc.team_size;
+    const size_t smem_ws_size_in_bytes = dataset_desc.smem_ws_size_in_bytes;
+
+    // Initial random pickup: fills buf_a with result_buffer_size candidates per row.
+    random_pickup_mp<DATA_T, INDEX_T, DISTANCE_T>(partition_descs,
+                                                  num_partitions,
+                                                  team_size,
+                                                  smem_ws_size_in_bytes,
+                                                  queries_ptr,
+                                                  num_queries,
+                                                  result_buffer_size,
+                                                  num_random_samplings,
+                                                  rand_xor_mask,
+                                                  /* seed_ptr */ nullptr,
+                                                  /* num_seeds */ 0,
+                                                  buf_a_idx.data(),
+                                                  buf_a_dist.data(),
+                                                  result_buffer_size,
+                                                  hashmap.data(),
+                                                  hash_bitlen,
+                                                  stream);
+
+    // Iteration loop. Each iter: refine via select_k, pick parents, compute child distances.
+    INDEX_T* in_idx      = buf_a_idx.data();
+    INDEX_T* out_idx     = buf_b_idx.data();
+    DISTANCE_T* in_dist  = buf_a_dist.data();
+    DISTANCE_T* out_dist = buf_b_dist.data();
+
+    unsigned iter = 0;
+    while (true) {
+      // Refine: top itopk_size from result_buffer_size candidates per row. Write into a
+      // contiguous temp buffer then memcpy into the [0..itopk_size) slot of each ping-pong
+      // row (whose stride is result_buffer_size, not itopk_size).
+      cuvs::selection::select_k(
+        res,
+        raft::make_device_matrix_view<const DISTANCE_T, int64_t, raft::row_major>(
+          in_dist, static_cast<int64_t>(total_rows), static_cast<int64_t>(result_buffer_size)),
+        std::optional{raft::make_device_matrix_view<const INDEX_T, int64_t, raft::row_major>(
+          in_idx, static_cast<int64_t>(total_rows), static_cast<int64_t>(result_buffer_size))},
+        raft::make_device_matrix_view<DISTANCE_T, int64_t, raft::row_major>(
+          selectk_out_dist.data(),
+          static_cast<int64_t>(total_rows),
+          static_cast<int64_t>(itopk_size)),
+        raft::make_device_matrix_view<INDEX_T, int64_t, raft::row_major>(
+          selectk_out_idx.data(),
+          static_cast<int64_t>(total_rows),
+          static_cast<int64_t>(itopk_size)),
+        /* select_min */ true,
+        /* sort */ true);
+      batched_memcpy(out_dist,
+                     result_buffer_size,
+                     selectk_out_dist.data(),
+                     itopk_size,
+                     itopk_size,
+                     total_rows,
+                     stream);
+      batched_memcpy(out_idx,
+                     result_buffer_size,
+                     selectk_out_idx.data(),
+                     itopk_size,
+                     itopk_size,
+                     total_rows,
+                     stream);
+
+      // Termination 1: max_iterations reached.
+      if ((iter + 1) == max_iterations) {
+        iter++;
+        break;
+      }
+
+      // Set terminate_flag = 1 if past min_iterations; pickup_next_parents_mp clears it to 0
+      // when any (query, partition) finds new parents.
+      if (iter + 1 >= min_iterations) { set_value<uint32_t>(terminate_flag.data(), 1, stream); }
+
+      uint32_t _small_hash_bitlen = 0;
+      if ((iter + 1) % small_hash_reset_interval == 0) { _small_hash_bitlen = small_hash_bitlen; }
+      pickup_next_parents_mp<INDEX_T>(out_idx,
+                                      result_buffer_size,
+                                      itopk_size,
+                                      num_queries,
+                                      num_partitions,
+                                      hashmap.data(),
+                                      hash_bitlen,
+                                      _small_hash_bitlen,
+                                      parent_node_list.data(),
+                                      search_width,
+                                      search_width,
+                                      terminate_flag.data(),
+                                      stream);
+
+      // Termination 2: terminate_flag still 1 means no (query, partition) found new parents.
+      if (iter + 1 >= min_iterations && get_value(terminate_flag.data(), stream)) {
+        iter++;
+        break;
+      }
+
+      // Compute distance from each parent to its child nodes. Writes new candidate distances
+      // and indices into [itopk_size, result_buffer_size) per row of the out buffer.
+      compute_distance_to_child_nodes_mp<DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T_>(
+        parent_node_list.data(),
+        out_idx,
+        out_dist,
+        result_buffer_size,
+        search_width,
+        partition_descs,
+        num_partitions,
+        graph_degree,
+        team_size,
+        smem_ws_size_in_bytes,
+        queries_ptr,
+        num_queries,
+        hashmap.data(),
+        hash_bitlen,
+        out_idx + itopk_size,
+        out_dist + itopk_size,
+        result_buffer_size,
+        sample_filter,
+        stream);
+
+      iter++;
+      std::swap(in_idx, out_idx);
+      std::swap(in_dist, out_dist);
+    }
+
+    // Post-loop: clear parent-bit markers (MSBs) on the final refined indices, then copy the
+    // first topk entries of each row to the caller's intermediate output buffers.
+    remove_parent_bit_mp<INDEX_T>(
+      num_queries, num_partitions, itopk_size, out_idx, result_buffer_size, stream);
+
+    batched_memcpy(
+      intermediate_neighbors_ptr, topk, out_idx, result_buffer_size, topk, total_rows, stream);
+    batched_memcpy(
+      intermediate_distances_ptr, topk, out_dist, result_buffer_size, topk, total_rows, stream);
   }
 };
 
