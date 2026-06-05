@@ -93,19 +93,15 @@ std::uint64_t cagra_sample_filter_type_id(const SampleFilterT& sample_filter)
 template <typename SourceIndexT, typename SampleFilterT>
 std::uint64_t cagra_sample_filter_hash(const SampleFilterT& sample_filter)
 {
-  const auto payload_owner = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  std::uint64_t seed       = cagra_sample_filter_type_id(sample_filter);
-  if (const auto* storage = payload_owner.storage_owner.host_payload(); storage != nullptr) {
-    seed = cagra_hash_combine(
-      seed, static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(storage->bitset_ptr)));
-    seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(storage->bitset_len));
-    seed = cagra_hash_combine(seed, static_cast<std::uint64_t>(storage->original_nbits));
-  }
-  seed = cagra_hash_combine(seed,
-                            static_cast<std::uint64_t>(
-                              reinterpret_cast<std::uintptr_t>(payload_owner.payload.filter_data)));
-  seed =
-    cagra_hash_combine(seed, static_cast<std::uint64_t>(payload_owner.payload.query_id_offset));
+  std::uint64_t seed = cagra_sample_filter_type_id(sample_filter);
+  seed               = cagra_hash_combine(
+    seed, cagra_filter_payload_hash<SourceIndexT>(sample_filter));
+  seed = cagra_hash_combine(
+    seed,
+    static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(
+      cagra_filter_data_ptr(sample_filter))));
+  seed = cagra_hash_combine(
+    seed, static_cast<std::uint64_t>(cagra_filter_query_id_offset(sample_filter)));
   seed = cagra_hash_combine(seed, cagra_udf_source_hash(sample_filter));
   return seed;
 }
@@ -506,7 +502,6 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
   rmm::device_uvector<index_type> hashmap;
   std::atomic<std::chrono::time_point<std::chrono::system_clock>> last_touch;
   uint64_t param_hash;
-  cagra_sample_filter_payload<SourceIndexT> filter_payload_owner;
   cagra_sample_filter<SourceIndexT> filter_payload;
 
   static inline auto calculate_parameter_hash(
@@ -625,8 +620,7 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
                                           topk_by_bitonic_sort,
                                           bitonic_sort_and_merge_multi_warps))
   {
-    filter_payload_owner           = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-    this->filter_payload           = filter_payload_owner.device_payload(stream);
+    this->filter_payload           = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
     const uint32_t query_id_offset = filter_payload.query_id_offset;
 
     // set kernel launch parameters
@@ -815,8 +809,7 @@ void select_and_run(
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
-  const auto filter_payload_owner = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  const auto filter_payload       = filter_payload_owner.device_payload(stream);
+  const auto filter_payload       = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
   const uint32_t query_id_offset  = filter_payload.query_id_offset;
 
   // Use common logic to compute launch config

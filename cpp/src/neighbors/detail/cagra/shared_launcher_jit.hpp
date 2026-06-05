@@ -8,8 +8,8 @@
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 #include <cuvs/detail/jit_lto/common_fragments.hpp>
 
-#include "../../sample_filter.cuh"                   // For none_sample_filter, bitset_filter
-#include "jit_lto_kernels/cagra_filter_payload.cuh"  // sample-filter payload helpers
+#include "../../sample_filter.cuh"   // For none_sample_filter, bitset_filter
+#include "cagra_filter_payload.hpp"  // sample-filter payload helpers
 
 #include <cstdint>
 #include <iostream>
@@ -116,7 +116,7 @@ struct sample_filter_jit_tag {
             cagra_jit_sample_filter_tag_type_always_false<U>,
             "CAGRA JIT: sample_filter_jit_tag does not know how to link this filter. "
             "CagraSampleFilterWithQueryIdOffset<Inner> requires Inner to be a supported "
-            "built-in filter or udf_filter (see cagra_filter_payload.cuh and "
+            "built-in filter or udf_filter (see cagra_filter_payload.hpp and "
             "sample_filter_utils.cuh). "
             "For a new filter kind, add a sample_filter_jit_tag branch. "
             "(SAMPLE_FILTER_T in error; check InnerFilter in compiler output.)");

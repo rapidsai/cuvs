@@ -111,8 +111,7 @@ void compute_distance_to_child_nodes_jit(
   cudaStream_t cuda_stream,
   std::shared_ptr<AlgorithmLauncher> const& launcher)
 {
-  const auto filter_payload_owner = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  const auto filter_payload       = filter_payload_owner.device_payload(cuda_stream);
+  const auto filter_payload = extract_cagra_sample_filter<SourceIndexT>(sample_filter, cuda_stream);
 
   const auto block_size      = 128;
   const auto teams_per_block = block_size / dataset_desc.team_size;
@@ -161,8 +160,7 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                       cudaStream_t cuda_stream,
                       std::shared_ptr<AlgorithmLauncher> const& launcher)
 {
-  const auto filter_payload_owner      = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  const auto filter_payload            = filter_payload_owner.device_payload(cuda_stream);
+  const auto filter_payload = extract_cagra_sample_filter<SourceIndexT>(sample_filter, cuda_stream);
   const auto effective_query_id_offset = query_id_offset + filter_payload.query_id_offset;
 
   const std::uint32_t block_size = 256;

@@ -56,9 +56,8 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     SampleFilterT sample_filter,
                     cudaStream_t stream)
 {
-  const auto filter_payload_owner = extract_cagra_sample_filter<SourceIndexT>(sample_filter);
-  const auto filter_payload       = filter_payload_owner.device_payload(stream);
-  const uint32_t query_id_offset  = filter_payload.query_id_offset;
+  const auto filter_payload      = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
+  const uint32_t query_id_offset = filter_payload.query_id_offset;
 
   std::shared_ptr<AlgorithmLauncher> launcher =
     make_cagra_multi_cta_jit_launcher<DataT,
