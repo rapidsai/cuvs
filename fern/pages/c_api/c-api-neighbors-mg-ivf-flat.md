@@ -35,7 +35,7 @@ struct cuvsMultiGpuIvfFlatIndexParams {
 Allocate Multi-GPU IVF-Flat Index params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexParamsCreate(cuvsMultiGpuIvfFlatIndexParams_t* index_params);
+cuvsError_t cuvsMultiGpuIvfFlatIndexParamsCreate(cuvsMultiGpuIvfFlatIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -46,7 +46,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexParamsCreate(cuvsMultiGpuIvfFlat
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuivfflatindexparamsdestroy"></a>
 ### cuvsMultiGpuIvfFlatIndexParamsDestroy
@@ -54,7 +54,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexParamsCreate(cuvsMultiGpuIvfFlat
 De-allocate Multi-GPU IVF-Flat Index params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexParamsDestroy(cuvsMultiGpuIvfFlatIndexParams_t index_params);
+cuvsError_t cuvsMultiGpuIvfFlatIndexParamsDestroy(cuvsMultiGpuIvfFlatIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -65,7 +65,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexParamsDestroy(cuvsMultiGpuIvfFla
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index search parameters
 
@@ -100,7 +100,7 @@ struct cuvsMultiGpuIvfFlatSearchParams {
 Allocate Multi-GPU IVF-Flat search params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSearchParamsCreate(cuvsMultiGpuIvfFlatSearchParams_t* params);
+cuvsError_t cuvsMultiGpuIvfFlatSearchParamsCreate(cuvsMultiGpuIvfFlatSearchParams_t* params);
 ```
 
 **Parameters**
@@ -111,7 +111,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSearchParamsCreate(cuvsMultiGpuIvfFla
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuivfflatsearchparamsdestroy"></a>
 ### cuvsMultiGpuIvfFlatSearchParamsDestroy
@@ -119,7 +119,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSearchParamsCreate(cuvsMultiGpuIvfFla
 De-allocate Multi-GPU IVF-Flat search params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSearchParamsDestroy(cuvsMultiGpuIvfFlatSearchParams_t params);
+cuvsError_t cuvsMultiGpuIvfFlatSearchParamsDestroy(cuvsMultiGpuIvfFlatSearchParams_t params);
 ```
 
 **Parameters**
@@ -130,7 +130,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSearchParamsDestroy(cuvsMultiGpuIvfFl
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index
 
@@ -159,7 +159,7 @@ typedef struct {
 Allocate Multi-GPU IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexCreate(cuvsMultiGpuIvfFlatIndex_t* index);
+cuvsError_t cuvsMultiGpuIvfFlatIndexCreate(cuvsMultiGpuIvfFlatIndex_t* index);
 ```
 
 **Parameters**
@@ -170,7 +170,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexCreate(cuvsMultiGpuIvfFlatIndex_
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuivfflatindexdestroy"></a>
 ### cuvsMultiGpuIvfFlatIndexDestroy
@@ -178,7 +178,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexCreate(cuvsMultiGpuIvfFlatIndex_
 De-allocate Multi-GPU IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex_t index);
+cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex_t index);
 ```
 
 **Parameters**
@@ -189,7 +189,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index build
 
@@ -199,7 +199,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex
 Build a Multi-GPU IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatBuild(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuIvfFlatBuild(cuvsResources_t res,
 cuvsMultiGpuIvfFlatIndexParams_t params,
 DLManagedTensor* dataset_tensor,
 cuvsMultiGpuIvfFlatIndex_t index);
@@ -216,7 +216,7 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index search
 
@@ -226,7 +226,7 @@ cuvsMultiGpuIvfFlatIndex_t index);
 Search a Multi-GPU IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSearch(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuIvfFlatSearch(cuvsResources_t res,
 cuvsMultiGpuIvfFlatSearchParams_t params,
 cuvsMultiGpuIvfFlatIndex_t index,
 DLManagedTensor* queries_tensor,
@@ -247,7 +247,7 @@ DLManagedTensor* distances_tensor);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index extend
 
@@ -257,7 +257,7 @@ DLManagedTensor* distances_tensor);
 Extend a Multi-GPU IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatExtend(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuIvfFlatExtend(cuvsResources_t res,
 cuvsMultiGpuIvfFlatIndex_t index,
 DLManagedTensor* new_vectors_tensor,
 DLManagedTensor* new_indices_tensor);
@@ -274,7 +274,7 @@ DLManagedTensor* new_indices_tensor);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index serialize
 
@@ -284,7 +284,7 @@ DLManagedTensor* new_indices_tensor);
 Serialize a Multi-GPU IVF-Flat index to file
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatSerialize(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuIvfFlatSerialize(cuvsResources_t res,
 cuvsMultiGpuIvfFlatIndex_t index,
 const char* filename);
 ```
@@ -299,7 +299,7 @@ const char* filename);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index deserialize
 
@@ -309,7 +309,7 @@ const char* filename);
 Deserialize a Multi-GPU IVF-Flat index from file
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatDeserialize(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuIvfFlatDeserialize(cuvsResources_t res,
 const char* filename,
 cuvsMultiGpuIvfFlatIndex_t index);
 ```
@@ -324,7 +324,7 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU IVF-Flat index distribute
 
@@ -334,7 +334,7 @@ cuvsMultiGpuIvfFlatIndex_t index);
 Distribute a local IVF-Flat index to create a Multi-GPU index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuIvfFlatDistribute(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuIvfFlatDistribute(cuvsResources_t res,
 const char* filename,
 cuvsMultiGpuIvfFlatIndex_t index);
 ```
@@ -349,4 +349,4 @@ cuvsMultiGpuIvfFlatIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
