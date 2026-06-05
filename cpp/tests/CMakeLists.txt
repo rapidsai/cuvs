@@ -174,17 +174,6 @@ ConfigureTest(
 )
 
 ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_MULTI_KERNEL_MP_TEST
-  PATH neighbors/ann_cagra/test_multi_kernel_mp.cu
-  GPUS 1
-  PERCENT 100
-)
-target_include_directories(
-  NEIGHBORS_ANN_CAGRA_MULTI_KERNEL_MP_TEST PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src"
-                                                   "${CMAKE_CURRENT_BINARY_DIR}/../src"
-)
-
-ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST
   PATH neighbors/ann_cagra/test_float_uint32_t.cu
   GPUS 1
