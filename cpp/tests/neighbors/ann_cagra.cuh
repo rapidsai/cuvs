@@ -277,7 +277,7 @@ struct AnnCagraInputs {
   std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
   cuvs::neighbors::MergeStrategy merge_strategy =
     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
-  cuvs::neighbors::cagra::internal_dtype smem_dtype = cuvs::neighbors::cagra::internal_dtype::AUTO;
+  cuvs::neighbors::cagra::internal_dtype smem_dtype = cuvs::neighbors::cagra::internal_dtype::F16;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -305,7 +305,6 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     switch (dtype) {
       case cuvs::neighbors::cagra::internal_dtype::F16: return "F16";
       case cuvs::neighbors::cagra::internal_dtype::E5M2: return "E5M2";
-      case cuvs::neighbors::cagra::internal_dtype::AUTO: return "AUTO";
     }
     return "Unknown";
   };
@@ -1712,8 +1711,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   for (uint32_t pq_len : {2, 4, 8}) {
     for (uint32_t vq_n_centers : {100, 1000}) {
       for (auto internal_smem_dtype : {cuvs::neighbors::cagra::internal_dtype::E5M2,
-                                       cuvs::neighbors::cagra::internal_dtype::F16,
-                                       cuvs::neighbors::cagra::internal_dtype::AUTO}) {
+                                       cuvs::neighbors::cagra::internal_dtype::F16}) {
         for (auto input : inputs2) {
           vpq_params ps{};
           ps.pq_dim       = input.dim / pq_len;
