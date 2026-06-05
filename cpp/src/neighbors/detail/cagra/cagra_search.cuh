@@ -338,7 +338,8 @@ void search_multi_partition(
   if (indices[0]->metric() == cuvs::distance::DistanceType::CosineExpanded) {
     dataset_norms_ptr0 = indices[0]->dataset_norms().value().data_handle();
   }
-  // Use the first partition's descriptor to construct the plan (smem layout is type-dependent only).
+  // Use the first partition's descriptor to construct the plan (smem layout is type-dependent
+  // only).
   auto plan_desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
     res, params, *strided_dset0, indices[0]->metric(), dataset_norms_ptr0);
 
@@ -346,18 +347,10 @@ void search_multi_partition(
     search<T, graph_idx_type, DistanceT, CagraSampleFilterT, graph_idx_type, graph_idx_type>
       plan(res, params, plan_desc, dim, max_dataset_size, max_graph_degree, topk);
 
-  // Multi-partition produces the global top-k by merging itopk_size candidates from each partition.
-  // Require the combined pool to be at least topk; otherwise the merge is forced to fill the
-  // output with sentinels from partitions that couldn't supply enough refined candidates. This is
-  // a necessary condition to avoid garbage in the output — not a sufficient one for good recall,
-  // which still depends on per-partition itopk_size relative to the true top-k's distribution
-  // across partitions. Compared against the post-adjustment plan.itopk_size to mirror how
-  // single-partition validates topk in plan->check().
-  RAFT_EXPECTS(static_cast<uint64_t>(plan.itopk_size) * num_partitions >= topk,
-               "itopk_size (%lu) * num_partitions (%u) must be >= topk (%u).",
-               plan.itopk_size,
-               num_partitions,
-               topk);
+  RAFT_EXPECTS(topk <= plan.itopk_size,
+               "topk = %u must be smaller than itopk_size = %lu",
+               topk,
+               plan.itopk_size);
 
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
@@ -430,9 +423,8 @@ void search_multi_partition(
   // once. The unconditional allocation is small (n_queries floats) relative to the search.
   auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, n_queries);
   {
-    auto scaled_sq_op = raft::compose_op(raft::sq_op{},
-                                         raft::div_const_op<DistanceT>{DistanceT(kScale)},
-                                         raft::cast_op<DistanceT>());
+    auto scaled_sq_op = raft::compose_op(
+      raft::sq_op{}, raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::cast_op<DistanceT>());
     raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
       res,
       raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
