@@ -6,7 +6,7 @@ slug: user-guide/api-guides
 
 Use these pages to find task-focused NVIDIA cuVS API examples for clustering, vector indexing, preprocessing, and supporting routines.
 
-NVIDIA cuVS is written in C++ at its core and wrapped by a stable C API layer. The Python, Java, Rust, and Go bindings use that C layer so they can share the same ABI boundary; see [Compatibility](/user-guide/compatibility) for why that matters. These API guides are intended for general use and include examples for supported programming languages where possible, but some guides document C++ concepts explicitly because all NVIDIA cuVS algorithm implementations are C++ at the core.
+NVIDIA cuVS is written in C++ at its core and wrapped by a stable C API layer. The Python, Java, Rust, and Go bindings use that C layer so they can share the same ABI boundary; see [Compatibility](/user-guide/field-guide/compatibility) for why that matters. These API guides are intended for general use and include examples for supported programming languages where possible, but some guides document C++ concepts explicitly because all NVIDIA cuVS algorithm implementations are C++ at the core.
 
 ## Common Types
 

@@ -45,7 +45,7 @@ struct cuvsIvfFlatIndexParams {
 Allocate IVF-Flat Index params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* index_params);
+cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -56,7 +56,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* i
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatindexparamsdestroy"></a>
 ### cuvsIvfFlatIndexParamsDestroy
@@ -64,7 +64,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* i
 De-allocate IVF-Flat Index params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params);
+cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -75,7 +75,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t i
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## IVF-Flat index search parameters
 
@@ -102,7 +102,7 @@ struct cuvsIvfFlatSearchParams {
 Allocate IVF-Flat search params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
+cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
 ```
 
 **Parameters**
@@ -113,7 +113,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t*
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatsearchparamsdestroy"></a>
 ### cuvsIvfFlatSearchParamsDestroy
@@ -121,7 +121,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t*
 De-allocate IVF-Flat search params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
+cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
 ```
 
 **Parameters**
@@ -132,7 +132,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## IVF-Flat index
 
@@ -161,7 +161,7 @@ typedef struct {
 Allocate IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
+cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 ```
 
 **Parameters**
@@ -172,7 +172,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatindexdestroy"></a>
 ### cuvsIvfFlatIndexDestroy
@@ -180,7 +180,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 De-allocate IVF-Flat index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
+cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 ```
 
 **Parameters**
@@ -191,7 +191,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatindexgetnlists"></a>
 ### cuvsIvfFlatIndexGetNLists
@@ -199,7 +199,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 Get the number of clusters/inverted lists in the index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists);
+cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists);
 ```
 
 **Parameters**
@@ -211,7 +211,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int6
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatindexgetdim"></a>
 ### cuvsIvfFlatIndexGetDim
@@ -219,7 +219,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int6
 Get the dimensionality of the indexed data
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
+cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
 ```
 
 **Parameters**
@@ -231,7 +231,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatindexgetcenters"></a>
 ### cuvsIvfFlatIndexGetCenters
@@ -239,7 +239,7 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t
 Get the cluster centers corresponding to the lists [n_lists, dim]
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLManagedTensor* centers);
+cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLManagedTensor* centers);
 ```
 
 **Parameters**
@@ -251,17 +251,21 @@ CUVS_EXPORT cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLM
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## IVF-Flat index build
 
 <a id="cuvsivfflatbuild"></a>
 ### cuvsIvfFlatBuild
 
-Build a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` 3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+Build a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
+cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
 cuvsIvfFlatIndexParams_t index_params,
 DLManagedTensor* dataset,
 cuvsIvfFlatIndex_t index);
@@ -278,17 +282,21 @@ cuvsIvfFlatIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## IVF-Flat index search
 
 <a id="cuvsivfflatsearch"></a>
 ### cuvsIvfFlatSearch
 
-Search a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are: 1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32` 3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+Search a IVF-Flat index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`. It is also important to note that the IVF-Flat Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Types for input are:
+
+1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
+cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
 cuvsIvfFlatSearchParams_t search_params,
 cuvsIvfFlatIndex_t index,
 DLManagedTensor* queries,
@@ -311,7 +319,7 @@ cuvsFilter filter);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## IVF-Flat C-API serialize functions
 
@@ -321,7 +329,7 @@ cuvsFilter filter);
 Save the index to file.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
+cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
 const char* filename,
 cuvsIvfFlatIndex_t index);
 ```
@@ -338,7 +346,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsivfflatdeserialize"></a>
 ### cuvsIvfFlatDeserialize
@@ -346,7 +354,7 @@ Experimental, both the API and the serialization format are subject to change.
 Load index from file.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
+cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
 const char* filename,
 cuvsIvfFlatIndex_t index);
 ```
@@ -363,7 +371,7 @@ Experimental, both the API and the serialization format are subject to change.
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## IVF-Flat index extend
 
@@ -373,7 +381,7 @@ Experimental, both the API and the serialization format are subject to change.
 Extend the index with the new data.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
 DLManagedTensor* new_vectors,
 DLManagedTensor* new_indices,
 cuvsIvfFlatIndex_t index);
@@ -390,4 +398,4 @@ cuvsIvfFlatIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
