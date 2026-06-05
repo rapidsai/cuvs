@@ -40,9 +40,9 @@ Example usage
 | `out_val` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | output values [batch_size, k]; the k smallest/largest values from each row of the `in_val`. |
 | `out_idx` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | output payload (e.g. indices) [batch_size, k]; the payload selected together with `out_val`. |
 | `select_min` | in | `bool` | whether to select k smallest (true) or largest (false) keys. |
-| `sorted` | in | `bool` | whether to make sure selected pairs are sorted by value Default: `false`. |
-| `algo` | in | `SelectAlgo` | the selection algorithm to use Default: `SelectAlgo::kAuto`. |
-| `len_i` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional array of size (batch_size) providing lengths for each individual row Default: `std::nullopt`. |
+| `sorted` | in | `bool` | whether to make sure selected pairs are sorted by value<br />Default: `false`. |
+| `algo` | in | `SelectAlgo` | the selection algorithm to use<br />Default: `SelectAlgo::kAuto`. |
+| `len_i` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional array of size (batch_size) providing lengths for each individual row<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -79,9 +79,9 @@ Example usage
 | `out_val` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | output values [batch_size, k]; the k smallest/largest values from each row of the `in_val`. |
 | `out_idx` | out | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` | output payload (e.g. indices) [batch_size, k]; the payload selected together with `out_val`. |
 | `select_min` | in | `bool` | whether to select k smallest (true) or largest (false) keys. |
-| `sorted` | in | `bool` | whether to make sure selected pairs are sorted by value Default: `false`. |
-| `algo` | in | `SelectAlgo` | the selection algorithm to use Default: `SelectAlgo::kAuto`. |
-| `len_i` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | optional array of size (batch_size) providing lengths for each individual row Default: `std::nullopt`. |
+| `sorted` | in | `bool` | whether to make sure selected pairs are sorted by value<br />Default: `false`. |
+| `algo` | in | `SelectAlgo` | the selection algorithm to use<br />Default: `SelectAlgo::kAuto`. |
+| `len_i` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | optional array of size (batch_size) providing lengths for each individual row<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -118,9 +118,9 @@ Example usage
 | `out_val` | out | `raft::device_matrix_view<half, int64_t, raft::row_major>` | output values [batch_size, k]; the k smallest/largest values from each row of the `in_val`. |
 | `out_idx` | out | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` | output payload (e.g. indices) [batch_size, k]; the payload selected together with `out_val`. |
 | `select_min` | in | `bool` | whether to select k smallest (true) or largest (false) keys. |
-| `sorted` | in | `bool` | whether to make sure selected pairs are sorted by value Default: `false`. |
-| `algo` | in | `SelectAlgo` | the selection algorithm to use Default: `SelectAlgo::kAuto`. |
-| `len_i` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | optional array of size (batch_size) providing lengths for each individual row Default: `std::nullopt`. |
+| `sorted` | in | `bool` | whether to make sure selected pairs are sorted by value<br />Default: `false`. |
+| `algo` | in | `SelectAlgo` | the selection algorithm to use<br />Default: `SelectAlgo::kAuto`. |
+| `len_i` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | optional array of size (batch_size) providing lengths for each individual row<br />Default: `std::nullopt`. |
 
 **Returns**
 
