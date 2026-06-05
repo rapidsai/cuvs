@@ -26,6 +26,7 @@ from cuvs_bench.backends._utils import (
     expand_param_grid,
     load_vectors,
 )
+from cuvs_bench.generate_groundtruth.utils import memmap_bin_file
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
 
@@ -218,6 +219,8 @@ class TestLoadVectors:
         [
             (".fbin", np.float32, np.uint32),
             (".fbin", np.float32, np.uint64),
+            (".f16bin", np.float16, np.uint32),
+            (".f16bin", np.float16, np.uint64),
             (".ibin", np.int32, np.uint32),
             (".ibin", np.int32, np.uint64),
             (".u8bin", np.uint8, np.uint32),
@@ -298,21 +301,24 @@ class TestBinHeaderHelpers:
         assert (n_rows, n_cols, hbytes) == (11, 5, EXTENDED_HEADER_BYTES)
 
     def test_read_synthesized_huge_extended_header(self, tmp_path):
-        """A hand-crafted extended-header file with >UINT32_MAX rows reads correctly.
+        """Extended-header file with >UINT32_MAX rows and positive n_cols.
 
-        We can't materialize the data section (>16 GB just for the dummy
-        bytes), so write only the header and pad with the exact number of
-        zero bytes ``read_bin_header`` expects to balance the size equation
-        -- using ``n_cols=0`` so the data section is empty.
+        We can't materialize the full data section, so write the header and
+        truncate to the exact file size ``read_bin_header`` expects.
         """
         path = tmp_path / "huge.fbin"
         n_rows = UINT32_MAX + 17
-        n_cols = 0
+        n_cols = 4
+        itemsize = 4
+        expected_size = EXTENDED_HEADER_BYTES + n_rows * n_cols * itemsize
         with open(path, "wb") as f:
             write_bin_header(f, n_rows, n_cols)
-        assert path.stat().st_size == EXTENDED_HEADER_BYTES
+            f.truncate(expected_size)
 
-        got_rows, got_cols, hbytes = read_bin_header(str(path), itemsize=4)
+        assert path.stat().st_size == expected_size
+        got_rows, got_cols, hbytes = read_bin_header(
+            str(path), itemsize=itemsize
+        )
         assert got_rows == n_rows
         assert got_cols == n_cols
         assert hbytes == EXTENDED_HEADER_BYTES
@@ -347,6 +353,76 @@ class TestBinHeaderHelpers:
             data.tofile(f)
         _, _, hbytes = read_bin_header(str(path), itemsize=4)
         assert hbytes == LEGACY_HEADER_BYTES
+
+
+class TestMemmapBinFile:
+    """Tests for ``generate_groundtruth.utils.memmap_bin_file``."""
+
+    def test_read_legacy_header(self, tmp_path):
+        """Read mode auto-detects the legacy 8-byte header offset."""
+        data = np.random.rand(30, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data)
+
+        mm = memmap_bin_file(path, np.float32, mode="r")
+        assert mm.shape == (30, 8)
+        np.testing.assert_array_equal(mm[:], data)
+
+    def test_read_extended_header(self, tmp_path):
+        """Read mode auto-detects the extended 16-byte header offset."""
+        data = np.random.rand(30, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data, size_dtype=np.uint64)
+
+        mm = memmap_bin_file(path, np.float32, mode="r")
+        assert mm.shape == (30, 8)
+        np.testing.assert_array_equal(mm[:], data)
+
+    def test_read_partial_shape_override(self, tmp_path):
+        """Read mode fills ``None`` shape entries from the header."""
+        data = np.random.rand(50, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data)
+
+        mm = memmap_bin_file(path, np.float32, shape=(10, None), mode="r")
+        assert mm.shape == (10, 8)
+        np.testing.assert_array_equal(mm[:], data[:10])
+
+    def test_write_read_roundtrip_legacy(self, tmp_path):
+        """Write mode with uint32 header, then read back via memmap."""
+        path = str(tmp_path / "test.fbin")
+        shape = (20, 8)
+        data = np.random.rand(*shape).astype(np.float32)
+
+        mm = memmap_bin_file(path, np.float32, shape=shape, mode="w+")
+        mm[:] = data
+        mm.flush()
+        del mm
+
+        loaded = memmap_bin_file(path, np.float32, mode="r")
+        assert loaded.shape == shape
+        np.testing.assert_array_equal(loaded[:], data)
+
+    def test_write_read_roundtrip_extended(self, tmp_path):
+        """Write mode with uint64 header, then read back via memmap."""
+        path = str(tmp_path / "test.fbin")
+        shape = (20, 8)
+        data = np.random.rand(*shape).astype(np.float32)
+
+        mm = memmap_bin_file(
+            path, np.float32, shape=shape, mode="w+", size_dtype=np.uint64
+        )
+        mm[:] = data
+        mm.flush()
+        del mm
+
+        loaded = memmap_bin_file(path, np.float32, mode="r")
+        assert loaded.shape == shape
+        np.testing.assert_array_equal(loaded[:], data)
+        assert (
+            tmp_path.joinpath("test.fbin").stat().st_size
+            == EXTENDED_HEADER_BYTES + data.nbytes
+        )
 
 
 class TestDatasetLazyLoading:
