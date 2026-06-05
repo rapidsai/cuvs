@@ -86,11 +86,11 @@ Parameters to build index for HNSW nearest neighbor search
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `hierarchy` | `string, default = "gpu" (optional)` | The hierarchy of the HNSW index. Valid values are ["none", "cpu", "gpu"].<br />- "none": No hierarchy is built.<br />- "cpu": Hierarchy is built using CPU.<br />- "gpu": Hierarchy is built using GPU. |
+| `hierarchy` | `string, default = "gpu" (optional)` | The hierarchy of the HNSW index.<br />Valid values are ["none", "cpu", "gpu"].<br />- "none": No hierarchy is built.<br />- "cpu": Hierarchy is built using CPU.<br />- "gpu": Hierarchy is built using GPU. |
 | `ef_construction` | `int, default = 200 (optional)` | Maximum number of candidate list size used during construction when hierarchy is `cpu`. |
-| `num_threads` | `int, default = 0 (optional)` | Number of CPU threads used to increase construction parallelism when hierarchy is `cpu` or `gpu`. When the value is 0, the number of threads is automatically determined to the maximum number of threads available. NOTE: When hierarchy is `gpu`, while the majority of the work is done on the GPU, initialization of the HNSW index itself and some other work is parallelized with the help of CPU threads. |
+| `num_threads` | `int, default = 0 (optional)` | Number of CPU threads used to increase construction parallelism when hierarchy is `cpu` or `gpu`. When the value is 0, the number of threads is automatically determined to the maximum number of threads available.<br />NOTE: When hierarchy is `gpu`, while the majority of the work is done on the GPU, initialization of the HNSW index itself and some other work is parallelized with the help of CPU threads. |
 | `M` | `int, default = 32 (optional)` | HNSW M parameter: number of bi-directional links per node (used when building with ACE). graph_degree = m * 2, intermediate_graph_degree = m * 3. |
-| `metric` | `string, default = "sqeuclidean" (optional)` | Distance metric to use. Valid values: ["sqeuclidean", "inner_product"] |
+| `metric` | `string, default = "sqeuclidean" (optional)` | Distance metric to use.<br />Valid values: ["sqeuclidean", "inner_product"] |
 | `ace_params` | `AceParams, default = None (optional)` | ACE parameters for building HNSW index using ACE algorithm. If set, enables the build() function to use ACE for index construction. |
 
 **Constructor**

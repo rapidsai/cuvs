@@ -58,7 +58,7 @@ typedef struct {
 Allocate Tiered Index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
+cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
 ```
 
 **Parameters**
@@ -69,7 +69,7 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvstieredindexdestroy"></a>
 ### cuvsTieredIndexDestroy
@@ -77,7 +77,7 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index);
 De-allocate Tiered index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
+cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
 ```
 
 **Parameters**
@@ -88,7 +88,7 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered Index build parameters
 
@@ -127,7 +127,7 @@ struct cuvsTieredIndexParams {
 Allocate Tiered Index Params and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* index_params);
+cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -138,7 +138,7 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* ind
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvstieredindexparamsdestroy"></a>
 ### cuvsTieredIndexParamsDestroy
@@ -146,7 +146,7 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* ind
 De-allocate Tiered Index params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
+cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -157,17 +157,20 @@ CUVS_EXPORT cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t ind
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered index build
 
 <a id="cuvstieredindexbuild"></a>
 ### cuvsTieredIndexBuild
 
-Build a TieredIndex index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are: 1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` 2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+Build a TieredIndex index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`, or `kDLCPU`. Also, acceptable underlying types are:
+
+1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexBuild(cuvsResources_t res,
+cuvsError_t cuvsTieredIndexBuild(cuvsResources_t res,
 cuvsTieredIndexParams_t index_params,
 DLManagedTensor* dataset,
 cuvsTieredIndex_t index);
@@ -184,7 +187,7 @@ cuvsTieredIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered index search
 
@@ -194,7 +197,7 @@ cuvsTieredIndex_t index);
 Search a TieredIndex index with a `DLManagedTensor`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexSearch(cuvsResources_t res,
+cuvsError_t cuvsTieredIndexSearch(cuvsResources_t res,
 void* search_params,
 cuvsTieredIndex_t index,
 DLManagedTensor* queries,
@@ -217,7 +220,7 @@ cuvsFilter prefilter);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered index extend
 
@@ -227,7 +230,7 @@ cuvsFilter prefilter);
 Extend the index with the new data.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
+cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
 DLManagedTensor* new_vectors,
 cuvsTieredIndex_t index);
 ```
@@ -242,7 +245,7 @@ cuvsTieredIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Tiered index merge
 
@@ -252,7 +255,7 @@ cuvsTieredIndex_t index);
 Merge multiple indices together into a single index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
+cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
 cuvsTieredIndexParams_t index_params,
 cuvsTieredIndex_t* indices,
 size_t num_indices,
@@ -271,4 +274,4 @@ cuvsTieredIndex_t output_index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

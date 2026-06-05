@@ -63,15 +63,19 @@ cdef class IndexParams
 
 Parameters to build index for IvfSq nearest neighbor search
 
+Note: IVF-SQ currently uses fixed 8-bit residual scalar quantization.
+There are no additional SQ-specific tuning knobs.
+
 **Parameters**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `n_lists` | `int, default = 1024` | The number of clusters used in the coarse quantizer. |
-| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type. Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- euclidean is the euclidean distance<br />- inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
+| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type.<br />Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- euclidean is the euclidean distance<br />- inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
+| `metric_arg` | `float, default = 2.0` | Additional metric argument forwarded to cuVS distance computations. |
 | `kmeans_n_iters` | `int, default = 20` | The number of iterations searching for kmeans centers during index building. |
 | `max_train_points_per_cluster` | `int, default = 256` | The number of data vectors per cluster to use during iterative kmeans building. The index uses at most n_lists * max_train_points_per_cluster rows for training. |
-| `add_data_on_build` | `bool, default = True` | After training the coarse and fine quantizers, we will populate the index with the dataset if add_data_on_build == True, otherwise the index is left empty, and the extend method can be used to add new vectors to the index. |
+| `add_data_on_build` | `bool, default = True` | After training the coarse clustering model and residual scalar quantization parameters, we populate the index with the dataset if add_data_on_build == True. Otherwise, the index is left empty, and the extend method can be used to add new vectors to the index. |
 | `conservative_memory_allocation` | `bool, default = False` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). To disable this behavior and use as little GPU memory for the database as possible, set this flag to `True`. |
 
 **Constructor**
@@ -190,10 +194,12 @@ def build(IndexParams index_params, dataset, resources=None)
 
 Build the IvfSq index from the dataset for efficient search.
 
-IVF-SQ (Scalar Quantization) combines an IVF coarse quantizer with
+IVF-SQ (Scalar Quantization) uses IVF partitioning together with
 per-dimension scalar quantization. Each vector's residual is encoded
-as one byte per dimension, providing ~4x memory reduction vs IVF-Flat
-with higher recall than IVF-PQ at similar memory budgets.
+as one byte per dimension, which can reduce vector-storage memory by
+about 4x vs IVF-Flat for float32 inputs (about 2x for float16 inputs),
+excluding IVF structural overhead. Recall and speed trade-offs versus
+IVF-PQ are dataset and tuning dependent.
 
 **Parameters**
 
@@ -313,7 +319,7 @@ version of cuvs is not guaranteed to work.
 `@auto_sync_resources`
 
 ```python
-def save(filename, Index index, bool include_dataset=True, resources=None)
+def save(filename, Index index, resources=None)
 ```
 
 Saves the index to a file.

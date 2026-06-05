@@ -41,7 +41,7 @@ Extends single-GPU IndexParams with multi-GPU specific parameters.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `distribution_mode` | `str, default = "sharded"` | Distribution mode for multi-GPU setup. Valid values: ["replicated", "sharded"] |
+| `distribution_mode` | `str, default = "sharded"` | Distribution mode for multi-GPU setup.<br />Valid values: ["replicated", "sharded"] |
 | `**kwargs` | `Additional parameters passed to single-GPU IndexParams` |  |
 
 **Constructor**
