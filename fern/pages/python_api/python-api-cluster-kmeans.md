@@ -208,7 +208,7 @@ reducing ``streaming_batch_size`` to reduce GPU memory usage.
 | `params` | `KMeansParams` | Parameters to use to fit KMeans model.  For host data, ``params.streaming_batch_size`` controls how many samples are sent to the GPU per batch. |
 | `X` | `array-like` | Training instances, shape (m, k).  Accepts both device arrays (cupy / CUDA array interface) and host arrays (numpy). |
 | `centroids` | `Optional writable CUDA array interface compliant matrix` | shape (n_clusters, k) |
-| `sample_weights` | `Optional weights per observation.  Must reside on` | the same memory space as X (device or host). default: None |
+| `sample_weights` | `Optional weights per observation.  Must reside on` | the same memory space as X (device or host).<br />default: None |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
 **Returns**
