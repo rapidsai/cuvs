@@ -160,7 +160,8 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
     },
     # =========================================================================
     # Elasticsearch GPU HNSW (hnsw, int8_hnsw, int4_hnsw, bbq_hnsw)
-    # Per ES-GPU-API-REFERENCE.md: index_options (m, ef_construction), knn (num_candidates)
+    # Per ES-GPU-API-REFERENCE.md: index_options (m, ef_construction),
+    # knn (num_candidates)
     # =========================================================================
     "elastic_hnsw": {
         "build": {
@@ -196,6 +197,17 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
         },
         "search": {
             "num_candidates": {"type": "int", "min": 50, "max": 500},
+        },
+    },
+    # =========================================================================
+    # OpenSearch HNSW (faiss engine)
+    # =========================================================================
+    "opensearch_faiss_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 4, "max": 64},
+        },
+        "search": {
+            "ef_search": {"type": "int", "min": 10, "max": 1000},
         },
     },
 }

@@ -575,7 +575,6 @@ class BenchmarkOrchestrator:
             "append_results": append_results,
         }
         backend = self.backend_class(backend_config)
-
         result = None
         try:
             backend.initialize()
@@ -601,18 +600,18 @@ class BenchmarkOrchestrator:
                     search_threads=search_threads,
                     dry_run=dry_run,
                 )
+
+                # Compute recall for backends that return actual neighbors.
+                if _should_compute_recall(result):
+                    gt = bench_dataset.groundtruth_neighbors
+                    if gt is not None:
+                        result.recall = compute_recall(
+                            result.neighbors, gt, count
+                        )
+
+            return result
         finally:
             backend.cleanup()
-
-            # Compute recall for backends that return actual neighbors.
-            # Note: The recall computation relies on empty neighbors to
-            # distinguish backends that already computed recall.
-            if _should_compute_recall(result):
-                gt = bench_dataset.groundtruth_neighbors
-                if gt is not None:
-                    result.recall = compute_recall(result.neighbors, gt, count)
-
-        return result
 
     def _create_dataset(self, dataset_config: DatasetConfig) -> Dataset:
         """
