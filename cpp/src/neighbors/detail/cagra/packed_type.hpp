@@ -47,7 +47,7 @@ struct fp8xN<NumPacked, 5> {
     HDI storage_t() : u{0} {}
   } data;
 
-  HDI fp8xN() = default;
+  HDI fp8xN() : data{} {}
 
   HDI uint_t& as_uint() { return data.u; }
   HDI uint_t as_uint() const { return data.u; }
