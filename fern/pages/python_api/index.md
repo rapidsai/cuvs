@@ -30,6 +30,7 @@ These pages are generated from the Python and Cython sources under `python/cuvs/
 - [HNSW](/api-reference/python-api-neighbors-hnsw)
 - [IVF Flat](/api-reference/python-api-neighbors-ivf-flat)
 - [IVF PQ](/api-reference/python-api-neighbors-ivf-pq)
+- [IVF SQ](/api-reference/python-api-neighbors-ivf-sq)
 - [NN Descent](/api-reference/python-api-neighbors-nn-descent)
 - [Neighbors](/api-reference/python-api-neighbors)
 - [Tiered Index](/api-reference/python-api-neighbors-tiered-index)

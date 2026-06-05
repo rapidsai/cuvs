@@ -72,8 +72,8 @@ scale the algorithm beyond the n^2 memory consumption of implementations that us
 | `labels` | out | `raft::device_vector_view<int, int>` | output labels vector (size n_rows) |
 | `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use when constructing connectivities graph |
 | `n_clusters` | in | `size_t` | number of clusters to assign data samples |
-| `linkage` | in | [`cuvs::cluster::agglomerative::Linkage`](/api-reference/cpp-api-cluster-agglomerative#cluster-agglomerative-linkage) | strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller datasets. KNN_GRAPH allows the memory usage to be controlled (using parameter c) at the expense of potentially additional minimum spanning tree iterations. Default: `cuvs::cluster::agglomerative::Linkage::KNN_GRAPH`. |
-| `c` | in | `std::optional<int>` | a constant used when constructing linkage from knn graph. Allows the indirect control of k. The algorithm will set `k = log(n) + c` Default: `std::make_optional&lt;int&gt;(DEFAULT_CONST_C)`. |
+| `linkage` | in | [`cuvs::cluster::agglomerative::Linkage`](/api-reference/cpp-api-cluster-agglomerative#cluster-agglomerative-linkage) | strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller datasets. KNN_GRAPH allows the memory usage to be controlled (using parameter c) at the expense of potentially additional minimum spanning tree iterations.<br />Default: `cuvs::cluster::agglomerative::Linkage::KNN_GRAPH`. |
+| `c` | in | `std::optional<int>` | a constant used when constructing linkage from knn graph. Allows the indirect control of k. The algorithm will set `k = log(n) + c`<br />Default: `std::make_optional&lt;int&gt;(DEFAULT_CONST_C)`. |
 
 **Returns**
 

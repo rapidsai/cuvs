@@ -33,7 +33,7 @@ Keep generated Panama bindings and native `MemorySegment` details out of the pub
 
 Java APIs are consumed by downstream applications and should change carefully. Add new methods or overloads before removing old ones, preserve existing builder behavior where possible, and avoid changing defaults in ways that silently alter search quality, memory use, or native resource ownership.
 
-The Java bindings should call the NVIDIA cuVS C APIs rather than C++ or CUDA implementation details directly. The C layer is the ABI-stable boundary for bindings, so changes that require new native behavior should usually start with the C API. See [ABI Stability](/developer-guide/abi-stability) for more detail.
+The Java bindings should call the NVIDIA cuVS C APIs rather than C++ or CUDA implementation details directly. The C layer is the ABI-stable boundary for bindings, so changes that require new native behavior should usually start with the C API. See [ABI Stability](/developer-guide/advanced-topics/abi-stability) for more detail.
 
 ### Resource Lifecycle
 

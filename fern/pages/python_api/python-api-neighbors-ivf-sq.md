@@ -1,10 +1,10 @@
 ---
-slug: api-reference/python-api-neighbors-ivf-flat
+slug: api-reference/python-api-neighbors-ivf-sq
 ---
 
-# IVF Flat
+# IVF SQ
 
-_Python module: `cuvs.neighbors.ivf_flat`_
+_Python module: `cuvs.neighbors.ivf_sq`_
 
 ## Index
 
@@ -12,7 +12,7 @@ _Python module: `cuvs.neighbors.ivf_flat`_
 cdef class Index
 ```
 
-IvfFlat index object. This object stores the trained IvfFlat index state
+IvfSq index object. This object stores the trained IvfSq index state
 which can be used to perform nearest neighbors searches.
 
 **Members**
@@ -61,7 +61,10 @@ original space
 cdef class IndexParams
 ```
 
-Parameters to build index for IvfFlat nearest neighbor search
+Parameters to build index for IvfSq nearest neighbor search
+
+Note: IVF-SQ currently uses fixed 8-bit residual scalar quantization.
+There are no additional SQ-specific tuning knobs.
 
 **Parameters**
 
@@ -69,15 +72,16 @@ Parameters to build index for IvfFlat nearest neighbor search
 | --- | --- | --- |
 | `n_lists` | `int, default = 1024` | The number of clusters used in the coarse quantizer. |
 | `metric` | `str, default = "sqeuclidean"` | String denoting the metric type.<br />Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"], where<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,<br />- euclidean is the euclidean distance<br />- inner product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
-| `kmeans_n_iters` | `int, default = 20` | The number of iterations searching for kmeans centers during index building. The default setting is often fine, but this parameter can be decreased to improve training time wih larger trainset fractions (10M+ vectors) or increased for smaller trainset fractions (very small number of vectors) to improve recall. |
-| `kmeans_trainset_fraction` | `int, default = 0.5` | If kmeans_trainset_fraction is less than 1, then the dataset is subsampled, and only n_samples * kmeans_trainset_fraction rows are used for training. |
-| `add_data_on_build` | `bool, default = True` | After training the coarse and fine quantizers, we will populate the index with the dataset if add_data_on_build == True, otherwise the index is left empty, and the extend method can be used to add new vectors to the index. |
-| `adaptive_centers` | `bool, default = False` | By default (adaptive_centers = False), the cluster centers are trained in `ivf_flat.build`, and and never modified in `ivf_flat.extend`. The alternative behavior (adaptive_centers = true) is to update the cluster centers for new data when it is added. In this case, `index.centers()` are always exactly the centroids of the data in the corresponding clusters. The drawback of this behavior is that the centroids depend on the order of adding new data (through the classification of the added data); that is, `index.centers()` "drift" together with the changing distribution of the newly added data. |
+| `metric_arg` | `float, default = 2.0` | Additional metric argument forwarded to cuVS distance computations. |
+| `kmeans_n_iters` | `int, default = 20` | The number of iterations searching for kmeans centers during index building. |
+| `max_train_points_per_cluster` | `int, default = 256` | The number of data vectors per cluster to use during iterative kmeans building. The index uses at most n_lists * max_train_points_per_cluster rows for training. |
+| `add_data_on_build` | `bool, default = True` | After training the coarse clustering model and residual scalar quantization parameters, we populate the index with the dataset if add_data_on_build == True. Otherwise, the index is left empty, and the extend method can be used to add new vectors to the index. |
+| `conservative_memory_allocation` | `bool, default = False` | By default, the algorithm allocates more space than necessary for individual clusters (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of data copies during repeated calls to `extend` (extending the database). To disable this behavior and use as little GPU memory for the database as possible, set this flag to `True`. |
 
 **Constructor**
 
 ```python
-def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans_n_iters=20, kmeans_trainset_fraction=0.5, adaptive_centers=False, add_data_on_build=True, conservative_memory_allocation=False)
+def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans_n_iters=20, max_train_points_per_cluster=256, add_data_on_build=True, conservative_memory_allocation=False)
 ```
 
 **Members**
@@ -90,8 +94,7 @@ def __init__(self, *, n_lists=1024, metric="sqeuclidean", metric_arg=2.0, kmeans
 | `add_data_on_build` | property |
 | `n_lists` | property |
 | `kmeans_n_iters` | property |
-| `kmeans_trainset_fraction` | property |
-| `adaptive_centers` | property |
+| `max_train_points_per_cluster` | property |
 | `conservative_memory_allocation` | property |
 
 ### get_handle
@@ -130,16 +133,10 @@ def n_lists(self)
 def kmeans_n_iters(self)
 ```
 
-### kmeans_trainset_fraction
+### max_train_points_per_cluster
 
 ```python
-def kmeans_trainset_fraction(self)
-```
-
-### adaptive_centers
-
-```python
-def adaptive_centers(self)
+def max_train_points_per_cluster(self)
 ```
 
 ### conservative_memory_allocation
@@ -154,7 +151,7 @@ def conservative_memory_allocation(self)
 cdef class SearchParams
 ```
 
-Supplemental parameters to search IVF-Flat index
+Supplemental parameters to search IVF-SQ index
 
 **Parameters**
 
@@ -195,38 +192,45 @@ def n_probes(self)
 def build(IndexParams index_params, dataset, resources=None)
 ```
 
-Build the IvfFlat index from the dataset for efficient search.
+Build the IvfSq index from the dataset for efficient search.
+
+IVF-SQ (Scalar Quantization) uses IVF partitioning together with
+per-dimension scalar quantization. Each vector's residual is encoded
+as one byte per dimension, which can reduce vector-storage memory by
+about 4x vs IVF-Flat for float32 inputs (about 2x for float16 inputs),
+excluding IVF structural overhead. Recall and speed trade-offs versus
+IVF-PQ are dataset and tuning dependent.
 
 **Parameters**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `index_params` | `cuvs.neighbors.ivf_flat.IndexParams` |  |
-| `dataset` | `CUDA array interface compliant matrix shape (n_samples, dim)` | Supported dtype [float32, float16, int8, uint8] |
+| `index_params` | `cuvs.neighbors.ivf_sq.IndexParams` |  |
+| `dataset` | `CUDA array interface compliant matrix shape (n_samples, dim)` | Supported dtype [float32, float16] |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
 **Returns**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `index` | `cuvs.neighbors.ivf_flat.Index` |  |
+| `index` | `cuvs.neighbors.ivf_sq.Index` |  |
 
 **Examples**
 
 ```python
 >>> import cupy as cp
->>> from cuvs.neighbors import ivf_flat
+>>> from cuvs.neighbors import ivf_sq
 >>> n_samples = 50000
 >>> n_features = 50
 >>> n_queries = 1000
 >>> k = 10
 >>> dataset = cp.random.random_sample((n_samples, n_features),
 ...                                   dtype=cp.float32)
->>> build_params = ivf_flat.IndexParams(metric="sqeuclidean")
->>> index = ivf_flat.build(build_params, dataset)
->>> distances, neighbors = ivf_flat.search(ivf_flat.SearchParams(),
-...                                        index, dataset,
-...                                        k)
+>>> build_params = ivf_sq.IndexParams(metric="sqeuclidean")
+>>> index = ivf_sq.build(build_params, dataset)
+>>> distances, neighbors = ivf_sq.search(ivf_sq.SearchParams(),
+...                                      index, dataset,
+...                                      k)
 >>> distances = cp.asarray(distances)
 >>> neighbors = cp.asarray(neighbors)
 ```
@@ -248,8 +252,8 @@ array interface compliant matrix in host memory.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `index` | `ivf_flat.Index` | Trained ivf_flat object. |
-| `new_vectors` | `array interface compliant matrix shape (n_samples, dim)` | Supported dtype [float32, float16, int8, uint8] |
+| `index` | `ivf_sq.Index` | Trained ivf_sq object. |
+| `new_vectors` | `array interface compliant matrix shape (n_samples, dim)` | Supported dtype [float32, float16] |
 | `new_indices` | `array interface compliant vector shape (n_samples)` | Supported dtype [int64] |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
@@ -257,28 +261,28 @@ array interface compliant matrix in host memory.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `index` | `cuvs.neighbors.ivf_flat.Index` |  |
+| `index` | `cuvs.neighbors.ivf_sq.Index` |  |
 
 **Examples**
 
 ```python
 >>> import cupy as cp
->>> from cuvs.neighbors import ivf_flat
+>>> from cuvs.neighbors import ivf_sq
 >>> n_samples = 50000
 >>> n_features = 50
 >>> n_queries = 1000
 >>> dataset = cp.random.random_sample((n_samples, n_features),
 ...                                   dtype=cp.float32)
->>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+>>> index = ivf_sq.build(ivf_sq.IndexParams(), dataset)
 >>> n_rows = 100
 >>> more_data = cp.random.random_sample((n_rows, n_features),
 ...                                     dtype=cp.float32)
 >>> indices = n_samples + cp.arange(n_rows, dtype=cp.int64)
->>> index = ivf_flat.extend(index, more_data, indices)
+>>> index = ivf_sq.extend(index, more_data, indices)
 >>> # Search using the built index
 >>> queries = cp.random.random_sample((n_queries, n_features),
 ...                                   dtype=cp.float32)
->>> distances, neighbors = ivf_flat.search(ivf_flat.SearchParams(),
+>>> distances, neighbors = ivf_sq.search(ivf_sq.SearchParams(),
 ...                                      index, queries,
 ...                                      k=10)
 ```
@@ -315,7 +319,7 @@ version of cuvs is not guaranteed to work.
 `@auto_sync_resources`
 
 ```python
-def save(filename, Index index, bool include_dataset=True, resources=None)
+def save(filename, Index index, resources=None)
 ```
 
 Saves the index to a file.
@@ -328,23 +332,23 @@ subject to change.
 | Name | Type | Description |
 | --- | --- | --- |
 | `filename` | `string` | Name of the file. |
-| `index` | `Index` | Trained IVF-Flat index. |
+| `index` | `Index` | Trained IVF-SQ index. |
 | `resources` | `cuvs.common.Resources, optional` |  |
 
 **Examples**
 
 ```python
 >>> import cupy as cp
->>> from cuvs.neighbors import ivf_flat
+>>> from cuvs.neighbors import ivf_sq
 >>> n_samples = 50000
 >>> n_features = 50
 >>> dataset = cp.random.random_sample((n_samples, n_features),
 ...                                   dtype=cp.float32)
 >>> # Build index
->>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
->>> # Serialize and deserialize the ivf_flat index built
->>> ivf_flat.save("my_index.bin", index)
->>> index_loaded = ivf_flat.load("my_index.bin")
+>>> index = ivf_sq.build(ivf_sq.IndexParams(), dataset)
+>>> # Serialize and deserialize the ivf_sq index built
+>>> ivf_sq.save("my_index.bin", index)
+>>> index_loaded = ivf_sq.load("my_index.bin")
 ```
 
 ## search
@@ -362,9 +366,9 @@ Find the k nearest neighbors for each query.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `search_params` | `cuvs.neighbors.ivf_flat.SearchParams` |  |
-| `index` | `cuvs.neighbors.ivf_flat.Index` | Trained IvfFlat index. |
-| `queries` | `CUDA array interface compliant matrix shape (n_samples, dim)` | Supported dtype [float32, float16, int8, uint8] |
+| `search_params` | `cuvs.neighbors.ivf_sq.SearchParams` |  |
+| `index` | `cuvs.neighbors.ivf_sq.Index` | Trained IvfSq index. |
+| `queries` | `CUDA array interface compliant matrix shape (n_samples, dim)` | Supported dtype [float32, float16] |
 | `k` | `int` | The number of neighbors. |
 | `neighbors` | `Optional CUDA array interface compliant matrix shape` | (n_queries, k), dtype int64_t. If supplied, neighbor indices will be written here in-place. (default None) |
 | `distances` | `Optional CUDA array interface compliant matrix shape` | (n_queries, k) If supplied, the distances to the neighbors will be written here in-place. (default None) |
@@ -375,21 +379,21 @@ Find the k nearest neighbors for each query.
 
 ```python
 >>> import cupy as cp
->>> from cuvs.neighbors import ivf_flat
+>>> from cuvs.neighbors import ivf_sq
 >>> n_samples = 50000
 >>> n_features = 50
 >>> n_queries = 1000
 >>> dataset = cp.random.random_sample((n_samples, n_features),
 ...                                   dtype=cp.float32)
 >>> # Build the index
->>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+>>> index = ivf_sq.build(ivf_sq.IndexParams(), dataset)
 >>>
 >>> # Search using the built index
 >>> queries = cp.random.random_sample((n_queries, n_features),
 ...                                   dtype=cp.float32)
 >>> k = 10
->>> search_params = ivf_flat.SearchParams(n_probes=20)
+>>> search_params = ivf_sq.SearchParams(n_probes=20)
 >>>
->>> distances, neighbors = ivf_flat.search(search_params, index, queries,
+>>> distances, neighbors = ivf_sq.search(search_params, index, queries,
 ...                                     k)
 ```
