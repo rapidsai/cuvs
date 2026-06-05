@@ -56,6 +56,47 @@ def _distance_to_similarity(distance: str) -> str:
     return m.get(distance, "l2_norm")
 
 
+def _supported_elastic_algorithms_message() -> str:
+    """Return a readable list of supported elastic algorithm names."""
+    return ", ".join(f"'{algo}'" for algo in _SUPPORTED_ALGOS)
+
+
+def _validate_elastic_index_type(index_type: str) -> str:
+    """Validate an Elasticsearch dense_vector index_options type."""
+    if index_type not in _SUPPORTED_INDEX_TYPES:
+        raise ValueError(
+            "Received params for unsupported Elasticsearch index type "
+            f"{index_type!r}. Supported index types are: "
+            f"{', '.join(_SUPPORTED_INDEX_TYPES)}. "
+            "Please check the benchmark configuration."
+        )
+    return index_type
+
+
+def _validate_elastic_similarity(similarity: str) -> str:
+    """Validate an Elasticsearch dense_vector similarity value."""
+    if similarity not in _SUPPORTED_SIMILARITIES:
+        raise ValueError(
+            "Received unsupported Elasticsearch similarity "
+            f"{similarity!r}. Supported similarities are: "
+            f"{', '.join(_SUPPORTED_SIMILARITIES)}. "
+            "Please check the benchmark configuration or dataset distance metric."
+        )
+    return similarity
+
+
+def _validate_elastic_algorithm(algo_name: str) -> str:
+    """Validate a cuvs-bench elastic algorithm name."""
+    if algo_name not in _SUPPORTED_ALGOS:
+        raise ValueError(
+            "Received unsupported algorithm "
+            f"{algo_name!r} for the Elasticsearch backend. "
+            "Supported algorithms are: "
+            f"{_supported_elastic_algorithms_message()}."
+        )
+    return algo_name
+
+
 # Defaults for index creation when not specified in config
 _DEFAULT_INDEX_TYPE = "hnsw"
 _DEFAULT_M = 16
@@ -65,6 +106,12 @@ _DEFAULT_NUM_REPLICAS = 0
 
 _DEFAULT_VECTOR_FIELD = "embedding"
 _DEFAULT_NUM_CANDIDATES = 100
+
+_SUPPORTED_INDEX_TYPES = ("hnsw", "int8_hnsw", "int4_hnsw", "bbq_hnsw")
+_SUPPORTED_SIMILARITIES = ("l2_norm", "cosine", "max_inner_product")
+_SUPPORTED_ALGOS = tuple(
+    f"elastic_{index_type}" for index_type in _SUPPORTED_INDEX_TYPES
+)
 
 _BUILD_PARAM_KEYS = (
     "type",
@@ -226,6 +273,21 @@ class ElasticBackend(BenchmarkBackend):
             getattr(dataset, "distance_metric", None) or "euclidean"
         )
 
+        index_type = build_params.get("type", _DEFAULT_INDEX_TYPE)
+        try:
+            _validate_elastic_index_type(index_type)
+            _validate_elastic_similarity(similarity)
+        except ValueError as e:
+            return BuildResult(
+                index_path="",
+                build_time_seconds=0.0,
+                index_size_bytes=0,
+                algorithm=self.algo,
+                build_params=build_params,
+                success=False,
+                error_message=str(e),
+            )
+
         try:
             n_vectors = len(vectors)
             dims = vectors.shape[1]
@@ -234,7 +296,6 @@ class ElasticBackend(BenchmarkBackend):
             vector_field = build_params.get(
                 "vector_field", _DEFAULT_VECTOR_FIELD
             )
-            index_type = build_params.get("type", _DEFAULT_INDEX_TYPE)
             m = build_params.get("m", _DEFAULT_M)
             ef_construction = build_params.get(
                 "ef_construction", _DEFAULT_EF_CONSTRUCTION
@@ -698,6 +759,7 @@ class ElasticConfigLoader(ConfigLoader):
             search_combos,
             _group_meta,
         ) in expanded_groups:
+            _validate_elastic_algorithm(algo_name)
             if tune_mode and tune_build_params is not None:
                 actual_build = [dict(tune_build_params)]
                 actual_search = (
@@ -713,6 +775,9 @@ class ElasticConfigLoader(ConfigLoader):
                     "elastic_"
                 ):
                     build_param["type"] = algo_name.replace("elastic_", "", 1)
+                _validate_elastic_index_type(build_param["type"])
+                if "similarity" in build_param:
+                    _validate_elastic_similarity(build_param["similarity"])
 
                 if tune_mode:
                     label_prefix = f"{algo_name}_tune"

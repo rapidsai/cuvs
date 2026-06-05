@@ -747,6 +747,74 @@ class TestElasticWithExtraInstalled:
         backend_int8 = cls(config={"name": "test", "type": "int8_hnsw"})
         assert backend_int8.algo == "elastic_int8_hnsw"
 
+    def test_elastic_build_rejects_unsupported_index_type(self):
+        """Elastic build fails early with a descriptive unsupported-index error."""
+        cls = get_backend_class("elastic")
+        backend = cls(
+            config={"name": "test", "host": "localhost", "port": 9200}
+        )
+
+        dataset = Dataset(
+            name="test",
+            training_vectors=np.random.rand(8, 4).astype(np.float32),
+            query_vectors=np.random.rand(2, 4).astype(np.float32),
+            distance_metric="euclidean",
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_scann_test",
+                algo="elastic_scann",
+                build_param={"type": "scann"},
+                search_params=[{"num_candidates": 10}],
+                file="",
+            )
+        ]
+
+        with patch.object(
+            backend, "_check_network_available", return_value=True
+        ):
+            result = backend.build(dataset=dataset, indexes=indexes)
+
+        assert not result.success
+        assert "unsupported Elasticsearch index type" in (
+            result.error_message or ""
+        )
+        assert "scann" in (result.error_message or "")
+
+    def test_elastic_build_rejects_unsupported_similarity(self):
+        """Elastic build fails early with a descriptive unsupported-similarity error."""
+        cls = get_backend_class("elastic")
+        backend = cls(
+            config={"name": "test", "host": "localhost", "port": 9200}
+        )
+
+        dataset = Dataset(
+            name="test",
+            training_vectors=np.random.rand(8, 4).astype(np.float32),
+            query_vectors=np.random.rand(2, 4).astype(np.float32),
+            distance_metric="euclidean",
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_hnsw_test",
+                algo="elastic_hnsw",
+                build_param={"type": "hnsw", "similarity": "dot_product"},
+                search_params=[{"num_candidates": 10}],
+                file="",
+            )
+        ]
+
+        with patch.object(
+            backend, "_check_network_available", return_value=True
+        ):
+            result = backend.build(dataset=dataset, indexes=indexes)
+
+        assert not result.success
+        assert "unsupported Elasticsearch similarity" in (
+            result.error_message or ""
+        )
+        assert "dot_product" in (result.error_message or "")
+
     def test_elastic_cleanup_closes_client(self):
         """ElasticBackend.cleanup() closes client and sets _client to None."""
         cls = get_backend_class("elastic")
@@ -811,6 +879,47 @@ class TestElasticHelpers:
         assert _distance_to_similarity("inner_product") == "max_inner_product"
         assert _distance_to_similarity("cosine") == "cosine"
         assert _distance_to_similarity("unknown") == "l2_norm"
+
+    def test_validate_elastic_algorithm_rejects_unknown(self):
+        """Unknown elastic algorithm names fail with a descriptive error."""
+        from cuvs_bench.backends.elasticsearch import (
+            _validate_elastic_algorithm,
+        )
+
+        with pytest.raises(
+            ValueError, match="unsupported algorithm"
+        ) as exc_info:
+            _validate_elastic_algorithm("elastic_scann")
+
+        assert "elastic_hnsw" in str(exc_info.value)
+
+    def test_validate_elastic_index_type_rejects_unknown(self):
+        """Unknown elastic index types fail with a descriptive error."""
+        from cuvs_bench.backends.elasticsearch import (
+            _validate_elastic_index_type,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="unsupported Elasticsearch index type",
+        ) as exc_info:
+            _validate_elastic_index_type("scann")
+
+        assert "hnsw" in str(exc_info.value)
+
+    def test_validate_elastic_similarity_rejects_unknown(self):
+        """Unknown elastic similarities fail with a descriptive error."""
+        from cuvs_bench.backends.elasticsearch import (
+            _validate_elastic_similarity,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="unsupported Elasticsearch similarity",
+        ) as exc_info:
+            _validate_elastic_similarity("dot_product")
+
+        assert "max_inner_product" in str(exc_info.value)
 
     def test_load_fbin(self):
         """_load_fbin loads big-ann-bench fbin format."""
