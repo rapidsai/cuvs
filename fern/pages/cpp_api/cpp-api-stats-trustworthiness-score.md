@@ -33,8 +33,8 @@ int batch_size                      = 512);
 | `X` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | Data in original dimension |
 | `X_embedded` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | Data in target dimension (embedding) |
 | `n_neighbors` | in | `int` | Number of neighbors considered by trustworthiness score |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2SqrtUnexpanded`. |
-| `batch_size` | in | `int` | Batch size Default: `512`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2SqrtUnexpanded`. |
+| `batch_size` | in | `int` | Batch size<br />Default: `512`. |
 
 **Returns**
 

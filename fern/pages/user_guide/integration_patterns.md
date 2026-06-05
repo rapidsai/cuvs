@@ -1,3 +1,7 @@
+---
+slug: user-guide/field-guide/integration-patterns
+---
+
 # Integration Patterns
 
 NVIDIA cuVS is used in several different ways across vector databases, search engines, data platforms, and application libraries. Some products call NVIDIA cuVS directly inside the same process. Others offload expensive index builds to a separate service, container, or serverless worker, then load the resulting index back into the serving system.
@@ -32,7 +36,7 @@ Products that integrate at the binary level should prefer the NVIDIA cuVS C APIs
 
 ABI stability is especially useful for databases, search engines, language bindings, and packaged applications. It allows vendors to build against one compatible NVIDIA cuVS release while giving users or package managers flexibility to install a newer runtime from the same ABI compatibility window.
 
-For compatibility rules, release windows, and shared library naming, see [Compatibility](/user-guide/compatibility).
+For compatibility rules, release windows, and shared library naming, see [Compatibility](/user-guide/field-guide/compatibility).
 
 ## Choosing a pattern
 

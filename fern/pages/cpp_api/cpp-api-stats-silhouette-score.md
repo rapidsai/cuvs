@@ -32,7 +32,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded
 | `labels` | in | `raft::device_vector_view<const int, int64_t>` | the pointer to the array containing labels for every data sample (length: nRows) |
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | optional array populated with the silhouette score for every sample (length: nRows) |
 | `n_unique_labels` | in | `int64_t` | number of unique labels in the labels array |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | Distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -66,7 +66,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | optional array populated with the silhouette score for every sample (length: nRows) |
 | `n_unique_labels` | in | `int64_t` | number of unique labels in the labels array |
 | `batch_size` | in | `int64_t` | number of samples per batch |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | the numerical value that maps to the type of distance metric to be used in the calculations Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | the numerical value that maps to the type of distance metric to be used in the calculations<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -97,7 +97,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded
 | `labels` | in | `raft::device_vector_view<const int, int64_t>` | the pointer to the array containing labels for every data sample (length: nRows) |
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<double, int64_t>>` | optional array populated with the silhouette score for every sample (length: nRows) |
 | `n_unique_labels` | in | `int64_t` | number of unique labels in the labels array |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | the numerical value that maps to the type of distance metric to be used in the calculations Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | the numerical value that maps to the type of distance metric to be used in the calculations<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -130,7 +130,7 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded
 | `silhouette_score_per_sample` | out | `std::optional<raft::device_vector_view<double, int64_t>>` | optional array populated with the silhouette score for every sample (length: nRows) |
 | `n_unique_labels` | in | `int64_t` | number of unique labels in the labels array |
 | `batch_size` | in | `int64_t` | number of samples per batch |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | the numerical value that maps to the type of distance metric to be used in the calculations Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | the numerical value that maps to the type of distance metric to be used in the calculations<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 

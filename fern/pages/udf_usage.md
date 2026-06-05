@@ -4,7 +4,7 @@
 
 ## What this feature does
 
-You can supply **your own CUDA device code** that defines how distance accumulates between a query vector and database vectors **inside the IVF-flat interleaved scan** (the fine search over lists). Technical background on compilation and linking is in [Link-time Optimization](jit_lto_guide.md).
+You can supply **your own CUDA device code** that defines how distance accumulates between a query vector and database vectors **inside the IVF-flat interleaved scan** (the fine search over lists). Technical background on compilation and linking is in [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization).
 
 ## Available via C++ APIs
 
@@ -63,4 +63,4 @@ More examples: `cpp/tests/neighbors/ann_ivf_flat/test_udf.cu`.
 ## Further reading
 
 - C++ API reference: [neighbors::ivf_flat](/api-reference/cpp-api-neighbors-ivf-flat)
-- JIT LTO architecture and IVF-flat fragments: [Link-time Optimization](jit_lto_guide.md)
+- JIT LTO architecture and IVF-flat fragments: [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization)
