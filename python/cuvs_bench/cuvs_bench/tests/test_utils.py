@@ -29,7 +29,10 @@ from cuvs_bench.backends._utils import (
 from cuvs_bench.generate_groundtruth.utils import (
     groundtruth_neighbors_filename,
     memmap_bin_file,
+    neighbor_index_accumulator_dtype,
     neighbor_index_dtype,
+    offset_neighbor_indices,
+    write_groundtruth_neighbors,
 )
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
@@ -266,6 +269,12 @@ class TestGroundtruthNeighborFormat:
     def test_neighbor_index_dtype_large_base(self):
         assert neighbor_index_dtype(np.iinfo(np.int32).max + 1) == np.uint64
 
+    def test_neighbor_index_accumulator_dtype_large_base(self):
+        assert (
+            neighbor_index_accumulator_dtype(np.iinfo(np.int32).max + 1)
+            == np.int64
+        )
+
     def test_groundtruth_neighbors_filename_small_base(self):
         assert (
             groundtruth_neighbors_filename(1_000_000)
@@ -287,6 +296,46 @@ class TestGroundtruthNeighborFormat:
 
         loaded = load_vectors(path)
         np.testing.assert_array_equal(loaded, indices)
+
+    def test_offset_neighbor_indices_small_base(self):
+        local = np.array([[0, 1, 2]], dtype=np.uint32)
+        offset = offset_neighbor_indices(local, 1000, 1_000_000)
+        assert offset.dtype == np.int32
+        np.testing.assert_array_equal(offset, [[1000, 1001, 1002]])
+
+    def test_offset_neighbor_indices_large_batch_offset(self):
+        """Search-local IDs must not wrap when batch offset exceeds INT32_MAX."""
+        batch_offset = np.iinfo(np.int32).max + 1
+        n_base = batch_offset + 10
+        local = np.array([[0, 1, 2]], dtype=np.int64)
+        offset = offset_neighbor_indices(local, batch_offset, n_base)
+        assert offset.dtype == np.int64
+        np.testing.assert_array_equal(
+            offset,
+            [[batch_offset, batch_offset + 1, batch_offset + 2]],
+        )
+
+    def test_write_groundtruth_neighbors_round_trip(self, tmp_path):
+        """GT write/load preserves neighbor IDs above INT32_MAX."""
+        n_base = np.iinfo(np.int32).max + 1
+        large_id = n_base + 999
+        indices = np.array([[large_id, large_id - 1, 0]], dtype=np.int64)
+        path = str(tmp_path / groundtruth_neighbors_filename(n_base))
+        write_groundtruth_neighbors(path, indices, n_base)
+
+        loaded = load_vectors(path)
+        assert loaded.dtype == np.uint64
+        np.testing.assert_array_equal(loaded, indices.astype(np.uint64))
+
+    def test_dataset_lazy_load_u64bin_groundtruth(self, tmp_path):
+        """Dataset loads .u64bin ground truth with IDs above INT32_MAX."""
+        large_id = np.iinfo(np.int32).max + 12345
+        gt = np.array([[large_id, 0, 1]], dtype=np.uint64)
+        path = str(tmp_path / "groundtruth.neighbors.u64bin")
+        _write_test_bin(path, gt)
+
+        dataset = Dataset(name="test", groundtruth_neighbors_file=path)
+        np.testing.assert_array_equal(dataset.groundtruth_neighbors, gt)
 
 
 class TestBinHeaderHelpers:
@@ -720,3 +769,10 @@ class TestComputeRecall:
         groundtruth = np.array([[0, 1, 2], [3, 4, 5]])
         recall = compute_recall(neighbors, groundtruth, k=3)
         assert abs(recall - 5.0 / 6.0) < 1e-9
+
+    def test_large_uint64_neighbor_ids(self):
+        """Recall works when GT neighbor IDs exceed INT32_MAX."""
+        large_id = np.iinfo(np.int32).max + 999
+        neighbors = np.array([[large_id, 0, 1]], dtype=np.int64)
+        groundtruth = np.array([[large_id, 0, 1]], dtype=np.uint64)
+        assert compute_recall(neighbors, groundtruth, k=3) == 1.0

@@ -12,9 +12,10 @@ import warnings
 from .utils import (
     groundtruth_neighbors_filename,
     memmap_bin_file,
-    neighbor_index_dtype,
+    offset_neighbor_indices,
     suffix_from_dtype,
     write_bin,
+    write_groundtruth_neighbors,
 )
 
 
@@ -199,7 +200,7 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
             D, Ind = cpu_search(X, queries, k, metric=metric)
 
         D, Ind = xp.asarray(D), xp.asarray(Ind)
-        Ind += i  # shift neighbor index by offset i
+        Ind = offset_neighbor_indices(Ind, i, n_samples)
 
         if distances is None:
             distances = D
@@ -365,10 +366,10 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
     distances, indices = calc_truth(dataset, queries, args.k, args.metric)
 
     n_base = dataset.shape[0]
-    neighbor_dtype = neighbor_index_dtype(n_base)
-    write_bin(
+    write_groundtruth_neighbors(
         os.path.join(args.output, groundtruth_neighbors_filename(n_base)),
-        xp.asarray(indices, dtype=neighbor_dtype),
+        indices,
+        n_base,
     )
     write_bin(
         os.path.join(args.output, "groundtruth.distances.fbin"),

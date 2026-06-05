@@ -52,11 +52,36 @@ def neighbor_index_dtype(n_base: int) -> np.dtype:
     return np.int32
 
 
+def neighbor_index_accumulator_dtype(n_base: int) -> np.dtype:
+    """Return the in-memory dtype for neighbor IDs during GT computation.
+
+    cuVS brute-force search returns ``int64`` neighbors. Use ``int64`` for
+    large bases so batch offsets up to multi-billion row counts do not
+    overflow; cast to :func:`neighbor_index_dtype` only when writing files.
+    """
+    if n_base > np.iinfo(np.int32).max:
+        return np.int64
+    return np.int32
+
+
 def groundtruth_neighbors_filename(n_base: int) -> str:
     """Return the ground-truth neighbors filename for a base set size."""
     if n_base > np.iinfo(np.int32).max:
         return "groundtruth.neighbors.u64bin"
     return "groundtruth.neighbors.ibin"
+
+
+def offset_neighbor_indices(indices, batch_offset: int, n_base: int):
+    """Shift local neighbor IDs by a batch offset without integer overflow."""
+    dtype = neighbor_index_accumulator_dtype(n_base)
+    return indices.astype(dtype) + batch_offset
+
+
+def write_groundtruth_neighbors(path, indices, n_base: int):
+    """Write a ground-truth neighbor matrix using the correct on-disk dtype."""
+    storage_dtype = neighbor_index_dtype(n_base)
+    data = np.asarray(indices, dtype=storage_dtype)
+    write_bin(path, data)
 
 
 def memmap_bin_file(
