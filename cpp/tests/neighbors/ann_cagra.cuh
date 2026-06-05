@@ -355,10 +355,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::L1 &&
         ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
-    if (ps.smem_dtype == cuvs::neighbors::cagra::internal_dtype::E5M2 &&
-        raft::getComputeCapability().first < 9) {
-      GTEST_SKIP() << "CAGRA VPQ E5M2 smem dtype requires native FP8 support on SM90+";
-    }
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
