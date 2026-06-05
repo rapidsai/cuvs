@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 #endif
 
 namespace cuvs::neighbors::cagra::detail {
@@ -61,6 +62,8 @@ struct cagra_device_payload_owner {
     PayloadT host_payload{};
     PayloadT* device_payload{nullptr};
     cudaStream_t stream{};
+    cudaEvent_t ready_event{};
+    int device{-1};
     std::mutex mutex;
 
     explicit state(PayloadT payload) : host_payload(payload) {}
@@ -70,12 +73,14 @@ struct cagra_device_payload_owner {
       if (device_payload != nullptr) {
         RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(device_payload, stream));
       }
+      if (ready_event != nullptr) { RAFT_CUDA_TRY_NO_THROW(cudaEventDestroy(ready_event)); }
     }
 
     PayloadT* dev_ptr(cudaStream_t cuda_stream)
     {
       std::lock_guard<std::mutex> lock(mutex);
       if (device_payload == nullptr) {
+        RAFT_CUDA_TRY(cudaGetDevice(&device));
         RAFT_CUDA_TRY(
           cudaMallocAsync(reinterpret_cast<void**>(&device_payload), sizeof(PayloadT), cuda_stream));
         RAFT_CUDA_TRY(cudaMemcpyAsync(device_payload,
@@ -83,35 +88,73 @@ struct cagra_device_payload_owner {
                                       sizeof(PayloadT),
                                       cudaMemcpyHostToDevice,
                                       cuda_stream));
+        RAFT_CUDA_TRY(cudaEventCreateWithFlags(&ready_event, cudaEventDisableTiming));
+        RAFT_CUDA_TRY(cudaEventRecord(ready_event, cuda_stream));
         stream = cuda_stream;
+      } else {
+        RAFT_CUDA_TRY(cudaStreamWaitEvent(cuda_stream, ready_event, 0));
       }
       return device_payload;
+    }
+  };
+
+  struct cache_key {
+    std::uint64_t payload_hash{};
+    int device{};
+
+    bool operator==(cache_key const& other) const
+    {
+      return payload_hash == other.payload_hash && device == other.device;
+    }
+  };
+
+  struct cache_key_hash {
+    std::size_t operator()(cache_key const& key) const
+    {
+      auto seed = static_cast<std::size_t>(key.payload_hash);
+      seed ^= static_cast<std::size_t>(key.device) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      return seed;
     }
   };
 
   cagra_device_payload_owner() = default;
 
   explicit cagra_device_payload_owner(PayloadT payload)
+    : state_{std::make_shared<state>(payload)}
   {
-    static std::mutex cache_mutex;
-    static std::unordered_map<std::uint64_t, std::shared_ptr<state>> cache;
-
-    const auto key = cagra_payload_hash(payload);
-    std::lock_guard<std::mutex> lock(cache_mutex);
-    if (auto it = cache.find(key); it != cache.end()) {
-      if (auto cached = it->second;
-          std::memcmp(&cached->host_payload, &payload, sizeof(PayloadT)) == 0) {
-        state_ = std::move(cached);
-        return;
-      }
-    }
-    state_    = std::make_shared<state>(payload);
-    cache[key] = state_;
   }
 
   void* dev_ptr(cudaStream_t stream) const
   {
-    return state_ == nullptr ? nullptr : state_->dev_ptr(stream);
+    if (state_ == nullptr) { return nullptr; }
+
+    int device{};
+    RAFT_CUDA_TRY(cudaGetDevice(&device));
+
+    static std::mutex cache_mutex;
+    // Keep cached payload copies for process lifetime to avoid per-search allocation/copy churn.
+    // Cross-stream reuse is ordered by each state's ready_event before kernels consume the pointer.
+    static std::unordered_map<cache_key, std::vector<std::shared_ptr<state>>, cache_key_hash> cache;
+
+    const auto key = cache_key{cagra_payload_hash(state_->host_payload), device};
+    std::shared_ptr<state> selected_state;
+    {
+      std::lock_guard<std::mutex> lock(cache_mutex);
+      auto& entries = cache[key];
+      for (auto const& cached : entries) {
+        if (std::memcmp(&cached->host_payload, &state_->host_payload, sizeof(PayloadT)) == 0) {
+          selected_state = cached;
+          break;
+        }
+      }
+      if (selected_state == nullptr) {
+        selected_state = state_;
+        entries.push_back(selected_state);
+      }
+    }
+
+    state_ = std::move(selected_state);
+    return state_->dev_ptr(stream);
   }
 
   PayloadT const* host_payload() const
@@ -120,7 +163,7 @@ struct cagra_device_payload_owner {
   }
 
  private:
-  std::shared_ptr<state> state_;
+  mutable std::shared_ptr<state> state_;
 };
 
 template <typename SourceIndexT>
