@@ -98,7 +98,7 @@ all available GPUs.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `stream` | `int, optional` | A CUDA stream pointer to use for this resource handle. If None, a default stream will be used. |
+| `stream` | `int, optional` | A CUDA stream pointer to use for this resource handle. If None, a<br />default stream will be used. |
 | `device_ids` | `list of int, optional` | A list of device IDs to use for multi-GPU operations. If None, all available GPUs will be used. |
 
 **Examples**

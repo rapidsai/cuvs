@@ -48,7 +48,7 @@ struct search_params : cuvs::neighbors::search_params {
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `dispatch_timeout_ms` | `double` | How long a request can stay in the queue (milliseconds). Note, this only affects the dispatch time and does not reflect full request latency; the latter depends on the upstream search parameters and the batch size. |
+| `dispatch_timeout_ms` | `double` | How long a request can stay in the queue (milliseconds).<br />Note, this only affects the dispatch time and does not reflect full request latency; the latter depends on the upstream search parameters and the batch size. |
 
 ## Dynamic Batching index type
 
@@ -108,7 +108,7 @@ const cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 | `params` | in | [`const cuvs::neighbors::dynamic_batching::index_params&`](/api-reference/cpp-api-neighbors-dynamic-batching#neighbors-dynamic-batching-index-params) | dynamic batching parameters |
 | `upstream_index` | in | `const Upstream&` | the original index to perform the search (the reference must be alive for the lifetime of the dynamic batching index) |
 | `upstream_params` | in | `const typename Upstream::search_params_type&` | the original index search parameters for all queries in a batch (the parameters are captured by value for the lifetime of the dynamic batching index) |
-| `sample_filter` | in | `const cuvs::neighbors::filtering::base_filter*` | filtering function, if any, must be the same for all requests in a batch (the pointer must be alive for the lifetime of the dynamic batching index) Default: `nullptr`. |
+| `sample_filter` | in | `const cuvs::neighbors::filtering::base_filter*` | filtering function, if any, must be the same for all requests in a batch (the pointer must be alive for the lifetime of the dynamic batching index)<br />Default: `nullptr`. |
 
 **Returns**
 
