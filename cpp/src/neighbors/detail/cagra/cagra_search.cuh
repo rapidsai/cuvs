@@ -222,9 +222,9 @@ void search_main(raft::resources const& res,
   if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
     RAFT_FAIL(
       "Attempted to search without a dataset. Please call index.update_dataset(...) first.");
-  } else if constexpr (cuvs::neighbors::is_vpq_f32_dataset_view_v<DatasetViewT>) {
+  } else if constexpr (cuvs::neighbors::is_device_vpq_f32_dataset_view_v<DatasetViewT>) {
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
-  } else if constexpr (cuvs::neighbors::is_vpq_f16_dataset_view_v<DatasetViewT>) {
+  } else if constexpr (cuvs::neighbors::is_device_vpq_f16_dataset_view_v<DatasetViewT>) {
     auto const& vv = index.data();
     auto desc      = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, vv.dset(), index.metric(), nullptr);
@@ -238,8 +238,13 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
-  } else if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
+  } else if constexpr (cuvs::neighbors::is_device_padded_dataset_view_v<DatasetViewT>) {
     run_strided_like(index.data());
+  } else if constexpr (cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>) {
+    static_assert(sizeof(DatasetViewT) == 0,
+                  "search requires a device-resident dataset. "
+                  "Call cagra::attach_device_dataset_on_host_index(res, host_idx, device_view) "
+                  "to convert the host index and attach a device dataset before searching.");
   } else {
     static_assert(sizeof(DatasetViewT) == 0, "search: unsupported dataset view type");
   }

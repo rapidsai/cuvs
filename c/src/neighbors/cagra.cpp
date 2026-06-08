@@ -235,19 +235,23 @@ void _build(cuvsResources_t res,
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
           index_params.graph_build_params)) {
-      auto index = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+      // build returns host_padded_index; convert graph to device padded_index for the holder.
+      auto host_idx  = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+      auto device_idx = cuvs::neighbors::cagra::convert_host_to_device_index(*res_ptr, host_idx);
       std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_owner = nullptr;
-      // In-memory ACE returns a graph-only index; disk ACE attaches dataset via file descriptors.
-      if (index.dim() == 0) {
+      if (host_idx.dataset_fd().has_value()) {
+        // Disk-mode ACE: transfer file descriptor from host index to device index.
+        device_idx.update_dataset(*res_ptr, std::move(*host_idx.steal_dataset_fd()));
+      } else {
+        // In-memory ACE: graph-only, attach device dataset.
         auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);
-        auto view   = padded->as_dataset_view();
-        index.update_dataset(*res_ptr, view);
+        device_idx.update_dataset(*res_ptr, padded->as_dataset_view());
         padded_owner = std::move(padded);
       }
       auto* holder = new cuvs_cagra_c_api_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>{
         std::move(padded_owner),
         raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
-        std::move(index)};
+        std::move(device_idx)};
       assign_lifetime_holder<T, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(output_index, output_index->dtype, holder);
     } else {
       auto padded = cuvs::neighbors::make_device_padded_dataset(*res_ptr, mds);

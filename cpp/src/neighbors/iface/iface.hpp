@@ -42,34 +42,6 @@ bool dataset_mdspan_uses_padded_device_view(
   return device_src && (src_stride == required_stride);
 }
 
-/** Attach padded device storage when `build` returned a graph-only index. */
-template <typename T, typename IdxT, typename Accessor>
-void cagra_attach_dataset_for_search(
-  raft::resources const& h,
-  raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> m,
-  cagra::padded_index<T, IdxT>& index,
-  cuvs::neighbors::iface<cagra::padded_index<T, IdxT>, T, IdxT>& interface)
-{
-  if (index.dim() != 0) { return; }
-  if (dataset_mdspan_uses_padded_device_view(m)) {
-    cudaPointerAttributes a{};
-    RAFT_CUDA_TRY(cudaPointerGetAttributes(&a, m.data_handle()));
-    T const* devp = reinterpret_cast<T const*>(a.devicePointer);
-    uint32_t const s_stride =
-      m.stride(0) > 0 ? static_cast<uint32_t>(m.stride(0)) : static_cast<uint32_t>(m.extent(1));
-    auto d_m = raft::make_device_strided_matrix_view<T const, int64_t, row_major>(
-      devp, m.extent(0), m.extent(1), s_stride);
-    auto padded = cuvs::neighbors::make_device_padded_dataset_view(h, d_m);
-    index.update_dataset(h, padded);
-    interface.cagra_owned_dataset_.reset();
-  } else {
-    auto padded_r = cuvs::neighbors::make_device_padded_dataset(h, m);
-    auto view     = padded_r->as_dataset_view();
-    index.update_dataset(h, view);
-    interface.cagra_owned_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(padded_r));
-  }
-}
-
 /** Graph build via padded device view, not mdspan host build. */
 template <typename T, typename IdxT, typename Accessor>
 void cagra_build_from_device_dataset(
@@ -90,6 +62,9 @@ void cagra_build_from_device_dataset(
 }
 }  // namespace iface_detail
 
+// TODO: Refactor this function signature to use the Dataset API instead of raft::mdspan.
+//       Currently takes a raw mdspan; should accept a dataset_view<...> so callers pass typed
+//       views.
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
 void build(const raft::resources& handle,
            cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
@@ -111,9 +86,17 @@ void build(const raft::resources& handle,
     if (raft::get_device_for_address(index_dataset.data_handle()) != -1) {
       iface_detail::cagra_build_from_device_dataset(handle, cagra_params, index_dataset, interface);
     } else {
-      auto idx = cuvs::neighbors::cagra::build(handle, cagra_params, index_dataset);
-      iface_detail::cagra_attach_dataset_for_search(handle, index_dataset, idx, interface);
-      interface.index_.emplace(std::move(idx));
+      // Explicitly form a host_matrix_view so the call always resolves to the host build
+      // shim regardless of the mdspan Accessor type (both branches compile for all Accessors;
+      // at runtime this else branch is only reached when data_handle() is host memory).
+      auto host_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
+        index_dataset.data_handle(), index_dataset.extent(0), index_dataset.extent(1));
+      auto host_idx   = cuvs::neighbors::cagra::build(handle, cagra_params, host_view);
+      auto padded_r   = cuvs::neighbors::make_device_padded_dataset(handle, index_dataset);
+      auto device_idx = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
+        handle, host_idx, padded_r->as_dataset_view());
+      interface.cagra_owned_dataset_ = cuvs::neighbors::wrap_any_owning(std::move(padded_r));
+      interface.index_.emplace(std::move(device_idx));
     }
   }
   resource::sync_stream(handle);

@@ -1307,8 +1307,12 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     ace_params.npartitions,
     ace_params.ef_construction);
 
-  // Build CAGRA index using ACE
-  auto ace_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
+  // Build CAGRA index using ACE (returns host_padded_index; graph-only for in-memory ACE).
+  auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
+  // Attach a device dataset so from_cagra (which expects padded_index) can read vectors.
+  auto ace_device_padded = cuvs::neighbors::make_device_padded_dataset(res, dataset);
+  auto ace_index         = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
+    res, ace_host_index, ace_device_padded->as_dataset_view());
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
   // Convert CAGRA index to HNSW index

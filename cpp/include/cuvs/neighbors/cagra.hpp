@@ -432,6 +432,19 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     return dataset_fd_;
   }
 
+  /**
+   * Move out the dataset file descriptor (for disk-backed index).
+   *
+   * Intended for host-to-device index conversion: steal the fd from a host_padded_index and
+   * then call `update_dataset(res, std::move(*stolen_fd))` on the target device index.
+   * Clears the stored fd (and leaves n_rows_/dim_ in place for the remaining graph).
+   */
+  [[nodiscard]] inline auto steal_dataset_fd() noexcept
+    -> std::optional<cuvs::util::file_descriptor>
+  {
+    return std::exchange(dataset_fd_, std::nullopt);
+  }
+
   /** Get the graph file descriptor (for disk-backed index) */
   [[nodiscard]] inline auto graph_fd() const noexcept
     -> const std::optional<cuvs::util::file_descriptor>&
@@ -473,8 +486,12 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
       dataset_([] {
         if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
           return DatasetViewT{0};
-        } else if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
+        } else if constexpr (cuvs::neighbors::is_device_padded_dataset_view_v<DatasetViewT>) {
           auto v = raft::make_device_matrix_view<const T, int64_t>(
+            static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
+          return DatasetViewT(v, uint32_t{0});
+        } else if constexpr (cuvs::neighbors::is_host_padded_dataset_view_v<DatasetViewT>) {
+          auto v = raft::make_host_matrix_view<const T, int64_t>(
             static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
           return DatasetViewT(v, uint32_t{0});
         } else if constexpr (cuvs::neighbors::is_vpq_dataset_view_v<DatasetViewT>) {
@@ -546,6 +563,7 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
    * keep the underlying device data alive. Clears precomputed norms.
    */
   void update_dataset(raft::resources const& res, DatasetViewT const& dataset)
+    requires cuvs::neighbors::is_device_dataset_view_v<DatasetViewT>
   {
     dataset_ = dataset;
     dataset_norms_.reset();
@@ -684,8 +702,12 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     // Re-open the file descriptor in read-only mode for subsequent operations
     dataset_fd_.emplace(std::move(fd));
 
-    if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
+    if constexpr (cuvs::neighbors::is_device_padded_dataset_view_v<DatasetViewT>) {
       auto v = raft::make_device_matrix_view<const T, int64_t>(
+        static_cast<const T*>(nullptr), int64_t{0}, dim_);
+      dataset_ = DatasetViewT(v, dim_);
+    } else if constexpr (cuvs::neighbors::is_host_padded_dataset_view_v<DatasetViewT>) {
+      auto v = raft::make_host_matrix_view<const T, int64_t>(
         static_cast<const T*>(nullptr), int64_t{0}, dim_);
       dataset_ = DatasetViewT(v, dim_);
     } else if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
@@ -795,6 +817,10 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
 /** CAGRA index with the usual padded device dataset view (graph build output type). */
 template <typename T, typename IdxT = uint32_t>
 using padded_index = index<T, IdxT, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>;
+
+/** CAGRA index with a host-resident padded dataset view (returned by host build path). */
+template <typename T, typename IdxT = uint32_t>
+using host_padded_index = index<T, IdxT, cuvs::neighbors::host_padded_dataset_view<T, int64_t>>;
 
 /** Index type returned by `cagra::build(res, params, dataset_view)`. */
 template <typename DatasetViewT>
@@ -932,7 +958,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::padded_index<float>;
+  -> cuvs::neighbors::cagra::host_padded_index<float>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1025,7 +1051,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::padded_index<half>;
+  -> cuvs::neighbors::cagra::host_padded_index<half>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1122,7 +1148,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::padded_index<int8_t>;
+  -> cuvs::neighbors::cagra::host_padded_index<int8_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1220,7 +1246,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::padded_index<uint8_t>;
+  -> cuvs::neighbors::cagra::host_padded_index<uint8_t>;
 
 /**
  * @brief Build the index from a device `dataset_view` (non-owning).
@@ -1231,8 +1257,23 @@ auto build(raft::resources const& res,
  * `device_vpq_dataset_view` after building on padded rows.
  */
 template <typename DatasetViewT>
-  requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t> &&
-           !cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>)
+  requires(cuvs::neighbors::is_device_dataset_view_v<DatasetViewT> &&
+           !cuvs::neighbors::is_device_empty_dataset_view_v<DatasetViewT>)
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           DatasetViewT const& dataset) -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>;
+
+/**
+ * @brief Build the index from a host `dataset_view` (non-owning).
+ *
+ * Graph construction runs on device; the dataset is used to build the knn graph.
+ * The returned index contains only the optimized graph and is typed on the host dataset view.
+ * Call `attach_device_dataset_on_host_index` before search to convert to a device index and
+ * attach a device dataset.
+ */
+template <typename DatasetViewT>
+  requires(cuvs::neighbors::is_host_dataset_view_v<DatasetViewT> &&
+           !cuvs::neighbors::is_host_empty_dataset_view_v<DatasetViewT>)
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            DatasetViewT const& dataset) -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>;
@@ -3165,6 +3206,58 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Convert a host-resident CAGRA index to a device-resident index (graph only).
+ *
+ * Copies the graph host → device. The returned device index has no dataset attached;
+ * call `index::update_dataset(res, device_view)` or `attach_device_dataset_on_host_index`
+ * before search.
+ *
+ * @tparam T      element type
+ * @tparam IdxT   index type
+ * @tparam HostViewT  any host-resident dataset view type
+ * @param[in] res   RAFT resources
+ * @param[in] src   host index (graph only, no dataset needed)
+ * @return device index with graph copied from src
+ */
+template <typename T, typename IdxT, typename HostViewT>
+  requires cuvs::neighbors::is_host_dataset_view_v<HostViewT>
+auto convert_host_to_device_index(raft::resources const& res, index<T, IdxT, HostViewT> const& src)
+  -> index<T, IdxT, cuvs::neighbors::device_counterpart_t<HostViewT>>
+{
+  using DeviceViewT = cuvs::neighbors::device_counterpart_t<HostViewT>;
+  index<T, IdxT, DeviceViewT> out(res, src.metric());
+  out.update_graph(res, src.graph());
+  return out;
+}
+
+/**
+ * @brief Convert a host index to device and attach a device dataset in one step.
+ *
+ * Equivalent to `convert_host_to_device_index(res, host_idx)` followed by
+ * `device_idx.update_dataset(res, device_dataset)`.
+ *
+ * @tparam T          element type
+ * @tparam IdxT       index type
+ * @tparam HostViewT  host-resident dataset view type
+ * @tparam DeviceViewT device-resident dataset view of the same kind
+ * @param[in]  res            RAFT resources
+ * @param[in]  host_idx       host index returned by `build(res, params, host_view)`
+ * @param[in]  device_dataset device dataset view to attach (caller owns underlying memory)
+ * @return device index with graph and dataset ready for search
+ */
+template <typename T, typename IdxT, typename HostViewT, typename DeviceViewT>
+  requires cuvs::neighbors::compatible_host_device_dataset_views_v<HostViewT, DeviceViewT>
+auto attach_device_dataset_on_host_index(raft::resources const& res,
+                                         index<T, IdxT, HostViewT> const& host_idx,
+                                         DeviceViewT const& device_dataset)
+  -> index<T, IdxT, DeviceViewT>
+{
+  auto device_idx = convert_host_to_device_index(res, host_idx);
+  device_idx.update_dataset(res, device_dataset);
+  return device_idx;
+}
 
 }  // namespace cagra
 }  // namespace neighbors

@@ -224,13 +224,13 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
                             params.graph_build_params);
   if (index_params_.num_dataset_splits <= 1) {
     if (use_ace_host) {
-      auto ace_index = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
-      if (ace_index.dim() == 0) {
-        auto padded = cuvs::neighbors::make_device_padded_dataset(handle_, dataset_view_host);
-        ace_index.update_dataset(handle_, padded->as_dataset_view());
-        *dataset_ = std::move(padded->data_);
-      }
-      index_ = std::make_shared<index_type>(std::move(ace_index));
+      // ACE build is always graph-only; convert host index to device and attach dataset.
+      auto ace_host_index = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
+      auto padded         = cuvs::neighbors::make_device_padded_dataset(handle_, dataset_view_host);
+      auto ace_index      = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
+        handle_, ace_host_index, padded->as_dataset_view());
+      *dataset_ = std::move(padded->data_);
+      index_    = std::make_shared<index_type>(std::move(ace_index));
     } else {
       // Non-ACE CAGRA build must use cagra::build(res, params, dataset_view) from
       // make_device_padded_dataset / make_device_padded_dataset_view; the host mdspan and raw
@@ -308,13 +308,12 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (use_ace_host) {
-          auto ace_index = cuvs::neighbors::cagra::build(handle_, params, sub_host);
-          if (ace_index.dim() == 0) {
-            auto padded_sub = cuvs::neighbors::make_device_padded_dataset(handle_, sub_host);
-            ace_index.update_dataset(handle_, padded_sub->as_dataset_view());
-            sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
-          }
-          sub_index = std::move(ace_index);
+          // ACE build is always graph-only; convert host index to device and attach dataset.
+          auto ace_host_index = cuvs::neighbors::cagra::build(handle_, params, sub_host);
+          auto padded_sub     = cuvs::neighbors::make_device_padded_dataset(handle_, sub_host);
+          sub_index           = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
+            handle_, ace_host_index, padded_sub->as_dataset_view());
+          sub_dataset_buffers_->push_back(std::move(padded_sub->data_));
         } else if (dataset_is_on_host) {
           sub_dataset_buffers_->emplace_back(raft::make_device_matrix<T, int64_t>(
             handle_, static_cast<int64_t>(rows), static_cast<int64_t>(dim_)));

@@ -1102,10 +1102,10 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 }
 
 template <typename T, typename IdxT, typename DatasetViewT>
-  requires cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>
+  requires cuvs::neighbors::is_device_dataset_view_v<DatasetViewT>
 auto build_from_device_matrix(raft::resources const& res,
                               const index_params& params,
-                              DatasetViewT const& dataset)
+                              DatasetViewT const& device_dataset)
   -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>;
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
@@ -1117,11 +1117,12 @@ auto build_from_device_matrix(raft::resources const& res,
 // Supports both in-memory and disk-based modes depending on available host memory.
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
-template <typename T, typename IdxT>
-cuvs::neighbors::cagra::padded_index<T, IdxT> build_ace(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<const T, int64_t, row_major> dataset)
+template <typename T, typename IdxT, typename DatasetViewT>
+  requires cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>
+auto build_ace(raft::resources const& res,
+               const index_params& params,
+               raft::host_matrix_view<const T, int64_t, row_major> dataset)
+  -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>
 {
   // Extract ACE parameters from graph_build_params
   RAFT_EXPECTS(
@@ -1492,7 +1493,7 @@ cuvs::neighbors::cagra::padded_index<T, IdxT> build_ace(
     }
 
     auto index_creation_start = std::chrono::high_resolution_clock::now();
-    cuvs::neighbors::cagra::padded_index<T, IdxT> idx(res, params.metric);
+    cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> idx(res, params.metric);
     if (!use_disk_mode) {
       idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
     } else {
@@ -2297,11 +2298,12 @@ auto build_cagra_host_graph_from_knn_params(raft::resources const& res,
  * padded device copy for graph build. The returned index contains only the optimized graph; call
  * `index::update_dataset` with a device dataset view before search.
  */
-template <typename T, typename IdxT = uint32_t>
+template <typename T, typename IdxT = uint32_t, typename DatasetViewT>
+  requires cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>
 auto build_from_host_matrix(raft::resources const& res,
                             const index_params& params,
                             raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset)
-  -> cuvs::neighbors::cagra::padded_index<T, IdxT>
+  -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>
 {
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_own{};
 
@@ -2339,7 +2341,7 @@ auto build_from_host_matrix(raft::resources const& res,
 
   RAFT_LOG_TRACE("Graph optimized, creating index");
 
-  cuvs::neighbors::cagra::padded_index<T, IdxT> out(res, params.metric);
+  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> out(res, params.metric);
   out.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   padded_own.reset();
   return out;
@@ -2355,13 +2357,13 @@ auto build_from_host_matrix(raft::resources const& res,
  * contains only the optimized graph; call `index::update_dataset` before search.
  */
 template <typename T, typename IdxT, typename DatasetViewT>
-  requires cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t>
+  requires cuvs::neighbors::is_device_dataset_view_v<DatasetViewT>
 auto build_from_device_matrix(raft::resources const& res,
                               const index_params& params,
-                              DatasetViewT const& dataset)
+                              DatasetViewT const& device_dataset)
   -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>
 {
-  const auto padded = convert_dataset_view_to_padded_for_graph_build<T>(dataset);
+  const auto padded = convert_dataset_view_to_padded_for_graph_build<T>(device_dataset);
 
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;

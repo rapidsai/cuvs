@@ -284,33 +284,6 @@ void optimize(
   detail::optimize(res, knn_graph, new_graph, guarantee_connectivity);
 }
 
-// TODO(removal): Deprecated host mdspan build->index (delete with matrix-view build API).
-
-template <typename T,
-          typename IdxT = uint32_t,
-          typename Accessor =
-            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-cuvs::neighbors::cagra::padded_index<T, IdxT> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
-{
-  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
-    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
-                 "ACE: Dataset must be on host for ACE build");
-    auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
-      dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
-  }
-  RAFT_EXPECTS(
-    raft::get_device_for_address(dataset.data_handle()) == -1,
-    "cagra::build: non-ACE path from an mdspan host overload must use host memory. For "
-    "device data, use cagra::build with raft::device_matrix_view or a device dataset_view.");
-  auto hview = raft::make_host_matrix_view<const T, int64_t, row_major>(
-    dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-  return detail::build_from_host_matrix<T, IdxT>(res, params, hview);
-}
-
 /**
  * @brief Build the index from a device `dataset_view` (padded or VPQ).
  *
@@ -318,8 +291,8 @@ cuvs::neighbors::cagra::padded_index<T, IdxT> build(
  * contains only the optimized graph; call `index::update_dataset(res, dataset)` before search.
  */
 template <typename DatasetViewT>
-  requires(cuvs::neighbors::cagra_dataset_view<DatasetViewT, int64_t> &&
-           !cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>)
+  requires(cuvs::neighbors::is_device_dataset_view_v<DatasetViewT> &&
+           !cuvs::neighbors::is_device_empty_dataset_view_v<DatasetViewT>)
 auto build(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)
   -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
 {
@@ -327,6 +300,29 @@ auto build(raft::resources const& res, const index_params& params, DatasetViewT 
   using IdxT = uint32_t;
   return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
     res, params, dataset);
+}
+
+/**
+ * @brief Build the index from a host `dataset_view` (non-owning).
+ *
+ * Graph construction runs on device internally; the returned index is typed on the host view.
+ * Call `attach_device_dataset_on_host_index` before search to attach a device dataset.
+ */
+template <typename DatasetViewT>
+  requires(cuvs::neighbors::is_host_dataset_view_v<DatasetViewT> &&
+           !cuvs::neighbors::is_host_empty_dataset_view_v<DatasetViewT>)
+auto build(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)
+  -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
+{
+  using T    = cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>;
+  using IdxT = uint32_t;
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT, DatasetViewT>(
+      res, params, dataset.view());
+  }
+  // host_padded_dataset_view::view() → host_matrix_view, which build_from_host_matrix expects
+  return cuvs::neighbors::cagra::detail::build_from_host_matrix<T, IdxT, DatasetViewT>(
+    res, params, dataset.view());
 }
 
 /**
