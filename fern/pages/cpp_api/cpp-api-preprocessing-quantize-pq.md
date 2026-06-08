@@ -175,7 +175,7 @@ Usage example:
 | `quant` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-pq#preprocessing-quantize-pq-quantizer) | a product quantizer |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t>` | a row-major matrix view on device or host |
 | `codes_out` | out | `raft::device_matrix_view<uint8_t, int64_t>` | a row-major matrix view on device containing the PQ codes |
-| `vq_labels` | out | `std::optional<raft::device_vector_view<uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is used, optional Default: `std::nullopt`. |
+| `vq_labels` | out | `std::optional<raft::device_vector_view<uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is used, optional<br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -248,7 +248,7 @@ std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std
 | `quant` | in | [`const quantizer<float>&`](/api-reference/cpp-api-preprocessing-quantize-pq#preprocessing-quantize-pq-quantizer) | a product quantizer |
 | `pq_codes` | in | `raft::device_matrix_view<const uint8_t, int64_t>` | a row-major matrix view on device containing the PQ codes |
 | `out` | out | `raft::device_matrix_view<float, int64_t>` | a row-major matrix view on device |
-| `vq_labels` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is used, optional Default: `std::nullopt`. |
+| `vq_labels` | in | `std::optional<raft::device_vector_view<const uint32_t, int64_t>>` | a vector view on device containing the VQ labels when VQ is used, optional<br />Default: `std::nullopt`. |
 
 **Returns**
 

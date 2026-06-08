@@ -63,7 +63,7 @@ struct cuvsKMeansParams {
 | `tol` | `double` | Relative tolerance with regards to inertia to declare convergence. |
 | `n_init` | `int` | Number of instance k-means algorithm will be run with different seeds. |
 | `oversampling_factor` | `double` | Oversampling factor for use in the k-means\|\| algorithm |
-| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids |
+| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint<br />Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids |
 | `batch_centroids` | `int` | if 0 then batch_centroids = n_clusters |
 | `inertia_check` | `bool` | Deprecated, ignored. Kept for ABI compatibility. |
 | `hierarchical` | `bool` | Whether to use hierarchical (balanced) kmeans or not |
@@ -105,7 +105,7 @@ struct cuvsKMeansParams_v2 {
 | `tol` | `double` | Relative tolerance with regards to inertia to declare convergence. |
 | `n_init` | `int` | Number of instance k-means algorithm will be run with different seeds. |
 | `oversampling_factor` | `double` | Oversampling factor for use in the k-means\|\| algorithm |
-| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids |
+| `batch_samples` | `int` | batch_samples and batch_centroids are used to tile 1NN computation which is useful to optimize/control the memory footprint<br />Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0 then don't tile the centroids |
 | `batch_centroids` | `int` | if 0 then batch_centroids = n_clusters |
 | `hierarchical` | `bool` | Whether to use hierarchical (balanced) kmeans or not |
 | `hierarchical_n_iters` | `int` | For hierarchical k-means , defines the number of training iterations |
@@ -119,7 +119,7 @@ struct cuvsKMeansParams_v2 {
 Allocate KMeans params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
+cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 ```
 
 **Note:** In cuVS 26.08 (next ABI major version) this signature will be<br />replaced by cuvsKMeansParamsCreate_v2.
@@ -132,7 +132,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeansparamsdestroy"></a>
 ### cuvsKMeansParamsDestroy
@@ -140,7 +140,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 De-allocate KMeans params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
+cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 ```
 
 **Note:** In cuVS 26.08 (next ABI major version) this signature will be<br />replaced by cuvsKMeansParamsDestroy_v2.
@@ -153,7 +153,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeansparamscreate-v2"></a>
 ### cuvsKMeansParamsCreate_v2
@@ -161,7 +161,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 Allocate KMeans params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansParamsCreate_v2(cuvsKMeansParams_v2_t* params);
+cuvsError_t cuvsKMeansParamsCreate_v2(cuvsKMeansParams_v2_t* params);
 ```
 
 Mirrors cuvsKMeansParamsCreate but operates on cuvsKMeansParams_v2. Will become the unsuffixed cuvsKMeansParamsCreate in cuVS 26.08.
@@ -174,7 +174,7 @@ Mirrors cuvsKMeansParamsCreate but operates on cuvsKMeansParams_v2. Will become 
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeansparamsdestroy-v2"></a>
 ### cuvsKMeansParamsDestroy_v2
@@ -182,7 +182,7 @@ Mirrors cuvsKMeansParamsCreate but operates on cuvsKMeansParams_v2. Will become 
 De-allocate KMeans params allocated by cuvsKMeansParamsCreate_v2.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params);
+cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params);
 ```
 
 **Parameters**
@@ -193,7 +193,7 @@ CUVS_EXPORT cuvsError_t cuvsKMeansParamsDestroy_v2(cuvsKMeansParams_v2_t params)
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeanstype"></a>
 ### cuvsKMeansType
@@ -222,7 +222,7 @@ typedef enum {
 Find clusters with k-means algorithm.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansFit(cuvsResources_t res,
+cuvsError_t cuvsKMeansFit(cuvsResources_t res,
 cuvsKMeansParams_t params,
 DLManagedTensor* X,
 DLManagedTensor* sample_weight,
@@ -251,7 +251,7 @@ X may reside on either host (CPU) or device (GPU) memory. When X is on the host 
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeansfit-v2"></a>
 ### cuvsKMeansFit_v2
@@ -259,7 +259,7 @@ X may reside on either host (CPU) or device (GPU) memory. When X is on the host 
 Find clusters with k-means algorithm (v2 params layout).
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansFit_v2(cuvsResources_t res,
+cuvsError_t cuvsKMeansFit_v2(cuvsResources_t res,
 cuvsKMeansParams_v2_t params,
 DLManagedTensor* X,
 DLManagedTensor* sample_weight,
@@ -284,7 +284,7 @@ Mirrors cuvsKMeansFit but takes cuvsKMeansParams_v2_t. Will become the unsuffixe
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeanspredict"></a>
 ### cuvsKMeansPredict
@@ -292,7 +292,7 @@ Mirrors cuvsKMeansFit but takes cuvsKMeansParams_v2_t. Will become the unsuffixe
 Predict the closest cluster each sample in X belongs to.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
+cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
 cuvsKMeansParams_t params,
 DLManagedTensor* X,
 DLManagedTensor* sample_weight,
@@ -319,7 +319,7 @@ double* inertia);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeanspredict-v2"></a>
 ### cuvsKMeansPredict_v2
@@ -327,7 +327,7 @@ double* inertia);
 Predict the closest cluster each sample in X belongs to (v2 params layout).
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansPredict_v2(cuvsResources_t res,
+cuvsError_t cuvsKMeansPredict_v2(cuvsResources_t res,
 cuvsKMeansParams_v2_t params,
 DLManagedTensor* X,
 DLManagedTensor* sample_weight,
@@ -354,7 +354,7 @@ Mirrors cuvsKMeansPredict but takes cuvsKMeansParams_v2_t. Will become the unsuf
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvskmeansclustercost"></a>
 ### cuvsKMeansClusterCost
@@ -362,7 +362,7 @@ Mirrors cuvsKMeansPredict but takes cuvsKMeansParams_v2_t. Will become the unsuf
 Compute cluster cost
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
+cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
 DLManagedTensor* X,
 DLManagedTensor* centroids,
 double* cost);
@@ -379,4 +379,4 @@ double* cost);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
