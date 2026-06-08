@@ -12,7 +12,7 @@ array of the dtype implied by the file extension. Two layouts are supported:
 
 - **Legacy**:  ``[uint32 n_rows, uint32 n_cols, data ...]``  (8-byte header).
   This is what every existing ``.fbin`` / ``.ibin`` / ``.u8bin`` / ``.i8bin``
-  / ``.f16bin`` / ``.hbin`` file on disk uses today.
+  / ``.f16bin`` / ``.hbin`` / ``.u64bin`` file on disk uses today.
 
 - **Extended**: ``[uint64 n_rows, uint64 n_cols, data ...]``  (16-byte header).
   For datasets whose ``n_rows`` or ``n_cols`` exceeds ``UINT32_MAX`` (~4.29B).
@@ -31,11 +31,11 @@ of the file and:
    truncated, padded, or has a mismatched dtype extension.
 """
 
-from __future__ import annotations
-
 import os
 import struct
 from typing import BinaryIO, Tuple
+
+import numpy as np
 
 UINT32_MAX = (1 << 32) - 1
 
@@ -57,16 +57,13 @@ def read_bin_header(path: str, itemsize: int) -> Tuple[int, int, int]:
         Path to the binary file.
     itemsize : int
         Per-element size in bytes (e.g. ``4`` for ``float32``, ``1`` for
-        ``int8``). Used purely for the size-equation check; the file
-        contents are not inspected.
+        ``int8``) used for the size-equation check.
 
     Returns
     -------
     (n_rows, n_cols, header_bytes) : Tuple[int, int, int]
         Row count, column count, and the number of bytes the header
-        occupies on disk (``8`` for legacy, ``16`` for extended). Callers
-        seeking to the data start should use ``header_bytes`` rather than
-        a hardcoded offset.
+        occupies on disk (``8`` for legacy, ``16`` for extended).
 
     Raises
     ------
@@ -75,6 +72,10 @@ def read_bin_header(path: str, itemsize: int) -> Tuple[int, int, int]:
     FileNotFoundError
         If ``path`` does not exist.
     """
+    if itemsize < 1:
+        raise ValueError(
+            f"itemsize must be a positive integer, got {itemsize!r}"
+        )
     file_size = os.path.getsize(path)
     with open(path, "rb") as f:
         head = f.read(EXTENDED_HEADER_BYTES)
@@ -110,13 +111,13 @@ def write_bin_header(
     n_rows: int,
     n_cols: int,
     *,
-    force_uint64: bool = False,
+    size_dtype=np.uint32,
 ) -> int:
     """Write the canonical cuvs-bench binary header at the current position.
 
     The legacy 8-byte uint32 layout is used whenever both ``n_rows`` and
     ``n_cols`` fit in a ``uint32``. The 16-byte uint64 layout is used
-    otherwise, or when explicitly requested via ``force_uint64=True``.
+    otherwise, or when explicitly requested via ``size_dtype=np.uint64``.
 
     Parameters
     ----------
@@ -124,9 +125,9 @@ def write_bin_header(
         Open binary file handle, positioned where the header should go.
     n_rows, n_cols : int
         Header values to write. Must be non-negative.
-    force_uint64 : bool
-        If ``True``, always write the 16-byte uint64 layout regardless of
-        whether the values fit in ``uint32``. Defaults to ``False``.
+    size_dtype : numpy dtype
+        ``np.uint32`` for the legacy 8-byte header (default), or
+        ``np.uint64`` to force the extended 16-byte header.
 
     Returns
     -------
@@ -137,7 +138,12 @@ def write_bin_header(
         raise ValueError(
             f"n_rows and n_cols must be non-negative, got ({n_rows}, {n_cols})"
         )
-    if force_uint64 or n_rows > UINT32_MAX or n_cols > UINT32_MAX:
+    use_uint64 = (
+        np.dtype(size_dtype) == np.uint64
+        or n_rows > UINT32_MAX
+        or n_cols > UINT32_MAX
+    )
+    if use_uint64:
         f.write(struct.pack("<QQ", int(n_rows), int(n_cols)))
         return EXTENDED_HEADER_BYTES
     f.write(struct.pack("<II", int(n_rows), int(n_cols)))

@@ -43,6 +43,8 @@ def dtype_from_filename(filename):
         return np.float16
     elif ext == ".ibin":
         return np.int32
+    elif ext == ".u64bin":
+        return np.uint64
     elif ext == ".u8bin":
         return np.ubyte
     elif ext == ".i8bin":
@@ -58,6 +60,8 @@ def suffix_from_dtype(dtype):
         return ".hbin"
     elif dtype == np.int32:
         return ".ibin"
+    elif dtype == np.uint64:
+        return ".u64bin"
     elif dtype == np.ubyte:
         return ".u8bin"
     elif dtype == np.byte:
@@ -66,15 +70,62 @@ def suffix_from_dtype(dtype):
         raise RuntimeError("Not supported dtype extension" + dtype)
 
 
+def neighbor_index_dtype(n_base: int) -> np.dtype:
+    """Return the dtype used to store neighbor row IDs for a base set size."""
+    if n_base > np.iinfo(np.int32).max:
+        return np.uint64
+    return np.int32
+
+
+def neighbor_index_accumulator_dtype(n_base: int) -> np.dtype:
+    """Return the in-memory dtype for neighbor IDs during GT computation.
+
+    cuVS brute-force search returns ``int64`` neighbors. Use ``int64`` for
+    large bases so batch offsets up to multi-billion row counts do not
+    overflow; cast to :func:`neighbor_index_dtype` only when writing files.
+    """
+    if n_base > np.iinfo(np.int32).max:
+        return np.int64
+    return np.int32
+
+
+def groundtruth_neighbors_filename(n_base: int) -> str:
+    """Return the ground-truth neighbors filename for a base set size."""
+    if n_base > np.iinfo(np.int32).max:
+        return "groundtruth.neighbors.u64bin"
+    return "groundtruth.neighbors.ibin"
+
+
+def offset_neighbor_indices(indices, batch_offset: int, n_base: int):
+    """Shift local neighbor IDs by a batch offset without integer overflow."""
+    dtype = neighbor_index_accumulator_dtype(n_base)
+    return indices.astype(dtype) + batch_offset
+
+
+def _to_host_numpy(array, dtype):
+    """Copy *array* to a host NumPy array, including from CuPy if needed."""
+    get = getattr(array, "get", None)
+    if callable(get):
+        array = get()
+    return np.asarray(array, dtype=dtype)
+
+
+def write_groundtruth_neighbors(path, indices, n_base: int):
+    """Write a ground-truth neighbor matrix using the correct on-disk dtype."""
+    storage_dtype = neighbor_index_dtype(n_base)
+    data = _to_host_numpy(indices, storage_dtype)
+    write_bin(path, data)
+
+
 def memmap_bin_file(
-    bin_file, dtype, shape=None, mode="r", *, force_uint64=False
+    bin_file, dtype, shape=None, mode="r", size_dtype=np.uint32
 ):
     """Memory-map a cuvs-bench binary file.
 
     Supports both the legacy 8-byte ``[uint32 n_rows, uint32 n_cols]`` and
     the extended 16-byte ``[uint64 n_rows, uint64 n_cols]`` headers. In read
     mode the layout is auto-detected from the file size; in write mode the
-    legacy layout is used unless ``force_uint64=True`` or one of the shape
+    legacy layout is used unless ``size_dtype=np.uint64`` or one of the shape
     dimensions exceeds ``UINT32_MAX``.
 
     Parameters
@@ -91,15 +142,21 @@ def memmap_bin_file(
         required ``(n_rows, n_cols)`` of the file to create.
     mode : str
         Standard ``np.memmap`` mode string (``"r"``, ``"r+"``, ``"w+"``).
-    force_uint64 : bool
-        Write mode only: force the extended uint64 header even when the
-        shape would fit in uint32. Ignored in read mode (auto-detected).
+    size_dtype : numpy dtype
+        Write mode only: ``np.uint32`` for the legacy 8-byte header (default),
+        or ``np.uint64`` to force the extended 16-byte header. Ignored in read
+        mode (auto-detected).
     """
     if bin_file is None:
         return None
     if dtype is None:
         dtype = dtype_from_filename(bin_file)
     itemsize = np.dtype(dtype).itemsize
+
+    if shape is not None and len(shape) != 2:
+        raise ValueError(
+            f"shape must have exactly 2 dimensions (n_rows, n_cols), got {shape!r}"
+        )
 
     if mode[0] == "r":
         n_rows, n_cols, header_bytes = read_bin_header(bin_file, itemsize)
@@ -128,7 +185,7 @@ def memmap_bin_file(
             os.makedirs(dirname, exist_ok=True)
         with open(bin_file, "wb") as f:
             header_bytes = write_bin_header(
-                f, shape[0], shape[1], force_uint64=force_uint64
+                f, shape[0], shape[1], size_dtype=size_dtype
             )
         return np.memmap(
             bin_file,
@@ -139,16 +196,9 @@ def memmap_bin_file(
         )
 
 
-def write_bin(fname, data, *, force_uint64=False):
-    """Write a 2-D numpy array to a cuvs-bench binary file.
-
-    The legacy 8-byte uint32 header is used by default; pass
-    ``force_uint64=True`` (or supply a shape with a dimension exceeding
-    ``UINT32_MAX``) to write the extended 16-byte uint64 header instead.
-    """
+def write_bin(fname, data):
+    """Write a 2-D numpy array to a cuvs-bench binary file."""
     print("writing", fname, data.shape, data.dtype, "...")
     with open(fname, "wb") as f:
-        write_bin_header(
-            f, data.shape[0], data.shape[1], force_uint64=force_uint64
-        )
+        write_bin_header(f, data.shape[0], data.shape[1])
         data.tofile(f)

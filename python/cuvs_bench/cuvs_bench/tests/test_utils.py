@@ -26,14 +26,22 @@ from cuvs_bench.backends._utils import (
     expand_param_grid,
     load_vectors,
 )
+from cuvs_bench.generate_groundtruth.utils import (
+    groundtruth_neighbors_filename,
+    memmap_bin_file,
+    neighbor_index_accumulator_dtype,
+    neighbor_index_dtype,
+    offset_neighbor_indices,
+    write_groundtruth_neighbors,
+)
 from cuvs_bench.orchestrator.config_loaders import CppGBenchConfigLoader
 
 
-def _write_test_bin(path, data, *, force_uint64=False):
+def _write_test_bin(path, data, *, size_dtype=np.uint32):
     """Write a numpy array in cuvs-bench binary format."""
     with open(path, "wb") as f:
         write_bin_header(
-            f, data.shape[0], data.shape[1], force_uint64=force_uint64
+            f, data.shape[0], data.shape[1], size_dtype=size_dtype
         )
         data.tofile(f)
 
@@ -52,6 +60,10 @@ class TestDtypeFromFilename:
     def test_ibin(self):
         """Test .ibin maps to int32."""
         assert dtype_from_filename("groundtruth.ibin") == np.int32
+
+    def test_u64bin(self):
+        """Test .u64bin maps to uint64."""
+        assert dtype_from_filename("groundtruth.neighbors.u64bin") == np.uint64
 
     def test_u8bin(self):
         """Test .u8bin maps to uint8."""
@@ -193,7 +205,7 @@ class TestLoadVectors:
         """``load_vectors`` reads files written with the extended uint64 header."""
         data = np.random.rand(40, 16).astype(np.float32)
         path = str(tmp_path / "test.fbin")
-        _write_test_bin(path, data, force_uint64=True)
+        _write_test_bin(path, data, size_dtype=np.uint64)
 
         # Sanity check: file really uses the extended layout.
         assert (
@@ -207,41 +219,123 @@ class TestLoadVectors:
         """``subset_size`` works regardless of which header layout was used."""
         data = np.random.rand(50, 8).astype(np.float32)
         path = str(tmp_path / "test.fbin")
-        _write_test_bin(path, data, force_uint64=True)
+        _write_test_bin(path, data, size_dtype=np.uint64)
 
         loaded = load_vectors(path, subset_size=12)
         assert loaded.shape == (12, 8)
         np.testing.assert_array_equal(loaded, data[:12])
 
     @pytest.mark.parametrize(
-        "ext, dtype, force_uint64",
+        "ext, dtype, size_dtype",
         [
-            (".fbin", np.float32, False),
-            (".fbin", np.float32, True),
-            (".ibin", np.int32, False),
-            (".ibin", np.int32, True),
-            (".u8bin", np.uint8, False),
-            (".u8bin", np.uint8, True),
-            (".i8bin", np.int8, False),
-            (".i8bin", np.int8, True),
+            (".fbin", np.float32, np.uint32),
+            (".fbin", np.float32, np.uint64),
+            (".f16bin", np.float16, np.uint32),
+            (".f16bin", np.float16, np.uint64),
+            (".ibin", np.int32, np.uint32),
+            (".ibin", np.int32, np.uint64),
+            (".u64bin", np.uint64, np.uint32),
+            (".u64bin", np.uint64, np.uint64),
+            (".u8bin", np.uint8, np.uint32),
+            (".u8bin", np.uint8, np.uint64),
+            (".i8bin", np.int8, np.uint32),
+            (".i8bin", np.int8, np.uint64),
         ],
     )
-    def test_load_roundtrip_all_dtypes(
-        self, tmp_path, ext, dtype, force_uint64
-    ):
+    def test_load_roundtrip_all_dtypes(self, tmp_path, ext, dtype, size_dtype):
         """Round-trip every supported dtype through both header layouts."""
         if np.issubdtype(dtype, np.integer):
             info = np.iinfo(dtype)
             data = np.random.randint(
                 info.min, info.max, size=(25, 7), dtype=dtype
             )
+            if dtype == np.uint64:
+                data[0, 0] = np.iinfo(np.int32).max + 42
         else:
             data = np.random.rand(25, 7).astype(dtype)
         path = str(tmp_path / f"test{ext}")
-        _write_test_bin(path, data, force_uint64=force_uint64)
+        _write_test_bin(path, data, size_dtype=size_dtype)
 
         loaded = load_vectors(path)
         np.testing.assert_array_equal(loaded, data)
+
+
+class TestGroundtruthNeighborFormat:
+    """Tests for large-base ground-truth neighbor index format selection."""
+
+    def test_neighbor_index_dtype_small_base(self):
+        assert neighbor_index_dtype(1_000_000) == np.int32
+
+    def test_neighbor_index_dtype_large_base(self):
+        assert neighbor_index_dtype(np.iinfo(np.int32).max + 1) == np.uint64
+
+    def test_neighbor_index_accumulator_dtype_large_base(self):
+        assert (
+            neighbor_index_accumulator_dtype(np.iinfo(np.int32).max + 1)
+            == np.int64
+        )
+
+    def test_groundtruth_neighbors_filename_small_base(self):
+        assert (
+            groundtruth_neighbors_filename(1_000_000)
+            == "groundtruth.neighbors.ibin"
+        )
+
+    def test_groundtruth_neighbors_filename_large_base(self):
+        assert (
+            groundtruth_neighbors_filename(np.iinfo(np.int32).max + 1)
+            == "groundtruth.neighbors.u64bin"
+        )
+
+    def test_load_u64bin_preserves_large_indices(self, tmp_path):
+        """uint64 GT files preserve neighbor IDs above INT32_MAX."""
+        large_id = np.iinfo(np.int32).max + 12345
+        indices = np.array([[large_id, 0, 1]], dtype=np.uint64)
+        path = str(tmp_path / "gt.u64bin")
+        _write_test_bin(path, indices)
+
+        loaded = load_vectors(path)
+        np.testing.assert_array_equal(loaded, indices)
+
+    def test_offset_neighbor_indices_small_base(self):
+        local = np.array([[0, 1, 2]], dtype=np.uint32)
+        offset = offset_neighbor_indices(local, 1000, 1_000_000)
+        assert offset.dtype == np.int32
+        np.testing.assert_array_equal(offset, [[1000, 1001, 1002]])
+
+    def test_offset_neighbor_indices_large_batch_offset(self):
+        """Search-local IDs must not wrap when batch offset exceeds INT32_MAX."""
+        batch_offset = np.iinfo(np.int32).max + 1
+        n_base = batch_offset + 10
+        local = np.array([[0, 1, 2]], dtype=np.int64)
+        offset = offset_neighbor_indices(local, batch_offset, n_base)
+        assert offset.dtype == np.int64
+        np.testing.assert_array_equal(
+            offset,
+            [[batch_offset, batch_offset + 1, batch_offset + 2]],
+        )
+
+    def test_write_groundtruth_neighbors_round_trip(self, tmp_path):
+        """GT write/load preserves neighbor IDs above INT32_MAX."""
+        n_base = np.iinfo(np.int32).max + 1
+        large_id = n_base + 999
+        indices = np.array([[large_id, large_id - 1, 0]], dtype=np.int64)
+        path = str(tmp_path / groundtruth_neighbors_filename(n_base))
+        write_groundtruth_neighbors(path, indices, n_base)
+
+        loaded = load_vectors(path)
+        assert loaded.dtype == np.uint64
+        np.testing.assert_array_equal(loaded, indices.astype(np.uint64))
+
+    def test_dataset_lazy_load_u64bin_groundtruth(self, tmp_path):
+        """Dataset loads .u64bin ground truth with IDs above INT32_MAX."""
+        large_id = np.iinfo(np.int32).max + 12345
+        gt = np.array([[large_id, 0, 1]], dtype=np.uint64)
+        path = str(tmp_path / "groundtruth.neighbors.u64bin")
+        _write_test_bin(path, gt)
+
+        dataset = Dataset(name="test", groundtruth_neighbors_file=path)
+        np.testing.assert_array_equal(dataset.groundtruth_neighbors, gt)
 
 
 class TestBinHeaderHelpers:
@@ -255,11 +349,11 @@ class TestBinHeaderHelpers:
         assert n == LEGACY_HEADER_BYTES
         assert path.stat().st_size == LEGACY_HEADER_BYTES
 
-    def test_write_force_uint64_returns_16_bytes(self, tmp_path):
-        """``force_uint64=True`` should write the 16-byte uint64 header."""
+    def test_write_size_dtype_uint64_returns_16_bytes(self, tmp_path):
+        """``size_dtype=np.uint64`` should write the 16-byte uint64 header."""
         path = tmp_path / "h.bin"
         with open(path, "wb") as f:
-            n = write_bin_header(f, 7, 3, force_uint64=True)
+            n = write_bin_header(f, 7, 3, size_dtype=np.uint64)
         assert n == EXTENDED_HEADER_BYTES
         assert path.stat().st_size == EXTENDED_HEADER_BYTES
 
@@ -293,28 +387,31 @@ class TestBinHeaderHelpers:
         data = np.random.rand(11, 5).astype(np.float32)
         with open(path, "wb") as f:
             write_bin_header(
-                f, data.shape[0], data.shape[1], force_uint64=True
+                f, data.shape[0], data.shape[1], size_dtype=np.uint64
             )
             data.tofile(f)
         n_rows, n_cols, hbytes = read_bin_header(str(path), itemsize=4)
         assert (n_rows, n_cols, hbytes) == (11, 5, EXTENDED_HEADER_BYTES)
 
     def test_read_synthesized_huge_extended_header(self, tmp_path):
-        """A hand-crafted extended-header file with >UINT32_MAX rows reads correctly.
+        """Extended-header file with >UINT32_MAX rows and positive n_cols.
 
-        We can't materialize the data section (>16 GB just for the dummy
-        bytes), so write only the header and pad with the exact number of
-        zero bytes ``read_bin_header`` expects to balance the size equation
-        -- using ``n_cols=0`` so the data section is empty.
+        We can't materialize the full data section, so write the header and
+        truncate to the exact file size ``read_bin_header`` expects.
         """
         path = tmp_path / "huge.fbin"
         n_rows = UINT32_MAX + 17
-        n_cols = 0
+        n_cols = 4
+        itemsize = 4
+        expected_size = EXTENDED_HEADER_BYTES + n_rows * n_cols * itemsize
         with open(path, "wb") as f:
             write_bin_header(f, n_rows, n_cols)
-        assert path.stat().st_size == EXTENDED_HEADER_BYTES
+            f.truncate(expected_size)
 
-        got_rows, got_cols, hbytes = read_bin_header(str(path), itemsize=4)
+        assert path.stat().st_size == expected_size
+        got_rows, got_cols, hbytes = read_bin_header(
+            str(path), itemsize=itemsize
+        )
         assert got_rows == n_rows
         assert got_cols == n_cols
         assert hbytes == EXTENDED_HEADER_BYTES
@@ -349,6 +446,76 @@ class TestBinHeaderHelpers:
             data.tofile(f)
         _, _, hbytes = read_bin_header(str(path), itemsize=4)
         assert hbytes == LEGACY_HEADER_BYTES
+
+
+class TestMemmapBinFile:
+    """Tests for ``generate_groundtruth.utils.memmap_bin_file``."""
+
+    def test_read_legacy_header(self, tmp_path):
+        """Read mode auto-detects the legacy 8-byte header offset."""
+        data = np.random.rand(30, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data)
+
+        mm = memmap_bin_file(path, np.float32, mode="r")
+        assert mm.shape == (30, 8)
+        np.testing.assert_array_equal(mm[:], data)
+
+    def test_read_extended_header(self, tmp_path):
+        """Read mode auto-detects the extended 16-byte header offset."""
+        data = np.random.rand(30, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data, size_dtype=np.uint64)
+
+        mm = memmap_bin_file(path, np.float32, mode="r")
+        assert mm.shape == (30, 8)
+        np.testing.assert_array_equal(mm[:], data)
+
+    def test_read_partial_shape_override(self, tmp_path):
+        """Read mode fills ``None`` shape entries from the header."""
+        data = np.random.rand(50, 8).astype(np.float32)
+        path = str(tmp_path / "test.fbin")
+        _write_test_bin(path, data)
+
+        mm = memmap_bin_file(path, np.float32, shape=(10, None), mode="r")
+        assert mm.shape == (10, 8)
+        np.testing.assert_array_equal(mm[:], data[:10])
+
+    def test_write_read_roundtrip_legacy(self, tmp_path):
+        """Write mode with uint32 header, then read back via memmap."""
+        path = str(tmp_path / "test.fbin")
+        shape = (20, 8)
+        data = np.random.rand(*shape).astype(np.float32)
+
+        mm = memmap_bin_file(path, np.float32, shape=shape, mode="w+")
+        mm[:] = data
+        mm.flush()
+        del mm
+
+        loaded = memmap_bin_file(path, np.float32, mode="r")
+        assert loaded.shape == shape
+        np.testing.assert_array_equal(loaded[:], data)
+
+    def test_write_read_roundtrip_extended(self, tmp_path):
+        """Write mode with uint64 header, then read back via memmap."""
+        path = str(tmp_path / "test.fbin")
+        shape = (20, 8)
+        data = np.random.rand(*shape).astype(np.float32)
+
+        mm = memmap_bin_file(
+            path, np.float32, shape=shape, mode="w+", size_dtype=np.uint64
+        )
+        mm[:] = data
+        mm.flush()
+        del mm
+
+        loaded = memmap_bin_file(path, np.float32, mode="r")
+        assert loaded.shape == shape
+        np.testing.assert_array_equal(loaded[:], data)
+        assert (
+            tmp_path.joinpath("test.fbin").stat().st_size
+            == EXTENDED_HEADER_BYTES + data.nbytes
+        )
 
 
 class TestDatasetLazyLoading:
@@ -602,3 +769,10 @@ class TestComputeRecall:
         groundtruth = np.array([[0, 1, 2], [3, 4, 5]])
         recall = compute_recall(neighbors, groundtruth, k=3)
         assert abs(recall - 5.0 / 6.0) < 1e-9
+
+    def test_large_uint64_neighbor_ids(self):
+        """Recall works when GT neighbor IDs exceed INT32_MAX."""
+        large_id = np.iinfo(np.int32).max + 999
+        neighbors = np.array([[large_id, 0, 1]], dtype=np.int64)
+        groundtruth = np.array([[large_id, 0, 1]], dtype=np.uint64)
+        assert compute_recall(neighbors, groundtruth, k=3) == 1.0

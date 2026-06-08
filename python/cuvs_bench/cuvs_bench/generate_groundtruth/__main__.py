@@ -11,9 +11,12 @@ import warnings
 
 from .utils import (
     is_l2_normalized,
+    groundtruth_neighbors_filename,
     memmap_bin_file,
+    offset_neighbor_indices,
     suffix_from_dtype,
     write_bin,
+    write_groundtruth_neighbors,
 )
 
 
@@ -232,7 +235,7 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
             D, Ind = cpu_search(X, queries, k, metric=metric)
 
         D, Ind = xp.asarray(D), xp.asarray(Ind)
-        Ind += i  # shift neighbor index by offset i
+        Ind = offset_neighbor_indices(Ind, i, n_samples)
 
         if distances is None:
             distances = D
@@ -408,9 +411,11 @@ def main():
     print("Calculating true nearest neighbors")
     distances, indices = calc_truth(dataset, queries, args.k, args.metric)
 
-    write_bin(
-        os.path.join(args.output, "groundtruth.neighbors.ibin"),
-        indices.astype(xp.uint32),
+    n_base = dataset.shape[0]
+    write_groundtruth_neighbors(
+        os.path.join(args.output, groundtruth_neighbors_filename(n_base)),
+        indices,
+        n_base,
     )
     write_bin(
         os.path.join(args.output, "groundtruth.distances.fbin"),
