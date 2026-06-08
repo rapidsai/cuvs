@@ -477,9 +477,11 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         if (ps.compression.has_value()) {
           auto decoded_dataset =
             raft::make_device_matrix<DataT, int64_t>(handle_, ps.n_rows, ps.dim);
-          cuvs::neighbors::decode_vpq_dataset<DataT, half>(
+
+          using VpqMathT = half;
+          cuvs::neighbors::decode_vpq_dataset<DataT, VpqMathT>(
             decoded_dataset.view(),
-            dynamic_cast<const cuvs::neighbors::vpq_dataset<half, int64_t>&>(index.data()),
+            dynamic_cast<const cuvs::neighbors::vpq_dataset<VpqMathT, int64_t>&>(index.data()),
             raft::resource::get_cuda_stream(handle_));
           auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
             indices_dev.data(), ps.n_queries, ps.k);
