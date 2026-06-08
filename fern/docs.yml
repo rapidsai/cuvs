@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=https://schema.buildwithfern.dev/docs-yml.json
 
+global-theme: nvidia
 title: "cuVS"
 instances:
   - url: "nvidia-cuvs.docs.buildwithfern.com/cuvs"
