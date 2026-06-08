@@ -118,7 +118,6 @@ __device__ void compute_inner_products_with_lut_block_sort_impl(
 
     int final_num_candidates = min(num_candidates, (int)params.max_candidates_per_pair);
 
-    __syncthreads();
     if (final_num_candidates > 0) {
       using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
         flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;

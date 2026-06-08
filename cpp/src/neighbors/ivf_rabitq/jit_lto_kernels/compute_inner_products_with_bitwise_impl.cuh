@@ -75,10 +75,7 @@ __device__ void compute_inner_products_with_bitwise_impl(
     float* shared_ip2_results = shared_query + params.D;
     float q_kbxsumq           = params.d_G_kbxSumq[query_idx];
 
-    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-      size_t vec_idx = vec_base + tid;
-      if (vec_idx >= num_vectors_in_cluster) break;
-
+    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
       float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
                                                        shared_query,
                                                        cluster_start_index,
@@ -101,10 +98,7 @@ __device__ void compute_inner_products_with_bitwise_impl(
   } else {
     float q_k1xsumq = params.d_G_k1xSumq[query_idx];
 
-    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-      size_t vec_idx = vec_base + tid;
-      if (vec_idx >= num_vectors_in_cluster) break;
-
+    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
       size_t factor_offset = cluster_start_index + vec_idx;
       float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
       float f_add          = factors.x;

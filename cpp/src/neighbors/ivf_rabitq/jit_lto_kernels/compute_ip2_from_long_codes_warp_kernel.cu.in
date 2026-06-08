@@ -4,6 +4,7 @@
  */
 
 #include <neighbors/ivf_rabitq/jit_lto_kernels/device_functions.cuh>
+#include <neighbors/ivf_rabitq/utils/reductions.cuh>
 
 #include <raft/util/cuda_dev_essentials.cuh>
 
@@ -27,11 +28,7 @@ __device__ float compute_ip2_from_long_codes_warp(const uint8_t* vec_long_code,
     uint32_t code_val = extract_code(vec_long_code, d);
     ip2 += shared_query[d] * static_cast<float>(code_val);
   }
-#pragma unroll
-  for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-    ip2 += __shfl_down_sync(0xFFFFFFFF, ip2, offset);
-  }
-  return ip2;
+  return warpReduceSum(ip2);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

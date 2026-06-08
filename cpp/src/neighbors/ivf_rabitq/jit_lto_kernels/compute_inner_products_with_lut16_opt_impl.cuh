@@ -88,10 +88,7 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
     float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
     float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
-    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-      size_t vec_idx = vec_base + tid;
-      if (vec_idx >= num_vectors_in_cluster) break;
-
+    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
       float ip = compute_lut_ip_for_vec<__half>(params.d_short_data,
                                                 shared_lut_fp16,
                                                 cluster_start_index,
@@ -133,10 +130,7 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
     __syncthreads();
     uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
 
-    for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
-      size_t vec_idx = vec_base + tid;
-      if (vec_idx >= num_vectors_in_cluster) break;
-
+    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
       size_t factor_offset = cluster_start_index + vec_idx;
       float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
       float f_add          = factors.x;

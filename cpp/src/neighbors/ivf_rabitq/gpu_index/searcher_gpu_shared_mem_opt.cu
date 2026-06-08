@@ -325,8 +325,6 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
     d_final_pids,
     /*select_min=*/true,
     /*sorted=*/false);
-
-  raft::resource::sync_stream(handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

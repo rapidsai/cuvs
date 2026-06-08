@@ -9,6 +9,7 @@
 
 #include "../../../util/serialize_validation.hpp"
 #include "../../detail/ann_utils.cuh"
+#include "../utils/reductions.cuh"
 #include "ivf_gpu.cuh"
 #include "searcher_gpu.cuh"
 #include <raft/util/integer_utils.hpp>
@@ -974,17 +975,6 @@ void sort_cluster_query_pairs(raft::resources const& handle,
   combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(
     d_sorted_clusters.data_handle(), d_sorted_queries.data_handle(), d_sorted_pairs, total_pairs);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-}
-
-// Warp-level reduction using shuffle instructions
-template <typename T>
-__device__ __forceinline__ T warpReduceSum(T val)
-{
-#pragma unroll
-  for (int offset = 16; offset > 0; offset /= 2) {
-    val += __shfl_down_sync(0xffffffff, val, offset);
-  }
-  return val;
 }
 
 // Generic warp-level kernel: Multiple queries per block, one query per warp

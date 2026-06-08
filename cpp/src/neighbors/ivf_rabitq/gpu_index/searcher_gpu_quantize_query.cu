@@ -12,6 +12,7 @@
 #include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../jit_lto_kernels/kernel_def.hpp"
 #include "../jit_lto_kernels/launcher_factory.hpp"
+#include "../utils/reductions.cuh"
 #include "../utils/searcher_gpu_utils.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
@@ -23,33 +24,12 @@
 
 #include <thrust/fill.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cuda_runtime.h>
 #include <limits>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
-
-__inline__ __device__ float warpReduceSum(float v)
-{
-  for (int offset = 16; offset > 0; offset >>= 1)
-    v += __shfl_down_sync(0xffffffff, v, offset);
-  return v;
-}
-
-__inline__ __device__ float blockReduceSum(float v)
-{
-  __shared__ float shared[32];  // up to 1024 threads -> 32 warps
-  int lane = threadIdx.x & 31;
-  int wid  = threadIdx.x >> 5;
-
-  v = warpReduceSum(v);
-  if (lane == 0) shared[wid] = v;
-  __syncthreads();
-
-  float out = (threadIdx.x < blockDim.x / 32) ? shared[lane] : 0.f;
-  if (wid == 0) out = warpReduceSum(out);
-  return out;
-}
 
 //---------------------------------------------------------------------------
 // Kernel: exrabitq_quantize_query
@@ -77,9 +57,8 @@ __global__ void exrabitq_quantize_query(
 
   // Dynamically allocated shared memory for one row's data.
   extern __shared__ float s_mem[];
-  float* s_xp        = s_mem;
-  int8_t* s_tmp_code = (int8_t*)(s_xp + D);
-  float* s_reduce    = (float*)(s_tmp_code + D);  // For reduction
+  float* s_xp     = s_mem;
+  float* s_reduce = s_xp + D;  // For reduction
 
   int tid = threadIdx.x;
 
@@ -108,39 +87,29 @@ __global__ void exrabitq_quantize_query(
   float norm_inv = (norm > 0) ? (1.0f / norm) : 0.0f;
 
   //=========================================================================
-  // Step 1 (skipped): Coalesced load of all necessary data into shared memory
+  // Part A+B+C: Quantize, accumulate factors, and write codes
   //=========================================================================
+  // Each thread fully owns the j values it visits, so code_val stays in a
+  // register: there is no need to materialize an int8_t scratch in shared
+  // memory or to read it back in separate passes.
+  const int max_code = (1 << (EX_BITS - 1)) - 1;
+  const int min_code = -(1 << (EX_BITS - 1));
+  int8_t* out_ptr    = d_long_code + row * D;  // long_code_length == D
 
-  //=========================================================================
-  // Part A: ExRaBitQ Code Generation
-  //=========================================================================
-  // Parallel quantization and start of ip_norm reduction
+  float ip_resi_xucb = 0.f, xu_sq = 0.f;
   for (int j = tid; j < D; j += BlockSize) {
     float val    = s_xp[j] * norm_inv;
-    int code_val = __float2int_rn((const_scaling_factor * val) /*+ 0.5*/);  // round-to-nearest-even
-    if (code_val > (1 << (EX_BITS - 1)) - 1) code_val = (1 << (EX_BITS - 1)) - 1;
-    if (code_val < (-(1 << (EX_BITS - 1)))) code_val = -(1 << (EX_BITS - 1));
-    s_tmp_code[j] = code_val;
-  }
-  __syncthreads();
+    int code_val = __float2int_rn(const_scaling_factor * val);  // round-to-nearest-even
+    code_val     = std::clamp(code_val, min_code, max_code);
 
-  //=========================================================================
-  // Part B: Factor Computation
-  //=========================================================================
-  float ip_resi_xucb = 0.f, xu_sq = 0.f;
-
-  for (size_t j = tid; j < D; j += BlockSize) {
-    float res  = s_xp[j];
-    int xu_pre = s_tmp_code[j];
-
-    float xu = float(xu_pre) /* - (static_cast<float>(1 << (EX_BITS - 1))) */;
+    float xu = float(code_val);
     // just ignore the 0.5 since we are not going to store extra shift
-    ip_resi_xucb += res * xu;  // for cos_similarity
-    xu_sq += xu * xu;          // norm_quan^2
+    ip_resi_xucb += s_xp[j] * xu;  // for cos_similarity
+    xu_sq += xu * xu;              // norm_quan^2
+    out_ptr[j] = static_cast<int8_t>(code_val);
   }
 
-  // only thread 0 in the block need the results, so simply use blockReduceSum
-  // Perform parallel reductions for all factor components
+  // only thread 0 in the block needs the results, so simply use blockReduceSum
   ip_resi_xucb = blockReduceSum(ip_resi_xucb);
   xu_sq        = blockReduceSum(xu_sq);
 
@@ -158,14 +127,6 @@ __global__ void exrabitq_quantize_query(
     size_t base   = row;
     d_delta[base] = delta;
   }
-
-  //=========================================================================
-  // Part C: Pack and Write Long Code (MINIMAL READS, PARALLEL, COALESCED)
-  //=========================================================================
-  int long_code_length = D;  // D dims, then D bytes
-  int8_t* out_ptr      = d_long_code + row * long_code_length;
-  for (int j = tid; j < D; j += BlockSize)
-    out_ptr[j] = s_tmp_code[j];  // write outputs directly
 }
 
 __global__ void findQueryRanges(const float* __restrict__ queries,
@@ -192,7 +153,6 @@ __global__ void findQueryRanges(const float* __restrict__ queries,
   }
 
   float block_min = BlockReduceFloat(temp_storage_min).Reduce(local_min, cuda::minimum<>{});
-  __syncthreads();
   float block_max = BlockReduceFloat(temp_storage_max).Reduce(local_max, cuda::maximum<>{});
 
   if (threadIdx.x == 0) {
@@ -395,7 +355,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     if (rabitq_quantize_flag_) {
       const int block_size = 256;
       const int grid_size  = num_queries;
-      size_t shared_mem    = D * sizeof(float) + D * sizeof(int8_t) + block_size * sizeof(float);
+      size_t shared_mem    = D * sizeof(float) + block_size * sizeof(float);
       exrabitq_quantize_query<block_size>
         <<<grid_size, block_size, shared_mem, stream_>>>(queries.data_handle(),
                                                          num_queries,
@@ -585,8 +545,6 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     d_final_pids,
     /*select_min=*/true,
     /*sorted=*/false);
-
-  raft::resource::sync_stream(handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

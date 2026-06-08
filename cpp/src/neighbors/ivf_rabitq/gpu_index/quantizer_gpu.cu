@@ -8,6 +8,7 @@
 //
 
 #include "../../detail/smem_utils.cuh"
+#include "../utils/reductions.cuh"
 #include "quantizer_gpu.cuh"
 
 #include <curand_kernel.h>
@@ -46,8 +47,7 @@ void data_transformation_batch_opt(const float* d_data,
                                    float* d_X_and_C_pad,
                                    size_t DIM,
                                    size_t D,
-                                   raft::resources const& handle,
-                                   rmm::cuda_stream_view stream);
+                                   raft::resources const& handle);
 
 void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
                                               const float* d_centroid,
@@ -60,8 +60,7 @@ void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
                                               float* d_X_and_C_pad,
                                               size_t DIM,
                                               size_t D,
-                                              raft::resources const& handle,
-                                              rmm::cuda_stream_view stream);
+                                              raft::resources const& handle);
 
 void rabitq_codes_and_factors_fused(const float* d_rotated_c,
                                     const int* d_bin_XP,
@@ -70,8 +69,7 @@ void rabitq_codes_and_factors_fused(const float* d_rotated_c,
                                     float* d_short_data_factors,
                                     size_t num_points,
                                     size_t D,
-                                    raft::resources const& handle,
-                                    rmm::cuda_stream_view stream);
+                                    raft::resources const& handle);
 
 void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
                                       const float* d_XP_norm,
@@ -83,8 +81,7 @@ void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
                                       size_t D,
                                       size_t EX_BITS,
                                       float const_scaling_factor,
-                                      raft::resources const& handle,
-                                      rmm::cuda_stream_view stream);
+                                      raft::resources const& handle);
 
 void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
                                           const float* d_XP_norm,
@@ -95,8 +92,7 @@ void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
                                           size_t num_points,
                                           size_t D,
                                           size_t EX_BITS,
-                                          raft::resources const& handle,
-                                          rmm::cuda_stream_view stream);
+                                          raft::resources const& handle);
 
 //---------------------------------------------------------------------------
 // Kernel: subtract_normalize_binarize_Kernel (Fused)
@@ -176,10 +172,10 @@ __global__ void subtract_normalize_binarize_Kernel(
 //---------------------------------------------------------------------------
 // Kernel: gatherAndPadKernel (Combined)
 // Populates a (num_points + 1) x D matrix, d_X_and_C_pad.
-// - The first num_points rows are filled by gathering data points from d_data
-//   using d_IDs and padding them to length D.
+// - The first num_points rows are filled with data points padded to length D.
+//   If d_IDs is non-null, rows are gathered from d_data via d_IDs;
+//   if d_IDs is null, d_data is assumed contiguous and copied directly.
 // - The last row (index num_points) is filled with the padded centroid.
-// This kernel replaces gatherKernel and copyCentroidKernel.
 __global__ void gatherAndPadKernel(const float* __restrict__ d_data,
                                    const PID* __restrict__ d_IDs,
                                    const float* __restrict__ d_centroid,
@@ -200,9 +196,9 @@ __global__ void gatherAndPadKernel(const float* __restrict__ d_data,
     if (row_idx < num_points) {
       // This thread is processing a data point.
       if (col_idx < DIM) {
-        // Gather the data from the source using the ID.
-        // Source row starts at d_data[d_IDs[row_idx] * DIM].
-        d_X_and_C_pad[global_idx] = d_data[d_IDs[row_idx] * DIM + col_idx];
+        // Gather via d_IDs when provided; otherwise treat d_data as contiguous.
+        size_t src_row = (d_IDs != nullptr) ? static_cast<size_t>(d_IDs[row_idx]) : row_idx;
+        d_X_and_C_pad[global_idx] = d_data[src_row * DIM + col_idx];
       } else {
         // Pad with zero.
         d_X_and_C_pad[global_idx] = 0.0f;
@@ -218,28 +214,6 @@ __global__ void gatherAndPadKernel(const float* __restrict__ d_data,
       }
     }
   }
-}
-
-__inline__ __device__ float warpReduceSumdup(float v)
-{
-  for (int offset = 16; offset > 0; offset >>= 1)
-    v += __shfl_down_sync(0xffffffff, v, offset);
-  return v;
-}
-
-__inline__ __device__ float blockReduceSumdup(float v)
-{
-  __shared__ float shared[32];  // up to 1024 threads -> 32 warps
-  int lane = threadIdx.x & 31;
-  int wid  = threadIdx.x >> 5;
-
-  v = warpReduceSumdup(v);
-  if (lane == 0) shared[wid] = v;
-  __syncthreads();
-
-  float out = (threadIdx.x < blockDim.x / 32) ? shared[lane] : 0.f;
-  if (wid == 0) out = warpReduceSumdup(out);
-  return out;
 }
 
 //---------------------------------------------------------------------------
@@ -290,10 +264,10 @@ __global__ void pack_and_compute_factors_kernel(
   }
 
   // Perform parallel reduction within the block
-  l2_sqr       = blockReduceSumdup(l2_sqr);
-  ip_resi_xucb = blockReduceSumdup(ip_resi_xucb);
-  ip_cent_xucb = blockReduceSumdup(ip_cent_xucb);
-  xu_sq        = blockReduceSumdup(xu_sq);
+  l2_sqr       = blockReduceSum(l2_sqr);
+  ip_resi_xucb = blockReduceSum(ip_resi_xucb);
+  ip_cent_xucb = blockReduceSum(ip_cent_xucb);
+  xu_sq        = blockReduceSum(xu_sq);
 
   // Thread 0 performs the final calculations and writes the factors
   if (threadIdx.x == 0) {
@@ -401,7 +375,7 @@ __global__ void exrabitq_fused_kernel_batch(
   }
 
   // Finish ip_norm reduction
-  float total_ipnorm = blockReduceSumdup(thread_ipnorm_sum);
+  float total_ipnorm = blockReduceSum(thread_ipnorm_sum);
   float ip_norm_inv  = 1.0f;
   if (tid == 0) {
     float inv   = 1.0f / total_ipnorm;
@@ -428,10 +402,10 @@ __global__ void exrabitq_fused_kernel_batch(
   }
 
   // Perform parallel reductions for all factor components
-  l2_sqr       = blockReduceSumdup(l2_sqr);
-  ip_resi_xucb = blockReduceSumdup(ip_resi_xucb);
-  ip_cent_xucb = blockReduceSumdup(ip_cent_xucb);
-  xu_sq        = blockReduceSumdup(xu_sq);
+  l2_sqr       = blockReduceSum(l2_sqr);
+  ip_resi_xucb = blockReduceSum(ip_resi_xucb);
+  ip_cent_xucb = blockReduceSum(ip_cent_xucb);
+  xu_sq        = blockReduceSum(xu_sq);
 
   // Thread 0 computes and writes the final factors
   if (tid == 0) {
@@ -517,9 +491,10 @@ void data_transformation_batch_opt(const float* d_data,
                                    float* d_X_and_C_pad,
                                    size_t DIM,
                                    size_t D,
-                                   raft::resources const& handle,
-                                   rmm::cuda_stream_view stream)
+                                   raft::resources const& handle)
 {
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
 
   // 2. Launch a single kernel to gather and pad both data and centroid.
@@ -569,9 +544,10 @@ void rabitq_codes_and_factors_fused(const float* d_rotated_c,
                                     float* d_short_data_factors,
                                     size_t num_points,
                                     size_t D,
-                                    raft::resources const& handle,
-                                    rmm::cuda_stream_view stream)
+                                    raft::resources const& handle)
 {
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   int threads_per_block = 256;  // A good default, can be tuned
   dim3 grid(num_points);
   dim3 block(threads_per_block);
@@ -602,9 +578,10 @@ void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
                                       size_t D,
                                       size_t EX_BITS,
                                       float const_scaling_factor,
-                                      raft::resources const& handle,
-                                      rmm::cuda_stream_view stream)
+                                      raft::resources const& handle)
 {
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   const unsigned int BlockSize = 256;  // A good default, can be tuned
   dim3 gridDim(num_points);
   dim3 blockDim(BlockSize);
@@ -656,8 +633,7 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                 d_X_and_C_pad.data_handle(),
                                 DIM,
                                 D,
-                                handle_,
-                                stream_);
+                                handle_);
 
   rabitq_codes_and_factors_fused(d_rotated_c,
                                  d_bin_XP.data_handle(),
@@ -666,8 +642,7 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                  d_short_data_factors,
                                  num_points,
                                  D,
-                                 handle_,
-                                 stream_);
+                                 handle_);
 
   // 5. Compute ExRaBitQ quantization codes.
   if (fast_quantize_flag) {
@@ -681,8 +656,7 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                      D,
                                      EX_BITS,
                                      const_scaling_factor,
-                                     handle_,
-                                     stream_);
+                                     handle_);
   } else {
     exrabitq_codes_and_factors_fused_ori(d_bin_XP.data_handle(),
                                          d_XP_norm.data_handle(),
@@ -693,56 +667,11 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                          num_points,
                                          D,
                                          EX_BITS,
-                                         handle_,
-                                         stream_);
+                                         handle_);
   }
 }
 
 namespace {
-
-//---------------------------------------------------------------------------
-// Kernel: copyAndPadContiguousWithCentroidKernel
-// Populates a (num_points + 1) x D matrix, d_X_and_C_pad.
-// - The first num_points rows are filled by copying data points from d_contiguous_data
-//   (which is already contiguous) and padding them to length D.
-// - The last row (index num_points) is filled with the padded centroid.
-__global__ void copyAndPadContiguousWithCentroidKernel(const float* __restrict__ d_contiguous_data,
-                                                       const float* __restrict__ d_centroid,
-                                                       float* d_X_and_C_pad,
-                                                       size_t num_points,
-                                                       size_t DIM,
-                                                       size_t D)
-{
-  // Calculate the global thread ID for a 1D grid over all elements.
-  int global_idx        = blockIdx.x * blockDim.x + threadIdx.x;
-  size_t total_elements = (num_points + 1) * D;
-
-  if (global_idx < total_elements) {
-    // Determine which row and column this thread is responsible for.
-    int row_idx = global_idx / D;
-    int col_idx = global_idx % D;
-
-    if (row_idx < num_points) {
-      // This thread is processing a data point.
-      if (col_idx < DIM) {
-        // Copy the data from the contiguous source.
-        d_X_and_C_pad[global_idx] = d_contiguous_data[row_idx * DIM + col_idx];
-      } else {
-        // Pad with zero.
-        d_X_and_C_pad[global_idx] = 0.0f;
-      }
-    } else {
-      // This thread is processing the centroid (row_idx == num_points).
-      if (col_idx < DIM) {
-        // Copy from the centroid vector.
-        d_X_and_C_pad[global_idx] = d_centroid[col_idx];
-      } else {
-        // Pad with zero.
-        d_X_and_C_pad[global_idx] = 0.0f;
-      }
-    }
-  }
-}
 
 void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
                                               const float* d_centroid,
@@ -755,17 +684,18 @@ void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
                                               float* d_X_and_C_pad,
                                               size_t DIM,
                                               size_t D,
-                                              raft::resources const& handle,
-                                              rmm::cuda_stream_view stream)
+                                              raft::resources const& handle)
 {
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
 
   // 2. Launch a single kernel to copy, pad, and add centroid.
   int blockSize           = D < 256 ? 128 : 256;
   size_t totalPadElements = (num_points + 1) * D;
   int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
-  copyAndPadContiguousWithCentroidKernel<<<gridPadSize, blockSize, 0, stream>>>(
-    d_contiguous_data, d_centroid, d_X_and_C_pad, num_points, DIM, D);
+  gatherAndPadKernel<<<gridPadSize, blockSize, 0, stream>>>(
+    d_contiguous_data, nullptr, d_centroid, d_X_and_C_pad, num_points, DIM, D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
@@ -823,8 +753,7 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                            d_X_and_C_pad.data_handle(),
                                            DIM,
                                            D,
-                                           handle_,
-                                           stream_);
+                                           handle_);
 
   rabitq_codes_and_factors_fused(d_rotated_c,
                                  d_bin_XP.data_handle(),
@@ -833,8 +762,7 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                  d_short_data_factors,
                                  num_points,
                                  D,
-                                 handle_,
-                                 stream_);
+                                 handle_);
 
   // 5. Compute ExRaBitQ quantization codes.
   if (fast_quantize_flag) {
@@ -848,8 +776,7 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                      D,
                                      EX_BITS,
                                      const_scaling_factor,
-                                     handle_,
-                                     stream_);
+                                     handle_);
   } else {
     exrabitq_codes_and_factors_fused_ori(d_bin_XP.data_handle(),
                                          d_XP_norm.data_handle(),
@@ -860,8 +787,7 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                          num_points,
                                          D,
                                          EX_BITS,
-                                         handle_,
-                                         stream_);
+                                         handle_);
   }
 }
 
@@ -964,6 +890,7 @@ float DataQuantizerGPU::get_const_scaling_factors(raft::resources const& handle,
              rand.data_handle(),
              kConstNum * dim,
              raft::resource::get_cuda_stream(handle));
+  raft::resource::sync_stream(handle);
 
   double sum = 0;
   for (long j = 0; j < kConstNum; ++j) {
@@ -1195,7 +1122,7 @@ __global__ void exrabitq_fused_kernel_batch_ori(
   }
 
   // Finish ip_norm reduction
-  float total_ipnorm = blockReduceSumdup(thread_ipnorm_sum);
+  float total_ipnorm = blockReduceSum(thread_ipnorm_sum);
   float ip_norm_inv  = 1.0f;
   if (tid == 0) {
     float inv   = 1.0f / total_ipnorm;
@@ -1222,10 +1149,10 @@ __global__ void exrabitq_fused_kernel_batch_ori(
   }
 
   // Perform parallel reductions for all factor components
-  l2_sqr       = blockReduceSumdup(l2_sqr);
-  ip_resi_xucb = blockReduceSumdup(ip_resi_xucb);
-  ip_cent_xucb = blockReduceSumdup(ip_cent_xucb);
-  xu_sq        = blockReduceSumdup(xu_sq);
+  l2_sqr       = blockReduceSum(l2_sqr);
+  ip_resi_xucb = blockReduceSum(ip_resi_xucb);
+  ip_cent_xucb = blockReduceSum(ip_cent_xucb);
+  xu_sq        = blockReduceSum(xu_sq);
 
   // Thread 0 computes and writes the final factors
   if (tid == 0) {
@@ -1311,9 +1238,10 @@ void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
                                           size_t num_points,
                                           size_t D,
                                           size_t EX_BITS,
-                                          raft::resources const& handle,
-                                          rmm::cuda_stream_view stream)
+                                          raft::resources const& handle)
 {
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   const unsigned int BlockSize = 256;  // A good default, can be tuned
   dim3 gridDim(num_points);
   dim3 blockDim(BlockSize);
@@ -1368,20 +1296,15 @@ __global__ void fully_fused_kernel(float* __restrict__ output_factors,
   curandState rng_state;
   curand_init(seed, row_id * block_size + tid, 0, &rng_state);
 
-  // Generate random Gaussian values
-  for (int i = tid; i < cols; i += block_size) {
-    row_data[i] = curand_normal(&rng_state);
-  }
-  __syncthreads();
-
-  // Calculate L2 norm
+  // Generate random Gaussian values and calculate L2 norm
   float local_sum = 0.0f;
   for (int i = tid; i < cols; i += block_size) {
-    float val = row_data[i];
+    float val   = curand_normal(&rng_state);
+    row_data[i] = val;
     local_sum += val * val;
   }
 
-  float norm_squared = blockReduceSumdup(local_sum);
+  float norm_squared = blockReduceSum(local_sum);
 
   __shared__ float inv_norm;
   if (tid == 0) { inv_norm = rsqrtf(norm_squared); }
@@ -1390,7 +1313,6 @@ __global__ void fully_fused_kernel(float* __restrict__ output_factors,
   for (int i = tid; i < cols; i += block_size) {
     row_data[i] = fabsf(row_data[i] * inv_norm);
   }
-  __syncthreads();
 
   float rescale_factor =
     compute_best_rescale_parallel(row_data, cols, ex_bits, reuse_space, block_size);
