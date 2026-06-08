@@ -16,12 +16,13 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-// Unified kernel template using BlockSort.
-// WithEx=true adds warp-level IP2 refinement with long codes. The
-// num_bits-dependent popc inner-product loop is dispatched at runtime through
-// the compute_bitwise_quantized_ip_for_vec JIT-LTO fragment, so this kernel is
-// not templated on num_bits.
-template <bool WithEx>
+// Unified kernel using BlockSort. The WithEx-axis-specific tail (refine + sort
+// for WithEx=true, direct sort for WithEx=false) lives in the
+// bitwise_block_sort_emit_topk JIT-LTO fragment, so this kernel is emitted as
+// a single fragment regardless of WithEx. The num_bits-dependent popc
+// inner-product loop is dispatched at runtime through the
+// compute_bitwise_quantized_ip_for_vec JIT-LTO fragment, so this kernel is
+// also not templated on num_bits.
 __device__ void compute_inner_products_with_bitwise_block_sort_impl(
   const ComputeInnerProductsKernelParams params)
 {
@@ -66,7 +67,6 @@ __device__ void compute_inner_products_with_bitwise_block_sort_impl(
   int* shared_candidate_indices =
     reinterpret_cast<int*>(shared_candidate_ips + params.max_candidates_per_pair);
   float* shared_query = (float*)(shared_candidate_indices + params.max_candidates_per_pair);
-  const size_t short_code_length = params.D / 32;
 
   // Phase 1: Bitwise inner product filter
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
@@ -118,143 +118,15 @@ __device__ void compute_inner_products_with_bitwise_block_sort_impl(
     }
     __syncthreads();
 
-    const int candidates_per_thread = (num_candidates + num_threads - 1) / num_threads;
-    __shared__ int probe_slot;
-
-    if constexpr (WithEx) {
-      // Phase 2 (WithEx): Compute exact 1-bit IPs and store for IP2 refinement
-      for (int c = 0; c < candidates_per_thread; ++c) {
-        int cand_idx = tid + c * num_threads;
-        if (cand_idx < num_candidates) {
-          int vec_idx                    = shared_candidate_indices[cand_idx];
-          float exact_ip                 = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
-                                                           shared_query,
-                                                           cluster_start_index,
-                                                           num_vectors_in_cluster,
-                                                           vec_idx,
-                                                           short_code_length,
-                                                           params.D);
-          shared_candidate_ips[cand_idx] = exact_ip;
-        }
-      }
-      __syncthreads();
-
-      // Phase 3 (WithEx): Warp-level IP2 computation + block-sort queue
-      {
-        using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-          flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
-        block_sort_t queue(params.topk);
-
-        float q_kbxsumq               = params.d_G_kbxSumq[query_idx];
-        const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-        float* shared_ip2_results     = reinterpret_cast<float*>(shared_mem_raw_2);
-
-        const int warp_id   = tid / raft::WarpSize;
-        const int lane_id   = tid % raft::WarpSize;
-        const int num_warps = num_threads / raft::WarpSize;
-
-        for (int cand_idx = warp_id; cand_idx < num_candidates; cand_idx += num_warps) {
-          size_t global_vec_idx        = cluster_start_index + shared_candidate_indices[cand_idx];
-          const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-
-          float ip2 =
-            compute_ip2_from_long_codes_warp(vec_long_code, shared_query, params.D, lane_id);
-          if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-        }
-        __syncthreads();
-
-        for (int round = 0; round < candidates_per_thread; round++) {
-          int cand_idx = tid + round * num_threads;
-
-          float ex_dist;
-          uint32_t pid;
-          if (cand_idx < num_candidates) {
-            float ip              = shared_candidate_ips[cand_idx];
-            float ip2             = shared_ip2_results[cand_idx];
-            int local_vec_idx     = shared_candidate_indices[cand_idx];
-            size_t global_vec_idx = cluster_start_index + local_vec_idx;
-
-            float2 ex_factors = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-            float f_ex_add    = ex_factors.x;
-            float f_ex_rescale = ex_factors.y;
-
-            ex_dist =
-              f_ex_add + q_g_add +
-              f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
-            pid = (uint32_t)params.d_pids[global_vec_idx];
-          } else {
-            ex_dist = INFINITY;
-            pid     = 0;
-          }
-          queue.add(ex_dist, pid);
-        }
-        __syncthreads();
-
-        queue.done((uint8_t*)shared_mem_raw_2);
-        if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
-        __syncthreads();
-
-        if (probe_slot >= params.nprobe) { return; }
-
-        uint32_t output_offset =
-          query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
-        queue.store(params.d_topk_dists + output_offset,
-                    (uint32_t*)(params.d_topk_pids + output_offset));
-      }
-    } else {
-      // Phase 2+3 (NoEx): Compute exact 1-bit IPs and add directly to queue
-      using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-        flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
-      block_sort_t queue(params.topk);
-
-      float final_dist;
-      PID final_pid;
-      for (int c = 0; c < candidates_per_thread; ++c) {
-        int cand_idx = tid + c * num_threads;
-        if (cand_idx < num_candidates) {
-          int vec_idx          = shared_candidate_indices[cand_idx];
-          size_t factor_offset = cluster_start_index + vec_idx;
-          float3 factors  = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-          float f_add     = factors.x;
-          float f_rescale = factors.y;
-          size_t global_vec_idx = cluster_start_index + vec_idx;
-
-          float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
-                                                           shared_query,
-                                                           cluster_start_index,
-                                                           num_vectors_in_cluster,
-                                                           vec_idx,
-                                                           short_code_length,
-                                                           params.D);
-          final_dist     = f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
-          final_pid      = (uint32_t)params.d_pids[global_vec_idx];
-        } else {
-          final_dist = INFINITY;
-          final_pid  = 0;
-        }
-        queue.add(final_dist, final_pid);
-      }
-      __syncthreads();
-
-      queue.done((uint8_t*)shared_mem_raw_2);
-      if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
-      __syncthreads();
-
-      uint32_t output_offset = query_idx * (params.topk * params.nprobe) + probe_slot * params.topk;
-      queue.store(params.d_topk_dists + output_offset,
-                  (uint32_t*)(params.d_topk_pids + output_offset));
-    }
-
-    if (num_candidates >= params.topk) {
-      update_threshold_atomicmin(params.d_topk_dists,
-                                 params.d_threshold,
+    bitwise_block_sort_emit_topk(params,
+                                 num_candidates,
                                  query_idx,
-                                 params.topk,
-                                 params.nprobe,
-                                 probe_slot,
-                                 threshold,
-                                 tid);
-    }
+                                 cluster_idx,
+                                 num_vectors_in_cluster,
+                                 cluster_start_index,
+                                 q_g_add,
+                                 q_k1xsumq,
+                                 threshold);
   }
 }
 

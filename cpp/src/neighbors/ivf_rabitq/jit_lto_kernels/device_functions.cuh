@@ -5,6 +5,11 @@
 
 #pragma once
 
+#include "../gpu_index/searcher_gpu_common.cuh"
+#include "../utils/reductions.cuh"
+
+#include <raft/util/cuda_dev_essentials.cuh>
+
 #include <cstddef>
 #include <cstdint>
 #include <cuda_fp16.h>
@@ -17,10 +22,21 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // adds them via add_*_device_function().
 __device__ uint32_t extract_code(const uint8_t* codes, size_t d);
 
-__device__ float compute_ip2_from_long_codes_warp(const uint8_t* vec_long_code,
-                                                  const float* shared_query,
-                                                  size_t D,
-                                                  int lane_id);
+// The body does not depend on ex_bits; the inner extract_code call is the
+// ex_bits-specialized fragment, resolved at nvJitLink time based on which
+// extract_code variant the planner adds.
+__inline__ __device__ float compute_ip2_from_long_codes_warp(const uint8_t* vec_long_code,
+                                                             const float* shared_query,
+                                                             size_t D,
+                                                             int lane_id)
+{
+  float ip2 = 0.0f;
+  for (size_t d = lane_id; d < D; d += raft::WarpSize) {
+    uint32_t code_val = extract_code(vec_long_code, d);
+    ip2 += shared_query[d] * static_cast<float>(code_val);
+  }
+  return warpReduceSum(ip2);
+}
 
 // Primary template; explicit instantiations live in the
 // compute_lut_ip_for_vec_kernel.cu.in fragment, one per @lut_dtype@ substitution
@@ -90,5 +106,64 @@ __device__ int32_t compute_bitwise_quantized_ip_for_vec(const uint32_t* d_short_
                                                         size_t num_vectors_in_cluster,
                                                         size_t vec_idx,
                                                         uint32_t num_words);
+
+// WithEx-axis-specific final step of the bitwise (non-BlockSort) kernel:
+// optionally precomputes IP2 in shared memory and writes per-vector distances
+// to the output. Two fragments (with_ex / no_ex) define this symbol; nvJitLink
+// resolves the call. Pre-computed state passed in to avoid redundant global
+// loads and give the JIT-LTO inliner direct visibility into the helper inputs.
+__device__ void bitwise_emit_distances(const ComputeInnerProductsKernelParams params,
+                                       int query_idx,
+                                       int cluster_idx,
+                                       size_t num_vectors_in_cluster,
+                                       size_t cluster_start_index,
+                                       float q_g_add);
+
+// WithEx-axis-specific final step of the LUT (non-BlockSort) kernel: computes
+// and writes per-vector distances, with optional IP2 refinement when WithEx.
+__device__ void lut_emit_distances(const ComputeInnerProductsKernelParams params,
+                                   int query_idx,
+                                   int cluster_idx,
+                                   size_t num_vectors_in_cluster,
+                                   size_t cluster_start_index,
+                                   float q_g_add);
+
+// WithEx-axis-specific final step of the half-precision LUT (non-BlockSort)
+// kernel: computes and writes per-vector distances, with optional IP2
+// refinement when WithEx.
+__device__ void lut16_opt_emit_distances(const ComputeInnerProductsKernelParams params,
+                                         int query_idx,
+                                         int cluster_idx,
+                                         size_t num_vectors_in_cluster,
+                                         size_t cluster_start_index,
+                                         float q_g_add);
+
+// WithEx-axis-specific final step of the LUT BlockSort kernel: filters
+// candidates via the LUT and builds the per-block top-k (with IP2 refinement
+// when WithEx). Two fragments (with_ex / no_ex) define this symbol.
+__device__ void lut_block_sort_emit_topk(const ComputeInnerProductsKernelParams params,
+                                         int query_idx,
+                                         int cluster_idx,
+                                         size_t num_vectors_in_cluster,
+                                         size_t cluster_start_index,
+                                         float q_g_add,
+                                         float q_k1xsumq,
+                                         float threshold);
+
+// WithEx-axis-specific final step of the bitwise BlockSort kernel: builds and
+// stores the per-block top-k for the current cluster/query pair. Two fragments
+// (with_ex / no_ex) define this symbol; nvJitLink resolves the call. State the
+// kernel already computed for Phase 1 is passed in to avoid redundant global
+// loads and to give the JIT-LTO inliner the same view as the previous
+// templated kernel.
+__device__ void bitwise_block_sort_emit_topk(const ComputeInnerProductsKernelParams params,
+                                             int num_candidates,
+                                             int query_idx,
+                                             int cluster_idx,
+                                             size_t num_vectors_in_cluster,
+                                             size_t cluster_start_index,
+                                             float q_g_add,
+                                             float q_k1xsumq,
+                                             float threshold);
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -7,29 +7,36 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-template <bool WithEx>
 struct fragment_tag_compute_inner_products_with_lut {};
 
 template <bool WithEx>
+struct fragment_tag_lut_emit_distances {};
+
 struct fragment_tag_compute_inner_products_with_lut_block_sort {};
 
 template <bool WithEx>
+struct fragment_tag_lut_block_sort_emit_topk {};
+
 struct fragment_tag_compute_inner_products_with_lut16_opt {};
+
+template <bool WithEx>
+struct fragment_tag_lut16_opt_emit_distances {};
 
 template <bool WithEx>
 struct fragment_tag_compute_inner_products_with_lut16_opt_block_sort {};
 
-template <bool WithEx>
 struct fragment_tag_compute_inner_products_with_bitwise {};
 
 template <bool WithEx>
+struct fragment_tag_bitwise_emit_distances {};
+
 struct fragment_tag_compute_inner_products_with_bitwise_block_sort {};
+
+template <bool WithEx>
+struct fragment_tag_bitwise_block_sort_emit_topk {};
 
 template <int EX_BITS>
 struct fragment_tag_extract_code {};
-
-template <int EX_BITS>
-struct fragment_tag_compute_ip2_from_long_codes_warp {};
 
 struct tag_lut_dtype_f32 {};
 struct tag_lut_dtype_f16 {};

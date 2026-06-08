@@ -14,10 +14,11 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-// Unified kernel template without BlockSort.
-// WithEx=true precomputes warp-level IP2 for all cluster vectors; WithEx=false uses only 1-bit
-// short codes.
-template <bool WithEx>
+// Unified kernel without BlockSort. The WithEx-axis-specific tail (IP2
+// precompute + per-vector distance write for WithEx=true, simple distance
+// write for WithEx=false) lives in the bitwise_emit_distances JIT-LTO
+// fragment, so this kernel is emitted as a single fragment regardless of
+// WithEx.
 __device__ void compute_inner_products_with_bitwise_impl(
   const ComputeInnerProductsKernelParams params)
 {
@@ -43,81 +44,10 @@ __device__ void compute_inner_products_with_bitwise_impl(
   }
   __syncthreads();
 
-  if constexpr (WithEx) {
-    // Precompute warp-level IP2 for every vector, stored in shared memory
-    float* shared_ip2_results     = shared_query + params.D;
-    const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-    const int warp_id             = tid / raft::WarpSize;
-    const int lane_id             = tid % raft::WarpSize;
-    const int num_warps           = num_threads / raft::WarpSize;
-
-    for (int cand_idx = warp_id; cand_idx < num_vectors_in_cluster; cand_idx += num_warps) {
-      size_t global_vec_idx        = cluster_start_index + cand_idx;
-      const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-      float ip2 = compute_ip2_from_long_codes_warp(vec_long_code, shared_query, params.D, lane_id);
-      if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-    }
-    __syncthreads();
-  }
-
-  const size_t short_code_length = params.D / 32;
   float q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
 
-  __shared__ int probe_slot;
-  if (tid == 0) {
-    probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
-  }
-  __syncthreads();
-
-  uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
-
-  if constexpr (WithEx) {
-    float* shared_ip2_results = shared_query + params.D;
-    float q_kbxsumq           = params.d_G_kbxSumq[query_idx];
-
-    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
-      float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
-                                                       shared_query,
-                                                       cluster_start_index,
-                                                       num_vectors_in_cluster,
-                                                       vec_idx,
-                                                       short_code_length,
-                                                       params.D);
-
-      float ip2             = shared_ip2_results[vec_idx];
-      size_t global_vec_idx = cluster_start_index + vec_idx;
-      float2 ex_factors     = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-      float f_ex_add        = ex_factors.x;
-      float f_ex_rescale    = ex_factors.y;
-
-      params.d_topk_dists[output_offset + vec_idx] =
-        f_ex_add + q_g_add +
-        f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * exact_ip + ip2 + q_kbxsumq);
-      params.d_topk_pids[output_offset + vec_idx] = params.d_pids[global_vec_idx];
-    }
-  } else {
-    float q_k1xsumq = params.d_G_k1xSumq[query_idx];
-
-    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      size_t global_vec_idx = cluster_start_index + vec_idx;
-
-      float exact_ip = compute_bitwise_1bit_ip_for_vec(params.d_short_data,
-                                                       shared_query,
-                                                       cluster_start_index,
-                                                       num_vectors_in_cluster,
-                                                       vec_idx,
-                                                       short_code_length,
-                                                       params.D);
-
-      params.d_topk_dists[output_offset + vec_idx] =
-        f_add + q_g_add + f_rescale * (exact_ip + q_k1xsumq);
-      params.d_topk_pids[output_offset + vec_idx] = params.d_pids[global_vec_idx];
-    }
-  }
+  bitwise_emit_distances(
+    params, query_idx, cluster_idx, num_vectors_in_cluster, cluster_start_index, q_g_add);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -14,10 +14,11 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-// Unified non-BlockSort half-precision LUT kernel body.
-// WithEx=true: IP2 precomputed with long codes for all cluster vectors before the distance loop.
-// WithEx=false: direct 1-bit LUT distance, no IP2 step.
-template <bool WithEx>
+// Unified non-BlockSort half-precision LUT kernel. The WithEx-axis-specific
+// body (IP2 precompute + per-vector distance write for WithEx=true, FP16-LUT
+// distance write for WithEx=false) lives in the lut16_opt_emit_distances
+// JIT-LTO fragment, so this kernel is emitted as a single fragment regardless
+// of WithEx.
 __device__ void compute_inner_products_with_lut16_opt_impl(
   const ComputeInnerProductsKernelParams params)
 {
@@ -32,121 +33,10 @@ __device__ void compute_inner_products_with_lut16_opt_impl(
 
   size_t num_vectors_in_cluster = params.d_cluster_meta[cluster_idx].num;
   size_t cluster_start_index    = params.d_cluster_meta[cluster_idx].start_index;
+  float q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
 
-  const uint32_t num_chunks         = params.D / BITS_PER_CHUNK;
-  const uint32_t lut_per_query_size = num_chunks * LUT_SIZE;
-
-  extern __shared__ __align__(256) char shared_mem_raw[];
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  if constexpr (WithEx) {
-    // Shared memory layout: [ip2_results (max_candidates_per_pair floats)][lut_fp16 / query]
-    float* shared_ip2_results = reinterpret_cast<float*>(shared_mem_raw);
-    lut_dtype* shared_lut_fp16 =
-      reinterpret_cast<lut_dtype*>(shared_ip2_results + params.max_candidates_per_pair);
-
-    const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
-
-    // Load query into LUT region (reused; D floats always fit in lut_per_query_size lut_dtype
-    // slots)
-    float* shared_query = reinterpret_cast<float*>(shared_lut_fp16);
-    for (uint32_t i = tid; i < params.D; i += num_threads) {
-      shared_query[i] = params.d_query[query_idx * params.D + i];
-    }
-    __syncthreads();
-
-    const int warp_id   = tid / raft::WarpSize;
-    const int lane_id   = tid % raft::WarpSize;
-    const int num_warps = num_threads / raft::WarpSize;
-
-    for (int cand_idx = warp_id; cand_idx < num_vectors_in_cluster; cand_idx += num_warps) {
-      size_t global_vec_idx        = cluster_start_index + cand_idx;
-      const uint8_t* vec_long_code = params.d_long_code + global_vec_idx * long_code_size;
-
-      float ip2 = compute_ip2_from_long_codes_warp(vec_long_code, shared_query, params.D, lane_id);
-      if (lane_id == 0) { shared_ip2_results[cand_idx] = ip2; }
-    }
-    __syncthreads();
-
-    // Load LUT (overwrites query)
-    lut_dtype* query_lut = params.d_lut_for_queries_half + query_idx * lut_per_query_size;
-    for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-      shared_lut_fp16[i] = query_lut[i];
-    }
-
-    const uint32_t short_code_length = params.D / 32;
-
-    __shared__ int probe_slot;
-    if (tid == 0) {
-      probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
-    }
-    __syncthreads();
-    uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
-
-    float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    float q_kbxsumq = params.d_G_kbxSumq[query_idx];
-
-    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
-      float ip = compute_lut_ip_for_vec<__half>(params.d_short_data,
-                                                shared_lut_fp16,
-                                                cluster_start_index,
-                                                num_vectors_in_cluster,
-                                                vec_idx,
-                                                short_code_length);
-
-      float ip2             = shared_ip2_results[vec_idx];
-      size_t global_vec_idx = cluster_start_index + vec_idx;
-
-      float2 ex_factors  = reinterpret_cast<const float2*>(params.d_ex_factor)[global_vec_idx];
-      float f_ex_add     = ex_factors.x;
-      float f_ex_rescale = ex_factors.y;
-
-      params.d_topk_dists[output_offset + vec_idx] =
-        f_ex_add + q_g_add +
-        f_ex_rescale * (static_cast<float>(1 << params.ex_bits) * ip + ip2 + q_kbxsumq);
-      params.d_topk_pids[output_offset + vec_idx] = params.d_pids[global_vec_idx];
-    }
-  } else {
-    // Shared memory layout: [lut_fp16 (lut_per_query_size lut_dtype elements)]
-    lut_dtype* shared_lut_fp16 = reinterpret_cast<lut_dtype*>(shared_mem_raw);
-
-    lut_dtype* query_lut = params.d_lut_for_queries_half + query_idx * lut_per_query_size;
-    for (uint32_t i = tid; i < lut_per_query_size; i += num_threads) {
-      shared_lut_fp16[i] = query_lut[i];
-    }
-    __syncthreads();
-
-    float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    float q_k1xsumq = params.d_G_k1xSumq[query_idx];
-
-    const uint32_t short_code_length = params.D / 32;
-
-    __shared__ int probe_slot;
-    if (tid == 0) {
-      probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
-    }
-    __syncthreads();
-    uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
-
-    for (size_t vec_idx = tid; vec_idx < num_vectors_in_cluster; vec_idx += num_threads) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-
-      float ip = compute_lut_ip_for_vec<__half>(params.d_short_data,
-                                                shared_lut_fp16,
-                                                cluster_start_index,
-                                                num_vectors_in_cluster,
-                                                vec_idx,
-                                                short_code_length);
-
-      params.d_topk_dists[output_offset + vec_idx] = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      params.d_topk_pids[output_offset + vec_idx]  = params.d_pids[cluster_start_index + vec_idx];
-    }
-  }
+  lut16_opt_emit_distances(
+    params, query_idx, cluster_idx, num_vectors_in_cluster, cluster_start_index, q_g_add);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
