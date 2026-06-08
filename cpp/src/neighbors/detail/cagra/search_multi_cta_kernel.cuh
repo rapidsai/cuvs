@@ -10,6 +10,20 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
+/**
+ * Per-partition descriptor for the multi-partition MULTI_CTA search kernel. One instance per
+ * index partition; the kernel reads this array from device memory using blockIdx.z as the
+ * partition index. Queries and result buffers are shared across all partitions and are passed
+ * to the kernel as separate parameters rather than embedded in this descriptor.
+ */
+template <typename DataT, typename IndexT, typename DistanceT>
+struct alignas(16) multi_partition_desc_t {
+  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc;
+  const IndexT* graph;  // [dataset_size, graph_degree]
+  uint32_t graph_degree;
+  uint32_t _pad;
+};
+
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
@@ -38,4 +52,31 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     SampleFilterT sample_filter,
                     cudaStream_t stream);
 
-}
+/**
+ * Multi-partition launcher. Drives `search_kernel_mp` with a 3D grid
+ * (num_cta_per_query, num_queries, num_partitions). Per-(query, partition) outputs are written
+ * into the intermediate buffer in partition-major layout
+ * [num_partitions, num_queries, num_cta_per_query * itopk_size]. Each partition's data
+ * (dataset_desc, graph, graph_degree) is read by the kernel from partition_descs[blockIdx.z];
+ * smem and the result buffer are sized for the max graph_degree across partitions.
+ */
+template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
+void select_and_run_mp(const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
+                       uint32_t num_partitions,
+                       uint32_t max_graph_degree,
+                       IndexT* intermediate_indices_ptr,
+                       DistanceT* intermediate_distances_ptr,
+                       const DataT* queries_ptr,
+                       uint32_t num_queries,
+                       const search_params& ps,
+                       uint32_t block_size,
+                       uint32_t result_buffer_size,
+                       uint32_t smem_size,
+                       uint32_t visited_hash_bitlen,
+                       int64_t traversed_hash_bitlen,
+                       IndexT* traversed_hashmap_ptr,
+                       uint32_t num_cta_per_query,
+                       SampleFilterT sample_filter,
+                       cudaStream_t stream);
+
+}  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

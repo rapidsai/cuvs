@@ -632,5 +632,365 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        static_cast<IndexT>(graph.extent(0)));
 }
 
+//
+// Multi-partition variant of search_kernel. Grid is
+// (num_cta_per_query, num_queries, num_partitions); per-partition data (dataset_desc, graph,
+// graph_degree) is read from partition_descs[blockIdx.z]. Cross-CTA state (traversed_hashmap)
+// is per-(query, partition), indexed by row = partition_id * num_queries + query_id. Outputs
+// land in [num_partitions, num_queries, num_cta_per_query, itopk_size] partition-major.
+//
+template <class DATASET_DESCRIPTOR_T, class SAMPLE_FILTER_T>
+RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_mp(
+  const multi_partition_desc_t<typename DATASET_DESCRIPTOR_T::DATA_T,
+                               typename DATASET_DESCRIPTOR_T::INDEX_T,
+                               typename DATASET_DESCRIPTOR_T::DISTANCE_T>* partition_descs,
+  typename DATASET_DESCRIPTOR_T::INDEX_T* const
+    result_indices_ptr,  // [num_partitions, num_queries, num_cta_per_query, itopk_size]
+  typename DATASET_DESCRIPTOR_T::DISTANCE_T* const
+    result_distances_ptr,  // [num_partitions, num_queries, num_cta_per_query, itopk_size]
+  const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
+  const uint32_t max_elements,
+  const uint32_t max_graph_degree,
+  const unsigned num_distilation,
+  const uint64_t rand_xor_mask,
+  const uint32_t visited_hash_bitlen,
+  typename DATASET_DESCRIPTOR_T::INDEX_T* const
+    traversed_hashmap_ptr,  // [num_partitions * num_queries, 1 << traversed_hash_bitlen]
+  const uint32_t traversed_hash_bitlen,
+  const uint32_t itopk_size,
+  const uint32_t min_iteration,
+  const uint32_t max_iteration,
+  SAMPLE_FILTER_T sample_filter)
+{
+  using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
+  using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
+  using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
+
+  const auto num_queries       = gridDim.y;
+  const auto query_id          = blockIdx.y;
+  const auto num_cta_per_query = gridDim.x;
+  const auto cta_id            = blockIdx.x;  // local CTA ID
+  const auto partition_id      = blockIdx.z;
+  const auto row               = partition_id * num_queries + query_id;
+
+  const auto& part              = partition_descs[partition_id];
+  const auto* part_dataset_desc = part.dataset_desc;
+  const auto* knn_graph         = part.graph;
+  const auto graph_degree       = part.graph_degree;
+
+  extern __shared__ uint8_t smem[];
+
+  // Layout of result_buffer (same as search_kernel, sized for max_graph_degree).
+  // +----------------+---------+---------------------------+
+  // | internal_top_k | padding | neighbors of parent nodes |
+  // | <itopk_size>   | upto 32 | <max_graph_degree>        |
+  // +----------------+---------+---------------------------+
+  // |<---        result_buffer_size_32                 --->|
+  const auto result_buffer_size    = itopk_size + max_graph_degree;
+  const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
+  assert(result_buffer_size_32 <= max_elements);
+
+  // Set smem working buffer for the distance calculation. Use partition's own dataset_desc.
+  const auto* dataset_desc = part_dataset_desc->setup_workspace(smem, queries_ptr, query_id);
+
+  auto* __restrict__ result_indices_buffer =
+    reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes());
+  auto* __restrict__ result_distances_buffer =
+    reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
+  auto* __restrict__ local_visited_hashmap_ptr =
+    reinterpret_cast<INDEX_T*>(result_distances_buffer + result_buffer_size_32);
+  auto* __restrict__ parent_indices_buffer =
+    reinterpret_cast<INDEX_T*>(local_visited_hashmap_ptr + hashmap::get_size(visited_hash_bitlen));
+  auto* __restrict__ result_position = reinterpret_cast<int*>(parent_indices_buffer + 1);
+
+  // Per-(query, partition) cross-CTA traversed hashmap row.
+  INDEX_T* const local_traversed_hashmap_ptr =
+    traversed_hashmap_ptr + (hashmap::get_size(traversed_hash_bitlen) * row);
+
+  constexpr INDEX_T invalid_index    = ~static_cast<INDEX_T>(0);
+  constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
+
+  for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
+    result_indices_buffer[i]   = invalid_index;
+    result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+  }
+  hashmap::init<INDEX_T>(local_visited_hashmap_ptr, visited_hash_bitlen);
+  __syncthreads();
+
+  // block_id is the unique CTA id across the whole grid; num_blocks is the total CTA count.
+  // These drive deterministic seeding for compute_distance_to_random_nodes.
+  uint32_t block_id   = cta_id + (num_cta_per_query * row);
+  uint32_t num_blocks = num_cta_per_query * num_queries * gridDim.z;
+
+  // Use partition's graph_degree for the random-pickup count. seed_ptr is unused in
+  // multi-partition (we don't carry per-(query, partition) seeds); compute_distance_to_random
+  // falls back to dataset_desc->size for the index limit, which is per-partition.
+  device::compute_distance_to_random_nodes(result_indices_buffer,
+                                           result_distances_buffer,
+                                           *dataset_desc,
+                                           graph_degree,
+                                           num_distilation,
+                                           rand_xor_mask,
+                                           static_cast<const INDEX_T*>(nullptr),
+                                           /* num_seeds */ 0u,
+                                           local_visited_hashmap_ptr,
+                                           visited_hash_bitlen,
+                                           local_traversed_hashmap_ptr,
+                                           traversed_hash_bitlen,
+                                           block_id,
+                                           num_blocks,
+                                           /* graph_size */ static_cast<INDEX_T>(0));
+  __syncthreads();
+
+  uint32_t iter = 0;
+  while (1) {
+    if (threadIdx.x < 32) {
+      // [1st warp] Topk with bitonic sort
+      if constexpr (std::is_same_v<INDEX_T, uint32_t>) {
+        if (max_elements <= 64) {
+          topk_by_bitonic_sort_wrapper_64(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else if (max_elements <= 128) {
+          topk_by_bitonic_sort_wrapper_128(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else {
+          assert(max_elements <= 256);
+          topk_by_bitonic_sort_wrapper_256(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        }
+      } else {
+        if (max_elements <= 64) {
+          topk_by_bitonic_sort<64, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else if (max_elements <= 128) {
+          topk_by_bitonic_sort<128, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else {
+          assert(max_elements <= 256);
+          topk_by_bitonic_sort<256, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        }
+      }
+    }
+    __syncthreads();
+
+    if (iter + 1 >= max_iteration) { break; }
+
+    if (threadIdx.x < 32) {
+      pickup_next_parent<INDEX_T, DISTANCE_T>(parent_indices_buffer,
+                                              result_indices_buffer,
+                                              result_distances_buffer,
+                                              local_traversed_hashmap_ptr,
+                                              traversed_hash_bitlen);
+    } else {
+      hashmap::init<INDEX_T>(local_visited_hashmap_ptr, visited_hash_bitlen, 32);
+    }
+    __syncthreads();
+
+    if ((parent_indices_buffer[0] == invalid_index) && (iter >= min_iteration)) { break; }
+
+    for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
+      INDEX_T index = result_indices_buffer[i];
+      if (index == invalid_index) { continue; }
+      if ((i >= itopk_size) && (index & index_msb_1_mask)) {
+        hashmap::remove<INDEX_T>(
+          local_traversed_hashmap_ptr, traversed_hash_bitlen, index & ~index_msb_1_mask);
+        result_indices_buffer[i]   = invalid_index;
+        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+      } else {
+        index &= ~index_msb_1_mask;
+        hashmap::insert(local_visited_hashmap_ptr, visited_hash_bitlen, index);
+      }
+    }
+    if (threadIdx.x == blockDim.x - 1) { result_position[0] = result_buffer_size_32; }
+    __syncthreads();
+
+    // Per-partition graph_degree determines child-node count; uses partition's knn_graph.
+    device::compute_distance_to_child_nodes<INDEX_T, DISTANCE_T, DATASET_DESCRIPTOR_T, 0>(
+      result_indices_buffer,
+      result_distances_buffer,
+      *dataset_desc,
+      knn_graph,
+      graph_degree,
+      local_visited_hashmap_ptr,
+      visited_hash_bitlen,
+      local_traversed_hashmap_ptr,
+      traversed_hash_bitlen,
+      parent_indices_buffer,
+      result_indices_buffer,
+      1,
+      result_position,
+      result_buffer_size_32);
+
+    for (uint32_t i = threadIdx.x; i < result_position[0]; i += blockDim.x) {
+      INDEX_T index = result_indices_buffer[i];
+      if (index == invalid_index || index & index_msb_1_mask) { continue; }
+      if (hashmap::search<INDEX_T, 1>(local_traversed_hashmap_ptr, traversed_hash_bitlen, index)) {
+        result_indices_buffer[i]   = invalid_index;
+        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+      }
+    }
+    __syncthreads();
+
+    // Filter at parent level. multi_partition_bitset_filter reads blockIdx.z internally to
+    // index into the per-partition bitset region; partition-local parent_id is the right
+    // sample_ix.
+    if constexpr (!std::is_same<SAMPLE_FILTER_T,
+                                cuvs::neighbors::filtering::none_sample_filter>::value) {
+      for (unsigned p = threadIdx.x; p < 1; p += blockDim.x) {
+        if (parent_indices_buffer[p] != invalid_index) {
+          const auto parent_id =
+            result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
+          if (!sample_filter(query_id, parent_id)) {
+            result_distances_buffer[parent_indices_buffer[p]] = utils::get_max_value<DISTANCE_T>();
+            result_indices_buffer[parent_indices_buffer[p]]   = invalid_index;
+          }
+        }
+      }
+      __syncthreads();
+    }
+
+    iter++;
+  }
+
+  // Final filter sweep over remaining results.
+  if constexpr (!std::is_same<SAMPLE_FILTER_T,
+                              cuvs::neighbors::filtering::none_sample_filter>::value) {
+    for (uint32_t i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
+      INDEX_T index = result_indices_buffer[i];
+      if (index == invalid_index) { continue; }
+      index &= ~index_msb_1_mask;
+      if (!sample_filter(query_id, index)) {
+        result_indices_buffer[i]   = invalid_index;
+        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+      }
+    }
+    __syncthreads();
+  }
+
+  // Output search results (1st warp only). Output offset uses row (partition-major).
+  if (threadIdx.x < 32) {
+    uint32_t offset = 0;
+    for (uint32_t i = threadIdx.x; i < result_buffer_size_32; i += 32) {
+      INDEX_T index = result_indices_buffer[i];
+      bool is_valid = false;
+      if (index != invalid_index) {
+        if (index & index_msb_1_mask) {
+          is_valid = true;
+          index &= ~index_msb_1_mask;
+        } else if ((offset < itopk_size) &&
+                   hashmap::insert<INDEX_T, 1>(
+                     local_traversed_hashmap_ptr, traversed_hash_bitlen, index)) {
+          is_valid = true;
+        }
+      }
+      const auto mask = __ballot_sync(0xffffffff, is_valid);
+      if (is_valid) {
+        const auto j = offset + __popc(mask & ((1 << threadIdx.x) - 1));
+        if (j < itopk_size) {
+          uint32_t k            = j + (itopk_size * (cta_id + (num_cta_per_query * row)));
+          result_indices_ptr[k] = index & ~index_msb_1_mask;
+          if (result_distances_ptr != nullptr) {
+            result_distances_ptr[k] = result_distances_buffer[i];
+          }
+        } else {
+          hashmap::remove<INDEX_T>(local_traversed_hashmap_ptr, traversed_hash_bitlen, index);
+        }
+      }
+      offset += __popc(mask);
+    }
+    for (uint32_t i = offset + threadIdx.x; i < itopk_size; i += 32) {
+      uint32_t k            = i + (itopk_size * (cta_id + (num_cta_per_query * row)));
+      result_indices_ptr[k] = invalid_index;
+      if (result_distances_ptr != nullptr) {
+        result_distances_ptr[k] = utils::get_max_value<DISTANCE_T>();
+      }
+    }
+  }
+}
+
+template <typename DATASET_DESCRIPTOR_T, typename SAMPLE_FILTER_T>
+struct search_kernel_mp_config {
+  using kernel_t = decltype(&search_kernel_mp<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>);
+
+  static auto choose_buffer_size(unsigned result_buffer_size, unsigned block_size) -> kernel_t
+  {
+    if (result_buffer_size <= 256) {
+      return search_kernel_mp<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>;
+    }
+    THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
+  }
+};
+
+template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
+void select_and_run_mp(const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
+                       uint32_t num_partitions,
+                       uint32_t max_graph_degree,
+                       IndexT* intermediate_indices_ptr,
+                       DistanceT* intermediate_distances_ptr,
+                       const DataT* queries_ptr,
+                       uint32_t num_queries,
+                       const search_params& ps,
+                       uint32_t block_size,
+                       uint32_t result_buffer_size,
+                       uint32_t smem_size,
+                       uint32_t visited_hash_bitlen,
+                       int64_t traversed_hash_bitlen,
+                       IndexT* traversed_hashmap_ptr,
+                       uint32_t num_cta_per_query,
+                       SampleFilterT sample_filter,
+                       cudaStream_t stream)
+{
+  auto kernel =
+    search_kernel_mp_config<dataset_descriptor_base_t<DataT, IndexT, DistanceT>,
+                            SampleFilterT>::choose_buffer_size(result_buffer_size, block_size);
+
+  uint32_t max_elements{};
+  if (result_buffer_size <= 64) {
+    max_elements = 64;
+  } else if (result_buffer_size <= 128) {
+    max_elements = 128;
+  } else if (result_buffer_size <= 256) {
+    max_elements = 256;
+  } else {
+    THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
+  }
+
+  // Initialize the cross-CTA traversed hashmap for every (query, partition) row.
+  const uint32_t traversed_hash_size = hashmap::get_size(traversed_hash_bitlen);
+  set_value_batch(traversed_hashmap_ptr,
+                  traversed_hash_size,
+                  ~static_cast<IndexT>(0),
+                  traversed_hash_size,
+                  static_cast<std::size_t>(num_queries) * num_partitions,
+                  stream);
+
+  dim3 block_dims(block_size, 1, 1);
+  dim3 grid_dims(num_cta_per_query, num_queries, num_partitions);
+  RAFT_LOG_DEBUG("Launching kernel_mp with %u threads, (%u, %u, %u) blocks %u smem",
+                 block_size,
+                 num_cta_per_query,
+                 num_queries,
+                 num_partitions,
+                 smem_size);
+
+  kernel<<<grid_dims, block_dims, smem_size, stream>>>(partition_descs,
+                                                       intermediate_indices_ptr,
+                                                       intermediate_distances_ptr,
+                                                       queries_ptr,
+                                                       max_elements,
+                                                       max_graph_degree,
+                                                       ps.num_random_samplings,
+                                                       ps.rand_xor_mask,
+                                                       visited_hash_bitlen,
+                                                       traversed_hashmap_ptr,
+                                                       traversed_hash_bitlen,
+                                                       ps.itopk_size,
+                                                       ps.min_iterations,
+                                                       ps.max_iterations,
+                                                       sample_filter);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+}
+
 }  // namespace multi_cta_search
 }  // namespace cuvs::neighbors::cagra::detail
