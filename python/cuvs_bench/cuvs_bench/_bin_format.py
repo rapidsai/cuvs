@@ -31,8 +31,6 @@ of the file and:
    truncated, padded, or has a mismatched dtype extension.
 """
 
-from __future__ import annotations
-
 import os
 import struct
 from typing import BinaryIO, Tuple

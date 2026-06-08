@@ -77,10 +77,18 @@ def offset_neighbor_indices(indices, batch_offset: int, n_base: int):
     return indices.astype(dtype) + batch_offset
 
 
+def _to_host_numpy(array, dtype):
+    """Copy *array* to a host NumPy array, including from CuPy if needed."""
+    get = getattr(array, "get", None)
+    if callable(get):
+        array = get()
+    return np.asarray(array, dtype=dtype)
+
+
 def write_groundtruth_neighbors(path, indices, n_base: int):
     """Write a ground-truth neighbor matrix using the correct on-disk dtype."""
     storage_dtype = neighbor_index_dtype(n_base)
-    data = np.asarray(indices, dtype=storage_dtype)
+    data = _to_host_numpy(indices, storage_dtype)
     write_bin(path, data)
 
 
