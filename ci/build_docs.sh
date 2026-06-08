@@ -17,6 +17,8 @@ conda config --set channel_priority strict
 rapids-dependency-file-generator \
   --output conda \
   --file-key docs \
+  --prepend-channel "${CPP_CHANNEL}" \
+  --prepend-channel "${PYTHON_CHANNEL}" \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" \
   | tee env.yaml
 
