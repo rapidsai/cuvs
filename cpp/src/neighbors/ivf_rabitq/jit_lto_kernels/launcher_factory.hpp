@@ -82,7 +82,6 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_lut_b
 {
   ComputeInnerProductsWithLutBlockSortPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
-  planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     add_ex_bits_device_functions(planner, ex_bits);
@@ -111,7 +110,6 @@ make_compute_inner_products_with_lut16_opt_block_sort_launcher(int ex_bits, bool
 {
   ComputeInnerProductsWithLut16OptBlockSortPlanner planner;
   planner.add_compute_lut_ip_for_vec_device_function();
-  planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     add_ex_bits_device_functions(planner, ex_bits);
@@ -125,7 +123,6 @@ inline std::shared_ptr<AlgorithmLauncher> make_compute_inner_products_with_bitwi
   int ex_bits, bool with_ex)
 {
   ComputeInnerProductsWithBitwisePlanner planner;
-  planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     add_ex_bits_device_functions(planner, ex_bits);
@@ -141,13 +138,11 @@ make_compute_inner_products_with_bitwise_block_sort_launcher(int num_bits,
                                                              bool with_ex)
 {
   ComputeInnerProductsWithBitwiseBlockSortPlanner planner;
-  planner.add_compute_bitwise_1bit_ip_for_vec_device_function();
   if (num_bits == 4) {
     planner.add_compute_bitwise_quantized_ip_for_vec_device_function<4>();
   } else {
     planner.add_compute_bitwise_quantized_ip_for_vec_device_function<8>();
   }
-  planner.add_update_threshold_atomicmin_device_function();
   if (with_ex) {
     planner.add_entrypoint<true>();
     add_ex_bits_device_functions(planner, ex_bits);

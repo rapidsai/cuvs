@@ -38,16 +38,6 @@ struct ComputeInnerProductsWithBitwiseBlockSortPlanner : AlgorithmPlanner {
     this->add_static_fragment<fragment_tag_compute_ip2_from_long_codes_warp<EX_BITS>>();
   }
 
-  void add_compute_bitwise_1bit_ip_for_vec_device_function()
-  {
-    this->add_static_fragment<fragment_tag_compute_bitwise_1bit_ip_for_vec>();
-  }
-
-  void add_update_threshold_atomicmin_device_function()
-  {
-    this->add_static_fragment<fragment_tag_update_threshold_atomicmin>();
-  }
-
   template <int NumBits>
   void add_compute_bitwise_quantized_ip_for_vec_device_function()
   {

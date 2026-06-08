@@ -41,11 +41,6 @@ struct ComputeInnerProductsWithLutBlockSortPlanner : AlgorithmPlanner {
   {
     this->add_static_fragment<fragment_tag_compute_lut_ip_for_vec<tag_lut_dtype_f32>>();
   }
-
-  void add_update_threshold_atomicmin_device_function()
-  {
-    this->add_static_fragment<fragment_tag_update_threshold_atomicmin>();
-  }
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
