@@ -281,10 +281,10 @@ void init_centroids_for_mg_batched(
       std::vector<raft::device_matrix_view<const DataT, IndexT>> device_parts;
       device_parts.reserve(X_parts.size());
       for (auto const& part : X_parts) {
-        device_parts.push_back(raft::make_device_matrix_view<const DataT, IndexT>(
-          part.data_handle(),
-          static_cast<IndexT>(part.extent(0)),
-          static_cast<IndexT>(part.extent(1))));
+        device_parts.push_back(
+          raft::make_device_matrix_view<const DataT, IndexT>(part.data_handle(),
+                                                             static_cast<IndexT>(part.extent(0)),
+                                                             static_cast<IndexT>(part.extent(1))));
       }
       const int num_ranks = static_cast<int>(rank_counts.size());
       initKMeansPlusPlus_distributed<DataT, IndexT>(handle,
