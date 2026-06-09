@@ -94,12 +94,10 @@ template <typename SourceIndexT, typename SampleFilterT>
 std::uint64_t cagra_sample_filter_hash(const SampleFilterT& sample_filter)
 {
   std::uint64_t seed = cagra_sample_filter_type_id(sample_filter);
-  seed               = cagra_hash_combine(
-    seed, cagra_filter_payload_hash<SourceIndexT>(sample_filter));
-  seed = cagra_hash_combine(
-    seed,
-    static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(
-      cagra_filter_data_ptr(sample_filter))));
+  seed = cagra_hash_combine(seed, cagra_filter_payload_hash<SourceIndexT>(sample_filter));
+  seed = cagra_hash_combine(seed,
+                            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(
+                              cagra_filter_data_ptr(sample_filter))));
   seed = cagra_hash_combine(
     seed, static_cast<std::uint64_t>(cagra_filter_query_id_offset(sample_filter)));
   seed = cagra_hash_combine(seed, cagra_udf_source_hash(sample_filter));
@@ -620,7 +618,7 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
                                           topk_by_bitonic_sort,
                                           bitonic_sort_and_merge_multi_warps))
   {
-    this->filter_payload           = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
+    this->filter_payload = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
     const uint32_t query_id_offset = filter_payload.query_id_offset;
 
     // set kernel launch parameters
@@ -809,8 +807,8 @@ void select_and_run(
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
-  const auto filter_payload       = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
-  const uint32_t query_id_offset  = filter_payload.query_id_offset;
+  const auto filter_payload      = extract_cagra_sample_filter<SourceIndexT>(sample_filter, stream);
+  const uint32_t query_id_offset = filter_payload.query_id_offset;
 
   // Use common logic to compute launch config
   auto config             = compute_launch_config(num_itopk_candidates, ps.itopk_size, block_size);
