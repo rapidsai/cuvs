@@ -12,11 +12,11 @@
 
 ## Useful Resources
 
-- [Documentation](https://docs.rapids.ai/api/cuvs/nightly/): Library documentation.
-- [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
-- [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Guide to getting started with cuVS.
+- [Documentation](https://docs.nvidia.com/cuvs): Library documentation.
+- [Build and Install Guide](https://docs.nvidia.com/cuvs/installation): Instructions for installing and building cuVS.
+- [Getting Started Guide](https://docs.nvidia.com/cuvs/getting-started): Guide to getting started with cuVS.
 - [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
-- [API Reference Documentation](https://docs.rapids.ai/api/cuvs/nightly/api_docs): API Documentation.
+- [API Reference Documentation](https://docs.nvidia.com/cuvs/api_reference): API Documentation.
 - [RAPIDS Community](https://rapids.ai/community.html): Get help, contribute, and collaborate.
 - [GitHub repository](https://github.com/rapidsai/cuvs): Download the cuVS source code.
 - [Issue tracker](https://github.com/rapidsai/cuvs/issues): Report issues or request features.
