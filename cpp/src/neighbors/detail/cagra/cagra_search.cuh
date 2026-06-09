@@ -328,12 +328,21 @@ void search_multi_partition(
     RAFT_FAIL("MULTI_KERNEL is not supported for multi-partition search");
   }
 
-  // AUTO resolution. SINGLE_CTA's itopk_size hard cap is 512; above that, the search would
-  // fail at SINGLE_CTA plan construction, so AUTO routes to MULTI_CTA (which spawns
-  // ceildiv(itopk_size, 32) CTAs per query to cover larger itopk pools). At or below 512 it
-  // stays on SINGLE_CTA, which is the existing default for this path.
+  // AUTO resolution. Mirrors single-partition's heuristic in search_plan_impl_base, with the
+  // occupancy gate scaled by num_partitions (multi-partition grids already have a partition
+  // axis, so each query produces num_partitions CTAs on SINGLE_CTA). SINGLE_CTA's
+  // itopk_size <= 512 hard cap is enforced in its plan constructor (search_single_cta.cuh);
+  // above that, AUTO must route to MULTI_CTA. Below the cap, SINGLE_CTA wins only if there
+  // are enough (query, partition) CTAs to fill the GPU; otherwise MULTI_CTA's
+  // ceildiv(itopk_size, 32) CTAs per query recover occupancy.
   if (params.algo == search_algo::AUTO) {
-    params.algo = (params.itopk_size > 512) ? search_algo::MULTI_CTA : search_algo::SINGLE_CTA;
+    const size_t num_sm = raft::getMultiProcessorCount();
+    if (params.itopk_size <= 512 &&
+        static_cast<size_t>(params.max_queries) * num_partitions >= num_sm * 2lu) {
+      params.algo = search_algo::SINGLE_CTA;
+    } else {
+      params.algo = search_algo::MULTI_CTA;
+    }
   }
 
   // Build a single plan_desc sized for the maximum graph_degree across all partitions. The
