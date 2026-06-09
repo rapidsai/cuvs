@@ -2,7 +2,14 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
+#pragma once
+
 #include <cuvs/neighbors/common.hpp>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/util/integer_utils.hpp>
+
+#include <cstddef>
+#include <cstdint>
 
 namespace cuvs::neighbors {
 template <class data_t, class math_t>
@@ -44,6 +51,9 @@ void decode_vpq_dataset(raft::device_matrix_view<data_t, int64_t> decoded_datase
 {
   const auto dataset_size = decoded_dataset.extent(0);
   RAFT_EXPECTS(vpq_dataset.data.extent(0) == dataset_size, "Dataset sizes mismatch");
+  RAFT_EXPECTS(vpq_dataset.pq_bits() == 8,
+               "decode_vpq_dataset currently only supports pq_bits == 8 (got %u)",
+               vpq_dataset.pq_bits());
 
   constexpr uint32_t block_size  = 256;
   constexpr uint32_t warp_size   = 32;

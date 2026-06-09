@@ -26,11 +26,14 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 #include <string>
 #include <variant>
 
-namespace cuvs::neighbors::cagra {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
 
 /**
  * @defgroup cagra_cpp_search_params CAGRA index search parameters
@@ -48,7 +51,7 @@ enum class search_algo {
 
 enum class hash_mode { HASH = 0, SMALL = 1, AUTO = 100 };
 
-enum class internal_dtype { F16 = 0, E5M2 = 1, AUTO = 100 };
+enum class internal_dtype { F16 = 0, E5M2 = 1 };
 
 struct search_params : cuvs::neighbors::search_params {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
@@ -126,15 +129,20 @@ struct search_params : cuvs::neighbors::search_params {
 
   /** Data type of the query vector and codebook table on shared memory. Currently, only VPQ
    * supports FP8. **/
-  internal_dtype smem_dtype = internal_dtype::AUTO;
+  internal_dtype smem_dtype = internal_dtype::F16;
 };
 
-/** @} */
+/**
+ * @}
+ */
 
-}  // namespace cuvs::neighbors::cagra
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
 
-namespace cuvs::neighbors::graph_build_params {
-
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
 /**
  * Parameters for the iterative CAGRA graph build algorithm.
  *
@@ -227,9 +235,12 @@ struct ace_params {
   ace_params() = default;
 };
 
-}  // namespace cuvs::neighbors::graph_build_params
-
-namespace cuvs::neighbors::cagra {
+}  // namespace graph_build_params
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
 // For re-exporting into cagra namespace
 namespace graph_build_params = cuvs::neighbors::graph_build_params;
 /**
@@ -430,7 +441,7 @@ static_assert(std::is_aggregate_v<search_params>);
  *
  */
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index {
+struct CUVS_EXPORT index : cuvs::neighbors::index {
   using index_params_type  = cagra::index_params;
   using search_params_type = cagra::search_params;
   using index_type         = IdxT;
@@ -922,6 +933,7 @@ struct index : cuvs::neighbors::index {
   size_t dim_          = 0;
   size_t graph_degree_ = 0;
 };
+
 /**
  * @}
  */
@@ -3272,9 +3284,13 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
-}  // namespace cuvs::neighbors::cagra
-
-namespace cuvs::neighbors::cagra::helpers {
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace cagra {
+namespace helpers {
 
 /**
  * @brief Optimize a KNN graph into a CAGRA graph.
@@ -3299,4 +3315,7 @@ void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
 
-}  // namespace cuvs::neighbors::cagra::helpers
+}  // namespace helpers
+}  // namespace cagra
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

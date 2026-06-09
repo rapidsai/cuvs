@@ -19,6 +19,7 @@
 
 #include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
+#include <cuvs/core/export.hpp>
 #include <raft/core/detail/macros.hpp>
 
 #include <memory>
@@ -29,7 +30,8 @@
 #include <bit>
 #endif
 
-namespace cuvs::neighbors {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
 /**
  * @addtogroup cagra_cpp_index_params
  * @{
@@ -821,11 +823,11 @@ using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
  *       `cuvs::neighbors::ivf_pq::helpers::resize_list` which handle type casting internally.
  */
 template <typename ListT>
-void resize_list(raft::resources const& res,
-                 std::shared_ptr<ListT>& orig_list,  // NOLINT
-                 const typename ListT::spec_type& spec,
-                 typename ListT::size_type new_used_size,
-                 typename ListT::size_type old_used_size);
+CUVS_EXPORT void resize_list(raft::resources const& res,
+                             std::shared_ptr<ListT>& orig_list,  // NOLINT
+                             const typename ListT::spec_type& spec,
+                             typename ListT::size_type new_used_size,
+                             typename ListT::size_type old_used_size);
 
 /**
  * Serialize a list to an output stream.
@@ -989,4 +991,5 @@ struct mg_index {
   std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
 };
 
-}  // namespace cuvs::neighbors
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

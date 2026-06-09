@@ -32,6 +32,7 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 
+// All includes are done before opening namespace to avoid nested namespace issues
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT,
@@ -154,10 +155,9 @@ void search_main(raft::resources const& res,
   // Dispatch search parameters based on the dataset kind.
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
-    if (params.smem_dtype != cuvs::neighbors::cagra::internal_dtype::AUTO &&
-        params.smem_dtype != cuvs::neighbors::cagra::internal_dtype::F16) {
-      RAFT_LOG_WARN("In this search mode, smem_dtype supports only AUTO or F16. Set it to AUTO.");
-      params.smem_dtype = cuvs::neighbors::cagra::internal_dtype::AUTO;
+    if (params.smem_dtype != cuvs::neighbors::cagra::internal_dtype::F16) {
+      RAFT_LOG_WARN("In this search mode, smem_dtype supports only F16. Set it to F16.");
+      params.smem_dtype = cuvs::neighbors::cagra::internal_dtype::F16;
     }
     // Search using a plain (strided) row-major dataset
     RAFT_LOG_DEBUG("Searching with strided dataset");

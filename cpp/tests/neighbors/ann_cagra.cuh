@@ -27,6 +27,7 @@
 #include <raft/linalg/normalize.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/random/rng.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/itertools.hpp>
 
 #include <rmm/device_buffer.hpp>
@@ -276,6 +277,7 @@ struct AnnCagraInputs {
   std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
   cuvs::neighbors::MergeStrategy merge_strategy =
     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+  cuvs::neighbors::cagra::internal_dtype smem_dtype = cuvs::neighbors::cagra::internal_dtype::F16;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -299,6 +301,13 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     {search_algo::AUTO, "auto"}                   //
   };
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
+  const auto smem_dtype_str           = [](cuvs::neighbors::cagra::internal_dtype dtype) {
+    switch (dtype) {
+      case cuvs::neighbors::cagra::internal_dtype::F16: return "F16";
+      case cuvs::neighbors::cagra::internal_dtype::E5M2: return "E5M2";
+    }
+    return "Unknown";
+  };
   std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo_name[p.algo] << ", max_queries=" << p.max_queries
@@ -312,7 +321,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
   if (p.compression.has_value()) {
     auto vpq = p.compression.value();
     os << ", pq_bits=" << vpq.pq_bits << ", pq_dim=" << vpq.pq_dim
-       << ", vq_n_centers=" << vpq.vq_n_centers;
+       << ", vq_n_centers=" << vpq.vq_n_centers << ", smem_dtype=" << smem_dtype_str(p.smem_dtype);
   }
   os << '}' << std::endl;
   return os;
@@ -415,6 +424,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
         search_params.team_size   = ps.team_size;
+        search_params.smem_dtype  = ps.smem_dtype;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -467,9 +477,11 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         if (ps.compression.has_value()) {
           auto decoded_dataset =
             raft::make_device_matrix<DataT, int64_t>(handle_, ps.n_rows, ps.dim);
-          cuvs::neighbors::decode_vpq_dataset<DataT, half>(
+
+          using VpqMathT = half;
+          cuvs::neighbors::decode_vpq_dataset<DataT, VpqMathT>(
             decoded_dataset.view(),
-            dynamic_cast<const cuvs::neighbors::vpq_dataset<half, int64_t>&>(index.data()),
+            dynamic_cast<const cuvs::neighbors::vpq_dataset<VpqMathT, int64_t>&>(index.data()),
             raft::resource::get_cuda_stream(handle_));
           auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
             indices_dev.data(), ps.n_queries, ps.k);
@@ -1694,15 +1706,18 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});  // don't demand high recall
                                                                 // without refinement
-  for (uint32_t pq_len :
-       {2, 4, 8}) {  // for now, only pq_len = 2 is supported, more options coming  soon
+  for (uint32_t pq_len : {2, 4, 8}) {
     for (uint32_t vq_n_centers : {100, 1000}) {
-      for (auto input : inputs2) {
-        vpq_params ps{};
-        ps.pq_dim       = input.dim / pq_len;
-        ps.vq_n_centers = vq_n_centers;
-        input.compression.emplace(ps);
-        inputs.push_back(input);
+      for (auto internal_smem_dtype : {cuvs::neighbors::cagra::internal_dtype::E5M2,
+                                       cuvs::neighbors::cagra::internal_dtype::F16}) {
+        for (auto input : inputs2) {
+          vpq_params ps{};
+          ps.pq_dim       = input.dim / pq_len;
+          ps.vq_n_centers = vq_n_centers;
+          input.compression.emplace(ps);
+          input.smem_dtype = internal_smem_dtype;
+          inputs.push_back(input);
+        }
       }
     }
   }

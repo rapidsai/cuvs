@@ -35,6 +35,11 @@ extern template class cuvs::bench::cuvs_cagra<uint8_t, uint32_t>;
 extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 #endif
 
+#ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_SQ
+#include "cuvs_ivf_sq_wrapper.h"
+extern template class cuvs::bench::cuvs_ivf_sq<float>;
+extern template class cuvs::bench::cuvs_ivf_sq<half>;
+#endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_MG
 #include "cuvs_ivf_flat_wrapper.h"
 #include "cuvs_mg_ivf_flat_wrapper.h"
@@ -83,6 +88,30 @@ void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::cuvs_ivf_flat<T, IdxT>::search_param& param)
 {
   param.ivf_flat_params.n_probes = conf.at("nprobe");
+}
+#endif
+
+#ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_SQ
+template <typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::cuvs_ivf_sq<T>::build_param& param)
+{
+  param.n_lists = conf.at("nlist");
+  if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
+  if (conf.contains("ratio")) {
+    throw std::runtime_error(
+      "cuvs_ivf_sq build parameter ratio was replaced by max_train_points_per_cluster");
+  }
+  if (conf.contains("max_train_points_per_cluster")) {
+    param.max_train_points_per_cluster = conf.at("max_train_points_per_cluster");
+  }
+}
+
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::cuvs_ivf_sq<T>::search_param& param)
+{
+  param.ivf_sq_params.n_probes = conf.at("nprobe");
 }
 #endif
 
@@ -291,12 +320,12 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
   }
 
   // Parse build-algo-specific parameters and use them to decide on the algo type
-  nlohmann::json ivf_pq_build_conf  = collect_conf_with_prefix(conf, "ivf_pq_build_");
-  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
-  nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
-  nlohmann::json ace_conf           = collect_conf_with_prefix(conf, "ace_");
-  nlohmann::json build_compression_conf  = collect_conf_with_prefix(conf, "build_compression_");
-  nlohmann::json build_search_conf       = collect_conf_with_prefix(conf, "build_search_");
+  nlohmann::json ivf_pq_build_conf      = collect_conf_with_prefix(conf, "ivf_pq_build_");
+  nlohmann::json ivf_pq_search_conf     = collect_conf_with_prefix(conf, "ivf_pq_search_");
+  nlohmann::json nn_descent_conf        = collect_conf_with_prefix(conf, "nn_descent_");
+  nlohmann::json ace_conf               = collect_conf_with_prefix(conf, "ace_");
+  nlohmann::json build_compression_conf = collect_conf_with_prefix(conf, "build_compression_");
+  nlohmann::json build_search_conf      = collect_conf_with_prefix(conf, "build_search_");
 
   // When graph_build_algo is not specified, leave graph_build_params as monostate so the
   // CAGRA build uses AUTO selection (NN_DESCENT or IVF_PQ based on dataset/heuristics).
@@ -328,7 +357,8 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
                                           cuvs::neighbors::graph_build_params::nn_descent_params>) {
         parse_build_param<T, IdxT>(nn_descent_conf, arg);
       } else if constexpr (std::is_same_v<
-                             U, cuvs::neighbors::graph_build_params::iterative_search_params>) {
+                             U,
+                             cuvs::neighbors::graph_build_params::iterative_search_params>) {
         if (!build_compression_conf.empty()) {
           auto vpq_pams = arg.build_compression.value_or(cuvs::neighbors::vpq_params{});
           parse_build_param(build_compression_conf, vpq_pams);
@@ -343,9 +373,7 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
         if (build_search_conf.contains("min_iterations")) {
           arg.min_iterations = build_search_conf.at("min_iterations");
         }
-        if (build_search_conf.contains("itopk")) {
-          arg.itopk_size = build_search_conf.at("itopk");
-        }
+        if (build_search_conf.contains("itopk")) { arg.itopk_size = build_search_conf.at("itopk"); }
         if (build_search_conf.contains("max_queries")) {
           arg.max_queries = build_search_conf.at("max_queries");
         }
