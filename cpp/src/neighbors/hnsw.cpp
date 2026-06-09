@@ -46,7 +46,7 @@ CUVS_INST_HNSW_BUILD(int8_t);
   std::unique_ptr<index<T>> from_cagra(                                               \
     raft::resources const& res,                                                       \
     const index_params& params,                                                       \
-    const cuvs::neighbors::cagra::padded_index<T, uint32_t>& cagra_index,             \
+    const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,      \
     std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset) \
   {                                                                                   \
     return detail::from_cagra<T>(res, params, cagra_index, dataset);                  \

@@ -9,7 +9,7 @@
 namespace {
 
 using data_t              = @data_type@;
-using inst_padded_view_t  = cuvs::neighbors::padded_dataset_view_t<data_t, int64_t>;
+using inst_padded_view_t  = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
 using inst_vpq_f16_view_t = cuvs::neighbors::device_vpq_dataset_view<half, int64_t>;
 using inst_vpq_f32_view_t = cuvs::neighbors::device_vpq_dataset_view<float, int64_t>;
 using inst_empty_view_t   = cuvs::neighbors::device_empty_dataset_view<int64_t>;

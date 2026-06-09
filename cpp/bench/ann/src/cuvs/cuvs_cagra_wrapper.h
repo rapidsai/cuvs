@@ -74,7 +74,7 @@ enum class CagraMergeType { kPhysical, kLogical };
 template <typename T, typename IdxT>
 class cuvs_cagra : public algo<T>, public algo_gpu {
  public:
-  using index_type        = cuvs::neighbors::cagra::padded_index<T, IdxT>;
+  using index_type        = cuvs::neighbors::cagra::device_padded_index<T, IdxT>;
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
   using algo<T>::metric_;

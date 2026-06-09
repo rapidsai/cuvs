@@ -188,7 +188,7 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::padded_index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<NONE>");
@@ -216,7 +216,7 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::padded_index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<CPU>");
@@ -342,10 +342,11 @@ void all_neighbors_graph(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-void serialize_to_hnswlib_from_disk(raft::resources const& res,
-                                    std::ostream& os_raw,
-                                    const cuvs::neighbors::hnsw::index_params& params,
-                                    const cuvs::neighbors::cagra::padded_index<T, IdxT>& index_)
+void serialize_to_hnswlib_from_disk(
+  raft::resources const& res,
+  std::ostream& os_raw,
+  const cuvs::neighbors::hnsw::index_params& params,
+  const cuvs::neighbors::cagra::device_padded_index<T, IdxT>& index_)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
@@ -824,7 +825,7 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::padded_index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
@@ -1070,7 +1071,7 @@ template <typename T>
 std::unique_ptr<index<T>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::padded_index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   // special treatment for index on disk
@@ -1309,7 +1310,7 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
   // Build CAGRA index using ACE (returns host_padded_index; graph-only for in-memory ACE).
   auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
-  // Attach a device dataset so from_cagra (which expects padded_index) can read vectors.
+  // Attach a device dataset so from_cagra (which expects device_padded_index) can read vectors.
   auto ace_device_padded = cuvs::neighbors::make_device_padded_dataset(res, dataset);
   auto ace_index         = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
     res, ace_host_index, ace_device_padded->as_dataset_view());

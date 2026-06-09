@@ -18,7 +18,7 @@ template <typename T, typename IdxT>
 auto build_cagra_with_dataset(raft::resources const& res,
                               cagra::index_params const& params,
                               raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
-  -> cagra::padded_index<T, IdxT>
+  -> cagra::device_padded_index<T, IdxT>
 {
   auto padded = cuvs::neighbors::make_device_padded_dataset_view(res, dataset);
   auto index  = cagra::build(res, params, padded);
@@ -30,13 +30,13 @@ auto build_cagra_with_dataset(raft::resources const& res,
 
 using cagra_F32 = dynamic_batching_test<float,
                                         uint32_t,
-                                        cagra::padded_index<float, uint32_t>,
+                                        cagra::device_padded_index<float, uint32_t>,
                                         build_cagra_with_dataset<float, uint32_t>,
                                         cagra::search>;
 
 using cagra_U8 = dynamic_batching_test<uint8_t,
                                        uint32_t,
-                                       cagra::padded_index<uint8_t, uint32_t>,
+                                       cagra::device_padded_index<uint8_t, uint32_t>,
                                        build_cagra_with_dataset<uint8_t, uint32_t>,
                                        cagra::search>;
 

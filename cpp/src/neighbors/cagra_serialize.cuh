@@ -12,7 +12,7 @@ namespace cuvs::neighbors::cagra {
 #define CUVS_INST_CAGRA_SERIALIZE(DTYPE)                                                          \
   void serialize(raft::resources const& handle,                                                   \
                  const std::string& filename,                                                     \
-                 const cuvs::neighbors::cagra::padded_index<DTYPE, uint32_t>& index,              \
+                 const cuvs::neighbors::cagra::device_padded_index<DTYPE, uint32_t>& index,       \
                  bool include_dataset)                                                            \
   {                                                                                               \
     cuvs::neighbors::cagra::detail::serialize<DTYPE, uint32_t>(                                   \
@@ -22,7 +22,7 @@ namespace cuvs::neighbors::cagra {
   void deserialize(                                                                               \
     raft::resources const& handle,                                                                \
     const std::string& filename,                                                                  \
-    cuvs::neighbors::cagra::padded_index<DTYPE, uint32_t>* index,                                 \
+    cuvs::neighbors::cagra::device_padded_index<DTYPE, uint32_t>* index,                          \
     std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset)            \
   {                                                                                               \
     cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(                                 \
@@ -30,7 +30,7 @@ namespace cuvs::neighbors::cagra {
   };                                                                                              \
   void serialize(raft::resources const& handle,                                                   \
                  std::ostream& os,                                                                \
-                 const cuvs::neighbors::cagra::padded_index<DTYPE, uint32_t>& index,              \
+                 const cuvs::neighbors::cagra::device_padded_index<DTYPE, uint32_t>& index,       \
                  bool include_dataset)                                                            \
   {                                                                                               \
     cuvs::neighbors::cagra::detail::serialize<DTYPE, uint32_t>(                                   \
@@ -40,7 +40,7 @@ namespace cuvs::neighbors::cagra {
   void deserialize(                                                                               \
     raft::resources const& handle,                                                                \
     std::istream& is,                                                                             \
-    cuvs::neighbors::cagra::padded_index<DTYPE, uint32_t>* index,                                 \
+    cuvs::neighbors::cagra::device_padded_index<DTYPE, uint32_t>* index,                          \
     std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset)            \
   {                                                                                               \
     cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(handle, is, index, out_dataset); \
@@ -49,7 +49,7 @@ namespace cuvs::neighbors::cagra {
   void serialize_to_hnswlib(                                                                      \
     raft::resources const& handle,                                                                \
     std::ostream& os,                                                                             \
-    const cuvs::neighbors::cagra::padded_index<DTYPE, uint32_t>& index,                           \
+    const cuvs::neighbors::cagra::device_padded_index<DTYPE, uint32_t>& index,                    \
     std::optional<raft::host_matrix_view<const DTYPE, int64_t, raft::row_major>> dataset)         \
   {                                                                                               \
     cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \
@@ -59,7 +59,7 @@ namespace cuvs::neighbors::cagra {
   void serialize_to_hnswlib(                                                                      \
     raft::resources const& handle,                                                                \
     const std::string& filename,                                                                  \
-    const cuvs::neighbors::cagra::padded_index<DTYPE, uint32_t>& index,                           \
+    const cuvs::neighbors::cagra::device_padded_index<DTYPE, uint32_t>& index,                    \
     std::optional<raft::host_matrix_view<const DTYPE, int64_t, raft::row_major>> dataset)         \
   {                                                                                               \
     cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \

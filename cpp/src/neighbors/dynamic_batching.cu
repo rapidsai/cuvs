@@ -16,10 +16,10 @@
 namespace cuvs::neighbors::cagra {
 
 // Single-token names for CUVS_INST_DYNAMIC_BATCHING_INDEX (macro expands Namespace ::__VA_ARGS__).
-using cagra_f32_u32_index = padded_index<float, uint32_t>;
-using cagra_f16_u32_index = padded_index<half, uint32_t>;
-using cagra_i8_u32_index  = padded_index<int8_t, uint32_t>;
-using cagra_u8_u32_index  = padded_index<uint8_t, uint32_t>;
+using cagra_f32_u32_index = device_padded_index<float, uint32_t>;
+using cagra_f16_u32_index = device_padded_index<half, uint32_t>;
+using cagra_i8_u32_index  = device_padded_index<int8_t, uint32_t>;
+using cagra_u8_u32_index  = device_padded_index<uint8_t, uint32_t>;
 
 }  // namespace cuvs::neighbors::cagra
 

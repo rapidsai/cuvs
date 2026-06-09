@@ -14,7 +14,7 @@ namespace {
 
 using data_t                  = @data_type@;
 using index_t                 = @index_type@;
-using inst_padded_view_t      = cuvs::neighbors::padded_dataset_view_t<data_t, int64_t>;
+using inst_padded_view_t      = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
 using inst_host_padded_view_t = cuvs::neighbors::host_padded_dataset_view<data_t, int64_t>;
 using inst_vpq_f16_view_t     = cuvs::neighbors::device_vpq_dataset_view<half, int64_t>;
 using inst_vpq_f32_view_t     = cuvs::neighbors::device_vpq_dataset_view<float, int64_t>;
@@ -36,7 +36,7 @@ void build_knn_graph(raft::resources const& handle,
 auto build(raft::resources const& handle,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::padded_index<data_t, index_t>
+  -> cuvs::neighbors::cagra::device_padded_index<data_t, index_t>
 {
   auto padded = cuvs::neighbors::make_device_padded_dataset_view(handle, dataset);
   return cuvs::neighbors::cagra::build(handle, params, padded);

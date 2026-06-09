@@ -302,7 +302,7 @@ void add_graph_nodes(
     updated_graph_view.data_handle(), initial_dataset_size, degree);
   raft::copy(handle, updated_graph_prefix, raft::make_const_mdspan(index.graph()));
 
-  using padded_view_t = cuvs::neighbors::padded_dataset_view_t<T, int64_t>;
+  using padded_view_t = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
   auto zero_row       = raft::make_device_matrix_view<const T, int64_t>(
     static_cast<const T*>(nullptr), int64_t{0}, static_cast<uint32_t>(dim));
   padded_view_t device_empty_dataset_view(zero_row, static_cast<uint32_t>(dim));

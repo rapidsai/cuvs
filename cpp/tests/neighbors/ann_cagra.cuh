@@ -59,7 +59,7 @@ void cagra_build_into_index(
   cagra::index_params const& params,
   std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host_dataset,
   cuvs::neighbors::device_padded_dataset_view<DataT, int64_t> const& padded,
-  cagra::padded_index<DataT>& index)
+  cagra::device_padded_index<DataT>& index)
 {
   if (ace_host_dataset.has_value()) {
     auto host_idx = cagra::build(res, params, *ace_host_dataset);
@@ -444,7 +444,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         {
           std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
           std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host_dataset;
-          cagra::padded_index<DataT, IdxT> index(handle_, index_params.metric);
+          cagra::device_padded_index<DataT, IdxT> index(handle_, index_params.metric);
           if (ps.host_dataset) {
             database_host.emplace(raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim));
             raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
@@ -468,7 +468,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           cagra::serialize(handle_, index_file.filename, index, ps.include_serialized_dataset);
         }
 
-        cagra::padded_index<DataT, IdxT> index(handle_);
+        cagra::device_padded_index<DataT, IdxT> index(handle_);
         std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> loaded_dataset;
         cagra::deserialize(handle_, index_file.filename, &index, &loaded_dataset);
 
@@ -652,7 +652,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host_dataset;
-        cagra::padded_index<DataT, IdxT> index(handle_);
+        cagra::device_padded_index<DataT, IdxT> index(handle_);
         if (ps.host_dataset) {
           database_host.emplace(raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim));
           raft::copy(
@@ -869,7 +869,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host_dataset;
-        cagra::padded_index<DataT, IdxT> index(handle_);
+        cagra::device_padded_index<DataT, IdxT> index(handle_);
         if (ps.host_dataset) {
           database_host.emplace(raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim));
           raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
@@ -1123,8 +1123,8 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded1(handle_,
                                                                              database1_view);
 
-        cagra::padded_index<DataT, IdxT> index0(handle_, index_params.metric);
-        cagra::padded_index<DataT, IdxT> index1(handle_, index_params.metric);
+        cagra::device_padded_index<DataT, IdxT> index0(handle_, index_params.metric);
+        cagra::device_padded_index<DataT, IdxT> index1(handle_, index_params.metric);
         std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host0, ace_host1;
         if (ps.host_dataset) {
@@ -1142,7 +1142,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         cagra_build_into_index(handle_, index_params, ace_host0, padded0.view, index0);
         cagra_build_into_index(handle_, index_params, ace_host1, padded1.view, index1);
 
-        std::vector<cuvs::neighbors::cagra::padded_index<DataT, IdxT>*> indices;
+        std::vector<cuvs::neighbors::cagra::device_padded_index<DataT, IdxT>*> indices;
         indices.push_back(&index0);
         indices.push_back(&index1);
 
@@ -1337,8 +1337,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> merge_padded1(handle_,
                                                                                    database1_view);
 
-        cagra::padded_index<DataT, IdxT> index0(handle_, index_params.metric);
-        cagra::padded_index<DataT, IdxT> index1(handle_, index_params.metric);
+        cagra::device_padded_index<DataT, IdxT> index0(handle_, index_params.metric);
+        cagra::device_padded_index<DataT, IdxT> index1(handle_, index_params.metric);
         std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         std::optional<raft::host_matrix_view<const DataT, int64_t>> ace_host0, ace_host1;
         if (ps.host_dataset) {
@@ -1369,7 +1369,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        std::vector<cagra::padded_index<DataT, IdxT>*> indices_to_merge{&index0, &index1};
+        std::vector<cagra::device_padded_index<DataT, IdxT>*> indices_to_merge{&index0, &index1};
 
         if (ps.merge_strategy == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
           auto merge_storage =

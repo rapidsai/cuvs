@@ -60,7 +60,7 @@ TEST(Issue93Reproducer, ConcurrentSearchDifferentGraphDegrees)
 
   // Build indices on the main thread (keep padded builders alive for view-based indexes).
   std::vector<cuvs::neighbors::test::padded_device_matrix_for_cagra<float>> padded_builders;
-  std::vector<cagra::padded_index<float, uint32_t>> indices;
+  std::vector<cagra::device_padded_index<float, uint32_t>> indices;
   for (int n_rows : dataset_sizes) {
     auto database = raft::make_device_matrix<float, int64_t>(handle, n_rows, dim);
     raft::random::uniform(

@@ -12,7 +12,7 @@ namespace {
 
 using data_t             = @data_type@;
 using index_t            = @index_type@;
-using inst_padded_view_t = cuvs::neighbors::padded_dataset_view_t<data_t, int64_t>;
+using inst_padded_view_t = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
 
 }  // namespace
 

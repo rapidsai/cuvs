@@ -36,26 +36,26 @@ void expect_cagra_row_width_for_graph(uint32_t logical_dim, int64_t pitch)
 }
 
 template <typename T, typename IdxT>
-  requires is_padded_dataset_view_v<padded_dataset_view_t<T, IdxT>>
-auto convert_dataset_view_to_padded_for_graph_build(padded_dataset_view_t<T, IdxT> const& view)
-  -> padded_dataset_view_t<T, IdxT>
+  requires is_padded_dataset_view_v<device_padded_dataset_view<T, IdxT>>
+auto convert_dataset_view_to_padded_for_graph_build(device_padded_dataset_view<T, IdxT> const& view)
+  -> device_padded_dataset_view<T, IdxT>
 {
   expect_cagra_row_width_for_graph<T>(view.dim(), static_cast<int64_t>(view.stride()));
   return view;
 }
 
 template <typename T, typename IdxT>
-  requires is_empty_dataset_view_v<empty_dataset_view_t<IdxT>>
-auto convert_dataset_view_to_padded_for_graph_build(empty_dataset_view_t<IdxT> const&)
-  -> padded_dataset_view_t<T, IdxT>
+  requires is_empty_dataset_view_v<device_empty_dataset_view<IdxT>>
+auto convert_dataset_view_to_padded_for_graph_build(device_empty_dataset_view<IdxT> const&)
+  -> device_padded_dataset_view<T, IdxT>
 {
   RAFT_FAIL("cagra::build: empty dataset.");
 }
 
 template <typename T, typename IdxT, typename MathT>
-  requires is_vpq_dataset_view_v<vpq_dataset_view_t<MathT, IdxT>>
-auto convert_dataset_view_to_padded_for_graph_build(vpq_dataset_view_t<MathT, IdxT> const&)
-  -> padded_dataset_view_t<T, IdxT>
+  requires is_vpq_dataset_view_v<device_vpq_dataset_view<MathT, IdxT>>
+auto convert_dataset_view_to_padded_for_graph_build(device_vpq_dataset_view<MathT, IdxT> const&)
+  -> device_padded_dataset_view<T, IdxT>
 {
   RAFT_FAIL(
     "cagra::build: VPQ-compressed dataset cannot be converted to padded dense rows for graph "
@@ -63,7 +63,7 @@ auto convert_dataset_view_to_padded_for_graph_build(vpq_dataset_view_t<MathT, Id
 }
 
 template <typename T, typename IdxT>
-auto dataset_view_to_strided_device_matrix(padded_dataset_view_t<T, IdxT> const& view)
+auto dataset_view_to_strided_device_matrix(device_padded_dataset_view<T, IdxT> const& view)
   -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
 {
   return raft::make_device_strided_matrix_view<const T, int64_t>(
@@ -71,7 +71,7 @@ auto dataset_view_to_strided_device_matrix(padded_dataset_view_t<T, IdxT> const&
 }
 
 template <typename T, typename IdxT>
-auto dataset_view_to_strided_device_matrix(vpq_dataset_view_t<half, IdxT> const& view)
+auto dataset_view_to_strided_device_matrix(device_vpq_dataset_view<half, IdxT> const& view)
   -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
 {
   auto d = view.dim();
@@ -79,7 +79,7 @@ auto dataset_view_to_strided_device_matrix(vpq_dataset_view_t<half, IdxT> const&
 }
 
 template <typename T, typename IdxT>
-auto dataset_view_to_strided_device_matrix(vpq_dataset_view_t<float, IdxT> const& view)
+auto dataset_view_to_strided_device_matrix(device_vpq_dataset_view<float, IdxT> const& view)
   -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
 {
   auto d = view.dim();
@@ -87,7 +87,7 @@ auto dataset_view_to_strided_device_matrix(vpq_dataset_view_t<float, IdxT> const
 }
 
 template <typename T, typename IdxT>
-auto dataset_view_to_strided_device_matrix(empty_dataset_view_t<IdxT> const& view)
+auto dataset_view_to_strided_device_matrix(device_empty_dataset_view<IdxT> const& view)
   -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
 {
   auto d = view.dim();

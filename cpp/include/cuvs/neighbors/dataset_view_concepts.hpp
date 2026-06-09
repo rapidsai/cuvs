@@ -28,15 +28,6 @@ concept cagra_dataset_view = requires(V const& v) {
   { v.dim() } -> std::convertible_to<uint32_t>;
 };
 
-template <typename DataT, typename IdxT>
-using padded_dataset_view_t = device_padded_dataset_view<DataT, IdxT>;
-
-template <typename MathT, typename IdxT>
-using vpq_dataset_view_t = device_vpq_dataset_view<MathT, IdxT>;
-
-template <typename IdxT>
-using empty_dataset_view_t = device_empty_dataset_view<IdxT>;
-
 enum class dataset_view_kind {
   // TODO(removal): Remove `unknown` once all deprecated host_matrix_view / device_matrix_view /
   // mdspan overloads are deleted. It exists solely so that overload resolution on the deprecated
@@ -229,7 +220,7 @@ struct cagra_view_element_type<host_padded_dataset_view<DataT, IdxT>> {
 };
 
 template <typename MathT, typename IdxT>
-struct cagra_view_element_type<vpq_dataset_view_t<MathT, IdxT>> {
+struct cagra_view_element_type<device_vpq_dataset_view<MathT, IdxT>> {
   using type = MathT;
 };
 

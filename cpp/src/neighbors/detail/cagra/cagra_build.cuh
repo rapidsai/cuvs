@@ -2096,7 +2096,7 @@ auto iterative_build_graph(raft::resources const& res,
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> sub_padded(dev_dataset_view,
                                                                        logical_dim);
 
-    auto idx = cuvs::neighbors::cagra::padded_index<T, IdxT>(
+    auto idx = cuvs::neighbors::cagra::device_padded_index<T, IdxT>(
       res, params.metric, sub_padded, raft::make_const_mdspan(cagra_graph.view()));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(

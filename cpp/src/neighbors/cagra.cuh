@@ -112,7 +112,7 @@ void index<T, IdxT, DatasetViewT>::compute_dataset_norms_(raft::resources const&
  *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
  *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
- *   auto index = cagra::index<T, IdxT, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(
+ *   auto index = cagra::index<T, IdxT, cuvs::neighbors::device_padded_dataset_view<T, int64_t>>(
  *     res, build_params.metric(), dataset, optimized_graph.view());
  * @endcode
  *
@@ -170,7 +170,7 @@ void build_knn_graph(
  *   auto optimized_gaph      = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), 64);
  *   cagra::optimize(res, dataset, nn_descent_index.graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
- *   auto index = cagra::padded_index<T, IdxT>(res, build_params.metric(), dataset,
+ *   auto index = cagra::device_padded_index<T, IdxT>(res, build_params.metric(), dataset,
  *                                           optimized_graph.view());
  * @endcode
  *
@@ -216,7 +216,7 @@ void build_knn_graph(
  *   // optimize graph
  *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
- *   auto index = cagra::index<T, IdxT, cuvs::neighbors::padded_dataset_view_t<T, int64_t>>(
+ *   auto index = cagra::index<T, IdxT, cuvs::neighbors::device_padded_dataset_view<T, int64_t>>(
  *     res, build_params.metric(), dataset, optimized_graph.view());
  * @endcode
  *
@@ -285,44 +285,34 @@ void optimize(
 }
 
 /**
- * @brief Build the index from a device `dataset_view` (padded or VPQ).
+ * @brief Build the index from a `dataset_view` (device padded, device VPQ, or host padded).
  *
- * Graph construction uses `convert_dataset_view_to_padded_for_graph_build`. The returned index
- * contains only the optimized graph; call `index::update_dataset(res, dataset)` before search.
+ * For device views, graph construction uses `build_from_device_matrix`; the returned index
+ * contains only the optimized graph — call `index::update_dataset(res, dataset)` before search.
+ * For host views, the returned index is typed on the host view — call
+ * `attach_device_dataset_on_host_index` before search to convert to a device index and attach a
+ * device dataset.
  */
 template <typename DatasetViewT>
-  requires(cuvs::neighbors::is_device_dataset_view_v<DatasetViewT> &&
-           !cuvs::neighbors::is_device_empty_dataset_view_v<DatasetViewT>)
+  requires(!cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT> &&
+           (cuvs::neighbors::is_device_dataset_view_v<DatasetViewT> ||
+            cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>))
 auto build(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)
   -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
 {
   using T    = cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>;
   using IdxT = uint32_t;
-  return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
-    res, params, dataset);
-}
-
-/**
- * @brief Build the index from a host `dataset_view` (non-owning).
- *
- * Graph construction runs on device internally; the returned index is typed on the host view.
- * Call `attach_device_dataset_on_host_index` before search to attach a device dataset.
- */
-template <typename DatasetViewT>
-  requires(cuvs::neighbors::is_host_dataset_view_v<DatasetViewT> &&
-           !cuvs::neighbors::is_host_empty_dataset_view_v<DatasetViewT>)
-auto build(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)
-  -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
-{
-  using T    = cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>;
-  using IdxT = uint32_t;
-  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
-    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT, DatasetViewT>(
+  if constexpr (cuvs::neighbors::is_device_dataset_view_v<DatasetViewT>) {
+    return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
+      res, params, dataset);
+  } else {
+    if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+      return cuvs::neighbors::cagra::detail::build_ace<T, IdxT, DatasetViewT>(
+        res, params, dataset.view());
+    }
+    return cuvs::neighbors::cagra::detail::build_from_host_matrix<T, IdxT, DatasetViewT>(
       res, params, dataset.view());
   }
-  // host_padded_dataset_view::view() → host_matrix_view, which build_from_host_matrix expects
-  return cuvs::neighbors::cagra::detail::build_from_host_matrix<T, IdxT, DatasetViewT>(
-    res, params, dataset.view());
 }
 
 /**
