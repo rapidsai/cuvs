@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+#include "../ann_cagra.cuh"
+
 #include <cuvs/core/bitset.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
@@ -169,6 +171,82 @@ class CagraUdfFilterTest : public ::testing::TestWithParam<cagra::search_algo> {
   std::optional<cagra::index<float, uint32_t>> index         = std::nullopt;
 };
 
+class CagraUdfFilterHalfTest : public ::testing::TestWithParam<cagra::search_algo> {
+ protected:
+  void SetUp() override
+  {
+    dataset.emplace(raft::make_device_matrix<half, int64_t>(res, n_rows, n_dim));
+    queries.emplace(raft::make_device_matrix<half, int64_t>(res, n_queries, n_dim));
+
+    raft::random::RngState rng(1234ULL);
+    InitDataset(res,
+                dataset->data_handle(),
+                static_cast<std::uint32_t>(n_rows),
+                static_cast<std::uint32_t>(n_dim),
+                cuvs::distance::DistanceType::L2Expanded,
+                rng);
+    InitDataset(res,
+                queries->data_handle(),
+                static_cast<std::uint32_t>(n_queries),
+                static_cast<std::uint32_t>(n_dim),
+                cuvs::distance::DistanceType::L2Expanded,
+                rng);
+
+    cagra::index_params index_params;
+    index_params.metric                    = cuvs::distance::DistanceType::L2Expanded;
+    index_params.graph_degree              = 32;
+    index_params.intermediate_graph_degree = 64;
+    index_params.graph_build_params =
+      cagra::graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+
+    index.emplace(cagra::build(res, index_params, raft::make_const_mdspan(dataset->view())));
+    raft::resource::sync_stream(res);
+  }
+
+  void TearDown() override
+  {
+    index.reset();
+    queries.reset();
+    dataset.reset();
+    raft::resource::sync_stream(res);
+  }
+
+  cagra_search_result search(cuvs::neighbors::filtering::base_filter const& filter,
+                             float filtering_rate = -1.0f)
+  {
+    auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(res, n_queries, k);
+    auto distances = raft::make_device_matrix<float, int64_t>(res, n_queries, k);
+
+    cagra::search_params search_params;
+    search_params.algo              = GetParam();
+    search_params.itopk_size        = 64;
+    search_params.max_queries       = 2;
+    search_params.thread_block_size = 256;
+    search_params.filtering_rate    = filtering_rate;
+
+    cagra::search(res,
+                  search_params,
+                  *index,
+                  raft::make_const_mdspan(queries->view()),
+                  neighbors.view(),
+                  distances.view(),
+                  filter);
+
+    auto stream = raft::resource::get_cuda_stream(res);
+    cagra_search_result result{std::vector<uint32_t>(n_queries * k),
+                               std::vector<float>(n_queries * k)};
+    raft::copy(result.neighbors.data(), neighbors.data_handle(), result.neighbors.size(), stream);
+    raft::copy(result.distances.data(), distances.data_handle(), result.distances.size(), stream);
+    raft::resource::sync_stream(res);
+    return result;
+  }
+
+  raft::resources res;
+  std::optional<raft::device_matrix<half, int64_t>> dataset = std::nullopt;
+  std::optional<raft::device_matrix<half, int64_t>> queries = std::nullopt;
+  std::optional<cagra::index<half, uint32_t>> index         = std::nullopt;
+};
+
 TEST_P(CagraUdfFilterTest, AcceptAllMatchesNoFilter)
 {
   cuvs::neighbors::filtering::none_sample_filter no_filter;
@@ -178,6 +256,20 @@ TEST_P(CagraUdfFilterTest, AcceptAllMatchesNoFilter)
   auto actual = search(udf_filter);
 
   expect_same_results(expected, actual);
+}
+
+TEST_P(CagraUdfFilterHalfTest, ThresholdReturnsOnlyValidNeighbors)
+{
+  float const filtering_rate = static_cast<float>(threshold) / static_cast<float>(n_rows);
+  cuvs::neighbors::filtering::udf_filter udf_filter(
+    threshold_udf_source(), nullptr, filtering_rate);
+  auto result = search(udf_filter, filtering_rate);
+
+  for (auto source_id : result.neighbors) {
+    if (source_id < static_cast<uint32_t>(n_rows)) {
+      EXPECT_GE(source_id, static_cast<uint32_t>(threshold));
+    }
+  }
 }
 
 TEST_P(CagraUdfFilterTest, RejectAllReturnsNoValidNeighbors)
@@ -285,6 +377,12 @@ TEST_P(CagraUdfFilterTest, TenantContextHonorsQuerySpecificMetadata)
 
 INSTANTIATE_TEST_CASE_P(CagraUdfFilters,
                         CagraUdfFilterTest,
+                        ::testing::Values(cagra::search_algo::SINGLE_CTA,
+                                          cagra::search_algo::MULTI_CTA,
+                                          cagra::search_algo::MULTI_KERNEL));
+
+INSTANTIATE_TEST_CASE_P(CagraUdfFilterHalf,
+                        CagraUdfFilterHalfTest,
                         ::testing::Values(cagra::search_algo::SINGLE_CTA,
                                           cagra::search_algo::MULTI_CTA,
                                           cagra::search_algo::MULTI_KERNEL));
