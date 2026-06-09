@@ -33,12 +33,12 @@ typedef enum {
 Returns a string describing the last seen error on this thread, or NULL if the last function succeeded.
 
 ```c
-CUVS_EXPORT const char* cuvsGetLastErrorText();
+const char* cuvsGetLastErrorText();
 ```
 
 **Returns**
 
-`CUVS_EXPORT const char*`
+`const char*`
 
 <a id="cuvssetlasterrortext"></a>
 ### cuvsSetLastErrorText
@@ -46,7 +46,7 @@ CUVS_EXPORT const char* cuvsGetLastErrorText();
 Sets a string describing an error seen on the thread. Passing NULL clears any previously seen error message.
 
 ```c
-CUVS_EXPORT void cuvsSetLastErrorText(const char* error);
+void cuvsSetLastErrorText(const char* error);
 ```
 
 **Parameters**
@@ -57,7 +57,7 @@ CUVS_EXPORT void cuvsSetLastErrorText(const char* error);
 
 **Returns**
 
-`CUVS_EXPORT void`
+`void`
 
 ## cuVS Logging
 
@@ -96,12 +96,12 @@ typedef enum {
 Returns the current log level
 
 ```c
-CUVS_EXPORT cuvsLogLevel_t cuvsGetLogLevel();
+cuvsLogLevel_t cuvsGetLogLevel();
 ```
 
 **Returns**
 
-[`CUVS_EXPORT cuvsLogLevel_t`](/api-reference/c-api-core-c-api#cuvsloglevel-t)
+[`cuvsLogLevel_t`](/api-reference/c-api-core-c-api#cuvsloglevel-t)
 
 <a id="cuvssetloglevel"></a>
 ### cuvsSetLogLevel
@@ -109,7 +109,7 @@ CUVS_EXPORT cuvsLogLevel_t cuvsGetLogLevel();
 Sets the log level
 
 ```c
-CUVS_EXPORT void cuvsSetLogLevel(cuvsLogLevel_t);
+void cuvsSetLogLevel(cuvsLogLevel_t);
 ```
 
 **Parameters**
@@ -120,7 +120,7 @@ CUVS_EXPORT void cuvsSetLogLevel(cuvsLogLevel_t);
 
 **Returns**
 
-`CUVS_EXPORT void`
+`void`
 
 ## cuVS Resources Handle
 
@@ -139,7 +139,7 @@ typedef uintptr_t cuvsResources_t;
 Create an Initialized opaque C handle for C++ type `raft::resources`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
+cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
 ```
 
 **Parameters**
@@ -150,7 +150,7 @@ CUVS_EXPORT cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsresourcesdestroy"></a>
 ### cuvsResourcesDestroy
@@ -158,7 +158,7 @@ CUVS_EXPORT cuvsError_t cuvsResourcesCreate(cuvsResources_t* res);
 Destroy and de-allocate opaque C handle for C++ type `raft::resources`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
+cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 ```
 
 **Parameters**
@@ -169,7 +169,7 @@ CUVS_EXPORT cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsstreamset"></a>
 ### cuvsStreamSet
@@ -177,7 +177,7 @@ CUVS_EXPORT cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 Set cudaStream_t on cuvsResources_t to queue CUDA kernels on APIs that accept a cuvsResources_t handle
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
+cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 ```
 
 **Parameters**
@@ -189,7 +189,7 @@ CUVS_EXPORT cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsstreamget"></a>
 ### cuvsStreamGet
@@ -197,7 +197,7 @@ CUVS_EXPORT cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 Get the cudaStream_t from a cuvsResources_t
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
+cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
 ```
 
 **Parameters**
@@ -209,7 +209,7 @@ CUVS_EXPORT cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream)
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsstreamsync"></a>
 ### cuvsStreamSync
@@ -217,7 +217,7 @@ CUVS_EXPORT cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream)
 Syncs the current CUDA stream on the resources object
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsStreamSync(cuvsResources_t res);
+cuvsError_t cuvsStreamSync(cuvsResources_t res);
 ```
 
 **Parameters**
@@ -228,7 +228,7 @@ CUVS_EXPORT cuvsError_t cuvsStreamSync(cuvsResources_t res);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsdeviceidget"></a>
 ### cuvsDeviceIdGet
@@ -236,7 +236,7 @@ CUVS_EXPORT cuvsError_t cuvsStreamSync(cuvsResources_t res);
 Get the id of the device associated with this cuvsResources_t
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
+cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 ```
 
 **Parameters**
@@ -248,7 +248,7 @@ CUVS_EXPORT cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuresourcescreate"></a>
 ### cuvsMultiGpuResourcesCreate
@@ -256,7 +256,7 @@ CUVS_EXPORT cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg` for multi-GPU operations
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
+cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
 ```
 
 **Parameters**
@@ -267,7 +267,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuresourcescreatewithdeviceids"></a>
 ### cuvsMultiGpuResourcesCreateWithDeviceIds
@@ -275,7 +275,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
 Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg` for multi-GPU operations with specific device IDs
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
 DLManagedTensor* device_ids);
 ```
 
@@ -288,7 +288,7 @@ DLManagedTensor* device_ids);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuresourcesdestroy"></a>
 ### cuvsMultiGpuResourcesDestroy
@@ -296,7 +296,7 @@ DLManagedTensor* device_ids);
 Destroy and de-allocate opaque C handle for C++ type `raft::device_resources_snmg`
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
+cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 ```
 
 **Parameters**
@@ -307,7 +307,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpuresourcessetmemorypool"></a>
 ### cuvsMultiGpuResourcesSetMemoryPool
@@ -315,7 +315,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 Set a memory pool on all devices managed by the multi-GPU resources
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_of_free_memory);
+cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_of_free_memory);
 ```
 
 **Parameters**
@@ -327,7 +327,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, 
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## cuVS Memory Allocation
 
@@ -337,7 +337,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, 
 Allocates device memory using RMM
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
+cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
 ```
 
 **Parameters**
@@ -350,7 +350,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byt
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsrmmfree"></a>
 ### cuvsRMMFree
@@ -358,7 +358,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byt
 Deallocates device memory using RMM
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
+cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
 ```
 
 **Parameters**
@@ -371,7 +371,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsrmmpoolmemoryresourceenable"></a>
 ### cuvsRMMPoolMemoryResourceEnable
@@ -379,7 +379,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes
 Switches the working memory resource to use the RMM pool memory resource, which will bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving that up for temporary memory allocations within algorithms. Be aware that this function will change the memory resource for the whole process and the new memory resource will be used until explicitly changed.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
+cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
 int max_pool_size_percent,
 bool managed);
 ```
@@ -394,7 +394,7 @@ bool managed);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsrmmmemoryresourcereset"></a>
 ### cuvsRMMMemoryResourceReset
@@ -402,12 +402,12 @@ bool managed);
 Resets the memory resource to use the default memory resource (cuda_memory_resource)
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRMMMemoryResourceReset();
+cuvsError_t cuvsRMMMemoryResourceReset();
 ```
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsrmmhostalloc"></a>
 ### cuvsRMMHostAlloc
@@ -415,7 +415,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMMemoryResourceReset();
 Allocates pinned memory on the host using RMM
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
+cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
 ```
 
 **Parameters**
@@ -427,7 +427,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsrmmhostfree"></a>
 ### cuvsRMMHostFree
@@ -435,7 +435,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
 Deallocates pinned memory on the host using RMM
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
+cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 ```
 
 **Parameters**
@@ -447,7 +447,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsversionget"></a>
 ### cuvsVersionGet
@@ -455,7 +455,7 @@ CUVS_EXPORT cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 Get the version of the cuVS library
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
+cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
 ```
 
 **Parameters**
@@ -468,7 +468,7 @@ CUVS_EXPORT cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmatrixcopy"></a>
 ### cuvsMatrixCopy
@@ -476,7 +476,7 @@ CUVS_EXPORT cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_
 Copy a matrix
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
+cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
 ```
 
 This function copies a matrix from dst to src. This lets you copy a matrix from device memory to host memory (or vice versa), while accounting for differences in strides.
@@ -493,7 +493,7 @@ Both src and dst must have the same shape and dtype, but can have different stri
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmatrixslicerows"></a>
 ### cuvsMatrixSliceRows
@@ -501,7 +501,7 @@ Both src and dst must have the same shape and dtype, but can have different stri
 Slices rows from a matrix
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMatrixSliceRows(
+cuvsError_t cuvsMatrixSliceRows(
 cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManagedTensor* dst);
 ```
 
@@ -517,4 +517,4 @@ cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManaged
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
