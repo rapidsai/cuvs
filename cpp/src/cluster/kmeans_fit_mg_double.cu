@@ -52,10 +52,7 @@ void fit(raft::resources const& handle,
     handle, params, X_parts, sample_weight_parts, centroids, inertia, n_iter);
 }
 
-// ---------------------------------------------------------------------------
 // Single-mdspan convenience overloads.
-// ---------------------------------------------------------------------------
-
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const double, int> X,

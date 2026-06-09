@@ -217,7 +217,8 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
     }
   }
 
-  comms.allreduce(sampled_rows.data_handle(), sampled_rows.data_handle(), sampled_rows.size());
+  comms.reduce(
+    sampled_rows.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), KMEANS_COMM_ROOT);
   return sampled_rows;
 }
 
@@ -250,7 +251,11 @@ void init_centroids_for_mg_batched(
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
     auto sampled_rows = sample_global_rows<DataT, IndexT, Accessor>(
       handle, params, X_parts, n_features, n_clusters, rank, rank_counts, global_n, comms);
-    raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
+    if (rank == KMEANS_COMM_ROOT) {
+      raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
+    }
+    comms.bcast(
+      centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
     IndexT init_sample_size = get_global_kmeanspp_init_sample_size(params, global_n, n_clusters);
     auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(

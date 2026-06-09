@@ -102,6 +102,22 @@ class mnmg_comms {
     }
   }
 
+  template <typename T>
+  void reduce(T* sendbuf,
+              T* recvbuf,
+              std::size_t count,
+              int root,
+              raft::comms::op_t op = raft::comms::op_t::SUM) const
+  {
+    if (use_nccl_) {
+      RAFT_NCCL_TRY(ncclReduce(
+        sendbuf, recvbuf, count, nccl_dtype<T>(), nccl_op(op), root, nccl_comm_, stream_));
+    } else {
+      const auto& comm = raft::resource::get_comms(dev_res_);
+      comm.reduce(sendbuf, recvbuf, count, op, root, stream_);
+    }
+  }
+
   void group_start() const
   {
     if (use_nccl_) { RAFT_NCCL_TRY(ncclGroupStart()); }
