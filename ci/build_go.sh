@@ -20,6 +20,8 @@ rapids-dependency-file-generator \
   --prepend-channel "${CPP_CHANNEL}" \
   | tee env.yaml
 
+source ./ci/use_conda_packages_from_prs.sh
+
 rapids-mamba-retry env create --yes -f env.yaml -n go
 
 # seeing failures on activating the environment here on unbound locals

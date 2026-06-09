@@ -9,6 +9,8 @@ source rapids-init-pip
 # Delete system libnccl.so to ensure the wheel is used
 rm -rf /usr/lib64/libnccl*
 
+source ./ci/use_wheels_from_prs.sh
+
 LIBCUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-artifact-name wheel_cpp libcuvs cuvs --cuda "$RAPIDS_CUDA_VERSION")")
 CUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-artifact-name wheel_python cuvs cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
 

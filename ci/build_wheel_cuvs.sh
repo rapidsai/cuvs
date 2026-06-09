@@ -15,6 +15,8 @@ RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")"
 #
 # env variable 'PIP_CONSTRAINT' is set up by rapids-init-pip. It constrains all subsequent
 # 'pip install', 'pip download', etc. calls (except those used in 'pip wheel', handled separately in build scripts)
+source ./ci/use_wheels_from_prs.sh
+
 LIBCUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-artifact-name wheel_cpp libcuvs cuvs --cuda "$RAPIDS_CUDA_VERSION")")
 echo "libcuvs-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo "${LIBCUVS_WHEELHOUSE}"/libcuvs_*.whl)" >> "${PIP_CONSTRAINT}"
 
