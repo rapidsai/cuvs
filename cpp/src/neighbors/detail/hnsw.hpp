@@ -878,6 +878,9 @@ void write_layered_base_links_from_disk(const cuvs::neighbors::cagra::index<T, I
                                 graph_npy.header_size + source_start * graph_row_bytes);
     graph_bytes_read += batch_bytes;
 
+    // Rows stay in source (ACE-reordered) order so the artifact is written sequentially on the
+    // build node. Each row records its original ID in base_nodes and remaps its neighbors to
+    // original IDs. The search node scatters each row into get_linklist0(original_id) on load.
     bool invalid_neighbor = false;
 #pragma omp parallel for reduction(|| : invalid_neighbor)
     for (int64_t batch_idx = 0; batch_idx < static_cast<int64_t>(current_batch_size); ++batch_idx) {
@@ -1123,6 +1126,9 @@ auto serialize_to_layered_hnsw_from_disk(
           std::fill(link_buffer.begin(),
                     link_buffer.begin() + current_batch_size * metadata.upper_link_row_bytes,
                     0);
+        // Upper-layer rows stay in promoted (per-level) order for sequential writes. node_buffer
+        // records each node's original ID and neighbors are remapped to original IDs. The search
+        // node scatters each row into get_linklist(original_id, level) on load.
 #pragma omp parallel for
           for (int64_t batch_idx = 0; batch_idx < static_cast<int64_t>(current_batch_size);
                ++batch_idx) {

@@ -28,8 +28,7 @@ auto parse_build_param(const nlohmann::json& conf) ->
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
     } else if (conf.at("hierarchy") == "gpu") {
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
-    } else if (conf.at("hierarchy") == "gpu_layered_on_disk" ||
-               conf.at("hierarchy") == "gpu_layered" || conf.at("hierarchy") == "layered") {
+    } else if (conf.at("hierarchy") == "gpu_layered_on_disk") {
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU_LAYERED_ON_DISK;
     } else {
       THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
