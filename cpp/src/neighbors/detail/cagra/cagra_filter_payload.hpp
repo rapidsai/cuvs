@@ -15,16 +15,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <memory>
+#include <list>
 #include <mutex>
 #include <type_traits>
 #include <unordered_map>
-#include <vector>
 
 namespace cuvs::neighbors::cagra::detail {
-
-template <typename SourceIndexT>
-using cagra_filter_data_storage = ::cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT>;
 
 template <typename PayloadT>
 std::uint64_t cagra_payload_hash(PayloadT const& payload)
@@ -112,19 +108,19 @@ struct cagra_device_payload_owner {
     // Keep cached payload copies for process lifetime to avoid per-search allocation/copy churn.
     // Cross-stream reuse is ordered by each state's ready_event before kernels consume the pointer.
     const auto key = cache_key{cagra_payload_hash(payload), device};
-    std::shared_ptr<state> selected_state;
+    state* selected_state{};
     {
       std::lock_guard<std::mutex> lock(cache_mutex_);
       auto& entries = cache_[key];
-      for (auto const& cached : entries) {
-        if (std::memcmp(&cached->host_payload, &payload, sizeof(PayloadT)) == 0) {
-          selected_state = cached;
+      for (auto& cached : entries) {
+        if (std::memcmp(&cached.host_payload, &payload, sizeof(PayloadT)) == 0) {
+          selected_state = &cached;
           break;
         }
       }
       if (selected_state == nullptr) {
-        selected_state = std::make_shared<state>(payload);
-        entries.push_back(selected_state);
+        entries.emplace_back(payload);
+        selected_state = &entries.back();
       }
     }
 
@@ -133,7 +129,7 @@ struct cagra_device_payload_owner {
 
  private:
   mutable std::mutex cache_mutex_;
-  mutable std::unordered_map<cache_key, std::vector<std::shared_ptr<state>>, cache_key_hash> cache_;
+  mutable std::unordered_map<cache_key, std::list<state>, cache_key_hash> cache_;
 };
 
 template <typename T>
@@ -150,10 +146,11 @@ template <>
 struct is_udf_filter<::cuvs::neighbors::filtering::udf_filter> : std::true_type {};
 
 template <typename SourceIndexT, typename FilterT>
-cagra_filter_data_storage<SourceIndexT> make_cagra_filter_data_storage(const FilterT& filter)
+::cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> make_cagra_bitset_filter_storage(
+  const FilterT& filter)
 {
   const auto bitset_view = filter.view();
-  return cagra_filter_data_storage<SourceIndexT>{
+  return ::cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT>{
     const_cast<std::uint32_t*>(bitset_view.data()),
     static_cast<SourceIndexT>(bitset_view.size()),
     static_cast<SourceIndexT>(bitset_view.get_original_nbits())};
@@ -167,14 +164,19 @@ void* get_cagra_device_payload(PayloadT payload, cudaStream_t stream)
 }
 
 template <typename SourceIndexT, typename FilterT>
+void* make_cagra_bitset_filter_payload(const FilterT& filter, cudaStream_t stream)
+{
+  return get_cagra_device_payload(make_cagra_bitset_filter_storage<SourceIndexT>(filter), stream);
+}
+
+template <typename SourceIndexT, typename FilterT>
 void fill_cagra_sample_filter(cagra_sample_filter<SourceIndexT>& out,
                               const FilterT& filter,
                               cudaStream_t stream)
 {
   using DecayedFilter = std::decay_t<FilterT>;
   if constexpr (is_bitset_filter<DecayedFilter>::value) {
-    out.filter_data = get_cagra_device_payload(make_cagra_filter_data_storage<SourceIndexT>(filter),
-                                               stream);
+    out.filter_data = make_cagra_bitset_filter_payload<SourceIndexT>(filter, stream);
   } else if constexpr (is_udf_filter<DecayedFilter>::value) {
     out.filter_data = filter.filter_data;
   }
@@ -185,7 +187,7 @@ std::uint64_t cagra_filter_payload_hash(const FilterT& filter)
 {
   using DecayedFilter = std::decay_t<FilterT>;
   if constexpr (is_bitset_filter<DecayedFilter>::value) {
-    return cagra_payload_hash(make_cagra_filter_data_storage<SourceIndexT>(filter));
+    return cagra_payload_hash(make_cagra_bitset_filter_storage<SourceIndexT>(filter));
   } else if constexpr (requires { filter.filter; }) {
     return cagra_filter_payload_hash<SourceIndexT>(filter.filter);
   } else {
