@@ -39,7 +39,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::device_matrix_view<const int64_t, int64_t, raft::row_major>` | indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | device matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | device matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -75,7 +75,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::device_matrix_view<const uint32_t, int64_t, raft::row_major>` | indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>` | device matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | device matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -111,7 +111,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::device_matrix_view<const int64_t, int64_t, raft::row_major>` | indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | device matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | device matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -147,7 +147,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::device_matrix_view<const int64_t, int64_t, raft::row_major>` | indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | device matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | device matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -183,7 +183,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::device_matrix_view<const int64_t, int64_t, raft::row_major>` | indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | device matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::device_matrix_view<float, int64_t, raft::row_major>` | device matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -219,7 +219,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::host_matrix_view<const int64_t, int64_t, raft::row_major>` | host matrix with indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::host_matrix_view<int64_t, int64_t, raft::row_major>` | host matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | host matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -255,7 +255,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::host_matrix_view<const uint32_t, int64_t, raft::row_major>` | host matrix with indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::host_matrix_view<uint32_t, int64_t, raft::row_major>` | host matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | host matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -291,7 +291,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::host_matrix_view<const int64_t, int64_t, raft::row_major>` | host matrix with indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::host_matrix_view<int64_t, int64_t, raft::row_major>` | host matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | host matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -327,7 +327,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::host_matrix_view<const int64_t, int64_t, raft::row_major>` | host matrix with indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::host_matrix_view<int64_t, int64_t, raft::row_major>` | host matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | host matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 
@@ -363,7 +363,7 @@ Example usage
 | `neighbor_candidates` | in | `raft::host_matrix_view<const int64_t, int64_t, raft::row_major>` | host matrix with indices of candidate vectors [n_queries, n_candidates], where n_candidates &gt;= k |
 | `indices` | out | `raft::host_matrix_view<int64_t, int64_t, raft::row_major>` | host matrix that stores the refined indices [n_queries, k] |
 | `distances` | out | `raft::host_matrix_view<float, int64_t, raft::row_major>` | host matrix that stores the refined distances [n_queries, k] |
-| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
+| `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use. Euclidean (L2) is used by default<br />Default: `cuvs::distance::DistanceType::L2Unexpanded`. |
 
 **Returns**
 

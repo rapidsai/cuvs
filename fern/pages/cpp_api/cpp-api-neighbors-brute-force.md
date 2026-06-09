@@ -567,7 +567,7 @@ The serialization format can be subject to changes, therefore loading an index s
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
 | `index` | in | [`const cuvs::neighbors::brute_force::index<half, float>&`](/api-reference/cpp-api-neighbors-brute-force#neighbors-brute-force-index) | brute force index |
-| `include_dataset` | in | `bool` | whether to include the dataset in the serialized output Default: `true`. |
+| `include_dataset` | in | `bool` | whether to include the dataset in the serialized output<br />Default: `true`. |
 
 **Returns**
 
@@ -599,7 +599,7 @@ The serialization format can be subject to changes, therefore loading an index s
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `filename` | in | `const std::string&` | the file name for saving the index |
 | `index` | in | [`const cuvs::neighbors::brute_force::index<float, float>&`](/api-reference/cpp-api-neighbors-brute-force#neighbors-brute-force-index) | brute force index |
-| `include_dataset` | in | `bool` | whether to include the dataset in the serialized output Default: `true`. |
+| `include_dataset` | in | `bool` | whether to include the dataset in the serialized output<br />Default: `true`. |
 
 **Returns**
 
@@ -625,7 +625,7 @@ The serialization format can be subject to changes, therefore loading an index s
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
 | `index` | in | [`const cuvs::neighbors::brute_force::index<half, float>&`](/api-reference/cpp-api-neighbors-brute-force#neighbors-brute-force-index) | brute force index |
-| `include_dataset` | in | `bool` | Whether or not to write out the dataset to the file. Default: `true`. |
+| `include_dataset` | in | `bool` | Whether or not to write out the dataset to the file.<br />Default: `true`. |
 
 **Returns**
 
@@ -651,7 +651,7 @@ The serialization format can be subject to changes, therefore loading an index s
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `os` | in | `std::ostream&` | output stream |
 | `index` | in | [`const cuvs::neighbors::brute_force::index<float, float>&`](/api-reference/cpp-api-neighbors-brute-force#neighbors-brute-force-index) | brute force index |
-| `include_dataset` | in | `bool` | Whether or not to write out the dataset to the file. Default: `true`. |
+| `include_dataset` | in | `bool` | Whether or not to write out the dataset to the file.<br />Default: `true`. |
 
 **Returns**
 
