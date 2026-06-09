@@ -62,7 +62,9 @@ void cagra_build_into_index(
   cagra::device_padded_index<DataT>& index)
 {
   if (ace_host_dataset.has_value()) {
-    auto host_idx = cagra::build(res, params, *ace_host_dataset);
+    cuvs::neighbors::host_padded_dataset_view<DataT, int64_t> host_view(
+      *ace_host_dataset, static_cast<uint32_t>(ace_host_dataset->extent(1)));
+    auto host_idx = cagra::build(res, params, host_view);
     // In-memory ACE returns graph-only; attach device padded storage for search.
     index = cagra::attach_device_dataset_on_host_index(res, host_idx, padded);
     return;

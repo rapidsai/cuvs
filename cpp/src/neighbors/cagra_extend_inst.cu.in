@@ -8,9 +8,9 @@
 
 namespace {
 
-using data_t             = @data_type@;
-using index_t            = @index_type@;
-using inst_padded_view_t = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
+using data_t                    = @data_type@;
+using index_t                   = @index_type@;
+using inst_device_padded_view_t = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
 
 }  // namespace
 
@@ -40,8 +40,8 @@ namespace cuvs::neighbors::cagra {
       handle, params, additional_dataset, index, ndv, ngv);                                 \
   }
 
-CUVS_INST_CAGRA_EXTEND_DEVICE(data_t, index_t, inst_padded_view_t);
-CUVS_INST_CAGRA_EXTEND_HOST(data_t, index_t, inst_padded_view_t);
+CUVS_INST_CAGRA_EXTEND_DEVICE(data_t, index_t, inst_device_padded_view_t);
+CUVS_INST_CAGRA_EXTEND_HOST(data_t, index_t, inst_device_padded_view_t);
 
 #undef CUVS_INST_CAGRA_EXTEND_HOST
 #undef CUVS_INST_CAGRA_EXTEND_DEVICE

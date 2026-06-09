@@ -28,14 +28,29 @@ void typed_search(raft::resources const& res,
 }
 }  // namespace cuvs::neighbors::ivf_pq
 
+namespace {
+// Wrapper with the exact signature expected by upstream_build_function_type<device_padded_index>.
+// cagra::build is now a template (no concrete device_matrix_view overload), so it cannot be
+// passed as a plain function pointer; this wrapper bridges the gap.
+cuvs::neighbors::cagra::device_padded_index<float, uint32_t> cagra_build_for_tiered(
+  raft::resources const& res,
+  cuvs::neighbors::cagra::index_params const& params,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+{
+  cuvs::neighbors::device_padded_dataset_view<float, int64_t> view(
+    dataset, static_cast<uint32_t>(dataset.extent(1)));
+  return cuvs::neighbors::cagra::build(res, params, view);
+}
+}  // namespace
+
 namespace cuvs::neighbors::tiered_index {
 auto build(raft::resources const& res,
            const index_params<cagra::index_params>& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> tiered_index::index<cagra::device_padded_index<float, uint32_t>>
 {
-  auto state =
-    detail::build<cagra::device_padded_index<float, uint32_t>>(res, params, cagra::build, dataset);
+  auto state = detail::build<cagra::device_padded_index<float, uint32_t>>(
+    res, params, cagra_build_for_tiered, dataset);
   return cuvs::neighbors::tiered_index::index<cagra::device_padded_index<float, uint32_t>>(state);
 }
 

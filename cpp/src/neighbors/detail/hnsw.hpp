@@ -1309,7 +1309,11 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     ace_params.ef_construction);
 
   // Build CAGRA index using ACE (returns host_padded_index; graph-only for in-memory ACE).
-  auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
+  // Wrap in host_padded_dataset_view directly: ACE graph build is CPU-side and does not require
+  // CUDA row-alignment. The device dataset is padded separately below.
+  cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_padded_view(
+    dataset, static_cast<uint32_t>(dataset.extent(1)));
+  auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, host_padded_view);
   // Attach a device dataset so from_cagra (which expects device_padded_index) can read vectors.
   auto ace_device_padded = cuvs::neighbors::make_device_padded_dataset(res, dataset);
   auto ace_index         = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(

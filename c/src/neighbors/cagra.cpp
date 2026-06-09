@@ -236,7 +236,11 @@ void _build(cuvsResources_t res,
     if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
           index_params.graph_build_params)) {
       // build returns host_padded_index; convert graph to device device_padded_index for the holder.
-      auto host_idx  = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+      // Construct the host padded view directly from the tight DLPack mdspan: ACE graph build is
+      // host-side CPU work and does not require CUDA row-alignment.
+      cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_view(
+        mds, static_cast<uint32_t>(mds.extent(1)));
+      auto host_idx = cuvs::neighbors::cagra::build(*res_ptr, index_params, host_view);
       auto device_idx = cuvs::neighbors::cagra::convert_host_to_device_index(*res_ptr, host_idx);
       std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_owner = nullptr;
       if (host_idx.dataset_fd().has_value()) {
