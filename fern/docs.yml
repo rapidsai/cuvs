@@ -259,6 +259,7 @@ navigation:
       - page: "Contributing"
         path: "./pages/contributing.md"
   - section: "API Reference"
+    path: "./pages/api_reference.md"
     contents:
       - section: "C API Documentation"
         path: "./pages/c_api/index.md"
