@@ -173,7 +173,8 @@ void batched_insert_vamana(
 
   int align_padding = raft::alignTo(dim, 16) - dim;
 
-  auto s_coords_mem = raft::make_device_mdarray<T>(
+  using QueryCoordT = typename greedy_search_query_coord<T>::type;
+  auto s_coords_mem = raft::make_device_mdarray<QueryCoordT>(
     res,
     raft::resource::get_large_workspace_resource_ref(res),
     raft::make_extents<int64_t>(min(maxBlocks, max(max_batchsize, reverse_batch)),
@@ -188,7 +189,8 @@ void batched_insert_vamana(
   SELECT_SORT_SMEM_SIZE(degree, visited_size);  // Sets sort_smem_size based on dataset
 
   // GreedySearch: per-warp shared memory (4 warps): coords, neighbor_array, candidate_queue
-  const int coords_size      = (dim + align_padding) * sizeof(T);
+  // Half datasets promote query coords to float in smem.
+  const int coords_size      = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
   const int neighbor_size    = degree * sizeof(IdxT);
   const int queue_size_bytes = queue_size * sizeof(DistPair<IdxT, accT>);
   int search_smem_total_size =

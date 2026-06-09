@@ -384,22 +384,25 @@ __forceinline__ __device__ void enqueue_all_neighbors(int num_neighbors,
 }
 
 // Warp-level version: lane 0 does insert_back, no __syncthreads
-template <typename T, typename accT, typename IdxT>
+template <typename QueryT, typename DataT, typename accT, typename IdxT>
 __forceinline__ __device__ void enqueue_all_neighbors_warp(int num_neighbors,
-                                                          Point<T, accT>* query_vec,
-                                                          const T* vec_ptr,
-                                                          IdxT* neighbor_array,
-                                                          PriorityQueue<IdxT, accT>& heap_queue,
-                                                          int dim,
-                                                          cuvs::distance::DistanceType metric,
-                                                          int laneId)
+                                                             Point<QueryT, accT>* query_vec,
+                                                             const DataT* vec_ptr,
+                                                             IdxT* neighbor_array,
+                                                             PriorityQueue<IdxT, accT>& heap_queue,
+                                                             int dim,
+                                                             cuvs::distance::DistanceType metric,
+                                                             int laneId)
 {
   for (int i = 0; i < num_neighbors; i++) {
-    accT dist_out = dist_warp<T, accT>(query_vec->coords,
-                                       &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)],
-                                       dim,
-                                       metric,
-                                       laneId);
+    const DataT* neighbor_vec = &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)];
+    accT dist_out;
+    if constexpr (std::is_same_v<QueryT, float> && is_cuda_fp16_v<DataT>) {
+      dist_out = dist_warp<accT>(query_vec->coords, neighbor_vec, dim, metric, laneId);
+    } else {
+      static_assert(std::is_same_v<QueryT, DataT>);
+      dist_out = dist_warp<QueryT, accT>(query_vec->coords, neighbor_vec, dim, metric, laneId);
+    }
     if (laneId == 0) { heap_queue.insert_back(dist_out, neighbor_array[i]); }
   }
 }

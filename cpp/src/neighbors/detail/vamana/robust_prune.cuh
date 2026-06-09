@@ -9,6 +9,8 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>
 
+#include <type_traits>
+
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
@@ -61,13 +63,15 @@ __global__ void RobustPruneKernel(
   int visited_size,
   cuvs::distance::DistanceType metric,
   float alpha,
-  T* s_coords_mem)
+  typename greedy_search_query_coord<T>::type* s_coords_mem)
 {
   int n      = dataset.extent(0);
   int dim    = dataset.extent(1);
   int degree = graph.extent(1);
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+
+  using QueryCoordT = typename greedy_search_query_coord<T>::type;
 
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
@@ -84,7 +88,7 @@ __global__ void RobustPruneKernel(
   DistPair<IdxT, accT>* new_nbh_list =
     reinterpret_cast<DistPair<IdxT, accT>*>(&smem[(degree + visited_size) * sizeof(float)]);
 
-  static __shared__ Point<T, accT> s_query;
+  static __shared__ Point<QueryCoordT, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
   s_query.Dim    = dim;
   static __shared__ int prev_edges;
@@ -93,7 +97,11 @@ __global__ void RobustPruneKernel(
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     int queryId = query_list[i].queryId;
 
-    update_shared_point<T, accT>(&s_query, &dataset(0, 0), queryId, dim, i);
+    if constexpr (is_cuda_fp16_v<T>) {
+      update_shared_point_half_to_float<accT>(&s_query, &dataset(0, 0), queryId, dim);
+    } else {
+      update_shared_point<T, accT>(&s_query, &dataset(0, 0), queryId, dim, i);
+    }
 
     int graphIdx = 0;
     int listIdx  = 0;
@@ -141,8 +149,16 @@ __global__ void RobustPruneKernel(
         }
       } else if (listIdx >= visited_size) {
         next_cand.idx = graph(queryId, graphIdx);
-        accT tempDist =
-          dist<T, accT>(s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
+        accT tempDist;
+        if constexpr (is_cuda_fp16_v<T>) {
+          tempDist = dist<accT>(s_query.coords,
+                                &dataset((size_t)graph(queryId, graphIdx), 0),
+                                dim,
+                                metric);
+        } else {
+          tempDist = dist<T, accT>(
+            s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
+        }
         if (threadIdx.x == 0) graphDist = tempDist;
         __syncthreads();
         next_cand.dist = graphDist;
@@ -150,8 +166,16 @@ __global__ void RobustPruneKernel(
       } else {
         accT listDist = query_list[i].dists[listIdx];
 
-        accT tempDist =
-          dist<T, accT>(s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
+        accT tempDist;
+        if constexpr (is_cuda_fp16_v<T>) {
+          tempDist = dist<accT>(s_query.coords,
+                                &dataset((size_t)graph(queryId, graphIdx), 0),
+                                dim,
+                                metric);
+        } else {
+          tempDist = dist<T, accT>(
+            s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
+        }
         if (threadIdx.x == 0) graphDist = tempDist;
         __syncthreads();
 

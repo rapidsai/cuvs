@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <type_traits>
 #include <vector>
 
 namespace cuvs::neighbors::vamana::detail {
@@ -108,8 +109,10 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
+  using QueryCoordT = typename greedy_search_query_coord<T>::type;
+
   union ShmemLayout {
-    T coords;
+    QueryCoordT coords;
     IdxT neighborhood_arr;
     DistPair<IdxT, accT> candidate_queue;
   };
@@ -118,14 +121,13 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
   // Per-warp shared memory layout: coords, neighbor_array, candidate_queue
-  const int coords_size      = (dim + align_padding) * sizeof(T);
+  const int coords_size      = (dim + align_padding) * sizeof(QueryCoordT);
   const int neighbor_size    = degree * sizeof(IdxT);
   const int queue_size_bytes = max_queue_size * sizeof(DistPair<IdxT, accT>);
   const int per_warp_size    = (coords_size + neighbor_size + queue_size_bytes + 15) & ~15;
 
   char* warp_smem = &smem[warpIdx * per_warp_size];
-  T* s_coords =
-    reinterpret_cast<T*>(warp_smem);
+  QueryCoordT* s_coords = reinterpret_cast<QueryCoordT*>(warp_smem);
   IdxT* neighbor_array = reinterpret_cast<IdxT*>(warp_smem + coords_size);
   DistPair<IdxT, accT>* candidate_queue_smem =
     reinterpret_cast<DistPair<IdxT, accT>*>(warp_smem + coords_size + neighbor_size);
@@ -136,7 +138,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   static __shared__ int k_max_idx[4];
   static __shared__ int num_neighbors[4];
 
-  Point<T, accT> s_query;
+  Point<QueryCoordT, accT> s_query;
   s_query.Dim    = dim;
   s_query.coords = s_coords;
 
@@ -151,7 +153,12 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   for (int i = blockIdx.x * 4 + warpIdx; i < num_queries; i += gridDim.x * 4) {
     query_list[i].reset_warp(laneId);
 
-    update_shared_point_warp<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim, laneId);
+    if constexpr (is_cuda_fp16_v<T>) {
+      update_shared_point_warp_half_to_float<accT>(
+        &s_query, vec_ptr, query_list[i].queryId, dim, laneId);
+    } else {
+      update_shared_point_warp<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim, laneId);
+    }
 
     if (laneId == 0) {
       topk_q_size[warpIdx] = 0;
@@ -162,11 +169,20 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
       heap_queue.reset();
     }
 
-    Point<T, accT>* query_vec = &s_query;
-    query_vec->Dim            = dim;
-    query_vec->coords         = s_coords;
-    accT medoid_dist = dist_warp<T, accT>(
-      query_vec->coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
+    Point<QueryCoordT, accT>* query_vec = &s_query;
+    query_vec->Dim                      = dim;
+    query_vec->coords                   = s_coords;
+    accT medoid_dist;
+    if constexpr (is_cuda_fp16_v<T>) {
+      medoid_dist = dist_warp<accT>(query_vec->coords,
+                                    &vec_ptr[(size_t)medoid_id * (size_t)dim],
+                                    dim,
+                                    metric,
+                                    laneId);
+    } else {
+      medoid_dist = dist_warp<T, accT>(
+        query_vec->coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
+    }
 
     if (laneId == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
 
@@ -226,14 +242,14 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
           atomicMin(&num_neighbors[warpIdx], (int)j);
       }
 
-      enqueue_all_neighbors_warp<T, accT, IdxT>(num_neighbors[warpIdx],
-                                                query_vec,
-                                                vec_ptr,
-                                                neighbor_array,
-                                                heap_queue,
-                                                dim,
-                                                metric,
-                                                laneId);
+      enqueue_all_neighbors_warp<QueryCoordT, T, accT, IdxT>(num_neighbors[warpIdx],
+                                                             query_vec,
+                                                             vec_ptr,
+                                                             neighbor_array,
+                                                             heap_queue,
+                                                             dim,
+                                                             metric,
+                                                             laneId);
     }
 
     bool self_found = false;
