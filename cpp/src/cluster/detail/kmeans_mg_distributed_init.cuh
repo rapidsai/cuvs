@@ -402,8 +402,7 @@ void initKMeansPlusPlus_distributed(
                                                  stream);
 
     std::vector<IndexT> h_indices(static_cast<std::size_t>(n_random));
-    raft::copy(
-      h_indices.data(), indices.data_handle(), static_cast<std::size_t>(n_random), stream);
+    raft::copy(h_indices.data(), indices.data_handle(), static_cast<std::size_t>(n_random), stream);
     raft::resource::sync_stream(handle);
 
     for (IndexT i = 0; i < n_random; ++i) {

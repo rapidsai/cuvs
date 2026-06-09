@@ -200,7 +200,8 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
   int rank,
   const std::vector<IndexT>& rank_counts,
   IndexT global_n,
-  const mnmg_comms& comms)
+  const mnmg_comms& comms,
+  bool result_on_all_ranks = false)
 {
   auto sample_ids = broadcast_sampled_global_indices(
     handle, params.rng_state.seed, global_n, sample_size, rank, comms);
@@ -231,8 +232,14 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
     }
   }
 
-  comms.reduce(
-    sampled_rows.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), KMEANS_COMM_ROOT);
+  if (result_on_all_ranks) {
+    comms.allreduce(sampled_rows.data_handle(), sampled_rows.data_handle(), sampled_rows.size());
+  } else {
+    comms.reduce(sampled_rows.data_handle(),
+                 sampled_rows.data_handle(),
+                 sampled_rows.size(),
+                 KMEANS_COMM_ROOT);
+  }
   return sampled_rows;
 }
 
@@ -264,12 +271,8 @@ void init_centroids_for_mg_batched(
 
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
     auto sampled_rows = sample_global_rows<DataT, IndexT, Accessor>(
-      handle, params, X_parts, n_features, n_clusters, rank, rank_counts, global_n, comms);
-    if (rank == KMEANS_COMM_ROOT) {
-      raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
-    }
-    comms.bcast(
-      centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
+      handle, params, X_parts, n_features, n_clusters, rank, rank_counts, global_n, comms, true);
+    raft::copy(centroids.data_handle(), sampled_rows.data_handle(), sampled_rows.size(), stream);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
     using view_t =
       raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>;
