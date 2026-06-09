@@ -31,6 +31,20 @@
 
 namespace cuvs::cluster::kmeans::mg::detail {
 
+template <typename DataT, typename IndexT>
+void initKMeansPlusPlus_distributed(
+  const raft::resources& handle,
+  const cuvs::cluster::kmeans::params& params,
+  const std::vector<raft::device_matrix_view<const DataT, IndexT>>& X_parts,
+  IndexT n_features,
+  raft::device_matrix_view<DataT, IndexT> centroidsRawData,
+  rmm::device_uvector<char>& workspace,
+  const std::vector<IndexT>& rank_counts,
+  IndexT global_n,
+  int rank,
+  int num_ranks,
+  const cuvs::core::detail::mnmg_comms& comms);
+
 #define CUVS_LOG_KMEANS(handle, fmt, ...)                    \
   do {                                                       \
     bool isRoot = true;                                      \
@@ -257,22 +271,53 @@ void init_centroids_for_mg_batched(
     comms.bcast(
       centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-    IndexT init_sample_size = get_global_kmeanspp_init_sample_size(params, global_n, n_clusters);
-    auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(
-      handle, params, X_parts, n_features, init_sample_size, rank, rank_counts, global_n, comms);
-
-    if (rank == KMEANS_COMM_ROOT) {
-      auto init_view = raft::make_const_mdspan(init_sample.view());
-      if (params.oversampling_factor == 0) {
-        cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
-          handle, params, init_view, centroids, workspace);
-      } else {
-        cuvs::cluster::kmeans::detail::initScalableKMeansPlusPlus<DataT, IndexT>(
-          handle, params, init_view, centroids, workspace);
+    using view_t =
+      raft::mdspan<const DataT, raft::matrix_extent<IndexT>, raft::row_major, Accessor>;
+    if constexpr (raft::is_device_mdspan_v<view_t>) {
+      // Device path: run scalable KMeans++ with NCCL collectives, no central
+      // sampling on root. Rewrap into the canonical device_matrix_view so the
+      // call binds regardless of the exact device accessor template instance
+      // (e.g. accessor with different cv-qualifiers).
+      std::vector<raft::device_matrix_view<const DataT, IndexT>> device_parts;
+      device_parts.reserve(X_parts.size());
+      for (auto const& part : X_parts) {
+        device_parts.push_back(raft::make_device_matrix_view<const DataT, IndexT>(
+          part.data_handle(),
+          static_cast<IndexT>(part.extent(0)),
+          static_cast<IndexT>(part.extent(1))));
       }
+      const int num_ranks = static_cast<int>(rank_counts.size());
+      initKMeansPlusPlus_distributed<DataT, IndexT>(handle,
+                                                    params,
+                                                    device_parts,
+                                                    n_features,
+                                                    centroids,
+                                                    workspace,
+                                                    rank_counts,
+                                                    global_n,
+                                                    rank,
+                                                    num_ranks,
+                                                    comms);
+    } else {
+      // Host (out-of-core) path: sample a subset to root then run single-GPU
+      // KMeans++ on the sampled set and broadcast.
+      IndexT init_sample_size = get_global_kmeanspp_init_sample_size(params, global_n, n_clusters);
+      auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(
+        handle, params, X_parts, n_features, init_sample_size, rank, rank_counts, global_n, comms);
+
+      if (rank == KMEANS_COMM_ROOT) {
+        auto init_view = raft::make_const_mdspan(init_sample.view());
+        if (params.oversampling_factor == 0) {
+          cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
+            handle, params, init_view, centroids, workspace);
+        } else {
+          cuvs::cluster::kmeans::detail::initScalableKMeansPlusPlus<DataT, IndexT>(
+            handle, params, init_view, centroids, workspace);
+        }
+      }
+      comms.bcast(
+        centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
     }
-    comms.bcast(
-      centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
   } else {
     THROW("unknown initialization method to select initial centers");
   }

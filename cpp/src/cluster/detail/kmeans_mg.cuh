@@ -8,6 +8,7 @@
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
 #include "kmeans_mg_batched_init.cuh"
+#include "kmeans_mg_distributed_init.cuh"
 
 #include "../../core/mnmg_comms.cuh"
 #include "../../core/omp_wrapper.hpp"

@@ -103,6 +103,45 @@ class mnmg_comms {
   }
 
   template <typename T>
+  void allgatherv(const T* sendbuf,
+                  T* recvbuf,
+                  const std::size_t* recvcounts,
+                  const std::size_t* displs,
+                  std::size_t my_count) const
+  {
+    if (use_nccl_) {
+      int my_rank   = 0;
+      int num_ranks = 0;
+      RAFT_NCCL_TRY(ncclCommUserRank(nccl_comm_, &my_rank));
+      RAFT_NCCL_TRY(ncclCommCount(nccl_comm_, &num_ranks));
+
+      RAFT_NCCL_TRY(ncclGroupStart());
+      for (int r = 0; r < num_ranks; ++r) {
+        if (r == my_rank) { continue; }
+        if (my_count > 0) {
+          RAFT_NCCL_TRY(ncclSend(sendbuf, my_count, nccl_dtype<T>(), r, nccl_comm_, stream_));
+        }
+        if (recvcounts[r] > 0) {
+          RAFT_NCCL_TRY(
+            ncclRecv(recvbuf + displs[r], recvcounts[r], nccl_dtype<T>(), r, nccl_comm_, stream_));
+        }
+      }
+      RAFT_NCCL_TRY(ncclGroupEnd());
+
+      if (my_count > 0 && sendbuf != recvbuf + displs[my_rank]) {
+        RAFT_CUDA_TRY(cudaMemcpyAsync(recvbuf + displs[my_rank],
+                                      sendbuf,
+                                      my_count * sizeof(T),
+                                      cudaMemcpyDeviceToDevice,
+                                      stream_));
+      }
+    } else {
+      const auto& comm = raft::resource::get_comms(dev_res_);
+      comm.allgatherv(sendbuf, recvbuf, recvcounts, displs, stream_);
+    }
+  }
+
+  template <typename T>
   void reduce(T* sendbuf,
               T* recvbuf,
               std::size_t count,
