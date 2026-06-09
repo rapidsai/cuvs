@@ -4,8 +4,8 @@
  */
 
 #include <neighbors/detail/smem_utils.cuh>
-#include <neighbors/ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh>
 #include <neighbors/ivf_rabitq/gpu_index/searcher_gpu_common.cuh>
+#include <neighbors/ivf_rabitq/jit_lto_kernels/block_sort.cuh>
 #include <neighbors/ivf_rabitq/jit_lto_kernels/device_functions.cuh>
 
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -70,8 +70,7 @@ __device__ void bitwise_block_sort_emit_topk(const ComputeInnerProductsKernelPar
     __syncthreads();
 
     // Phase 3 (WithEx): Warp-level IP2 computation + block-sort queue
-    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-      flat_block_sort<kMaxTopKBlockSort, true, float, uint32_t>::type;
+    using block_sort_t = typename rabitq_block_sort<kMaxTopKBlockSort, T, IdxT>::type;
     block_sort_t queue(params.topk);
 
     float q_kbxsumq               = params.d_G_kbxSumq[query_idx];
@@ -130,8 +129,7 @@ __device__ void bitwise_block_sort_emit_topk(const ComputeInnerProductsKernelPar
                 (uint32_t*)(params.d_topk_pids + output_offset));
   } else {
     // Phase 2+3 (NoEx): Compute exact 1-bit IPs and add directly to queue
-    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-      flat_block_sort<kMaxTopKBlockSort, true, float, uint32_t>::type;
+    using block_sort_t = typename rabitq_block_sort<kMaxTopKBlockSort, T, IdxT>::type;
     block_sort_t queue(params.topk);
 
     float final_dist;

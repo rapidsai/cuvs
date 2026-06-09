@@ -9,7 +9,6 @@
 
 // This file implements `SearcherGPU::SearchClusterQueryPairsSharedMemOpt`.
 #include "../../detail/smem_utils.cuh"
-#include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../jit_lto_kernels/kernel_def.hpp"
 #include "../jit_lto_kernels/launcher_factory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"

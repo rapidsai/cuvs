@@ -6,8 +6,8 @@
 #pragma once
 
 #include "../../detail/smem_utils.cuh"
-#include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../gpu_index/searcher_gpu_common.cuh"
+#include "block_sort.cuh"
 #include "device_functions.cuh"
 
 #include <raft/util/cuda_dev_essentials.cuh>

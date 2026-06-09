@@ -6,8 +6,8 @@
 #pragma once
 
 #include "../../detail/smem_utils.cuh"
-#include "../../ivf_flat/detail/jit_lto_kernels/interleaved_scan_impl.cuh"
 #include "../gpu_index/searcher_gpu_common.cuh"
+#include "block_sort.cuh"
 #include "device_functions.cuh"
 
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -132,8 +132,7 @@ __device__ void compute_inner_products_with_lut16_opt_block_sort_impl(
     __shared__ int probe_slot;
     uint32_t output_offset;
     {
-      using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
-        flat_block_sort<kMaxTopKBlockSort, true, T, IdxT>::type;
+      using block_sort_t = typename rabitq_block_sort<kMaxTopKBlockSort, T, IdxT>::type;
       block_sort_t queue(params.topk);
 
       if constexpr (WithEx) {
