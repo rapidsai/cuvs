@@ -1287,33 +1287,27 @@ auto build(raft::resources const& res,
  *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
+ * @tparam T data element type
+ * @tparam IdxT graph index type stored in the index
+ * @tparam DatasetViewT concrete dataset view type stored in the index
  * @param[in] handle raft resources
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on device memory
  * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
+ * @param[out] new_dataset_buffer_view optional caller-managed buffer for the extended dataset
+ * @param[out] new_graph_buffer_view optional caller-managed buffer for the extended graph
  */
+template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void extend(
   raft::resources const& handle,
   const cagra::extend_params& params,
-  raft::device_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+  raft::device_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& idx,
+  std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view =
+    std::nullopt,
+  std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view = std::nullopt);
 
-/** @brief Add new vectors to a CAGRA index
+/** @brief Add new vectors to a CAGRA index (host additional dataset)
  *
  * Usage example:
  * @code{.cpp}
@@ -1325,259 +1319,26 @@ void extend(
  *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
+ * @tparam T data element type
+ * @tparam IdxT graph index type stored in the index
+ * @tparam DatasetViewT concrete dataset view type stored in the index
  * @param[in] handle raft resources
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on host memory
  * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
+ * @param[out] new_dataset_buffer_view optional caller-managed buffer for the extended dataset
+ * @param[out] new_graph_buffer_view optional caller-managed buffer for the extended graph
  */
+template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void extend(
   raft::resources const& handle,
   const cagra::extend_params& params,
-  raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+  raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& idx,
+  std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view =
+    std::nullopt,
+  std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view = std::nullopt);
 
-/** @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_device_matrix<half, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on device memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
- */
-void extend(
-  raft::resources const& handle,
-  const cagra::extend_params& params,
-  raft::device_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<half, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
-
-/** @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_host_matrix<half, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on host memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
- */
-void extend(
-  raft::resources const& handle,
-  const cagra::extend_params& params,
-  raft::host_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<half, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
-
-/** @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_device_matrix<int8_t, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on device memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
- */
-void extend(
-  raft::resources const& handle,
-  const cagra::extend_params& params,
-  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
-
-/** @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_host_matrix<int8_t, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on host memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
- */
-void extend(
-  raft::resources const& handle,
-  const cagra::extend_params& params,
-  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
-
-/** @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on host memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
- */
-void extend(
-  raft::resources const& handle,
-  const cagra::extend_params& params,
-  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
-
-/** @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on host memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
- * part. The data will be copied from the current index in this function. The num rows must be the
- * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
- * stride must be the same as the original index dataset. This view will be stored in the output
- * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
- * This option is useful when users want to manage the memory space for the dataset themselves.
- * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
- * The data will be copied from the current index in this function. The num rows must be the sum of
- * the original and additional datasets and cols must be the graph degree. This view will be stored
- * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
- * as the index. This option is useful when users want to manage the memory space for the graph
- * themselves.
- */
-void extend(
-  raft::resources const& handle,
-  const cagra::extend_params& params,
-  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& idx,
-  std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>
-    new_dataset_buffer_view                                                        = std::nullopt,
-  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 /**
  * @}
  */
@@ -1607,6 +1368,8 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+// Concrete non-template overloads for device_padded_index — preferred by overload resolution
+// over the template above, ensuring stable non-template ABI symbols for the common case.
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& index,

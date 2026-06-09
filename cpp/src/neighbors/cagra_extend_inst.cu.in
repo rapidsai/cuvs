@@ -18,24 +18,28 @@ using inst_padded_view_t = cuvs::neighbors::device_padded_dataset_view<data_t, i
 
 namespace cuvs::neighbors::cagra {
 
-void extend(raft::resources const& handle,
-            const cagra::extend_params& params,
-            raft::device_matrix_view<const data_t, int64_t, raft::row_major> additional_dataset,
-            cuvs::neighbors::cagra::index<data_t, index_t, inst_padded_view_t>& idx,
-            std::optional<raft::device_matrix_view<data_t, int64_t, raft::layout_stride>> ndv,
-            std::optional<raft::device_matrix_view<index_t, int64_t>> ngv)
-{
-  extend<data_t, index_t, inst_padded_view_t>(handle, additional_dataset, idx, params, ndv, ngv);
-}
+#define CUVS_INST_CAGRA_EXTEND_DEVICE(T, IdxT, DatasetViewT)                        \
+  template CUVS_EXPORT void cuvs::neighbors::cagra::extend<T, IdxT, DatasetViewT>(  \
+    raft::resources const& handle,                                                  \
+    const cuvs::neighbors::cagra::extend_params& params,                            \
+    raft::device_matrix_view<const T, int64_t, raft::row_major> additional_dataset, \
+    cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& index,                    \
+    std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> ndv,   \
+    std::optional<raft::device_matrix_view<IdxT, int64_t>> ngv)
 
-void extend(raft::resources const& handle,
-            const cagra::extend_params& params,
-            raft::host_matrix_view<const data_t, int64_t, raft::row_major> additional_dataset,
-            cuvs::neighbors::cagra::index<data_t, index_t, inst_padded_view_t>& idx,
-            std::optional<raft::device_matrix_view<data_t, int64_t, raft::layout_stride>> ndv,
-            std::optional<raft::device_matrix_view<index_t, int64_t>> ngv)
-{
-  extend<data_t, index_t, inst_padded_view_t>(handle, additional_dataset, idx, params, ndv, ngv);
-}
+#define CUVS_INST_CAGRA_EXTEND_HOST(T, IdxT, DatasetViewT)                         \
+  template CUVS_EXPORT void cuvs::neighbors::cagra::extend<T, IdxT, DatasetViewT>( \
+    raft::resources const& handle,                                                 \
+    const cuvs::neighbors::cagra::extend_params& params,                           \
+    raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,  \
+    cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& index,                   \
+    std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> ndv,  \
+    std::optional<raft::device_matrix_view<IdxT, int64_t>> ngv)
+
+CUVS_INST_CAGRA_EXTEND_DEVICE(data_t, index_t, inst_padded_view_t);
+CUVS_INST_CAGRA_EXTEND_HOST(data_t, index_t, inst_padded_view_t);
+
+#undef CUVS_INST_CAGRA_EXTEND_HOST
+#undef CUVS_INST_CAGRA_EXTEND_DEVICE
 
 }  // namespace cuvs::neighbors::cagra

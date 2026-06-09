@@ -391,11 +391,11 @@ void _extend(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
-    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, ndv_buf, std::nullopt);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, ndv_buf);
   } else {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
-    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, ndv_buf, std::nullopt);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, ndv_buf);
   }
 
   auto* box      = reinterpret_cast<cagra_c_api_index_box*>(index.addr);
