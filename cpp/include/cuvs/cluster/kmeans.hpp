@@ -1720,6 +1720,80 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<int64_t> n_iter);
 
 /**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ *
+ * Convenience overload for the common case where each rank has exactly one
+ * local partition. The mdspan is wrapped in a one-element vector and routed
+ * through the vector-of-partitions overload above. See that overload's
+ * documentation for backend selection and handle requirements.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const float, int> X,
+         std::optional<raft::device_vector_view<const float, int>> sample_weight,
+         raft::device_matrix_view<float, int> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const float, int64_t> X,
+         std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const double, int> X,
+         std::optional<raft::device_vector_view<const double, int>> sample_weight,
+         raft::device_matrix_view<double, int> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const double, int64_t> X,
+         std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit, single mdspan per rank.
+ *
+ * Dispatches to the SNMG-clique (batched per-rank) backend when the handle
+ * carries an SNMG clique, and to the NCCL multi-process backend otherwise.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const float, int64_t> X,
+         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const double, int64_t> X,
+         std::optional<raft::host_vector_view<const double, int64_t>> sample_weight,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
  * @}
  */
 }  // namespace mg

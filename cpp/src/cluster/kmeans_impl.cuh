@@ -5,30 +5,11 @@
 #pragma once
 
 #include "kmeans.cuh"
-#include "kmeans_mg.hpp"
 
-#include <vector>
+#include <raft/core/logger.hpp>
+#include <raft/core/resource/comms.hpp>
 
 namespace cuvs::cluster::kmeans {
-
-template <typename DataT, typename IndexT>
-void fit_main(raft::resources const& handle,
-              const kmeans::params& params,
-              raft::device_matrix_view<const DataT, IndexT> X,
-              raft::device_vector_view<const DataT, IndexT> sample_weights,
-              raft::device_matrix_view<DataT, IndexT> centroids,
-              raft::host_scalar_view<DataT> inertia,
-              raft::host_scalar_view<IndexT> n_iter,
-              rmm::device_uvector<char>& workspace)
-{
-  cuvs::cluster::kmeans::params p = params;
-  p.init                          = kmeans::params::InitMethod::Array;
-  RAFT_EXPECTS(sample_weights.extent(0) == X.extent(0),
-               "invalid parameter (sample_weight!=n_samples)");
-  auto sw = std::make_optional(sample_weights);
-  cuvs::cluster::kmeans::detail::kmeans_fit(
-    handle, p, X, sw, centroids, inertia, n_iter, std::ref(workspace));
-}
 
 template <typename DataT, typename IndexT>
 void fit(raft::resources const& handle,
@@ -40,18 +21,12 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<IndexT> n_iter)
 {
   if (raft::resource::comms_initialized(handle)) {
-    // Wrap the single per-rank mdspan into a one-element vector so we can
-    // dispatch through the unified vector-of-partitions MG API.
-    std::vector<raft::device_matrix_view<const DataT, IndexT>> X_parts{X};
-    std::optional<std::vector<raft::device_vector_view<const DataT, IndexT>>> sw_parts;
-    if (sample_weight) {
-      sw_parts = std::vector<raft::device_vector_view<const DataT, IndexT>>{*sample_weight};
-    }
-    cuvs::cluster::kmeans::mg::fit(handle, params, X_parts, sw_parts, centroids, inertia, n_iter);
-  } else {
-    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
+    RAFT_LOG_WARN(
+      "Multi-GPU handle detected on single-GPU kmeans::fit() entry; "
+      "falling back to single-GPU. Use cuvs::cluster::kmeans::mg::fit(...) for multi-GPU.");
   }
+  cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
+    handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
 
 template <typename DataT, typename IndexT>
