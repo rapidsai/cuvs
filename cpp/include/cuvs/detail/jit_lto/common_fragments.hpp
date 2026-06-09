@@ -9,6 +9,7 @@ namespace cuvs::neighbors::detail {
 
 struct tag_f {};
 struct tag_h {};
+struct tag_d {};
 struct tag_i8 {};
 struct tag_u8 {};
 struct tag_filter_none {};
@@ -17,6 +18,7 @@ struct tag_filter_udf {};
 
 struct tag_bitset_u32 {};
 
+struct tag_index_i32 {};
 struct tag_index_u32 {};
 struct tag_index_i64 {};
 
