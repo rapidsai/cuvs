@@ -40,8 +40,7 @@ auto parse_build_param(const nlohmann::json& conf) ->
 
   // Reuse the CAGRA wrapper params parser
   ::parse_build_param<T, IdxT>(conf, cagra_params);
-  // If the users provides parameter M, we can use the CAGRA-HNSW heuristics to find optimal
-  // parameters for the dataset and HNSW reference.
+
   if (conf.contains("M")) { hnsw_params.M = conf.at("M"); }
   return param;
 }

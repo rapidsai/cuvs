@@ -814,6 +814,8 @@ constexpr double usable_cpu_memory_fraction = 0.8;
 constexpr double usable_gpu_memory_fraction = 0.8;
 constexpr double imbalance_factor           = 3.0;
 constexpr double vector_expansion_factor    = 2.0;
+constexpr size_t extra_cpu_workspace_size   = 1e9;
+constexpr size_t extra_gpu_workspace_size   = 2e9;
 
 // Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
@@ -844,20 +846,22 @@ bool ace_check_use_disk_mode(bool use_disk,
 
   // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
   // For memory path:
-  //   - Partition labels (core + augmented): 2 * dataset_size * sizeof(IdxT)
-  //   - Backward ID mapping arrays (core + augmented): 2 * dataset_size * sizeof(IdxT)
+  //   - Partition labels (core + augmented): vector_expansion_factor * dataset_size * sizeof(IdxT)
+  //   - Backward ID mapping arrays (core + augmented): vector_expansion_factor * dataset_size *
+  //   sizeof(IdxT)
   //   - Avg. per-partition dataset: vector_expansion_factor * (dataset_size / n_partitions) *
   //   dataset_dim * sizeof(T)
   //   - Avg. per-partition graph during build: vector_expansion_factor * (dataset_size /
   //   n_partitions) * (intermediate + final) * sizeof(IdxT)
   //   - Final assembled graph: dataset_size * graph_degree * sizeof(IdxT)
-  mem.partition_labels_size = 2 * dataset_size * sizeof(IdxT);
-  mem.id_mapping_size       = 2 * dataset_size * sizeof(IdxT);
+  mem.partition_labels_size = vector_expansion_factor * dataset_size * sizeof(IdxT);
+  mem.id_mapping_size       = vector_expansion_factor * dataset_size * sizeof(IdxT);
   mem.sub_dataset_size      = sub_partition_size * dataset_dim * sizeof(T);
   mem.sub_graph_size   = sub_partition_size * (intermediate_degree + graph_degree) * sizeof(IdxT);
   mem.cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
   mem.total_size       = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
-                   mem.sub_graph_size + mem.cagra_graph_size + opt_host_ws_total + 2e9;
+                   mem.sub_graph_size + mem.cagra_graph_size + opt_host_ws_total +
+                   extra_cpu_workspace_size;
 
   RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GiB, available: %.2f GiB",
                 to_gib(mem.total_size),
@@ -880,7 +884,8 @@ bool ace_check_use_disk_mode(bool use_disk,
   // * IVF-PQ on partition  (sub_dataset_size, uncompressed upper bound)
   // * optimize workspace (opt_dev_ws_total)
   // + some extra workspace (IVF-PQ search, ...)
-  size_t gpu_memory_required = std::max(mem.sub_dataset_size, opt_dev_ws_total) + 2e9;
+  size_t gpu_memory_required =
+    std::max(mem.sub_dataset_size, opt_dev_ws_total) + extra_gpu_workspace_size;
 
   bool gpu_memory_limited = static_cast<size_t>(usable_gpu_memory_fraction *
                                                 mem.available_gpu_memory) < gpu_memory_required;
@@ -940,8 +945,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 {
   // In disk mode, we don't need the full dataset or final graph in memory.
   // Host memory model for disk mode:
-  //   - Partition labels (core + augmented): 2 * dataset_size * sizeof(IdxT)
-  //   - ID mapping arrays (core + augmented): 2 * dataset_size * sizeof(IdxT)
+  //   - Partition labels (core + augmented): vector_expansion_factor * dataset_size * sizeof(IdxT)
+  //   - ID mapping arrays (core + augmented): vector_expansion_factor * dataset_size * sizeof(IdxT)
   //   - Avg. per-partition dataset during processing: vector_expansion_factor * (dataset_size /
   //   n_partitions) * dataset_dim * sizeof(T)
   //   - Avg. per-partition graph during build: vector_expansion_factor * (dataset_size /
@@ -966,7 +971,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   // Check host memory requirements
   size_t disk_mode_host_required = mem.partition_labels_size + mem.id_mapping_size +
                                    mem.sub_dataset_size + mem.sub_graph_size +
-                                   host_workspace_size_total + 2e9;
+                                   host_workspace_size_total + extra_cpu_workspace_size;
 
   if (static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) <
       disk_mode_host_required) {
@@ -978,11 +983,11 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(mem.available_host_memory),
       to_gib(mem.sub_dataset_size),
       to_gib(mem.sub_graph_size),
-      to_gib(host_workspace_size_total));
+      to_gib(host_workspace_size_total + extra_cpu_workspace_size));
 
     // Calculate suggested number of partitions for host memory
-    size_t disk_mode_host_static =
-      mem.partition_labels_size + mem.id_mapping_size + host_workspace_size_fixed + 2e9;
+    size_t disk_mode_host_static = mem.partition_labels_size + mem.id_mapping_size +
+                                   host_workspace_size_fixed + extra_cpu_workspace_size;
     size_t disk_mode_host_dynamic = disk_mode_host_required - disk_mode_host_static;
     double available_for_scaling =
       usable_cpu_memory_fraction * mem.available_host_memory - disk_mode_host_static;
@@ -1004,7 +1009,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   // * IVF-PQ on partition  (mem.sub_dataset_size) (compressed?)
   // * optimize workspace (gpu_workspace_size_total)
   // + some extra workspace (IVF-PQ search, ...)
-  size_t disk_mode_gpu_required = std::max(mem.sub_dataset_size, gpu_workspace_size_total) + 2e9;
+  size_t disk_mode_gpu_required =
+    std::max(mem.sub_dataset_size, gpu_workspace_size_total) + extra_gpu_workspace_size;
 
   if (static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
       disk_mode_gpu_required) {
@@ -1015,9 +1021,9 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(disk_mode_gpu_required),
       to_gib(mem.available_gpu_memory),
       to_gib(mem.sub_dataset_size),
-      to_gib(gpu_workspace_size_total));
+      to_gib(gpu_workspace_size_total + extra_gpu_workspace_size));
 
-    size_t disk_mode_gpu_static  = gpu_workspace_size_fixed + 2e9;
+    size_t disk_mode_gpu_static  = gpu_workspace_size_fixed + extra_gpu_workspace_size;
     size_t disk_mode_gpu_dynamic = disk_mode_gpu_required - disk_mode_gpu_static;
     double available_for_scaling =
       usable_gpu_memory_fraction * mem.available_gpu_memory - disk_mode_gpu_static;
@@ -1064,15 +1070,16 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
     mem.sub_graph_size =
       new_sub_partition_size * (intermediate_degree + graph_degree) * sizeof(IdxT);
     mem.total_size = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
-                     mem.sub_graph_size + mem.cagra_graph_size + new_opt_host_ws + 2e9;
+                     mem.sub_graph_size + mem.cagra_graph_size + new_opt_host_ws +
+                     extra_cpu_workspace_size;
 
     RAFT_LOG_INFO(
       "ACE: Updated per-partition memory estimates: dataset %.2f GiB, graph %.2f GiB, "
       "host workspace %.2f GiB, GPU workspace %.2f GiB",
       to_gib(mem.sub_dataset_size),
       to_gib(mem.sub_graph_size),
-      to_gib(new_opt_host_ws),
-      to_gib(new_opt_dev_ws));
+      to_gib(new_opt_host_ws + extra_cpu_workspace_size),
+      to_gib(new_opt_dev_ws + extra_gpu_workspace_size));
   }
 }
 

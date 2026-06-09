@@ -24,10 +24,12 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 
+#include <cmath>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <numeric>
 #include <random>
@@ -1263,9 +1265,29 @@ std::unique_ptr<index<T>> from_cagra(
     auto dummy_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), params.hierarchy);
     auto dummy_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
       dummy_index->get_space(), 1, (graph_degree_int + 1) / 2, params.ef_construction);
-    // The base level dominates; add ~12% for hierarchy linklists and transients.
-    size_t required_host = static_cast<size_t>(n_rows) * dummy_algo->size_data_per_element_;
-    required_host += required_host / 8;
+
+    // The contiguous level-0 array (size_data_per_element_ = level-0 links + vector + label)
+    // dominates, but hnswlib allocates several additional per-element structures that are NOT
+    // part of it. These fixed-size costs (locks, hash map) don't shrink with the vector, so a
+    // flat percentage under-counts for low-dim/8-bit/small-M and hierarchical indexes. Model
+    // them explicitly instead:
+    //   - linkLists_   : char* per element
+    //   - element_levels_ : int per element
+    //   - link_list_locks_ : std::mutex per element (kept for the index lifetime)
+    //   - label_lookup_ : unordered_map<labeltype,tableint> node + bucket slot (~56 B upper bound)
+    //   - upper-level link lists (hierarchy != NONE only): expected
+    //     size_links_per_element / ln(M) bytes per element
+    size_t per_element = dummy_algo->size_data_per_element_;
+    per_element += sizeof(void*) + sizeof(int) + sizeof(std::mutex);
+    per_element += 56;  // unordered_map node + bucket slot (upper bound)
+    if (params.hierarchy != HnswHierarchy::NONE) {
+      int m_used = std::max(2, (graph_degree_int + 1) / 2);
+      size_t size_links_per_element =
+        static_cast<size_t>(m_used) * sizeof(uint32_t) + sizeof(uint32_t);
+      per_element +=
+        static_cast<size_t>(size_links_per_element / std::log(static_cast<double>(m_used)));
+    }
+    size_t required_host = static_cast<size_t>(n_rows) * per_element;
 
     // Honor an explicit host-memory limit from ACE params (if configured), mirroring
     // hnsw::build. This also makes the spill branch deterministically testable.
@@ -1284,11 +1306,21 @@ std::unique_ptr<index<T>> from_cagra(
     if (required_host >= available_host) {
       RAFT_LOG_INFO("Not enough host memory for in-memory HNSW. Spilling HNSW index to disk.");
 
-      // Determine output directory from ACE build_dir if configured, else /tmp.
-      std::string index_directory = "/tmp";
+      // Use the ACE build_dir if configured, otherwise fallback to system temp
+      std::string index_directory;
       if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
         const auto& ace = std::get<graph_build_params::ace_params>(params.graph_build_params);
         if (!ace.build_dir.empty()) { index_directory = ace.build_dir; }
+      }
+      if (index_directory.empty()) {
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::filesystem::path candidate;
+        do {
+          candidate =
+            std::filesystem::temp_directory_path() / ("cuvs_hnsw_" + std::to_string(gen()));
+        } while (std::filesystem::exists(candidate));
+        index_directory = candidate.string();
       }
       std::filesystem::create_directories(index_directory);
       RAFT_EXPECTS(
@@ -1476,9 +1508,9 @@ void deserialize(raft::resources const& res,
  *
  * This function builds an HNSW index
  * 1. Converting HNSW parameters to CAGRA parameters
- * 2. inspect memory usage and decide to use ACE build or in-memory build
- * 3. Building a CAGRA index  (ACE configuration by default if memory is limited)
- * 4. Converting the CAGRA index to HNSW format (disk-backed or in-memory)
+ * 2. Inspect memory requirements (fall back to ACE algorithm if memory constrained)
+ * 3. Building a CAGRA index with the chosen algorithm in (2)
+ * 4. Converting the CAGRA index to HNSW format (in-memory or disk-backed)
  */
 template <typename T>
 std::unique_ptr<index<T>> build(raft::resources const& res,
@@ -1503,7 +1535,7 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
       params.metric);
 
     auto [required_host, required_dev] = cuvs::neighbors::cagra::helpers::cagra_build_mem_usage(
-      res, dataset.extents(), sizeof(T), cagra_params);
+      res, dataset.extents(), sizeof(T), std::is_same_v<T, float>, cagra_params);
     auto [available_host, available_dev] = get_available_memory();
 
     RAFT_LOG_INFO("CAGRA in memory build, required host mem %4.1f GB, GPU mem %4.1f GB",
@@ -1517,7 +1549,7 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     } else {
       use_ace = true;
       RAFT_LOG_INFO(
-        "Not enough host or device memory. Falling back to ACE build with disk spilling");
+        "Not enough host or device memory. Falling back to ACE build with optional disk spilling");
     }
   }
   if (use_ace) {
