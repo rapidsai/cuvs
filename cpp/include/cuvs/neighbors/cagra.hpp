@@ -822,6 +822,14 @@ using device_padded_index = index<T, IdxT, cuvs::neighbors::device_padded_datase
 template <typename T, typename IdxT = uint32_t>
 using host_padded_index = index<T, IdxT, cuvs::neighbors::host_padded_dataset_view<T, int64_t>>;
 
+/** CAGRA index with a device-resident VPQ dataset (f16 codebook vectors). */
+template <typename T, typename IdxT = uint32_t>
+using vpq_f16_index = index<T, IdxT, cuvs::neighbors::device_vpq_dataset_view<half, int64_t>>;
+
+/** CAGRA index with a device-resident VPQ dataset (f32 codebook vectors). */
+template <typename T, typename IdxT = uint32_t>
+using vpq_f32_index = index<T, IdxT, cuvs::neighbors::device_vpq_dataset_view<float, int64_t>>;
+
 /** Index type returned by `cagra::build(res, params, dataset_view)`. */
 template <typename DatasetViewT>
 using cagra_index_t = index<cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>,
@@ -1275,21 +1283,18 @@ auto build(raft::resources const& res,
  * @{
  */
 
-/** @brief Add new vectors to a CAGRA index
+// Concrete non-template overloads for all supported index types.
+// Previously a single template <T, IdxT, DatasetViewT> covered all index types; it has been
+// replaced with explicit overloads to maintain a stable non-template ABI. When a new index
+// type is added (e.g. a future host_padded_index extend), add a corresponding overload here.
+// Index types for which extend is not meaningful (e.g. VPQ — read-only compressed codes)
+// are intentionally omitted.
+
+/** @brief Add new vectors to a CAGRA index.
  *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_device_matrix<float, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
+ * Only `device_padded_index` supports extend (VPQ and other compressed index types are
+ * read-only once built and have no extend overload).
  *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT graph index type stored in the index
- * @tparam DatasetViewT concrete dataset view type stored in the index
  * @param[in] handle raft resources
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on device memory
@@ -1297,47 +1302,78 @@ auto build(raft::resources const& res,
  * @param[out] new_dataset_buffer_view optional caller-managed buffer for the extended dataset
  * @param[out] new_graph_buffer_view optional caller-managed buffer for the extended graph
  */
-template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void extend(
   raft::resources const& handle,
   const cagra::extend_params& params,
-  raft::device_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& idx,
-  std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view =
-    std::nullopt,
-  std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view = std::nullopt);
+  raft::device_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 
-/** @brief Add new vectors to a CAGRA index (host additional dataset)
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto additional_dataset = raft::make_host_matrix<float, int64_t>(handle,add_size,dim);
- *   // set_additional_dataset(additional_dataset.view());
- *
- *   cagra::extend_params params;
- *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT graph index type stored in the index
- * @tparam DatasetViewT concrete dataset view type stored in the index
- * @param[in] handle raft resources
- * @param[in] params extend params
- * @param[in] additional_dataset additional dataset on host memory
- * @param[in,out] idx CAGRA index
- * @param[out] new_dataset_buffer_view optional caller-managed buffer for the extended dataset
- * @param[out] new_graph_buffer_view optional caller-managed buffer for the extended graph
- */
-template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void extend(
   raft::resources const& handle,
   const cagra::extend_params& params,
-  raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
-  cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& idx,
-  std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view =
-    std::nullopt,
-  std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view = std::nullopt);
+  raft::device_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<half, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+/** @brief Add new vectors to a CAGRA index (host additional dataset). */
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::host_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<half, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<int8_t, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<uint8_t, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 
 /**
  * @}
@@ -1348,28 +1384,12 @@ void extend(
  * @{
  */
 
-/** @brief Search ANN using the constructed index.
- *
- * @tparam T data element type
- * @tparam IdxT graph index type stored in the index
- * @tparam DatasetViewT concrete dataset view type stored in the index
- * @tparam OutputIdxT type of the returned neighbor indices
- */
-template <typename T,
-          typename IdxT,
-          cuvs::neighbors::cagra_dataset_view DatasetViewT,
-          typename OutputIdxT = IdxT>
-void search(raft::resources const& res,
-            cuvs::neighbors::cagra::search_params const& params,
-            const cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>& index,
-            raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
-            raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            const cuvs::neighbors::filtering::base_filter& sample_filter =
-              cuvs::neighbors::filtering::none_sample_filter{});
-
-// Concrete non-template overloads for device_padded_index — preferred by overload resolution
-// over the template above, ensuring stable non-template ABI symbols for the common case.
+// Concrete non-template overloads for all supported index types.
+// Previously a single template <T, IdxT, DatasetViewT, OutputIdxT> covered all index types; it
+// has been replaced with explicit overloads to maintain a stable non-template ABI. When a new
+// index type is added, add corresponding overloads here. Index types whose search is not yet
+// implemented (e.g. vpq_f32_index) are still declared so the symbols exist when the
+// implementation lands.
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& index,
@@ -1436,6 +1456,154 @@ void search(raft::resources const& res,
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& index,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+// VPQ f16 index overloads (OutputIdxT = uint32_t)
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<float, uint32_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<int8_t, uint32_t>& index,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<uint8_t, uint32_t>& index,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+// VPQ f16 index overloads (OutputIdxT = int64_t)
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<float, uint32_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<int8_t, uint32_t>& index,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f16_index<uint8_t, uint32_t>& index,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+// VPQ f32 index overloads (OutputIdxT = uint32_t)
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<float, uint32_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<int8_t, uint32_t>& index,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<uint8_t, uint32_t>& index,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+// VPQ f32 index overloads (OutputIdxT = int64_t)
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<float, uint32_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<int8_t, uint32_t>& index,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::vpq_f32_index<uint8_t, uint32_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
