@@ -184,6 +184,12 @@ void search_main(raft::resources const& res,
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
+    if (params.smem_dtype == cuvs::neighbors::cagra::internal_dtype::E5M2 &&
+        raft::getComputeCapability().first < 9) {
+      RAFT_LOG_WARN(
+        "CAGRA VPQ E5M2 smem_dtype requires native FP8 support on SM90+. Falling back to F16.");
+      params.smem_dtype = cuvs::neighbors::cagra::internal_dtype::F16;
+    }
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *vpq_dset, index.metric(), nullptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(

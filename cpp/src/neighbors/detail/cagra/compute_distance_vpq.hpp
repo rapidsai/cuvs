@@ -8,10 +8,21 @@
 #include "compute_distance.hpp"
 
 #include <cuvs/distance/distance.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
+
+inline auto select_supported_vpq_smem_dtype(const cagra::search_params& params)
+  -> cuvs::neighbors::cagra::internal_dtype
+{
+  if (params.smem_dtype == cuvs::neighbors::cagra::internal_dtype::E5M2 &&
+      raft::getComputeCapability().first < 9) {
+    return cuvs::neighbors::cagra::internal_dtype::F16;
+  }
+  return params.smem_dtype;
+}
 
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
@@ -70,7 +81,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
     // Match codebook params
     if (dataset.pq_bits() != PqBits) { return -1.0; }
     if (dataset.pq_len() != PqLen) { return -1.0; }
-    if (params.smem_dtype != SmemDType) { return -1.0; }
+    if (select_supported_vpq_smem_dtype(params) != SmemDType) { return -1.0; }
     // Keep auto-selection on the tuned VPQ diagonal while allowing explicit team_size requests to
     // use the expanded team_size / dataset_block_dim grid.
     constexpr std::uint32_t auto_dataset_block_dim_per_team = PqLen == 8 ? 32 : 16;
