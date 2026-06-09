@@ -38,7 +38,6 @@
 #include <numeric>
 #include <optional>
 #include <random>
-#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <type_traits>
@@ -539,13 +538,55 @@ struct layered_hnsw_file_metadata {
   std::vector<layered_hnsw_layer_info> layers;
 };
 
+enum class layered_hnsw_dtype : uint32_t {
+  unknown = 0,
+  float32 = 1,
+  float16 = 2,
+  uint8   = 3,
+  int8    = 4,
+};
+
+// The layered HNSW artifact begins with this fixed-size POD header, immediately followed by
+// `num_layers` layered_hnsw_layer_descriptor records and then the payload sections.
 struct layered_hnsw_file_header {
   char magic[32];
+  uint64_t n_rows;
+  uint64_t dim;
+  uint64_t M;
+  uint64_t maxM;
+  uint64_t maxM0;
+  uint64_t ef_construction;
+  uint64_t base_degree;
+  uint64_t levels_bytes;
+  uint64_t base_nodes_bytes;
+  uint64_t base_link_row_bytes;
+  uint64_t base_links_bytes;
+  uint64_t upper_nodes_count;
+  uint64_t upper_nodes_bytes;
+  uint64_t upper_link_row_bytes;
+  uint64_t upper_links_bytes;
+  double mult;
   uint32_t version;
-  uint32_t reserved;
-  uint64_t metadata_size;
-  uint64_t metadata_offset;
+  uint32_t dtype;
+  uint32_t metric;
+  uint32_t num_layers;
+  int32_t maxlevel;
+  int32_t enterpoint_node;
+  uint32_t reserved0;
+  uint32_t reserved1;
 };
+static_assert(sizeof(layered_hnsw_file_header) == 192,
+              "layered_hnsw_file_header must keep a fixed 192-byte on-disk layout");
+
+struct layered_hnsw_layer_descriptor {
+  uint64_t level;
+  uint64_t row_count;
+  uint64_t degree;
+  uint64_t node_offset;
+  uint64_t link_offset;
+};
+static_assert(sizeof(layered_hnsw_layer_descriptor) == 40,
+              "layered_hnsw_layer_descriptor must keep a fixed 40-byte on-disk layout");
 
 constexpr const char* layered_hnsw_magic = "CUVS_HNSW_LAYERED";
 constexpr uint32_t layered_hnsw_version  = 1;
@@ -557,18 +598,29 @@ inline auto align_up(size_t value, size_t alignment) -> size_t
 }
 
 template <typename T>
-auto layered_dtype_name() -> const char*
+constexpr auto layered_dtype_code() -> layered_hnsw_dtype
 {
   if constexpr (std::is_same_v<T, float>) {
-    return "float32";
+    return layered_hnsw_dtype::float32;
   } else if constexpr (std::is_same_v<T, half>) {
-    return "float16";
+    return layered_hnsw_dtype::float16;
   } else if constexpr (std::is_same_v<T, uint8_t>) {
-    return "uint8";
+    return layered_hnsw_dtype::uint8;
   } else if constexpr (std::is_same_v<T, int8_t>) {
-    return "int8";
+    return layered_hnsw_dtype::int8;
   } else {
-    return "unknown";
+    return layered_hnsw_dtype::unknown;
+  }
+}
+
+inline auto layered_dtype_name(layered_hnsw_dtype dtype) -> const char*
+{
+  switch (dtype) {
+    case layered_hnsw_dtype::float32: return "float32";
+    case layered_hnsw_dtype::float16: return "float16";
+    case layered_hnsw_dtype::uint8: return "uint8";
+    case layered_hnsw_dtype::int8: return "int8";
+    default: return "unknown";
   }
 }
 
@@ -582,128 +634,58 @@ inline auto metric_name(cuvs::distance::DistanceType metric) -> const char*
 }
 
 template <typename T>
-auto make_layered_hnsw_metadata_json(const layered_hnsw_file_metadata& metadata,
-                                     cuvs::distance::DistanceType metric) -> std::string
+auto make_layered_hnsw_header(const layered_hnsw_file_metadata& metadata,
+                              cuvs::distance::DistanceType metric) -> layered_hnsw_file_header
 {
-  std::stringstream os;
-  os << "{\n";
-  os << "  \"format\": \"cuvs_hnsw_layered\",\n";
-  os << "  \"version\": " << layered_hnsw_version << ",\n";
-  os << "  \"n_rows\": " << metadata.n_rows << ",\n";
-  os << "  \"dim\": " << metadata.dim << ",\n";
-  os << "  \"dtype\": \"" << layered_dtype_name<T>() << "\",\n";
-  os << "  \"metric\": \"" << metric_name(metric) << "\",\n";
-  os << "  \"row_order\": \"original_id\",\n";
-  os << "  \"base_link_order\": \"base_nodes\",\n";
-  os << "  \"M\": " << metadata.M << ",\n";
-  os << "  \"maxM\": " << metadata.maxM << ",\n";
-  os << "  \"maxM0\": " << metadata.maxM0 << ",\n";
-  os << "  \"ef_construction\": " << metadata.ef_construction << ",\n";
-  os << "  \"mult\": " << metadata.mult << ",\n";
-  os << "  \"maxlevel\": " << metadata.maxlevel << ",\n";
-  os << "  \"enterpoint_node\": " << metadata.enterpoint_node << ",\n";
-  os << "  \"base_degree\": " << metadata.base_degree << ",\n";
-  os << "  \"levels_bytes\": " << metadata.levels_bytes << ",\n";
-  os << "  \"base_nodes_bytes\": " << metadata.base_nodes_bytes << ",\n";
-  os << "  \"base_link_row_bytes\": " << metadata.base_link_row_bytes << ",\n";
-  os << "  \"base_links_bytes\": " << metadata.base_links_bytes << ",\n";
-  os << "  \"upper_nodes_count\": " << metadata.upper_nodes_count << ",\n";
-  os << "  \"upper_nodes_bytes\": " << metadata.upper_nodes_bytes << ",\n";
-  os << "  \"upper_link_row_bytes\": " << metadata.upper_link_row_bytes << ",\n";
-  os << "  \"upper_links_bytes\": " << metadata.upper_links_bytes << ",\n";
-  os << "  \"layers\": [\n";
-  for (size_t i = 0; i < metadata.layers.size(); ++i) {
-    const auto& layer = metadata.layers[i];
-    os << "    {\"level\": " << layer.level << ", \"row_count\": " << layer.row_count
-       << ", \"degree\": " << layer.degree << ", \"node_offset\": " << layer.node_offset
-       << ", \"link_offset\": " << layer.link_offset << "}";
-    os << (i + 1 == metadata.layers.size() ? "\n" : ",\n");
-  }
-  os << "  ]\n";
-  os << "}\n";
-  return os.str();
+  layered_hnsw_file_header header{};
+  std::strncpy(header.magic, layered_hnsw_magic, sizeof(header.magic) - 1);
+  header.version              = layered_hnsw_version;
+  header.dtype                = static_cast<uint32_t>(layered_dtype_code<T>());
+  header.metric               = static_cast<uint32_t>(metric);
+  header.num_layers           = static_cast<uint32_t>(metadata.layers.size());
+  header.n_rows               = metadata.n_rows;
+  header.dim                  = metadata.dim;
+  header.M                    = metadata.M;
+  header.maxM                 = metadata.maxM;
+  header.maxM0                = metadata.maxM0;
+  header.ef_construction      = metadata.ef_construction;
+  header.base_degree          = metadata.base_degree;
+  header.levels_bytes         = metadata.levels_bytes;
+  header.base_nodes_bytes     = metadata.base_nodes_bytes;
+  header.base_link_row_bytes  = metadata.base_link_row_bytes;
+  header.base_links_bytes     = metadata.base_links_bytes;
+  header.upper_nodes_count    = metadata.upper_nodes_count;
+  header.upper_nodes_bytes    = metadata.upper_nodes_bytes;
+  header.upper_link_row_bytes = metadata.upper_link_row_bytes;
+  header.upper_links_bytes    = metadata.upper_links_bytes;
+  header.mult                 = metadata.mult;
+  header.maxlevel             = metadata.maxlevel;
+  header.enterpoint_node      = metadata.enterpoint_node;
+  return header;
 }
 
-inline auto json_find_key(const std::string& json, const std::string& key, size_t start = 0)
-  -> size_t
-{
-  const auto pos = json.find("\"" + key + "\"", start);
-  RAFT_EXPECTS(
-    pos != std::string::npos, "Cannot find key '%s' in layered HNSW metadata", key.c_str());
-  return pos;
-}
-
-inline auto json_parse_size(const std::string& json, const std::string& key) -> size_t
-{
-  auto pos   = json_find_key(json, key);
-  auto colon = json.find(':', pos);
-  RAFT_EXPECTS(colon != std::string::npos, "Malformed JSON near key '%s'", key.c_str());
-  auto begin = json.find_first_of("0123456789", colon + 1);
-  auto end   = json.find_first_not_of("0123456789", begin);
-  RAFT_EXPECTS(
-    begin != std::string::npos, "Malformed integer JSON value for key '%s'", key.c_str());
-  return static_cast<size_t>(std::stoull(json.substr(begin, end - begin)));
-}
-
-inline auto json_parse_double(const std::string& json, const std::string& key) -> double
-{
-  auto pos   = json_find_key(json, key);
-  auto colon = json.find(':', pos);
-  RAFT_EXPECTS(colon != std::string::npos, "Malformed JSON near key '%s'", key.c_str());
-  auto begin = json.find_first_of("0123456789-.", colon + 1);
-  auto end   = json.find_first_not_of("0123456789-.eE+", begin);
-  RAFT_EXPECTS(begin != std::string::npos, "Malformed double JSON value for key '%s'", key.c_str());
-  return std::stod(json.substr(begin, end - begin));
-}
-
-inline auto json_parse_layer_field(const std::string& object, const std::string& key) -> size_t
-{
-  return json_parse_size(object, key);
-}
-
-inline auto parse_layered_hnsw_metadata(const std::string& json) -> layered_hnsw_file_metadata
+inline auto layered_hnsw_metadata_from_header(const layered_hnsw_file_header& header)
+  -> layered_hnsw_file_metadata
 {
   layered_hnsw_file_metadata metadata;
-  metadata.n_rows               = json_parse_size(json, "n_rows");
-  metadata.dim                  = json_parse_size(json, "dim");
-  metadata.M                    = json_parse_size(json, "M");
-  metadata.maxM                 = json_parse_size(json, "maxM");
-  metadata.maxM0                = json_parse_size(json, "maxM0");
-  metadata.ef_construction      = json_parse_size(json, "ef_construction");
-  metadata.mult                 = json_parse_double(json, "mult");
-  metadata.maxlevel             = static_cast<int>(json_parse_size(json, "maxlevel"));
-  metadata.enterpoint_node      = static_cast<int>(json_parse_size(json, "enterpoint_node"));
-  metadata.base_degree          = json_parse_size(json, "base_degree");
-  metadata.levels_bytes         = json_parse_size(json, "levels_bytes");
-  metadata.base_nodes_bytes     = json_parse_size(json, "base_nodes_bytes");
-  metadata.base_link_row_bytes  = json_parse_size(json, "base_link_row_bytes");
-  metadata.base_links_bytes     = json_parse_size(json, "base_links_bytes");
-  metadata.upper_nodes_count    = json_parse_size(json, "upper_nodes_count");
-  metadata.upper_nodes_bytes    = json_parse_size(json, "upper_nodes_bytes");
-  metadata.upper_link_row_bytes = json_parse_size(json, "upper_link_row_bytes");
-  metadata.upper_links_bytes    = json_parse_size(json, "upper_links_bytes");
-
-  auto layers_pos = json_find_key(json, "layers");
-  auto array_open = json.find('[', layers_pos);
-  auto array_end  = json.find(']', array_open);
-  RAFT_EXPECTS(array_open != std::string::npos && array_end != std::string::npos,
-               "Malformed layers array in layered HNSW metadata");
-
-  size_t pos = array_open;
-  while (true) {
-    auto object_open = json.find('{', pos);
-    if (object_open == std::string::npos || object_open > array_end) { break; }
-    auto object_end = json.find('}', object_open);
-    RAFT_EXPECTS(object_end != std::string::npos && object_end < array_end,
-                 "Malformed layer object in layered HNSW metadata");
-    const auto object = json.substr(object_open, object_end - object_open + 1);
-    metadata.layers.push_back({json_parse_layer_field(object, "level"),
-                               json_parse_layer_field(object, "row_count"),
-                               json_parse_layer_field(object, "degree"),
-                               json_parse_layer_field(object, "node_offset"),
-                               json_parse_layer_field(object, "link_offset")});
-    pos = object_end + 1;
-  }
+  metadata.n_rows               = header.n_rows;
+  metadata.dim                  = header.dim;
+  metadata.M                    = header.M;
+  metadata.maxM                 = header.maxM;
+  metadata.maxM0                = header.maxM0;
+  metadata.ef_construction      = header.ef_construction;
+  metadata.base_degree          = header.base_degree;
+  metadata.levels_bytes         = header.levels_bytes;
+  metadata.base_nodes_bytes     = header.base_nodes_bytes;
+  metadata.base_link_row_bytes  = header.base_link_row_bytes;
+  metadata.base_links_bytes     = header.base_links_bytes;
+  metadata.upper_nodes_count    = header.upper_nodes_count;
+  metadata.upper_nodes_bytes    = header.upper_nodes_bytes;
+  metadata.upper_link_row_bytes = header.upper_link_row_bytes;
+  metadata.upper_links_bytes    = header.upper_links_bytes;
+  metadata.mult                 = header.mult;
+  metadata.maxlevel             = header.maxlevel;
+  metadata.enterpoint_node      = header.enterpoint_node;
   return metadata;
 }
 
@@ -1027,15 +1009,21 @@ auto serialize_to_layered_hnsw_from_disk(
   metadata.upper_nodes_bytes = metadata.upper_nodes_count * sizeof(IdxT);
   metadata.upper_links_bytes = next_upper_link_offset * metadata.upper_link_row_bytes;
 
-  const auto metadata_json = make_layered_hnsw_metadata_json<T>(metadata, index_.metric());
-  layered_hnsw_file_header header{};
-  std::strncpy(header.magic, layered_hnsw_magic, sizeof(header.magic) - 1);
-  header.version         = layered_hnsw_version;
-  header.metadata_size   = metadata_json.size();
-  header.metadata_offset = sizeof(layered_hnsw_file_header);
+  const auto header = make_layered_hnsw_header<T>(metadata, index_.metric());
+  std::vector<layered_hnsw_layer_descriptor> layer_descriptors(metadata.layers.size());
+  for (size_t i = 0; i < metadata.layers.size(); ++i) {
+    const auto& layer    = metadata.layers[i];
+    layer_descriptors[i] = {static_cast<uint64_t>(layer.level),
+                            static_cast<uint64_t>(layer.row_count),
+                            static_cast<uint64_t>(layer.degree),
+                            static_cast<uint64_t>(layer.node_offset),
+                            static_cast<uint64_t>(layer.link_offset)};
+  }
+  const auto descriptors_offset = sizeof(layered_hnsw_file_header);
+  const auto descriptors_bytes  = layer_descriptors.size() * sizeof(layered_hnsw_layer_descriptor);
 
   const auto payload_offset =
-    align_up(header.metadata_offset + header.metadata_size, layered_hnsw_alignment);
+    align_up(descriptors_offset + descriptors_bytes, layered_hnsw_alignment);
   const auto levels_offset      = payload_offset;
   const auto base_nodes_offset  = levels_offset + metadata.levels_bytes;
   const auto base_links_offset  = base_nodes_offset + metadata.base_nodes_bytes;
@@ -1050,8 +1038,10 @@ auto serialize_to_layered_hnsw_from_disk(
                artifact_file.string().c_str(),
                std::strerror(fallocate_result));
   cuvs::util::write_large_file(artifact_fd, &header, sizeof(header), 0);
-  cuvs::util::write_large_file(
-    artifact_fd, metadata_json.data(), metadata_json.size(), header.metadata_offset);
+  if (descriptors_bytes > 0) {
+    cuvs::util::write_large_file(
+      artifact_fd, layer_descriptors.data(), descriptors_bytes, descriptors_offset);
+  }
 
   const auto levels_start_time = std::chrono::steady_clock::now();
   cuvs::util::write_large_file(
@@ -2089,22 +2079,40 @@ auto deserialize_layered_hnsw(raft::resources const& res,
   RAFT_EXPECTS(header.version == layered_hnsw_version,
                "Unsupported layered HNSW artifact version %u",
                header.version);
-  RAFT_EXPECTS(header.metadata_offset >= sizeof(layered_hnsw_file_header),
-               "Invalid layered HNSW metadata offset");
-  RAFT_EXPECTS(header.metadata_size > 0, "Invalid layered HNSW metadata size");
-  const auto artifact_size = static_cast<size_t>(std::filesystem::file_size(artifact_path));
-  RAFT_EXPECTS(header.metadata_offset <= artifact_size &&
-                 header.metadata_size <= artifact_size - header.metadata_offset,
-               "Layered HNSW metadata range is outside artifact: offset=%zu size=%zu "
+  RAFT_EXPECTS(header.dtype == static_cast<uint32_t>(layered_dtype_code<T>()),
+               "Layered HNSW artifact dtype (%s) does not match requested dtype (%s)",
+               layered_dtype_name(static_cast<layered_hnsw_dtype>(header.dtype)),
+               layered_dtype_name(layered_dtype_code<T>()));
+  RAFT_EXPECTS(header.metric == static_cast<uint32_t>(metric),
+               "Layered HNSW artifact metric (%s) does not match requested metric (%s)",
+               metric_name(static_cast<cuvs::distance::DistanceType>(header.metric)),
+               metric_name(metric));
+
+  const auto artifact_size      = static_cast<size_t>(std::filesystem::file_size(artifact_path));
+  const auto descriptors_offset = sizeof(layered_hnsw_file_header);
+  const auto descriptors_bytes =
+    static_cast<size_t>(header.num_layers) * sizeof(layered_hnsw_layer_descriptor);
+  RAFT_EXPECTS(descriptors_offset + descriptors_bytes <= artifact_size,
+               "Layered HNSW layer descriptors are outside artifact: offset=%zu size=%zu "
                "artifact=%zu",
-               static_cast<size_t>(header.metadata_offset),
-               static_cast<size_t>(header.metadata_size),
+               descriptors_offset,
+               descriptors_bytes,
                artifact_size);
 
-  std::string metadata_json(header.metadata_size, '\0');
-  cuvs::util::read_large_file(
-    artifact_fd, metadata_json.data(), metadata_json.size(), header.metadata_offset);
-  const auto metadata            = parse_layered_hnsw_metadata(metadata_json);
+  std::vector<layered_hnsw_layer_descriptor> layer_descriptors(header.num_layers);
+  if (descriptors_bytes > 0) {
+    cuvs::util::read_large_file(
+      artifact_fd, layer_descriptors.data(), descriptors_bytes, descriptors_offset);
+  }
+  auto metadata = layered_hnsw_metadata_from_header(header);
+  metadata.layers.reserve(layer_descriptors.size());
+  for (const auto& descriptor : layer_descriptors) {
+    metadata.layers.push_back({static_cast<size_t>(descriptor.level),
+                               static_cast<size_t>(descriptor.row_count),
+                               static_cast<size_t>(descriptor.degree),
+                               static_cast<size_t>(descriptor.node_offset),
+                               static_cast<size_t>(descriptor.link_offset)});
+  }
   const auto metadata_elapsed_ms = elapsed_ms_since(metadata_start_time);
 
   RAFT_EXPECTS(metadata.n_rows > 0, "Layered HNSW artifact must contain at least one row");
@@ -2122,7 +2130,7 @@ auto deserialize_layered_hnsw(raft::resources const& res,
                "Layered HNSW deserialization requires index_params.dataset_path");
 
   const auto payload_offset =
-    align_up(header.metadata_offset + header.metadata_size, layered_hnsw_alignment);
+    align_up(descriptors_offset + descriptors_bytes, layered_hnsw_alignment);
   const auto levels_offset      = payload_offset;
   const auto base_nodes_offset  = levels_offset + metadata.levels_bytes;
   const auto base_links_offset  = base_nodes_offset + metadata.base_nodes_bytes;
