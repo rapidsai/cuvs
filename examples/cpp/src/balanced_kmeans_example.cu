@@ -24,6 +24,7 @@
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -37,7 +38,16 @@ static struct argp_option options[] = {
   {"dtype", 't', "TYPE", 0, "Data type [float/half/int8/uint8]"},
   {"partitions", 'P', "INT", 0, "Number of balanced partitions"},
   {"iterations", 'I', "INT", 0, "Number of k-means iterations (default: 20)"},
-  {"balance-tolerance", 'B', "FLOAT", 0, "Balance tolerance (default: 0.33)"},
+  {"balance-lower-tolerance",
+   'L',
+   "FLOATS",
+   0,
+   "Comma-separated lower balance tolerances (default: 0.333)"},
+  {"balance-upper-tolerance",
+   'U',
+   "FLOATS",
+   0,
+   "Comma-separated upper balance tolerances (default: 3.0)"},
   {"centroid-offset", 'O', "FLOAT", 0, "Centroid offset when splitting partitions (default: 0.01)"},
   {0}};
 
@@ -46,9 +56,25 @@ struct arguments {
   std::string dtype;
   std::uint32_t n_partitions;
   std::uint32_t n_iters;
-  float balance_tolerance;
+  std::vector<float> balance_lower_tolerances;
+  std::vector<float> balance_upper_tolerances;
   float centroid_offset;
 };
+
+std::vector<float> parse_float_list(std::string const& arg)
+{
+  std::vector<float> values;
+  std::stringstream ss(arg);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    if (token.empty()) {
+      throw std::invalid_argument("Empty value in comma-separated list: " + arg);
+    }
+    values.push_back(std::stof(token));
+  }
+  if (values.empty()) { throw std::invalid_argument("Empty comma-separated list"); }
+  return values;
+}
 
 static error_t parse_opt(int key, char* arg, struct argp_state* state)
 {
@@ -59,7 +85,8 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state)
     case 't': arguments->dtype = arg; break;
     case 'P': arguments->n_partitions = std::stoul(arg); break;
     case 'I': arguments->n_iters = std::stoul(arg); break;
-    case 'B': arguments->balance_tolerance = std::stof(arg); break;
+    case 'L': arguments->balance_lower_tolerances = parse_float_list(arg); break;
+    case 'U': arguments->balance_upper_tolerances = parse_float_list(arg); break;
     case 'O': arguments->centroid_offset = std::stof(arg); break;
     case ARGP_KEY_ARG: break;
     case ARGP_KEY_END: break;
@@ -166,7 +193,8 @@ partition_size_stats compute_partition_size_stats(
   raft::device_resources const& resources,
   int64_t n_partitions,
   raft::device_vector_view<const LabelT, int64_t> labels,
-  float balance_tolerance)
+  float balance_lower_tolerance,
+  float balance_upper_tolerance)
 {
   auto host_labels = raft::make_host_vector<LabelT, int64_t>(labels.extent(0));
   auto stream      = raft::resource::get_cuda_stream(resources);
@@ -188,8 +216,8 @@ partition_size_stats compute_partition_size_stats(
       ? (partition_sizes[n_partitions / 2 - 1] + partition_sizes[n_partitions / 2]) / 2.0
       : static_cast<double>(partition_sizes[n_partitions / 2]);
   auto mean            = static_cast<double>(labels.extent(0)) / n_partitions;
-  auto lower_threshold = mean * balance_tolerance;
-  auto upper_threshold = mean / balance_tolerance;
+  auto lower_threshold = mean * balance_lower_tolerance;
+  auto upper_threshold = mean * balance_upper_tolerance;
   auto underflow_count = static_cast<int64_t>(
     std::count_if(partition_sizes.begin(), partition_sizes.end(), [lower_threshold](int64_t size) {
       return size < lower_threshold;
@@ -229,22 +257,35 @@ void print_partition_size_stats(std::string const& label, partition_size_stats c
             << '\n';
 }
 
+void print_partition_size_summary(std::string const& label, partition_size_stats const& stats)
+{
+  std::cout << label << " partition size statistics: min=" << stats.min_size
+            << ", max=" << stats.max_size << ", median=" << stats.median_size
+            << ", mean=" << stats.mean_size << ", standard deviation=" << stats.stddev_size
+            << ", min/mean=" << stats.min_size / stats.mean_size
+            << ", max/mean=" << stats.max_size / stats.mean_size << '\n';
+}
+
 void print_partition_size_histogram(std::string const& label,
                                     partition_size_stats const& stats,
                                     int64_t histogram_min,
-                                    int64_t histogram_max,
+                                    double histogram_upper,
                                     int64_t n_bins = 20)
 {
   if (stats.sorted_sizes.empty()) { return; }
 
-  std::vector<int64_t> bins(n_bins, 0);
-  auto const range = static_cast<double>(histogram_max - histogram_min);
+  std::vector<int64_t> bins(n_bins + 1, 0);
+  auto const range = histogram_upper - histogram_min;
   if (range == 0.0) {
     bins.front() = static_cast<int64_t>(stats.sorted_sizes.size());
   } else {
     for (auto size : stats.sorted_sizes) {
-      auto bin = static_cast<int64_t>((size - histogram_min) / range * n_bins);
-      bins[std::min<int64_t>(bin, n_bins - 1)]++;
+      if (static_cast<double>(size) > histogram_upper) {
+        bins.back()++;
+      } else {
+        auto bin = static_cast<int64_t>((size - histogram_min) / range * n_bins);
+        bins[std::min<int64_t>(bin, n_bins - 1)]++;
+      }
     }
   }
 
@@ -256,8 +297,7 @@ void print_partition_size_histogram(std::string const& label,
   for (int64_t bin = 0; bin < n_bins; ++bin) {
     auto const lower =
       range == 0.0 ? static_cast<double>(histogram_min) : histogram_min + bin_width * bin;
-    auto const upper =
-      range == 0.0 ? static_cast<double>(histogram_max) : histogram_min + bin_width * (bin + 1);
+    auto const upper = range == 0.0 ? histogram_upper : histogram_min + bin_width * (bin + 1);
     auto const count = bins[bin];
     auto const hashes =
       max_bin_count == 0 ? int64_t{0} : std::max<int64_t>(1, count * bar_width / max_bin_count);
@@ -270,6 +310,18 @@ void print_partition_size_histogram(std::string const& label,
     }
     std::cout << '\n';
   }
+
+  auto const overflow_count  = bins.back();
+  auto const overflow_hashes = max_bin_count == 0
+                                 ? int64_t{0}
+                                 : std::max<int64_t>(1, overflow_count * bar_width / max_bin_count);
+  std::cout << "  (" << std::setw(8) << static_cast<int64_t>(std::ceil(histogram_upper)) << ", "
+            << std::setw(8) << "inf"
+            << "] " << std::setw(4) << overflow_count << " | ";
+  for (int64_t i = 0; i < overflow_hashes && overflow_count != 0; ++i) {
+    std::cout << '#';
+  }
+  std::cout << '\n';
 }
 
 void print_balance_improvement(partition_size_stats const& regular_stats,
@@ -285,12 +337,11 @@ void print_balance_improvement(partition_size_stats const& regular_stats,
 }
 
 template <typename DataT>
-std::optional<partition_size_stats> run_regular_kmeans_comparison(
-  raft::device_resources const& resources,
-  raft::device_matrix_view<const DataT, int64_t> dataset,
-  int64_t n_partitions,
-  std::uint32_t n_iters,
-  float balance_tolerance)
+bool run_regular_kmeans(raft::device_resources const& resources,
+                        raft::device_matrix_view<const DataT, int64_t> dataset,
+                        int64_t n_partitions,
+                        std::uint32_t n_iters,
+                        raft::device_vector_view<int64_t, int64_t> labels)
 {
   if constexpr (std::is_same_v<DataT, float>) {
     cuvs::cluster::kmeans::params params;
@@ -300,7 +351,6 @@ std::optional<partition_size_stats> run_regular_kmeans_comparison(
 
     auto centroids = raft::make_device_matrix<float, int64_t>(
       resources, n_partitions, static_cast<int64_t>(dataset.extent(1)));
-    auto labels = raft::make_device_vector<int64_t, int64_t>(resources, dataset.extent(0));
 
     float inertia  = 0.0f;
     int64_t n_iter = 0;
@@ -316,14 +366,13 @@ std::optional<partition_size_stats> run_regular_kmeans_comparison(
                                    dataset,
                                    std::nullopt,
                                    raft::make_const_mdspan(centroids.view()),
-                                   labels.view(),
+                                   labels,
                                    false,
                                    raft::make_host_scalar_view(&inertia));
 
-    return compute_partition_size_stats(
-      resources, n_partitions, raft::make_const_mdspan(labels.view()), balance_tolerance);
+    return true;
   } else {
-    return std::nullopt;
+    return false;
   }
 }
 
@@ -331,7 +380,8 @@ template <typename DataT>
 void partition_dataset(std::string const& dataset_path,
                        std::uint32_t n_partitions,
                        std::uint32_t n_iters,
-                       float balance_tolerance,
+                       std::vector<float> const& balance_lower_tolerances,
+                       std::vector<float> const& balance_upper_tolerances,
                        float centroid_offset)
 {
   raft::device_resources resources;
@@ -354,43 +404,71 @@ void partition_dataset(std::string const& dataset_path,
   std::cout << "Partitioning " << n_samples << " vectors with " << n_features << " dimensions into "
             << n_partitions << " balanced partitions\n";
 
-  cuvs::cluster::kmeans::balanced_params params;
-  params.metric            = cuvs::distance::DistanceType::L2Expanded;
-  params.n_iters           = n_iters;
-  params.balance_tolerance = balance_tolerance;
-  params.centroid_offset   = centroid_offset;
+  auto centroids = raft::make_device_matrix<float, int64_t>(resources, n_partitions, n_features);
+  auto labels    = raft::make_device_vector<uint32_t, int64_t>(resources, n_samples);
+  auto regular_labels = raft::make_device_vector<int64_t, int64_t>(resources, n_samples);
+  auto dataset_view   = raft::make_const_mdspan(dataset.view());
 
-  auto centroids    = raft::make_device_matrix<float, int64_t>(resources, n_partitions, n_features);
-  auto labels       = raft::make_device_vector<uint32_t, int64_t>(resources, n_samples);
-  auto dataset_view = raft::make_const_mdspan(dataset.view());
-
-  auto regular_stats = run_regular_kmeans_comparison<DataT>(
-    resources, dataset_view, n_partitions, n_iters, balance_tolerance);
-
-  cuvs::cluster::kmeans::fit(resources, params, dataset_view, centroids.view());
-  cuvs::cluster::kmeans::predict(
-    resources, params, dataset_view, raft::make_const_mdspan(centroids.view()), labels.view());
-
-  auto balanced_stats = compute_partition_size_stats(
-    resources, n_partitions, raft::make_const_mdspan(labels.view()), balance_tolerance);
-
-  if (regular_stats.has_value()) {
-    auto const histogram_min = std::min(regular_stats->min_size, balanced_stats.min_size);
-    auto const histogram_max = std::max(regular_stats->max_size, balanced_stats.max_size);
-    print_partition_size_stats("Regular k-means", regular_stats.value());
+  auto const has_regular_stats = run_regular_kmeans<DataT>(
+    resources, dataset_view, n_partitions, n_iters, regular_labels.view());
+  std::optional<partition_size_stats> regular_reference_stats;
+  if (has_regular_stats) {
+    regular_reference_stats =
+      compute_partition_size_stats(resources,
+                                   n_partitions,
+                                   raft::make_const_mdspan(regular_labels.view()),
+                                   balance_lower_tolerances.front(),
+                                   balance_upper_tolerances.front());
+    print_partition_size_summary("Regular k-means", regular_reference_stats.value());
     print_partition_size_histogram(
-      "Regular k-means", regular_stats.value(), histogram_min, histogram_max);
-    print_partition_size_stats("Balanced k-means", balanced_stats);
-    print_partition_size_histogram(
-      "Balanced k-means", balanced_stats, histogram_min, histogram_max);
+      "Regular k-means",
+      regular_reference_stats.value(),
+      regular_reference_stats->min_size,
+      regular_reference_stats->mean_size + 2.0 * regular_reference_stats->stddev_size);
   } else {
     std::cout << "Regular k-means comparison is only shown for float input in this example.\n";
-    print_partition_size_stats("Balanced k-means", balanced_stats);
-    print_partition_size_histogram(
-      "Balanced k-means", balanced_stats, balanced_stats.min_size, balanced_stats.max_size);
   }
-  if (regular_stats.has_value()) {
-    print_balance_improvement(regular_stats.value(), balanced_stats);
+
+  for (auto balance_lower_tolerance : balance_lower_tolerances) {
+    for (auto balance_upper_tolerance : balance_upper_tolerances) {
+      std::cout << "\n# balance_lower_tolerance: " << balance_lower_tolerance << '\n'
+                << "# balance_upper_tolerance: " << balance_upper_tolerance << '\n';
+
+      cuvs::cluster::kmeans::balanced_params params;
+      params.metric                  = cuvs::distance::DistanceType::L2Expanded;
+      params.n_iters                 = n_iters;
+      params.balance_lower_tolerance = balance_lower_tolerance;
+      params.balance_upper_tolerance = balance_upper_tolerance;
+      params.centroid_offset         = centroid_offset;
+
+      cuvs::cluster::kmeans::fit(resources, params, dataset_view, centroids.view());
+      cuvs::cluster::kmeans::predict(
+        resources, params, dataset_view, raft::make_const_mdspan(centroids.view()), labels.view());
+
+      auto balanced_stats = compute_partition_size_stats(resources,
+                                                         n_partitions,
+                                                         raft::make_const_mdspan(labels.view()),
+                                                         balance_lower_tolerance,
+                                                         balance_upper_tolerance);
+
+      if (has_regular_stats) {
+        auto const& regular_stats = regular_reference_stats.value();
+        auto const histogram_min  = std::min(regular_stats.min_size, balanced_stats.min_size);
+        auto const histogram_upper =
+          std::max(regular_stats.mean_size + 2.0 * regular_stats.stddev_size,
+                   balanced_stats.mean_size + 2.0 * balanced_stats.stddev_size);
+        print_partition_size_stats("Balanced k-means", balanced_stats);
+        print_partition_size_histogram(
+          "Balanced k-means", balanced_stats, histogram_min, histogram_upper);
+        print_balance_improvement(regular_stats, balanced_stats);
+      } else {
+        print_partition_size_stats("Balanced k-means", balanced_stats);
+        print_partition_size_histogram("Balanced k-means",
+                                       balanced_stats,
+                                       balanced_stats.min_size,
+                                       balanced_stats.mean_size + 2.0 * balanced_stats.stddev_size);
+      }
+    }
   }
 }
 
@@ -400,12 +478,13 @@ int main(int argc, char** argv)
 {
   try {
     struct arguments args = {
-      "",    /* dataset_path */
-      "",    /* dtype */
-      0,     /* n_partitions */
-      20,    /* n_iters */
-      0.33f, /* balance_tolerance */
-      0.01f, /* centroid_offset */
+      "",       /* dataset_path */
+      "",       /* dtype */
+      0,        /* n_partitions */
+      20,       /* n_iters */
+      {0.333f}, /* balance_lower_tolerances */
+      {3.0f},   /* balance_upper_tolerances */
+      0.01f,    /* centroid_offset */
     };
 
     argp_parse(&argp, argc, argv, 0, 0, &args);
@@ -421,9 +500,18 @@ int main(int argc, char** argv)
     if (args.n_iters == 0) {
       error_message += "- Number of k-means iterations must be larger than 0 (-I)\n";
     }
-    if (!std::isfinite(args.balance_tolerance) || args.balance_tolerance <= 0.0f ||
-        args.balance_tolerance >= 1.0f) {
-      error_message += "- Balance tolerance must be in the range (0, 1) (-B)\n";
+    for (auto balance_lower_tolerance : args.balance_lower_tolerances) {
+      if (!std::isfinite(balance_lower_tolerance) || balance_lower_tolerance <= 0.0f ||
+          balance_lower_tolerance >= 1.0f) {
+        error_message += "- Lower balance tolerances must be in the range (0, 1) (-L)\n";
+        break;
+      }
+    }
+    for (auto balance_upper_tolerance : args.balance_upper_tolerances) {
+      if (!std::isfinite(balance_upper_tolerance) || balance_upper_tolerance <= 1.0f) {
+        error_message += "- Upper balance tolerances must be greater than 1 (-U)\n";
+        break;
+      }
     }
     if (!std::isfinite(args.centroid_offset) || args.centroid_offset <= 0.0f ||
         args.centroid_offset > 1.0f) {
@@ -435,32 +523,43 @@ int main(int argc, char** argv)
               << "# dtype: " << args.dtype << '\n'
               << "# partitions: " << args.n_partitions << '\n'
               << "# iterations: " << args.n_iters << '\n'
-              << "# balance_tolerance: " << args.balance_tolerance << '\n'
-              << "# centroid_offset: " << args.centroid_offset << '\n';
+              << "# balance_lower_tolerances:";
+    for (auto value : args.balance_lower_tolerances) {
+      std::cout << ' ' << value;
+    }
+    std::cout << '\n' << "# balance_upper_tolerances:";
+    for (auto value : args.balance_upper_tolerances) {
+      std::cout << ' ' << value;
+    }
+    std::cout << '\n' << "# centroid_offset: " << args.centroid_offset << '\n';
 
     if (args.dtype == "float") {
       partition_dataset<float>(args.dataset_path,
                                args.n_partitions,
                                args.n_iters,
-                               args.balance_tolerance,
+                               args.balance_lower_tolerances,
+                               args.balance_upper_tolerances,
                                args.centroid_offset);
     } else if (args.dtype == "half") {
       partition_dataset<half>(args.dataset_path,
                               args.n_partitions,
                               args.n_iters,
-                              args.balance_tolerance,
+                              args.balance_lower_tolerances,
+                              args.balance_upper_tolerances,
                               args.centroid_offset);
     } else if (args.dtype == "int8") {
       partition_dataset<std::int8_t>(args.dataset_path,
                                      args.n_partitions,
                                      args.n_iters,
-                                     args.balance_tolerance,
+                                     args.balance_lower_tolerances,
+                                     args.balance_upper_tolerances,
                                      args.centroid_offset);
     } else if (args.dtype == "uint8") {
       partition_dataset<std::uint8_t>(args.dataset_path,
                                       args.n_partitions,
                                       args.n_iters,
-                                      args.balance_tolerance,
+                                      args.balance_lower_tolerances,
+                                      args.balance_upper_tolerances,
                                       args.centroid_offset);
     } else {
       throw std::invalid_argument("Unknown data type: " + args.dtype);

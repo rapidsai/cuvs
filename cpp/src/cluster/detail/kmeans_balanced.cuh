@@ -530,10 +530,12 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
  * @param[in] n_rows number of rows in `dataset`
  * @param[in] labels a host pointer to the cluster indices [n_rows]
  * @param[in] cluster_sizes number of rows in each cluster [n_clusters]
- * @param[in] balance_tolerance defines criteria for adjusting clusters:
- *                   min_cluster_size <= average_size * balance_tolerance, or
- *                   max_cluster_size > average_size / balance_tolerance
- *                   0 < balance_tolerance < 1
+ * @param[in] balance_lower_tolerance defines the underfull cluster criterion:
+ *                   min_cluster_size < average_size * balance_lower_tolerance
+ *                   0 < balance_lower_tolerance < 1
+ * @param[in] balance_upper_tolerance defines the overfull donor cluster criterion:
+ *                   max_cluster_size > average_size * balance_upper_tolerance
+ *                   balance_upper_tolerance > 1
  * @param[in] centroid_offset offset from the donor cluster centroid towards a donor point
  * @param[in] mapping_op Mapping operation from T to MathT
  * @param[in] stream CUDA stream
@@ -555,7 +557,8 @@ auto adjust_centers(MathT* centers,
                     IdxT n_rows,
                     const LabelT* labels,
                     const CounterT* cluster_sizes,
-                    MathT balance_tolerance,
+                    MathT balance_lower_tolerance,
+                    MathT balance_upper_tolerance,
                     MathT centroid_offset,
                     MappingOpT mapping_op,
                     rmm::cuda_stream_view stream,
@@ -571,8 +574,8 @@ auto adjust_centers(MathT* centers,
   static IdxT i_primes = 0;
 
   IdxT average         = n_rows / n_clusters;
-  auto lower_threshold = static_cast<MathT>(average) * balance_tolerance;
-  auto upper_threshold = static_cast<MathT>(average) / balance_tolerance;
+  auto lower_threshold = static_cast<MathT>(average) * balance_lower_tolerance;
+  auto upper_threshold = static_cast<MathT>(average) * balance_upper_tolerance;
   std::vector<CounterT> host_cluster_sizes(n_clusters);
   raft::update_host(host_cluster_sizes.data(), cluster_sizes, n_clusters, stream);
   raft::resource::sync_stream(handle, stream);
@@ -592,7 +595,7 @@ auto adjust_centers(MathT* centers,
     auto const& [small_size, small_cluster] = sorted_clusters[pair_id];
     auto const& [large_size, large_cluster] = sorted_clusters[n_clusters - 1 - pair_id];
     if (small_cluster == large_cluster) { break; }
-    if (static_cast<MathT>(small_size) > lower_threshold &&
+    if (static_cast<MathT>(small_size) >= lower_threshold &&
         static_cast<MathT>(large_size) <= upper_threshold) {
       break;
     }
@@ -664,11 +667,12 @@ auto adjust_centers(MathT* centers,
  *   one extra iteration is performed (this could happen several times) (default should be `2`).
  *   In other words, the first and then every `ballancing_pullback`-th rebalancing operation adds
  *   one more iteration to the main cycle.
- * @param[in] balance_tolerance
- *   the lower balance tolerance and the upper donor tolerance. Small clusters are rebalanced when
- *   their paired small cluster is smaller than `avg_size * balance_tolerance`; if their paired
- *   large cluster is larger than `avg_size / balance_tolerance`, the small cluster is rebalanced
- *   towards it.
+ * @param[in] balance_lower_tolerance
+ *   Small clusters are rebalanced when their paired small cluster is smaller than
+ *   `avg_size * balance_lower_tolerance`.
+ * @param[in] balance_upper_tolerance
+ *   If the paired large cluster is larger than `avg_size * balance_upper_tolerance`, the small
+ *   cluster is rebalanced towards it.
  * @param[in] mapping_op Mapping operation from T to MathT
  * @param[inout] device_memory
  *   A memory resource for device allocations (makes sense to provide a memory pool here)
@@ -691,12 +695,15 @@ void balancing_em_iters(const raft::resources& handle,
                         LabelT* cluster_labels,
                         CounterT* cluster_sizes,
                         uint32_t balancing_pullback,
-                        MathT balance_tolerance,
+                        MathT balance_lower_tolerance,
+                        MathT balance_upper_tolerance,
                         MappingOpT mapping_op,
                         rmm::device_async_resource_ref device_memory)
 {
-  RAFT_EXPECTS(balance_tolerance > MathT{0} && balance_tolerance < MathT{1},
-               "Balanced k-means balance tolerance must be in the range (0, 1)");
+  RAFT_EXPECTS(balance_lower_tolerance > MathT{0} && balance_lower_tolerance < MathT{1},
+               "Balanced k-means lower balance tolerance must be in the range (0, 1)");
+  RAFT_EXPECTS(balance_upper_tolerance > MathT{1},
+               "Balanced k-means upper balance tolerance must be greater than 1");
   RAFT_EXPECTS(params.centroid_offset > 0.0f && params.centroid_offset <= 1.0f,
                "Balanced k-means centroid offset must be in the range (0, 1]");
 
@@ -713,7 +720,8 @@ void balancing_em_iters(const raft::resources& handle,
                                    n_rows,
                                    cluster_labels,
                                    cluster_sizes,
-                                   balance_tolerance,
+                                   balance_lower_tolerance,
+                                   balance_upper_tolerance,
                                    static_cast<MathT>(params.centroid_offset),
                                    mapping_op,
                                    stream,
@@ -821,7 +829,8 @@ void build_clusters(const raft::resources& handle,
                      cluster_labels,
                      cluster_sizes,
                      2,
-                     static_cast<MathT>(params.balance_tolerance),
+                     static_cast<MathT>(params.balance_lower_tolerance),
+                     static_cast<MathT>(params.balance_upper_tolerance),
                      mapping_op,
                      device_memory);
 }
@@ -1170,7 +1179,8 @@ void build_hierarchical(const raft::resources& handle,
                      labels.data(),
                      cluster_sizes.data(),
                      5,
-                     static_cast<MathT>(params.balance_tolerance),
+                     static_cast<MathT>(params.balance_lower_tolerance),
+                     static_cast<MathT>(params.balance_upper_tolerance),
                      mapping_op,
                      device_memory);
 
