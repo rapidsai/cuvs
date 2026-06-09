@@ -202,11 +202,12 @@ struct dataset_descriptor_host {
   uint32_t team_size             = 0;
 
   // JIT LTO metadata - stored when descriptor is created
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
-  uint32_t dataset_block_dim          = 0;
-  bool is_vpq                         = false;
-  uint32_t pq_bits                    = 0;
-  uint32_t pq_len                     = 0;
+  cuvs::distance::DistanceType metric               = cuvs::distance::DistanceType::L2Expanded;
+  uint32_t dataset_block_dim                        = 0;
+  bool is_vpq                                       = false;
+  uint32_t pq_bits                                  = 0;
+  uint32_t pq_len                                   = 0;
+  cuvs::neighbors::cagra::internal_dtype smem_dtype = cuvs::neighbors::cagra::internal_dtype::F16;
   // Codebook type is determined by DataT for VPQ (always half for now)
 
   struct state {
@@ -221,11 +222,15 @@ struct dataset_descriptor_host {
     template <typename InitF>
     state(InitF init, size_t size) : ready{false}, value{std::make_tuple(init, size)}
     {
+      // RAFT_LOG_INFO("trying to create a descriptor state %p",
+      // reinterpret_cast<std::uintptr_t>(this));
     }
 
     ~state() noexcept
     {
       if (std::holds_alternative<ready_t>(value)) {
+        // RAFT_LOG_INFO("trying to free descriptor state %p",
+        // reinterpret_cast<std::uintptr_t>(this));
         auto& [ptr, stream] = std::get<ready_t>(value);
         RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(ptr, stream));
       }
@@ -258,7 +263,9 @@ struct dataset_descriptor_host {
                           uint32_t dataset_block_dim_val,
                           bool is_vpq_val      = false,
                           uint32_t pq_bits_val = 0,
-                          uint32_t pq_len_val  = 0)
+                          uint32_t pq_len_val  = 0,
+                          cuvs::neighbors::cagra::internal_dtype smem_dtype_val =
+                            cuvs::neighbors::cagra::internal_dtype::F16)
     : value_{std::make_shared<state>(init, sizeof(DescriptorImpl))},
       smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
       team_size{dd_host.team_size()},
@@ -266,7 +273,8 @@ struct dataset_descriptor_host {
       dataset_block_dim{dataset_block_dim_val},
       is_vpq{is_vpq_val},
       pq_bits{pq_bits_val},
-      pq_len{pq_len_val}
+      pq_len{pq_len_val},
+      smem_dtype{smem_dtype_val}
   {
   }
 
