@@ -20,10 +20,10 @@ You can also install through pip:
 
 ```bash
 # CUDA 13
-pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
+pip install cuvs-cu13
 
 # CUDA 12
-pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
+pip install cuvs-cu12
 ```
 
 The pip packages statically link the C and C++ libraries, so `libcuvs` and `libcuvs_c` shared libraries are not readily available for use by external code.
