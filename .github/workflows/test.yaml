@@ -39,6 +39,7 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       symbol_exclusions: (void (thrust::|cub::))
+      package_name: libcuvs
   conda-cpp-tests:
     permissions:
       actions: read
