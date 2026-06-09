@@ -120,7 +120,7 @@ GPU acceleration can help across the vector-search pipeline, not only during que
 
 Some systems use GPUs only where they are most valuable. For example, a graph index can be built quickly on the GPU and converted to a CPU-searchable format such as HNSW, or a database can offload index builds to a GPU worker while keeping serving in its existing CPU runtime. These hybrid patterns let products shorten ingest or rebuild time without requiring every query-serving node to have a GPU.
 
-For more integration details, see [Hybrid GPU-build and CPU-search](/user-guide/integration-patterns#hybrid-gpu-build-and-cpu-search) and [Offloaded index builds](/user-guide/integration-patterns#offloaded-index-builds).
+For more integration details, see [Hybrid GPU-build and CPU-search](/user-guide/field-guide/integration-patterns#hybrid-gpu-build-and-cpu-search) and [Offloaded index builds](/user-guide/field-guide/integration-patterns#offloaded-index-builds).
 
 ## Choosing Index Types
 
