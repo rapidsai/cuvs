@@ -23,8 +23,8 @@ mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
 
 # populates `RATTLER_CHANNELS` array and `RATTLER_ARGS` array
-source rapids-rattler-channel-string
 source ./ci/use_conda_packages_from_prs.sh
+source rapids-rattler-channel-string
 
 # --no-build-id allows for caching with `sccache`
 # more info is available at
