@@ -18,6 +18,7 @@ mod dlpack;
 mod error;
 pub mod ivf_flat;
 pub mod ivf_pq;
+pub mod preprocessing;
 mod resources;
 pub mod vamana;
 
