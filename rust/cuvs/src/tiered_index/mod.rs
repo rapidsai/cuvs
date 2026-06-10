@@ -17,8 +17,7 @@
 //! Example:
 //! ```
 //!
-//! use cuvs::tiered_index::{AnnAlgo, Index, IndexParams};
-//! use cuvs::cagra::SearchParams;
+//! use cuvs::tiered_index::{AnnAlgo, Index, IndexParams, SearchParams};
 //! use cuvs::{ManagedTensor, Resources, Result};
 //!
 //! use ndarray::s;
@@ -59,8 +58,8 @@
 //!     let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
 //!     let distances = ManagedTensor::from(&distances_host).to_device(&res)?;
 //!
-//!     // CAGRA-backed tiered index searches with CAGRA SearchParams
-//!     let search_params = SearchParams::new()?;
+//!     // The search params variant must match the index's ANN backend.
+//!     let search_params = SearchParams::Cagra(cuvs::cagra::SearchParams::new()?);
 //!     index.search(&res, &search_params, &queries, &neighbors, &distances)?;
 //!
 //!     neighbors.to_host(&res, &mut neighbors_host)?;
@@ -73,6 +72,8 @@
 
 mod index;
 mod index_params;
+mod search_params;
 
 pub use index::Index;
 pub use index_params::{AnnAlgo, IndexParams};
+pub use search_params::SearchParams;

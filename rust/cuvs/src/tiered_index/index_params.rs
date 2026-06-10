@@ -55,6 +55,12 @@ impl IndexParams {
         self.inner
     }
 
+    /// Which ANN algorithm backs the ANN tier, captured at build time so the
+    /// index can validate that search params match the backend.
+    pub(crate) fn algo(&self) -> AnnAlgo {
+        unsafe { (*self.inner).algo }
+    }
+
     /// DistanceType to use for building the index.
     pub fn set_metric(self, metric: DistanceType) -> IndexParams {
         unsafe {

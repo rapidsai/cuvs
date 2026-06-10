@@ -5,11 +5,10 @@
 
 use std::io::{Write, stderr};
 
-use crate::cagra::SearchParams;
 use crate::dlpack::ManagedTensor;
-use crate::error::{Result, check_cuvs};
+use crate::error::{Error, Result, check_cuvs};
 use crate::resources::Resources;
-use crate::tiered_index::IndexParams;
+use crate::tiered_index::{AnnAlgo, IndexParams, SearchParams};
 
 /// Tiered ANN Index.
 ///
@@ -23,7 +22,13 @@ use crate::tiered_index::IndexParams;
 /// wrapper does not expose persistence (and therefore takes no filesystem
 /// paths).
 #[derive(Debug)]
-pub struct Index(ffi::cuvsTieredIndex_t);
+pub struct Index {
+    handle: ffi::cuvsTieredIndex_t,
+    /// The ANN backend the index was built with, used to validate that search
+    /// params match the backend (the C search API reinterprets an opaque
+    /// `void*` per this algo).
+    algo: AnnAlgo,
+}
 
 impl Index {
     /// Builds a new tiered Index from the dataset for efficient search.
@@ -39,24 +44,28 @@ impl Index {
         dataset: T,
     ) -> Result<Index> {
         let dataset: ManagedTensor = dataset.into();
-        let index = Index::new()?;
+        let handle = Index::create_handle()?;
         unsafe {
             check_cuvs(ffi::cuvsTieredIndexBuild(
                 res.0,
                 params.as_ptr(),
                 dataset.as_ptr(),
-                index.0,
+                handle,
             ))?;
         }
-        Ok(index)
+        // Capture the backend so search() can reject mismatched params.
+        Ok(Index { handle, algo: params.algo() })
     }
 
     /// Creates a new empty index handle.
-    pub fn new() -> Result<Index> {
+    ///
+    /// Private: [`Index::build`] is the only public constructor so that every
+    /// `Index` carries the backend algo captured from its build params.
+    fn create_handle() -> Result<ffi::cuvsTieredIndex_t> {
         unsafe {
             let mut index = std::mem::MaybeUninit::<ffi::cuvsTieredIndex_t>::uninit();
             check_cuvs(ffi::cuvsTieredIndexCreate(index.as_mut_ptr()))?;
-            Ok(Index(index.assume_init()))
+            Ok(index.assume_init())
         }
     }
 
@@ -72,13 +81,15 @@ impl Index {
     /// * `new_vectors` - A row-major matrix on either the host or device to add
     pub fn extend<T: Into<ManagedTensor>>(&self, res: &Resources, new_vectors: T) -> Result<()> {
         let new_vectors: ManagedTensor = new_vectors.into();
-        unsafe { check_cuvs(ffi::cuvsTieredIndexExtend(res.0, new_vectors.as_ptr(), self.0)) }
+        unsafe { check_cuvs(ffi::cuvsTieredIndexExtend(res.0, new_vectors.as_ptr(), self.handle)) }
     }
 
     /// Performs an Approximate Nearest Neighbors search on the Index.
     ///
-    /// `params` must match the ANN backend the index was built with; for the
-    /// default CAGRA backend these are [`crate::cagra::SearchParams`].
+    /// `params` must match the ANN backend the index was built with (e.g.
+    /// [`SearchParams::Cagra`] for a CAGRA-backed index); a mismatch returns
+    /// [`crate::error::Error::InvalidArgument`] rather than risking the
+    /// undefined behavior of the C API reinterpreting the wrong struct.
     ///
     /// # Arguments
     ///
@@ -96,14 +107,14 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         let no_filter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
-        self.search_with_filter(res, params, queries, neighbors, distances, no_filter)
+        self.search_impl(res, params, queries, neighbors, distances, no_filter)
     }
 
-    /// Performs an Approximate Nearest Neighbors search with a prefilter.
+    /// Performs an Approximate Nearest Neighbors search with a bitset prefilter.
     ///
-    /// The prefilter is a [`ffi::cuvsFilter`] holding the address of a bitset or
-    /// bitmap tensor (and its [`ffi::cuvsFilterType`]) used to exclude vectors
-    /// from the result set. Use [`Index::search`] for an unfiltered search.
+    /// Like [`search`](Self::search), but accepts a bitset filter to exclude
+    /// vectors from the result set. `params` must match the index's backend;
+    /// a mismatch returns [`crate::error::Error::InvalidArgument`].
     ///
     /// # Arguments
     ///
@@ -112,8 +123,28 @@ impl Index {
     /// * `queries` - A matrix in device memory to query for
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
-    /// * `prefilter` - A [`ffi::cuvsFilter`] describing the bitset/bitmap to apply
+    /// * `bitset` - A 1-D `uint32` device tensor with `ceil(n_rows / 32)` elements.
+    ///   Each bit corresponds to a dataset row: bit 1 = include, bit 0 = exclude.
     pub fn search_with_filter(
+        &self,
+        res: &Resources,
+        params: &SearchParams,
+        queries: &ManagedTensor,
+        neighbors: &ManagedTensor,
+        distances: &ManagedTensor,
+        bitset: &ManagedTensor,
+    ) -> Result<()> {
+        let prefilter =
+            ffi::cuvsFilter { addr: bitset.as_ptr() as usize, type_: ffi::cuvsFilterType::BITSET };
+        self.search_impl(res, params, queries, neighbors, distances, prefilter)
+    }
+
+    /// Shared search path for the filtered and unfiltered variants.
+    ///
+    /// Validates that `params` matches the index's build-time backend before
+    /// handing the opaque pointer to the C API (which reinterprets it per the
+    /// index's algo — a mismatch would be undefined behavior).
+    fn search_impl(
         &self,
         res: &Resources,
         params: &SearchParams,
@@ -122,13 +153,21 @@ impl Index {
         distances: &ManagedTensor,
         prefilter: ffi::cuvsFilter,
     ) -> Result<()> {
+        if params.algo() != self.algo {
+            return Err(Error::InvalidArgument(format!(
+                "searched with {:?} params but index was built with {:?}",
+                params.algo(),
+                self.algo,
+            )));
+        }
         unsafe {
             check_cuvs(ffi::cuvsTieredIndexSearch(
                 res.0,
                 // The C API takes the backend's search params as an opaque
-                // void*; CAGRA is the default backend.
-                params.0 as *mut std::os::raw::c_void,
-                self.0,
+                // void*; the variant is validated above to match the index's
+                // build-time backend.
+                params.as_void_ptr(),
+                self.handle,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
@@ -140,7 +179,7 @@ impl Index {
 
 impl Drop for Index {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsTieredIndexDestroy(self.0) }) {
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsTieredIndexDestroy(self.handle) }) {
             write!(stderr(), "failed to call cuvsTieredIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
@@ -151,6 +190,7 @@ impl Drop for Index {
 mod tests {
     use super::*;
     use crate::tiered_index::AnnAlgo;
+    use crate::{cagra, ivf_flat};
     use ndarray::s;
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::Uniform;
@@ -189,7 +229,7 @@ mod tests {
         let distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
         let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
-        let search_params = SearchParams::new().unwrap();
+        let search_params = SearchParams::Cagra(cagra::SearchParams::new().unwrap());
         index.search(&res, &search_params, &queries, &neighbors, &distances).unwrap();
 
         neighbors.to_host(&res, &mut neighbors_host).unwrap();
@@ -229,7 +269,7 @@ mod tests {
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_new, k));
         let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
-        let search_params = SearchParams::new().unwrap();
+        let search_params = SearchParams::Cagra(cagra::SearchParams::new().unwrap());
         index.search(&res, &search_params, &queries, &neighbors, &distances).unwrap();
 
         neighbors.to_host(&res, &mut neighbors_host).unwrap();
@@ -263,7 +303,7 @@ mod tests {
         let index = Index::build(&res, &default_params(), dataset_device)
             .expect("failed to build tiered index");
 
-        let search_params = SearchParams::new().unwrap();
+        let search_params = SearchParams::Cagra(cagra::SearchParams::new().unwrap());
         let k = 8;
         let n_batch = 4;
         let mut total = n_initial;
@@ -334,8 +374,6 @@ mod tests {
         let mut bitset_host = ndarray::Array::<u32, _>::from_elem(n_words, u32::MAX);
         bitset_host[0] &= !1u32; // clear bit 0 -> exclude id 0
         let bitset = ManagedTensor::from(&bitset_host).to_device(&res).unwrap();
-        let prefilter =
-            ffi::cuvsFilter { addr: bitset.as_ptr() as usize, type_: ffi::cuvsFilterType::BITSET };
 
         let n_queries = 1;
         let queries = dataset.slice(s![0..n_queries, ..]);
@@ -346,15 +384,58 @@ mod tests {
         let distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
         let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
-        let search_params = SearchParams::new().unwrap();
+        let search_params = SearchParams::Cagra(cagra::SearchParams::new().unwrap());
         index
-            .search_with_filter(&res, &search_params, &queries, &neighbors, &distances, prefilter)
+            .search_with_filter(&res, &search_params, &queries, &neighbors, &distances, &bitset)
             .unwrap();
 
         neighbors.to_host(&res, &mut neighbors_host).unwrap();
         // id 0 was filtered out, so it must not appear among the neighbors.
         for j in 0..k {
             assert_ne!(neighbors_host[[0, j]], 0, "filtered id 0 must not be returned");
+        }
+    }
+
+    /// (e) Backend mismatch: searching a CAGRA-backed index with IVF-Flat
+    /// search params must be rejected before reaching the C API (which would
+    /// otherwise reinterpret the wrong struct — undefined behavior).
+    #[test]
+    fn test_search_params_backend_mismatch() {
+        let res = Resources::new().unwrap();
+
+        let n_features = 16;
+        let n_datapoints = 1024;
+        let dataset =
+            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+
+        // CAGRA-backed index (default_params sets CUVS_TIERED_INDEX_ALGO_CAGRA).
+        let index = Index::build(&res, &default_params(), dataset_device)
+            .expect("failed to build tiered index");
+
+        let n_queries = 1;
+        let queries = dataset.slice(s![0..n_queries, ..]);
+        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+        let k = 5;
+        let neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
+        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+        let distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+
+        // Wrong-backend params: IVF-Flat against a CAGRA index.
+        let search_params = SearchParams::IvfFlat(ivf_flat::SearchParams::new().unwrap());
+        let err = index
+            .search(&res, &search_params, &queries, &neighbors, &distances)
+            .expect_err("mismatched search params must be rejected");
+
+        match err {
+            Error::InvalidArgument(msg) => {
+                assert!(
+                    msg.contains("IVF_FLAT") && msg.contains("CAGRA"),
+                    "error should mention both the searched and built backends: {msg}"
+                );
+            }
+            other => panic!("expected InvalidArgument, got {other:?}"),
         }
     }
 }
