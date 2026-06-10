@@ -382,6 +382,9 @@ struct KmeansMGNcclInputs {
   int partitions_per_rank;
   cuvs::cluster::kmeans::params::InitMethod init = cuvs::cluster::kmeans::params::Array;
   int max_iter                                   = 20;
+  // When true, partitions are allocated on the host and the host vector-of-mdspan `mg::fit`
+  // overload is invoked from inside the OMP region.
+  bool host_data = false;
 };
 
 template <typename T>
@@ -477,45 +480,8 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
         const int rank_off = r * base + std::min(r, rem);
         const int rank_n   = base + (r < rem ? 1 : 0);
 
-        rmm::device_uvector<T> d_X_rank(static_cast<size_t>(rank_n) * n_features, rank_stream);
-        if (rank_n > 0) {
-          raft::update_device(d_X_rank.data(),
-                              h_X + static_cast<size_t>(rank_off) * n_features,
-                              d_X_rank.size(),
-                              rank_stream);
-        }
-
-        std::optional<rmm::device_uvector<T>> d_w_rank;
-        if (has_weights) {
-          d_w_rank.emplace(static_cast<size_t>(rank_n), rank_stream);
-          if (rank_n > 0) {
-            raft::update_device(
-              d_w_rank->data(), h_w.data() + rank_off, static_cast<size_t>(rank_n), rank_stream);
-          }
-        }
-
-        // Trailing partitions get 0 rows when K > rank_n (empty-partition path).
-        std::vector<raft::device_matrix_view<const T, int64_t>> X_parts;
-        X_parts.reserve(static_cast<size_t>(partitions_per_rank));
-        std::optional<std::vector<raft::device_vector_view<const T, int64_t>>> sw_parts;
-        if (has_weights) {
-          sw_parts.emplace();
-          sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
-        }
         const int part_base = rank_n / partitions_per_rank;
         const int part_rem  = rank_n % partitions_per_rank;
-        for (int p = 0; p < partitions_per_rank; ++p) {
-          int p_off  = p * part_base + std::min(p, part_rem);
-          int p_rows = part_base + (p < part_rem ? 1 : 0);
-
-          X_parts.push_back(raft::make_device_matrix_view<const T, int64_t>(
-            d_X_rank.data() + static_cast<size_t>(p_off) * n_features, p_rows, n_features));
-
-          if (sw_parts.has_value()) {
-            sw_parts->push_back(
-              raft::make_device_vector_view<const T, int64_t>(d_w_rank->data() + p_off, p_rows));
-          }
-        }
 
         rmm::device_uvector<T> d_rank_centroids(static_cast<size_t>(n_clusters) * n_features,
                                                 rank_stream);
@@ -538,14 +504,111 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
         T local_inertia      = T{0};
         int64_t local_n_iter = 0;
 
-        cuvs::cluster::kmeans::mg::fit(clique_,
-                                       kp,
-                                       X_parts,
-                                       sw_parts,
-                                       raft::make_device_matrix_view<T, int64_t>(
-                                         d_rank_centroids.data(), n_clusters, n_features),
-                                       raft::make_host_scalar_view(&local_inertia),
-                                       raft::make_host_scalar_view(&local_n_iter));
+        auto d_rank_centroids_view = raft::make_device_matrix_view<T, int64_t>(
+          d_rank_centroids.data(), n_clusters, n_features);
+
+        if (!testparams_.host_data) {
+          // Device-partition path: each partition is its own rmm::device_uvector.
+          std::vector<rmm::device_uvector<T>> d_X_parts;
+          d_X_parts.reserve(static_cast<size_t>(partitions_per_rank));
+          std::optional<std::vector<rmm::device_uvector<T>>> d_w_parts;
+          if (has_weights) {
+            d_w_parts.emplace();
+            d_w_parts->reserve(static_cast<size_t>(partitions_per_rank));
+          }
+
+          std::vector<raft::device_matrix_view<const T, int64_t>> X_parts;
+          X_parts.reserve(static_cast<size_t>(partitions_per_rank));
+          std::optional<std::vector<raft::device_vector_view<const T, int64_t>>> sw_parts;
+          if (has_weights) {
+            sw_parts.emplace();
+            sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
+          }
+
+          for (int p = 0; p < partitions_per_rank; ++p) {
+            int p_off  = p * part_base + std::min(p, part_rem);
+            int p_rows = part_base + (p < part_rem ? 1 : 0);
+
+            d_X_parts.emplace_back(static_cast<size_t>(p_rows) * n_features, rank_stream);
+            if (p_rows > 0) {
+              raft::update_device(d_X_parts.back().data(),
+                                  h_X + static_cast<size_t>(rank_off + p_off) * n_features,
+                                  d_X_parts.back().size(),
+                                  rank_stream);
+            }
+            X_parts.push_back(raft::make_device_matrix_view<const T, int64_t>(
+              d_X_parts.back().data(), p_rows, n_features));
+
+            if (d_w_parts.has_value()) {
+              d_w_parts->emplace_back(static_cast<size_t>(p_rows), rank_stream);
+              if (p_rows > 0) {
+                raft::update_device(d_w_parts->back().data(),
+                                    h_w.data() + rank_off + p_off,
+                                    static_cast<size_t>(p_rows),
+                                    rank_stream);
+              }
+              sw_parts->push_back(
+                raft::make_device_vector_view<const T, int64_t>(d_w_parts->back().data(), p_rows));
+            }
+          }
+
+          cuvs::cluster::kmeans::mg::fit(clique_,
+                                         kp,
+                                         X_parts,
+                                         sw_parts,
+                                         d_rank_centroids_view,
+                                         raft::make_host_scalar_view(&local_inertia),
+                                         raft::make_host_scalar_view(&local_n_iter));
+        } else {
+          std::vector<std::vector<T>> h_X_parts_buf;
+          h_X_parts_buf.reserve(static_cast<size_t>(partitions_per_rank));
+          std::optional<std::vector<std::vector<T>>> h_w_parts_buf;
+          if (has_weights) {
+            h_w_parts_buf.emplace();
+            h_w_parts_buf->reserve(static_cast<size_t>(partitions_per_rank));
+          }
+
+          std::vector<raft::host_matrix_view<const T, int64_t>> X_parts;
+          X_parts.reserve(static_cast<size_t>(partitions_per_rank));
+          std::optional<std::vector<raft::host_vector_view<const T, int64_t>>> sw_parts;
+          if (has_weights) {
+            sw_parts.emplace();
+            sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
+          }
+
+          for (int p = 0; p < partitions_per_rank; ++p) {
+            int p_off  = p * part_base + std::min(p, part_rem);
+            int p_rows = part_base + (p < part_rem ? 1 : 0);
+
+            h_X_parts_buf.emplace_back(static_cast<size_t>(p_rows) * n_features, T{0});
+            if (p_rows > 0) {
+              std::copy_n(h_X + static_cast<size_t>(rank_off + p_off) * n_features,
+                          static_cast<size_t>(p_rows) * n_features,
+                          h_X_parts_buf.back().data());
+            }
+            X_parts.push_back(raft::make_host_matrix_view<const T, int64_t>(
+              h_X_parts_buf.back().data(), p_rows, n_features));
+
+            if (h_w_parts_buf.has_value()) {
+              h_w_parts_buf->emplace_back(static_cast<size_t>(p_rows), T{0});
+              if (p_rows > 0) {
+                std::copy_n(h_w.data() + rank_off + p_off,
+                            static_cast<size_t>(p_rows),
+                            h_w_parts_buf->back().data());
+              }
+              sw_parts->push_back(raft::make_host_vector_view<const T, int64_t>(
+                h_w_parts_buf->back().data(), p_rows));
+            }
+          }
+
+          cuvs::cluster::kmeans::mg::fit(clique_,
+                                         kp,
+                                         X_parts,
+                                         sw_parts,
+                                         d_rank_centroids_view,
+                                         raft::make_host_scalar_view(&local_inertia),
+                                         raft::make_host_scalar_view(&local_n_iter));
+        }
 
         if (r == 0) {
           // `mnmg_fit` writes outputs only on rank 0.
@@ -710,6 +773,53 @@ const std::vector<KmeansMGNcclInputs<float>> mg_nccl_inputsf = {
    cuvs::cluster::kmeans::params::KMeansPlusPlus},
   // Empty-partition coverage: <=3 rows/rank split into 4 partitions.
   {10, 4, 3, 0.001f, kmeans_weight_mode::none, 10, 1, 4},
+  {10000, 16, 10, 0.0001f, kmeans_weight_mode::mild_nonuniform, 1024, 1, 5},
+  {2000,
+   16,
+   8,
+   0.0001f,
+   kmeans_weight_mode::none,
+   2000,
+   1,
+   3,
+   cuvs::cluster::kmeans::params::KMeansPlusPlus},
+  // Host partitions
+  {1000,
+   32,
+   5,
+   0.0001f,
+   kmeans_weight_mode::none,
+   256,
+   1,
+   3,
+   cuvs::cluster::kmeans::params::Array,
+   20,
+   true},
+  // Host-partition with weights + small batch size (multiple batches per
+  // partition stress the streaming + per-partition offset interaction).
+  {2000,
+   16,
+   6,
+   0.0001f,
+   kmeans_weight_mode::mild_nonuniform,
+   128,
+   1,
+   4,
+   cuvs::cluster::kmeans::params::Array,
+   20,
+   true},
+  // Host-partition KMeans++ (host out-of-core sample-to-root init path) with 2 parts/rank.
+  {1000,
+   16,
+   5,
+   0.0001f,
+   kmeans_weight_mode::none,
+   512,
+   1,
+   2,
+   cuvs::cluster::kmeans::params::KMeansPlusPlus,
+   20,
+   true},
 };
 
 // ============================================================================
@@ -729,6 +839,31 @@ const std::vector<KmeansMGNcclInputs<double>> mg_nccl_inputsd = {
    1,
    2,
    cuvs::cluster::kmeans::params::KMeansPlusPlus},
+  {10000, 16, 10, 0.0001, kmeans_weight_mode::mild_nonuniform, 1024, 1, 5},
+  // Host-partition multi-rank with weights and small batches.
+  {2000,
+   16,
+   6,
+   0.0001,
+   kmeans_weight_mode::mild_nonuniform,
+   128,
+   1,
+   4,
+   cuvs::cluster::kmeans::params::Array,
+   20,
+   true},
+  // Host-partition KMeans++ with 2 parts/rank.
+  {1000,
+   16,
+   5,
+   0.0001,
+   kmeans_weight_mode::none,
+   512,
+   1,
+   2,
+   cuvs::cluster::kmeans::params::KMeansPlusPlus,
+   20,
+   true},
 };
 
 typedef KmeansMGNcclTest<float> KmeansMGNcclTestF;
