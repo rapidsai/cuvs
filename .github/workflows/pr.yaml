@@ -406,6 +406,7 @@ jobs:
     with:
       build_type: pull-request
       symbol_exclusions: (void (thrust::|cub::))
+      package_name: libcuvs
   conda-python-build:
     needs: conda-cpp-build
     permissions:
