@@ -112,26 +112,32 @@ void initKMeansPlusPlus_distributed(
 
   raft::random::RngState rng(params.rng_state.seed, raft::random::GeneratorType::GenPhilox);
 
+  auto d_rp = raft::make_device_scalar<int>(handle, 0);
+  int rp    = 0;
+
   // Step 1.1 - choose the source rank deterministically (same seed -> same rp on all ranks).
-  std::mt19937 gen(params.rng_state.seed);
-  std::uniform_int_distribution<int> rank_dist(0, num_ranks - 1);
-  const int rp = rank_dist(gen);
+  if (rank == KMEANS_COMM_ROOT) {
+    std::mt19937 gen(params.rng_state.seed);
+    std::uniform_int_distribution<int> rank_dist(0, num_ranks - 1);
+    rp = rank_dist(gen);
+    raft::copy(d_rp.data_handle(), &rp, 1, stream);
+  }
+  comms.bcast(d_rp.data_handle(), static_cast<size_t>(1), KMEANS_COMM_ROOT);
+  raft::copy(&rp, d_rp.data_handle(), 1, stream);
+  raft::resource::sync_stream(handle);
 
   // Step 1.2 - the source rank picks one of its local rows uniformly.
   // Matches the original: re-seed mt19937(seed) so cIdx is the first draw of a
   // fresh generator (not the second draw of the same one used for rp).
   IndexT chosen_local_idx = -1;
+  auto initialCentroid    = raft::make_device_matrix<DataT, IndexT>(handle, 1, n_features);
   if (rank == rp) {
     RAFT_EXPECTS(n_local > 0,
                  "selected source rank %d has no local rows; cannot pick an initial centroid",
                  rp);
     std::mt19937 row_gen(params.rng_state.seed);
     std::uniform_int_distribution<IndexT> row_dist(IndexT{0}, n_local - 1);
-    chosen_local_idx = row_dist(row_gen);
-  }
-
-  auto initialCentroid = raft::make_device_matrix<DataT, IndexT>(handle, 1, n_features);
-  if (rank == rp) {
+    chosen_local_idx             = row_dist(row_gen);
     auto [part_idx, row_in_part] = locate_local_row(part_offsets, chosen_local_idx);
     auto const* src_row          = X_parts[part_idx].data_handle() + row_in_part * n_features;
     raft::copy(
@@ -151,8 +157,7 @@ void initKMeansPlusPlus_distributed(
     raft::copy(isSampleCentroid.data_handle() + chosen_local_idx, &one, 1, stream);
   }
 
-  // Growable buffer of candidate centroids (the "C" set). All ranks keep the
-  // same content after every allgatherv.
+  // Growable buffer of candidate centroids (the "C" set).
   rmm::device_uvector<DataT> centroidsBuf(static_cast<std::size_t>(n_features), stream);
   raft::copy(
     handle,
@@ -307,10 +312,10 @@ void initKMeansPlusPlus_distributed(
       auto old_size = centroidsBuf.size();
       centroidsBuf.resize(old_size + static_cast<std::size_t>(total_new) * n_features, stream);
       comms.allgatherv(local_cp.data(),
-                       centroidsBuf.data() + old_size,
+                       centroidsBuf.end() - total_new * n_features,
                        sizes.data(),
                        displs.data(),
-                       static_cast<std::size_t>(total_local_sampled) * n_features);
+                       local_cp.size());
     }
 
     IndexT tot_centroids = static_cast<IndexT>(potentialCentroids.extent(0)) + total_new;
