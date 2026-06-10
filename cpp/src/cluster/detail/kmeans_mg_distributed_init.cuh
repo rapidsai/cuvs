@@ -23,7 +23,6 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/matrix/init.cuh>
-#include <raft/random/permute.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -383,41 +382,31 @@ void initKMeansPlusPlus_distributed(
       std::ref(workspace));
 
   } else if (static_cast<IndexT>(potentialCentroids.extent(0)) < n_clusters) {
-    // Fewer candidates than requested centroids; supplement with random rows
-    // drawn from the rank's local data (matches the original
-    // initRandom-on-X call). Replicates shuffleAndGather without
-    // concatenating the local parts: produce the same device permutation
-    // over [0, n_local), then map each of the first n_random local indices
-    // back to (part, row_in_part) and copy that single row into
-    // centroidsRawData.
     const IndexT n_random = n_clusters - static_cast<IndexT>(potentialCentroids.extent(0));
     RAFT_LOG_DEBUG(
-      "Distributed KMeans||: candidates (%d) < n_clusters (%d); sampling %d random rows",
+      "[r=%d] dist_init: candidates (%d) < n_clusters (%d); globally sampling %d random rows",
+      rank,
       static_cast<int>(potentialCentroids.extent(0)),
       static_cast<int>(n_clusters),
       static_cast<int>(n_random));
 
-    auto indices = raft::make_device_vector<IndexT, IndexT>(handle, n_local);
-    raft::random::permute<DataT, IndexT, IndexT>(indices.data_handle(),
-                                                 /*outX=*/nullptr,
-                                                 /*inX=*/nullptr,
-                                                 n_features,
-                                                 n_local,
-                                                 /*rowMajor=*/true,
-                                                 stream);
+    auto random_centroids = sample_global_rows(handle,
+                                               params,
+                                               X_parts,
+                                               n_features,
+                                               n_random,
+                                               rank,
+                                               rank_counts,
+                                               global_n,
+                                               comms,
+                                               /*result_on_all_ranks=*/true);
 
-    std::vector<IndexT> h_indices(static_cast<std::size_t>(n_random));
-    raft::copy(h_indices.data(), indices.data_handle(), static_cast<std::size_t>(n_random), stream);
-    raft::resource::sync_stream(handle);
+    raft::copy(centroidsRawData.data_handle(),
+               random_centroids.data_handle(),
+               random_centroids.size(),
+               stream);
 
-    for (IndexT i = 0; i < n_random; ++i) {
-      auto [part_idx, row_in_part] = locate_local_row(part_offsets, h_indices[i]);
-      raft::copy(centroidsRawData.data_handle() + static_cast<std::size_t>(i) * n_features,
-                 X_parts[part_idx].data_handle() + row_in_part * n_features,
-                 n_features,
-                 stream);
-    }
-
+    // copy centroids generated during kmeans|| iteration to the buffer
     raft::copy(centroidsRawData.data_handle() + static_cast<std::size_t>(n_random) * n_features,
                potentialCentroids.data_handle(),
                potentialCentroids.size(),
