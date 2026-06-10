@@ -497,7 +497,7 @@ namespace filtering {
  * @{
  */
 
-enum class FilterType { None, Bitmap, Bitset, UDF };
+enum class FilterType { None, Bitmap, Bitset, Bloom, UDF };
 
 struct base_filter {
   ~base_filter()                             = default;
@@ -615,6 +615,32 @@ struct bitset_filter : public base_filter {
 
   template <typename csr_matrix_t>
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
+};
+
+/**
+ * @brief Filter CAGRA candidates with a global @c cuco bloom filter over the index.
+ *
+ * Build the filter once on the host with bulk @c add() over the allowed dataset row ids, obtain a
+ * @c ref() from the owning @c cuco::bloom_filter, copy that ref to device memory, and pass the
+ * device pointer as @c filter_data. The linked JIT-LTO fragment probes the same filter for every
+ * query and candidate, similar to @ref bitset_filter but with probabilistic membership tests.
+ *
+ * Bloom filters have no false negatives: if a row was inserted, @c contains returns @c true. False
+ * positives are possible, so highly selective predicates may still need a bitset or UDF for exact
+ * filtering.
+ */
+struct bloom_filter : public base_filter {
+  void* filter_data{nullptr};
+  float filtering_rate{-1.0f};
+
+  bloom_filter() = default;
+
+  explicit bloom_filter(void* filter_data, float filtering_rate = -1.0f)
+    : filter_data(filter_data), filtering_rate(filtering_rate)
+  {
+  }
+
+  FilterType get_filter_type() const override { return FilterType::Bloom; }
 };
 
 /**
