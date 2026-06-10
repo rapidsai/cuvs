@@ -127,12 +127,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker_impl(
     for (std::uint32_t e = 0; e < nelem; e++) {
       const std::uint32_t k = e * kTeamVLen + elem_offset + laneId * vlen;
       if (k >= n_subspace) break;
-      if constexpr (std::is_same_v<PQ_CODEBOOK_LOAD_T, uint32_t>) {
-        device::ldg_cg(pq_codes[e],
-                       reinterpret_cast<const PQ_CODEBOOK_LOAD_T*>(dataset_ptr + 4 + k));
-      } else {
-        pq_codes[e] = *reinterpret_cast<const PQ_CODEBOOK_LOAD_T*>(dataset_ptr + 4 + k);
-      }
+      device::ldg_cg(pq_codes[e], reinterpret_cast<const PQ_CODEBOOK_LOAD_T*>(dataset_ptr + 4 + k));
     }
     //
     if constexpr (PQ_LEN % 2 == 0) {
