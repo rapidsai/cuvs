@@ -180,7 +180,6 @@ void weightSum(
     for (IndexT i = 0; i < n_samples; ++i) {
       wt_sum += weight(i);
     }
-    RAFT_EXPECTS(wt_sum > DataT{0}, "invalid parameter (sum of sample weights must be positive)");
     raft::copy(d_wt_sum.data_handle(), &wt_sum, 1, stream);
   }
 }

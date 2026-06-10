@@ -232,6 +232,15 @@ void mnmg_fit(
 
     comms.allreduce(d_wt.data_handle(), d_wt.data_handle(), 1);
 
+    DataT h_global_wt = DataT{0};
+    raft::copy(&h_global_wt, d_wt.data_handle(), 1, stream);
+    raft::resource::sync_stream(dev_res);
+    RAFT_EXPECTS(h_global_wt > DataT{0},
+                 "invalid parameter (global sum of sample weights must be positive); "
+                 "rank %d observed global sum = %g",
+                 rank,
+                 static_cast<double>(h_global_wt));
+
     const IndexT* d_global_n_ptr = d_global_n.data_handle();
     const DataT* d_wt_ptr        = d_wt.data_handle();
     raft::linalg::map(
