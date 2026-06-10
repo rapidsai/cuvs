@@ -335,7 +335,6 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ)
   ConfigureAnnBench(
     NAME FAISS_CPU_IVF_RABITQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
-    cuvs
   )
 endif()
 
