@@ -189,7 +189,7 @@ void search(raft::resources const& handle,
                dim,
                idx.dim());
   RAFT_EXPECTS(params.n_probes <= idx.rabitq_index().get_num_centroids(),
-               "n_probes (%zu) cannot exceed number of IVF lists (%zu)",
+               "n_probes (%u) cannot exceed number of IVF lists (%zu)",
                params.n_probes,
                idx.rabitq_index().get_num_centroids());
 
