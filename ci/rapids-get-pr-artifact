@@ -1,0 +1,156 @@
+#!/bin/bash
+# Common functionality for downloading artifacts from GitHub PR builds
+#
+# Arguments:
+#   1) repo name
+#   2) PR number
+#   3) "cpp" or "python", to get the artifact for the C++ or Python build, respectively
+#   4) "wheel" or "conda", to get the wheel or conda package artifact, respectively
+#   5) [optional] full commit hash, to get the artifact for a specific commit
+# Flags:
+#   --stable: for wheel python packages that use stable ABI (abi3)
+#   --pure: for conda and wheel packages that are pure builds
+#   --cuda: for cuda-suffixed artifacts (uses `$RAPIDS_CUDA_VERSION`)
+#   --arch {ARCH}: arch to use if different from `$(arch)` -- or use 'any' for pure builds
+#   --pkg_name {package_name}: specify the package name to download if different from repo name (e.g. pylibraft)
+#
+# Additional environment variables recognized by 'rapids-get-pr-artifact':
+#
+#   * RAPIDS_BUILD_WORKFLOW_NAME = Filename for the workflow that build the artifacts you're trying to fetch.
+#                                  Defaults to 'pr.yaml'.
+#
+set -euo pipefail
+
+# Parse flags
+arch_flag=0
+stable_flag=0
+pure_flag=0
+cuda_flag=0
+pkg_name_arg=""
+arch_arg="$(arch)"
+positional_args=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --arch)
+      # shellcheck disable=SC2034
+      arch_arg="$2"
+      # shellcheck disable=SC2034
+      arch_flag=1
+      shift
+      ;;
+    --stable)
+      stable_flag=1
+      shift
+      ;;
+    --pure)
+      # shellcheck disable=SC2034
+      pure_flag=1
+      shift
+      ;;
+    --cuda)
+      cuda_flag=1
+      shift
+      ;;
+    --pkg_name)
+      pkg_name_arg="$2"
+      shift 2
+      ;;
+    -*)
+      echo "Unknown flag: $1" >&2
+      exit 1
+      ;;
+    *)
+      positional_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Check for minimum required arguments
+if [[ ${#positional_args[@]} -lt 4 ]]; then
+  echo "Must specify: REPO_NAME PR_NUMBER PACKAGE_TYPE PACKAGE_FORMAT [COMMIT]" >&2
+  exit 1
+fi
+
+repo_name="${positional_args[0]}"
+repo="rapidsai/${positional_args[0]}"
+pr="${positional_args[1]}"
+package_type="${positional_args[2]}"
+package_format="${positional_args[3]}"
+commit="${positional_args[4]:-}"
+
+# Validate --stable flag
+if (( stable_flag == 1 )); then
+  if [[ "${package_type:-}" != "python" ]]; then
+    rapids-echo-stderr "Error: --stable flag is only compatible with package_type='python'"
+    rapids-echo-stderr "Got: package_format='${package_format}'"
+    exit 1
+  fi
+fi
+
+source rapids-prompt-local-github-auth
+
+# If commit is not provided, get the latest commit on the PR
+if [[ -z "${commit:-}" ]]; then
+    commit=$(rapids-retry --quiet gh pr view "${pr}" --repo "${repo}" --json headRefOid --jq '.headRefOid')
+fi
+
+
+# Generate the artifact name
+
+PACKAGE_NAME="${pkg_name_arg:-${repo_name}}"                   \
+RAPIDS_ARTIFACT_NAME_ARGS=("${package_format}_${package_type}" "$PACKAGE_NAME" "${repo_name}")
+if (( stable_flag == 1 )); then
+   RAPIDS_ARTIFACT_NAME_ARGS+=("--stable")
+fi
+
+if (( cuda_flag == 1 )); then
+   RAPIDS_ARTIFACT_NAME_ARGS+=("--cuda" "$RAPIDS_CUDA_VERSION")
+fi
+
+pkg_name="$(rapids-artifact-name "${RAPIDS_ARTIFACT_NAME_ARGS[@]}")"
+
+# if RAPIDS_BUILD_WORKFLOW_NAME is set, use that instead of any RAPIDS conventions
+if [[ -n "${RAPIDS_BUILD_WORKFLOW_NAME:-}" ]]; then
+  workflow_that_produced_artifacts="${RAPIDS_BUILD_WORKFLOW_NAME}"
+else
+  # otherwise, rely on the RAPIDS workflow name conventions
+  workflow_that_produced_artifacts="pr.yaml"
+fi
+
+# get run ID
+# NOTE: cannot reuse rapids-github-run-id here, because the environment variable
+#       GITHUB_RUN_ID will refer to the run this is being called from, not
+#       the run that generated the artifact we're looking for.
+#
+#       For example, if this is called on a 'cudf' PR to download 'rmm' artifacts,
+#       here we want a run ID from an 'rmm' CI run, not the current 'cudf' one.
+github_run_id=$(
+    RAPIDS_RETRY_SLEEP=120                                 \
+      rapids-retry --quiet gh run list                     \
+          --repo "${repo}"                                 \
+          --branch "pull-request/${pr}"                    \
+          --commit "${commit}"                             \
+          --workflow "${workflow_that_produced_artifacts}" \
+          --json 'createdAt,databaseId'                    \
+          --jq 'sort_by(.createdAt) | reverse | .[0] | .databaseId'
+)
+
+# Passing an empty string to `gh run download` results in it searching all runs from all times... which could be
+# thousands of results and result in exceeding GitHub rate limits. Prevent that.
+if [[ -z "${github_run_id:-}" ]]; then
+  rapids-echo-stderr "ERROR: failed to find a GitHub Actions run for [repo=${repo}, workflow=${workflow_that_produced_artifacts}, branch=pull-request/${pr}, commit=${commit}]."
+  exit 1
+fi
+
+unzip_dest="${RAPIDS_UNZIP_DIR:-$(mktemp -d)}"
+
+rapids-echo-stderr "Downloading and decompressing ${pkg_name} from Run ID ${github_run_id} into ${unzip_dest}"
+rapids-retry gh run download \
+    "${github_run_id}"       \
+    --repo "${repo}"         \
+    --name "${pkg_name}"     \
+    --dir "${unzip_dest}"
+
+echo -n "${unzip_dest}"
