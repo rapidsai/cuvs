@@ -296,10 +296,24 @@ mod tests {
         let bad_out = ndarray::Array::<f32, _>::zeros((n_rows, n_cols));
         let bad_out_device = ManagedTensor::from(&bad_out).to_device(&res).unwrap();
         let result = quantizer.transform(&res, &dataset_device, &bad_out_device);
-        assert!(result.is_err(), "transform must reject a non-i8 output tensor");
+        assert!(
+            matches!(
+                &result,
+                Err(Error::InvalidArgument(msg))
+                    if msg.contains("transform output") && msg.contains("i8 tensor")
+            ),
+            "transform must reject a non-i8 output tensor via the dtype guard, got {result:?}"
+        );
 
         // Same guard on the inverse path's input.
         let result = quantizer.inverse_transform(&res, &bad_out_device, &dataset_device);
-        assert!(result.is_err(), "inverse_transform must reject a non-i8 input tensor");
+        assert!(
+            matches!(
+                &result,
+                Err(Error::InvalidArgument(msg))
+                    if msg.contains("inverse_transform input") && msg.contains("i8 tensor")
+            ),
+            "inverse_transform must reject a non-i8 input tensor via the dtype guard, got {result:?}"
+        );
     }
 }
