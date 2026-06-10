@@ -266,7 +266,15 @@ mod tests {
             .expect("failed to build brute force index");
         res.sync_stream().unwrap();
 
-        let filepath = std::env::temp_dir().join("test_brute_force_index.bin");
+        let unique = format!(
+            "test_brute_force_index_{}_{}.bin",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock before unix epoch")
+                .as_nanos()
+        );
+        let filepath = std::env::temp_dir().join(unique);
         index.serialize(&res, &filepath).expect("failed to serialize brute force index");
 
         assert!(filepath.exists(), "serialized index file should exist");

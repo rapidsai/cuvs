@@ -63,3 +63,5 @@ test result: ok. 3 passed; 0 failed; 0 ignored
 ```
 
 `cargo fmt` and `cargo clippy` are clean for the changed file.
+
+**On `path_to_cstring`:** intentionally mirrored byte-for-byte from `cagra/index.rs` (a third copy arrives with the in-flight IVF-SQ PR #2229). Happy to hoist it into a shared module here or as a follow-up once the serialize PRs settle — whichever you prefer.
