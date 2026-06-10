@@ -207,10 +207,18 @@ mod tests {
         q1_sorted.sort_unstable();
         assert_eq!(q1_sorted, vec![3, 4, 5], "q1 refined set wrong: {:?}", q1);
 
-        // Refined distances must be sorted ascending (nearest first) and the
-        // first entry must be the small in-cluster distance, not noise.
-        assert!(distances_host[[0, 0]] <= distances_host[[0, 1]]);
-        assert!(distances_host[[1, 0]] <= distances_host[[1, 1]]);
+        // Refined distances must be sorted ascending (nearest first) across
+        // the full top-k, and the first entry must be the small in-cluster
+        // distance, not noise.
+        for q in 0..2 {
+            for i in 0..2 {
+                assert!(
+                    distances_host[[q, i]] <= distances_host[[q, i + 1]],
+                    "q{q} distances not ascending at {i}: {:?}",
+                    (distances_host[[q, i]], distances_host[[q, i + 1]])
+                );
+            }
+        }
         assert!(
             distances_host[[0, 0]] < 1.0,
             "q0 nearest distance should be small, got {}",
