@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -188,6 +188,16 @@ public interface CuVSProvider {
    * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
    */
   void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /**
+   * Switch RMM allocations to use stream-ordered asynchronous allocation
+   * ({@code cudaMallocAsync} / {@code cudaFreeAsync}). Unlike the pool resource, this resource
+   * returns memory to the stream without blocking the CPU, eliminating device-wide synchronization
+   * on deallocation. This is especially beneficial when multiple CAGRA searches run concurrently
+   * on separate CUDA streams, because internal workspace allocations no longer serialize kernel
+   * launches. This operation has a global effect and will affect all resources on the current device.
+   */
+  void enableRMMAsyncMemory();
 
   /** Disables pooled memory on the current device, reverting back to the default setting.  */
   void resetRMMPooledMemory();

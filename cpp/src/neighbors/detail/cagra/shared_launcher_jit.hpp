@@ -100,6 +100,8 @@ struct sample_filter_jit_tag {
       using namespace cuvs::neighbors::filtering;
       if constexpr (std::is_same_v<U, none_sample_filter>) {
         return cuvs::neighbors::detail::tag_filter_none{};
+      } else if constexpr (is_mp_bitset_filter<U>::value) {
+        return cuvs::neighbors::detail::tag_filter_mp_bitset{};
       } else if constexpr (requires { std::declval<U>().filter; }) {
         using InnerFilter = decltype(std::declval<U>().filter);
         if constexpr (is_bitset_filter<InnerFilter>::value ||

@@ -40,4 +40,33 @@ struct CagraMultiCtaSearchPlanner
   }
 };
 
+template <typename DataTag,
+          typename IndexTag,
+          typename DistanceTag,
+          typename SourceIndexTag,
+          typename QueryTag,
+          typename CodebookTag,
+          typename SampleFilterJitTag>
+struct CagraMultiCtaMpSearchPlanner
+  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag> {
+  static inline LauncherJitCache launcher_jit_cache{};
+
+  CagraMultiCtaMpSearchPlanner(cuvs::distance::DistanceType /*metric*/,
+                               uint32_t /*team_size*/,
+                               uint32_t /*dataset_block_dim*/,
+                               bool /*is_vpq*/,
+                               uint32_t /*pq_bits*/,
+                               uint32_t /*pq_len*/)
+    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag, SampleFilterJitTag>(
+        "search_multi_cta_mp", launcher_jit_cache)
+  {
+  }
+
+  void add_search_multi_cta_kernel_fragment()
+  {
+    this->template add_static_fragment<
+      fragment_tag_search_multi_cta_mp<DataTag, SourceIndexTag, IndexTag, DistanceTag>>();
+  }
+};
+
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

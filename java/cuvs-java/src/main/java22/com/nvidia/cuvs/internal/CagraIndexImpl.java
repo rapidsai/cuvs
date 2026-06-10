@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
@@ -47,7 +47,7 @@ import java.util.*;
  *
  * @since 25.02
  */
-public class CagraIndexImpl implements CagraIndex {
+public class CagraIndexImpl implements CagraIndex, BufferedCagraSearch {
   private final CuVSResources resources;
   private final IndexReference cagraIndexReference;
   private boolean destroyed;
@@ -336,6 +336,12 @@ public class CagraIndexImpl implements CagraIndex {
           query.getMapping(),
           numQueries);
     }
+  }
+
+  /** Returns the underlying {@code cuvsCagraIndex_t} handle for native-side index passing. */
+  @Override
+  public MemorySegment getIndexHandle() {
+    return cagraIndexReference.getMemorySegment();
   }
 
   @Override
@@ -632,8 +638,10 @@ public class CagraIndexImpl implements CagraIndex {
       cuvsAceParams.npartitions(cuvsAceParamsMemorySegment, cuVSAceParams.getNpartitions());
       cuvsAceParams.ef_construction(cuvsAceParamsMemorySegment, cuVSAceParams.getEfConstruction());
       cuvsAceParams.use_disk(cuvsAceParamsMemorySegment, cuVSAceParams.isUseDisk());
-      cuvsAceParams.max_host_memory_gb(cuvsAceParamsMemorySegment, cuVSAceParams.getMaxHostMemoryGb());
-      cuvsAceParams.max_gpu_memory_gb(cuvsAceParamsMemorySegment, cuVSAceParams.getMaxGpuMemoryGb());
+      cuvsAceParams.max_host_memory_gb(
+          cuvsAceParamsMemorySegment, cuVSAceParams.getMaxHostMemoryGb());
+      cuvsAceParams.max_gpu_memory_gb(
+          cuvsAceParamsMemorySegment, cuVSAceParams.getMaxGpuMemoryGb());
 
       String buildDir = cuVSAceParams.getBuildDir();
       if (buildDir != null && !buildDir.isEmpty()) {

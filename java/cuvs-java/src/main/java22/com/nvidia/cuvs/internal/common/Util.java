@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal.common;
@@ -27,6 +27,7 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.BitSet;
+import java.util.logging.Logger;
 
 public class Util {
 
@@ -35,11 +36,46 @@ public class Util {
 
   private Util() {}
 
+  private static final Logger log = Logger.getLogger(Util.class.getName());
+
+  static {
+    if (!tryLoadCudart()) {
+      log.warning(
+          "Could not load libcudart from java.library.path, LD_LIBRARY_PATH, or"
+              + " /usr/local/cuda/lib64. If libcuvs_c.so was built with static CUDA,"
+              + " initialization will fail. Set -Djava.library.path to your CUDA lib64"
+              + " directory.");
+    }
+  }
+
+  private static boolean tryLoadCudart() {
+    try {
+      System.loadLibrary("cudart");
+      return true;
+    } catch (UnsatisfiedLinkError ignored) {
+    }
+    String ldLibPath = System.getenv("LD_LIBRARY_PATH");
+    if (ldLibPath != null) {
+      for (String dir : ldLibPath.split(":")) {
+        try {
+          System.load(dir + "/" + System.mapLibraryName("cudart"));
+          return true;
+        } catch (UnsatisfiedLinkError ignored) {
+        }
+      }
+    }
+    try {
+      System.load("/usr/local/cuda/lib64/" + System.mapLibraryName("cudart"));
+      return true;
+    } catch (UnsatisfiedLinkError ignored) {
+    }
+    return false;
+  }
+
   private static final Linker LINKER = Linker.nativeLinker();
 
   static final SymbolLookup SYMBOL_LOOKUP =
       SymbolLookup.libraryLookup(System.mapLibraryName("cuvs_c"), Arena.ofAuto())
-          .or(SymbolLookup.libraryLookup(System.mapLibraryName("cudart"), Arena.ofAuto()))
           .or(SymbolLookup.loaderLookup())
           .or(Linker.nativeLinker().defaultLookup());
 

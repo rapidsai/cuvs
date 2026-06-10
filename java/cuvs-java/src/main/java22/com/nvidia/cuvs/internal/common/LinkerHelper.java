@@ -25,6 +25,9 @@ public class LinkerHelper {
   public static final ValueLayout.OfLong C_LONG =
       (ValueLayout.OfLong) LINKER.canonicalLayouts().get("long");
 
+  public static final ValueLayout.OfShort C_SHORT =
+      (ValueLayout.OfShort) LINKER.canonicalLayouts().get("short");
+
   public static final ValueLayout.OfFloat C_FLOAT =
       (ValueLayout.OfFloat) LINKER.canonicalLayouts().get("float");
 

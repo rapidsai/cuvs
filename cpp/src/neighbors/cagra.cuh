@@ -406,6 +406,54 @@ index<T, IdxT> merge(raft::resources const& handle,
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
 
+template <typename T,
+          typename IdxT               = uint32_t,
+          typename OutputIdxT         = uint32_t,
+          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
+void search_multi_partition(
+  raft::resources const& res,
+  search_params const& params,
+  const std::vector<const index<T, IdxT>*>& indices,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+  CagraSampleFilterT sample_filter = CagraSampleFilterT{})
+{
+  cagra::detail::search_multi_partition<T, OutputIdxT, IdxT, float, CagraSampleFilterT>(
+    res, params, indices, queries, partition_ids, neighbors, distances, sample_filter);
+}
+
+template <typename T, typename IdxT = uint32_t, typename OutputIdxT = uint32_t>
+void search_multi_partition(
+  raft::resources const& res,
+  search_params const& params,
+  const std::vector<const index<T, IdxT>*>& indices,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> partition_ids,
+  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+  const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
+{
+  try {
+    using none_filter_t = cuvs::neighbors::filtering::none_sample_filter;
+    auto& f             = dynamic_cast<const none_filter_t&>(sample_filter_ref);
+    return search_multi_partition<T, IdxT, OutputIdxT, none_filter_t>(
+      res, params, indices, queries, partition_ids, neighbors, distances, f);
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    using mp_filter_t =
+      cuvs::neighbors::filtering::multi_partition_bitset_filter<uint32_t, int64_t>;
+    auto& f = dynamic_cast<const mp_filter_t&>(sample_filter_ref);
+    return search_multi_partition<T, IdxT, OutputIdxT, mp_filter_t>(
+      res, params, indices, queries, partition_ids, neighbors, distances, f);
+  } catch (const std::bad_cast&) {
+    RAFT_FAIL("Unsupported sample filter type for multi-partition search");
+  }
+}
+
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
