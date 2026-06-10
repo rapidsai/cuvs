@@ -31,7 +31,7 @@ Use `-I` to set the number of k-means iterations; it defaults to 20. Use `-L` to
 lower balance tolerances, `-U` to set one or more upper balance tolerances, and `-O` to set the
 centroid offset used when splitting large partitions; they default to 0.333, 3.0, and 0.01. The
 example runs balanced k-means for every `-L` and `-U` combination. The defaults target partitions
-outside roughly one third to three times the average partition size. Very strict upper tolerance
+outside roughly one-third to three times the average partition size. Very strict upper tolerance
 values around 1.4 or lower can be difficult for this heuristic rebalancing method to satisfy. The
 example prints partition size statistics, underflow/overflow counts, and histograms comparing
 regular k-means and balanced k-means for `float` input.
