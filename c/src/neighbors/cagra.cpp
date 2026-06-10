@@ -48,18 +48,6 @@ struct cuvs_cagra_c_api_lifetime_holder {
   std::optional<cuvs::neighbors::cagra::merged_dataset_storage<T, uint32_t>> merge_storage{};
 };
 
-template <typename T>
-static std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
-take_padded_from_any_owning(std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> box)
-{
-  using padded_t = cuvs::neighbors::device_padded_dataset<T, int64_t>;
-  auto& variant  = box->as_variant();
-  if (std::holds_alternative<padded_t>(variant)) {
-    return std::make_unique<padded_t>(std::move(std::get<padded_t>(variant)));
-  }
-  RAFT_FAIL("CAGRA C API deserialize: expected a padded dataset in the serialized index");
-}
-
 /** Owns how to delete co-located index storage; `cuvsCagraIndex::addr` points here. */
 struct cagra_c_api_index_box {
   void* index_ptr;
@@ -511,9 +499,9 @@ void _deserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t ou
     nullptr,
     raft::device_matrix<T, int64_t, raft::row_major>(*res_ptr),
     cuvs::neighbors::cagra::device_padded_index<T, uint32_t>(*res_ptr)};
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> out_dataset;
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> out_dataset;
   cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), &holder->idx, &out_dataset);
-  holder->padded_dataset_owner = take_padded_from_any_owning<T>(std::move(out_dataset));
+  holder->padded_dataset_owner = std::move(out_dataset);
 
   // Deserialized strided layout often matches logical dim (tight rows). CAGRA search requires the
   // same row width as device builds (see `matrix_row_width_matches_cagra_required` / `update_dataset`).

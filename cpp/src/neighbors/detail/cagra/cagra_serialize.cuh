@@ -29,49 +29,6 @@ namespace cuvs::neighbors::cagra::detail {
 
 constexpr int serialization_version = 5;
 
-namespace {
-
-template <typename T, typename IdxT>
-void attach_any_owning_to_device_padded_index(
-  raft::resources const& res,
-  cuvs::neighbors::cagra::device_padded_index<T, IdxT>* index,
-  cuvs::neighbors::device_any_owning_dataset<int64_t>& owner)
-{
-  using OT    = cuvs::neighbors::device_any_owning_dataset_types<int64_t>;
-  auto& store = owner.as_variant();
-  if (std::holds_alternative<typename OT::empty_owning>(store)) {
-    auto const& e = std::get<typename OT::empty_owning>(store);
-    auto v        = raft::make_device_matrix_view<const T, int64_t>(
-      static_cast<const T*>(nullptr), int64_t{0}, e.dim());
-    index->update_dataset(res, cuvs::neighbors::device_padded_dataset_view<T, int64_t>(v, e.dim()));
-    return;
-  }
-  if constexpr (std::is_same_v<T, float>) {
-    if (std::holds_alternative<typename OT::padded_f32_owning>(store)) {
-      index->update_dataset(res, std::get<typename OT::padded_f32_owning>(store).as_dataset_view());
-      return;
-    }
-  } else if constexpr (std::is_same_v<T, half>) {
-    if (std::holds_alternative<typename OT::padded_f16_owning>(store)) {
-      index->update_dataset(res, std::get<typename OT::padded_f16_owning>(store).as_dataset_view());
-      return;
-    }
-  } else if constexpr (std::is_same_v<T, int8_t>) {
-    if (std::holds_alternative<typename OT::padded_i8_owning>(store)) {
-      index->update_dataset(res, std::get<typename OT::padded_i8_owning>(store).as_dataset_view());
-      return;
-    }
-  } else if constexpr (std::is_same_v<T, uint8_t>) {
-    if (std::holds_alternative<typename OT::padded_u8_owning>(store)) {
-      index->update_dataset(res, std::get<typename OT::padded_u8_owning>(store).as_dataset_view());
-      return;
-    }
-  }
-  RAFT_FAIL("deserialized dataset kind cannot attach to a padded CAGRA index");
-}
-
-}  // namespace
-
 /**
  * Save the index to file.
  *
@@ -311,7 +268,7 @@ void deserialize(
   raft::resources const& res,
   std::istream& is,
   cuvs::neighbors::cagra::device_padded_index<T, IdxT>* index_,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr)
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>* out_dataset = nullptr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
@@ -356,8 +313,8 @@ void deserialize(
   if (has_dataset) {
     RAFT_EXPECTS(out_dataset != nullptr,
                  "deserialize: index contains a dataset; pass a non-null out_dataset to own it.");
-    *out_dataset = cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is);
-    attach_any_owning_to_device_padded_index(res, index_, *out_dataset->get());
+    *out_dataset = cuvs::neighbors::detail::deserialize_dataset<T, int64_t>(res, is);
+    index_->update_dataset(res, (*out_dataset)->as_dataset_view());
   }
 
   bool has_source_indices = content_map & 0x2u;
@@ -375,7 +332,7 @@ void deserialize(
   raft::resources const& res,
   const std::string& filename,
   cuvs::neighbors::cagra::device_padded_index<T, IdxT>* index_,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr)
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>* out_dataset = nullptr)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 

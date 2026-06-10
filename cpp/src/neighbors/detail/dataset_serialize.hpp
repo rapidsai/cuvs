@@ -74,33 +74,31 @@ void serialize_cagra_padded_dataset(const raft::resources& res,
 
 template <typename IdxT>
 auto deserialize_empty(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_empty_dataset<IdxT>>
 {
   auto suggested_dim = raft::deserialize_scalar<uint32_t>(res, is);
-  auto v             = device_empty_dataset<IdxT>(suggested_dim);
-  return std::make_unique<device_any_owning_dataset<IdxT>>(std::move(v));
+  return std::make_unique<device_empty_dataset<IdxT>>(suggested_dim);
 }
 
 template <typename DataT, typename IdxT>
-auto deserialize_strided(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
+auto deserialize_padded(raft::resources const& res, std::istream& is)
+  -> std::unique_ptr<device_padded_dataset<DataT, IdxT>>
 {
   auto n_rows = raft::deserialize_scalar<IdxT>(res, is);
   auto dim    = raft::deserialize_scalar<uint32_t>(res, is);
   auto stride = raft::deserialize_scalar<uint32_t>(res, is);
   RAFT_EXPECTS(dim <= stride,
-               "deserialize_strided: logical dim (%u) must not exceed row stride (%u).",
+               "deserialize_padded: logical dim (%u) must not exceed row stride (%u).",
                static_cast<unsigned>(dim),
                static_cast<unsigned>(stride));
   auto host_array = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
   raft::deserialize_mdspan(res, is, host_array.view());
-  auto padded = cuvs::neighbors::make_device_padded_dataset(res, host_array.view());
-  return cuvs::neighbors::wrap_any_owning(std::move(padded));
+  return cuvs::neighbors::make_device_padded_dataset(res, host_array.view());
 }
 
 template <typename DataT, typename IdxT>
 auto deserialize_vpq(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_vpq_dataset<DataT, IdxT>>
 {
   auto n_rows             = raft::deserialize_scalar<IdxT>(res, is);
   auto dim                = raft::deserialize_scalar<uint32_t>(res, is);
@@ -120,44 +118,33 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, pq_code_book.view());
   raft::deserialize_mdspan(res, is, data.view());
 
-  device_vpq_dataset<DataT, IdxT> vpq{
-    std::move(vq_code_book), std::move(pq_code_book), std::move(data)};
-  return std::make_unique<device_any_owning_dataset<IdxT>>(std::move(vpq));
+  return std::make_unique<device_vpq_dataset<DataT, IdxT>>(
+    std::move(vq_code_book), std::move(pq_code_book), std::move(data));
 }
 
-template <typename IdxT>
+// Reads tag + dtype prefix, validates they match DataT, and returns a concrete
+// device_padded_dataset. This is the only currently-supported dataset kind for CAGRA
+// serialize/deserialize. When a new dataset kind is supported, add a matching overload of
+// deserialize_dataset here rather than extending this one — overload dispatch replaces the old
+// type-erased variant routing.
+template <typename DataT, typename IdxT>
 auto deserialize_dataset(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
+  -> std::unique_ptr<device_padded_dataset<DataT, IdxT>>
 {
   const auto tag = raft::deserialize_scalar<dataset_instance_tag>(res, is);
-  switch (tag) {
-    case kSerializeEmptyDataset: return deserialize_empty<IdxT>(res, is);
-    case kSerializeStridedDataset: {
-      const auto dtype = raft::deserialize_scalar<cudaDataType_t>(res, is);
-      switch (dtype) {
-        case CUDA_R_32F: return deserialize_strided<float, IdxT>(res, is);
-        case CUDA_R_16F: return deserialize_strided<half, IdxT>(res, is);
-        case CUDA_R_8I: return deserialize_strided<int8_t, IdxT>(res, is);
-        case CUDA_R_8U: return deserialize_strided<uint8_t, IdxT>(res, is);
-        default:
-          RAFT_FAIL("Failed to deserialize dataset: unsupported strided dataset element type %d.",
-                    static_cast<int>(dtype));
-      }
-    }
-    case kSerializeVPQDataset: {
-      const auto dtype = raft::deserialize_scalar<cudaDataType_t>(res, is);
-      switch (dtype) {
-        case CUDA_R_32F: return deserialize_vpq<float, IdxT>(res, is);
-        case CUDA_R_16F: return deserialize_vpq<half, IdxT>(res, is);
-        default:
-          RAFT_FAIL("Failed to deserialize dataset: unsupported VPQ dtype %d.",
-                    static_cast<int>(dtype));
-      }
-    }
-    default:
-      RAFT_FAIL("Failed to deserialize dataset: unknown instance tag %u.",
-                static_cast<unsigned>(tag));
-  }
+  RAFT_EXPECTS(tag == kSerializeStridedDataset,
+               "deserialize_dataset: expected padded (strided) tag, got %u",
+               static_cast<unsigned>(tag));
+  const auto dtype                        = raft::deserialize_scalar<cudaDataType_t>(res, is);
+  constexpr cudaDataType_t expected_dtype = std::is_same_v<DataT, float>    ? CUDA_R_32F
+                                            : std::is_same_v<DataT, half>   ? CUDA_R_16F
+                                            : std::is_same_v<DataT, int8_t> ? CUDA_R_8I
+                                                                            : CUDA_R_8U;  // uint8_t
+  RAFT_EXPECTS(dtype == expected_dtype,
+               "deserialize_dataset: serialized dtype (%d) does not match expected (%d)",
+               static_cast<int>(dtype),
+               static_cast<int>(expected_dtype));
+  return deserialize_padded<DataT, IdxT>(res, is);
 }
 
 }  // namespace cuvs::neighbors::detail

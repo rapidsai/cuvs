@@ -1237,6 +1237,11 @@ void search(raft::resources const& res,
  * @{
  */
 
+// Serialize and deserialize are currently overloaded only for device_padded_index (the common
+// dense-dataset case).  To support a new dataset kind (e.g. vpq_f16_index) in the future, simply
+// add a matching pair of overloads here and a corresponding serialize_cagra_<kind>_dataset /
+// deserialize_<kind> implementation in detail/dataset_serialize.hpp.
+
 /**
  * Save the index to file.
  *
@@ -1294,7 +1299,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::device_padded_index<float>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1351,7 +1356,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::device_padded_index<float>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>* out_dataset = nullptr);
 /**
  * Save the index to file.
  *
@@ -1409,7 +1414,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::device_padded_index<half>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<half, int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1466,7 +1471,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::device_padded_index<half>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<half, int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -1524,7 +1529,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::device_padded_index<int8_t>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<int8_t, int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1581,7 +1586,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::device_padded_index<int8_t>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<int8_t, int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -1639,7 +1644,7 @@ void deserialize(
   raft::resources const& handle,
   const std::string& filename,
   cuvs::neighbors::cagra::device_padded_index<uint8_t>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<uint8_t, int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1696,7 +1701,7 @@ void deserialize(
   raft::resources const& handle,
   std::istream& is,
   cuvs::neighbors::cagra::device_padded_index<uint8_t>* index,
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>* out_dataset = nullptr);
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<uint8_t, int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream

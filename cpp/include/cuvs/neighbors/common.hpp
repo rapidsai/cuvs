@@ -914,20 +914,6 @@ template <typename T, typename I, typename L>
   return matrix_actual_row_width(m) == need;
 }
 
-template <typename DataT, typename IdxT>
-[[nodiscard]] inline auto wrap_any_owning(std::unique_ptr<device_padded_dataset<DataT, IdxT>>&& p)
-  -> std::unique_ptr<device_any_owning_dataset<IdxT>>
-{
-  return std::make_unique<device_any_owning_dataset<IdxT>>(std::move(*p));
-}
-
-template <typename DataT, typename IdxT>
-[[nodiscard]] inline auto wrap_any_owning(std::unique_ptr<host_padded_dataset<DataT, IdxT>>&& p)
-  -> std::unique_ptr<host_any_owning_dataset<IdxT>>
-{
-  return std::make_unique<host_any_owning_dataset<IdxT>>(std::move(*p));
-}
-
 template <typename SrcT>
 auto make_device_padded_dataset_view(const raft::resources& res,
                                      SrcT const& src,
@@ -1424,7 +1410,7 @@ struct iface {
   std::optional<raft::device_matrix<T, int64_t, raft::row_major>> cagra_build_dataset_;
   /** Used by CAGRA when deserializing an index that contains a dataset; keeps it alive for the
    * view. */
-  std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> cagra_owned_dataset_;
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> cagra_owned_dataset_;
   std::shared_ptr<std::mutex> mutex_;
 };
 

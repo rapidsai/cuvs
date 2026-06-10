@@ -193,8 +193,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>
     sub_dataset_buffers_ =
       std::make_shared<std::vector<raft::device_matrix<T, int64_t, raft::row_major>>>();
-  std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> deserialized_dataset_;
-  std::vector<std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>>
+  std::shared_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> deserialized_dataset_;
+  std::vector<std::shared_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>>
     sub_deserialized_datasets_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
@@ -569,19 +569,19 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
     for (size_t i = 0; i < count; ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
       auto sub_index      = std::make_shared<index_type>(handle_);
-      std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> tmp_ds;
+      std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> tmp_ds;
       cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get(), &tmp_ds);
       sub_deserialized_datasets_[i] =
-        std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>(std::move(tmp_ds));
+        std::shared_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>(std::move(tmp_ds));
       sub_indices_.push_back(std::move(sub_index));
     }
   } else {
     index_ = std::make_shared<index_type>(handle_);
     deserialized_dataset_.reset();
-    std::unique_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>> tmp_ds;
+    std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> tmp_ds;
     cuvs::neighbors::cagra::deserialize(handle_, file, index_.get(), &tmp_ds);
     deserialized_dataset_ =
-      std::shared_ptr<cuvs::neighbors::device_any_owning_dataset<int64_t>>(std::move(tmp_ds));
+      std::shared_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>(std::move(tmp_ds));
   }
 }
 
