@@ -393,7 +393,15 @@ mod tests {
         let build_params = IndexParams::new().unwrap().set_n_lists(64);
         let (dataset, index) = build_test_index(&res, &build_params);
 
-        let filepath = std::env::temp_dir().join("test_ivf_sq_index.bin");
+        let unique = format!(
+            "test_ivf_sq_index_{}_{}.bin",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock before unix epoch")
+                .as_nanos()
+        );
+        let filepath = std::env::temp_dir().join(unique);
         index.serialize(&res, &filepath).expect("failed to serialize ivf-sq index");
 
         assert!(filepath.exists(), "serialized index file should exist");
