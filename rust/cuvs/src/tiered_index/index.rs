@@ -238,6 +238,46 @@ mod tests {
         }
     }
 
+    /// A non-CAGRA backend must work end-to-end, proving the
+    /// `SearchParams::algo()` / `as_void_ptr()` mapping for IVF-Flat is
+    /// correct (the mismatch test alone only proves rejection).
+    #[test]
+    fn test_tiered_ivf_flat_backend_search() {
+        let res = Resources::new().unwrap();
+
+        let n_datapoints = 1024;
+        let n_features = 16;
+        let dataset =
+            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+
+        let params = IndexParams::new()
+            .unwrap()
+            .set_algo(AnnAlgo::CUVS_TIERED_INDEX_ALGO_IVF_FLAT)
+            .set_min_ann_rows(128)
+            .set_ivf_flat_params(crate::ivf_flat::IndexParams::new().unwrap());
+        let index = Index::build(&res, &params, dataset_device)
+            .expect("failed to build IVF-Flat-backed tiered index");
+
+        let n_queries = 4;
+        let queries = dataset.slice(s![0..n_queries, ..]);
+        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+
+        let k = 10;
+        let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
+        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+        let distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+
+        let search_params = SearchParams::IvfFlat(crate::ivf_flat::SearchParams::new().unwrap());
+        index.search(&res, &search_params, &queries, &neighbors, &distances).unwrap();
+
+        neighbors.to_host(&res, &mut neighbors_host).unwrap();
+        for i in 0..n_queries {
+            assert_eq!(neighbors_host[[i, 0]], i as i64, "query {i} should find itself");
+        }
+    }
+
     /// (b) THE KEY TEST: vectors added via extend after build must be
     /// immediately findable — the entire point of the tiered index.
     #[test]
