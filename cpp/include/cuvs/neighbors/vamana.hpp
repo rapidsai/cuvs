@@ -18,7 +18,6 @@
 
 #include <cuvs/core/export.hpp>
 #include <optional>
-#include <variant>
 
 namespace CUVS_EXPORT cuvs {
 namespace neighbors {
@@ -115,12 +114,15 @@ struct index : cuvs::neighbors::index {
   /** Total length of the index (number of vectors). */
   [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
   {
-    auto data_rows = dataset_->n_rows();
+    auto data_rows = dataset_.has_value() ? dataset_->n_rows() : IdxT{0};
     return data_rows > 0 ? data_rows : graph_view_.extent(0);
   }
 
   /** Dimensionality of the data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dataset_->dim(); }
+  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
+  {
+    return dataset_.has_value() ? dataset_->dim() : 0u;
+  }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
   {
@@ -130,9 +132,9 @@ struct index : cuvs::neighbors::index {
   /** Non-owning dataset view stored by the index (full-precision vectors may live in
    * `full_precision_storage_`). */
   [[nodiscard]] inline auto data() const noexcept
-    -> const cuvs::neighbors::device_any_dataset_view<T, int64_t>&
+    -> const cuvs::neighbors::device_padded_dataset_view<T, int64_t>&
   {
-    return *dataset_;
+    return dataset_.value();
   }
 
   /** Quantized dataset [size, codes_rowlen] */
@@ -168,8 +170,7 @@ struct index : cuvs::neighbors::index {
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
       full_precision_storage_(),
-      dataset_(std::make_unique<cuvs::neighbors::device_any_dataset_view<T, int64_t>>(
-        cuvs::neighbors::device_empty_dataset_view<int64_t>(0))),
+      dataset_{std::nullopt},
       quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0))
   {
   }
@@ -206,14 +207,10 @@ struct index : cuvs::neighbors::index {
     }
 
     if (use_padded_view) {
-      auto padded_view = cuvs::neighbors::make_device_padded_dataset_view(res, dataset);
-      dataset_         = std::make_unique<cuvs::neighbors::device_any_dataset_view<T, int64_t>>(
-        cuvs::neighbors::device_any_dataset_view<T, int64_t>(padded_view));
+      dataset_ = cuvs::neighbors::make_device_padded_dataset_view(res, dataset);
     } else {
-      auto padded_own         = cuvs::neighbors::make_device_padded_dataset(res, dataset);
-      auto ds_view            = padded_own->as_dataset_view();
-      full_precision_storage_ = std::move(padded_own);
-      dataset_ = std::make_unique<cuvs::neighbors::device_any_dataset_view<T, int64_t>>(ds_view);
+      full_precision_storage_ = cuvs::neighbors::make_device_padded_dataset(res, dataset);
+      dataset_                = full_precision_storage_->as_dataset_view();
     }
     update_graph(res, vamana_graph);
 
@@ -291,7 +288,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   /** Owns CAGRA-padded full-precision device storage for the index dataset view. */
   std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> full_precision_storage_;
-  std::unique_ptr<cuvs::neighbors::device_any_dataset_view<T, int64_t>> dataset_;
+  std::optional<cuvs::neighbors::device_padded_dataset_view<T, int64_t>> dataset_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;
   IdxT medoid_id_;
 };
