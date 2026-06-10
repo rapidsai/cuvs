@@ -15,8 +15,22 @@ use std::fmt;
 use std::io::{Write, stderr};
 
 use crate::dlpack::ManagedTensor;
-use crate::error::{Result, check_cuvs};
+use crate::error::{Error, Result, check_cuvs};
 use crate::resources::Resources;
+
+/// The C API reinterprets `i8` buffers without validating dtype; guard
+/// Rust-side so a wrong-dtype tensor surfaces as `InvalidArgument` instead
+/// of memory corruption.
+fn expect_i8_tensor(tensor: &ManagedTensor, arg: &str) -> Result<()> {
+    let dtype = unsafe { (*tensor.as_ptr()).dl_tensor.dtype };
+    if dtype.code != ffi::DLDataTypeCode::kDLInt as u8 || dtype.bits != 8 || dtype.lanes != 1 {
+        return Err(Error::InvalidArgument(format!(
+            "{arg} must be an i8 tensor (got code={}, bits={}, lanes={})",
+            dtype.code, dtype.bits, dtype.lanes
+        )));
+    }
+    Ok(())
+}
 
 /// Parameters controlling how a [`Quantizer`] is trained.
 pub struct ScalarQuantizerParams(pub ffi::cuvsScalarQuantizerParams_t);
@@ -53,8 +67,7 @@ impl fmt::Debug for ScalarQuantizerParams {
 impl Drop for ScalarQuantizerParams {
     fn drop(&mut self) {
         if let Err(e) = check_cuvs(unsafe { ffi::cuvsScalarQuantizerParamsDestroy(self.0) }) {
-            write!(stderr(), "failed to call cuvsScalarQuantizerParamsDestroy {:?}", e)
-                .expect("failed to write to stderr");
+            let _ = write!(stderr(), "failed to call cuvsScalarQuantizerParamsDestroy {:?}", e);
         }
     }
 }
@@ -117,6 +130,7 @@ impl Quantizer {
         dataset: &ManagedTensor,
         out: &ManagedTensor,
     ) -> Result<()> {
+        expect_i8_tensor(out, "transform output")?;
         unsafe {
             check_cuvs(ffi::cuvsScalarQuantizerTransform(
                 res.0,
@@ -144,6 +158,7 @@ impl Quantizer {
         dataset: &ManagedTensor,
         out: &ManagedTensor,
     ) -> Result<()> {
+        expect_i8_tensor(dataset, "inverse_transform input")?;
         unsafe {
             check_cuvs(ffi::cuvsScalarQuantizerInverseTransform(
                 res.0,
@@ -158,8 +173,7 @@ impl Quantizer {
 impl Drop for Quantizer {
     fn drop(&mut self) {
         if let Err(e) = check_cuvs(unsafe { ffi::cuvsScalarQuantizerDestroy(self.0) }) {
-            write!(stderr(), "failed to call cuvsScalarQuantizerDestroy {:?}", e)
-                .expect("failed to write to stderr");
+            let _ = write!(stderr(), "failed to call cuvsScalarQuantizerDestroy {:?}", e);
         }
     }
 }
@@ -264,5 +278,28 @@ mod tests {
             result.is_err(),
             "training on an unsupported (integer) dtype should return an error"
         );
+    }
+
+    #[test]
+    fn test_transform_rejects_non_i8_output() {
+        let res = Resources::new().unwrap();
+        let n_rows = 8;
+        let n_cols = 4;
+
+        let dataset = ndarray::Array::<f32, _>::zeros((n_rows, n_cols));
+        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let params = ScalarQuantizerParams::new().unwrap();
+        let quantizer = Quantizer::train(&res, &params, &dataset_device).unwrap();
+
+        // The C API would silently reinterpret a non-i8 output buffer;
+        // the wrapper must reject it before any FFI happens.
+        let bad_out = ndarray::Array::<f32, _>::zeros((n_rows, n_cols));
+        let bad_out_device = ManagedTensor::from(&bad_out).to_device(&res).unwrap();
+        let result = quantizer.transform(&res, &dataset_device, &bad_out_device);
+        assert!(result.is_err(), "transform must reject a non-i8 output tensor");
+
+        // Same guard on the inverse path's input.
+        let result = quantizer.inverse_transform(&res, &bad_out_device, &dataset_device);
+        assert!(result.is_err(), "inverse_transform must reject a non-i8 input tensor");
     }
 }
