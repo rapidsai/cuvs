@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -27,10 +27,10 @@ extern "C" {
  * @param[out] out_idx  DLManagedTensor* shape [1, k], int64,   device memory
  * @return cuvsError_t
  */
-cuvsError_t cuvsSelectK(cuvsResources_t res,
-                        DLManagedTensor* in_val,
-                        DLManagedTensor* out_val,
-                        DLManagedTensor* out_idx);
+CUVS_EXPORT cuvsError_t cuvsSelectK(cuvsResources_t res,
+                                    DLManagedTensor* in_val,
+                                    DLManagedTensor* out_val,
+                                    DLManagedTensor* out_idx);
 
 #ifdef __cplusplus
 }

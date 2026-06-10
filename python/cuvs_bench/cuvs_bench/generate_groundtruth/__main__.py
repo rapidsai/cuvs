@@ -9,7 +9,14 @@ import os
 import sys
 import warnings
 
-from .utils import memmap_bin_file, suffix_from_dtype, write_bin
+from .utils import (
+    groundtruth_neighbors_filename,
+    memmap_bin_file,
+    offset_neighbor_indices,
+    suffix_from_dtype,
+    write_bin,
+    write_groundtruth_neighbors,
+)
 
 
 def import_with_fallback(primary_lib, secondary_lib=None, alias=None):
@@ -271,7 +278,7 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean", bitset=None):
             )
 
         D, Ind = xp.asarray(D), xp.asarray(Ind)
-        Ind += i  # shift neighbor index by offset i
+        Ind = offset_neighbor_indices(Ind, i, n_samples)
 
         if distances is None:
             distances = D
@@ -279,7 +286,8 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean", bitset=None):
         else:
             distances = xp.concatenate([distances, D], axis=1)
             indices = xp.concatenate([indices, Ind], axis=1)
-            idx = xp.argsort(distances, axis=1)[:, :k]
+            sort_keys = -distances if metric == "inner_product" else distances
+            idx = xp.argsort(sort_keys, axis=1)[:, :k]
             distances = xp.take_along_axis(distances, idx, axis=1)
             indices = xp.take_along_axis(indices, idx, axis=1)
 
@@ -481,9 +489,11 @@ fbin --output=groundtruth_dir --queries=/dataset/query.fbin \
         dataset, queries, args.k, args.metric, bitset=bitset
     )
 
-    write_bin(
-        os.path.join(args.output, "groundtruth.neighbors.ibin"),
-        indices.astype(xp.uint32),
+    n_base = dataset.shape[0]
+    write_groundtruth_neighbors(
+        os.path.join(args.output, groundtruth_neighbors_filename(n_base)),
+        indices,
+        n_base,
     )
     write_bin(
         os.path.join(args.output, "groundtruth.distances.fbin"),

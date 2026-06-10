@@ -5,7 +5,7 @@
 # cmake-format: on
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
 include(../cmake/rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
@@ -89,6 +89,7 @@ add_library(
   src/neighbors/brute_force.cpp
   src/neighbors/ivf_flat.cpp
   src/neighbors/ivf_pq.cpp
+  src/neighbors/ivf_sq.cpp
   src/neighbors/cagra.cpp
   $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
   $<$<BOOL:${BUILD_MG_ALGOS}>:src/neighbors/mg_ivf_pq.cpp>
@@ -116,6 +117,8 @@ set_target_properties(
              POSITION_INDEPENDENT_CODE ON
              INTERFACE_POSITION_INDEPENDENT_CODE ON
              EXPORT_NAME c_api
+             CXX_VISIBILITY_PRESET hidden
+             VISIBILITY_INLINES_HIDDEN ON
 )
 
 # Setup the VERSION and SOVERSION of our library

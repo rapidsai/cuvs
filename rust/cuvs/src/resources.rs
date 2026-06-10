@@ -1,10 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-use crate::error::{check_cuvs, Result};
-use std::io::{stderr, Write};
+use crate::error::{Result, check_cuvs};
+use std::io::{Write, stderr};
 
 /// Resources are objects that are shared between function calls,
 /// and includes things like CUDA streams, cuBLAS handles and other

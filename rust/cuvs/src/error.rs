@@ -13,7 +13,6 @@ pub struct CuvsError {
 
 #[derive(Debug, Clone)]
 pub enum Error {
-    CudaError(ffi::cudaError_t),
     CuvsError(CuvsError),
     /// The caller passed an argument that could not be forwarded to the C API
     /// (e.g. a filename containing an interior NUL byte or invalid UTF-8).
@@ -28,7 +27,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::CudaError(cuda_error) => write!(f, "cudaError={:?}", cuda_error),
             Error::CuvsError(cuvs_error) => write!(f, "cuvsError={:?}", cuvs_error),
             Error::InvalidArgument(msg) => write!(f, "invalid argument: {}", msg),
         }
@@ -55,12 +53,5 @@ pub fn check_cuvs(err: ffi::cuvsError_t) -> Result<()> {
 
             Err(Error::CuvsError(CuvsError { code: err, text }))
         }
-    }
-}
-
-pub fn check_cuda(err: ffi::cudaError_t) -> Result<()> {
-    match err {
-        ffi::cudaError::cudaSuccess => Ok(()),
-        _ => Err(Error::CudaError(err)),
     }
 }

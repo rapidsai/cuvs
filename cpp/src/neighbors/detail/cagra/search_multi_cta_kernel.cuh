@@ -5,24 +5,11 @@
 #pragma once
 
 #include <neighbors/detail/cagra/compute_distance-ext.cuh>
+#include <neighbors/detail/cagra/multi_partition_desc.hpp>
 
 #include <cuvs/neighbors/cagra.hpp>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
-
-/**
- * Per-partition descriptor for the multi-partition MULTI_CTA search kernel. One instance per
- * index partition; the kernel reads this array from device memory using blockIdx.z as the
- * partition index. Queries and result buffers are shared across all partitions and are passed
- * to the kernel as separate parameters rather than embedded in this descriptor.
- */
-template <typename DataT, typename IndexT, typename DistanceT>
-struct alignas(16) multi_partition_desc_t {
-  const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc;
-  const IndexT* graph;  // [dataset_size, graph_degree]
-  uint32_t graph_degree;
-  uint32_t _pad;
-};
 
 template <typename DataT,
           typename IndexT,
@@ -60,8 +47,13 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
  * (dataset_desc, graph, graph_degree) is read by the kernel from partition_descs[blockIdx.z];
  * smem and the result buffer are sized for the max graph_degree across partitions.
  */
-template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
-void select_and_run_mp(const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SourceIndexT,
+          typename SampleFilterT>
+void select_and_run_mp(const dataset_descriptor_host<DataT, IndexT, DistanceT>& ref_dataset_desc,
+                       const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,
                        uint32_t num_partitions,
                        uint32_t max_graph_degree,
                        IndexT* intermediate_indices_ptr,

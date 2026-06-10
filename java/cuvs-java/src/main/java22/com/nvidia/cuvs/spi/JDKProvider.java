@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -7,7 +7,6 @@ package com.nvidia.cuvs.spi;
 import static com.nvidia.cuvs.internal.CuVSParamsHelper.*;
 import static com.nvidia.cuvs.internal.common.Util.*;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamSynchronize;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;

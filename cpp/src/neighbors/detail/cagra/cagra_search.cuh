@@ -36,6 +36,7 @@
 #include <raft/linalg/reduce.cuh>
 #include <raft/matrix/select_k.cuh>
 
+// All includes are done before opening namespace to avoid nested namespace issues
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT,

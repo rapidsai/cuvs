@@ -1,12 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
-#include "search_single_cta_kernel-inl.cuh"
 #include <cuvs/neighbors/common.hpp>
+
+// Include explicit instantiations before namespace (launcher includes JIT LTO headers with
+// namespace definitions)
+#include "search_single_cta_kernel_explicit_inst.cuh"
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
@@ -36,6 +39,7 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 #define instantiate_kernel_selection_mp(DataT, IndexT, DistanceT, SampleFilterT)                 \
   template void select_and_run_multi_partition<DataT, IndexT, DistanceT, IndexT, SampleFilterT>( \
+    const dataset_descriptor_host<DataT, IndexT, DistanceT>& ref_dataset_desc,                   \
     const multi_partition_desc_t<DataT, IndexT, DistanceT>* partition_descs,                     \
     uint32_t num_partitions,                                                                     \
     const DataT* queries_ptr,                                                                    \
