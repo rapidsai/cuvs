@@ -811,10 +811,10 @@ struct ace_memory_requirements {
 
 // TODO: Adjust overhead factor if needed. Very conservative for now.
 constexpr double usable_cpu_memory_fraction = 0.8;
-constexpr double usable_gpu_memory_fraction = 0.8;
+constexpr double usable_gpu_memory_fraction = 1.0;
 constexpr double imbalance_factor           = 3.0;
 constexpr double vector_expansion_factor    = 2.0;
-constexpr size_t extra_cpu_workspace_size   = 1e9;
+constexpr size_t extra_cpu_workspace_size   = 0;
 constexpr size_t extra_gpu_workspace_size   = 2e9;
 
 // Check if disk mode should be used for ACE based on memory constraints

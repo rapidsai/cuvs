@@ -234,13 +234,12 @@ def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
 
     with tempfile.TemporaryDirectory() as temp_dir:
         # Set ACE parameters with memory limits slightly above the minimum required
-        # Input GiB values * 80% usage factor --> requires 2GB static memory overhead
         # This should force disk mode even though we didn't explicitly set use_disk=True
         ace_params = hnsw.AceParams(
             npartitions=2,
             build_dir=temp_dir,
             use_disk=False,  # Not explicitly requesting disk mode
-            max_host_memory_gb=2.329,  # Tiny limit to force disk mode
+            max_host_memory_gb=0.001,  # Tiny limit to force disk mode
             max_gpu_memory_gb=0.0,  # No GPU memory limit
         )
 

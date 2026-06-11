@@ -237,10 +237,8 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
       ace_params.build_dir       = temp_dir;
       ace_params.use_disk        = false;  // Not explicitly requesting disk mode
 
-      // Add 2GB to the limits to account for static memory overhead limits
-      // Input GiB values * 80% usage factor --> requires 2GB static memory overhead
       // Selected host memory limit should enforce disk mode
-      ace_params.max_host_memory_gb  = 2.329;
+      ace_params.max_host_memory_gb  = 0.001;
       ace_params.max_gpu_memory_gb   = 3.0;
       hnsw_params.graph_build_params = ace_params;
 
