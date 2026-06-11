@@ -88,6 +88,12 @@ When an application should restrict NVIDIA cuVS to a subset of visible GPUs, use
 
 Use the multi-node path when each process controls one rank, often one GPU, and the application runtime provides launch, rank assignment, and data placement. This API is currently exposed only in C++. The application creates an `ncclComm_t`, attaches it to a RAFT handle, and then passes that handle to NVIDIA cuVS APIs that accept `raft::resources`.
 
+<Warning title="K-Means: explicit multi-GPU API (cuVS &ge; 26.08)">
+
+Earlier cuVS releases dispatched the single-GPU `cuvs::cluster::kmeans::fit` overloads to the multi-GPU backend automatically whenever the supplied `raft::resources` handle carried RAFT NCCL comms or an SNMG clique. That implicit dispatch has been removed: multi-GPU k-means now lives in `cuvs::cluster::kmeans::mg` and must be called explicitly. The example below uses `kmeans::mg::fit`; existing call sites that previously relied on auto-dispatch must be updated accordingly. See the [K-Means user guide](/user-guide/api-guides/clustering-guide/k-means) for a full before/after migration example.
+
+</Warning>
+
 <Tabs>
 <Tab title="C++">
 

@@ -114,7 +114,7 @@ enum class kmeans_type {
 <a id="cluster-kmeans-fit"></a>
 ### cluster::kmeans::fit
 
-Find clusters with k-means algorithm using batched processing of host data.
+Find clusters with k-means algorithm using batched processing of host data. Single-GPU only.
 
 ```cpp
 void fit(raft::resources const& handle,
@@ -126,23 +126,17 @@ raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int64_t> n_iter);
 ```
 
+silently dispatched this single-GPU overload to a multi-GPU implementation when the supplied `handle` had RAFT comms or an SNMG clique attached. That implicit dispatch has been removed: this overload is now strictly single-GPU. If `handle` carries communications/clique state it is ignored and the call falls back to the single-GPU path. To run on multiple GPUs, call `cuvs::cluster::kmeans::mg::fit` explicitly.
+
 TODO: Evaluate replacing the extent type with int64_t. Reference issue: https://github.com/rapidsai/cuvs/issues/1961
 
-This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by params.streaming_batch_size. In multi-GPU mode, this is a per-rank batch size.
-
-Multi-GPU dispatch is selected automatically based on the handle state:
-
-- If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X is split across GPUs internally with an OpenMP parallel region and NCCL.
-- If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as this worker's partition, and RAFT communicators are used for collectives.
-- Otherwise: single-GPU batched k-means.
-
-With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the effective initialization sample must fit in GPU memory on every rank because it is materialized on every device. Rank 0 must also have enough GPU memory for the seeding workspace before centroids are broadcast.
+This overload supports out-of-core computation where the dataset resides on the host. Data is processed in GPU-sized batches, streaming from host to device. The batch size is controlled by `params.streaming_batch_size`.
 
 **Parameters**
 
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
-| `handle` | in | `raft::resources const&` | The raft handle. When a multi-GPU resource is attached, multi-GPU dispatch is used automatically. |
+| `handle` | in | `raft::resources const&` | The raft handle. Any multi-GPU/comms state attached to the handle is ignored on this overload; use `cuvs::cluster::kmeans::mg::fit` for multi-GPU work. |
 | `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) | Parameters for KMeans model. Batch size is read from params.streaming_batch_size. |
 | `X` | in | `raft::host_matrix_view<const float, int64_t>` | Training instances on HOST memory. The data must be in row-major format. [dim = n_samples x n_features] |
 | `sample_weight` | in | `std::optional<raft::host_vector_view<const float, int64_t>>` | Optional weights for each observation in X (on host). [len = n_samples] |
@@ -1061,6 +1055,386 @@ std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = s
 | `centroids` | in | `raft::device_matrix_view<const double, int64_t>` | Cluster centroids. The data must be in row-major format. [dim = n_clusters x n_features] |
 | `cost` | out | `raft::host_scalar_view<double>` | Resulting cluster cost |
 | `sample_weight` | in | `std::optional<raft::device_vector_view<const double, int64_t>>` | Optional per-sample weights. [len = n_samples]<br />Default: `std::nullopt`. |
+
+**Returns**
+
+`void`
+
+## Multi-GPU / out-of-core k-means fit
+
+<a id="cluster-kmeans-mg-fit"></a>
+### cluster::kmeans::mg::fit
+
+Multi-GPU k-means fit with one or more local data partitions per rank.
+
+```cpp
+void fit(
+raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+const std::vector<raft::device_matrix_view<const float, int>>& X_parts,
+const std::optional<std::vector<raft::device_vector_view<const float, int>>>& sample_weight_parts,
+raft::device_matrix_view<float, int> centroids,
+raft::host_scalar_view<float> inertia,
+raft::host_scalar_view<int> n_iter);
+```
+
+Each rank supplies its local training data as a vector of partitions. The implementation streams every partition through Lloyd iterations using `params.streaming_batch_size`.
+
+The active backend is selected by the resources attached to `handle`:
+
+- When `raft::resource::is_multi_gpu(handle)` is true (SNMG clique), the call must be issued from inside an OpenMP region with one thread per rank in the clique.
+- Otherwise, multi-process NCCL comms must be initialized on the handle (`raft::resource::comms_initialized(handle)`); each process supplies its own local partitions.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` | in | `raft::resources const&` | The raft handle. Must have NCCL comms or a SNMG clique initialized. |
+| `params` | in | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) | K-means parameters. The streaming batch size is read from `params.streaming_batch_size`. |
+| `X_parts` | in | `const std::vector<raft::device_matrix_view<const float, int>>&` | Per-partition local data on this rank. Each entry is [n_rows_i x n_features]. |
+| `sample_weight_parts` | in | `const std::optional<std::vector<raft::device_vector_view<const float, int>>>&` | Optional per-partition row weights with one vector per data partition. |
+| `centroids` | inout | `raft::device_matrix_view<float, int>` | Device matrix [n_clusters x n_features]. On entry, used as the initial centers when `params.init == InitMethod::Array`. On return, holds the converged centroids. |
+| `inertia` | out | `raft::host_scalar_view<float>` | Host scalar receiving the final clustering cost. |
+| `n_iter` | out | `raft::host_scalar_view<int>` | Host scalar receiving the iteration count at which the run terminated. |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+const std::vector<raft::device_matrix_view<const float, int64_t>>& X_parts,
+const std::optional<std::vector<raft::device_vector_view<const float, int64_t>>>&
+sample_weight_parts,
+raft::device_matrix_view<float, int64_t> centroids,
+raft::host_scalar_view<float> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X_parts` |  | `const std::vector<raft::device_matrix_view<const float, int64_t>>&` |  |
+| `sample_weight_parts` |  | `const std::optional<std::vector<raft::device_vector_view<const float, int64_t>>>&` |  |
+| `centroids` |  | `raft::device_matrix_view<float, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<float>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+const std::vector<raft::device_matrix_view<const double, int>>& X_parts,
+const std::optional<std::vector<raft::device_vector_view<const double, int>>>&
+sample_weight_parts,
+raft::device_matrix_view<double, int> centroids,
+raft::host_scalar_view<double> inertia,
+raft::host_scalar_view<int> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X_parts` |  | `const std::vector<raft::device_matrix_view<const double, int>>&` |  |
+| `sample_weight_parts` |  | `const std::optional<std::vector<raft::device_vector_view<const double, int>>>&` |  |
+| `centroids` |  | `raft::device_matrix_view<double, int>` |  |
+| `inertia` |  | `raft::host_scalar_view<double>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+const std::vector<raft::device_matrix_view<const double, int64_t>>& X_parts,
+const std::optional<std::vector<raft::device_vector_view<const double, int64_t>>>&
+sample_weight_parts,
+raft::device_matrix_view<double, int64_t> centroids,
+raft::host_scalar_view<double> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X_parts` |  | `const std::vector<raft::device_matrix_view<const double, int64_t>>&` |  |
+| `sample_weight_parts` |  | `const std::optional<std::vector<raft::device_vector_view<const double, int64_t>>>&` |  |
+| `centroids` |  | `raft::device_matrix_view<double, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<double>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU / out-of-core k-means fit.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+const std::vector<raft::host_matrix_view<const float, int64_t>>& X_parts,
+const std::optional<std::vector<raft::host_vector_view<const float, int64_t>>>&
+sample_weight_parts,
+raft::device_matrix_view<float, int64_t> centroids,
+raft::host_scalar_view<float> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X_parts` |  | `const std::vector<raft::host_matrix_view<const float, int64_t>>&` |  |
+| `sample_weight_parts` |  | `const std::optional<std::vector<raft::host_vector_view<const float, int64_t>>>&` |  |
+| `centroids` |  | `raft::device_matrix_view<float, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<float>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU / out-of-core k-means fit.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+const std::vector<raft::host_matrix_view<const double, int64_t>>& X_parts,
+const std::optional<std::vector<raft::host_vector_view<const double, int64_t>>>&
+sample_weight_parts,
+raft::device_matrix_view<double, int64_t> centroids,
+raft::host_scalar_view<double> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X_parts` |  | `const std::vector<raft::host_matrix_view<const double, int64_t>>&` |  |
+| `sample_weight_parts` |  | `const std::optional<std::vector<raft::host_vector_view<const double, int64_t>>>&` |  |
+| `centroids` |  | `raft::device_matrix_view<double, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<double>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit, single mdspan per rank.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+raft::device_matrix_view<const float, int> X,
+std::optional<raft::device_vector_view<const float, int>> sample_weight,
+raft::device_matrix_view<float, int> centroids,
+raft::host_scalar_view<float> inertia,
+raft::host_scalar_view<int> n_iter);
+```
+
+Convenience overload for the common case where each rank has exactly one local partition. The mdspan is wrapped in a one-element vector and routed through the vector-of-partitions overload above. See that overload's documentation for backend selection and handle requirements.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X` |  | `raft::device_matrix_view<const float, int>` |  |
+| `sample_weight` |  | `std::optional<raft::device_vector_view<const float, int>>` |  |
+| `centroids` |  | `raft::device_matrix_view<float, int>` |  |
+| `inertia` |  | `raft::host_scalar_view<float>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit, single mdspan per rank.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+raft::device_matrix_view<const float, int64_t> X,
+std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
+raft::device_matrix_view<float, int64_t> centroids,
+raft::host_scalar_view<float> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X` |  | `raft::device_matrix_view<const float, int64_t>` |  |
+| `sample_weight` |  | `std::optional<raft::device_vector_view<const float, int64_t>>` |  |
+| `centroids` |  | `raft::device_matrix_view<float, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<float>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit, single mdspan per rank.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+raft::device_matrix_view<const double, int> X,
+std::optional<raft::device_vector_view<const double, int>> sample_weight,
+raft::device_matrix_view<double, int> centroids,
+raft::host_scalar_view<double> inertia,
+raft::host_scalar_view<int> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X` |  | `raft::device_matrix_view<const double, int>` |  |
+| `sample_weight` |  | `std::optional<raft::device_vector_view<const double, int>>` |  |
+| `centroids` |  | `raft::device_matrix_view<double, int>` |  |
+| `inertia` |  | `raft::host_scalar_view<double>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU k-means fit, single mdspan per rank.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+raft::device_matrix_view<const double, int64_t> X,
+std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
+raft::device_matrix_view<double, int64_t> centroids,
+raft::host_scalar_view<double> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X` |  | `raft::device_matrix_view<const double, int64_t>` |  |
+| `sample_weight` |  | `std::optional<raft::device_vector_view<const double, int64_t>>` |  |
+| `centroids` |  | `raft::device_matrix_view<double, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<double>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU / out-of-core k-means fit, single mdspan per rank.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+raft::host_matrix_view<const float, int64_t> X,
+std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
+raft::device_matrix_view<float, int64_t> centroids,
+raft::host_scalar_view<float> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+Dispatches to the SNMG-clique (batched per-rank) backend when the handle carries an SNMG clique, and to the NCCL multi-process backend otherwise.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X` |  | `raft::host_matrix_view<const float, int64_t>` |  |
+| `sample_weight` |  | `std::optional<raft::host_vector_view<const float, int64_t>>` |  |
+| `centroids` |  | `raft::device_matrix_view<float, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<float>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `cluster::kmeans::mg::fit`
+
+Multi-GPU / out-of-core k-means fit, single mdspan per rank.
+
+```cpp
+void fit(raft::resources const& handle,
+const cuvs::cluster::kmeans::params& params,
+raft::host_matrix_view<const double, int64_t> X,
+std::optional<raft::host_vector_view<const double, int64_t>> sample_weight,
+raft::device_matrix_view<double, int64_t> centroids,
+raft::host_scalar_view<double> inertia,
+raft::host_scalar_view<int64_t> n_iter);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `params` |  | [`const cuvs::cluster::kmeans::params&`](/api-reference/cpp-api-cluster-kmeans#cluster-kmeans-params) |  |
+| `X` |  | `raft::host_matrix_view<const double, int64_t>` |  |
+| `sample_weight` |  | `std::optional<raft::host_vector_view<const double, int64_t>>` |  |
+| `centroids` |  | `raft::device_matrix_view<double, int64_t>` |  |
+| `inertia` |  | `raft::host_scalar_view<double>` |  |
+| `n_iter` |  | `raft::host_scalar_view<int64_t>` |  |
 
 **Returns**
 
