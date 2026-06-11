@@ -345,7 +345,10 @@ struct extend_params {
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
 
-template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
+template <typename T,
+          typename IdxT,
+          cuvs::neighbors::cagra_dataset_view DatasetViewT =
+            cuvs::neighbors::device_padded_dataset_view<T, int64_t>>
 struct index;
 
 /**
