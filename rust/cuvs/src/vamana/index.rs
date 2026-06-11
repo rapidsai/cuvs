@@ -30,12 +30,12 @@ impl Index {
     /// * `res` - Resources to use
     /// * `params` - Parameters for building the index
     /// * `dataset` - A row-major matrix on either the host or device to index
-    pub fn build<T: Into<ManagedTensor>>(
+    pub fn build<'a, T: Into<ManagedTensor<'a>>>(
         res: &Resources,
         params: &IndexParams,
         dataset: T,
     ) -> Result<Index> {
-        let dataset: ManagedTensor = dataset.into();
+        let dataset: ManagedTensor<'a> = dataset.into();
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsVamanaBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
@@ -104,7 +104,8 @@ mod tests {
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset_device =
+            ManagedTensor::from_ndarray(&dataset).unwrap().to_device(&res).unwrap();
 
         // build the vamana index
         let _index = Index::build(&res, &build_params, dataset_device)

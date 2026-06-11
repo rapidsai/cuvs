@@ -28,7 +28,8 @@
 //!
 //!     // build the ivf-flat index
 //!     let build_params = IndexParams::new()?;
-//!     let index = Index::build(&res, &build_params, &dataset)?;
+//!     let dataset_device = ManagedTensor::from_ndarray(&dataset)?.to_device(&res)?;
+//!     let index = Index::build(&res, &build_params, dataset_device)?;
 //!     println!(
 //!         "Indexed {}x{} datapoints into ivf-flat index",
 //!         n_datapoints, n_features
@@ -44,12 +45,12 @@
 //!     // Ivf-Flat search API requires queries and outputs to be on device memory
 //!     // copy query data over, and allocate new device memory for the distances/ neighbors
 //!     // outputs
-//!     let queries = ManagedTensor::from(&queries).to_device(&res)?;
+//!     let queries = ManagedTensor::from_ndarray(&queries)?.to_device(&res)?;
 //!     let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-//!     let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res)?;
+//!     let neighbors = ManagedTensor::from_ndarray(&neighbors_host)?.to_device(&res)?;
 //!
 //!     let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-//!     let distances = ManagedTensor::from(&distances_host).to_device(&res)?;
+//!     let distances = ManagedTensor::from_ndarray(&distances_host)?.to_device(&res)?;
 //!
 //!     let search_params = SearchParams::new()?;
 //!

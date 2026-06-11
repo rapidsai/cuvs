@@ -52,15 +52,26 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto x_dt    = x_tensor->dl_tensor.dtype;
-    auto y_dt    = x_tensor->dl_tensor.dtype;
-    auto dist_dt = x_tensor->dl_tensor.dtype;
+    auto y_dt    = y_tensor->dl_tensor.dtype;
+    auto dist_dt = distances_tensor->dl_tensor.dtype;
 
     if ((x_dt.code != kDLFloat) || (y_dt.code != kDLFloat) || (dist_dt.code != kDLFloat)) {
       RAFT_FAIL("Inputs to cuvsPairwiseDistance must all be floating point tensors");
     }
 
-    if ((x_dt.bits != y_dt.bits) || (x_dt.bits != dist_dt.bits)) {
-      RAFT_FAIL("Inputs to cuvsPairwiseDistance must all have the same dtype");
+    if (x_dt.lanes != 1 || y_dt.lanes != 1 || dist_dt.lanes != 1) {
+      RAFT_FAIL("Inputs to cuvsPairwiseDistance must all have a single dtype lane");
+    }
+
+    if (x_dt.bits != y_dt.bits) {
+      RAFT_FAIL("X and Y inputs to cuvsPairwiseDistance must have the same dtype");
+    }
+
+    auto expected_dist_bits = x_dt.bits == 16 ? 32 : x_dt.bits;
+    if (dist_dt.bits != expected_dist_bits) {
+      RAFT_FAIL(
+        "distances output to cuvsPairwiseDistance must have dtype float32 for float16 inputs "
+        "and match the input dtype otherwise");
     }
 
     bool x_row_major;
