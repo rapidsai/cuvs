@@ -180,26 +180,22 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
 
 /**
  * @brief Find clusters with k-means algorithm using batched processing of host data.
+ *        Single-GPU only.
+ *
+ * Multi-GPU migration (breaking change in cuVS 26.08): earlier releases
+ * silently dispatched this single-GPU overload to a multi-GPU implementation
+ * when the supplied RAFT handle had RAFT comms or an SNMG clique attached. That
+ * implicit dispatch has been removed: this overload is now strictly
+ * single-GPU. If `handle` carries communications/clique state it is ignored and the call falls back
+ * to the single-GPU path. To run on multiple GPUs, call `cuvs::cluster::kmeans::mg::fit`
+ * explicitly.
  *
  * TODO: Evaluate replacing the extent type with int64_t. Reference issue:
  * https://github.com/rapidsai/cuvs/issues/1961
  *
  * This overload supports out-of-core computation where the dataset resides
- * on the host. Data is processed in GPU-sized batches, streaming from host to device.
- * The batch size is controlled by params.streaming_batch_size. In multi-GPU mode,
- * this is a per-rank batch size.
- *
- * Multi-GPU dispatch is selected automatically based on the handle state:
- *   - If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X
- *     is split across GPUs internally with an OpenMP parallel region and NCCL.
- *   - If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as
- *     this worker's partition, and RAFT communicators are used for collectives.
- *   - Otherwise: single-GPU batched k-means.
- *
- * With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the
- * effective initialization sample must fit in GPU memory on every rank because
- * it is materialized on every device. Rank 0 must also have enough GPU memory
- * for the seeding workspace before centroids are broadcast.
+ * on the host. Data is processed in batches, streaming from host to
+ * device. The batch size is controlled by `params.streaming_batch_size`.
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
@@ -230,8 +226,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *               raft::make_host_scalar_view(&n_iter));
  * @endcode
  *
- * @param[in]     handle        The raft handle. When a multi-GPU resource is
- *                              attached, multi-GPU dispatch is used automatically.
+ * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model. Batch size is read from
  *                              params.streaming_batch_size.
  * @param[in]     X             Training instances on HOST memory. The data must
@@ -1608,10 +1603,44 @@ void cluster_cost(
  * @}
  */
 
+#ifdef CUVS_BUILD_MG_ALGOS
 namespace mg {
 /**
  * @defgroup kmeans_mg Multi-GPU / out-of-core k-means fit
  * @{
+ *
+ * @brief Explicit multi-GPU k-means entry points.
+ *
+ * All multi-GPU k-means APIs live in this namespace
+ * (`cuvs::cluster::kmeans::mg`). To run k-means on multiple GPUs the
+ * application must call one of these overloads explicitly with a `handle` that
+ * carries either an SNMG clique (`raft::resource::is_multi_gpu(handle)`) or
+ * initialized RAFT comms (`raft::resource::comms_initialized(handle)`).
+ *
+ * Migration from earlier releases (breaking change in cuVS 26.08): before
+ * this release, the single-GPU `cuvs::cluster::kmeans::fit` overloads would
+ * silently dispatch to the multi-GPU backend when the supplied `handle`
+ * carried RAFT comms or an SNMG clique. That implicit dispatch has been
+ * removed: the single-GPU `fit` is now strictly single-GPU. Existing
+ * multi-GPU call sites must be updated to invoke
+ * `cuvs::cluster::kmeans::mg::fit` directly. Two flavors of the multi-GPU
+ * API are provided here:
+ *   - A single mdspan per rank (drop-in replacement for the old single-GPU
+ *     signature; cuVS wraps it into a one-element vector internally).
+ *   - A `std::vector` of mdspan partitions per rank (multiple partitions per
+ *     rank, typical for Dask/Ray and out-of-core host-data flows).
+ *
+ * @code{.cpp}
+ *   // Before (cuVS <= 26.06): implicit multi-GPU dispatch via single-GPU API.
+ *   //   raft::resources handle; // attached to NCCL comms or SNMG clique
+ *   //   cuvs::cluster::kmeans::fit(handle, params, local_X, std::nullopt,
+ *   //                              centroids, inertia, n_iter);
+ *
+ *   // After (cuVS >= 26.08): explicit multi-GPU API.
+ *   raft::resources handle; // NCCL comms or SNMG clique attached
+ *   cuvs::cluster::kmeans::mg::fit(handle, params, local_X, std::nullopt,
+ *                                  centroids, inertia, n_iter);
+ * @endcode
  */
 
 /**
@@ -1797,6 +1826,7 @@ void fit(raft::resources const& handle,
  * @}
  */
 }  // namespace mg
+#endif
 
 namespace helpers {
 /**

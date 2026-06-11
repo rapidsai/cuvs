@@ -116,9 +116,18 @@ void initKMeansPlusPlus_distributed(
 
   // Step 1.1 - choose the source rank deterministically (same seed -> same rp on all ranks).
   if (rank == KMEANS_COMM_ROOT) {
+    // Only draw from ranks that actually own at least one row to avoid an
+    std::vector<int> non_empty_ranks;
+    non_empty_ranks.reserve(static_cast<std::size_t>(num_ranks));
+    for (int r = 0; r < num_ranks; ++r) {
+      if (rank_counts[r] > IndexT{0}) { non_empty_ranks.push_back(r); }
+    }
+    RAFT_EXPECTS(!non_empty_ranks.empty(),
+                 "all ranks have zero local rows; cannot pick a source rank for KMeans++ init");
     std::mt19937 gen(params.rng_state.seed);
-    std::uniform_int_distribution<int> rank_dist(0, num_ranks - 1);
-    rp = rank_dist(gen);
+    std::uniform_int_distribution<std::size_t> rank_dist(std::size_t{0},
+                                                         non_empty_ranks.size() - 1);
+    rp = non_empty_ranks[rank_dist(gen)];
     raft::copy(d_rp.data_handle(), &rp, 1, stream);
   }
   comms.bcast(d_rp.data_handle(), static_cast<size_t>(1), KMEANS_COMM_ROOT);
