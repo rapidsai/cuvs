@@ -122,13 +122,6 @@ fn fit_kmeans(dataset: &ndarray::Array2<f32>, n_clusters: usize) -> Result<()> {
 
 Multi-GPU K-Means is exposed through the C++ API in the `cuvs::cluster::kmeans::mg` namespace. Configure a RAFT handle with NCCL communications (or an SNMG clique), pass each rank's local dataset shard to `mg::fit()`, and NVIDIA cuVS coordinates centroid updates across the participating GPUs.
 
-<Warning title="Migration from cuVS &le; 26.06: explicit multi-GPU API">
-
-Earlier cuVS releases dispatched the single-GPU `cuvs::cluster::kmeans::fit` overloads to the multi-GPU backend automatically whenever the supplied `raft::resources` handle carried RAFT NCCL comms or an SNMG clique.
-Starting with cuVS 26.08, the single-GPU `cuvs::cluster::kmeans::fit` overloads are strictly single-GPU and ignore any multi-GPU state on the handle. All multi-GPU k-means entry points now live in `cuvs::cluster::kmeans::mg` and must be called explicitly.
-
-</Warning>
-
 <Tabs>
 <Tab title="C++">
 
