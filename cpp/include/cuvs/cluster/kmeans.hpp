@@ -138,11 +138,13 @@ struct params : base_params {
   /**
    * Number of samples to process per GPU batch when fitting with host data.
    * When set to 0, defaults to n_samples (process all at once).
-   * Only used by the batched (host-data) code path and ignored by device-data
-   * overloads.
+   * Only used by the batched (host-data) code path and ignored by
+   * device-data overloads.
    *
-   * In multi-GPU mode, this is a per-rank batch size. Each rank processes up to
-   * this many local samples per batch, clamped to that rank's local sample count.
+   * In multi-GPU mode this is a per-rank batch size: each rank processes up
+   * to this many local samples per batch, clamped to that rank's local sample
+   * count. When MG is invoked with device partitions, the runtime ignores
+   * `streaming_batch_size` and processes each partition in full.
    * Default: 0 (process all data at once).
    */
   int64_t streaming_batch_size = 0;
@@ -1647,9 +1649,11 @@ namespace mg {
  * @brief Multi-GPU k-means fit with one or more local data
  *        partitions per rank.
  *
- * Each rank supplies its local training data as a vector of partitions. The
- * implementation streams every partition through Lloyd iterations using
- * `params.streaming_batch_size`.
+ * Each rank supplies its local training data as a vector of partitions. For
+ * host-resident partitions the implementation streams each partition through
+ * Lloyd iterations using `params.streaming_batch_size` (per rank). For
+ * device-resident partitions `streaming_batch_size` is ignored and each local
+ * partition is processed in full.
  *
  * The active backend is selected by the resources attached to
  * `handle`:
@@ -1662,9 +1666,11 @@ namespace mg {
  *
  * @param[in]     handle              The raft handle. Must have NCCL comms or
  *                                    a SNMG clique initialized.
- * @param[in]     params              K-means parameters. The streaming batch
+ * @param[in]     params              K-means parameters. For host-resident
+ *                                    partitions the per-rank streaming batch
  *                                    size is read from
- *                                    `params.streaming_batch_size`.
+ *                                    `params.streaming_batch_size`; it is
+ *                                    ignored for device-resident partitions.
  * @param[in]     X_parts             Per-partition local data on this rank.
  *                                    Each entry is [n_rows_i x n_features].
  * @param[in]     sample_weight_parts Optional per-partition row weights with
