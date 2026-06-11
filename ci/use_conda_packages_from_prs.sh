@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # download CI artifacts
-LIBRAFT_CHANNEL=$(./ci/rapids-get-pr-artifact raft 3052 cpp conda --cuda --pkg_name libraft)
-RAFT_CHANNEL=$(./ci/rapids-get-pr-artifact raft 3052 python conda --stable --cuda)
+LIBRAFT_CHANNEL=$(rapids-get-pr-artifact raft 3052 cpp conda)
+RAFT_CHANNEL=$(rapids-get-pr-artifact raft 3052 python conda)
 
 # For `rattler` builds:
 #
