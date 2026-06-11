@@ -69,7 +69,7 @@ void check_graph_degree(size_t& intermediate_degree, size_t& graph_degree, size_
     graph_degree = intermediate_degree;
   }
 
-  const size_t recommended_intermediate = graph_degree + ((graph_degree + 1) / 2);
+  const size_t recommended_intermediate = recommended_intermediate_graph_degree(graph_degree);
   if (intermediate_degree < recommended_intermediate) {
     RAFT_LOG_WARN(
       "CAGRA: intermediate_graph_degree (%lu) is below the recommended minimum (%lu, i.e. "

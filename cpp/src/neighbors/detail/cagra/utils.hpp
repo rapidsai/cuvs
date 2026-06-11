@@ -301,4 +301,9 @@ void copy_with_padding(
   }
 }
 
+constexpr size_t recommended_intermediate_graph_degree(size_t graph_degree) noexcept
+{
+  return graph_degree + ((graph_degree + 1) / 2);
+}
+
 }  // namespace cuvs::neighbors::cagra::detail

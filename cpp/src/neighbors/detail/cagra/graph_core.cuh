@@ -1679,7 +1679,8 @@ void prune_graph_gpu(
   raft::copy(res, host_stats.view(), raft::make_const_mdspan(dev_stats.view()));
   raft::resource::sync_stream(res);
 
-  const size_t recommended_intermediate = output_graph_degree + ((output_graph_degree + 1) / 2);
+  const size_t recommended_intermediate =
+    recommended_intermediate_graph_degree(output_graph_degree);
   RAFT_EXPECTS(
     invalid_neighbor_list == 0,
     "CAGRA graph pruning failed: could not select graph_degree (%lu) distinct neighbors for "
