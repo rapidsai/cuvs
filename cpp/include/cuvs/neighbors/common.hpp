@@ -583,6 +583,25 @@ using host_vpq_dataset = dataset<host_vpq_dataset_container, DataT, IdxT>;
 template <typename DataT, typename IdxT>
 using host_vpq_dataset_view = dataset_view<host_vpq_dataset_container, DataT, IdxT>;
 
+// Maps a dataset view type to its owning (allocating) dataset counterpart.
+// Used by serialize/deserialize to type the out_dataset output parameter;
+// adding a new dataset type only requires adding a new specialization here.
+template <typename DatasetViewT>
+struct owning_dataset_for_view;
+
+template <typename DataT, typename IdxT>
+struct owning_dataset_for_view<device_padded_dataset_view<DataT, IdxT>> {
+  using type = device_padded_dataset<DataT, IdxT>;
+};
+
+template <typename DataT, typename IdxT>
+struct owning_dataset_for_view<device_vpq_dataset_view<DataT, IdxT>> {
+  using type = device_vpq_dataset<DataT, IdxT>;
+};
+
+template <typename DatasetViewT>
+using owning_dataset_for_view_t = typename owning_dataset_for_view<DatasetViewT>::type;
+
 template <typename DatasetT>
 struct is_padded_dataset : std::false_type {};
 
