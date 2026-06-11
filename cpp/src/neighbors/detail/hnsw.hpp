@@ -279,12 +279,16 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   for (size_t i = 0; i < static_cast<size_t>(host_graph_view.extent(0)); ++i) {
     auto hnsw_internal_id = appr_algo->label_lookup_.find(i)->second;
     auto ll_i             = appr_algo->get_linklist0(hnsw_internal_id);
-    appr_algo->setListCount(ll_i, host_graph_view.extent(1));
-    auto* data = (uint32_t*)(ll_i + 1);
+    size_t actual_count   = 0;
+    auto* data            = (uint32_t*)(ll_i + 1);
     for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
-      auto neighbor_internal_id = appr_algo->label_lookup_.find(host_graph(i, j))->second;
-      data[j]                   = neighbor_internal_id;
+      auto neighbor_id = host_graph(i, j);
+      if (neighbor_id == static_cast<uint32_t>(-1)) { break; }
+      auto neighbor_internal_id = appr_algo->label_lookup_.find(neighbor_id)->second;
+      data[actual_count]        = neighbor_internal_id;
+      actual_count++;
     }
+    appr_algo->setListCount(ll_i, actual_count);
   }
 
   hnsw_index->set_index(std::move(appr_algo));
@@ -676,9 +680,16 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     for (int64_t batch_idx = 0; batch_idx < current_batch_size; batch_idx++) {
       const int64_t i = batch_start + batch_idx;
 
-      os.write(reinterpret_cast<char*>(&graph_degree_int), sizeof(int));
-
+      int actual_degree_int = graph_degree_int;
       const IdxT* graph_row = &graph_buffer(batch_idx, 0);
+      for (int gj = 0; gj < graph_degree_int; gj++) {
+        if (graph_row[gj] == static_cast<IdxT>(-1)) {
+          actual_degree_int = gj;
+          break;
+        }
+      }
+      os.write(reinterpret_cast<char*>(&actual_degree_int), sizeof(int));
+
       os.write(reinterpret_cast<const char*>(graph_row), sizeof(IdxT) * graph_degree_int);
 
       if (odd_graph_degree) {
@@ -1039,12 +1050,16 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0<host>");
 #pragma omp parallel for num_threads(num_threads)
     for (int64_t i = 0; i < n_rows; i++) {
-      auto ll_i = appr_algo->get_linklist0(i);
-      appr_algo->setListCount(ll_i, degree);
-      auto* data = (uint32_t*)(ll_i + 1);
+      auto ll_i            = appr_algo->get_linklist0(i);
+      auto* data           = (uint32_t*)(ll_i + 1);
+      int64_t actual_count = 0;
       for (int64_t j = 0; j < degree; j++) {
-        data[j] = graph_ptr[i * degree + j];
+        auto neighbor_id = graph_ptr[i * degree + j];
+        if (neighbor_id == static_cast<uint32_t>(-1)) { break; }
+        data[actual_count] = neighbor_id;
+        actual_count++;
       }
+      appr_algo->setListCount(ll_i, actual_count);
     }
   } else {
     common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0<device>");
@@ -1056,11 +1071,20 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
                                     n_rows,
                                     cudaMemcpyDefault,
                                     raft::resource::get_cuda_stream(res)));
+    raft::resource::sync_stream(res);
 #pragma omp parallel for num_threads(num_threads)
     for (int64_t i = 0; i < n_rows; i++) {
-      appr_algo->setListCount(appr_algo->get_linklist0(i), degree);
+      auto ll_i            = appr_algo->get_linklist0(i);
+      auto* data           = (uint32_t*)(ll_i + 1);
+      int64_t actual_count = degree;
+      for (int64_t j = 0; j < degree; j++) {
+        if (data[j] == static_cast<uint32_t>(-1)) {
+          actual_count = j;
+          break;
+        }
+      }
+      appr_algo->setListCount(ll_i, actual_count);
     }
-    raft::resource::sync_stream(res);
   }
   hnsw_index->set_index(std::move(appr_algo));
   return hnsw_index;
