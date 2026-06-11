@@ -106,7 +106,7 @@ index 3ba6066..4c1df72 100644
 
      /// Pinned memory allocation for use with this GPU
 diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.cu
-index b331fdc..2f536c3 100644
+index b331fdc..c81b72e 100644
 --- a/faiss/gpu/impl/BinaryCuvsCagra.cu
 +++ b/faiss/gpu/impl/BinaryCuvsCagra.cu
 @@ -58,7 +58,6 @@ BinaryCuvsCagra::BinaryCuvsCagra(
@@ -149,15 +149,22 @@ index b331fdc..2f536c3 100644
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else {
          FAISS_THROW_MSG(
-@@ -170,6 +173,7 @@ void BinaryCuvsCagra::train(idx_t n, const uint8_t* x) {
+@@ -166,10 +169,13 @@ void BinaryCuvsCagra::train(idx_t n, const uint8_t* x) {
+     if (getDeviceForAddress(x) >= 0) {
+         auto dataset = raft::make_device_matrix_view<const uint8_t, int64_t>(
+                 x, n, dim_ / 8);
++        auto dataset_view =
++                cuvs::neighbors::make_device_padded_dataset_view(raft_handle, dataset);
+         cuvs_index = std::make_shared<
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
                  cuvs::neighbors::cagra::build(
-                         raft_handle, index_params_, dataset));
+-                        raft_handle, index_params_, dataset));
++                        raft_handle, index_params_, dataset_view));
 +        store_dataset_ = true;
      } else {
          auto dataset = raft::make_host_matrix_view<const uint8_t, int64_t>(
                  x, n, dim_ / 8);
-@@ -177,6 +181,13 @@ void BinaryCuvsCagra::train(idx_t n, const uint8_t* x) {
+@@ -177,6 +183,13 @@ void BinaryCuvsCagra::train(idx_t n, const uint8_t* x) {
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>>(
                  cuvs::neighbors::cagra::build(
                          raft_handle, index_params_, dataset));
@@ -171,7 +178,7 @@ index b331fdc..2f536c3 100644
      }
  }
 
-@@ -212,14 +223,18 @@ void BinaryCuvsCagra::search(
+@@ -212,14 +225,18 @@ void BinaryCuvsCagra::search(
 
      if (!store_dataset_) {
          if (getDeviceForAddress(storage_) >= 0) {
@@ -192,7 +199,7 @@ index b331fdc..2f536c3 100644
          }
          store_dataset_ = true;
      }
-@@ -280,6 +295,7 @@ void BinaryCuvsCagra::search(
+@@ -280,6 +297,7 @@ void BinaryCuvsCagra::search(
 
  void BinaryCuvsCagra::reset() {
      cuvs_index.reset();
