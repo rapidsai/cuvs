@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cuco/bloom_filter.cuh>
+
 #include <cstddef>
 #include <cstdint>
 
@@ -19,6 +21,14 @@ struct bitset_filter_data_t {
   std::uint32_t* bitset_ptr{nullptr};
   SourceIndexT bitset_len{};
   SourceIndexT original_nbits{};
+};
+
+/// Global cuco bloom filter ref for linked @c sample_filter in CAGRA JIT LTO.
+template <typename Key = std::uint32_t>
+struct bloom_filter_data_t {
+  using ref_type = typename cuco::bloom_filter<Key>::ref_type<>;
+
+  ref_type filter{};
 };
 
 }  // namespace cuvs::neighbors::detail

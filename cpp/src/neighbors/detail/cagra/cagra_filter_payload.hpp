@@ -140,6 +140,12 @@ struct is_bitset_filter<::cuvs::neighbors::filtering::bitset_filter<bitset_t, in
   : std::true_type {};
 
 template <typename T>
+struct is_bloom_filter : std::false_type {};
+
+template <>
+struct is_bloom_filter<::cuvs::neighbors::filtering::bloom_filter> : std::true_type {};
+
+template <typename T>
 struct is_udf_filter : std::false_type {};
 
 template <>
@@ -177,6 +183,8 @@ void fill_cagra_sample_filter(cagra_sample_filter<SourceIndexT>& out,
   using DecayedFilter = std::decay_t<FilterT>;
   if constexpr (is_bitset_filter<DecayedFilter>::value) {
     out.filter_data = make_cagra_bitset_filter_payload<SourceIndexT>(filter, stream);
+  } else if constexpr (is_bloom_filter<DecayedFilter>::value) {
+    out.filter_data = filter.filter_data;
   } else if constexpr (is_udf_filter<DecayedFilter>::value) {
     out.filter_data = filter.filter_data;
   }
@@ -199,7 +207,7 @@ template <typename FilterT>
 void* cagra_filter_data_ptr(const FilterT& filter)
 {
   using DecayedFilter = std::decay_t<FilterT>;
-  if constexpr (is_udf_filter<DecayedFilter>::value) {
+  if constexpr (is_bloom_filter<DecayedFilter>::value || is_udf_filter<DecayedFilter>::value) {
     return filter.filter_data;
   } else if constexpr (requires { filter.filter; }) {
     return cagra_filter_data_ptr(filter.filter);
