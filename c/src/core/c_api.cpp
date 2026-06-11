@@ -339,33 +339,51 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
                                            DLManagedTensor* dst_managed)
 {
   return cuvs::core::translate_exceptions([=] {
-    RAFT_EXPECTS(end >= start, "end index must be greater than start index");
+    RAFT_EXPECTS(dst_managed != nullptr, "dst tensor should be initialized");
+
+    dst_managed->dl_tensor  = DLTensor{};
+    dst_managed->manager_ctx = nullptr;
+    dst_managed->deleter     = nullptr;
+
+    RAFT_EXPECTS(src_managed != nullptr, "src tensor should be initialized");
 
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
-    RAFT_EXPECTS(src.ndim <= 2, "src should be a 1 or 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim == 1 || src.ndim == 2, "src should be a 1 or 2 dimensional tensor");
     RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
+    RAFT_EXPECTS(src.data != nullptr, "data should be initialized in the src tensor");
+    RAFT_EXPECTS(start >= 0 && end >= start && end <= src.shape[0],
+                 "row slice range must satisfy 0 <= start <= end <= src.shape[0]");
 
-    dst.dtype    = src.dtype;
-    dst.device   = src.device;
-    dst.ndim     = src.ndim;
-    dst.shape    = new int64_t[dst.ndim];
-    dst.shape[0] = end - start;
+    auto shape = std::make_unique<int64_t[]>(src.ndim);
+    std::unique_ptr<int64_t[]> strides;
+    shape[0] = end - start;
 
     int64_t row_strides = 1;
 
-    if (dst.ndim == 2) {
-      dst.shape[1] = src.shape[1];
-      row_strides = dst.shape[1];
+    if (src.ndim == 1 && src.strides) {
+      strides     = std::make_unique<int64_t[]>(1);
+      row_strides = strides[0] = src.strides[0];
+    }
+
+    if (src.ndim == 2) {
+      shape[1]    = src.shape[1];
+      row_strides = shape[1];
 
       if (src.strides) {
-        dst.strides = new int64_t[2];
-        row_strides = dst.strides[0] = src.strides[0];
-        dst.strides[1]               = src.strides[1];
+        strides     = std::make_unique<int64_t[]>(2);
+        row_strides = strides[0] = src.strides[0];
+        strides[1]                = src.strides[1];
       }
     }
 
-    dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);
+    dst.dtype       = src.dtype;
+    dst.device      = src.device;
+    dst.ndim        = src.ndim;
+    dst.shape       = shape.release();
+    dst.strides     = strides.release();
+    dst.byte_offset = src.byte_offset;
+    dst.data        = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);
     dst_managed->deleter = cuvsMatrixDestroy;
   });
 }
