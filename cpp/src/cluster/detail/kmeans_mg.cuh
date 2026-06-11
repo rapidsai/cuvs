@@ -227,7 +227,7 @@ void mnmg_fit(
       if (n_weights == 0) { continue; }
 
       auto d_part_wt = raft::make_device_scalar<DataT>(dev_res, DataT{0});
-      cuvs::cluster::kmeans::detail::weightSum(dev_res, weights, d_part_wt.view());
+      cuvs::cluster::kmeans::detail::weightSum(dev_res, weights, d_part_wt.view(), false);
       raft::linalg::add(d_wt.data_handle(), d_wt.data_handle(), d_part_wt.data_handle(), 1, stream);
     }
 
