@@ -7,13 +7,16 @@
 
 #include "common.hpp"
 #include <cstdint>
+#include <cuvs/core/export.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <sstream>
 #include <string>
 
-namespace cuvs::neighbors::ivf_flat {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace ivf_flat {
 /**
  * @defgroup ivf_flat_cpp_index_params IVF-Flat index build parameters
  * @{
@@ -3523,10 +3526,8 @@ inline std::string instantiate_udf(char const* data_type, char const* acc_type, 
  *   })
  *
  *   CUVS_METRIC(my_chebyshev, {
- *       for (int i = 0; i < x.size(); ++i) {
- *           auto diff = (x[i] > y[i]) ? (x[i] - y[i]) : (y[i] - x[i]);
- *           if (diff > acc) acc = diff;
- *       }
+ *       auto d = abs_diff(x, y);
+ *       acc    = (d > acc) ? d : acc;
  *   })
  */
 #define CUVS_METRIC(NAME, BODY)                                                                   \
@@ -3571,4 +3572,7 @@ __device__ __forceinline__ void compute_dist_udf_impl(AccT& acc, AccT x, AccT y)
 
 }  // namespace experimental::udf
 
-}  // namespace cuvs::neighbors::ivf_flat
+}  // namespace ivf_flat
+}  // namespace neighbors
+
+}  // namespace CUVS_EXPORT cuvs

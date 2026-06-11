@@ -1,11 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 use crate::distance_type::DistanceType;
 use crate::dlpack::ManagedTensor;
-use crate::error::{check_cuvs, Result};
+use crate::error::{Result, check_cuvs};
 use crate::resources::Resources;
 
 /// Compute pairwise distances between X and Y
@@ -41,8 +41,8 @@ pub fn pairwise_distance(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
+    use ndarray_rand::rand_distr::Uniform;
 
     #[test]
     fn test_pairwise_distance() {
@@ -56,9 +56,7 @@ mod tests {
         let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_datapoints, n_datapoints));
-        let distances = ManagedTensor::from(&distances_host)
-            .to_device(&res)
-            .unwrap();
+        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
 
         pairwise_distance(
             &res,
