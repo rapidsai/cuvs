@@ -59,10 +59,12 @@ using cuvs::core::detail::mnmg_comms;
  * Backs both Path 1 (OMP threads sharing a clique with NCCL comms) and Path 2
  * (one rank per process with RAFT comms). The active backend is selected via
  * `raft::resource::is_multi_gpu(handle)`. Each rank owns one or more local
- * partitions, supplied as a vector of mdspans with the same accessor type, and
- * must own at least one row across those partitions. The implementation
- * streams every local partition through Lloyd iterations using batched
- * device-side reductions, allreducing partial centroid sums, weights,
+ * partitions, supplied as a vector of mdspans with the same accessor type.
+ * Individual partitions may be empty, and an entire rank may have zero local
+ * rows; only the global aggregate across all ranks must satisfy
+ * `global_n >= n_clusters` for non-Array initialization. The implementation
+ * streams every non-empty local partition through Lloyd iterations using
+ * batched device-side reductions, allreducing partial centroid sums, weights,
  * convergence state, and clustering cost at the end of each iteration.
  * Best-of-`n_init` is tracked per rank. RAFT comms ranks each write their own caller-provided
  * outputs; SNMG OMP threads share caller-provided outputs, so only rank 0 writes them.
@@ -78,8 +80,12 @@ using cuvs::core::detail::mnmg_comms;
  *                           n_init, tol, metric, batch_*, etc.).
  * @param[in]  X_parts       Local dataset partitions for this rank. Each
  *                           partition is [n_rows_i x n_features]. Individual
- *                           partitions may be empty, but every rank must own
- *                           at least one row in aggregate across its partitions.
+ *                           partitions may be empty, and a rank may have zero
+ *                           local rows in aggregate (it then contributes only
+ *                           to collective operations). Only the global row
+ *                           count across all ranks needs to satisfy the
+ *                           algorithmic precondition for the chosen init
+ *                           method (e.g. `global_n >= n_clusters`).
  * @param[in]  sample_weight_parts
  *                           Optional per-partition row weights. When set, it
  *                           must contain one weight vector per data partition,
