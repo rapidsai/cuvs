@@ -1314,14 +1314,30 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
   cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_padded_view(
     dataset, static_cast<uint32_t>(dataset.extent(1)));
   auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, host_padded_view);
-  // Attach a device dataset so from_cagra (which expects device_padded_index) can read vectors.
-  auto ace_device_padded = cuvs::neighbors::make_device_padded_dataset(res, dataset);
-  auto ace_index         = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
-    res, ace_host_index, ace_device_padded->as_dataset_view());
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
-  // Convert CAGRA index to HNSW index
-  return from_cagra<T>(res, params, ace_index, std::make_optional(dataset));
+
+  if (ace_host_index.dataset_fd().has_value()) {
+    // Disk-mode ACE: transfer all FDs to a device index so that from_cagra detects the
+    // disk-backed index and calls serialize_to_hnswlib_from_disk, writing hnsw_index.bin.
+    cuvs::neighbors::cagra::device_padded_index<T, uint32_t> ace_device_idx(
+      res, ace_host_index.metric());
+    ace_device_idx.update_dataset(res, std::move(*ace_host_index.steal_dataset_fd()));
+    if (ace_host_index.graph_fd().has_value()) {
+      ace_device_idx.update_graph(res, std::move(*ace_host_index.steal_graph_fd()));
+    }
+    if (ace_host_index.mapping_fd().has_value()) {
+      ace_device_idx.update_mapping(res, std::move(*ace_host_index.steal_mapping_fd()));
+    }
+    return from_cagra<T>(res, params, ace_device_idx, std::nullopt);
+  } else {
+    // In-memory ACE: attach the original (un-reordered) dataset as a device-padded view.
+    // from_cagra receives the host dataset directly to avoid an extra device-to-host copy.
+    auto ace_device_padded = cuvs::neighbors::make_device_padded_dataset(res, dataset);
+    auto ace_index         = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
+      res, ace_host_index, ace_device_padded->as_dataset_view());
+    return from_cagra<T>(res, params, ace_index, std::make_optional(dataset));
+  }
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail

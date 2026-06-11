@@ -458,11 +458,30 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     return graph_fd_;
   }
 
+  /**
+   * Move the graph file descriptor out of this index (for transferring ownership to another
+   * index). Leaves graph_fd_ as nullopt; graph_degree_ remains intact for metadata.
+   */
+  [[nodiscard]] inline auto steal_graph_fd() noexcept -> std::optional<cuvs::util::file_descriptor>
+  {
+    return std::exchange(graph_fd_, std::nullopt);
+  }
+
   /** Get the mapping file descriptor (for disk-backed index) */
   [[nodiscard]] inline auto mapping_fd() const noexcept
     -> const std::optional<cuvs::util::file_descriptor>&
   {
     return mapping_fd_;
+  }
+
+  /**
+   * Move the mapping file descriptor out of this index (for transferring ownership to another
+   * index). Leaves mapping_fd_ as nullopt.
+   */
+  [[nodiscard]] inline auto steal_mapping_fd() noexcept
+    -> std::optional<cuvs::util::file_descriptor>
+  {
+    return std::exchange(mapping_fd_, std::nullopt);
   }
 
   /** Dataset norms for cosine distance [size] */
