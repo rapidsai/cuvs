@@ -140,8 +140,29 @@ auto build(raft::resources const& handle,
       cluster_centers.data(), params.n_lists, dim);
     cuvs::cluster::kmeans::fit(
       handle, kmeans_params, raft::make_const_mdspan(trainset.view()), centers_view);
-    cuvs::cluster::kmeans::predict(
-      handle, kmeans_params, dataset_const_view, centers_const_view, labels_view);
+    if (use_streaming) {
+      // The full dataset lives on host (it doesn't fit comfortably in device memory, which is
+      // why we stream). `predict` launches device kernels, so it can't read the host pointer
+      // directly. Compute cluster labels in device-sized batches: copy each chunk to the GPU and
+      // predict into the matching slice of `labels`.
+      size_t batch_rows =
+        std::min(static_cast<size_t>(n_rows), std::max<size_t>(1, params.streaming_batch_size));
+      auto d_batch = raft::make_device_mdarray<T>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(batch_rows, dim));
+      for (size_t row_start = 0; row_start < static_cast<size_t>(n_rows); row_start += batch_rows) {
+        size_t rows = std::min(batch_rows, static_cast<size_t>(n_rows) - row_start);
+        raft::copy(d_batch.data_handle(), host_dataset_ptr + row_start * dim, rows * dim, stream);
+        auto batch_view =
+          raft::make_device_matrix_view<const float, int64_t>(d_batch.data_handle(), rows, dim);
+        auto batch_labels =
+          raft::make_device_vector_view<uint32_t, int64_t>(labels.data() + row_start, rows);
+        cuvs::cluster::kmeans::predict(
+          handle, kmeans_params, batch_view, centers_const_view, batch_labels);
+      }
+    } else {
+      cuvs::cluster::kmeans::predict(
+        handle, kmeans_params, dataset_const_view, centers_const_view, labels_view);
+    }
   }
 
   index<IdxT> index(handle, n_rows, dim, params.n_lists, params.bits_per_dim);
