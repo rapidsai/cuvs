@@ -348,7 +348,10 @@ struct search_params : cuvs::neighbors::search_params {
   /**
    * A parameter indicating the rate of nodes to be filtered-out, when filtering is used.
    * The value must be equal to or greater than 0.0 and less than 1.0. Default value is
-   * negative, in which case the filtering rate is automatically calculated.
+   * negative, in which case the filtering rate is automatically calculated when possible.
+   * For `filtering::udf_filter`, CAGRA uses `udf_filter::filtering_rate` when this value is
+   * negative. If both values are negative, CAGRA assumes 0.0 because a UDF's selectivity cannot be
+   * inferred from the source string.
    */
   float filtering_rate = -1.0;
 
