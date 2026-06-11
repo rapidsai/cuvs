@@ -73,7 +73,8 @@ __device__ __host__ void swap(DistPair<IdxT, accT>* a, DistPair<IdxT, accT>* b)
 // Structure to sort by distance
 template <typename IdxT, typename accT>
 struct CmpDist {
-  __device__ bool operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
+  __host__ __device__ bool operator()(const DistPair<IdxT, accT>& lhs,
+                                        const DistPair<IdxT, accT>& rhs)
   {
     return lhs.dist < rhs.dist;
   }
@@ -82,7 +83,7 @@ struct CmpDist {
 // Used to sort reverse edges by destination
 template <typename IdxT>
 struct CmpEdge {
-  __device__ bool operator()(const IdxT& lhs, const IdxT& rhs) { return lhs < rhs; }
+  __host__ __device__ bool operator()(const IdxT& lhs, const IdxT& rhs) { return lhs < rhs; }
 };
 
 /*********************************************************************
