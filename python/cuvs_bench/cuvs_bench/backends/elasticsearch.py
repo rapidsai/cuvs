@@ -401,8 +401,8 @@ class ElasticBackend(BenchmarkBackend):
         """Run kNN search over all search-param combinations and compute recall."""
         if dry_run:
             return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
+                neighbors=np.empty((0, k), dtype=np.int64),
+                distances=np.empty((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -414,8 +414,8 @@ class ElasticBackend(BenchmarkBackend):
         skip_reason = self._pre_flight_check()
         if skip_reason:
             return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
+                neighbors=np.empty((0, k), dtype=np.int64),
+                distances=np.empty((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -427,8 +427,8 @@ class ElasticBackend(BenchmarkBackend):
 
         if not indexes:
             return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
+                neighbors=np.empty((0, k), dtype=np.int64),
+                distances=np.empty((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -441,8 +441,8 @@ class ElasticBackend(BenchmarkBackend):
         query_vectors = dataset.query_vectors
         if query_vectors.size == 0:
             return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
+                neighbors=np.empty((0, k), dtype=np.int64),
+                distances=np.empty((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,
@@ -562,8 +562,8 @@ class ElasticBackend(BenchmarkBackend):
             )
         except Exception as e:
             return SearchResult(
-                neighbors=np.zeros((0, k), dtype=np.int64),
-                distances=np.zeros((0, k), dtype=np.float32),
+                neighbors=np.empty((0, k), dtype=np.int64),
+                distances=np.empty((0, k), dtype=np.float32),
                 search_time_ms=0,
                 queries_per_second=0,
                 recall=0,

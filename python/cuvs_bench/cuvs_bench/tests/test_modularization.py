@@ -284,6 +284,34 @@ class TestPluginLoaderMocked:
         msg = str(exc_info.value)
         assert "pip install cuvs-bench[elastic]" in msg
 
+    def test_import_error_with_opensearch_message_raises_helpful_error(
+        self,
+    ):
+        """Mock entry point raising ImportError(opensearchpy) -> our install message."""
+        registry = get_registry()
+        if "opensearch" in registry._backends:
+            registry.unregister("opensearch")
+            unregister_config_loader("opensearch")
+
+        mock_ep = MagicMock()
+        mock_ep.name = "opensearch"
+        mock_ep.load.side_effect = ImportError(
+            "No module named 'opensearchpy'"
+        )
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [mock_ep]
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            with pytest.raises(ImportError) as exc_info:
+                get_backend_class("opensearch")
+
+        msg = str(exc_info.value)
+        assert "pip install cuvs-bench[opensearch]" in msg
+
     def test_import_error_unrelated_propagates(self):
         """Mock entry point: unrelated ImportError propagates unchanged."""
         mock_ep = MagicMock()
@@ -337,6 +365,20 @@ class TestPluginLoaderMocked:
         msg = str(exc_info.value)
         assert "nonexistent_mock_xyz" in msg
         assert "cpp_gbench" in msg
+
+    def test_unknown_optional_backend_includes_install_hint(self):
+        """Missing optional backend names include install hints in the error."""
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = []
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                get_backend_class("opensearch")
+
+        assert "pip install cuvs-bench[opensearch]" in str(exc_info.value)
 
 
 def _elasticsearch_installed():

@@ -21,6 +21,38 @@ from .base import BenchmarkBackend
 _BACKENDS_GROUP = "cuvs_bench.backends"
 _CONFIG_LOADERS_GROUP = "cuvs_bench.config_loaders"
 
+_OPTIONAL_BACKEND_EXTRAS = {
+    "elastic": ("elasticsearch", "pip install cuvs-bench[elastic]"),
+    "opensearch": ("opensearchpy", "pip install cuvs-bench[opensearch]"),
+}
+
+
+def _optional_backend_install_hint(name: str) -> str:
+    """Return an install hint for optional backends."""
+    extra = _OPTIONAL_BACKEND_EXTRAS.get(name)
+    if extra is None:
+        return ""
+    return f" Install with: {extra[1]}"
+
+
+def _rewrite_optional_backend_import_error(
+    name: str, error: ImportError
+) -> ImportError | None:
+    """Rewrite ImportError with an install hint for known optional backends."""
+    extra = _OPTIONAL_BACKEND_EXTRAS.get(name)
+    if extra is None:
+        return None
+
+    module_name, install_cmd = extra
+    message = str(error).lower()
+    if module_name.lower() in message:
+        backend_name = name.capitalize()
+        return ImportError(
+            f"{backend_name} backend requires the '{name}' extra. "
+            f"Install with: {install_cmd}"
+        )
+    return None
+
 
 class BackendRegistry:
     """
@@ -401,11 +433,9 @@ def _try_load_plugin(name: str) -> None:
             try:
                 ep.load()()
             except ImportError as e:
-                if "elasticsearch" in str(e).lower() or "elasticsearch" in str(e):
-                    raise ImportError(
-                        f"Elasticsearch backend requires the 'elastic' extra. "
-                        f"Install with: pip install cuvs-bench[elastic]"
-                    ) from e
+                rewritten = _rewrite_optional_backend_import_error(name, e)
+                if rewritten is not None:
+                    raise rewritten from e
                 raise
             return  # Plugin loaded successfully
 
@@ -432,9 +462,7 @@ def get_backend_class(name: str) -> Type[BenchmarkBackend]:
         _try_load_plugin(name)
     if name not in registry._backends:
         available = ", ".join(registry._backends.keys())
-        hint = ""
-        if name == "elastic":
-            hint = " Install with: pip install cuvs-bench[elastic]"
+        hint = _optional_backend_install_hint(name)
         raise ValueError(
             f"Backend '{name}' not found. Available backends: {available or '(none)'}.{hint}"
         )
@@ -505,9 +533,7 @@ def get_config_loader(name: str) -> Type:
         _try_load_plugin(name)
     if name not in _CONFIG_LOADER_REGISTRY:
         available = ", ".join(_CONFIG_LOADER_REGISTRY.keys()) or "none"
-        hint = ""
-        if name == "elastic":
-            hint = " Install with: pip install cuvs-bench[elastic]"
+        hint = _optional_backend_install_hint(name)
         raise ValueError(
             f"Unknown config loader for backend: '{name}'. Available: {available}.{hint}"
         )
