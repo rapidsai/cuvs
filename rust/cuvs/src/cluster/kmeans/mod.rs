@@ -23,10 +23,10 @@
 //!     let n_clusters = 8;
 //!     let dataset =
 //!         ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
-//!     let dataset = ManagedTensor::from(&dataset).to_device(&res)?;
+//!     let dataset = ManagedTensor::from_ndarray(&dataset)?.to_device(&res)?;
 //!
 //!     let centroids_host = ndarray::Array::<f32, _>::zeros((n_clusters, n_features));
-//!     let mut centroids = ManagedTensor::from(&centroids_host).to_device(&res)?;
+//!     let mut centroids = ManagedTensor::from_ndarray(&centroids_host)?.to_device(&res)?;
 //!
 //!     // find the centroids with the kmeans index
 //!     let kmeans_params = kmeans::Params::new()?.set_n_clusters(n_clusters as i32);
@@ -56,9 +56,9 @@ use crate::resources::Resources;
 pub fn fit(
     res: &Resources,
     params: &Params,
-    x: &ManagedTensor,
-    sample_weight: &Option<ManagedTensor>,
-    centroids: &mut ManagedTensor,
+    x: &ManagedTensor<'_>,
+    sample_weight: &Option<ManagedTensor<'_>>,
+    centroids: &mut ManagedTensor<'_>,
 ) -> Result<(f64, i32)> {
     let mut inertia: f64 = 0.0;
     let mut niter: i32 = 0;
@@ -95,10 +95,10 @@ pub fn fit(
 pub fn predict(
     res: &Resources,
     params: &Params,
-    x: &ManagedTensor,
-    sample_weight: &Option<ManagedTensor>,
-    centroids: &ManagedTensor,
-    labels: &mut ManagedTensor,
+    x: &ManagedTensor<'_>,
+    sample_weight: &Option<ManagedTensor<'_>>,
+    centroids: &ManagedTensor<'_>,
+    labels: &mut ManagedTensor<'_>,
     normalize_weight: bool,
 ) -> Result<f64> {
     let mut inertia: f64 = 0.0;
@@ -128,7 +128,11 @@ pub fn predict(
 /// * `res` - Resources to use
 /// * `x` - Input matrix in device memory - shape (m, k)
 /// * `centroids` - Centroids calculated by fit in device memory, shape (n_clusters, k)
-pub fn cluster_cost(res: &Resources, x: &ManagedTensor, centroids: &ManagedTensor) -> Result<f64> {
+pub fn cluster_cost(
+    res: &Resources,
+    x: &ManagedTensor<'_>,
+    centroids: &ManagedTensor<'_>,
+) -> Result<f64> {
     let mut inertia: f64 = 0.0;
 
     unsafe {
@@ -159,10 +163,11 @@ mod tests {
         let n_features = 16;
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
-        let dataset = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset = ManagedTensor::from_ndarray(&dataset).unwrap().to_device(&res).unwrap();
 
         let centroids_host = ndarray::Array::<f32, _>::zeros((n_clusters, n_features));
-        let mut centroids = ManagedTensor::from(&centroids_host).to_device(&res).unwrap();
+        let mut centroids =
+            ManagedTensor::from_ndarray(&centroids_host).unwrap().to_device(&res).unwrap();
 
         let params = Params::new().unwrap().set_n_clusters(n_clusters as i32);
 
@@ -176,7 +181,8 @@ mod tests {
         assert!(n_iter >= 1);
 
         let mut labels_host = ndarray::Array::<i32, _>::zeros((n_clusters,));
-        let mut labels = ManagedTensor::from(&labels_host).to_device(&res).unwrap();
+        let mut labels =
+            ManagedTensor::from_ndarray(&labels_host).unwrap().to_device(&res).unwrap();
 
         // make sure the prediction for each centroid is the centroid itself
         predict(&res, &params, &centroids, &None, &centroids, &mut labels, false).unwrap();
