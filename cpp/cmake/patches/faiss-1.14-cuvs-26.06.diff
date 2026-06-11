@@ -273,7 +273,7 @@ index 755817f..0ae948e 100644
                  raft::make_const_mdspan(knn_graph_copy.view()));
      } else {
          FAISS_THROW_MSG(
-@@ -204,14 +207,22 @@ void CuvsCagra<data_t>::train(idx_t n, const data_t* x) {
+@@ -204,15 +207,21 @@ void CuvsCagra<data_t>::train(idx_t n, const data_t* x) {
          auto dataset = raft::make_device_matrix_view<const data_t, int64_t>(
                  x, n, dim_);
 +        auto dataset_view =
@@ -297,7 +297,6 @@ index 755817f..0ae948e 100644
 +                        device_dataset_for_host_storage_->as_dataset_view()));
      }
  }
-
 @@ -248,13 +259,17 @@ void CuvsCagra<data_t>::search(
 
      if (!store_dataset_) {
