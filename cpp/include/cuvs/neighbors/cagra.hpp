@@ -190,6 +190,38 @@ struct index_params : cuvs::neighbors::index_params {
   bool guarantee_connectivity = false;
 
   /**
+   * Whether to attach the dataset to the index after graph construction, i.e.:
+   *
+   *  - `true` (default) means `build` attaches the input dataset as a **non-owning view** to the
+   * index, so the index is ready to search immediately after `build` returns.  The caller is
+   * responsible for keeping the underlying dataset storage alive for as long as the index is used.
+   *  - `false` means `build` only builds the graph and the caller is expected to attach the dataset
+   * separately via `cuvs::neighbors::cagra::update_dataset` before searching.
+   *
+   * Unlike the legacy behavior, no copy of the dataset is made: the index always stores a view.
+   * Setting `attach_dataset_on_build = false` is useful when the caller needs to apply specific
+   * memory placement or transformation (e.g. moving to managed memory) before attaching.
+   *
+   * **Note:** this flag is only effective when building from a device dataset view
+   * (e.g. `device_padded_dataset_view`). For host builds (`host_padded_dataset_view`), it is
+   * ignored — the returned `host_padded_index` cannot be searched regardless, and the caller must
+   * always call `attach_device_dataset_on_host_index` to obtain a search-ready device index.
+   *
+   * @code{.cpp}
+   *   auto dataset = cuvs::neighbors::make_device_padded_dataset(res, host_matrix.view());
+   *   cagra::index_params index_params;
+   *   // Build graph only — caller attaches dataset later.
+   *   index_params.attach_dataset_on_build = false;
+   *   auto index = cagra::build(res, index_params, dataset->as_dataset_view());
+   *   // ASSERT(index.size() == 0);  // no dataset yet
+   *   // Attach with a view (storage owned by `dataset`).
+   *   index.update_dataset(res, dataset->as_dataset_view());
+   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   * @endcode
+   */
+  bool attach_dataset_on_build = true;
+
+  /**
    * @brief Create a CAGRA index parameters compatible with HNSW index
    *
    * @param dataset The shape of the input dataset
@@ -902,12 +934,20 @@ struct merged_dataset_storage {
 /**
  * @brief Build the index from a `dataset_view` (device padded, device VPQ, or host padded).
  *
- * For device views, graph construction uses `convert_dataset_view_to_padded_for_graph_build`.
- * The returned index contains only the optimized graph; call `index::update_dataset(res, dataset)`
- * with the same view type before search (keep underlying storage alive).
- * For host views, the returned index is typed on the host view; call
- * `attach_device_dataset_on_host_index` before search to convert to a device index and attach a
- * device dataset.
+ * When `index_params.attach_dataset_on_build = true` (the default) **and the input is a device
+ * view**, the `dataset` view is stored in the returned index as a **non-owning view** — no copy is
+ * made. The caller must keep the underlying storage alive for the lifetime of the index. The
+ * returned index is then ready to search immediately.
+ *
+ * When `index_params.attach_dataset_on_build = false`, or when building from a **host view**, only
+ * the search graph is built and the returned index holds no dataset.
+ *
+ * For host views, the returned `host_padded_index` cannot be searched regardless of
+ * `attach_dataset_on_build` (the flag is ignored). Call `attach_device_dataset_on_host_index` to
+ * convert it to a device-backed index before search.
+ *
+ * Note: disk-based ACE builds (`ace_params::use_disk = true`) always set a file-descriptor
+ * dataset internally (also host-typed); `attach_dataset_on_build` is ignored there too.
  */
 template <typename DatasetViewT>
   requires(!cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT> &&

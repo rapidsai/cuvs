@@ -288,11 +288,12 @@ void optimize(
 /**
  * @brief Build the index from a `dataset_view` (device padded, device VPQ, or host padded).
  *
- * For device views, graph construction uses `build_from_device_matrix`; the returned index
- * contains only the optimized graph — call `index::update_dataset(res, dataset)` before search.
- * For host views, the returned index is typed on the host view — call
- * `attach_device_dataset_on_host_index` before search to convert to a device index and attach a
- * device dataset.
+ * When `index_params.attach_dataset_on_build = true` (the default) **and the input is a device
+ * view**, the `dataset` view is stored in the returned index as a non-owning view — no copy is
+ * made. The caller must keep the underlying storage alive for the lifetime of the index.
+ *
+ * For host views, `attach_dataset_on_build` is ignored — the host_padded_index cannot be
+ * searched; call `attach_device_dataset_on_host_index` to get a search-ready device index.
  */
 template <typename DatasetViewT>
   requires(!cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT> &&
@@ -303,9 +304,15 @@ auto build(raft::resources const& res, const index_params& params, DatasetViewT 
 {
   using T    = cuvs::neighbors::cagra_view_element_type_t<DatasetViewT>;
   using IdxT = uint32_t;
+
+  // Device path: build graph, optionally attach dataset view.
+  // attach_dataset_on_build is only meaningful for device builds — a host_padded_index cannot
+  // be searched regardless; the caller must call attach_device_dataset_on_host_index.
   if constexpr (cuvs::neighbors::is_device_dataset_view_v<DatasetViewT>) {
-    return cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
+    auto idx = cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
       res, params, dataset);
+    if (params.attach_dataset_on_build) { idx.update_dataset(res, dataset); }
+    return idx;
   } else {
     if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
       return cuvs::neighbors::cagra::detail::build_ace<T, IdxT, DatasetViewT>(
