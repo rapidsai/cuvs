@@ -7,6 +7,9 @@
 
 namespace cuvs::neighbors::vamana::detail {
 
+// RobustPrune caches accepted candidate vectors in dynamic shared memory only at wide dims.
+static constexpr int kRobustPruneCandCacheMinDim = 128;
+
 /* Macros to compute the shared memory requirements for CUB primitives used by search and prune */
 #define COMPUTE_SMEM_SIZE(degree, visited_size, DEG, CANDS)                                     \
   if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                     \

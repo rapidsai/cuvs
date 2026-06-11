@@ -85,8 +85,14 @@ __global__ void RobustPruneKernel(
   int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
 
   float* occlusion_list = reinterpret_cast<float*>(smem);
+  const int nbh_list_offset = (degree + visited_size) * sizeof(float);
   DistPair<IdxT, accT>* new_nbh_list =
-    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[(degree + visited_size) * sizeof(float)]);
+    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[nbh_list_offset]);
+  QueryCoordT* s_cand_coords = nullptr;
+  if (dim >= kRobustPruneCandCacheMinDim) {
+    s_cand_coords = reinterpret_cast<QueryCoordT*>(
+      &smem[nbh_list_offset + (degree + visited_size) * sizeof(DistPair<IdxT, accT>)]);
+  }
 
   static __shared__ Point<QueryCoordT, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
@@ -201,6 +207,12 @@ __global__ void RobustPruneKernel(
     // If we need to prune at all...
     if (res_size > degree) {
       int accept_count = 0;
+      const bool cache_cand_in_smem = dim >= kRobustPruneCandCacheMinDim;
+      Point<QueryCoordT, accT> s_cand;
+      if (cache_cand_in_smem) {
+        s_cand.coords = s_cand_coords;
+        s_cand.Dim    = dim;
+      }
 
       // Go through different alpha values. These constants are hard-coded in the MSFT DiskANN code
       for (float cur_alpha = 1.0; cur_alpha <= alpha && accept_count < degree; cur_alpha *= 1.2) {
@@ -213,20 +225,53 @@ __global__ void RobustPruneKernel(
 
           if (new_nbh_list[pass_start].idx == queryId) { continue; }
 
-          T* cand_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[pass_start].idx), 0));
+          if (cache_cand_in_smem) {
+            if constexpr (is_cuda_fp16_v<T>) {
+              update_shared_point_half_to_float<accT>(
+                &s_cand, &dataset(0, 0), new_nbh_list[pass_start].idx, dim);
+            } else {
+              update_shared_point<T, accT>(
+                &s_cand, &dataset(0, 0), new_nbh_list[pass_start].idx, dim);
+            }
+            __syncthreads();
+          }
 
           occlusion_list[pass_start] = raft::lower_bound<float>();  // Mark as "accepted"
           accept_count++;
 
           // Update rest of the occlusion list
-          for (int occId = pass_start + 1; occId < res_size; occId++) {
-            if (occlusion_list[occId] <= alpha &&
-                occlusion_list[occId] != raft::lower_bound<float>()) {
-              T* k_ptr     = const_cast<T*>(&dataset((size_t)(new_nbh_list[occId].idx), 0));
-              accT djk     = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
-              accT new_occ = (float)(new_nbh_list[occId].dist / djk);
+          if (cache_cand_in_smem) {
+            for (int occId = pass_start + 1; occId < res_size; occId++) {
+              if (occlusion_list[occId] <= alpha &&
+                  occlusion_list[occId] != raft::lower_bound<float>()) {
+                T* k_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[occId].idx), 0));
+                accT djk;
+                if constexpr (is_cuda_fp16_v<T>) {
+                  djk = dist<accT>(s_cand.coords, k_ptr, dim, metric);
+                } else {
+                  djk = dist<T, accT>(s_cand.coords, k_ptr, dim, metric);
+                }
+                accT new_occ = (float)(new_nbh_list[occId].dist / djk);
 
-              occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
+                occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
+              }
+            }
+          } else {
+            T* cand_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[pass_start].idx), 0));
+            for (int occId = pass_start + 1; occId < res_size; occId++) {
+              if (occlusion_list[occId] <= alpha &&
+                  occlusion_list[occId] != raft::lower_bound<float>()) {
+                T* k_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[occId].idx), 0));
+                accT djk;
+                if constexpr (is_cuda_fp16_v<T>) {
+                  djk = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
+                } else {
+                  djk = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
+                }
+                accT new_occ = (float)(new_nbh_list[occId].dist / djk);
+
+                occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
+              }
             }
           }
         }

@@ -197,8 +197,11 @@ void batched_insert_vamana(
     static_cast<int>(4 * ((coords_size + neighbor_size + queue_size_bytes + 15) & ~15));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
+  const int cand_coords_smem_size =
+    (dim >= kRobustPruneCandCacheMinDim) ? coords_size : 0;
   int prune_smem_total_size = (degree + visited_size) * sizeof(float) +  // Occlusion list
-                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>) +
+                              cand_coords_smem_size;
 
   RAFT_LOG_DEBUG(
     "Dynamic shared memory usage (bytes): GreedySearch: %d, Segment Sort: %d, Robust Prune: %d",
