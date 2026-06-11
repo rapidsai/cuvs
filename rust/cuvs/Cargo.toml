@@ -18,6 +18,7 @@ ndarray = "0.15"
 
 [dev-dependencies]
 ndarray-rand = "0.14"
+tempfile = "3"
 
 [package.metadata.docs.rs]
 features = ["doc-only"]
