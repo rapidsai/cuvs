@@ -1076,20 +1076,20 @@ void IVFGPU::PrepareClusterSearchInputs(
                                                searcher.get_centroid_distances(),
                                                searcher_stream);
   const float alpha = -2.f, beta = 1.f;
-  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(searcher_handle,
-                                                               /* trans_a = */ true,
-                                                               /* trans_b = */ false,
-                                                               num_centroids,
-                                                               batch_size,
-                                                               num_padded_dim,
-                                                               &alpha,
-                                                               initializer->GetCentroid(0),
-                                                               num_padded_dim,
-                                                               queries.data_handle(),
-                                                               num_padded_dim,
-                                                               &beta,
-                                                               searcher.get_centroid_distances(),
-                                                               num_centroids);
+  raft::linalg::detail::matmul</* DevicePointerMode = */ false>(searcher_handle,
+                                                                /* trans_a = */ true,
+                                                                /* trans_b = */ false,
+                                                                num_centroids,
+                                                                batch_size,
+                                                                num_padded_dim,
+                                                                &alpha,
+                                                                initializer->GetCentroid(0),
+                                                                num_padded_dim,
+                                                                queries.data_handle(),
+                                                                num_padded_dim,
+                                                                &beta,
+                                                                searcher.get_centroid_distances(),
+                                                                num_centroids);
 
   // Step 4: select top-nprobe clusters per query
   auto d_raft_vals = raft::make_device_matrix<float, int64_t>(searcher_handle, batch_size, nprobe);
