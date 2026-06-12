@@ -156,7 +156,8 @@ void initKMeansPlusPlus_distributed(
     std::uniform_int_distribution<IndexT> row_dist(IndexT{0}, n_local - 1);
     chosen_local_idx             = row_dist(row_gen);
     auto [part_idx, row_in_part] = locate_local_row(part_offsets, chosen_local_idx);
-    initialCentroid              = const_cast<DataT*>(X_parts[part_idx].data_handle() + row_in_part * n_features);
+    initialCentroid =
+      const_cast<DataT*>(X_parts[part_idx].data_handle() + row_in_part * n_features);
   }
   // Step 1.3 - broadcast the chosen initial centroid to all ranks.
   comms.bcast(initialCentroid, centroidsBuf.data(), static_cast<size_t>(n_features), rp);
