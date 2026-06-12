@@ -291,10 +291,10 @@ void mnmg_fit(
   IndexT local_n_iter = 0;
 
   if (use_nccl && params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
-    raft::copy(rank_centroids.data_handle(),
-               centroids.data_handle(),
-               static_cast<size_t>(n_clusters) * n_features,
-               stream);
+    comms.bcast(centroids.data_handle(),
+                rank_centroids.data_handle(),
+                static_cast<size_t>(n_clusters) * n_features,
+                KMEANS_COMM_ROOT);
   }
 
   std::mt19937 gen(params.rng_state.seed);

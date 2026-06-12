@@ -92,6 +92,18 @@ class mnmg_comms {
   }
 
   template <typename T>
+  void bcast(const T* sendbuf, T* recvbuf, std::size_t count, int root) const
+  {
+    if (use_nccl_) {
+      RAFT_NCCL_TRY(
+        ncclBroadcast(sendbuf, recvbuf, count, nccl_dtype<T>(), root, nccl_comm_, stream_));
+    } else {
+      const auto& comm = raft::resource::get_comms(dev_res_);
+      comm.bcast(sendbuf, recvbuf, count, root, stream_);
+    }
+  }
+
+  template <typename T>
   void allgather(T* sendbuf, T* recvbuf, std::size_t count) const
   {
     if (use_nccl_) {

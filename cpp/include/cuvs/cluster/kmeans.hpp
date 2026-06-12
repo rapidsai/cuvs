@@ -1614,10 +1614,9 @@ namespace mg {
  * @brief Explicit multi-GPU k-means entry points.
  *
  * All multi-GPU k-means APIs live in this namespace
- * (`cuvs::cluster::kmeans::mg`). To run k-means on multiple GPUs the
- * application must call one of these overloads explicitly with a `handle` that
+ * (`cuvs::cluster::kmeans::mg`). To run k-means on multiple GPUs a `handle` that
  * carries either an SNMG clique (`raft::resource::is_multi_gpu(handle)`) or
- * initialized RAFT comms (`raft::resource::comms_initialized(handle)`).
+ * initialized RAFT comms (`raft::resource::comms_initialized(handle)`) must be used.
  *
  * Migration from earlier releases (breaking change in cuVS 26.08): before
  * this release, the single-GPU `cuvs::cluster::kmeans::fit` overloads would

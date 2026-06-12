@@ -89,6 +89,11 @@ void initKMeansPlusPlus_distributed(
   const auto n_clusters = static_cast<IndexT>(params.n_clusters);
   const auto metric     = params.metric;
 
+  // Clamp oversampling factor to 1.0 to maintain the distributed initialization with minimum
+  // selection probability guided by the cost alone.
+  const double effective_oversampling_factor =
+    params.oversampling_factor < double{1} ? double{1} : params.oversampling_factor;
+
   RAFT_EXPECTS(metric == cuvs::distance::DistanceType::L2Expanded ||
                  metric == cuvs::distance::DistanceType::L2SqrtExpanded,
                "Distributed KMeans++ init only supports L2Expanded or L2SqrtExpanded metrics");
@@ -138,7 +143,10 @@ void initKMeansPlusPlus_distributed(
   // Matches the original: re-seed mt19937(seed) so cIdx is the first draw of a
   // fresh generator (not the second draw of the same one used for rp).
   IndexT chosen_local_idx = -1;
-  auto initialCentroid    = raft::make_device_matrix<DataT, IndexT>(handle, 1, n_features);
+  // Growable buffer of candidate centroids (the "C" set).
+  rmm::device_uvector<DataT> centroidsBuf(static_cast<std::size_t>(n_features), stream);
+  auto potentialCentroids =
+    raft::make_device_matrix_view<DataT, IndexT>(centroidsBuf.data(), IndexT{1}, n_features);
   if (rank == rp) {
     RAFT_EXPECTS(n_local > 0,
                  "selected source rank %d has no local rows; cannot pick an initial centroid",
@@ -148,13 +156,9 @@ void initKMeansPlusPlus_distributed(
     chosen_local_idx             = row_dist(row_gen);
     auto [part_idx, row_in_part] = locate_local_row(part_offsets, chosen_local_idx);
     auto const* src_row          = X_parts[part_idx].data_handle() + row_in_part * n_features;
-    raft::copy(
-      handle,
-      raft::make_device_vector_view<DataT, IndexT>(initialCentroid.data_handle(), n_features),
-      raft::make_device_vector_view<const DataT, IndexT>(src_row, n_features));
+    // Step 1.3 - broadcast the chosen initial centroid to all ranks.
+    comms.bcast(src_row, centroidsBuf.data(), static_cast<size_t>(n_features), rp);
   }
-  // Step 1.3 - broadcast the chosen initial centroid to all ranks.
-  comms.bcast(initialCentroid.data_handle(), static_cast<size_t>(n_features), rp);
 
   // Per-rank "is this local row already a chosen centroid" bitmap.
   auto isSampleCentroid =
@@ -164,15 +168,6 @@ void initKMeansPlusPlus_distributed(
     const std::uint8_t one = 1;
     raft::copy(isSampleCentroid.data_handle() + chosen_local_idx, &one, 1, stream);
   }
-
-  // Growable buffer of candidate centroids (the "C" set).
-  rmm::device_uvector<DataT> centroidsBuf(static_cast<std::size_t>(n_features), stream);
-  raft::copy(
-    handle,
-    raft::make_device_vector_view<DataT, IndexT>(centroidsBuf.data(), n_features),
-    raft::make_device_vector_view<const DataT, IndexT>(initialCentroid.data_handle(), n_features));
-  auto potentialCentroids =
-    raft::make_device_matrix_view<DataT, IndexT>(centroidsBuf.data(), IndexT{1}, n_features);
 
   // Per-rank working buffers spanning the rank's local row range.
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, std::max(n_local, IndexT{1}));
@@ -274,7 +269,7 @@ void initKMeansPlusPlus_distributed(
         isSampleCentroid.data_handle() + part_offsets[p], part_rows);
 
       SamplingOp<DataT, IndexT> select_op(psi,
-                                          params.oversampling_factor,
+                                          effective_oversampling_factor,
                                           n_clusters,
                                           uniformRands.data_handle() + part_offsets[p],
                                           flag_slice.data_handle());
