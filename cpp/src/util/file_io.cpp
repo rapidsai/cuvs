@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,9 +10,28 @@
 #include <limits.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 namespace cuvs::util {
+
+void preallocate_file(const file_descriptor& fd, const size_t total_bytes)
+{
+  if (total_bytes == 0) { return; }
+  RAFT_EXPECTS(fd.is_valid(), "File descriptor must be valid");
+  const int rc = posix_fallocate(fd.get(), 0, static_cast<off_t>(total_bytes));
+  if (rc == 0) { return; }
+  // Some filesystems (tmpfs, certain NFS/overlay mounts) do not support preallocation; fall back
+  // to ftruncate so a valid output location is still usable.
+  if (rc == EOPNOTSUPP || rc == EINVAL || rc == ENOSYS) {
+    RAFT_EXPECTS(ftruncate(fd.get(), static_cast<off_t>(total_bytes)) == 0,
+                 "Failed to pre-size file %s via ftruncate: %s",
+                 fd.get_path().c_str(),
+                 strerror(errno));
+    return;
+  }
+  RAFT_FAIL("Failed to pre-allocate file %s: %s", fd.get_path().c_str(), strerror(rc));
+}
 
 void read_large_file(const file_descriptor& fd,
                      void* dest_ptr,

@@ -20,6 +20,7 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
         NONE
         CPU
         GPU
+        GPU_LAYERED_ON_DISK
 
     ctypedef struct cuvsHnswAceParams:
         size_t npartitions
@@ -41,6 +42,7 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
         size_t M
         cuvsDistanceType metric
         cuvsHnswAceParams_t ace_params
+        const char* dataset_path
 
     ctypedef cuvsHnswIndexParams* cuvsHnswIndexParams_t
 
@@ -105,3 +107,24 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
                                     int32_t dim,
                                     cuvsDistanceType metric,
                                     cuvsHnswIndex_t index) except +
+
+    ctypedef struct cuvsHnswMaterializeParams:
+        const char* dataset_path
+        double max_host_memory_gb
+        int num_threads
+
+    ctypedef cuvsHnswMaterializeParams* cuvsHnswMaterializeParams_t
+
+    cuvsError_t cuvsHnswMaterializeParamsCreate(
+        cuvsHnswMaterializeParams_t* params)
+
+    cuvsError_t cuvsHnswMaterializeParamsDestroy(
+        cuvsHnswMaterializeParams_t params)
+
+    cuvsError_t cuvsHnswMaterializeToHnswlib(
+        cuvsResources_t res,
+        cuvsHnswMaterializeParams_t params,
+        const char* layered_artifact_path,
+        const char* output_path,
+        int32_t dim,
+        cuvsDistanceType metric) except +
