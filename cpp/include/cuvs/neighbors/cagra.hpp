@@ -2862,7 +2862,7 @@ auto convert_host_to_device_index(raft::resources const& res, index<T, IdxT, Hos
                src.graph().size(),
                raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
-    out.update_graph(res, graph_host.view());  // host view overload: copies H→D and owns graph_
+    out.update_graph(res, raft::make_const_mdspan(graph_host.view()));  // host overload: copies H→D
   }
   return out;
 }
