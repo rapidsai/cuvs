@@ -18,7 +18,7 @@ Parameters for all-neighbors k-NN graph building.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `algo` | `str or cuvsAllNeighborsAlgo` | Algorithm to use for local k-NN graph building. Options: "brute_force", "ivf_pq", "nn_descent" |
+| `algo` | `str or cuvsAllNeighborsAlgo` | Algorithm to use for local k-NN graph building.<br />Options: "brute_force", "ivf_pq", "nn_descent" |
 | `overlap_factor` | `int, default=2` | Number of clusters each point is assigned to (must be &lt; n_clusters) |
 | `n_clusters` | `int, default=1` | Number of clusters/batches to partition the dataset into (&gt; overlap_factor). Use n_clusters&gt;1 to distribute the work across GPUs. |
 | `metric` | `str or cuvsDistanceType, default="sqeuclidean"` | Distance metric to use for graph construction |
