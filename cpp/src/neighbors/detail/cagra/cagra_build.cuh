@@ -833,8 +833,20 @@ bool ace_check_use_disk_mode(bool use_disk,
 {
   // Use overridden memory limits if provided (> 0), otherwise query actual system memory
   if (max_host_memory_gb.has_value() && max_host_memory_gb.value() > 0) {
-    mem.available_host_memory = static_cast<size_t>(max_host_memory_gb.value() * (1ULL << 30));
-    RAFT_LOG_INFO("ACE: Using overridden host memory limit: %.2f GiB", max_host_memory_gb.value());
+    auto actual_available_host_memory = cuvs::util::get_free_host_memory();
+    auto configured_host_memory = static_cast<size_t>(max_host_memory_gb.value() * (1ULL << 30));
+    if (actual_available_host_memory < configured_host_memory) {
+      RAFT_LOG_WARN(
+        "ACE: Actual host memory (%zu GiB) is less than configured limit (%zu GiB). "
+        "Using actual host memory.",
+        to_gib(actual_available_host_memory),
+        to_gib(configured_host_memory));
+      mem.available_host_memory = actual_available_host_memory;
+    } else {
+      RAFT_LOG_INFO("ACE: Using overridden host memory limit: %.2f GiB",
+                    max_host_memory_gb.value());
+      mem.available_host_memory = configured_host_memory;
+    }
   } else {
     mem.available_host_memory = cuvs::util::get_free_host_memory();
   }
@@ -874,8 +886,19 @@ bool ace_check_use_disk_mode(bool use_disk,
   // Check if GPU has enough memory for the final graph or use disk mode instead.
   // TODO: Extend model or use managed memory if running out of GPU memory.
   if (max_gpu_memory_gb.has_value() && max_gpu_memory_gb.value() > 0) {
-    mem.available_gpu_memory = static_cast<size_t>(max_gpu_memory_gb.value() * (1ULL << 30));
-    RAFT_LOG_INFO("ACE: Using overridden GPU memory limit: %.2f GiB", max_gpu_memory_gb.value());
+    auto actual_available_gpu_memory = rmm::available_device_memory().second;
+    auto configured_gpu_memory = static_cast<size_t>(max_gpu_memory_gb.value() * (1ULL << 30));
+    if (actual_available_gpu_memory < configured_gpu_memory) {
+      RAFT_LOG_WARN(
+        "ACE: Actual GPU memory (%zu GiB) is less than configured limit (%zu GiB). "
+        "Using actual GPU memory.",
+        to_gib(actual_available_gpu_memory),
+        to_gib(configured_gpu_memory));
+      mem.available_gpu_memory = actual_available_gpu_memory;
+    } else {
+      RAFT_LOG_INFO("ACE: Using overridden GPU memory limit: %.2f GiB", max_gpu_memory_gb.value());
+      mem.available_gpu_memory = configured_gpu_memory;
+    }
   } else {
     mem.available_gpu_memory = rmm::available_device_memory().second;
   }

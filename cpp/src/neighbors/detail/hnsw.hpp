@@ -1575,11 +1575,6 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     cagra_ace_params.max_host_memory_gb = ace_params.max_host_memory_gb;
     cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
     cagra_params.graph_build_params     = cagra_ace_params;
-
-    RAFT_LOG_INFO(
-      "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",
-      cagra_ace_params.npartitions,
-      cagra_ace_params.ef_construction);
   }
   // Build CAGRA index optionally using ACE
   auto cagra_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);

@@ -64,7 +64,6 @@ int cagra_build_search_ace(raft::resources const& res)
   hnsw::index_params params;
   params.M               = 24;
   params.ef_construction = 200;
-  params.hierarchy       = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
 
   auto hnsw_index = hnsw::build(res, params, dataset_host_view);
 

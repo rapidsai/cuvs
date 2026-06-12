@@ -155,7 +155,14 @@ int main(int argc, char** argv)
   // algorithms). In that case only the internal arrays would use the pool, any other allocation
   // uses the default RMM memory resource. Here is how to change the workspace memory resource to
   // a pool with 2 GiB upper limit.
-  raft::resource::set_workspace_to_pool_resource(res, 2 * 1024 * 1024 * 1024ull);
+  // raft::resource::set_workspace_to_pool_resource(res, 2 * 1024 * 1024 * 1024ull);
+
+  // Manually configure pool to allocate up to its limit right away to avoid fragmentation.
+  constexpr std::size_t kWorkspaceLimit = 2ull * 1024 * 1024 * 1024;  // 2 GiB
+  rmm::mr::pool_memory_resource pool_mr(
+    rmm::mr::get_current_device_resource_ref(), kWorkspaceLimit, kWorkspaceLimit);
+  raft::resource::set_workspace_resource(
+    res, raft::mr::device_resource{std::move(pool_mr)}, kWorkspaceLimit);
 
   raft::memory_tracking_resources tracked(res, args.stats_path, std::chrono::milliseconds(1));
 
