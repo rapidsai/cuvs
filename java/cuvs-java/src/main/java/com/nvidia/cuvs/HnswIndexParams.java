@@ -46,7 +46,16 @@ public class HnswIndexParams {
     /**
      * Full hierarchy is built using the GPU
      */
-    GPU(2);
+    GPU(2),
+
+    /**
+     * GPU-built hierarchy stored as a layered on-disk topology artifact.
+     *
+     * The artifact stores graph topology only. When loading such an artifact, the
+     * {@code datasetPath} must point to the original-ID-ordered vectors used to
+     * reconstruct an in-memory HNSW index.
+     */
+    GPU_LAYERED_ON_DISK(3);
 
     /**
      * The value for the enum choice.
@@ -65,6 +74,8 @@ public class HnswIndexParams {
     public static final CuvsHnswHierarchy NONE = CuvsHnswHierarchy.NONE;
     public static final CuvsHnswHierarchy CPU = CuvsHnswHierarchy.CPU;
     public static final CuvsHnswHierarchy GPU = CuvsHnswHierarchy.GPU;
+    public static final CuvsHnswHierarchy GPU_LAYERED_ON_DISK =
+        CuvsHnswHierarchy.GPU_LAYERED_ON_DISK;
   }
 
   private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.GPU;
@@ -74,6 +85,7 @@ public class HnswIndexParams {
   private long m = 32;
   private CuvsDistanceType metric = CuvsDistanceType.L2Expanded;
   private HnswAceParams aceParams;
+  private String datasetPath;
 
   private HnswIndexParams(
       CuvsHnswHierarchy hierarchy,
@@ -82,7 +94,8 @@ public class HnswIndexParams {
       int vectorDimension,
       long m,
       CuvsDistanceType metric,
-      HnswAceParams aceParams) {
+      HnswAceParams aceParams,
+      String datasetPath) {
     this.hierarchy = hierarchy;
     this.efConstruction = efConstruction;
     this.numThreads = numThreads;
@@ -90,6 +103,7 @@ public class HnswIndexParams {
     this.m = m;
     this.metric = metric;
     this.aceParams = aceParams;
+    this.datasetPath = datasetPath;
   }
 
   /**
@@ -153,6 +167,20 @@ public class HnswIndexParams {
     return aceParams;
   }
 
+  /**
+   * Gets the local dataset path used by layered HNSW deserialization.
+   *
+   * Required when {@code hierarchy == GPU_LAYERED_ON_DISK}: the artifact stores
+   * graph topology only, and loading reads the original-ID-ordered vectors from
+   * this path to reconstruct an in-memory HNSW index. Ignored for all other
+   * hierarchies.
+   *
+   * @return the dataset path, or null if not set
+   */
+  public String getDatasetPath() {
+    return datasetPath;
+  }
+
   @Override
   public String toString() {
     return "HnswIndexParams [hierarchy="
@@ -169,6 +197,8 @@ public class HnswIndexParams {
         + metric
         + ", aceParams="
         + aceParams
+        + ", datasetPath="
+        + datasetPath
         + "]";
   }
 
@@ -184,6 +214,7 @@ public class HnswIndexParams {
     private long m = 32;
     private CuvsDistanceType metric = CuvsDistanceType.L2Expanded;
     private HnswAceParams aceParams;
+    private String datasetPath;
 
     /**
      * Constructs this Builder with an instance of Arena.
@@ -277,6 +308,22 @@ public class HnswIndexParams {
     }
 
     /**
+     * Sets the local dataset path used by layered HNSW deserialization.
+     *
+     * Required when {@code hierarchy == GPU_LAYERED_ON_DISK}: the artifact stores
+     * graph topology only, and loading reads the original-ID-ordered vectors from
+     * this path to reconstruct an in-memory HNSW index. Ignored for all other
+     * hierarchies.
+     *
+     * @param datasetPath the local dataset path
+     * @return an instance of Builder
+     */
+    public Builder withDatasetPath(String datasetPath) {
+      this.datasetPath = datasetPath;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link HnswIndexParams}.
      *
      * @return an instance of {@link HnswIndexParams}
@@ -289,7 +336,8 @@ public class HnswIndexParams {
           vectorDimension,
           m,
           metric,
-          aceParams);
+          aceParams,
+          datasetPath);
     }
   }
 }

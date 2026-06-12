@@ -11,12 +11,15 @@
 // disk. It emits one topology-only artifact, hnsw_index.cuvs. The dataset remains separate and does
 // not need to be transferred to the search server, which typically has the dataset locally.
 //
-// This example demonstrates how to build a layered HNSW index with ACE:
+// This example demonstrates how to build a layered HNSW index with ACE and turn it into a standard
+// hnswlib index for in-memory search:
 //
 // 1. Optionally quantize the dataset and queries to int8.
 // 2. Build a single-file layered HNSW artifact with ACE using hnsw::build.
-// 3. Deserialize the layered HNSW artifact using hnsw::deserialize.
-// 4. Search the in-memory HNSW index.
+// 3. Materialize the layered artifact into a standard hnswlib index file on disk using
+//    hnsw::materialize_to_hnswlib (disk-to-disk, never holding the full index in host memory).
+// 4. Read the materialized hnswlib index into memory using hnsw::deserialize (hierarchy = CPU).
+// 5. Search the in-memory HNSW index.
 //
 // Layered-on-disk layout:
 //
@@ -27,14 +30,14 @@
 //     upper nodes + upper links: hnswlib-ready upper-layer topology
 //
 // The transferred index artifact is topology-only. The dataset is loaded locally during
-// deserialization from hnsw::index_params::dataset_path. The loader supports .npy and ANN benchmark
-// *.bin datasets; this example writes a local dataset .npy only to make the demo self-contained.
-//
-// Layer 0 node IDs and neighbor IDs are original dataset row IDs. Upper layers are generated with
-// the same level/order/KNN logic as serialize_to_hnswlib_from_disk, then stored as hnswlib-ready
-// link rows so deserialization does no graph remapping or link padding on the search node.
+// materialization from hnsw::materialize_params::dataset_path. The loader supports .npy and ANN
+// benchmark *.bin datasets; this example writes a local dataset .npy only to make the demo
+// self-contained. The materialized hnswlib index file is self-contained (it embeds the vectors),
+// so reading it back needs no dataset path.
 
 #include <algorithm>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
@@ -46,6 +49,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/random/make_blobs.cuh>
 
@@ -63,6 +67,18 @@
 namespace {
 
 constexpr const char* kBuildDir = "/tmp/hnsw_ace_layered";
+
+// Reports the wall-clock time of a callable in milliseconds.
+template <typename F>
+double time_ms(F&& fn)
+{
+  const auto start = std::chrono::steady_clock::now();
+  fn();
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+    .count();
+}
+
+double to_gib(double bytes) { return bytes / (1024.0 * 1024.0 * 1024.0); }
 
 template <typename T>
 std::string write_local_dataset(raft::host_matrix_view<const T, int64_t> dataset,
@@ -130,29 +146,72 @@ auto hnsw_build(raft::device_resources const& dev_resources,
 {
   using namespace cuvs::neighbors;
 
-  auto hnsw_index          = hnsw::build(dev_resources, hnsw_params, dataset);
+  std::unique_ptr<hnsw::index<T>> hnsw_index;
+  const auto build_ms =
+    time_ms([&]() { hnsw_index = hnsw::build(dev_resources, hnsw_params, dataset); });
   const auto artifact_path = hnsw_index->file_path();
   if (artifact_path.empty()) {
     throw std::runtime_error("Expected layered HNSW build to return an artifact path.");
   }
-  std::cout << "  hnsw_build: layered artifact written to " << artifact_path << std::endl;
+  const auto artifact_bytes = static_cast<double>(std::filesystem::file_size(artifact_path));
+  std::cout << "  hnsw_build: layered artifact written to " << artifact_path << "\n"
+            << "  hnsw_build: build wall time " << build_ms << " ms, artifact "
+            << to_gib(artifact_bytes) << " GiB" << std::endl;
   return artifact_path;
 }
 
+// Materialize the layered artifact into a standard hnswlib index file on disk and time the
+// disk-to-disk materialization. Returns the path to the native hnswlib index file.
 template <typename T>
-auto hnsw_deserialize(raft::device_resources const& dev_resources,
+auto hnsw_materialize(raft::device_resources const& dev_resources,
                       const cuvs::neighbors::hnsw::index_params& hnsw_params,
                       const std::string& artifact_path,
+                      const std::string& dataset_path,
+                      int64_t dim,
+                      const std::string& output_path) -> std::string
+{
+  using namespace cuvs::neighbors;
+
+  hnsw::materialize_params materialize_params;
+  materialize_params.dataset_path       = dataset_path;
+  materialize_params.max_host_memory_gb = 0;  // 0 => single in-memory reorder pass
+  materialize_params.num_threads        = 0;  // 0 => max threads
+
+  const auto materialize_ms = time_ms([&]() {
+    hnsw::materialize_to_hnswlib(dev_resources,
+                                 materialize_params,
+                                 artifact_path,
+                                 output_path,
+                                 static_cast<int>(dim),
+                                 hnsw_params.metric);
+  });
+
+  const auto native_bytes = static_cast<double>(std::filesystem::file_size(output_path));
+  std::cout << "  hnsw_materialize: native hnswlib index written to " << output_path << "\n"
+            << "  hnsw_materialize: wall time " << materialize_ms << " ms, output "
+            << to_gib(native_bytes) << " GiB" << std::endl;
+  return output_path;
+}
+
+// Read the materialized hnswlib index into memory for search. The materialized file is a standard
+// hnswlib index, so it is loaded with hierarchy == CPU and needs no dataset path (the file already
+// embeds the vectors).
+template <typename T>
+auto hnsw_load_native(raft::device_resources const& dev_resources,
+                      const std::string& native_index_path,
+                      cuvs::distance::DistanceType metric,
                       int64_t dim) -> std::unique_ptr<cuvs::neighbors::hnsw::index<T>>
 {
   using namespace cuvs::neighbors;
 
-  hnsw::index<T>* deserialized_index = nullptr;
-  // Set params.dataset_path to the local dataset path to load the dataset from disk.
-  // hnsw_params.dataset_path = "/tmp/dataset.npy";
+  hnsw::index_params load_params;
+  load_params.hierarchy = hnsw::HnswHierarchy::CPU;
+  load_params.metric    = metric;
+
+  hnsw::index<T>* loaded_index = nullptr;
   hnsw::deserialize(
-    dev_resources, hnsw_params, artifact_path, dim, hnsw_params.metric, &deserialized_index);
-  return std::unique_ptr<hnsw::index<T>>(deserialized_index);
+    dev_resources, load_params, native_index_path, static_cast<int>(dim), metric, &loaded_index);
+  return std::unique_ptr<hnsw::index<T>>(loaded_index);
 }
 
 template <typename T>
@@ -206,6 +265,9 @@ int main()
 {
   raft::device_resources dev_resources;
 
+  // Surface the per-phase build/materialize timing logs (RAFT_LOG_INFO).
+  raft::default_logger().set_level(rapids_logger::level_enum::info);
+
   rmm::mr::pool_memory_resource pool_mr(rmm::mr::get_current_device_resource_ref(),
                                         1024 * 1024 * 1024ull);
   rmm::mr::set_current_device_resource(pool_mr);
@@ -251,26 +313,40 @@ int main()
   auto dataset_path = write_local_dataset(dataset_i8_view, std::string{kBuildDir} + "/dataset.npy");
   auto hnsw_params  = make_hnsw_ace_params(kBuildDir, dataset_path);
 
+  const std::string native_index_path = std::string{kBuildDir} + "/hnsw_native.bin";
+
   std::cout << "[stage 2] Build layered HNSW index with ACE" << std::endl;
   auto artifact_path = hnsw_build<int8_t>(dev_resources, hnsw_params, dataset_i8_view);
 
-  std::cout << "[stage 3] Deserialize layered HNSW index" << std::endl;
-  auto hnsw_index = hnsw_deserialize<int8_t>(dev_resources, hnsw_params, artifact_path, n_dim);
+  std::cout << "[stage 3] Materialize layered HNSW -> native hnswlib index" << std::endl;
+  hnsw_materialize<int8_t>(
+    dev_resources, hnsw_params, artifact_path, dataset_path, n_dim, native_index_path);
 
-  std::cout << "[stage 4] Search HNSW index" << std::endl;
+  std::cout << "[stage 4] Read materialized hnswlib index into memory" << std::endl;
+  auto hnsw_index =
+    hnsw_load_native<int8_t>(dev_resources, native_index_path, hnsw_params.metric, n_dim);
+
+  std::cout << "[stage 5] Search HNSW index" << std::endl;
   hnsw_search<int8_t>(dev_resources, *hnsw_index, queries_i8_view);
 #else
   auto dataset_path =
     write_local_dataset(dataset_host_view, std::string{kBuildDir} + "/dataset.npy");
   auto hnsw_params = make_hnsw_ace_params(kBuildDir, dataset_path);
 
+  const std::string native_index_path = std::string{kBuildDir} + "/hnsw_native.bin";
+
   std::cout << "[stage 2] Build layered HNSW index with ACE" << std::endl;
   auto artifact_path = hnsw_build<float>(dev_resources, hnsw_params, dataset_host_view);
 
-  std::cout << "[stage 3] Deserialize layered HNSW index" << std::endl;
-  auto hnsw_index = hnsw_deserialize<float>(dev_resources, hnsw_params, artifact_path, n_dim);
+  std::cout << "[stage 3] Materialize layered HNSW -> native hnswlib index" << std::endl;
+  hnsw_materialize<float>(
+    dev_resources, hnsw_params, artifact_path, dataset_path, n_dim, native_index_path);
 
-  std::cout << "[stage 4] Search HNSW index" << std::endl;
+  std::cout << "[stage 4] Read materialized hnswlib index into memory" << std::endl;
+  auto hnsw_index =
+    hnsw_load_native<float>(dev_resources, native_index_path, hnsw_params.metric, n_dim);
+
+  std::cout << "[stage 5] Search HNSW index" << std::endl;
   hnsw_search<float>(dev_resources, *hnsw_index, queries_host_view);
 #endif
 

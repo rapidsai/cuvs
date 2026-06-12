@@ -124,10 +124,15 @@ cdef class IndexParams:
     Parameters
     ----------
     hierarchy : string, default = "gpu" (optional)
-        The hierarchy of the HNSW index. Valid values are ["none", "cpu", "gpu"].
+        The hierarchy of the HNSW index. Valid values are
+        ["none", "cpu", "gpu", "gpu_layered_on_disk"].
         - "none": No hierarchy is built.
         - "cpu": Hierarchy is built using CPU.
         - "gpu": Hierarchy is built using GPU.
+        - "gpu_layered_on_disk": The index artifact stores graph topology only
+          (built on the GPU and stored as a layered on-disk artifact). When
+          loading such an artifact with `load()`, `dataset_path` must point to
+          the original-ID-ordered vectors used to reconstruct the index.
     ef_construction : int, default = 200 (optional)
         Maximum number of candidate list size used during construction
         when hierarchy is `cpu`.
@@ -148,14 +153,22 @@ cdef class IndexParams:
     ace_params : AceParams, default = None (optional)
         ACE parameters for building HNSW index using ACE algorithm. If set,
         enables the build() function to use ACE for index construction.
+    dataset_path : string, default = None (optional)
+        Local dataset path used by layered HNSW deserialization. Required when
+        `hierarchy == "gpu_layered_on_disk"`: the artifact stores graph
+        topology only, and `load()` reads the original-ID-ordered vectors from
+        this path to reconstruct an in-memory HNSW index. Ignored for all other
+        hierarchies.
     """
 
     cdef cuvsHnswIndexParams* params
     cdef AceParams _ace_params
+    cdef object _dataset_path_bytes
 
     def __cinit__(self):
         check_cuvs(cuvsHnswIndexParamsCreate(&self.params))
         self._ace_params = None
+        self._dataset_path_bytes = None
 
     def __dealloc__(self):
         check_cuvs(cuvsHnswIndexParamsDestroy(self.params))
@@ -166,16 +179,20 @@ cdef class IndexParams:
                  num_threads=0,
                  M=32,
                  metric="sqeuclidean",
-                 ace_params=None):
+                 ace_params=None,
+                 dataset_path=None):
         if hierarchy == "none":
             self.params.hierarchy = cuvsHnswHierarchy.NONE
         elif hierarchy == "cpu":
             self.params.hierarchy = cuvsHnswHierarchy.CPU
         elif hierarchy == "gpu":
             self.params.hierarchy = cuvsHnswHierarchy.GPU
+        elif hierarchy == "gpu_layered_on_disk":
+            self.params.hierarchy = cuvsHnswHierarchy.GPU_LAYERED_ON_DISK
         else:
             raise ValueError("Invalid hierarchy type."
-                             " Valid values are 'none', 'cpu', and 'gpu'.")
+                             " Valid values are 'none', 'cpu', 'gpu', and"
+                             " 'gpu_layered_on_disk'.")
         self.params.ef_construction = ef_construction
         self.params.num_threads = num_threads
         self.params.M = M
@@ -189,6 +206,12 @@ cdef class IndexParams:
         else:
             self.params.ace_params = NULL
 
+        if dataset_path is not None:
+            self._dataset_path_bytes = dataset_path.encode('utf-8')
+            self.params.dataset_path = self._dataset_path_bytes
+        else:
+            self.params.dataset_path = NULL
+
     @property
     def hierarchy(self):
         if self.params.hierarchy == cuvsHnswHierarchy.NONE:
@@ -197,6 +220,8 @@ cdef class IndexParams:
             return "cpu"
         elif self.params.hierarchy == cuvsHnswHierarchy.GPU:
             return "gpu"
+        elif self.params.hierarchy == cuvsHnswHierarchy.GPU_LAYERED_ON_DISK:
+            return "gpu_layered_on_disk"
 
     @property
     def ef_construction(self):
@@ -213,6 +238,12 @@ cdef class IndexParams:
     @property
     def ace_params(self):
         return self._ace_params
+
+    @property
+    def dataset_path(self):
+        if self.params.dataset_path is not NULL:
+            return self.params.dataset_path.decode('utf-8')
+        return None
 
 
 cdef class Index:
@@ -264,6 +295,68 @@ cdef class ExtendParams:
     def __init__(self, *,
                  num_threads=0):
         self.params.num_threads = num_threads
+
+    @property
+    def num_threads(self):
+        return self.params.num_threads
+
+
+cdef class MaterializeParams:
+    """
+    Parameters for materializing a layered HNSW artifact into an hnswlib
+    index on disk.
+
+    Parameters
+    ----------
+    dataset_path : string, default = None (optional)
+        Local dataset path holding the original-ID-ordered vectors used to
+        build the artifact. Supported formats match layered deserialization:
+        `.npy` and ANN benchmark `*.bin` files with a
+        `[uint32 rows, uint32 cols]` header (`.fbin`, `.f16bin`, `.u8bin`,
+        `.i8bin`).
+    max_host_memory_gb : float, default = 0 (optional)
+        Upper bound on host memory (in GiB) used for the base-topology reorder
+        buffer. When <= 0, the whole base topology is reordered in a single
+        in-memory pass (no temporary files). When set, the base topology is
+        reordered through bucketed temporary files so that peak host memory
+        stays close to this budget.
+    num_threads : int, default = 0 (optional)
+        Number of host threads to use. When 0, the maximum number of threads
+        is used.
+    """
+
+    cdef cuvsHnswMaterializeParams* params
+    cdef object _dataset_path_bytes
+
+    def __cinit__(self):
+        check_cuvs(cuvsHnswMaterializeParamsCreate(&self.params))
+        self._dataset_path_bytes = None
+
+    def __dealloc__(self):
+        if self.params is not NULL:
+            check_cuvs(cuvsHnswMaterializeParamsDestroy(self.params))
+
+    def __init__(self, *,
+                 dataset_path=None,
+                 max_host_memory_gb=0,
+                 num_threads=0):
+        if dataset_path is not None:
+            self._dataset_path_bytes = dataset_path.encode('utf-8')
+            self.params.dataset_path = self._dataset_path_bytes
+        else:
+            self.params.dataset_path = NULL
+        self.params.max_host_memory_gb = max_host_memory_gb
+        self.params.num_threads = num_threads
+
+    @property
+    def dataset_path(self):
+        if self.params.dataset_path is not NULL:
+            return self.params.dataset_path.decode('utf-8')
+        return None
+
+    @property
+    def max_host_memory_gb(self):
+        return self.params.max_host_memory_gb
 
     @property
     def num_threads(self):
@@ -404,6 +497,84 @@ def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
     ))
     idx.trained = True
     return idx
+
+
+@auto_sync_resources
+def materialize_to_hnswlib(MaterializeParams materialize_params,
+                           layered_artifact_path,
+                           output_path,
+                           dim,
+                           metric="sqeuclidean",
+                           resources=None):
+    """
+    Materialize a layered HNSW artifact into a standard hnswlib index file
+    on disk.
+
+    Materializes a `gpu_layered_on_disk` artifact (graph topology only, stored
+    in ACE order) plus a local dataset into a standard hnswlib index file,
+    without ever holding the full materialized index in host memory. The
+    resulting file is compatible with the original hnswlib library and can be
+    read back through `load()` with `hierarchy="cpu"`. The element data type
+    (float32, float16, uint8, int8) is read from the artifact header.
+
+    Parameters
+    ----------
+    materialize_params : MaterializeParams
+        Materialization parameters. `dataset_path` must point to the
+        original-ID-ordered vectors used to build the artifact.
+    layered_artifact_path : string
+        Path to the layered HNSW artifact.
+    output_path : string
+        Path to the hnswlib index file to write.
+    dim : int
+        Dimensions of the training dataset.
+    metric : string denoting the metric type, default="sqeuclidean"
+        Valid values for metric: ["sqeuclidean", "inner_product"], where
+            - sqeuclidean is the euclidean distance without the square root
+              operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,
+            - inner_product distance is defined as
+              distance(a, b) = \\sum_i a_i * b_i.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from cuvs.neighbors import hnsw
+    >>> n_features = 50
+    >>> # Assume a layered artifact was produced by an ACE GPU build and the
+    >>> # original-ID-ordered vectors are stored in "dataset.fbin".
+    >>> materialize_params = hnsw.MaterializeParams(
+    ...     dataset_path="dataset.fbin"
+    ... )
+    >>> hnsw.materialize_to_hnswlib(
+    ...     materialize_params,
+    ...     "layered_artifact.cuvs",
+    ...     "index.bin",
+    ...     n_features,
+    ...     metric="sqeuclidean",
+    ... )
+    >>> # The materialized index can be loaded as a standard hnswlib index.
+    >>> index = hnsw.load(
+    ...     hnsw.IndexParams(hierarchy="cpu"),
+    ...     "index.bin",
+    ...     n_features,
+    ...     np.float32,
+    ...     "sqeuclidean",
+    ... )
+    """
+    cdef string c_artifact = layered_artifact_path.encode('utf-8')
+    cdef string c_output = output_path.encode('utf-8')
+    cdef cuvsDistanceType distance_type = DISTANCE_TYPES[metric]
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    check_cuvs(cuvsHnswMaterializeToHnswlib(
+        res,
+        materialize_params.params,
+        c_artifact.c_str(),
+        c_output.c_str(),
+        dim,
+        distance_type
+    ))
 
 
 @auto_sync_resources
