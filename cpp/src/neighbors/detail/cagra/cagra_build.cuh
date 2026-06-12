@@ -16,6 +16,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/integer_utils.hpp>
 
@@ -726,14 +727,14 @@ void ace_load_partition_dataset_from_disk(
     std::ifstream is(reordered_dataset_path, std::ios::in | std::ios::binary);
     if (!is) { RAFT_FAIL("Cannot open file %s", reordered_dataset_path.c_str()); }
     auto start_pos = is.tellg();
-    raft::detail::numpy_serializer::read_header(is);
+    raft::numpy_serializer::read_header(is);
     core_header_size = static_cast<size_t>(is.tellg() - start_pos);
   }
   {
     std::ifstream is(augmented_dataset_path, std::ios::in | std::ios::binary);
     if (!is) { RAFT_FAIL("Cannot open file %s", augmented_dataset_path.c_str()); }
     auto start_pos = is.tellg();
-    raft::detail::numpy_serializer::read_header(is);
+    raft::numpy_serializer::read_header(is);
     augmented_header_size = static_cast<size_t>(is.tellg() - start_pos);
   }
 
