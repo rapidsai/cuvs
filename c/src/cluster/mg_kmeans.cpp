@@ -199,24 +199,12 @@ void dispatch_fit(cuvsResources_t res,
 }  // namespace
 
 extern "C" cuvsError_t cuvsMultiGpuKMeansFit(cuvsResources_t res,
-                                             cuvsKMeansParams_t params,
+                                             cuvsKMeansParams_v2_t params,
                                              DLManagedTensor* X,
                                              DLManagedTensor* sample_weight,
                                              DLManagedTensor* centroids,
                                              double* inertia,
                                              int* n_iter)
-{
-  return cuvs::core::translate_exceptions(
-    [=] { dispatch_fit(res, params, X, sample_weight, centroids, inertia, n_iter); });
-}
-
-extern "C" cuvsError_t cuvsMultiGpuKMeansFit_v2(cuvsResources_t res,
-                                                cuvsKMeansParams_v2_t params,
-                                                DLManagedTensor* X,
-                                                DLManagedTensor* sample_weight,
-                                                DLManagedTensor* centroids,
-                                                double* inertia,
-                                                int* n_iter)
 {
   return cuvs::core::translate_exceptions(
     [=] { dispatch_fit(res, params, X, sample_weight, centroids, inertia, n_iter); });

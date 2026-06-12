@@ -40,22 +40,7 @@ float kExpectedCentroids[kNClusters * kNFeatures] = {1.5f, 1.5f, 10.5f, 10.5f};
 // 8 points, each at squared distance 0.5 from its cluster mean -> 4.0.
 constexpr double kExpectedInertia = 4.0;
 
-struct kmeans_mg_api_v1 {
-  using params_t = cuvsKMeansParams_t;
-  static cuvsError_t params_create(params_t* p) { return cuvsKMeansParamsCreate(p); }
-  static cuvsError_t params_destroy(params_t p) { return cuvsKMeansParamsDestroy(p); }
-  static cuvsError_t fit(cuvsResources_t res,
-                         params_t params,
-                         DLManagedTensor* dataset,
-                         DLManagedTensor* centroids,
-                         double* inertia,
-                         int* n_iter)
-  {
-    return cuvsMultiGpuKMeansFit(res, params, dataset, NULL, centroids, inertia, n_iter);
-  }
-};
-
-struct kmeans_mg_api_v2 {
+struct kmeans_mg_api {
   using params_t = cuvsKMeansParams_v2_t;
   static cuvsError_t params_create(params_t* p) { return cuvsKMeansParamsCreate_v2(p); }
   static cuvsError_t params_destroy(params_t p) { return cuvsKMeansParamsDestroy_v2(p); }
@@ -66,7 +51,7 @@ struct kmeans_mg_api_v2 {
                          double* inertia,
                          int* n_iter)
   {
-    return cuvsMultiGpuKMeansFit_v2(res, params, dataset, NULL, centroids, inertia, n_iter);
+    return cuvsMultiGpuKMeansFit(res, params, dataset, NULL, centroids, inertia, n_iter);
   }
 };
 
@@ -126,7 +111,4 @@ void test_mg_fit_host()
 
 }  // namespace
 
-TEST(KMeansMgC, FitHost) { test_mg_fit_host<kmeans_mg_api_v1>(); }
-// TODO(cuVS 26.08): remove FitHostV2 once `_v2` is promoted to the
-// unsuffixed ABI.
-TEST(KMeansMgC, FitHostV2) { test_mg_fit_host<kmeans_mg_api_v2>(); }
+TEST(KMeansMgC, FitHost) { test_mg_fit_host<kmeans_mg_api>(); }
