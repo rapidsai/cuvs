@@ -65,9 +65,13 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   raft::resource::sync_stream(dev_resources);
   auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
     dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
+  // Wrap in a host_padded_dataset_view. ACE graph construction is host-side CPU work and does not
+  // require CUDA row-alignment; construct the view directly to avoid the alignment check.
+  cuvs::neighbors::host_padded_dataset_view<float, int64_t> host_padded_view(
+    dataset_host_view, static_cast<uint32_t>(dataset_host_view.extent(1)));
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(dev_resources, index_params, dataset_host_view);
+  auto index = cagra::build(dev_resources, index_params, host_padded_view);
   // In-memory build of ACE provides the index in memory, so we can search it directly using
   // cagra::search
 

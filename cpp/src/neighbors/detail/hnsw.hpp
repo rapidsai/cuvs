@@ -188,7 +188,7 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<NONE>");
@@ -216,7 +216,7 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<CPU>");
@@ -342,10 +342,11 @@ void all_neighbors_graph(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-void serialize_to_hnswlib_from_disk(raft::resources const& res,
-                                    std::ostream& os_raw,
-                                    const cuvs::neighbors::hnsw::index_params& params,
-                                    const cuvs::neighbors::cagra::index<T, IdxT>& index_)
+void serialize_to_hnswlib_from_disk(
+  raft::resources const& res,
+  std::ostream& os_raw,
+  const cuvs::neighbors::hnsw::index_params& params,
+  const cuvs::neighbors::cagra::device_padded_index<T, IdxT>& index_)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
@@ -824,7 +825,7 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
@@ -1070,7 +1071,7 @@ template <typename T>
 std::unique_ptr<index<T>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+  const cuvs::neighbors::cagra::device_padded_index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   // special treatment for index on disk
@@ -1307,13 +1308,36 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     ace_params.npartitions,
     ace_params.ef_construction);
 
-  // Build CAGRA index using ACE
-  auto cagra_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
+  // Build CAGRA index using ACE (returns host_padded_index; graph-only for in-memory ACE).
+  // Wrap in host_padded_dataset_view directly: ACE graph build is CPU-side and does not require
+  // CUDA row-alignment. The device dataset is padded separately below.
+  cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_padded_view(
+    dataset, static_cast<uint32_t>(dataset.extent(1)));
+  auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, host_padded_view);
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
 
-  // Convert CAGRA index to HNSW index
-  return from_cagra<T>(res, params, cagra_index, dataset);
+  if (ace_host_index.dataset_fd().has_value()) {
+    // Disk-mode ACE: transfer all FDs to a device index so that from_cagra detects the
+    // disk-backed index and calls serialize_to_hnswlib_from_disk, writing hnsw_index.bin.
+    cuvs::neighbors::cagra::device_padded_index<T, uint32_t> ace_device_idx(
+      res, ace_host_index.metric());
+    ace_device_idx.update_dataset(res, std::move(*ace_host_index.steal_dataset_fd()));
+    if (ace_host_index.graph_fd().has_value()) {
+      ace_device_idx.update_graph(res, std::move(*ace_host_index.steal_graph_fd()));
+    }
+    if (ace_host_index.mapping_fd().has_value()) {
+      ace_device_idx.update_mapping(res, std::move(*ace_host_index.steal_mapping_fd()));
+    }
+    return from_cagra<T>(res, params, ace_device_idx, std::nullopt);
+  } else {
+    // In-memory ACE: attach the original (un-reordered) dataset as a device-padded view.
+    // from_cagra receives the host dataset directly to avoid an extra device-to-host copy.
+    auto ace_device_padded = cuvs::neighbors::make_device_padded_dataset(res, dataset);
+    auto ace_index         = cuvs::neighbors::cagra::attach_device_dataset_on_host_index(
+      res, ace_host_index, ace_device_padded->as_dataset_view());
+    return from_cagra<T>(res, params, ace_index, std::make_optional(dataset));
+  }
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail

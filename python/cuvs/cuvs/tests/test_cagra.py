@@ -34,7 +34,6 @@ def run_cagra_build_search_test(
     inplace=True,
     test_extend=False,
     search_params={},
-    compression=None,
     serialize=False,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
@@ -49,7 +48,6 @@ def run_cagra_build_search_test(
         intermediate_graph_degree=intermediate_graph_degree,
         graph_degree=graph_degree,
         build_algo=build_algo,
-        compression=compression,
     )
 
     if test_extend:
@@ -129,27 +127,26 @@ def run_cagra_build_search_test(
     cp_graph = cp.array(graph)
     assert cp_graph.shape == (n_rows, graph_degree)
 
-    if compression is None:
-        # make sure we can get the dataset from the cagra index
-        dataset_from_index = index.dataset
+    # make sure we can get the dataset from the cagra index
+    dataset_from_index = index.dataset
 
-        dataset_from_index_host = dataset_from_index.copy_to_host()
-        assert np.allclose(dataset, dataset_from_index_host)
+    dataset_from_index_host = dataset_from_index.copy_to_host()
+    assert np.allclose(dataset, dataset_from_index_host)
 
-        # make sure we can reconstruct the index from the graph
-        # Note that we can't actually use the dataset from the index itself
-        # - since that is a strided matrix (and we expect non-strided inputs
-        # in the C++ cagra::build api), so we are using the host version
-        # which will have been copied into a non-strided layout
-        reloaded_index = cagra.from_graph(
-            graph, dataset_from_index_host, metric=metric
-        )
+    # make sure we can reconstruct the index from the graph
+    # Note that we can't actually use the dataset from the index itself
+    # - since that is a strided matrix (and we expect non-strided inputs
+    # in the C++ cagra::build api), so we are using the host version
+    # which will have been copied into a non-strided layout
+    reloaded_index = cagra.from_graph(
+        graph, dataset_from_index_host, metric=metric
+    )
 
-        dist_device, idx_device = cagra.search(
-            search_params, reloaded_index, queries_device, k
-        )
-        recall = calc_recall(idx_device.copy_to_host(), skl_idx)
-        assert recall > 0.9
+    dist_device, idx_device = cagra.search(
+        search_params, reloaded_index, queries_device, k
+    )
+    recall = calc_recall(idx_device.copy_to_host(), skl_idx)
+    assert recall > 0.9
 
 
 @pytest.mark.parametrize("inplace", [True, False])
@@ -231,14 +228,6 @@ def test_cagra_index_params(params):
         intermediate_graph_degree=params["intermediate_graph_degree"],
         compare=False,
         build_algo=params["build_algo"],
-    )
-
-
-def test_cagra_vpq_compression():
-    dim = 64
-    pq_len = 2
-    run_cagra_build_search_test(
-        n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
     )
 
 

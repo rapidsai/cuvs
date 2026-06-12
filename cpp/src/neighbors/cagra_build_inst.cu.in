@@ -8,10 +8,16 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <neighbors/cagra.cuh>
 
+#include <memory>
+
 namespace {
 
-using data_t  = @data_type@;
-using index_t = @index_type@;
+using data_t                    = @data_type@;
+using index_t                   = @index_type@;
+using inst_device_padded_view_t = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
+using inst_host_padded_view_t   = cuvs::neighbors::host_padded_dataset_view<data_t, int64_t>;
+using inst_vpq_f16_view_t       = cuvs::neighbors::device_vpq_dataset_view<half, int64_t>;
+using inst_vpq_f32_view_t       = cuvs::neighbors::device_vpq_dataset_view<float, int64_t>;
 
 }  // namespace
 
@@ -25,22 +31,17 @@ void build_knn_graph(raft::resources const& handle,
   cuvs::neighbors::cagra::build_knn_graph<data_t, index_t>(handle, dataset, knn_graph, params);
 }
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<data_t, index_t>
-{
-  return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
-}
+#define CUVS_INST_CAGRA_BUILD(DatasetViewT)                              \
+  template CUVS_EXPORT auto cuvs::neighbors::cagra::build<DatasetViewT>( \
+    raft::resources const& res,                                          \
+    const cuvs::neighbors::cagra::index_params& params,                  \
+    DatasetViewT const& dataset) -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::host_matrix_view<const data_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<data_t, index_t>
-{
-  return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
-}
+CUVS_INST_CAGRA_BUILD(inst_device_padded_view_t);
+CUVS_INST_CAGRA_BUILD(inst_host_padded_view_t);
+CUVS_INST_CAGRA_BUILD(inst_vpq_f16_view_t);
+CUVS_INST_CAGRA_BUILD(inst_vpq_f32_view_t);
 
-template struct index<data_t, index_t>;
+#undef CUVS_INST_CAGRA_BUILD
 
 }  // namespace cuvs::neighbors::cagra

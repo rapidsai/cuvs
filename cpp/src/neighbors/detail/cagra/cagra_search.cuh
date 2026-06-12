@@ -19,6 +19,7 @@
 #include <cuvs/distance/distance.hpp>
 
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/dataset_view_concepts.hpp>
 
 // TODO: Fix these when ivf methods are moved over
 #include "../../ivf_common.cuh"
@@ -83,31 +84,76 @@ void search_main_core(
 
   RAFT_LOG_DEBUG("Cagra search");
   const uint32_t max_queries = plan->max_queries;
-  const uint32_t query_dim   = queries.extent(1);
+  const uint32_t query_dim   = static_cast<uint32_t>(queries.extent(1));
+  // Same 16B row-pitch rule as make_device_padded_dataset. Tight [n,dim] rows can be misaligned
+  // between rows (e.g. float, dim=1) and trigger misaligned access in CAGRA search. If
+  // query_row_stride>dim, device code still advances with "+= dim*query_id" in setup_workspace; in
+  // that case run one query per plan call so every kernel sees query_id==0 and the base pointer
+  // selects the row (keeps batched path when stride==dim).
+  const DataT* queries_buf{};
+  uint32_t query_row_stride{};
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<DataT, int64_t>> queries_padded_own;
+  if (cuvs::neighbors::matrix_row_width_matches_cagra_required(queries)) {
+    auto v           = cuvs::neighbors::make_device_padded_dataset_view(res, queries);
+    queries_buf      = v.view().data_handle();
+    query_row_stride = v.stride();
+  } else {
+    queries_padded_own = cuvs::neighbors::make_device_padded_dataset(res, queries);
+    auto v             = queries_padded_own->as_dataset_view();
+    queries_buf        = v.view().data_handle();
+    query_row_stride   = v.stride();
+  }
+  const bool can_batch_n_queries = (query_row_stride == query_dim);
 
   for (unsigned qid = 0; qid < queries.extent(0); qid += max_queries) {
     const uint32_t n_queries = std::min<std::size_t>(max_queries, queries.extent(0) - qid);
-    auto _topk_indices_ptr   = neighbors.data_handle() + (topk * qid);
-    auto _topk_distances_ptr = distances.data_handle() + (topk * qid);
-    // todo(tfeher): one could keep distances optional and pass nullptr
-    const auto* _query_ptr = queries.data_handle() + (query_dim * qid);
-    const auto* _seed_ptr =
-      plan->num_seeds > 0
-        ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * qid)
-        : nullptr;
-    uint32_t* _num_executed_iterations = nullptr;
+    if (can_batch_n_queries) {
+      auto _topk_indices_ptr   = neighbors.data_handle() + (topk * qid);
+      auto _topk_distances_ptr = distances.data_handle() + (topk * qid);
+      const auto* _query_ptr =
+        queries_buf + (static_cast<size_t>(query_row_stride) * static_cast<size_t>(qid));
+      const auto* _seed_ptr =
+        plan->num_seeds > 0
+          ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * qid)
+          : nullptr;
+      uint32_t* _num_executed_iterations = nullptr;
 
-    (*plan)(res,
-            graph,
-            source_indices,
-            _topk_indices_ptr,
-            _topk_distances_ptr,
-            _query_ptr,
-            n_queries,
-            _seed_ptr,
-            _num_executed_iterations,
-            topk,
-            set_offset(sample_filter, qid));
+      (*plan)(res,
+              graph,
+              source_indices,
+              _topk_indices_ptr,
+              _topk_distances_ptr,
+              _query_ptr,
+              n_queries,
+              _seed_ptr,
+              _num_executed_iterations,
+              topk,
+              set_offset(sample_filter, qid));
+    } else {
+      for (uint32_t qi = 0; qi < n_queries; ++qi) {
+        const size_t g           = static_cast<size_t>(qid) + static_cast<size_t>(qi);
+        auto _topk_indices_ptr   = neighbors.data_handle() + (topk * g);
+        auto _topk_distances_ptr = distances.data_handle() + (topk * g);
+        const auto* _query_ptr   = queries_buf + (query_row_stride * g);
+        const auto* _seed_ptr =
+          plan->num_seeds > 0
+            ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * g)
+            : nullptr;
+        uint32_t* _num_executed_iterations = nullptr;
+
+        (*plan)(res,
+                graph,
+                source_indices,
+                _topk_indices_ptr,
+                _topk_distances_ptr,
+                _query_ptr,
+                1u,
+                _seed_ptr,
+                _num_executed_iterations,
+                topk,
+                set_offset(sample_filter, g));
+      }
+    }
   }
 }
 
@@ -133,10 +179,11 @@ template <typename T,
           typename OutputIdxT,
           typename CagraSampleFilterT,
           typename IdxT      = uint32_t,
-          typename DistanceT = float>
+          typename DistanceT = float,
+          cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void search_main(raft::resources const& res,
                  search_params params,
-                 const index<T, IdxT>& index,
+                 const index<T, IdxT, DatasetViewT>& index,
                  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
@@ -147,13 +194,9 @@ void search_main(raft::resources const& res,
                "Use cuvs::neighbors::hnsw::from_cagra() to convert the index and "
                "cuvs::neighbors::hnsw::deserialize() to load it into memory before searching.");
 
-  // n_rows has the same type as the dataset index (the array extents type)
-  using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;
-  // Dispatch search parameters based on the dataset kind.
-  if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
-      strided_dset != nullptr) {
-    // Search using a plain (strided) row-major dataset
+
+  auto run_strided_like = [&](auto const& row_dataset) {
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
                    index.dataset_norms().has_value(),
                  "Dataset norms must be provided for CosineExpanded metric");
@@ -163,7 +206,7 @@ void search_main(raft::resources const& res,
       dataset_norms_ptr = index.dataset_norms().value().data_handle();
     }
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *strided_dset, index.metric(), dataset_norms_ptr);
+      res, params, row_dataset, index.metric(), dataset_norms_ptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
       res,
       params,
@@ -174,32 +217,36 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
-  } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(&index.data());
-             vpq_dset != nullptr) {
-    // Search using a compressed dataset
-    RAFT_FAIL("FP32 VPQ dataset support is coming soon");
-  } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
-             vpq_dset != nullptr) {
-    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *vpq_dset, index.metric(), nullptr);
-    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
-      res,
-      params,
-      desc,
-      index.graph(),
-      index.source_indices(),
-      queries,
-      neighbors,
-      distances,
-      sample_filter);
-  } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(&index.data());
-             empty_dset != nullptr) {
-    // Forgot to add a dataset.
+  };
+
+  if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
     RAFT_FAIL(
       "Attempted to search without a dataset. Please call index.update_dataset(...) first.");
+  } else if constexpr (cuvs::neighbors::is_device_vpq_f32_dataset_view_v<DatasetViewT>) {
+    RAFT_FAIL("FP32 VPQ dataset support is coming soon");
+  } else if constexpr (cuvs::neighbors::is_device_vpq_f16_dataset_view_v<DatasetViewT>) {
+    auto const& vv = index.data();
+    auto desc      = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+      res, params, vv.dset(), index.metric(), nullptr);
+    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+      res,
+      params,
+      desc,
+      index.graph(),
+      index.source_indices(),
+      queries,
+      neighbors,
+      distances,
+      sample_filter);
+  } else if constexpr (cuvs::neighbors::is_device_padded_dataset_view_v<DatasetViewT>) {
+    run_strided_like(index.data());
+  } else if constexpr (cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>) {
+    static_assert(sizeof(DatasetViewT) == 0,
+                  "search requires a device-resident dataset. "
+                  "Call cagra::attach_device_dataset_on_host_index(res, host_idx, device_view) "
+                  "to convert the host index and attach a device dataset before searching.");
   } else {
-    // This is a logic error.
-    RAFT_FAIL("Unrecognized dataset format");
+    static_assert(sizeof(DatasetViewT) == 0, "search: unsupported dataset view type");
   }
 
   static_assert(std::is_same_v<DistanceT, float>,

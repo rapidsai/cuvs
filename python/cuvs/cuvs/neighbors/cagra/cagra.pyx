@@ -47,83 +47,6 @@ from cuvs.neighbors import ivf_pq
 from cuvs.neighbors.filters import no_filter
 
 
-cdef class CompressionParams:
-    """
-    Parameters for VPQ Compression
-
-    Parameters
-    ----------
-    pq_bits: int
-        The bit length of the vector element after compression by PQ.
-        Possible values: [4, 5, 6, 7, 8]. The smaller the 'pq_bits', the
-        smaller the index size and the better the search performance, but
-        the lower the recall.
-    pq_dim: int
-        The dimensionality of the vector after compression by PQ. When zero,
-        an optimal value is selected using a heuristic.
-    vq_n_centers: int
-        Vector Quantization (VQ) codebook size - number of "coarse cluster
-        centers". When zero, an optimal value is selected using a heuristic.
-    kmeans_n_iters: int
-        The number of iterations searching for kmeans centers (both VQ & PQ
-        phases).
-    vq_kmeans_trainset_fraction: float
-        The fraction of data to use during iterative kmeans building (VQ
-        phase). When zero, an optimal value is selected using a heuristic.
-    pq_kmeans_trainset_fraction: float
-        The fraction of data to use during iterative kmeans building (PQ
-        phase). When zero, an optimal value is selected using a heuristic.
-    """
-    cdef cuvsCagraCompressionParams * params
-
-    def __cinit__(self):
-        check_cuvs(cuvsCagraCompressionParamsCreate(&self.params))
-
-    def __dealloc__(self):
-        check_cuvs(cuvsCagraCompressionParamsDestroy(self.params))
-
-    def __init__(self, *,
-                 pq_bits=8,
-                 pq_dim=0,
-                 vq_n_centers=0,
-                 kmeans_n_iters=25,
-                 vq_kmeans_trainset_fraction=0.0,
-                 pq_kmeans_trainset_fraction=0.0):
-        self.params.pq_bits = pq_bits
-        self.params.pq_dim = pq_dim
-        self.params.vq_n_centers = vq_n_centers
-        self.params.kmeans_n_iters = kmeans_n_iters
-        self.params.vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction
-        self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
-
-    @property
-    def pq_bits(self):
-        return self.params.pq_bits
-
-    @property
-    def pq_dim(self):
-        return self.params.pq_dim
-
-    @property
-    def vq_n_centers(self):
-        return self.params.vq_n_centers
-
-    @property
-    def kmeans_n_iters(self):
-        return self.params.kmeans_n_iters
-
-    @property
-    def vq_kmeans_trainset_fraction(self):
-        return self.params.vq_kmeans_trainset_fraction
-
-    @property
-    def pq_kmeans_trainset_fraction(self):
-        return self.params.pq_kmeans_trainset_fraction
-
-    def get_handle(self):
-        return <size_t>self.params
-
-
 cdef class AceParams:
     """
     Parameters for ACE (Augmented Core Extraction) graph building algorithm.
@@ -271,9 +194,6 @@ cdef class IndexParams:
             - ace will use ACE (Augmented Core Extraction) for building indices
               for datasets too large to fit in GPU memory
 
-    compression: CompressionParams, optional
-        If compression is desired should be a CompressionParams object. If None
-        compression will be disabled.
     ivf_pq_build_params: cuvs.neighbors.ivf_pq.IndexParams, optional
         Parameters for IVF-PQ algorithm. If provided, it will be used for
         building the graph.
@@ -289,7 +209,6 @@ cdef class IndexParams:
 
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
-        self.compression = None
         self.ivf_pq_build_params = None
         self.ivf_pq_search_params = None
         self.ace_params = None
@@ -304,7 +223,6 @@ cdef class IndexParams:
                  graph_degree=64,
                  build_algo="ivf_pq",
                  nn_descent_niter=20,
-                 compression=None,
                  ivf_pq_build_params: ivf_pq.IndexParams = None,
                  ivf_pq_search_params: ivf_pq.SearchParams = None,
                  ace_params: AceParams = None,
@@ -329,10 +247,6 @@ cdef class IndexParams:
             raise ValueError(f"Unknown build_algo '{build_algo}'")
 
         self.params.nn_descent_niter = nn_descent_niter
-        if compression is not None:
-            self.compression = compression
-            self.params.compression = \
-                <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
 
         # Handle graph build params based on build algorithm
         if build_algo == "ace":

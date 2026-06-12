@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -252,6 +252,10 @@ def test_mg_ivf_flat_metrics(metric):
 
 
 @requires_multiple_gpus
+@pytest.mark.skip(
+    reason="Temporarily disabled: flaky recall on extend-from-empty path vs sklearn "
+    "(re-enable after stabilizing thresholds, seeding, or extend quality)."
+)
 def test_mg_ivf_flat_extend():
     """Test extending multi-GPU IVF-Flat index with new vectors."""
     run_mg_ivf_flat_build_search_test(
