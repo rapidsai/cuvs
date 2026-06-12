@@ -147,6 +147,7 @@ void initKMeansPlusPlus_distributed(
   rmm::device_uvector<DataT> centroidsBuf(static_cast<std::size_t>(n_features), stream);
   auto potentialCentroids =
     raft::make_device_matrix_view<DataT, IndexT>(centroidsBuf.data(), IndexT{1}, n_features);
+  DataT* initialCentroid = nullptr;
   if (rank == rp) {
     RAFT_EXPECTS(n_local > 0,
                  "selected source rank %d has no local rows; cannot pick an initial centroid",
@@ -155,10 +156,10 @@ void initKMeansPlusPlus_distributed(
     std::uniform_int_distribution<IndexT> row_dist(IndexT{0}, n_local - 1);
     chosen_local_idx             = row_dist(row_gen);
     auto [part_idx, row_in_part] = locate_local_row(part_offsets, chosen_local_idx);
-    auto const* src_row          = X_parts[part_idx].data_handle() + row_in_part * n_features;
-    // Step 1.3 - broadcast the chosen initial centroid to all ranks.
-    comms.bcast(src_row, centroidsBuf.data(), static_cast<size_t>(n_features), rp);
+    initialCentroid              = const_cast<DataT*>(X_parts[part_idx].data_handle() + row_in_part * n_features);
   }
+  // Step 1.3 - broadcast the chosen initial centroid to all ranks.
+  comms.bcast(initialCentroid, centroidsBuf.data(), static_cast<size_t>(n_features), rp);
 
   // Per-rank "is this local row already a chosen centroid" bitmap.
   auto isSampleCentroid =
