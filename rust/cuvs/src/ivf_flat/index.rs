@@ -5,7 +5,7 @@
 
 use std::io::{Write, stderr};
 
-use crate::dlpack::ManagedTensor;
+use crate::dlpack::{IntoDlTensor, IntoDlTensorMut};
 use crate::error::{Result, check_cuvs};
 use crate::ivf_flat::{IndexParams, SearchParams};
 use crate::resources::Resources;
@@ -15,22 +15,29 @@ use crate::resources::Resources;
 pub struct Index(ffi::cuvsIvfFlatIndex_t);
 
 impl Index {
-    /// Builds a new Index from the dataset for efficient search.
+    /// Builds an IVF-Flat index over `dataset` for efficient search.
     ///
-    /// # Arguments
+    /// `dataset` is a row-major matrix on the host or device implementing
+    /// [`IntoDlTensor`](crate::IntoDlTensor). It is copied into the index, so the
+    /// caller may free it once this call returns (hence `Index` carries no
+    /// lifetime).
     ///
-    /// * `res` - Resources to use
-    /// * `params` - Parameters for building the index
-    /// * `dataset` - A row-major matrix on either the host or device to index
-    pub fn build<T: Into<ManagedTensor>>(
+    /// Supported dataset/query dtypes in the current C-backed implementation are
+    /// `f32`, `f16`, `i8`, and `u8`.
+    pub fn build<'a>(
         res: &Resources,
         params: &IndexParams,
-        dataset: T,
+        dataset: impl IntoDlTensor<'a>,
     ) -> Result<Index> {
-        let dataset: ManagedTensor = dataset.into();
+        let dataset = dataset.into_dl_tensor()?;
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsIvfFlatBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
+            check_cuvs(ffi::cuvsIvfFlatBuild(
+                res.0,
+                params.0,
+                dataset.to_c().as_mut_ptr(),
+                index.0,
+            ))?;
         }
         Ok(index)
     }
@@ -44,23 +51,24 @@ impl Index {
         }
     }
 
-    /// Perform a Approximate Nearest Neighbors search on the Index
+    /// Searches the index for the `k` nearest neighbors of each query.
     ///
-    /// # Arguments
-    ///
-    /// * `res` - Resources to use
-    /// * `params` - Parameters to use in searching the index
-    /// * `queries` - A matrix in device memory to query for
-    /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
-    /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
-    pub fn search(
+    /// `queries`, `neighbors`, and `distances` must reside in device memory and
+    /// implement [`IntoDlTensor`](crate::IntoDlTensor) /
+    /// [`IntoDlTensorMut`](crate::IntoDlTensorMut). `neighbors` receives the
+    /// neighbor indices and `distances` their distances; both are written in
+    /// place.
+    pub fn search<'a>(
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: &ManagedTensor,
-        neighbors: &ManagedTensor,
-        distances: &ManagedTensor,
+        queries: impl IntoDlTensor<'a>,
+        neighbors: impl IntoDlTensorMut<'a>,
+        distances: impl IntoDlTensorMut<'a>,
     ) -> Result<()> {
+        let queries = queries.into_dl_tensor()?;
+        let neighbors = neighbors.into_dl_tensor_mut()?;
+        let distances = distances.into_dl_tensor_mut()?;
         unsafe {
             let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
 
@@ -68,9 +76,9 @@ impl Index {
                 res.0,
                 params.0,
                 self.0,
-                queries.as_ptr(),
-                neighbors.as_ptr(),
-                distances.as_ptr(),
+                queries.to_c().as_mut_ptr(),
+                neighbors.to_c().as_mut_ptr(),
+                distances.to_c().as_mut_ptr(),
                 prefilter,
             ))
         }
@@ -89,6 +97,7 @@ impl Drop for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::DeviceTensor;
     use ndarray::s;
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::Uniform;
@@ -102,39 +111,41 @@ mod tests {
         // Create a new random dataset to index
         let n_datapoints = 1024;
         let n_features = 16;
-        let dataset =
-            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+        let dataset = ndarray::Array::<f32, _>::random(
+            (n_datapoints, n_features),
+            Uniform::new(0., 1.0).unwrap(),
+        );
 
-        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset_device = DeviceTensor::from_host(&res, &dataset).unwrap();
 
         // build the ivf-flat index
-        let index = Index::build(&res, &build_params, dataset_device)
+        let index = Index::build(&res, &build_params, &dataset_device)
             .expect("failed to create ivf-flat index");
 
         // use the first 4 points from the dataset as queries : will test that we get them back
         // as their own nearest neighbor
         let n_queries = 4;
-        let queries = dataset.slice(s![0..n_queries, ..]);
+        let queries = dataset.slice(s![0..n_queries, ..]).to_owned();
 
         let k = 10;
 
         // IvfFlat search API requires queries and outputs to be on device memory
         // copy query data over, and allocate new device memory for the distances/ neighbors
         // outputs
-        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+        let queries = DeviceTensor::from_host(&res, &queries).unwrap();
         let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+        let mut neighbors = DeviceTensor::<i64>::zeros(&res, &[n_queries, k]).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+        let mut distances = DeviceTensor::<f32>::zeros(&res, &[n_queries, k]).unwrap();
 
         let search_params = SearchParams::new().unwrap();
 
-        index.search(&res, &search_params, &queries, &neighbors, &distances).unwrap();
+        index.search(&res, &search_params, &queries, &mut neighbors, &mut distances).unwrap();
 
         // Copy back to host memory
-        distances.to_host(&res, &mut distances_host).unwrap();
-        neighbors.to_host(&res, &mut neighbors_host).unwrap();
+        distances.copy_to_host(&res, &mut distances_host).unwrap();
+        neighbors.copy_to_host(&res, &mut neighbors_host).unwrap();
 
         // nearest neighbors should be themselves, since queries are from the
         // dataset
@@ -154,13 +165,15 @@ mod tests {
         // Create a random dataset
         let n_datapoints = 1024;
         let n_features = 16;
-        let dataset =
-            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+        let dataset = ndarray::Array::<f32, _>::random(
+            (n_datapoints, n_features),
+            Uniform::new(0., 1.0).unwrap(),
+        );
 
-        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset_device = DeviceTensor::from_host(&res, &dataset).unwrap();
 
         // Build the index once
-        let index = Index::build(&res, &build_params, dataset_device)
+        let index = Index::build(&res, &build_params, &dataset_device)
             .expect("failed to create ivf-flat index");
 
         let search_params = SearchParams::new().unwrap();
@@ -169,23 +182,23 @@ mod tests {
         // Perform multiple searches on the same index
         for search_iter in 0..3 {
             let n_queries = 4;
-            let queries = dataset.slice(s![0..n_queries, ..]);
-            let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+            let queries = dataset.slice(s![0..n_queries, ..]).to_owned();
+            let queries = DeviceTensor::from_host(&res, &queries).unwrap();
 
             let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-            let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+            let mut neighbors = DeviceTensor::<i64>::zeros(&res, &[n_queries, k]).unwrap();
 
             let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-            let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+            let mut distances = DeviceTensor::<f32>::zeros(&res, &[n_queries, k]).unwrap();
 
             // This should work on every iteration because search() takes &self
             index
-                .search(&res, &search_params, &queries, &neighbors, &distances)
+                .search(&res, &search_params, &queries, &mut neighbors, &mut distances)
                 .expect(&format!("search iteration {} failed", search_iter));
 
             // Copy back to host memory
-            distances.to_host(&res, &mut distances_host).unwrap();
-            neighbors.to_host(&res, &mut neighbors_host).unwrap();
+            distances.copy_to_host(&res, &mut distances_host).unwrap();
+            neighbors.copy_to_host(&res, &mut neighbors_host).unwrap();
 
             // Verify results are consistent
             assert_eq!(

@@ -2,7 +2,11 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
-//! Vamana
+//! Vamana: builds a DiskANN-style Vamana graph over a dataset.
+//!
+//! Build an [`Index`] from a dataset (then typically serialize it). The dataset
+//! is passed through the [`IntoDlTensor`](crate::IntoDlTensor) trait; see the
+//! [`dlpack`](crate::dlpack) module for the tensor model.
 
 mod index;
 mod index_params;

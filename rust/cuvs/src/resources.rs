@@ -23,7 +23,12 @@ impl Resources {
     }
 
     /// Sets the current cuda stream
-    pub fn set_cuda_stream(&self, stream: ffi::cudaStream_t) -> Result<()> {
+    ///
+    /// # Safety
+    ///
+    /// `stream` must be a valid CUDA stream that remains valid for as long as it
+    /// is used by this resources handle.
+    pub unsafe fn set_cuda_stream(&self, stream: ffi::cudaStream_t) -> Result<()> {
         unsafe { check_cuvs(ffi::cuvsStreamSet(self.0, stream)) }
     }
 
