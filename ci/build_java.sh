@@ -38,6 +38,8 @@ rapids-dependency-file-generator \
   --prepend-channel "${CPP_CHANNEL}" \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch)" | tee "${ENV_YAML_DIR}/env.yaml"
 
+source ./ci/use_conda_packages_from_prs.sh
+
 rapids-mamba-retry env create --yes -f "${ENV_YAML_DIR}/env.yaml" -n java
 
 # Temporarily allow unbound variables for conda activation.

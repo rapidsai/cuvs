@@ -19,6 +19,8 @@ rapids-dependency-file-generator \
   --prepend-channel "${CPP_CHANNEL}" \
   | tee env.yaml
 
+source ./ci/use_conda_packages_from_prs.sh
+
 rapids-mamba-retry env create --yes -f env.yaml -n test
 
 # Temporarily allow unbound variables for conda activation.
