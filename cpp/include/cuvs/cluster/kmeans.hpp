@@ -95,7 +95,15 @@ struct params : base_params {
   int n_init = 1;
 
   /**
-   * Oversampling factor for use in the k-means|| algorithm
+   * Oversampling factor for use in the k-means|| algorithm.
+   *
+   * In the single-GPU path the value `0` is overloaded as an algorithm switch
+   * that selects the classic sequential k-means++ instead of the scalable
+   * variant. Any value `> 0` is used as-is.
+   *
+   * In the multi-GPU path (@ref cuvs::cluster::kmeans::mg::fit with device-
+   * resident inputs) any value `< 1.0` (including `0`) is internally clamped to `1.0`.
+   * Values `>= 1.0` are passed through unchanged.
    */
   double oversampling_factor = 2.0;
 
