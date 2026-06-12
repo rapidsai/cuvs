@@ -230,22 +230,8 @@ void _build(cuvsResources_t res,
         mds, static_cast<uint32_t>(mds.extent(1)));
       auto host_idx = cuvs::neighbors::cagra::build(*res_ptr, index_params, host_view);
       auto device_idx = cuvs::neighbors::cagra::convert_host_to_device_index(*res_ptr, host_idx);
-      // convert_host_to_device_index stores only a VIEW of host_idx.graph_ (no ownership
-      // transfer). We must make an owned copy before host_idx goes out of scope, otherwise
-      // device_idx.graph_view_ becomes a dangling pointer and search reads garbage memory.
-      {
-        auto gn = static_cast<int64_t>(device_idx.graph().extent(0));
-        auto gd = static_cast<int64_t>(device_idx.graph().extent(1));
-        if (gn > 0 && gd > 0) {
-          auto g_host = raft::make_host_matrix<uint32_t, int64_t>(gn, gd);
-          raft::copy(g_host.data_handle(),
-                     device_idx.graph().data_handle(),
-                     static_cast<size_t>(gn * gd),
-                     raft::resource::get_cuda_stream(*res_ptr));
-          raft::resource::sync_stream(*res_ptr);
-          device_idx.update_graph(*res_ptr, raft::make_const_mdspan(g_host.view()));
-        }
-      }
+      // convert_host_to_device_index now makes an owned copy of the graph (D→H→D), so
+      // device_idx.graph_ is self-contained and does not borrow from host_idx.
       std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_owner = nullptr;
       if (host_idx.dataset_fd().has_value()) {
         // Disk-mode ACE: transfer all file descriptors from host index to device index so that

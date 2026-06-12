@@ -2848,9 +2848,22 @@ template <typename T, typename IdxT, typename HostViewT>
 auto convert_host_to_device_index(raft::resources const& res, index<T, IdxT, HostViewT> const& src)
   -> index<T, IdxT, cuvs::neighbors::device_counterpart_t<HostViewT>>
 {
-  using DeviceViewT = cuvs::neighbors::device_counterpart_t<HostViewT>;
+  using DeviceViewT    = cuvs::neighbors::device_counterpart_t<HostViewT>;
+  using GraphIndexType = typename index<T, IdxT, HostViewT>::graph_index_type;
   index<T, IdxT, DeviceViewT> out(res, src.metric());
-  out.update_graph(res, src.graph());
+  if (src.graph().size() > 0) {
+    // The graph lives in device memory owned by `src`. `update_graph(device_view)` would only
+    // store a view (no ownership transfer), leaving `out` with a dangling pointer once `src`
+    // is destroyed.  Copy device→host→device so that `out` owns its graph memory.
+    auto graph_host =
+      raft::make_host_matrix<GraphIndexType, int64_t>(src.graph().extent(0), src.graph().extent(1));
+    raft::copy(graph_host.data_handle(),
+               src.graph().data_handle(),
+               src.graph().size(),
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    out.update_graph(res, graph_host.view());  // host view overload: copies H→D and owns graph_
+  }
   return out;
 }
 
