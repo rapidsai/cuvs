@@ -13,6 +13,7 @@
 
 #include <cuvs/core/export.hpp>
 #include <optional>
+#include <vector>
 
 namespace CUVS_EXPORT cuvs {
 namespace cluster {
@@ -94,7 +95,15 @@ struct params : base_params {
   int n_init = 1;
 
   /**
-   * Oversampling factor for use in the k-means|| algorithm
+   * Oversampling factor for use in the k-means|| algorithm.
+   *
+   * In the single-GPU path the value `0` is overloaded as an algorithm switch
+   * that selects the classic sequential k-means++ instead of the scalable
+   * variant. Any value `> 0` is used as-is.
+   *
+   * In the multi-GPU path (@ref cuvs::cluster::kmeans::mg::fit with device-
+   * resident inputs) any value `< 1.0` (including `0`) is internally clamped to `1.0`.
+   * Values `>= 1.0` are passed through unchanged.
    */
   double oversampling_factor = 2.0;
 
@@ -137,11 +146,13 @@ struct params : base_params {
   /**
    * Number of samples to process per GPU batch when fitting with host data.
    * When set to 0, defaults to n_samples (process all at once).
-   * Only used by the batched (host-data) code path and ignored by device-data
-   * overloads.
+   * Only used by the batched (host-data) code path and ignored by
+   * device-data overloads.
    *
-   * In multi-GPU mode, this is a per-rank batch size. Each rank processes up to
-   * this many local samples per batch, clamped to that rank's local sample count.
+   * In multi-GPU mode this is a per-rank batch size: each rank processes up
+   * to this many local samples per batch, clamped to that rank's local sample
+   * count. When MG is invoked with device partitions, the runtime ignores
+   * `streaming_batch_size` and processes each partition in full.
    * Default: 0 (process all data at once).
    */
   int64_t streaming_batch_size = 0;
@@ -179,26 +190,22 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
 
 /**
  * @brief Find clusters with k-means algorithm using batched processing of host data.
+ *        Single-GPU only.
+ *
+ * Multi-GPU migration (breaking change in cuVS 26.08): earlier releases
+ * silently dispatched this single-GPU overload to a multi-GPU implementation
+ * when the supplied RAFT handle had RAFT comms or an SNMG clique attached. That
+ * implicit dispatch has been removed: this overload is now strictly
+ * single-GPU. If `handle` carries communications/clique state it is ignored and the call falls back
+ * to the single-GPU path. To run on multiple GPUs, call `cuvs::cluster::kmeans::mg::fit`
+ * explicitly.
  *
  * TODO: Evaluate replacing the extent type with int64_t. Reference issue:
  * https://github.com/rapidsai/cuvs/issues/1961
  *
  * This overload supports out-of-core computation where the dataset resides
- * on the host. Data is processed in GPU-sized batches, streaming from host to device.
- * The batch size is controlled by params.streaming_batch_size. In multi-GPU mode,
- * this is a per-rank batch size.
- *
- * Multi-GPU dispatch is selected automatically based on the handle state:
- *   - If `raft::resource::is_multi_gpu(handle)` (cuVS SNMG): the full dataset X
- *     is split across GPUs internally with an OpenMP parallel region and NCCL.
- *   - If `raft::resource::comms_initialized(handle)` (Dask/Ray/MPI): X is treated as
- *     this worker's partition, and RAFT communicators are used for collectives.
- *   - Otherwise: single-GPU batched k-means.
- *
- * With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the
- * effective initialization sample must fit in GPU memory on every rank because
- * it is materialized on every device. Rank 0 must also have enough GPU memory
- * for the seeding workspace before centroids are broadcast.
+ * on the host. Data is processed in batches, streaming from host to
+ * device. The batch size is controlled by `params.streaming_batch_size`.
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
@@ -229,8 +236,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *               raft::make_host_scalar_view(&n_iter));
  * @endcode
  *
- * @param[in]     handle        The raft handle. When a multi-GPU resource is
- *                              attached, multi-GPU dispatch is used automatically.
+ * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model. Batch size is read from
  *                              params.streaming_batch_size.
  * @param[in]     X             Training instances on HOST memory. The data must
@@ -1606,6 +1612,234 @@ void cluster_cost(
 /**
  * @}
  */
+
+#ifdef CUVS_BUILD_MG_ALGOS
+namespace mg {
+/**
+ * @defgroup kmeans_mg Multi-GPU / out-of-core k-means fit
+ * @{
+ *
+ * @brief Explicit multi-GPU k-means entry points.
+ *
+ * All multi-GPU k-means APIs live in this namespace
+ * (`cuvs::cluster::kmeans::mg`). To run k-means on multiple GPUs a `handle` that
+ * carries either an SNMG clique (`raft::resource::is_multi_gpu(handle)`) or
+ * initialized RAFT comms (`raft::resource::comms_initialized(handle)`) must be used.
+ *
+ * Migration from earlier releases (breaking change in cuVS 26.08): before
+ * this release, the single-GPU `cuvs::cluster::kmeans::fit` overloads would
+ * silently dispatch to the multi-GPU backend when the supplied `handle`
+ * carried RAFT comms or an SNMG clique. That implicit dispatch has been
+ * removed: the single-GPU `fit` is now strictly single-GPU. Existing
+ * multi-GPU call sites must be updated to invoke
+ * `cuvs::cluster::kmeans::mg::fit` directly. Two flavors of the multi-GPU
+ * API are provided here:
+ *   - A single mdspan per rank (drop-in replacement for the old single-GPU
+ *     signature; cuVS wraps it into a one-element vector internally).
+ *   - A `std::vector` of mdspan partitions per rank (multiple partitions per
+ *     rank, typical for Dask/Ray and out-of-core host-data flows).
+ *
+ * @code{.cpp}
+ *   // Before (cuVS <= 26.06): implicit multi-GPU dispatch via single-GPU API.
+ *   //   raft::resources handle; // attached to NCCL comms or SNMG clique
+ *   //   cuvs::cluster::kmeans::fit(handle, params, local_X, std::nullopt,
+ *   //                              centroids, inertia, n_iter);
+ *
+ *   // After (cuVS >= 26.08): explicit multi-GPU API.
+ *   raft::resources handle; // NCCL comms or SNMG clique attached
+ *   cuvs::cluster::kmeans::mg::fit(handle, params, local_X, std::nullopt,
+ *                                  centroids, inertia, n_iter);
+ * @endcode
+ */
+
+/**
+ * @brief Multi-GPU k-means fit with one or more local data
+ *        partitions per rank.
+ *
+ * Each rank supplies its local training data as a vector of partitions. For
+ * host-resident partitions the implementation streams each partition through
+ * Lloyd iterations using `params.streaming_batch_size` (per rank). For
+ * device-resident partitions `streaming_batch_size` is ignored and each local
+ * partition is processed in full.
+ *
+ * The active backend is selected by the resources attached to
+ * `handle`:
+ *   - When `raft::resource::is_multi_gpu(handle)` is true (SNMG clique), the
+ *     call must be issued from inside an OpenMP region with one thread per
+ *     rank in the clique.
+ *   - Otherwise, multi-process NCCL comms must be initialized on the handle
+ *     (`raft::resource::comms_initialized(handle)`); each process supplies its
+ *     own local partitions.
+ *
+ * @param[in]     handle              The raft handle. Must have NCCL comms or
+ *                                    a SNMG clique initialized.
+ * @param[in]     params              K-means parameters. For host-resident
+ *                                    partitions the per-rank streaming batch
+ *                                    size is read from
+ *                                    `params.streaming_batch_size`; it is
+ *                                    ignored for device-resident partitions.
+ * @param[in]     X_parts             Per-partition local data on this rank.
+ *                                    Each entry is [n_rows_i x n_features].
+ * @param[in]     sample_weight_parts Optional per-partition row weights with
+ *                                    one vector per data partition.
+ * @param[inout]  centroids           Device matrix [n_clusters x n_features].
+ *                                    On entry, used as the initial centers
+ *                                    when `params.init == InitMethod::Array`.
+ *                                    On return, holds the converged
+ *                                    centroids.
+ * @param[out]    inertia             Host scalar receiving the final
+ *                                    clustering cost.
+ * @param[out]    n_iter              Host scalar receiving the iteration
+ *                                    count at which the run terminated.
+ */
+void fit(
+  raft::resources const& handle,
+  const cuvs::cluster::kmeans::params& params,
+  const std::vector<raft::device_matrix_view<const float, int>>& X_parts,
+  const std::optional<std::vector<raft::device_vector_view<const float, int>>>& sample_weight_parts,
+  raft::device_matrix_view<float, int> centroids,
+  raft::host_scalar_view<float> inertia,
+  raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const float, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const float, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const double, int>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const double, int>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::device_matrix_view<const double, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::device_vector_view<const double, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::host_matrix_view<const float, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::host_vector_view<const float, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         const std::vector<raft::host_matrix_view<const double, int64_t>>& X_parts,
+         const std::optional<std::vector<raft::host_vector_view<const double, int64_t>>>&
+           sample_weight_parts,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ *
+ * Convenience overload for the common case where each rank has exactly one
+ * local partition. The mdspan is wrapped in a one-element vector and routed
+ * through the vector-of-partitions overload above. See that overload's
+ * documentation for backend selection and handle requirements.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const float, int> X,
+         std::optional<raft::device_vector_view<const float, int>> sample_weight,
+         raft::device_matrix_view<float, int> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const float, int64_t> X,
+         std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const double, int> X,
+         std::optional<raft::device_vector_view<const double, int>> sample_weight,
+         raft::device_matrix_view<double, int> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int> n_iter);
+
+/**
+ * @brief Multi-GPU k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const double, int64_t> X,
+         std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit, single mdspan per rank.
+ *
+ * Dispatches to the SNMG-clique (batched per-rank) backend when the handle
+ * carries an SNMG clique, and to the NCCL multi-process backend otherwise.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const float, int64_t> X,
+         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @brief Multi-GPU / out-of-core k-means fit, single mdspan per rank.
+ */
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const double, int64_t> X,
+         std::optional<raft::host_vector_view<const double, int64_t>> sample_weight,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double> inertia,
+         raft::host_scalar_view<int64_t> n_iter);
+
+/**
+ * @}
+ */
+}  // namespace mg
+#endif
 
 namespace helpers {
 /**
