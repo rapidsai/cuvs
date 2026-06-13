@@ -49,6 +49,7 @@ namespace cuvs::neighbors::vamana::detail {
 
 static const int blockD        = 32;
 static const int blockD_greedy = 128;  // 4 warps per block, each warp processes one query
+static const int blockD_prune  = 128;  // 4 warps per block, parallel occlusion per query
 static const int maxBlocks     = 10000;
 
 // generate random permutation of inserts - TODO do this on GPU / faster
@@ -371,14 +372,14 @@ void batched_insert_vamana(
 
     // Run on candidates of vectors being inserted
     RobustPruneKernel<T, accT, IdxT>
-      <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
-                                                              dataset,
-                                                              query_list_ptr.data_handle(),
-                                                              step_size,
-                                                              visited_size,
-                                                              metric,
-                                                              alpha,
-                                                              s_coords_mem.data_handle());
+      <<<num_blocks, blockD_prune, prune_smem_total_size, stream>>>(d_graph.view(),
+                                                                     dataset,
+                                                                     query_list_ptr.data_handle(),
+                                                                     step_size,
+                                                                     visited_size,
+                                                                     metric,
+                                                                     alpha,
+                                                                     s_coords_mem.data_handle());
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     // Segmented sort on query list
@@ -525,14 +526,15 @@ void batched_insert_vamana(
 
       // Call 2nd RobustPrune on reverse query_list
       RobustPruneKernel<T, accT, IdxT>
-        <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
-                                                                raft::make_const_mdspan(dataset),
-                                                                reverse_list_ptr.data_handle(),
-                                                                reverse_batch,
-                                                                visited_size,
-                                                                metric,
-                                                                alpha,
-                                                                s_coords_mem.data_handle());
+        <<<num_blocks, blockD_prune, prune_smem_total_size, stream>>>(d_graph.view(),
+                                                                       raft::make_const_mdspan(
+                                                                         dataset),
+                                                                       reverse_list_ptr.data_handle(),
+                                                                       reverse_batch,
+                                                                       visited_size,
+                                                                       metric,
+                                                                       alpha,
+                                                                       s_coords_mem.data_handle());
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Segmented sort on reverse_list
