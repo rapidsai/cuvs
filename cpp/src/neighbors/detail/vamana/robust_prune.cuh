@@ -88,17 +88,21 @@ __global__ void RobustPruneKernel(
   const int nbh_list_offset = (degree + visited_size) * sizeof(float);
   DistPair<IdxT, accT>* new_nbh_list =
     reinterpret_cast<DistPair<IdxT, accT>*>(&smem[nbh_list_offset]);
+  const int cand_coords_offset =
+    nbh_list_offset + (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+  const int coord_bytes = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
+  int graph_dists_offset = cand_coords_offset;
   QueryCoordT* s_cand_coords = nullptr;
   if (dim >= kRobustPruneCandCacheMinDim) {
-    s_cand_coords = reinterpret_cast<QueryCoordT*>(
-      &smem[nbh_list_offset + (degree + visited_size) * sizeof(DistPair<IdxT, accT>)]);
+    s_cand_coords        = reinterpret_cast<QueryCoordT*>(&smem[cand_coords_offset]);
+    graph_dists_offset   = cand_coords_offset + coord_bytes;
   }
+  accT* graph_dists = reinterpret_cast<accT*>(&smem[graph_dists_offset]);
 
   static __shared__ Point<QueryCoordT, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
   s_query.Dim    = dim;
   static __shared__ int prev_edges;
-  static __shared__ accT graphDist;
   static __shared__ int s_accept_count;
   static __shared__ int s_do_accept;
 
@@ -135,6 +139,32 @@ __global__ void RobustPruneKernel(
     }
     __syncthreads();
 
+    // Precompute graph-edge distances in parallel; reuse GreedySearch dists when bit-exact.
+    const int visited_count     = query_list[i].size;
+    const IdxT* visited_ids     = query_list[i].ids;
+    const accT* visited_dists   = query_list[i].dists;
+    const bool reuse_search_dists = (dim >= kRobustPruneCandCacheMinDim);
+    for (int j = warpId; j < prev_edges; j += num_warps) {
+      IdxT gid = graph(queryId, j);
+      accT d;
+      bool found = false;
+      if (reuse_search_dists) {
+        found = lookup_visited_dist_warp(
+          visited_ids, visited_dists, visited_count, gid, d, laneId);
+      }
+      if (!found) {
+        if constexpr (is_cuda_fp16_v<T>) {
+          d = dist_warp<accT>(
+            s_query.coords, &dataset((size_t)gid, 0), dim, metric, laneId);
+        } else {
+          d = dist_warp<T, accT>(
+            s_query.coords, &dataset((size_t)gid, 0), dim, metric, laneId);
+        }
+      }
+      if (laneId == 0) { graph_dists[j] = d; }
+    }
+    __syncthreads();
+
     DistPair<IdxT, accT> next_cand;
     // Merge graph and candidate list
     for (int outIdx = 0; outIdx < degree + visited_size; outIdx++) {
@@ -160,60 +190,26 @@ __global__ void RobustPruneKernel(
           listIdx++;
         }
       } else if (listIdx >= visited_size) {
-        next_cand.idx = graph(queryId, graphIdx);
-        if (warpId == 0) {
-          accT tempDist;
-          if constexpr (is_cuda_fp16_v<T>) {
-            tempDist = dist_warp<accT>(s_query.coords,
-                                       &dataset((size_t)graph(queryId, graphIdx), 0),
-                                       dim,
-                                       metric,
-                                       laneId);
-          } else {
-            tempDist = dist_warp<T, accT>(s_query.coords,
-                                          &dataset((size_t)graph(queryId, graphIdx), 0),
-                                          dim,
-                                          metric,
-                                          laneId);
-          }
-          if (laneId == 0) graphDist = tempDist;
-        }
-        __syncthreads();
-        next_cand.dist = graphDist;
+        next_cand.idx  = graph(queryId, graphIdx);
+        next_cand.dist = graph_dists[graphIdx];
         graphIdx++;
       } else {
         accT listDist = query_list[i].dists[listIdx];
+        IdxT listId   = query_list[i].ids[listIdx];
+        IdxT graphId  = graph(queryId, graphIdx);
 
-        if (warpId == 0) {
-          accT tempDist;
-          if constexpr (is_cuda_fp16_v<T>) {
-            tempDist = dist_warp<accT>(s_query.coords,
-                                       &dataset((size_t)graph(queryId, graphIdx), 0),
-                                       dim,
-                                       metric,
-                                       laneId);
-          } else {
-            tempDist = dist_warp<T, accT>(s_query.coords,
-                                          &dataset((size_t)graph(queryId, graphIdx), 0),
-                                          dim,
-                                          metric,
-                                          laneId);
-          }
-          if (laneId == 0) graphDist = tempDist;
-        }
-        __syncthreads();
-
-        if (listDist <= graphDist) {
-          next_cand.idx  = query_list[i].ids[listIdx];
+        if (graphId == listId) {
+          next_cand.idx  = listId;
           next_cand.dist = listDist;
-
-          if (graph(queryId, graphIdx) == query_list[i].ids[listIdx]) {  // Duplicate found!
-            graphIdx++;                                                  // Skip the duplicate
-          }
+          graphIdx++;
+          listIdx++;
+        } else if (listDist <= graph_dists[graphIdx]) {
+          next_cand.idx  = listId;
+          next_cand.dist = listDist;
           listIdx++;
         } else {
-          next_cand.idx  = graph(queryId, graphIdx);
-          next_cand.dist = graphDist;
+          next_cand.idx  = graphId;
+          next_cand.dist = graph_dists[graphIdx];
           graphIdx++;
         }
       }

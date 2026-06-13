@@ -644,6 +644,30 @@ __forceinline__ __device__ SUMTYPE dist(const float* src,
   return d;
 }
 
+// Warp-cooperative id lookup in a GreedySearch visited list (sorted by distance, not id).
+// All lanes execute the same number of ballot rounds to avoid warp deadlock.
+template <typename IdxT, typename accT>
+__forceinline__ __device__ bool lookup_visited_dist_warp(
+  const IdxT* ids, const accT* dists, int size, IdxT target, accT& out_dist, int laneId)
+{
+  bool found      = false;
+  accT found_dist = static_cast<accT>(0);
+  const int num_iters = (size + 31) >> 5;
+  for (int k = 0; k < num_iters; ++k) {
+    const int j        = (k << 5) + laneId;
+    const bool hit     = (j < size) && (ids[j] == target);
+    accT my_dist       = hit ? dists[j] : static_cast<accT>(0);
+    const unsigned hits = raft::ballot(hit);
+    if (hits != 0 && !found) {
+      const int src_lane = __ffs(hits) - 1;
+      found_dist         = raft::shfl(my_dist, src_lane);
+      found              = true;
+    }
+  }
+  if (found) { out_dist = found_dist; }
+  return found;
+}
+
 /***************************************************************************************
  * Structure that holds information about and results of a query. Use by both
  * GreedySearch and RobustPrune, as well as reverse edge lists.

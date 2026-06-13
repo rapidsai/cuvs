@@ -229,7 +229,8 @@ void batched_insert_vamana(
     (dim >= kRobustPruneCandCacheMinDim) ? coords_size : 0;
   int prune_smem_total_size = (degree + visited_size) * sizeof(float) +  // Occlusion list
                               (degree + visited_size) * sizeof(DistPair<IdxT, accT>) +
-                              cand_coords_smem_size;
+                              cand_coords_smem_size +
+                              degree * static_cast<int>(sizeof(accT));  // graph edge dist cache
 
   RAFT_LOG_DEBUG(
     "Dynamic shared memory usage (bytes): GreedySearch: %d, Segment Sort: %d, Robust Prune: %d",
