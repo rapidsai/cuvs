@@ -423,6 +423,27 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
             arg.hashmap_mode = cuvs::neighbors::cagra::hash_mode::AUTO;
           }
         }
+        // Whether to shuffle the (compressed) dataset before the iterative build loop.
+        if (build_search_conf.contains("shuffle_dataset")) {
+          arg.shuffle_dataset = build_search_conf.at("shuffle_dataset").get<bool>();
+        }
+        // Precision of the codebook/query in shared memory for the VPQ search used during
+        // the iterative build. Accepts an integer code (0=F16, 1=E5M2) or a string.
+        if (build_search_conf.contains("smem_dtype")) {
+          const auto& sd = build_search_conf.at("smem_dtype");
+          if (sd.is_number_integer()) {
+            arg.smem_dtype = static_cast<cuvs::neighbors::cagra::internal_dtype>(sd.get<int>());
+          } else {
+            std::string s = sd.get<std::string>();
+            if (s == "f16" || s == "F16" || s == "fp16" || s == "half") {
+              arg.smem_dtype = cuvs::neighbors::cagra::internal_dtype::F16;
+            } else if (s == "e5m2" || s == "E5M2" || s == "fp8") {
+              arg.smem_dtype = cuvs::neighbors::cagra::internal_dtype::E5M2;
+            } else {
+              throw std::runtime_error("invalid value for build_search smem_dtype: " + s);
+            }
+          }
+        }
       }
     },
     params.graph_build_params);

@@ -166,6 +166,23 @@ struct iterative_search_params : cuvs::neighbors::cagra::search_params {
    */
   std::optional<cuvs::neighbors::vpq_params> build_compression = std::nullopt;
 
+  /**
+   * Whether to shuffle the dataset before building the graph.
+   *
+   * When enabled, the compressed dataset is randomly permuted before graph
+   * construction begins. This can improve graph quality by breaking any
+   * spatial locality in the original dataset ordering that might cause
+   * the iterative builder to get stuck in local optima during early
+   * iterations.
+   *
+   * After graph construction, the node indices in the graph are remapped
+   * back to the original dataset ordering.
+   *
+   * Only applies when compression is enabled (build_compression or
+   * index_params::compression is set).
+   */
+  bool shuffle_dataset = true;
+
   iterative_search_params()
   {
     this->search_width   = 1;
