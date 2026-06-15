@@ -15,7 +15,7 @@ doc-only = ["cuvs-sys/doc-only"]
 [dependencies]
 cuvs-sys = { workspace = true }
 thiserror = "2"
-tinyvec = { version = "1", features = ["alloc", "latest_stable_rust"] }
+tinyvec = { version = "1", features = ["alloc"] }
 
 [dev-dependencies]
 ndarray = "0.17"

@@ -18,9 +18,8 @@ use crate::resources::Resources;
 /// The lifetime `'d` ties this index to the underlying dataset,
 /// passed at construction time. The C library may store a non-owning view
 /// of properly aligned device-resident data, so the dataset must outlive
-/// the index. When an index is deserialized from disk or produced by
-/// [`Index::merge`], the data is self-contained and the lifetime is
-/// `'static`.
+/// the index. When an index is deserialized from disk, the data is
+/// self-contained and its lifetime is `'static`.
 #[derive(Debug)]
 pub struct Index<'d> {
     handle: ffi::cuvsCagraIndex_t,

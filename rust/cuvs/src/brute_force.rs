@@ -6,8 +6,8 @@
 //!
 //! Build an [`Index`] over a dataset, then [`search`](Index::search) it with
 //! device-resident queries and output buffers. Tensors are passed through the
-//! [`IntoDlTensor`](crate::IntoDlTensor) /
-//! [`IntoDlTensorMut`](crate::IntoDlTensorMut) traits; see the
+//! [`IntoDlTensor`] /
+//! [`IntoDlTensorMut`] traits; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model and `examples/cagra.rs`
 //! for the same build/search workflow.
 
@@ -33,7 +33,7 @@ impl<'d> Index<'d> {
     ///
     /// `metric` selects the distance and `metric_arg` is the optional `p` for
     /// Minkowski distances (defaults to 2). `dataset` is a row-major matrix on
-    /// the host or device implementing [`IntoDlTensor`](crate::IntoDlTensor); the
+    /// the host or device implementing [`IntoDlTensor`]; the
     /// C++ index keeps a non-owning view of it, so the returned [`Index`] borrows
     /// it for `'d` and cannot outlive it.
     pub fn build(
@@ -68,8 +68,8 @@ impl<'d> Index<'d> {
     /// Searches the index for the `k` nearest neighbors of each query.
     ///
     /// `queries`, `neighbors`, and `distances` must reside in device memory and
-    /// implement [`IntoDlTensor`](crate::IntoDlTensor) /
-    /// [`IntoDlTensorMut`](crate::IntoDlTensorMut). `neighbors` receives the
+    /// implement [`IntoDlTensor`] /
+    /// [`IntoDlTensorMut`]. `neighbors` receives the
     /// neighbor indices and `distances` their distances; both are written in
     /// place.
     pub fn search<'a>(

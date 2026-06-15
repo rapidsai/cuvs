@@ -18,16 +18,16 @@ use crate::error::{Result, check_cuvs};
 use crate::ffi;
 use crate::resources::Resources;
 
-pub(crate) struct DeviceTensor<T: DType> {
+pub(crate) struct DeviceTensor<'res, T: DType> {
     data: *mut std::ffi::c_void,
     shape: Vec<i64>,
     capacity_bytes: usize,
-    resources: ffi::cuvsResources_t,
+    resources: &'res Resources,
     _marker: PhantomData<T>,
 }
 
-impl<T: DType> DeviceTensor<T> {
-    pub(crate) fn zeros(res: &Resources, shape: &[usize]) -> Result<Self> {
+impl<'res, T: DType> DeviceTensor<'res, T> {
+    pub(crate) fn zeros(res: &'res Resources, shape: &[usize]) -> Result<Self> {
         let capacity_bytes = shape.iter().product::<usize>() * std::mem::size_of::<T>();
         let mut data: *mut std::ffi::c_void = std::ptr::null_mut();
         unsafe {
@@ -38,12 +38,12 @@ impl<T: DType> DeviceTensor<T> {
             data,
             shape: shape.iter().map(|&dim| dim as i64).collect(),
             capacity_bytes,
-            resources: res.0,
+            resources: res,
             _marker: PhantomData,
         })
     }
 
-    pub(crate) fn from_host<D>(res: &Resources, host: &ndarray::ArrayRef<T, D>) -> Result<Self>
+    pub(crate) fn from_host<D>(res: &'res Resources, host: &ndarray::ArrayRef<T, D>) -> Result<Self>
     where
         D: ndarray::Dimension,
     {
@@ -113,15 +113,15 @@ impl<T: DType> DeviceTensor<T> {
     }
 }
 
-impl<T: DType> Drop for DeviceTensor<T> {
+impl<T: DType> Drop for DeviceTensor<'_, T> {
     fn drop(&mut self) {
         if !self.data.is_null() {
-            let _ = unsafe { ffi::cuvsRMMFree(self.resources, self.data, self.capacity_bytes) };
+            let _ = unsafe { ffi::cuvsRMMFree(self.resources.0, self.data, self.capacity_bytes) };
         }
     }
 }
 
-impl<'a, T: DType> IntoDlTensor<'a> for &'a DeviceTensor<T> {
+impl<'a, 'res, T: DType> IntoDlTensor<'a> for &'a DeviceTensor<'res, T> {
     fn into_dl_tensor(self) -> std::result::Result<DLTensorView<'a>, DLPackError> {
         unsafe {
             DLTensorView::from_raw_parts(
@@ -135,7 +135,7 @@ impl<'a, T: DType> IntoDlTensor<'a> for &'a DeviceTensor<T> {
     }
 }
 
-impl<'a, T: DType> IntoDlTensorMut<'a> for &'a mut DeviceTensor<T> {
+impl<'a, 'res, T: DType> IntoDlTensorMut<'a> for &'a mut DeviceTensor<'res, T> {
     fn into_dl_tensor_mut(self) -> std::result::Result<DLTensorViewMut<'a>, DLPackError> {
         unsafe {
             DLTensorViewMut::from_raw_parts(

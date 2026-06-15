@@ -7,8 +7,8 @@
 //!
 //! [`pairwise_distance`] computes all pairwise distances between two device
 //! matrices. Inputs and output are passed through the
-//! [`IntoDlTensor`](crate::IntoDlTensor) /
-//! [`IntoDlTensorMut`](crate::IntoDlTensorMut) traits; see the
+//! [`IntoDlTensor`] /
+//! [`IntoDlTensorMut`] traits; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model.
 
 use crate::distance_type::DistanceType;
@@ -20,8 +20,8 @@ use crate::resources::Resources;
 /// `y` (shape `n × k`), writing the `m × n` result into `distances`.
 ///
 /// `x`, `y`, and `distances` reside in device memory and implement
-/// [`IntoDlTensor`](crate::IntoDlTensor) /
-/// [`IntoDlTensorMut`](crate::IntoDlTensorMut). `metric` selects the distance;
+/// [`IntoDlTensor`] /
+/// [`IntoDlTensorMut`]. `metric` selects the distance;
 /// `metric_arg` is the optional `p` for Minkowski distances (defaults to 2).
 pub fn pairwise_distance<'a>(
     res: &Resources,

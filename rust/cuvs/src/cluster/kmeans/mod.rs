@@ -8,8 +8,8 @@
 //! [`fit`] computes cluster centroids for a dataset, [`predict`] assigns points
 //! to clusters, and [`cluster_cost`] reports the inertia. All inputs and outputs
 //! reside in device memory and are passed through the
-//! [`IntoDlTensor`](crate::IntoDlTensor) /
-//! [`IntoDlTensorMut`](crate::IntoDlTensorMut) traits; see the
+//! [`IntoDlTensor`] /
+//! [`IntoDlTensorMut`] traits; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model.
 
 mod params;
@@ -25,8 +25,8 @@ use crate::resources::Resources;
 /// `x` (shape `m × k`) is the input matrix and `centroids` (shape
 /// `n_clusters × k`) receives the fitted centroids; `sample_weight` is an
 /// optional per-sample weight. All reside in device memory and implement
-/// [`IntoDlTensor`](crate::IntoDlTensor) /
-/// [`IntoDlTensorMut`](crate::IntoDlTensorMut).
+/// [`IntoDlTensor`] /
+/// [`IntoDlTensorMut`].
 pub fn fit<'a>(
     res: &Resources,
     params: &Params,
@@ -62,8 +62,8 @@ pub fn fit<'a>(
 ///
 /// `x` (shape `m × k`), `centroids` (shape `n_clusters × k`), the optional
 /// `sample_weight`, and `labels` (shape `m × 1`) reside in device memory and
-/// implement [`IntoDlTensor`](crate::IntoDlTensor) /
-/// [`IntoDlTensorMut`](crate::IntoDlTensorMut). `normalize_weight` selects
+/// implement [`IntoDlTensor`] /
+/// [`IntoDlTensorMut`]. `normalize_weight` selects
 /// whether the sample weights are normalized.
 pub fn predict<'a>(
     res: &Resources,
@@ -101,7 +101,7 @@ pub fn predict<'a>(
 /// Computes the k-means cost (inertia) of `x` against existing `centroids`.
 ///
 /// `x` (shape `m × k`) and `centroids` (shape `n_clusters × k`) reside in device
-/// memory and implement [`IntoDlTensor`](crate::IntoDlTensor).
+/// memory and implement [`IntoDlTensor`].
 pub fn cluster_cost<'a>(
     res: &Resources,
     x: impl IntoDlTensor<'a>,
@@ -154,7 +154,7 @@ mod tests {
 
         // fit the centroids, make sure that inertia has gone down
         let (inertia, n_iter) =
-            fit(&res, &params, &dataset, None::<&DeviceTensor<f32>>, &mut centroids).unwrap();
+            fit(&res, &params, &dataset, None::<&DeviceTensor<'_, f32>>, &mut centroids).unwrap();
 
         assert!(inertia < original_inertia);
         assert!(n_iter >= 1);
@@ -167,7 +167,7 @@ mod tests {
             &res,
             &params,
             &centroids,
-            None::<&DeviceTensor<f32>>,
+            None::<&DeviceTensor<'_, f32>>,
             &centroids,
             &mut labels,
             false,
