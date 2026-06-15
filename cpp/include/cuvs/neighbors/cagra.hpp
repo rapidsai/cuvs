@@ -346,7 +346,10 @@ struct search_params : cuvs::neighbors::search_params {
   /**
    * A parameter indicating the rate of nodes to be filtered-out, when filtering is used.
    * The value must be equal to or greater than 0.0 and less than 1.0. Default value is
-   * negative, in which case the filtering rate is automatically calculated.
+   * negative, in which case the filtering rate is automatically calculated when possible.
+   * For `filtering::udf_filter`, CAGRA uses `udf_filter::filtering_rate` when this value is
+   * negative. If both values are negative, CAGRA assumes 0.0 because a UDF's selectivity cannot be
+   * inferred from the source string.
    */
   float filtering_rate = -1.0;
 };
@@ -391,7 +394,7 @@ static_assert(std::is_aggregate_v<search_params>);
  *
  */
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index {
+struct CUVS_EXPORT index : cuvs::neighbors::index {
   using index_params_type  = cagra::index_params;
   using search_params_type = cagra::search_params;
   using index_type         = IdxT;
@@ -883,6 +886,7 @@ struct index : cuvs::neighbors::index {
   size_t dim_          = 0;
   size_t graph_degree_ = 0;
 };
+
 /**
  * @}
  */

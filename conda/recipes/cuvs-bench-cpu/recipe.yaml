@@ -94,6 +94,7 @@ requirements:
     - h5py ${{ h5py_version }}
     - matplotlib-base>=3.9
     - numpy >=1.23,<3.0
+    - opensearch-py>=2.4.0
     - pandas
     - pyyaml
     - python
