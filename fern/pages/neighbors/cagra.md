@@ -915,6 +915,43 @@ if err != nil {
 </Tab>
 </Tabs>
 
+### C++ filter UDFs
+
+CAGRA C++ search can also use a JIT-LTO filter UDF when the predicate needs device metadata such as per-row tenants, ACLs, timestamps, or query-specific attributes. The UDF is a candidate-validity predicate: it decides whether a logical `source_id` is allowed for a logical `query_id`. It cannot control graph traversal, access PQ/VPQ or graph internals, or change distance computation.
+
+```cpp
+struct tenant_filter_context {
+  const uint32_t* row_tenants;
+  const uint32_t* query_tenants;
+};
+
+std::string source = R"cpp(
+struct tenant_filter_context {
+  const uint32_t* row_tenants;
+  const uint32_t* query_tenants;
+};
+
+__device__ bool cuvs_filter_udf(uint32_t query_id,
+                                source_index_t source_id,
+                                void* filter_data)
+{
+  auto* ctx = static_cast<const tenant_filter_context*>(filter_data);
+  return ctx->row_tenants[source_id] == ctx->query_tenants[query_id];
+}
+)cpp";
+
+tenant_filter_context host_ctx{row_tenants_device, query_tenants_device};
+tenant_filter_context* ctx_device = copy_to_device(host_ctx);
+
+auto filter = cuvs::neighbors::filtering::udf_filter(source, ctx_device, 0.75f);
+
+cagra::search(res, search_params, index, queries, neighbors, distances, filter);
+```
+
+The `filter_data` pointer is passed through unchanged to the device predicate. If the predicate dereferences it, the pointer and any nested pointers must refer to device-accessible memory and remain valid for the duration of the search. The `query_id` passed to the UDF is the global logical query id, including the batch offset when `max_queries` causes CAGRA to split a search into multiple batches.
+
+If `search_params::filtering_rate` is negative, CAGRA uses `udf_filter::filtering_rate`. If both are negative, CAGRA assumes `0.0` because UDF selectivity cannot be inferred from arbitrary CUDA source. Because CAGRA remains approximate, filtered results are not guaranteed to match exact brute-force filtered search, especially for highly selective predicates without an accurate `filtering_rate`.
+
 ## Configuration parameters
 
 ### Build parameters
