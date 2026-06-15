@@ -331,7 +331,7 @@ inline void update_cagra_ann_dataset_for_stride(
       std::shared_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>(std::move(new_pad));
   } else {
     // Repoint to the strided view before dropping the padded owner the index may reference.
-    ann_index.update_dataset(res, dataset);
+    ann_index.update_dataset(res, cuvs::neighbors::make_device_padded_dataset_view(res, dataset));
     ann_build_pad.reset();
   }
 }

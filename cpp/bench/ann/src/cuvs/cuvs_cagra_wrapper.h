@@ -320,7 +320,16 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
             raft::make_const_mdspan(sub_dataset_buffers_->back().view()), dim_);
           sub_index.update_dataset(handle_, dv);
         } else {
-          sub_index.update_dataset(handle_, sub_dev);
+          if (cuvs::neighbors::matrix_row_width_matches_cagra_required(sub_dev)) {
+            auto pdv = cuvs::neighbors::make_device_padded_dataset_view(handle_, sub_dev);
+            sub_index.update_dataset(handle_, pdv);
+          } else {
+            auto padded = cuvs::neighbors::make_device_padded_dataset(handle_, sub_dev);
+            sub_dataset_buffers_->push_back(std::move(padded->data_));
+            cuvs::neighbors::device_padded_dataset_view<T, int64_t> pdv(
+              raft::make_const_mdspan(sub_dataset_buffers_->back().view()), dim_);
+            sub_index.update_dataset(handle_, pdv);
+          }
         }
       }
       if (index_params_.merge_type == CagraMergeType::kLogical) {
@@ -542,7 +551,16 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
             raft::make_const_mdspan(sub_dataset_buffers_->back().view()), dim_);
           sub_index->update_dataset(handle_, dv);
         } else {
-          sub_index->update_dataset(handle_, sub_dev);
+          if (cuvs::neighbors::matrix_row_width_matches_cagra_required(sub_dev)) {
+            auto pdv = cuvs::neighbors::make_device_padded_dataset_view(handle_, sub_dev);
+            sub_index->update_dataset(handle_, pdv);
+          } else {
+            auto padded = cuvs::neighbors::make_device_padded_dataset(handle_, sub_dev);
+            sub_dataset_buffers_->push_back(std::move(padded->data_));
+            cuvs::neighbors::device_padded_dataset_view<T, int64_t> pdv(
+              raft::make_const_mdspan(sub_dataset_buffers_->back().view()), dim_);
+            sub_index->update_dataset(handle_, pdv);
+          }
         }
       }
     }

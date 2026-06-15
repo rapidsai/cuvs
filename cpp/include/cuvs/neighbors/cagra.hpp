@@ -630,27 +630,6 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
   }
 
   /**
-   * @overload
-   * @brief Replace the dataset with a non-owning row-major device matrix view.
-   *
-   * @deprecated Prefer `update_dataset(res, dataset_view)` with a concrete `DatasetViewT`.
-   */
-  [[deprecated("Prefer update_dataset with a concrete dataset view type.")]]
-  void update_dataset(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view)
-  {
-    if constexpr (cuvs::neighbors::is_padded_dataset_view_v<DatasetViewT>) {
-      dataset_ = cuvs::neighbors::make_device_padded_dataset_view(res, dataset_view);
-      dataset_norms_.reset();
-      if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        if (dataset_.n_rows() > 0) { compute_dataset_norms_(res); }
-      }
-    } else {
-      RAFT_FAIL("update_dataset(mdspan): index DatasetViewT is not a padded dataset view.");
-    }
-  }
-
-  /**
    * Replace the graph with a new graph.
    *
    * Since the new graph is a device array, we store a reference to that, and it is
