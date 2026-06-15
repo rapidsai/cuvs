@@ -70,7 +70,7 @@ Computes the principal components, explained variances, singular values, and col
 | `singular_vals` | out | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |
 | `mu` | out | `raft::device_vector_view<float, int64_t>` | column means [n_cols] |
 | `noise_vars` | out | `raft::device_scalar_view<float, int64_t>` | noise variance (scalar) |
-| `flip_signs_based_on_U` | in | `bool` | whether to determine signs by U (true) or V.T (false) Default: `false`. |
+| `flip_signs_based_on_U` | in | `bool` | whether to determine signs by U (true) or V.T (false)<br />Default: `false`. |
 
 **Returns**
 
@@ -111,7 +111,7 @@ Computes the principal components and transforms the input data into the eigensp
 | `singular_vals` | out | `raft::device_vector_view<float, int64_t>` | singular values [n_components] |
 | `mu` | out | `raft::device_vector_view<float, int64_t>` | column means [n_cols] |
 | `noise_vars` | out | `raft::device_scalar_view<float, int64_t>` | noise variance (scalar) |
-| `flip_signs_based_on_U` | in | `bool` | whether to determine signs by U (true) or V.T (false) Default: `false`. |
+| `flip_signs_based_on_U` | in | `bool` | whether to determine signs by U (true) or V.T (false)<br />Default: `false`. |
 
 **Returns**
 

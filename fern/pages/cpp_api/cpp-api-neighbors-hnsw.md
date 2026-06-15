@@ -84,7 +84,7 @@ index(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy = Hn
 | --- | --- | --- | --- |
 | `dim` | in | `int` | dimensions of the training dataset |
 | `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to search. Supported metrics ("L2Expanded", "InnerProduct") |
-| `hierarchy` | in | [`HnswHierarchy`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-hnswhierarchy) | hierarchy used for upper HNSW layers Default: `HnswHierarchy::NONE`. |
+| `hierarchy` | in | [`HnswHierarchy`](/api-reference/cpp-api-neighbors-hnsw#neighbors-hnsw-hnswhierarchy) | hierarchy used for upper HNSW layers<br />Default: `HnswHierarchy::NONE`. |
 
 **Returns**
 
@@ -286,7 +286,10 @@ Usage example:
 <a id="neighbors-hnsw-from-cagra"></a>
 ### neighbors::hnsw::from_cagra
 
-Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 ```cpp
 std::unique_ptr<index<float>> from_cagra(
@@ -306,7 +309,7 @@ Usage example:
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `cagra_index` | in | [`const cuvs::neighbors::cagra::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
-| `dataset` | in | `std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
+| `dataset` | in | `std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU`<br /><br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -314,7 +317,10 @@ Usage example:
 
 **Additional overload:** `neighbors::hnsw::from_cagra`
 
-Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 ```cpp
 std::unique_ptr<index<half>> from_cagra(
@@ -334,7 +340,7 @@ Usage example:
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `cagra_index` | in | [`const cuvs::neighbors::cagra::index<half, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
-| `dataset` | in | `std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
+| `dataset` | in | `std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU`<br /><br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -342,7 +348,10 @@ Usage example:
 
 **Additional overload:** `neighbors::hnsw::from_cagra`
 
-Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 ```cpp
 std::unique_ptr<index<uint8_t>> from_cagra(
@@ -362,7 +371,7 @@ Usage example:
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `cagra_index` | in | [`const cuvs::neighbors::cagra::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
-| `dataset` | in | `std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
+| `dataset` | in | `std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU`<br /><br />Default: `std::nullopt`. |
 
 **Returns**
 
@@ -370,7 +379,10 @@ Usage example:
 
 **Additional overload:** `neighbors::hnsw::from_cagra`
 
-Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is: 1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib. 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
+Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 ```cpp
 std::unique_ptr<index<int8_t>> from_cagra(
@@ -390,7 +402,7 @@ Usage example:
 | `res` | in | `raft::resources const&` | raft resources |
 | `params` | in | `const index_params&` | hnsw index parameters |
 | `cagra_index` | in | [`const cuvs::neighbors::cagra::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-cagra#neighbors-cagra-index) | cagra index |
-| `dataset` | in | `std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU` Default: `std::nullopt`. |
+| `dataset` | in | `std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>>` | optional dataset to avoid extra memory copy when hierarchy is `CPU`<br /><br />Default: `std::nullopt`. |
 
 **Returns**
 

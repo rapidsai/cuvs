@@ -532,8 +532,8 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `file_prefix` | in | `const std::string&` | prefix of path and name of index files |
 | `index` | in | [`const cuvs::neighbors::vamana::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-vamana#neighbors-vamana-index) | Vamana index |
-| `include_dataset` | in | `bool` | whether or not to serialize the dataset Default: `true`. |
-| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes Default: `false`. |
+| `include_dataset` | in | `bool` | whether or not to serialize the dataset<br />Default: `true`. |
+| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes<br />Default: `false`. |
 
 **Returns**
 
@@ -560,8 +560,8 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `file_prefix` | in | `const std::string&` | prefix of path and name of index files |
 | `index` | in | [`const cuvs::neighbors::vamana::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-vamana#neighbors-vamana-index) | Vamana index |
-| `include_dataset` | in | `bool` | whether or not to serialize the dataset Default: `true`. |
-| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes Default: `false`. |
+| `include_dataset` | in | `bool` | whether or not to serialize the dataset<br />Default: `true`. |
+| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes<br />Default: `false`. |
 
 **Returns**
 
@@ -588,8 +588,8 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `file_prefix` | in | `const std::string&` | prefix of path and name of index files |
 | `index` | in | [`const cuvs::neighbors::vamana::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-vamana#neighbors-vamana-index) | Vamana index |
-| `include_dataset` | in | `bool` | whether or not to serialize the dataset Default: `true`. |
-| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes Default: `false`. |
+| `include_dataset` | in | `bool` | whether or not to serialize the dataset<br />Default: `true`. |
+| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes<br />Default: `false`. |
 
 **Returns**
 
