@@ -483,9 +483,12 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   IdxT i                = n_rows;
   IdxT j                = raft::laneId();
   for (IdxT attempt = 0; attempt < n_rows; attempt += raft::WarpSize) {
-    auto candidate = (seed * (attempt + j + 1) + pair_id) % n_rows;
-    auto found     = static_cast<IdxT>(labels[candidate]) == donor_cluster;
-    auto mask      = __ballot_sync(raft::warp_full_mask(), found);
+    auto candidate =
+      static_cast<IdxT>((static_cast<int64_t>(seed) * static_cast<int64_t>(attempt + j + 1) +
+                         static_cast<int64_t>(pair_id)) %
+                        static_cast<int64_t>(n_rows));
+    auto found = static_cast<IdxT>(labels[candidate]) == donor_cluster;
+    auto mask  = __ballot_sync(raft::warp_full_mask(), found);
     if (mask != 0) {
       auto source_lane = __ffs(mask) - 1;
       i                = raft::shfl(found ? candidate : n_rows, source_lane);
@@ -573,9 +576,9 @@ auto adjust_centers(MathT* centers,
                                       2053, 2129, 2213, 2287, 2357, 2423, 2531, 2617, 2687, 2741};
   static IdxT i_primes = 0;
 
-  IdxT average         = n_rows / n_clusters;
-  auto lower_threshold = static_cast<MathT>(average) * balance_lower_tolerance;
-  auto upper_threshold = static_cast<MathT>(average) * balance_upper_tolerance;
+  auto average         = static_cast<MathT>(n_rows) / static_cast<MathT>(n_clusters);
+  auto lower_threshold = average * balance_lower_tolerance;
+  auto upper_threshold = average * balance_upper_tolerance;
   std::vector<CounterT> host_cluster_sizes(n_clusters);
   raft::update_host(host_cluster_sizes.data(), cluster_sizes, n_clusters, stream);
   raft::resource::sync_stream(handle, stream);
@@ -595,6 +598,7 @@ auto adjust_centers(MathT* centers,
     auto const& [small_size, small_cluster] = sorted_clusters[pair_id];
     auto const& [large_size, large_cluster] = sorted_clusters[n_clusters - 1 - pair_id];
     if (small_cluster == large_cluster) { break; }
+    if (large_size == 0) { break; }
     if (static_cast<MathT>(small_size) >= lower_threshold &&
         static_cast<MathT>(large_size) <= upper_threshold) {
       break;

@@ -156,8 +156,13 @@ void get_dataset_info(dataset_descriptor_t<DataT>& desc,
     desc.dim  = tmp_val[1];
   } else {
     std::fprintf(stderr, "# Xvec type file (%s)\n", file_path.c_str());
-    desc.dim  = tmp_val[0];
-    desc.size = (file_size_in_byte - sizeof(std::uint32_t)) / desc.dim / sizeof(DataT) - 1;
+    desc.dim = tmp_val[0];
+    auto const row_size =
+      sizeof(std::uint32_t) + sizeof(DataT) * static_cast<std::size_t>(desc.dim);
+    if (row_size == 0 || file_size_in_byte % row_size != 0) {
+      throw std::runtime_error("Invalid Xvec file size : " + file_path);
+    }
+    desc.size = file_size_in_byte / row_size;
   }
 }
 
@@ -180,12 +185,16 @@ void load_dataset(dataset_descriptor_t<DataT>& desc,
     ifs.seekg(sizeof(std::uint32_t) * 2, std::ios::beg);
     ifs.read(reinterpret_cast<char*>(desc.data.get()), array_size);
   } else {
-    ifs.seekg(sizeof(std::uint32_t), std::ios::beg);
     for (std::size_t i = 0; i < desc.size; i++) {
-      ifs.seekg(sizeof(std::uint32_t), std::ios::cur);
+      std::uint32_t row_dim = 0;
+      ifs.read(reinterpret_cast<char*>(&row_dim), sizeof(row_dim));
+      if (row_dim != desc.dim) {
+        throw std::runtime_error("Inconsistent Xvec dimension in : " + file_path);
+      }
       ifs.read(reinterpret_cast<char*>(desc.data.get() + i * desc.dim), sizeof(DataT) * desc.dim);
     }
   }
+  if (!ifs) { throw std::runtime_error("Failed to read dataset : " + file_path); }
 }
 
 template <typename LabelT>
