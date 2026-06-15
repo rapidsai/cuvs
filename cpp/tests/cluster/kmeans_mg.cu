@@ -35,6 +35,184 @@ namespace {
 
 constexpr int kMaxRanksForNcclTest = 4;
 
+template <typename T>
+int run_mg_fit_omp(raft::device_resources_snmg& clique,
+                   const cuvs::cluster::kmeans::params& kp,
+                   const T* h_X,
+                   const std::vector<T>* h_w,
+                   const std::vector<T>* h_initial_centroids,
+                   int n_samples,
+                   int n_features,
+                   int n_clusters,
+                   int partitions_per_rank,
+                   bool host_data,
+                   std::vector<T>& out_h_centroids,
+                   T& out_inertia,
+                   int64_t& out_n_iter)
+{
+  const int num_ranks = raft::resource::get_num_ranks(clique);
+  raft::resource::get_nccl_comms(clique);
+  partitions_per_rank = std::max(1, partitions_per_rank);
+  out_h_centroids.assign(static_cast<size_t>(n_clusters) * n_features, T{0});
+  T inertia          = T{0};
+  int64_t n_iter     = 0;
+  int actual_threads = 0;
+
+#pragma omp parallel num_threads(num_ranks)
+  {
+#pragma omp single
+    {
+      actual_threads = omp_get_num_threads();
+    }
+    if (actual_threads == num_ranks) {
+      const int r          = omp_get_thread_num();
+      auto const& rank_res = raft::resource::set_current_device_to_rank(clique, r);
+      auto rank_stream     = raft::resource::get_cuda_stream(rank_res);
+
+      const int base     = n_samples / num_ranks;
+      const int rem      = n_samples % num_ranks;
+      const int rank_off = r * base + std::min(r, rem);
+      const int rank_n   = base + (r < rem ? 1 : 0);
+
+      const int part_base = rank_n / partitions_per_rank;
+      const int part_rem  = rank_n % partitions_per_rank;
+
+      rmm::device_uvector<T> d_rank_centroids(static_cast<size_t>(n_clusters) * n_features,
+                                              rank_stream);
+      if (h_initial_centroids != nullptr) {
+        raft::update_device(d_rank_centroids.data(),
+                            h_initial_centroids->data(),
+                            d_rank_centroids.size(),
+                            rank_stream);
+      }
+
+      auto d_rank_centroids_view =
+        raft::make_device_matrix_view<T, int64_t>(d_rank_centroids.data(), n_clusters, n_features);
+
+      T local_inertia      = T{0};
+      int64_t local_n_iter = 0;
+
+      if (!host_data) {
+        // Device-partition path: each partition is its own rmm::device_uvector.
+        std::vector<rmm::device_uvector<T>> d_X_parts;
+        d_X_parts.reserve(static_cast<size_t>(partitions_per_rank));
+        std::optional<std::vector<rmm::device_uvector<T>>> d_w_parts;
+        if (h_w != nullptr) {
+          d_w_parts.emplace();
+          d_w_parts->reserve(static_cast<size_t>(partitions_per_rank));
+        }
+
+        std::vector<raft::device_matrix_view<const T, int64_t>> X_parts;
+        X_parts.reserve(static_cast<size_t>(partitions_per_rank));
+        std::optional<std::vector<raft::device_vector_view<const T, int64_t>>> sw_parts;
+        if (h_w != nullptr) {
+          sw_parts.emplace();
+          sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
+        }
+
+        for (int p = 0; p < partitions_per_rank; ++p) {
+          int p_off  = p * part_base + std::min(p, part_rem);
+          int p_rows = part_base + (p < part_rem ? 1 : 0);
+
+          d_X_parts.emplace_back(static_cast<size_t>(p_rows) * n_features, rank_stream);
+          if (p_rows > 0) {
+            raft::update_device(d_X_parts.back().data(),
+                                h_X + static_cast<size_t>(rank_off + p_off) * n_features,
+                                d_X_parts.back().size(),
+                                rank_stream);
+          }
+          X_parts.push_back(raft::make_device_matrix_view<const T, int64_t>(
+            d_X_parts.back().data(), p_rows, n_features));
+
+          if (d_w_parts.has_value()) {
+            d_w_parts->emplace_back(static_cast<size_t>(p_rows), rank_stream);
+            if (p_rows > 0) {
+              raft::update_device(d_w_parts->back().data(),
+                                  h_w->data() + rank_off + p_off,
+                                  static_cast<size_t>(p_rows),
+                                  rank_stream);
+            }
+            sw_parts->push_back(
+              raft::make_device_vector_view<const T, int64_t>(d_w_parts->back().data(), p_rows));
+          }
+        }
+
+        cuvs::cluster::kmeans::mg::fit(clique,
+                                       kp,
+                                       X_parts,
+                                       sw_parts,
+                                       d_rank_centroids_view,
+                                       raft::make_host_scalar_view(&local_inertia),
+                                       raft::make_host_scalar_view(&local_n_iter));
+      } else {
+        // Host-partition path: each partition is a std::vector<T> on host, views
+        // are host_*_view, and `mg::fit` streams batches to device internally.
+        std::vector<std::vector<T>> h_X_parts_buf;
+        h_X_parts_buf.reserve(static_cast<size_t>(partitions_per_rank));
+        std::optional<std::vector<std::vector<T>>> h_w_parts_buf;
+        if (h_w != nullptr) {
+          h_w_parts_buf.emplace();
+          h_w_parts_buf->reserve(static_cast<size_t>(partitions_per_rank));
+        }
+
+        std::vector<raft::host_matrix_view<const T, int64_t>> X_parts;
+        X_parts.reserve(static_cast<size_t>(partitions_per_rank));
+        std::optional<std::vector<raft::host_vector_view<const T, int64_t>>> sw_parts;
+        if (h_w != nullptr) {
+          sw_parts.emplace();
+          sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
+        }
+
+        for (int p = 0; p < partitions_per_rank; ++p) {
+          int p_off  = p * part_base + std::min(p, part_rem);
+          int p_rows = part_base + (p < part_rem ? 1 : 0);
+
+          h_X_parts_buf.emplace_back(static_cast<size_t>(p_rows) * n_features, T{0});
+          if (p_rows > 0) {
+            std::copy_n(h_X + static_cast<size_t>(rank_off + p_off) * n_features,
+                        static_cast<size_t>(p_rows) * n_features,
+                        h_X_parts_buf.back().data());
+          }
+          X_parts.push_back(raft::make_host_matrix_view<const T, int64_t>(
+            h_X_parts_buf.back().data(), p_rows, n_features));
+
+          if (h_w_parts_buf.has_value()) {
+            h_w_parts_buf->emplace_back(static_cast<size_t>(p_rows), T{0});
+            if (p_rows > 0) {
+              std::copy_n(h_w->data() + rank_off + p_off,
+                          static_cast<size_t>(p_rows),
+                          h_w_parts_buf->back().data());
+            }
+            sw_parts->push_back(
+              raft::make_host_vector_view<const T, int64_t>(h_w_parts_buf->back().data(), p_rows));
+          }
+        }
+
+        cuvs::cluster::kmeans::mg::fit(clique,
+                                       kp,
+                                       X_parts,
+                                       sw_parts,
+                                       d_rank_centroids_view,
+                                       raft::make_host_scalar_view(&local_inertia),
+                                       raft::make_host_scalar_view(&local_n_iter));
+      }
+
+      if (r == 0) {
+        // mnmg_fit writes outputs only on rank 0.
+        raft::update_host(
+          out_h_centroids.data(), d_rank_centroids.data(), out_h_centroids.size(), rank_stream);
+        raft::resource::sync_stream(rank_res);
+        inertia = local_inertia;
+        n_iter  = local_n_iter;
+      }
+    }
+  }
+
+  out_inertia = inertia;
+  out_n_iter  = n_iter;
+  return actual_threads;
+}
+
 }  // namespace
 
 template <typename T>
@@ -459,167 +637,35 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
       }
     }
 
-    std::vector<T> h_mg_centroids(static_cast<size_t>(n_clusters) * n_features, T{0});
-    T mg_inertia       = T{0};
-    int64_t mg_n_iter  = 0;
-    int actual_threads = 0;
+    cuvs::cluster::kmeans::params kp;
+    kp.n_clusters           = n_clusters;
+    kp.tol                  = testparams_.tol;
+    kp.max_iter             = testparams_.max_iter;
+    kp.n_init               = testparams_.n_init;
+    kp.rng_state.seed       = 42;
+    kp.init                 = testparams_.init;
+    kp.streaming_batch_size = testparams_.streaming_batch_size;
 
-#pragma omp parallel num_threads(num_ranks)
-    {
-#pragma omp single
-      {
-        actual_threads = omp_get_num_threads();
-      }
-      if (actual_threads == num_ranks) {
-        const int r          = omp_get_thread_num();
-        auto const& rank_res = raft::resource::set_current_device_to_rank(clique_, r);
-        auto rank_stream     = raft::resource::get_cuda_stream(rank_res);
+    std::vector<T> h_mg_centroids;
+    T mg_inertia      = T{0};
+    int64_t mg_n_iter = 0;
 
-        const int base     = n_samples / num_ranks;
-        const int rem      = n_samples % num_ranks;
-        const int rank_off = r * base + std::min(r, rem);
-        const int rank_n   = base + (r < rem ? 1 : 0);
-
-        const int part_base = rank_n / partitions_per_rank;
-        const int part_rem  = rank_n % partitions_per_rank;
-
-        rmm::device_uvector<T> d_rank_centroids(static_cast<size_t>(n_clusters) * n_features,
-                                                rank_stream);
-        if (testparams_.init == cuvs::cluster::kmeans::params::Array) {
-          raft::update_device(d_rank_centroids.data(),
-                              h_initial_centroids.data(),
-                              d_rank_centroids.size(),
-                              rank_stream);
-        }
-
-        cuvs::cluster::kmeans::params kp;
-        kp.n_clusters           = n_clusters;
-        kp.tol                  = testparams_.tol;
-        kp.max_iter             = testparams_.max_iter;
-        kp.n_init               = testparams_.n_init;
-        kp.rng_state.seed       = 42;
-        kp.init                 = testparams_.init;
-        kp.streaming_batch_size = testparams_.streaming_batch_size;
-
-        T local_inertia      = T{0};
-        int64_t local_n_iter = 0;
-
-        auto d_rank_centroids_view = raft::make_device_matrix_view<T, int64_t>(
-          d_rank_centroids.data(), n_clusters, n_features);
-
-        if (!testparams_.host_data) {
-          // Device-partition path: each partition is its own rmm::device_uvector.
-          std::vector<rmm::device_uvector<T>> d_X_parts;
-          d_X_parts.reserve(static_cast<size_t>(partitions_per_rank));
-          std::optional<std::vector<rmm::device_uvector<T>>> d_w_parts;
-          if (has_weights) {
-            d_w_parts.emplace();
-            d_w_parts->reserve(static_cast<size_t>(partitions_per_rank));
-          }
-
-          std::vector<raft::device_matrix_view<const T, int64_t>> X_parts;
-          X_parts.reserve(static_cast<size_t>(partitions_per_rank));
-          std::optional<std::vector<raft::device_vector_view<const T, int64_t>>> sw_parts;
-          if (has_weights) {
-            sw_parts.emplace();
-            sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
-          }
-
-          for (int p = 0; p < partitions_per_rank; ++p) {
-            int p_off  = p * part_base + std::min(p, part_rem);
-            int p_rows = part_base + (p < part_rem ? 1 : 0);
-
-            d_X_parts.emplace_back(static_cast<size_t>(p_rows) * n_features, rank_stream);
-            if (p_rows > 0) {
-              raft::update_device(d_X_parts.back().data(),
-                                  h_X + static_cast<size_t>(rank_off + p_off) * n_features,
-                                  d_X_parts.back().size(),
-                                  rank_stream);
-            }
-            X_parts.push_back(raft::make_device_matrix_view<const T, int64_t>(
-              d_X_parts.back().data(), p_rows, n_features));
-
-            if (d_w_parts.has_value()) {
-              d_w_parts->emplace_back(static_cast<size_t>(p_rows), rank_stream);
-              if (p_rows > 0) {
-                raft::update_device(d_w_parts->back().data(),
-                                    h_w.data() + rank_off + p_off,
-                                    static_cast<size_t>(p_rows),
-                                    rank_stream);
-              }
-              sw_parts->push_back(
-                raft::make_device_vector_view<const T, int64_t>(d_w_parts->back().data(), p_rows));
-            }
-          }
-
-          cuvs::cluster::kmeans::mg::fit(clique_,
-                                         kp,
-                                         X_parts,
-                                         sw_parts,
-                                         d_rank_centroids_view,
-                                         raft::make_host_scalar_view(&local_inertia),
-                                         raft::make_host_scalar_view(&local_n_iter));
-        } else {
-          std::vector<std::vector<T>> h_X_parts_buf;
-          h_X_parts_buf.reserve(static_cast<size_t>(partitions_per_rank));
-          std::optional<std::vector<std::vector<T>>> h_w_parts_buf;
-          if (has_weights) {
-            h_w_parts_buf.emplace();
-            h_w_parts_buf->reserve(static_cast<size_t>(partitions_per_rank));
-          }
-
-          std::vector<raft::host_matrix_view<const T, int64_t>> X_parts;
-          X_parts.reserve(static_cast<size_t>(partitions_per_rank));
-          std::optional<std::vector<raft::host_vector_view<const T, int64_t>>> sw_parts;
-          if (has_weights) {
-            sw_parts.emplace();
-            sw_parts->reserve(static_cast<size_t>(partitions_per_rank));
-          }
-
-          for (int p = 0; p < partitions_per_rank; ++p) {
-            int p_off  = p * part_base + std::min(p, part_rem);
-            int p_rows = part_base + (p < part_rem ? 1 : 0);
-
-            h_X_parts_buf.emplace_back(static_cast<size_t>(p_rows) * n_features, T{0});
-            if (p_rows > 0) {
-              std::copy_n(h_X + static_cast<size_t>(rank_off + p_off) * n_features,
-                          static_cast<size_t>(p_rows) * n_features,
-                          h_X_parts_buf.back().data());
-            }
-            X_parts.push_back(raft::make_host_matrix_view<const T, int64_t>(
-              h_X_parts_buf.back().data(), p_rows, n_features));
-
-            if (h_w_parts_buf.has_value()) {
-              h_w_parts_buf->emplace_back(static_cast<size_t>(p_rows), T{0});
-              if (p_rows > 0) {
-                std::copy_n(h_w.data() + rank_off + p_off,
-                            static_cast<size_t>(p_rows),
-                            h_w_parts_buf->back().data());
-              }
-              sw_parts->push_back(raft::make_host_vector_view<const T, int64_t>(
-                h_w_parts_buf->back().data(), p_rows));
-            }
-          }
-
-          cuvs::cluster::kmeans::mg::fit(clique_,
-                                         kp,
-                                         X_parts,
-                                         sw_parts,
-                                         d_rank_centroids_view,
-                                         raft::make_host_scalar_view(&local_inertia),
-                                         raft::make_host_scalar_view(&local_n_iter));
-        }
-
-        if (r == 0) {
-          // `mnmg_fit` writes outputs only on rank 0.
-          raft::update_host(
-            h_mg_centroids.data(), d_rank_centroids.data(), h_mg_centroids.size(), rank_stream);
-          raft::resource::sync_stream(rank_res);
-          mg_inertia = local_inertia;
-          mg_n_iter  = local_n_iter;
-        }
-      }
-    }
+    const std::vector<T>* h_w_ptr = has_weights ? &h_w : nullptr;
+    const std::vector<T>* h_init_ptr =
+      testparams_.init == cuvs::cluster::kmeans::params::Array ? &h_initial_centroids : nullptr;
+    const int actual_threads = run_mg_fit_omp<T>(clique_,
+                                                 kp,
+                                                 h_X,
+                                                 h_w_ptr,
+                                                 h_init_ptr,
+                                                 n_samples,
+                                                 n_features,
+                                                 n_clusters,
+                                                 partitions_per_rank,
+                                                 testparams_.host_data,
+                                                 h_mg_centroids,
+                                                 mg_inertia,
+                                                 mg_n_iter);
     ASSERT_EQ(actual_threads, num_ranks)
       << "MG NCCL test required " << num_ranks << " OMP threads but got " << actual_threads;
 
@@ -878,5 +924,100 @@ INSTANTIATE_TEST_SUITE_P(KmeansMGNcclTests,
 INSTANTIATE_TEST_SUITE_P(KmeansMGNcclTests,
                          KmeansMGNcclTestD,
                          ::testing::ValuesIn(mg_nccl_inputsd));
+
+template <typename T>
+class KmeansMGOversamplingTest : public ::testing::Test {
+ protected:
+  KmeansMGOversamplingTest() : clique_(make_clique_device_ids()) { clique_.set_memory_pool(50); }
+
+  static std::vector<int> make_clique_device_ids()
+  {
+    int num_devices = 0;
+    RAFT_CUDA_TRY(cudaGetDeviceCount(&num_devices));
+    int n = std::min(num_devices, kMaxRanksForNcclTest);
+    std::vector<int> ids(n);
+    for (int i = 0; i < n; ++i) {
+      ids[i] = i;
+    }
+    return ids;
+  }
+
+  void run_test_body()
+  {
+    const int num_ranks = raft::resource::get_num_ranks(clique_);
+    if (num_ranks < 1) { GTEST_SKIP() << "No CUDA devices available."; }
+
+    constexpr int n_samples  = 2000;
+    constexpr int n_features = 2;
+    constexpr int n_clusters = 8;
+
+    RAFT_CUDA_TRY(cudaSetDevice(0));
+    raft::resources gen_handle;
+    auto bi      = make_kmeans_blob_inputs<T>(gen_handle, n_samples, n_features, n_clusters);
+    const T* h_X = bi.h_X->data_handle();
+    std::vector<T> h_X_vec(h_X, h_X + static_cast<size_t>(n_samples) * n_features);
+
+    T inertia_clamped      = T{0};
+    T inertia_unit         = T{0};
+    int64_t n_iter_clamped = 0;
+    int64_t n_iter_unit    = 0;
+    run_fit(h_X_vec, n_samples, n_features, n_clusters, inertia_clamped, n_iter_clamped, 0.0);
+    run_fit(h_X_vec, n_samples, n_features, n_clusters, inertia_unit, n_iter_unit, 1.0);
+
+    ASSERT_TRUE(std::isfinite(inertia_clamped));
+    ASSERT_TRUE(std::isfinite(inertia_unit));
+    ASSERT_GT(inertia_clamped, T{0});
+    ASSERT_GT(inertia_unit, T{0});
+
+    const double rel = std::abs(static_cast<double>(inertia_clamped - inertia_unit)) /
+                       static_cast<double>(inertia_unit);
+    EXPECT_LT(rel, 0.01) << "oversampling_factor=0 and oversampling_factor=1.0 produced different "
+                            "inertias rel diff = "
+                         << rel << ", " << inertia_clamped << " vs " << inertia_unit;
+  }
+
+  void run_fit(const std::vector<T>& h_X,
+               int n_samples,
+               int n_features,
+               int n_clusters,
+               T& inertia,
+               int64_t& n_iter,
+               double oversampling_factor = 1.0)
+  {
+    cuvs::cluster::kmeans::params kp;
+    kp.n_clusters           = n_clusters;
+    kp.tol                  = T(1e-4);
+    kp.max_iter             = 30;
+    kp.n_init               = 1;
+    kp.rng_state.seed       = 42;
+    kp.init                 = cuvs::cluster::kmeans::params::KMeansPlusPlus;
+    kp.streaming_batch_size = n_samples;
+    kp.oversampling_factor  = oversampling_factor;
+
+    std::vector<T> h_centroids;
+    const int actual_threads = run_mg_fit_omp<T>(clique_,
+                                                 kp,
+                                                 h_X.data(),
+                                                 /*h_w=*/nullptr,
+                                                 /*h_initial_centroids=*/nullptr,
+                                                 n_samples,
+                                                 n_features,
+                                                 n_clusters,
+                                                 /*partitions_per_rank=*/1,
+                                                 /*host_data=*/false,
+                                                 h_centroids,
+                                                 inertia,
+                                                 n_iter);
+    ASSERT_EQ(actual_threads, raft::resource::get_num_ranks(clique_));
+  }
+
+  raft::device_resources_snmg clique_;
+};
+
+typedef KmeansMGOversamplingTest<float> KmeansMGOversamplingTestF;
+typedef KmeansMGOversamplingTest<double> KmeansMGOversamplingTestD;
+
+TEST_F(KmeansMGOversamplingTestF, ZeroEquivalentToOne) { run_test_body(); }
+TEST_F(KmeansMGOversamplingTestD, ZeroEquivalentToOne) { run_test_body(); }
 
 }  // namespace cuvs
