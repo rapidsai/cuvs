@@ -81,13 +81,43 @@ API_INDEX_GROUP_ORDER = [
     "Utilities",
     "Other",
 ]
+API_REFERENCE_DIRS = [
+    "c_api",
+    "cpp_api",
+    "python_api",
+    "java_api",
+    "rust_api",
+    "go_api",
+]
 
 COMMENT_RE = re.compile(r"/\*\*.*?\*/|(?:///[^\n]*(?:\n|$))+", re.DOTALL)
 DOXYGEN_COMMAND_RE = re.compile(r"[@\\](\w+)\b")
 DOXYGEN_LIST_ITEM_RE = re.compile(r"^(?:-\s+|\d+\.\s+)")
+DESCRIPTION_BREAK_PREFIX_RE = re.compile(
+    r"^(?i:(?:possible values?|valid values?(?:\s+for\s+[^:]+)?|"
+    r"allowed values?|supported values?|options?|key fields|hint|note|nb|"
+    r"todo|warning|defaults?(?:\s+to)?)\b:?|use\s+`[^`]+`:?)"
+)
+DESCRIPTION_INLINE_BREAK_RE = re.compile(
+    r"\s+(?=(?i:(?:possible values?|valid values?(?:\s+for\s+[^:]+)?|"
+    r"allowed values?|supported values?)\b:?|"
+    r"(?:options?|key fields|hint|note|nb|todo|warning)\b:)|"
+    r"Defaults?\s+to\b|Use\s+`[^`]+`)"
+)
 DOXYGEN_FIELD_LIST_ITEM_RE = re.compile(
     r"^(?:-\s+)?`?(?P<name>[A-Za-z_]\w*)`?\s*:\s*(?P<description>.*)"
 )
+SQUASHED_MARKDOWN_LIST_PATTERNS = [
+    (
+        "inline markdown bullet list",
+        re.compile(r"(?<!<br />)\s+-\s+`[^`]+`:"),
+    ),
+    (
+        "inline markdown numbered list",
+        re.compile(r"(?:^|[\s:])1\.\s+[^|\n]+?\s+2\.\s+"),
+    ),
+]
+API_DECORATOR_LEAK_RE = re.compile(r"\bCUVS_EXPORT\b")
 PUBLIC_JAVA_TYPE_RE = re.compile(
     r"\bpublic\s+(?:abstract\s+|final\s+|sealed\s+|non-sealed\s+)?"
     r"(?P<kind>class|interface|enum|record)\s+(?P<name>[A-Za-z_]\w*)"
@@ -99,6 +129,7 @@ MATH_PLACEHOLDER_RE = re.compile(r"@@FERN_MATH_([0-9a-f]+)@@")
 CPP_COMPOUND_RE = re.compile(
     r"^\s*(?:typedef\s+)?(?:struct|class|enum(?:\s+class)?)\b"
 )
+API_DECORATOR_RE = re.compile(r"\bCUVS_EXPORT\b\s*")
 
 
 @dataclass
@@ -401,6 +432,7 @@ def main() -> int:
     generate_rust_api_pages()
     generate_go_api_pages()
     update_api_navigation()
+    validate_generated_api_markdown()
     return 0
 
 
@@ -2428,7 +2460,8 @@ def render_native_function(
     else:
         lines = [f"**Additional overload:** `{escape_code(entry.name)}`", ""]
     if entry.summary:
-        lines.extend([escape_text(entry.summary), ""])
+        lines.extend(render_doxygen_summary(entry.summary))
+        lines.append("")
     lines.extend([f"```{language}", signature, "```", ""])
 
     if entry.details:
@@ -2504,24 +2537,46 @@ def render_native_compound(
         f"### {heading_text(entry.name)}",
         "",
     ]
-    if entry.summary:
-        lines.extend([escape_text(entry.summary), ""])
 
     members: list[DoxygenEntry] = []
     values: list[dict[str, str]] = []
     field_descriptions: dict[str, str] = {}
+    summary = entry.summary
     details = entry.details
     if entry.kind == "enum":
         values = parse_enum_values(entry.signature)
-        field_descriptions, details = extract_field_descriptions(
+        summary_field_descriptions, summary_remaining = (
+            extract_field_descriptions(
+                summary.splitlines(), {value["name"] for value in values}
+            )
+        )
+        detail_field_descriptions, details = extract_field_descriptions(
             entry.details, {value["name"] for value in values}
         )
+        field_descriptions = {
+            **summary_field_descriptions,
+            **detail_field_descriptions,
+        }
+        summary = "\n".join(trim_blank_lines(summary_remaining)).strip()
     elif not is_class_signature(entry.signature):
         members = parse_struct_members(entry)
-        field_descriptions, details = extract_field_descriptions(
+        summary_field_descriptions, summary_remaining = (
+            extract_field_descriptions(
+                summary.splitlines(), {member.name for member in members}
+            )
+        )
+        detail_field_descriptions, details = extract_field_descriptions(
             entry.details, {member.name for member in members}
         )
+        field_descriptions = {
+            **summary_field_descriptions,
+            **detail_field_descriptions,
+        }
+        summary = "\n".join(trim_blank_lines(summary_remaining)).strip()
 
+    if summary:
+        lines.extend(render_doxygen_summary(summary))
+        lines.append("")
     if details:
         lines.extend(render_doxygen_details(details))
         lines.append("")
@@ -2593,7 +2648,8 @@ def render_native_member(entry: DoxygenEntry, language: str) -> list[str]:
         "",
     ]
     if entry.summary:
-        lines.extend([escape_text(entry.summary), ""])
+        lines.extend(render_doxygen_summary(entry.summary))
+        lines.append("")
     lines.extend(
         [f"```{language}", normalize_signature(entry.signature), "```", ""]
     )
@@ -3285,11 +3341,15 @@ def parse_doxygen_entry(
             continue
 
         if active_returns:
-            returns = append_sentence(returns, clean_doxygen_text(line_text))
+            returns = append_doxygen_line(
+                returns, clean_doxygen_text(line_text)
+            )
             continue
 
         if active_summary:
-            summary = append_sentence(summary, clean_doxygen_text(line_text))
+            summary = append_doxygen_line(
+                summary, clean_doxygen_text(line_text)
+            )
             continue
 
         details.append(clean_doxygen_text(raw_line.rstrip()))
@@ -3410,7 +3470,9 @@ def append_doxygen_line(existing: str, addition: str) -> str:
     if not existing:
         return addition
     lines = existing.splitlines()
-    if DOXYGEN_LIST_ITEM_RE.match(addition):
+    if DOXYGEN_LIST_ITEM_RE.match(addition) or is_description_break_line(
+        addition
+    ):
         lines.append(addition)
     else:
         lines[-1] = append_sentence(lines[-1], addition)
@@ -3421,6 +3483,18 @@ def append_doxygen_blank_line(existing: str) -> str:
     if not existing or existing.endswith("\n"):
         return existing
     return f"{existing}\n"
+
+
+def is_description_break_line(line: str) -> bool:
+    return bool(DESCRIPTION_BREAK_PREFIX_RE.match(line.strip()))
+
+
+def split_description_breaks(line: str) -> list[str]:
+    return [
+        part.strip()
+        for part in DESCRIPTION_INLINE_BREAK_RE.split(line.strip())
+        if part.strip()
+    ]
 
 
 def parse_doxygen_kind(declaration: str) -> str:
@@ -3492,7 +3566,7 @@ def parse_member_name(declaration: str) -> str:
 def parse_struct_name(declaration: str) -> str | None:
     declaration = strip_leading_cpp_templates(declaration)
     match = re.search(
-        r"^\s*(?:typedef\s+)?(?:struct|class)\s+([A-Za-z_]\w*)",
+        r"^\s*(?:typedef\s+)?(?:struct|class)\s+(?:CUVS_EXPORT\s+)?([A-Za-z_]\w*)",
         declaration,
     )
     return match.group(1) if match else None
@@ -3565,7 +3639,7 @@ def infer_cpp_context(prefix: str) -> tuple[str, list[str], str | None]:
     depth = 0
     token_re = re.compile(
         r"\bnamespace\s+([A-Za-z_][\w:]*)(?:\s*=\s*[^;{}]+)?\s*{"
-        r"|\b(class|struct)\s+([A-Za-z_]\w*)[^;{}]*{"
+        r"|\b(class|struct)\s+(?:CUVS_EXPORT\s+)?([A-Za-z_]\w*)[^;{}]*{"
         r"|\b(public|private|protected)\s*:"
         r"|[{}]"
     )
@@ -3629,6 +3703,7 @@ def normalize_entry_signature(declaration: str, kind: str) -> str:
 
 
 def normalize_signature(declaration: str) -> str:
+    declaration = API_DECORATOR_RE.sub("", declaration)
     declaration = re.sub(r"\n\s+", "\n", declaration.strip())
     return "\n".join(
         line.rstrip() for line in declaration.splitlines()
@@ -3972,7 +4047,9 @@ def extract_field_descriptions(
                     break
                 description.append(next_stripped)
                 idx += 1
-            descriptions[name] = " ".join(part for part in description if part)
+            descriptions[name] = "\n".join(
+                part for part in description if part
+            )
             continue
         remaining.append(line)
         idx += 1
@@ -4320,7 +4397,10 @@ def render_table_description(value: str) -> str:
     rendered: list[str] = []
     for paragraph in paragraphs:
         normalized = normalize_description_lines(paragraph)
-        if any(DOXYGEN_LIST_ITEM_RE.match(line) for line in normalized):
+        if any(
+            DOXYGEN_LIST_ITEM_RE.match(line) or is_description_break_line(line)
+            for line in normalized
+        ):
             rendered.append(
                 "<br />".join(escape_text(line) for line in normalized)
             )
@@ -4333,25 +4413,41 @@ def normalize_description_lines(raw_lines: list[str]) -> list[str]:
     lines: list[str] = []
     paragraph: list[str] = []
     in_list = False
+    in_semantic_break = False
+
+    def flush_paragraph() -> None:
+        nonlocal paragraph
+        if paragraph:
+            lines.append(" ".join(paragraph))
+            paragraph = []
 
     for raw_line in raw_lines:
-        line = raw_line.strip()
-        if DOXYGEN_LIST_ITEM_RE.match(line):
-            if paragraph:
-                lines.append(" ".join(paragraph))
-                paragraph = []
-            lines.append(line)
-            in_list = True
-            continue
+        for line in split_description_breaks(raw_line):
+            if DOXYGEN_LIST_ITEM_RE.match(line):
+                flush_paragraph()
+                lines.append(line)
+                in_list = True
+                in_semantic_break = False
+                continue
 
-        if in_list and lines:
-            lines[-1] = append_sentence(lines[-1], line)
-            continue
+            if is_description_break_line(line):
+                flush_paragraph()
+                lines.append(line)
+                in_list = False
+                in_semantic_break = True
+                continue
 
-        paragraph.append(line)
+            if in_list and lines:
+                lines[-1] = append_sentence(lines[-1], line)
+                continue
 
-    if paragraph:
-        lines.append(" ".join(paragraph))
+            if in_semantic_break and lines:
+                lines[-1] = append_sentence(lines[-1], line)
+                continue
+
+            paragraph.append(line)
+
+    flush_paragraph()
     return lines
 
 
@@ -4396,6 +4492,13 @@ def render_doxygen_details(raw_lines: list[str]) -> list[str]:
 
     flush_paragraph()
     return trim_blank_lines(lines)
+
+
+def render_doxygen_summary(summary: str) -> list[str]:
+    raw_lines = summary.splitlines()
+    if len(raw_lines) > 1:
+        return render_doxygen_details(raw_lines)
+    return [escape_text(summary)]
 
 
 def render_doc_lines(raw_lines: list[str]) -> list[str]:
@@ -4574,9 +4677,11 @@ def parse_javadoc(raw: str) -> JavaDoc:
             active_kind = ""
             continue
         if active is not None and active_kind in {"param", "throws"}:
-            active.description = append_sentence(active.description, stripped)
+            active.description = append_doxygen_line(
+                active.description, stripped
+            )
         elif active_kind == "return":
-            doc.returns = append_sentence(doc.returns, stripped)
+            doc.returns = append_doxygen_line(doc.returns, stripped)
         else:
             summary_lines.append(stripped)
     doc.summary = "\n".join(trim_blank_lines(summary_lines)).strip()
@@ -4607,7 +4712,7 @@ def render_javadoc(doc: JavaDoc) -> list[str]:
         )
         for param in doc.params:
             lines.append(
-                f"| `{escape_code(param.name)}` | {escape_text(param.description)} |"
+                f"| `{escape_code(param.name)}` | {render_table_description(param.description)} |"
             )
         lines.append("")
     if doc.returns:
@@ -4618,7 +4723,7 @@ def render_javadoc(doc: JavaDoc) -> list[str]:
         )
         for param in doc.throws:
             lines.append(
-                f"| `{escape_code(param.name)}` | {escape_text(param.description)} |"
+                f"| `{escape_code(param.name)}` | {render_table_description(param.description)} |"
             )
         lines.append("")
     return trim_blank_lines(lines)
@@ -5709,8 +5814,11 @@ def render_param_table(
         row.append(render_type_reference(param.get("type", ""), symbol_links))
         description = param.get("description", "")
         if param.get("default"):
+            default_text = f"Default: `{param['default']}`."
             description = (
-                f"{description} Default: `{param['default']}`.".strip()
+                f"{description}\n{default_text}"
+                if description
+                else default_text
             )
         row.append(render_table_description(description))
         lines.append("| " + " | ".join(row) + " |")
@@ -5871,6 +5979,67 @@ def write_page(path: Path, lines: list[str]) -> None:
         "\n".join(trim_blank_lines(lines)).rstrip() + "\n", encoding="utf-8"
     )
     print(f"Wrote {path.relative_to(REPO_DIR)}")
+
+
+def validate_generated_api_markdown() -> None:
+    failures: list[str] = []
+    for api_dir in API_REFERENCE_DIRS:
+        page_dir = FERN_PAGES / api_dir
+        if not page_dir.exists():
+            continue
+        for path in sorted(page_dir.glob("*.md")):
+            failures.extend(find_squashed_markdown_lists(path))
+            failures.extend(find_api_decorator_leaks(path))
+
+    if failures:
+        examples = "\n".join(failures[:50])
+        suffix = ""
+        if len(failures) > 50:
+            suffix = f"\n... and {len(failures) - 50} more"
+        raise RuntimeError(
+            "Generated API docs contain list markers flattened into prose. "
+            "Preserve the source Doxygen line breaks or update the parser.\n"
+            f"{examples}{suffix}"
+        )
+
+
+def find_squashed_markdown_lists(path: Path) -> list[str]:
+    failures: list[str] = []
+    in_code_block = False
+    for line_no, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
+        if line.lstrip().startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+
+        for label, pattern in SQUASHED_MARKDOWN_LIST_PATTERNS:
+            if pattern.search(line):
+                preview = line.strip()
+                if len(preview) > 220:
+                    preview = f"{preview[:217]}..."
+                failures.append(
+                    f"{path.relative_to(REPO_DIR)}:{line_no}: {label}: {preview}"
+                )
+    return failures
+
+
+def find_api_decorator_leaks(path: Path) -> list[str]:
+    failures: list[str] = []
+    for line_no, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
+        if not API_DECORATOR_LEAK_RE.search(line):
+            continue
+        preview = line.strip()
+        if len(preview) > 220:
+            preview = f"{preview[:217]}..."
+        failures.append(
+            f"{path.relative_to(REPO_DIR)}:{line_no}: API decorator leaked into docs: {preview}"
+        )
+    return failures
 
 
 if __name__ == "__main__":

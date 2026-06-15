@@ -101,7 +101,7 @@ Parameters for VPQ Compression
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `int` | The bit length of the vector element after compression by PQ. Possible values: [4, 5, 6, 7, 8]. The smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_bits` | `int` | The bit length of the vector element after compression by PQ.<br />Possible values: [4, 5, 6, 7, 8]. The smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
 | `pq_dim` | `int` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. |
 | `vq_n_centers` | `int` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. |
 | `kmeans_n_iters` | `int` | The number of iterations searching for kmeans centers (both VQ & PQ phases). |
@@ -265,10 +265,10 @@ Parameters to build index for CAGRA nearest neighbor search
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type, valid values for metric are ["sqeuclidean", "inner_product", "cosine"], where:<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2<br />- inner_product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
+| `metric` | `str, default = "sqeuclidean"` | String denoting the metric type,<br />valid values for metric are ["sqeuclidean", "inner_product", "cosine"], where:<br /><br />- sqeuclidean is the euclidean distance without the square root operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2<br />- inner_product distance is defined as distance(a, b) = \\sum_i a_i * b_i.<br />- cosine distance is defined as distance(a, b) = 1 - \\sum_i a_i * b_i / ( \|\|a\|\|_2 * \|\|b\|\|_2). |
 | `intermediate_graph_degree` | `int, default = 128` |  |
 | `graph_degree` | `int, default = 64` |  |
-| `build_algo` | `str, default = "ivf_pq"` | string denoting the graph building algorithm to use. Valid values for algo: ["ivf_pq", "nn_descent", "iterative_cagra_search", "ace"], where<br /><br />- ivf_pq will use the IVF-PQ algorithm for building the knn graph<br />- nn_descent (experimental) will use the NN-Descent algorithm for building the knn graph. It is expected to be generally faster than ivf_pq.<br />- iterative_cagra_search will iteratively build the knn graph using CAGRA's search() and optimize()<br />- ace will use ACE (Augmented Core Extraction) for building indices for datasets too large to fit in GPU memory |
+| `build_algo` | `str, default = "ivf_pq"` | string denoting the graph building algorithm to use.<br />Valid values for algo: ["ivf_pq", "nn_descent", "iterative_cagra_search", "ace"], where<br /><br />- ivf_pq will use the IVF-PQ algorithm for building the knn graph<br />- nn_descent (experimental) will use the NN-Descent algorithm for building the knn graph. It is expected to be generally faster than ivf_pq.<br />- iterative_cagra_search will iteratively build the knn graph using CAGRA's search() and optimize()<br />- ace will use ACE (Augmented Core Extraction) for building indices for datasets too large to fit in GPU memory |
 | `compression` | `CompressionParams, optional` | If compression is desired should be a CompressionParams object. If None compression will be disabled. |
 | `ivf_pq_build_params` | `cuvs.neighbors.ivf_pq.IndexParams, optional` | Parameters for IVF-PQ algorithm. If provided, it will be used for building the graph. |
 | `ivf_pq_search_params` | `cuvs.neighbors.ivf_pq.SearchParams, optional` | Parameters for IVF-PQ search. If provided, it will be used for searching the graph. |
@@ -350,12 +350,12 @@ CAGRA search parameters
 | `max_queries` | `int, default = 0` | Maximum number of queries to search at the same time (batch size). Auto select when 0. |
 | `itopk_size` | `int, default = 64` | Number of intermediate search results retained during the search. This is the main knob to adjust trade off between accuracy and search speed. Higher values improve the search accuracy. |
 | `max_iterations` | `int, default = 0` | Upper limit of search iterations. Auto select when 0. |
-| `algo` | `str, default = "auto"` | String denoting the search algorithm to use Valid values for algo: ["auto", "single_cta", "multi_cta"], where:<br /><br />- auto will automatically select the best value based on query size<br />- single_cta is better when query contains larger number of vectors (e.g &gt;10)<br />- multi_cta is better when query contains only a few vectors |
+| `algo` | `str, default = "auto"` | String denoting the search algorithm to use<br />Valid values for algo: ["auto", "single_cta", "multi_cta"], where:<br /><br />- auto will automatically select the best value based on query size<br />- single_cta is better when query contains larger number of vectors (e.g &gt;10)<br />- multi_cta is better when query contains only a few vectors |
 | `team_size` | `int, default = 0` | Number of threads used to calculate a single distance. 4, 8, 16, or 32. |
 | `search_width` | `int, default = 1` | Number of graph nodes to select as the starting point for the search in each iteration. |
 | `min_iterations` | `int, default = 0` | Lower limit of search iterations. |
 | `thread_block_size` | `int, default = 0` | Thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when 0. |
-| `hashmap_mode` | `str, default = "auto"` | String denoting the type of hash map to use. It's usually better to allow the algorithm to select this value, Valid values for hashmap_mode: ["auto", "small", "hash"], where:<br /><br />- auto will automatically select the best value based on algo<br />- small will use the small shared memory hash table with resetting.<br />- hash will use a single hash table in global memory. |
+| `hashmap_mode` | `str, default = "auto"` | String denoting the type of hash map to use. It's usually better to allow the algorithm to select this value,<br />Valid values for hashmap_mode: ["auto", "small", "hash"], where:<br /><br />- auto will automatically select the best value based on algo<br />- small will use the small shared memory hash table with resetting.<br />- hash will use a single hash table in global memory. |
 | `hashmap_min_bitlen` | `int, default = 0` | Upper limit of hashmap fill rate. More than 0.1, less than 0.9. |
 | `hashmap_max_fill_rate` | `float, default = 0.5` | Upper limit of hashmap fill rate. More than 0.1, less than 0.9. |
 | `num_random_samplings` | `int, default = 1` | Number of iterations of initial random seed node selection. 1 or more. |
