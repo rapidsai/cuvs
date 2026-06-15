@@ -2284,9 +2284,18 @@ auto iterative_build_graph(
                                                        true,
                                                        stream);
 
-      // Apply permutation to VPQ data: shuffled_data[i] = original_data[perm[i]]
-      // Use in-place gather which reorders rows according to the map
-      raft::matrix::gather(res, vpq_dset.data.view(), raft::make_const_mdspan(dev_perm_i64.view()));
+      // Apply permutation to VPQ data: shuffled_data[i] = original_data[perm[i]].
+      // NOTE: use an out-of-place device gather into a temporary buffer rather than the
+      // in-place gather overload. The in-place overload uses a host-orchestrated,
+      // double-buffered, multi-stream path that races here and triggers an asynchronous
+      // illegal memory access (the crash disappears under CUDA_LAUNCH_BLOCKING=1).
+      auto shuffled_data = raft::make_device_matrix<uint8_t, int64_t>(
+        res, vpq_dset.data.extent(0), vpq_dset.data.extent(1));
+      raft::matrix::gather(res,
+                           raft::make_const_mdspan(vpq_dset.data.view()),
+                           raft::make_const_mdspan(dev_perm_i64.view()),
+                           shuffled_data.view());
+      vpq_dset.data = std::move(shuffled_data);
 
       // Store perm as IdxT for graph unshuffling later
       // perm[shuffled_idx] = original_idx
