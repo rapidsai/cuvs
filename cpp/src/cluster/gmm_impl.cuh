@@ -405,7 +405,7 @@ void e_step(raft::resources const& handle,
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   covariance_type ct  = params.cov_type;
 
-  if (ct == covariance_type::FULL || ct == covariance_type::TIED) {
+  if (ct == covariance_type::FULL || (ct == covariance_type::TIED && d > 128)) {
     int prec_pc = (ct == covariance_type::FULL) ? 1 : 0;
     // Size-based solver selection (mirrors rapids-singlecell): the fused
     // shared-memory kernels are fastest for the moderate-d regime; wide
@@ -486,21 +486,66 @@ void e_step(raft::resources const& handle,
           X, weights, means, prec_chol, log_det, n, d, K, prec_pc, log_prob);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
-  } else {
-    int threads = 256;
-    dim3 block(threads);
-    dim3 grid((n + threads - 1) / threads);
-    if (ct == covariance_type::DIAG) {
-      size_t shmem = (size_t)2 * K * d * sizeof(T);
-      int use_smem = (shmem <= DEFAULT_SMEM_LIMIT) ? 1 : 0;
-      detail::e_step_log_prob_diag_kernel<T><<<grid, block, use_smem ? shmem : 0, stream>>>(
-        X, weights, means, prec_chol, log_det, n, d, K, use_smem, log_prob);
-    } else {
-      size_t shmem = (size_t)K * d * sizeof(T);
-      int use_smem = (shmem <= DEFAULT_SMEM_LIMIT) ? 1 : 0;
-      detail::e_step_log_prob_spherical_kernel<T><<<grid, block, use_smem ? shmem : 0, stream>>>(
-        X, weights, means, prec_chol, log_det, n, d, K, use_smem, log_prob);
-    }
+  } else if (ct == covariance_type::DIAG ||
+             ct == covariance_type::SPHERICAL) {  // fast register-tiled log-prob
+    // (component-tiled in shared memory, so it scales to large K where the
+    // per-mode kernels can't fit the means). Writes log_prob[n,k]; normalize below.
+    rmm::device_uvector<T> const_k(K, stream);
+    detail::fused_const_kernel<T>
+      <<<dim3((K + 255) / 256), dim3(256), 0, stream>>>(weights, log_det, d, K, const_k.data());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    constexpr int FEAT = 32;
+    constexpr int CELL = (sizeof(T) == 4) ? 64 : 32;
+    int tpb            = 256;
+    int gb             = (n + tpb - 1) / tpb;
+    if (ct == covariance_type::DIAG)
+      detail::estep_tiled_kernel<T, CELL, FEAT, /*DIAG*/ true, /*WRITE_FULL*/ true>
+        <<<gb, tpb, 0, stream>>>(
+          X, means, prec_chol, const_k.data(), n, d, K, nullptr, nullptr, log_prob);
+    else
+      detail::estep_tiled_kernel<T, CELL, FEAT, /*DIAG*/ false, /*WRITE_FULL*/ true>
+        <<<gb, tpb, 0, stream>>>(
+          X, means, prec_chol, const_k.data(), n, d, K, nullptr, nullptr, log_prob);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+  } else {  // TIED, d <= 128: shared Cholesky U -> transform X̃ = X·U, μ̃ = means·U,
+            // then ‖Uᵀ(x-μ_k)‖² is Euclidean ‖x̃-μ̃_k‖² -> same register-tiled kernel.
+    cublasHandle_t cublas = raft::resource::get_cublas_handle(handle);
+    cublas_check(cublasSetStream(cublas, stream), "cublasSetStream");
+    rmm::device_uvector<T> xt((size_t)n * d, stream);
+    rmm::device_uvector<T> mut((size_t)K * d, stream);
+    rmm::device_uvector<T> ones_pc(K, stream);
+    rmm::device_uvector<T> const_k(K, stream);
+    thrust::fill(thrust::cuda::par.on(stream), ones_pc.data(), ones_pc.data() + K, T(1));
+    T one = T(1), zero = T(0);
+    cublas_check(
+      cublas_gemm<T>(
+        cublas, CUBLAS_OP_N, CUBLAS_OP_N, d, n, d, &one, prec_chol, d, X, d, &zero, xt.data(), d),
+      "gemm(tied_X)");
+    cublas_check(cublas_gemm<T>(cublas,
+                                CUBLAS_OP_N,
+                                CUBLAS_OP_N,
+                                d,
+                                K,
+                                d,
+                                &one,
+                                prec_chol,
+                                d,
+                                means,
+                                d,
+                                &zero,
+                                mut.data(),
+                                d),
+                 "gemm(tied_mu)");
+    detail::fused_const_kernel<T>
+      <<<dim3((K + 255) / 256), dim3(256), 0, stream>>>(weights, log_det, d, K, const_k.data());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    constexpr int FEAT = 32;
+    constexpr int CELL = (sizeof(T) == 4) ? 64 : 32;
+    int tpb            = 256;
+    int gb             = (n + tpb - 1) / tpb;
+    detail::estep_tiled_kernel<T, CELL, FEAT, /*DIAG*/ false, /*WRITE_FULL*/ true>
+      <<<gb, tpb, 0, stream>>>(
+        xt.data(), mut.data(), ones_pc.data(), const_k.data(), n, d, K, nullptr, nullptr, log_prob);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 
@@ -523,6 +568,7 @@ struct MStepWorkspace {
   rmm::device_uvector<T> Xsq;
   rmm::device_uvector<T> diag_var;
   rmm::device_uvector<T> scaled_means;
+  rmm::device_uvector<T> XtX;
   rmm::device_uvector<T> Lbuf;
   rmm::device_uvector<T> potrf_work;
   rmm::device_uvector<int> devInfo;
@@ -540,6 +586,7 @@ struct MStepWorkspace {
       Xsq(0, raft::resource::get_cuda_stream(handle)),
       diag_var(0, raft::resource::get_cuda_stream(handle)),
       scaled_means(0, raft::resource::get_cuda_stream(handle)),
+      XtX(0, raft::resource::get_cuda_stream(handle)),
       Lbuf(0, raft::resource::get_cuda_stream(handle)),
       potrf_work(0, raft::resource::get_cuda_stream(handle)),
       devInfo(K, raft::resource::get_cuda_stream(handle)),
@@ -560,6 +607,7 @@ struct MStepWorkspace {
       dB_ptrs.resize(K, stream);
     } else if (ct == covariance_type::TIED) {
       scaled_means.resize((size_t)K * d, stream);
+      XtX.resize((size_t)d * d, stream);
     } else {  // diag / spherical
       Xsq.resize((size_t)n * d, stream);
       num2.resize((size_t)K * d, stream);
@@ -581,19 +629,78 @@ struct MStepWorkspace {
   }
 };
 
-// Compute means / weights / covariances from responsibilities.
+// Accumulate responsibility-weighted sufficient statistics for one batch into the
+// workspace: N_k += Σr, num += Σr·x, plus the second-moment term (num2 += Σr·x²
+// for diag/sph; covariances += Σr·x·xᵀ for full; XtX += Σx·xᵀ for tied). beta=0
+// starts fresh, beta=1 adds on — so fit can stream N in tiles, never holding (N,K).
 template <typename T>
-void m_step(raft::resources const& handle,
-            const params& params,
-            const T* X,
-            int n,
-            int d,
-            int K,
-            const T* resp,
-            T* weights,
-            T* means,
-            T* covariances,
-            MStepWorkspace<T>& ws)
+void m_accumulate(raft::resources const& handle,
+                  const params& params,
+                  const T* X,
+                  int n,
+                  int d,
+                  int K,
+                  const T* resp,
+                  MStepWorkspace<T>& ws,
+                  T beta)
+{
+  cudaStream_t stream   = raft::resource::get_cuda_stream(handle);
+  cublasHandle_t cublas = raft::resource::get_cublas_handle(handle);
+  cublas_check(cublasSetStream(cublas, stream), "cublasSetStream");
+  covariance_type ct = params.cov_type;
+  T one              = T(1);
+
+  cublas_check(
+    cublas_gemv<T>(
+      cublas, CUBLAS_OP_N, K, n, &one, resp, K, ws.ones.data(), 1, &beta, ws.N_k.data(), 1),
+    "gemv(N_k)");
+  cublas_check(
+    cublas_gemm<T>(
+      cublas, CUBLAS_OP_N, CUBLAS_OP_T, d, K, n, &one, X, d, resp, K, &beta, ws.num.data(), d),
+    "gemm(num)");
+
+  // FULL accumulates its centered covariance in a separate pass (needs means);
+  // here only N_k / num are gathered for it.
+  if (ct == covariance_type::TIED) {
+    cublas_check(
+      cublas_gemm<T>(
+        cublas, CUBLAS_OP_N, CUBLAS_OP_T, d, d, n, &one, X, d, X, d, &beta, ws.XtX.data(), d),
+      "gemm(XtX)");
+  } else if (ct == covariance_type::DIAG || ct == covariance_type::SPHERICAL) {
+    int threads = 256;
+    int blocks  = (int)(((size_t)n * d + threads - 1) / threads);
+    detail::elementwise_square_kernel<T>
+      <<<blocks, threads, 0, stream>>>(X, (size_t)n * d, ws.Xsq.data());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    cublas_check(cublas_gemm<T>(cublas,
+                                CUBLAS_OP_N,
+                                CUBLAS_OP_T,
+                                d,
+                                K,
+                                n,
+                                &one,
+                                ws.Xsq.data(),
+                                d,
+                                resp,
+                                K,
+                                &beta,
+                                ws.num2.data(),
+                                d),
+                 "gemm(num2)");
+  }
+}
+
+// Turn accumulated stats into weights / means / covariances (uncentered recovery).
+template <typename T>
+void m_finalize(raft::resources const& handle,
+                const params& params,
+                int n,
+                int d,
+                int K,
+                MStepWorkspace<T>& ws,
+                T* weights,
+                T* means,
+                T* covariances)
 {
   cudaStream_t stream   = raft::resource::get_cuda_stream(handle);
   cublasHandle_t cublas = raft::resource::get_cublas_handle(handle);
@@ -602,58 +709,13 @@ void m_step(raft::resources const& handle,
   T one = T(1), zero = T(0);
   T eps = std::numeric_limits<T>::epsilon();
 
-  // N_k = respᵀ @ 1
-  cublas_check(
-    cublas_gemv<T>(
-      cublas, CUBLAS_OP_N, K, n, &one, resp, K, ws.ones.data(), 1, &zero, ws.N_k.data(), 1),
-    "gemv(N_k)");
-  // num = Xᵀ @ resp  -> (K, d)
-  cublas_check(
-    cublas_gemm<T>(
-      cublas, CUBLAS_OP_N, CUBLAS_OP_T, d, K, n, &one, X, d, resp, K, &zero, ws.num.data(), d),
-    "gemm(num)");
-  {
-    detail::m_step_finalize_means_kernel<T><<<dim3(K), dim3(256), 0, stream>>>(
-      ws.N_k.data(), ws.num.data(), weights, means, eps, n, d, K);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  }
+  detail::m_step_finalize_means_kernel<T>
+    <<<dim3(K), dim3(256), 0, stream>>>(ws.N_k.data(), ws.num.data(), weights, means, eps, n, d, K);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-  if (ct == covariance_type::FULL) {
-    int threads = 256;
-    int blocks  = (int)(((size_t)n * d + threads - 1) / threads);
-    for (int k = 0; k < K; ++k) {
-      detail::weighted_center_kernel<T>
-        <<<blocks, threads, 0, stream>>>(X, resp, means, n, d, K, k, ws.centered.data());
-      RAFT_CUDA_TRY(cudaPeekAtLastError());
-      T* cov_k = covariances + (size_t)k * d * d;
-      cublas_check(cublas_gemm<T>(cublas,
-                                  CUBLAS_OP_N,
-                                  CUBLAS_OP_T,
-                                  d,
-                                  d,
-                                  n,
-                                  &one,
-                                  ws.centered.data(),
-                                  d,
-                                  ws.centered.data(),
-                                  d,
-                                  &zero,
-                                  cov_k,
-                                  d),
-                   "gemm(cov_full)");
-    }
-    detail::m_step_finalize_cov_full_kernel<T><<<dim3(K), dim3(256), 0, stream>>>(
-      ws.N_k.data(), covariances, T(params.reg_covar), eps, d, K);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  } else if (ct == covariance_type::TIED) {
-    rmm::device_uvector<T> XtX((size_t)d * d, stream);
+  // FULL: covariance is finalized after its separate centered pass; nothing here.
+  if (ct == covariance_type::TIED) {
     rmm::device_uvector<T> weighted_outer((size_t)d * d, stream);
-    // XtX = Xᵀ @ X
-    cublas_check(
-      cublas_gemm<T>(
-        cublas, CUBLAS_OP_N, CUBLAS_OP_T, d, d, n, &one, X, d, X, d, &zero, XtX.data(), d),
-      "gemm(XtX)");
-    // scaled_means = N_k * means; weighted_outer = scaled_meansᵀ @ means
     detail::scale_rows_by_kernel<T>
       <<<dim3(K), dim3(256), 0, stream>>>(means, ws.N_k.data(), eps, d, K, ws.scaled_means.data());
     RAFT_CUDA_TRY(cudaPeekAtLastError());
@@ -672,41 +734,17 @@ void m_step(raft::resources const& handle,
                                 weighted_outer.data(),
                                 d),
                  "gemm(weighted_outer)");
-    // sum_Nk = sum_k (N_k[k] + 10 eps)
     std::vector<T> h_Nk(K);
     raft::copy(h_Nk.data(), ws.N_k.data(), K, stream);
     raft::resource::sync_stream(handle);
     double sum_nk = 0.0;
     for (int k = 0; k < K; ++k)
       sum_nk += (double)h_Nk[k] + 10.0 * (double)eps;
-    int total   = d * d;
-    int threads = 256;
-    int blocks  = (total + threads - 1) / threads;
+    int total = d * d, threads = 256, blocks = (total + threads - 1) / threads;
     detail::m_step_finalize_tied_kernel<T><<<blocks, threads, 0, stream>>>(
-      XtX.data(), weighted_outer.data(), T(sum_nk), T(params.reg_covar), d, covariances);
+      ws.XtX.data(), weighted_outer.data(), T(sum_nk), T(params.reg_covar), d, covariances);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
-  } else {  // diag / spherical
-    int threads = 256;
-    int blocks  = (int)(((size_t)n * d + threads - 1) / threads);
-    detail::elementwise_square_kernel<T>
-      <<<blocks, threads, 0, stream>>>(X, (size_t)n * d, ws.Xsq.data());
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-    // num2 = respᵀ @ Xsq -> (K, d)
-    cublas_check(cublas_gemm<T>(cublas,
-                                CUBLAS_OP_N,
-                                CUBLAS_OP_T,
-                                d,
-                                K,
-                                n,
-                                &one,
-                                ws.Xsq.data(),
-                                d,
-                                resp,
-                                K,
-                                &zero,
-                                ws.num2.data(),
-                                d),
-                 "gemm(num2)");
+  } else if (ct == covariance_type::DIAG || ct == covariance_type::SPHERICAL) {
     if (ct == covariance_type::DIAG) {
       detail::m_step_finalize_diag_kernel<T><<<dim3(K), dim3(256), 0, stream>>>(
         ws.N_k.data(), ws.num2.data(), means, T(params.reg_covar), eps, d, K, covariances);
@@ -719,6 +757,66 @@ void m_step(raft::resources const& handle,
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
+}
+
+// FULL covariance, pass 2: accumulate the centered moment Σ r·(x-mu)(x-mu)ᵀ for
+// one batch into covariances (beta=0 fresh, beta=1 add). Centered (not Σr·x·xᵀ)
+// to avoid the catastrophic cancellation of the uncentered form on data far from
+// the origin. Requires the means from pass 1.
+template <typename T>
+void m_cov_full_pass(raft::resources const& handle,
+                     const T* X,
+                     int n,
+                     int d,
+                     int K,
+                     const T* resp,
+                     const T* means,
+                     T* covariances,
+                     MStepWorkspace<T>& ws,
+                     T beta)
+{
+  cudaStream_t stream   = raft::resource::get_cuda_stream(handle);
+  cublasHandle_t cublas = raft::resource::get_cublas_handle(handle);
+  cublas_check(cublasSetStream(cublas, stream), "cublasSetStream");
+  T one       = T(1);
+  int threads = 256;
+  int blocks  = (int)(((size_t)n * d + threads - 1) / threads);
+  for (int k = 0; k < K; ++k) {
+    detail::weighted_center_kernel<T>
+      <<<blocks, threads, 0, stream>>>(X, resp, means, n, d, K, k, ws.centered.data());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    cublas_check(cublas_gemm<T>(cublas,
+                                CUBLAS_OP_N,
+                                CUBLAS_OP_T,
+                                d,
+                                d,
+                                n,
+                                &one,
+                                ws.centered.data(),
+                                d,
+                                ws.centered.data(),
+                                d,
+                                &beta,
+                                covariances + (size_t)k * d * d,
+                                d),
+                 "gemm(cov_full)");
+  }
+}
+
+// Finalize FULL covariances (divide by N_k, symmetrize, add reg_covar).
+template <typename T>
+void m_finalize_cov_full(raft::resources const& handle,
+                         const params& params,
+                         int d,
+                         int K,
+                         MStepWorkspace<T>& ws,
+                         T* covariances)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  T eps               = std::numeric_limits<T>::epsilon();
+  detail::m_step_finalize_cov_full_kernel<T>
+    <<<dim3(K), dim3(256), 0, stream>>>(ws.N_k.data(), covariances, T(params.reg_covar), eps, d, K);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 // One d×d precision-Cholesky: potrf(LOWER) then trsm solving L X = I; the
@@ -911,78 +1009,53 @@ void compute_precisions(raft::resources const& handle,
                  "gemm(precisions_tied)");
   } else {
     size_t total = cov_elems(ct, d, K);
-    detail::square_kernel<T>
+    detail::elementwise_square_kernel<T>
       <<<dim3((total + 255) / 256), dim3(256), 0, stream>>>(prec_chol, total, precisions);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
 
-// ===========================================================================
-// Initialization of responsibilities
-// ===========================================================================
+// k-means (or k-means++ seeding) hard labels for GMM initialization. Centroids
+// are computed internally; only the per-sample labels (length n) are returned.
 template <typename T>
-void init_resp(raft::resources const& handle,
-               const params& params,
-               const T* X,
-               int n,
-               int d,
-               int K,
-               raft::random::RngState& rng,
-               uint64_t init_seed,
-               T* resp)
+void kmeans_assign(raft::resources const& handle,
+                   const params& params,
+                   const T* X,
+                   int n,
+                   int d,
+                   int K,
+                   uint64_t init_seed,
+                   int* labels_out)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  init_method im      = params.init;
-
-  if (im == init_method::Random) {
-    raft::random::uniform(handle, rng, resp, (size_t)n * K, T(0), T(1));
-    detail::normalize_rows_kernel<T><<<dim3((n + 255) / 256), dim3(256), 0, stream>>>(resp, n, K);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  } else if (im == init_method::RandomFromData) {
-    auto idx = raft::random::excess_subsample<int, int>(handle, rng, n, K);
-    RAFT_CUDA_TRY(cudaMemsetAsync(resp, 0, sizeof(T) * (size_t)n * K, stream));
-    detail::scatter_onehot_indices_kernel<T>
-      <<<dim3((K + 255) / 256), dim3(256), 0, stream>>>(idx.data_handle(), K, resp);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  } else {  // KMeans / KMeansPlusPlus
-    rmm::device_uvector<T> centroids((size_t)K * d, stream);
-    rmm::device_uvector<int> labels(n, stream);
-    cuvs::cluster::kmeans::params kp;
-    kp.n_clusters = K;
-    // KMeansPlusPlus uses the k-means++ seeding labels directly (no Lloyd
-    // refinement: max_iter=0 leaves the centroids at their seeded positions);
-    // KMeans runs full Lloyd and uses the converged hard labels.
-    kp.max_iter = (im == init_method::KMeansPlusPlus) ? 0 : 300;
-    kp.tol      = 1e-4;
-    kp.n_init   = 1;
-    kp.init     = cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus;
-    // Per-restart seed so n_init>1 explores distinct k-means initializations.
-    kp.rng_state        = raft::random::RngState{init_seed, raft::random::GeneratorType::GenPhilox};
-    T inertia           = T(0);
-    int km_iter         = 0;
-    auto X_view         = raft::make_device_matrix_view<const T, int>(X, n, d);
-    auto centroids_view = raft::make_device_matrix_view<T, int>(centroids.data(), K, d);
-    cuvs::cluster::kmeans::fit(handle,
-                               kp,
-                               X_view,
-                               std::nullopt,
-                               centroids_view,
-                               raft::make_host_scalar_view<T>(&inertia),
-                               raft::make_host_scalar_view<int>(&km_iter));
-    auto centroids_const = raft::make_device_matrix_view<const T, int>(centroids.data(), K, d);
-    auto labels_view     = raft::make_device_vector_view<int, int>(labels.data(), n);
-    cuvs::cluster::kmeans::predict(handle,
-                                   kp,
-                                   X_view,
-                                   std::nullopt,
-                                   centroids_const,
-                                   labels_view,
-                                   true,
-                                   raft::make_host_scalar_view<T>(&inertia));
-    detail::labels_to_onehot_kernel<T>
-      <<<dim3((n + 255) / 256), dim3(256), 0, stream>>>(labels.data(), n, K, resp);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  }
+  cuvs::cluster::kmeans::params kp;
+  kp.n_clusters = K;
+  // KMeansPlusPlus: seeding labels only (max_iter=0, no Lloyd); KMeans: full Lloyd.
+  kp.max_iter  = (params.init == init_method::KMeansPlusPlus) ? 0 : 300;
+  kp.tol       = 1e-4;
+  kp.n_init    = 1;
+  kp.init      = cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus;
+  kp.rng_state = raft::random::RngState{init_seed, raft::random::GeneratorType::GenPhilox};
+  rmm::device_uvector<T> centroids((size_t)K * d, stream);
+  T inertia   = T(0);
+  int km_iter = 0;
+  auto X_view = raft::make_device_matrix_view<const T, int>(X, n, d);
+  cuvs::cluster::kmeans::fit(handle,
+                             kp,
+                             X_view,
+                             std::nullopt,
+                             raft::make_device_matrix_view<T, int>(centroids.data(), K, d),
+                             raft::make_host_scalar_view<T>(&inertia),
+                             raft::make_host_scalar_view<int>(&km_iter));
+  cuvs::cluster::kmeans::predict(
+    handle,
+    kp,
+    X_view,
+    std::nullopt,
+    raft::make_device_matrix_view<const T, int>(centroids.data(), K, d),
+    raft::make_device_vector_view<int, int>(labels_out, n),
+    true,
+    raft::make_host_scalar_view<T>(&inertia));
 }
 
 // ===========================================================================
@@ -1018,19 +1091,74 @@ void fit_impl(raft::resources const& handle,
   covariance_type ct  = params.cov_type;
   size_t cn           = cov_elems(ct, d, K);
 
-  MStepWorkspace<T> ws(handle, params, n, d, K);
-  rmm::device_uvector<T> resp((size_t)n * K, stream);
-  rmm::device_uvector<T> log_prob((size_t)n * K, stream);
-  rmm::device_uvector<T> log_prob_norm(n, stream);
+  // Stream the E+M over N-tiles: only a bounded (tile, K) responsibility block
+  // ever exists, never the full (N, K).
+  int tile = std::min(n, 65536);
+
+  MStepWorkspace<T> ws(handle, params, tile, d, K);
+  // normalize overwrites log_prob with resp in place (each element is read once and
+  // written once in the same expression), so one (tile, K) buffer serves both.
+  rmm::device_uvector<T> resp((size_t)tile * K, stream);
+  rmm::device_uvector<T> lpn(tile, stream);
   rmm::device_uvector<T> log_det(K, stream);
 
-  // best-parameter buffers
   rmm::device_uvector<T> best_w(K, stream);
   rmm::device_uvector<T> best_m((size_t)K * d, stream);
   rmm::device_uvector<T> best_cov(cn, stream);
   rmm::device_uvector<T> best_pc(cn, stream);
 
   raft::random::RngState rng(params.seed, raft::random::GeneratorType::GenPhilox);
+
+  // One E-step (+ optional M-step) over all data, streamed in tiles; returns the
+  // mean lower bound. FULL needs a second centered pass (means first); both passes
+  // re-run e_step with the same (pre-update) params, so the resp is identical.
+  auto estep_tile = [&](int t0, int nt) {
+    e_step<T>(handle,
+              params,
+              X + (size_t)t0 * d,
+              nt,
+              d,
+              K,
+              weights,
+              means,
+              precisions_chol,
+              log_det.data(),
+              resp.data(),
+              resp.data(),
+              lpn.data());
+  };
+  auto em_step = [&](bool do_mstep) -> double {
+    double lb_sum = 0.0;
+    for (int t0 = 0; t0 < n; t0 += tile) {
+      int nt = std::min(tile, n - t0);
+      estep_tile(t0, nt);
+      if (do_mstep)
+        m_accumulate<T>(
+          handle, params, X + (size_t)t0 * d, nt, d, K, resp.data(), ws, (t0 == 0) ? T(0) : T(1));
+      lb_sum += (double)mean_device<T>(handle, lpn.data(), nt) * nt;
+    }
+    if (do_mstep) {
+      m_finalize<T>(handle, params, n, d, K, ws, weights, means, covariances);
+      if (ct == covariance_type::FULL) {
+        for (int t0 = 0; t0 < n; t0 += tile) {
+          int nt = std::min(tile, n - t0);
+          estep_tile(t0, nt);
+          m_cov_full_pass<T>(handle,
+                             X + (size_t)t0 * d,
+                             nt,
+                             d,
+                             K,
+                             resp.data(),
+                             means,
+                             covariances,
+                             ws,
+                             (t0 == 0) ? T(0) : T(1));
+        }
+        m_finalize_cov_full<T>(handle, params, d, K, ws, covariances);
+      }
+    }
+    return lb_sum / n;
+  };
 
   bool do_init   = !warm_start;
   int n_init     = do_init ? params.n_init : 1;
@@ -1042,11 +1170,60 @@ void fit_impl(raft::resources const& handle,
   for (int init = 0; init < n_init; ++init) {
     if (do_init) {
       uint64_t init_seed = params.seed + (uint64_t)init * 0x9E3779B97F4A7C15ULL;
-      init_resp<T>(handle, params, X, n, d, K, rng, init_seed, resp.data());
-      m_step<T>(handle, params, X, n, d, K, resp.data(), weights, means, covariances, ws);
+      init_method im     = params.init;
+      // Per-sample assignment is O(n)/O(K), not (N, K): k-means labels, or the K
+      // random-from-data indices. The one-hot resp is then built one tile at a time.
+      rmm::device_uvector<int> km_labels(0, stream);
+      rmm::device_uvector<int> rfd_idx(0, stream);
+      if (im == init_method::KMeans || im == init_method::KMeansPlusPlus) {
+        km_labels.resize(n, stream);
+        kmeans_assign<T>(handle, params, X, n, d, K, init_seed, km_labels.data());
+      } else if (im == init_method::RandomFromData) {
+        rfd_idx.resize(K, stream);
+        auto idx = raft::random::excess_subsample<int, int>(handle, rng, n, K);
+        raft::copy(rfd_idx.data(), idx.data_handle(), K, stream);
+      }
+      auto fill_init_resp = [&](int t0, int nt) {
+        if (im == init_method::Random) {
+          raft::random::uniform(handle, rng, resp.data(), (size_t)nt * K, T(0), T(1));
+          detail::normalize_rows_kernel<T>
+            <<<dim3((nt + 255) / 256), dim3(256), 0, stream>>>(resp.data(), nt, K);
+        } else if (im == init_method::RandomFromData) {
+          RAFT_CUDA_TRY(cudaMemsetAsync(resp.data(), 0, sizeof(T) * (size_t)nt * K, stream));
+          detail::scatter_onehot_tile_kernel<T><<<dim3((K + 255) / 256), dim3(256), 0, stream>>>(
+            rfd_idx.data(), K, t0, nt, resp.data());
+        } else {
+          detail::labels_to_onehot_kernel<T><<<dim3((nt + 255) / 256), dim3(256), 0, stream>>>(
+            km_labels.data() + t0, nt, K, resp.data());
+        }
+        RAFT_CUDA_TRY(cudaPeekAtLastError());
+      };
+      for (int t0 = 0; t0 < n; t0 += tile) {
+        int nt = std::min(tile, n - t0);
+        fill_init_resp(t0, nt);
+        m_accumulate<T>(
+          handle, params, X + (size_t)t0 * d, nt, d, K, resp.data(), ws, (t0 == 0) ? T(0) : T(1));
+      }
+      m_finalize<T>(handle, params, n, d, K, ws, weights, means, covariances);
+      if (ct == covariance_type::FULL) {
+        for (int t0 = 0; t0 < n; t0 += tile) {
+          int nt = std::min(tile, n - t0);
+          fill_init_resp(t0, nt);
+          m_cov_full_pass<T>(handle,
+                             X + (size_t)t0 * d,
+                             nt,
+                             d,
+                             K,
+                             resp.data(),
+                             means,
+                             covariances,
+                             ws,
+                             (t0 == 0) ? T(0) : T(1));
+        }
+        m_finalize_cov_full<T>(handle, params, d, K, ws, covariances);
+      }
       update_precisions<T>(handle, params, covariances, d, K, precisions_chol, log_det.data(), ws);
     } else {
-      // warm start: use the incoming weights/means/covariances as-is.
       update_precisions<T>(handle, params, covariances, d, K, precisions_chol, log_det.data(), ws);
     }
 
@@ -1055,44 +1232,15 @@ void fit_impl(raft::resources const& handle,
     int iters = 0;
     for (int it = 1; it <= params.max_iter; ++it) {
       double prev = lb;
-      e_step<T>(handle,
-                params,
-                X,
-                n,
-                d,
-                K,
-                weights,
-                means,
-                precisions_chol,
-                log_det.data(),
-                log_prob.data(),
-                resp.data(),
-                log_prob_norm.data());
-      lb    = (double)mean_device<T>(handle, log_prob_norm.data(), n);
-      iters = it;
-      m_step<T>(handle, params, X, n, d, K, resp.data(), weights, means, covariances, ws);
+      lb          = em_step(/* do_mstep */ true);
       update_precisions<T>(handle, params, covariances, d, K, precisions_chol, log_det.data(), ws);
+      iters = it;
       if (std::abs(lb - prev) < params.tol) {
         conv = true;
         break;
       }
     }
-    if (params.max_iter == 0) {
-      e_step<T>(handle,
-                params,
-                X,
-                n,
-                d,
-                K,
-                weights,
-                means,
-                precisions_chol,
-                log_det.data(),
-                log_prob.data(),
-                resp.data(),
-                log_prob_norm.data());
-      lb = (double)mean_device<T>(handle, log_prob_norm.data(), n);
-    }
+    if (params.max_iter == 0) lb = em_step(/* do_mstep */ false);
 
     if (!have_best || lb > best_lb) {
       best_lb   = lb;
@@ -1129,22 +1277,26 @@ void fit_impl(raft::resources const& handle,
 
   compute_precisions<T>(handle, params, precisions_chol, d, K, precisions);
 
-  e_step<T>(handle,
-            params,
-            X,
-            n,
-            d,
-            K,
-            weights,
-            means,
-            precisions_chol,
-            log_det.data(),
-            log_prob.data(),
-            resp.data(),
-            log_prob_norm.data());
-  detail::argmax_kernel<T>
-    <<<dim3((n + 255) / 256), dim3(256), 0, stream>>>(resp.data(), n, K, labels);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  // Hard labels = argmax responsibility, computed tile-by-tile (no full (N, K)).
+  for (int t0 = 0; t0 < n; t0 += tile) {
+    int nt = std::min(tile, n - t0);
+    e_step<T>(handle,
+              params,
+              X + (size_t)t0 * d,
+              nt,
+              d,
+              K,
+              weights,
+              means,
+              precisions_chol,
+              log_det.data(),
+              resp.data(),
+              resp.data(),
+              lpn.data());
+    detail::argmax_kernel<T>
+      <<<dim3((nt + 255) / 256), dim3(256), 0, stream>>>(resp.data(), nt, K, labels + t0);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+  }
 
   lower_bound = (T)best_lb;
   n_iter      = best_iter;
@@ -1203,54 +1355,32 @@ void infer(raft::resources const& handle,
             log_prob_norm);
 }
 
-// Launch the fast tiled fused E-step (diag / spherical), picking the smallest
-// register bucket (MAXD) that holds d. Returns false (no launch) when d exceeds
-// the largest bucket, so the caller can fall back to the runtime-d kernel.
-template <typename T>
-bool launch_fused_tiled(raft::resources const& handle,
+// Launch the register-tiled fused E-step for spherical (DIAG=false) or diag
+// (DIAG=true). Components are tiled into CELL register accumulators; features
+// stream through a small shared-memory tile -> high occupancy, any d, and the
+// (N, K) distance matrix is never materialized. CELL=64 (float) / 32 (double)
+// with FEAT=32 is the occupancy sweet spot on Blackwell.
+template <typename T, bool DIAG, bool WRITE_FULL = false>
+void launch_estep_tiled(raft::resources const& handle,
                         const T* X,
-                        const T* const_k,
                         const T* means,
                         const T* prec_chol,
+                        const T* const_k,
                         int n,
                         int d,
                         int K,
-                        bool is_diag,
                         T* log_prob_norm,
-                        int* labels)
+                        int* labels,
+                        T* log_prob = nullptr)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  constexpr int TPB   = 128;
-  int rb              = (n + TPB - 1) / TPB;
-#define CUVS_GMM_LAUNCH_TILED(MAXD, DIAG)         \
-  detail::fused_estep_tiled_kernel<T, MAXD, DIAG> \
-    <<<rb, TPB, 0, stream>>>(X, const_k, means, prec_chol, n, d, K, log_prob_norm, labels)
-  if (is_diag) {
-    if (d <= 16)
-      CUVS_GMM_LAUNCH_TILED(16, true);
-    else if (d <= 32)
-      CUVS_GMM_LAUNCH_TILED(32, true);
-    else if (d <= 64)
-      CUVS_GMM_LAUNCH_TILED(64, true);
-    else if (d <= 128)
-      CUVS_GMM_LAUNCH_TILED(128, true);
-    else
-      return false;
-  } else {
-    if (d <= 16)
-      CUVS_GMM_LAUNCH_TILED(16, false);
-    else if (d <= 32)
-      CUVS_GMM_LAUNCH_TILED(32, false);
-    else if (d <= 64)
-      CUVS_GMM_LAUNCH_TILED(64, false);
-    else if (d <= 128)
-      CUVS_GMM_LAUNCH_TILED(128, false);
-    else
-      return false;
-  }
-#undef CUVS_GMM_LAUNCH_TILED
+  constexpr int FEAT  = 32;
+  constexpr int CELL  = (sizeof(T) == 4) ? 64 : 32;
+  constexpr int TPB   = 256;
+  int gb              = (n + TPB - 1) / TPB;
+  detail::estep_tiled_kernel<T, CELL, FEAT, DIAG, WRITE_FULL><<<gb, TPB, 0, stream>>>(
+    X, means, prec_chol, const_k, n, d, K, log_prob_norm, labels, log_prob);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  return true;
 }
 
 // Fused E-step that writes log_prob_norm (and optionally argmax labels) WITHOUT
@@ -1303,37 +1433,16 @@ void fused_score(raft::resources const& handle,
   int threads = 256;
   int rb      = (n + threads - 1) / threads;
 
-  if (ct == covariance_type::DIAG || ct == covariance_type::SPHERICAL) {
-    bool is_diag = (ct == covariance_type::DIAG);
-    if (!launch_fused_tiled<T>(handle,
-                               X,
-                               const_k.data(),
-                               means,
-                               precisions_chol,
-                               n,
-                               d,
-                               K,
-                               is_diag,
-                               log_prob_norm,
-                               labels)) {
-      // d beyond the largest register bucket: runtime-d fallback.
-      detail::fused_estep_diag_sph_kernel<T><<<rb, threads, 0, stream>>>(X,
-                                                                         weights,
-                                                                         means,
-                                                                         precisions_chol,
-                                                                         log_det.data(),
-                                                                         n,
-                                                                         d,
-                                                                         K,
-                                                                         is_diag ? 1 : 0,
-                                                                         log_prob_norm,
-                                                                         labels);
-      RAFT_CUDA_TRY(cudaPeekAtLastError());
-    }
+  if (ct == covariance_type::SPHERICAL) {
+    launch_estep_tiled<T, /* DIAG */ false>(
+      handle, X, means, precisions_chol, const_k.data(), n, d, K, log_prob_norm, labels);
+  } else if (ct == covariance_type::DIAG) {
+    launch_estep_tiled<T, /* DIAG */ true>(
+      handle, X, means, precisions_chol, const_k.data(), n, d, K, log_prob_norm, labels);
   } else if (ct == covariance_type::TIED && d <= 128) {
     // Shared precision Cholesky U: transform X̃ = X·U and μ̃ = means·U once,
     // then the Mahalanobis distance ‖Uᵀ(x-μ_k)‖² becomes the Euclidean
-    // ‖x̃ - μ̃_k‖² -> reuse the fast spherical tiled kernel (prec = 1).
+    // ‖x̃ - μ̃_k‖² -> reuse the fast register-tiled kernel (prec = 1).
     cublasHandle_t cublas = raft::resource::get_cublas_handle(handle);
     cublas_check(cublasSetStream(cublas, stream), "cublasSetStream");
     rmm::device_uvector<T> xt((size_t)n * d, stream);
@@ -1372,17 +1481,16 @@ void fused_score(raft::resources const& handle,
                                 mut.data(),
                                 d),
                  "gemm(tied_transform_mu)");
-    launch_fused_tiled<T>(handle,
-                          xt.data(),
-                          const_k.data(),
-                          mut.data(),
-                          ones_pc.data(),
-                          n,
-                          d,
-                          K,
-                          /*is_diag=*/false,
-                          log_prob_norm,
-                          labels);
+    launch_estep_tiled<T, /* DIAG */ false>(handle,
+                                            xt.data(),
+                                            mut.data(),
+                                            ones_pc.data(),
+                                            const_k.data(),
+                                            n,
+                                            d,
+                                            K,
+                                            log_prob_norm,
+                                            labels);
   } else {
     // full (or tied with d > 128): un-centered E-step. y = M_k @ X is formed by
     // one GEMM per component, then folded online as ||y - c_k||^2 with the

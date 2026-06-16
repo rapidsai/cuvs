@@ -152,6 +152,8 @@ navigation:
             contents:
               - page: "K-Means"
                 path: "./pages/cluster/kmeans.md"
+              - page: "Gaussian Mixture Model"
+                path: "./pages/cluster/gmm.md"
               - page: "Single-linkage"
                 path: "./pages/cluster/single_linkage.md"
               - page: "Spectral Clustering"

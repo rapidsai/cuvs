@@ -217,99 +217,6 @@ __global__ void e_step_log_prob_large_d_thread64_kernel(const T* __restrict__ X,
 }
 
 // ---------------------------------------------------------------------------
-// diagonal covariance: prec_chol is (K, d) reciprocal std-devs.
-//
-// One thread per sample: each thread reads its X row once (kept hot in L1
-// across the K components) and ``means``/``prec_chol`` are cached in shared
-// memory when they fit. This avoids the K-fold re-read of X that a
-// thread-per-(sample, component) layout incurs.
-// ---------------------------------------------------------------------------
-template <typename T>
-__global__ void e_step_log_prob_diag_kernel(const T* __restrict__ X,
-                                            const T* __restrict__ weights,
-                                            const T* __restrict__ means,
-                                            const T* __restrict__ prec_chol,
-                                            const T* __restrict__ log_det,
-                                            int n,
-                                            int d,
-                                            int K,
-                                            int use_smem,
-                                            T* __restrict__ log_prob)
-{
-  extern __shared__ unsigned char smem_raw[];
-  T* sh_means = reinterpret_cast<T*>(smem_raw);
-  T* sh_pc    = sh_means + (size_t)K * d;
-  if (use_smem) {
-    for (int i = threadIdx.x; i < K * d; i += blockDim.x) {
-      sh_means[i] = means[i];
-      sh_pc[i]    = prec_chol[i];
-    }
-    __syncthreads();
-  }
-  const T* M = use_smem ? sh_means : means;
-  const T* P = use_smem ? sh_pc : prec_chol;
-
-  int row = blockIdx.x * blockDim.x + threadIdx.x;
-  if (row >= n) return;
-  const T* x = X + (size_t)row * d;
-
-  for (int k = 0; k < K; ++k) {
-    const T* mu = M + (size_t)k * d;
-    const T* pc = P + (size_t)k * d;
-    T mahal     = T(0);
-    for (int dd = 0; dd < d; ++dd) {
-      T y = (x[dd] - mu[dd]) * pc[dd];
-      mahal += y * y;
-    }
-    T constant = T(-0.5) * T(d) * log_2pi_const<T>() + log_det[k] + log(weights[k]);
-    log_prob[(size_t)row * K + k] = constant - T(0.5) * mahal;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// spherical covariance: prec_chol is (K,) reciprocal std-devs. One thread per
-// sample; ``means`` cached in shared memory when it fits.
-// ---------------------------------------------------------------------------
-template <typename T>
-__global__ void e_step_log_prob_spherical_kernel(const T* __restrict__ X,
-                                                 const T* __restrict__ weights,
-                                                 const T* __restrict__ means,
-                                                 const T* __restrict__ prec_chol,
-                                                 const T* __restrict__ log_det,
-                                                 int n,
-                                                 int d,
-                                                 int K,
-                                                 int use_smem,
-                                                 T* __restrict__ log_prob)
-{
-  extern __shared__ unsigned char smem_raw[];
-  T* sh_means = reinterpret_cast<T*>(smem_raw);
-  if (use_smem) {
-    for (int i = threadIdx.x; i < K * d; i += blockDim.x)
-      sh_means[i] = means[i];
-    __syncthreads();
-  }
-  const T* M = use_smem ? sh_means : means;
-
-  int row = blockIdx.x * blockDim.x + threadIdx.x;
-  if (row >= n) return;
-  const T* x = X + (size_t)row * d;
-
-  for (int k = 0; k < K; ++k) {
-    const T* mu = M + (size_t)k * d;
-    T pc        = prec_chol[k];
-    T sq        = T(0);
-    for (int dd = 0; dd < d; ++dd) {
-      T diff = x[dd] - mu[dd];
-      sq += diff * diff;
-    }
-    T mahal    = pc * pc * sq;
-    T constant = T(-0.5) * T(d) * log_2pi_const<T>() + log_det[k] + log(weights[k]);
-    log_prob[(size_t)row * K + k] = constant - T(0.5) * mahal;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // cuBLAS E-step (full/tied, wide d): center one component's data, X - means[k].
 // ---------------------------------------------------------------------------
 template <typename T>
@@ -469,14 +376,17 @@ __global__ void weighted_center_kernel(const T* __restrict__ X,
   size_t total = (size_t)n * d;
   if (idx >= total) return;
 
-  int row       = idx / d;
-  int col       = idx - (size_t)row * d;
-  T r           = resp[row * K + k];
-  centered[idx] = sqrt(r) * (X[idx] - means[k * d + col]);
+  int row = idx / d;
+  int col = idx - (size_t)row * d;
+  T r     = resp[row * K + k];
+  // means == nullptr -> sqrt(r)*x (uncentered moment); else sqrt(r)*(x - mu_k).
+  T mu          = means ? means[(size_t)k * d + col] : T(0);
+  centered[idx] = sqrt(r) * (X[idx] - mu);
 }
 
-// Finalize one full covariance matrix: divide by N_k, symmetrize the row-major
-// result the column-major GEMM produced, and add reg_covar to the diagonal.
+// Finalize one full covariance from the centered moment Σ r·(x-mu)(x-mu)ᵀ:
+// divide by N_k, symmetrize the row-major result the column-major GEMM produced,
+// and add reg_covar to the diagonal.
 template <typename T>
 __global__ void m_step_finalize_cov_full_kernel(
   const T* __restrict__ N_k, T* __restrict__ covariances, T reg_covar, T eps, int d, int K)
@@ -755,16 +665,16 @@ __global__ void labels_to_onehot_kernel(const int* __restrict__ labels,
     resp[(size_t)n_idx * K + k] = (k == lab) ? T(1) : T(0);
 }
 
-// One-hot from a set of chosen sample indices (resp[indices[k], k] = 1), used by
-// 'random_from_data'. resp must be pre-zeroed.
+// Tile variant: scatter the one-hot for any chosen index falling in [t0, t0+nt)
+// into a tile-local (nt, K) buffer (memset to 0 by the caller).
 template <typename T>
-__global__ void scatter_onehot_indices_kernel(const int* __restrict__ indices,
-                                              int K,
-                                              T* __restrict__ resp)
+__global__ void scatter_onehot_tile_kernel(
+  const int* __restrict__ indices, int K, int t0, int nt, T* __restrict__ resp_tile)
 {
   int k = blockIdx.x * blockDim.x + threadIdx.x;
   if (k >= K) return;
-  resp[(size_t)indices[k] * K + k] = T(1);
+  int s = indices[k] - t0;
+  if (s >= 0 && s < nt) resp_tile[(size_t)s * K + k] = T(1);
 }
 
 // Normalize each row of resp to sum to one (used by 'random' init).
@@ -780,73 +690,6 @@ __global__ void normalize_rows_kernel(T* __restrict__ resp, int n, int K)
   T inv = T(1) / sum;
   for (int k = 0; k < K; ++k)
     r[k] *= inv;
-}
-
-// precisions = prec_chol^2 for diag/spherical.
-template <typename T>
-__global__ void square_kernel(const T* __restrict__ in, size_t total, T* __restrict__ out)
-{
-  size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= total) return;
-  T v      = in[idx];
-  out[idx] = v * v;
-}
-
-// ===========================================================================
-// Fused E-step (no N×K materialization): per-sample online log-sum-exp.
-// Produces log_prob_norm[n] = log p(x_n) directly, and optionally the argmax
-// component label[n]. Used by score_samples / predict for all covariance
-// types — eliminates the (N, K) log_prob/resp buffers the standard E-step
-// allocates. ``is_diag`` selects spherical (prec_chol is (K,)) vs diagonal
-// (prec_chol is (K, d)); full / tied feed the cuBLAS-fold path below.
-// ===========================================================================
-template <typename T>
-__global__ void fused_estep_diag_sph_kernel(const T* __restrict__ X,
-                                            const T* __restrict__ weights,
-                                            const T* __restrict__ means,
-                                            const T* __restrict__ prec_chol,
-                                            const T* __restrict__ log_det,
-                                            int n,
-                                            int d,
-                                            int K,
-                                            int is_diag,
-                                            T* __restrict__ log_prob_norm,
-                                            int* __restrict__ labels)
-{
-  int row = blockIdx.x * blockDim.x + threadIdx.x;
-  if (row >= n) return;
-  const T* x = X + (size_t)row * d;
-
-  T rmax = -CUDART_INF_F, rsum = T(0), best_lp = -CUDART_INF_F;
-  int best = 0;
-  for (int k = 0; k < K; ++k) {
-    const T* mu = means + (size_t)k * d;
-    T mahal     = T(0);
-    if (is_diag) {
-      const T* pc = prec_chol + (size_t)k * d;
-      for (int dd = 0; dd < d; ++dd) {
-        T y = (x[dd] - mu[dd]) * pc[dd];
-        mahal += y * y;
-      }
-    } else {
-      T sq = T(0);
-      for (int dd = 0; dd < d; ++dd) {
-        T diff = x[dd] - mu[dd];
-        sq += diff * diff;
-      }
-      mahal = prec_chol[k] * prec_chol[k] * sq;
-    }
-    T lp = T(-0.5) * T(d) * log_2pi_const<T>() + log_det[k] + log(weights[k]) - T(0.5) * mahal;
-    if (lp > best_lp) {
-      best_lp = lp;
-      best    = k;
-    }
-    T nm = fmax(rmax, lp);
-    rsum = rsum * exp(rmax - nm) + exp(lp - nm);
-    rmax = nm;
-  }
-  log_prob_norm[row] = rmax + log(rsum);
-  if (labels) labels[row] = best;
 }
 
 // Fast tiled fused E-step (diag / spherical): thread-per-sample with the
@@ -868,73 +711,6 @@ __global__ void fused_const_kernel(const T* __restrict__ weights,
   int k = blockIdx.x * blockDim.x + threadIdx.x;
   if (k >= K) return;
   const_k[k] = T(-0.5) * T(d) * log_2pi_const<T>() + log_det[k] + log(weights[k]);
-}
-
-template <typename T, int MAXD, bool DIAG>
-__global__ void fused_estep_tiled_kernel(const T* __restrict__ X,
-                                         const T* __restrict__ const_k,
-                                         const T* __restrict__ means,
-                                         const T* __restrict__ prec_chol,
-                                         int n,
-                                         int d,
-                                         int K,
-                                         T* __restrict__ log_prob_norm,
-                                         int* __restrict__ labels)
-{
-  constexpr int CELL = 32;
-  int q              = blockIdx.x * blockDim.x + threadIdx.x;
-  T xq[MAXD];
-  if (q < n) {
-    for (int dd = 0; dd < d; ++dd)
-      xq[dd] = X[(size_t)q * d + dd];
-  }
-  __shared__ T smu[CELL * MAXD];
-  __shared__ T spc[DIAG ? CELL * MAXD : 1];
-
-  T rmax = -CUDART_INF_F, rsum = T(0), best_lp = -CUDART_INF_F;
-  int best = 0;
-  for (int k0 = 0; k0 < K; k0 += CELL) {
-    int cells = min(CELL, K - k0);
-    for (int i = threadIdx.x; i < cells * d; i += blockDim.x) {
-      smu[i] = means[(size_t)k0 * d + i];
-      if constexpr (DIAG) spc[i] = prec_chol[(size_t)k0 * d + i];
-    }
-    __syncthreads();
-    if (q < n) {
-      for (int c = 0; c < cells; ++c) {
-        int k       = k0 + c;
-        const T* mu = smu + c * d;
-        T mahal     = T(0);
-        if constexpr (DIAG) {
-          const T* pc = spc + c * d;
-          for (int dd = 0; dd < d; ++dd) {
-            T y = (xq[dd] - mu[dd]) * pc[dd];
-            mahal += y * y;
-          }
-        } else {
-          T sq = T(0);
-          for (int dd = 0; dd < d; ++dd) {
-            T df = xq[dd] - mu[dd];
-            sq += df * df;
-          }
-          mahal = prec_chol[k] * prec_chol[k] * sq;
-        }
-        T lp = const_k[k] - T(0.5) * mahal;
-        if (lp > best_lp) {
-          best_lp = lp;
-          best    = k;
-        }
-        T nm = fmax(rmax, lp);
-        rsum = rsum * exp(rmax - nm) + exp(lp - nm);
-        rmax = nm;
-      }
-    }
-    __syncthreads();
-  }
-  if (q < n) {
-    log_prob_norm[q] = rmax + log(rsum);
-    if (labels) labels[q] = best;
-  }
 }
 
 // Initialize the running (max, sum) accumulators for the cuBLAS fold path.
@@ -1002,6 +778,101 @@ __global__ void fused_lse_finalize_kernel(const T* __restrict__ rmax,
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
   log_prob_norm[i] = rmax[i] + log(rsum[i]);
+}
+
+// KDE-style register-tiled E-step for spherical / diag covariances: one thread
+// per sample, components tiled in CELL register accumulators, features streamed
+// through shared memory in FEAT-wide tiles. The (N, K) distance matrix is never
+// materialized — distances fold straight into an online log-sum-exp. Holding
+// only CELL accumulators (not all of x) keeps register pressure low -> high
+// occupancy (mirrors cuvs::distance::kde's tiling, specialized per component).
+// DIAG=false: spherical (scalar prec_chol[k]); DIAG=true: diag (prec_chol[k,:]).
+// WRITE_FULL=false: online log-sum-exp -> log_prob_norm (+ argmax labels), no
+// N×K. WRITE_FULL=true: also write the full per-component log_prob[n,k] (for the
+// materialized fit / predict_proba path, replacing the slow per-mode kernels);
+// log_prob_norm/labels are then left to the normalize kernel.
+template <typename T, int CELL, int FEAT, bool DIAG, bool WRITE_FULL>
+__global__ void estep_tiled_kernel(const T* __restrict__ X,
+                                   const T* __restrict__ means,
+                                   const T* __restrict__ prec_chol,
+                                   const T* __restrict__ const_k,
+                                   int n,
+                                   int d,
+                                   int K,
+                                   T* __restrict__ log_prob_norm,
+                                   int* __restrict__ labels,
+                                   T* __restrict__ log_prob)
+{
+  int i      = blockIdx.x * blockDim.x + threadIdx.x;
+  bool valid = i < n;
+  __shared__ T smu[FEAT * CELL];
+  __shared__ T spc[DIAG ? FEAT * CELL : 1];
+  T rmax = T(-1e30), rsum = T(0), best_lp = T(-1e30);
+  int best = 0;
+  for (int k0 = 0; k0 < K; k0 += CELL) {
+    int cells = min(CELL, K - k0);
+    T acc[CELL];
+#pragma unroll
+    for (int c = 0; c < CELL; ++c)
+      acc[c] = T(0);
+    for (int f0 = 0; f0 < d; f0 += FEAT) {
+      int feats = min(FEAT, d - f0);
+      for (int idx = threadIdx.x; idx < FEAT * CELL; idx += blockDim.x) {
+        int cell = idx / FEAT, feat = idx % FEAT;
+        bool in                 = (cell < cells && feat < feats);
+        size_t g                = (size_t)(k0 + cell) * d + f0 + feat;
+        smu[feat * CELL + cell] = in ? means[g] : T(0);
+        if constexpr (DIAG) spc[feat * CELL + cell] = in ? prec_chol[g] : T(0);
+      }
+      __syncthreads();
+      if (valid) {
+        for (int f = 0; f < feats; ++f) {
+          T xq = X[(size_t)i * d + f0 + f];
+#pragma unroll
+          for (int c = 0; c < CELL; ++c) {
+            T df = xq - smu[f * CELL + c];
+            if constexpr (DIAG) {
+              T y = df * spc[f * CELL + c];
+              acc[c] += y * y;
+            } else {
+              acc[c] += df * df;
+            }
+          }
+        }
+      }
+      __syncthreads();
+    }
+    if (valid) {
+#pragma unroll
+      for (int c = 0; c < CELL; ++c) {
+        if (c >= cells) break;
+        int k = k0 + c;
+        T mahal;
+        if constexpr (DIAG) {
+          mahal = acc[c];
+        } else {
+          T pc  = prec_chol[k];
+          mahal = (pc * pc) * acc[c];
+        }
+        T lp = const_k[k] - T(0.5) * mahal;
+        if constexpr (WRITE_FULL) {
+          log_prob[(size_t)i * K + k] = lp;
+        } else {
+          if (labels && lp > best_lp) {
+            best_lp = lp;
+            best    = k;
+          }
+          T nm = fmax(rmax, lp);
+          rsum = rsum * exp(rmax - nm) + exp(lp - nm);
+          rmax = nm;
+        }
+      }
+    }
+  }
+  if (valid && !WRITE_FULL) {
+    log_prob_norm[i] = rmax + log(rsum);
+    if (labels) labels[i] = best;
+  }
 }
 
 }  // namespace cuvs::cluster::gmm::detail
