@@ -6,8 +6,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/memory_tracking_resources.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/util/memory_tracking_resources.hpp>
 #include <string>
 
 #include <cuvs/neighbors/cagra.hpp>
