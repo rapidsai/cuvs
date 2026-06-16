@@ -56,7 +56,7 @@ void initKMeansPlusPlus_distributed(
     if (isRoot) { RAFT_LOG_DEBUG(fmt, ##__VA_ARGS__); }      \
   } while (0)
 
-#define KMEANS_COMM_ROOT 0
+#define CUVS_KMEANS_COMM_ROOT 0
 
 using cuvs::core::detail::mnmg_comms;
 
@@ -162,7 +162,7 @@ std::vector<IndexT> broadcast_sampled_global_indices(raft::resources const& hand
 
   auto d_sample_ids = raft::make_device_vector<IndexT, IndexT>(handle, sample_size);
   std::vector<IndexT> h_sample_ids(static_cast<std::size_t>(sample_size));
-  if (rank == KMEANS_COMM_ROOT) {
+  if (rank == CUVS_KMEANS_COMM_ROOT) {
     h_sample_ids = sample_unique_global_indices(global_n, sample_size, seed);
     raft::copy(
       handle,
@@ -170,7 +170,7 @@ std::vector<IndexT> broadcast_sampled_global_indices(raft::resources const& hand
       raft::make_host_vector_view<const IndexT, IndexT>(h_sample_ids.data(), sample_size));
   }
 
-  comms.bcast(d_sample_ids.data_handle(), static_cast<size_t>(sample_size), KMEANS_COMM_ROOT);
+  comms.bcast(d_sample_ids.data_handle(), static_cast<size_t>(sample_size), CUVS_KMEANS_COMM_ROOT);
 
   raft::copy(
     handle,
@@ -238,7 +238,7 @@ raft::device_matrix<DataT, IndexT> sample_global_rows(
     comms.reduce(sampled_rows.data_handle(),
                  sampled_rows.data_handle(),
                  sampled_rows.size(),
-                 KMEANS_COMM_ROOT);
+                 CUVS_KMEANS_COMM_ROOT);
   }
   return sampled_rows;
 }
@@ -308,7 +308,7 @@ void init_centroids_for_mg_batched(
       auto init_sample        = sample_global_rows<DataT, IndexT, Accessor>(
         handle, params, X_parts, n_features, init_sample_size, rank, rank_counts, global_n, comms);
 
-      if (rank == KMEANS_COMM_ROOT) {
+      if (rank == CUVS_KMEANS_COMM_ROOT) {
         auto init_view = raft::make_const_mdspan(init_sample.view());
         if (params.oversampling_factor == 0) {
           cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
@@ -318,8 +318,9 @@ void init_centroids_for_mg_batched(
             handle, params, init_view, centroids, workspace);
         }
       }
-      comms.bcast(
-        centroids.data_handle(), static_cast<size_t>(n_clusters) * n_features, KMEANS_COMM_ROOT);
+      comms.bcast(centroids.data_handle(),
+                  static_cast<size_t>(n_clusters) * n_features,
+                  CUVS_KMEANS_COMM_ROOT);
     }
   } else {
     THROW("unknown initialization method to select initial centers");

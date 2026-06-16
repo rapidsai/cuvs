@@ -294,7 +294,7 @@ void mnmg_fit(
     comms.bcast(centroids.data_handle(),
                 rank_centroids.data_handle(),
                 static_cast<size_t>(n_clusters) * n_features,
-                KMEANS_COMM_ROOT);
+                CUVS_KMEANS_COMM_ROOT);
   }
 
   std::mt19937 gen(params.rng_state.seed);

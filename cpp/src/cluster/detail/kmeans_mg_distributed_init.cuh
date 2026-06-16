@@ -40,6 +40,92 @@
 namespace cuvs::cluster::kmeans::mg::detail {
 
 /**
+ * @brief Compute the global cluster cost (psi) over partitioned device data.
+ *
+ * For every non-empty partition, computes the per-row minimum distance to the
+ * current candidate centroid set, reduces locally with `cluster_cost`, then
+ * allreduces across ranks. Returns the host-side global cost.
+ *
+ * Shared scratch (`L2NormBuf_OR_DistBuf`, `workspace`) is passed in by
+ * reference so it can be reused across repeated calls in the kmeans||
+ * candidate-sampling loop.
+ *
+ * @tparam DataT  float or double
+ * @tparam IndexT int or int64_t
+ *
+ * @param handle               RAFT resources for this rank.
+ * @param params               KMeans parameters (uses metric and batch sizes).
+ * @param X_parts              Local device matrix partitions on this rank.
+ * @param part_offsets         Prefix-sum of partition row counts (size
+ *                             `X_parts.size() + 1`).
+ * @param n_local              Total local rows (`part_offsets.back()`).
+ * @param L2NormX              Precomputed L2 norms of every local row (length
+ *                             `>= n_local`). Sliced per partition.
+ * @param potentialCentroids   Current candidate centroid set (the "C" buffer).
+ * @param minClusterDistance   Per-row min-distance scratch (length `>= n_local`).
+ * @param L2NormBuf_OR_DistBuf Scratch buffer reused across `min_cluster_distance`
+ *                             calls; grown as needed.
+ * @param workspace            General scratch buffer.
+ * @param comms                mnmg_comms wrapper for the cross-rank allreduce.
+ * @return Global cluster cost (psi).
+ */
+template <typename DataT, typename IndexT>
+DataT compute_global_cluster_cost(
+  const raft::resources& handle,
+  const cuvs::cluster::kmeans::params& params,
+  const std::vector<raft::device_matrix_view<const DataT, IndexT>>& X_parts,
+  const std::vector<IndexT>& part_offsets,
+  IndexT n_local,
+  raft::device_vector_view<DataT, IndexT> L2NormX,
+  raft::device_matrix_view<DataT, IndexT> potentialCentroids,
+  raft::device_vector_view<DataT, IndexT> minClusterDistance,
+  rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
+  rmm::device_uvector<char>& workspace,
+  const mnmg_comms& comms)
+{
+  cudaStream_t stream   = comms.stream();
+  const auto n_features = static_cast<IndexT>(potentialCentroids.extent(1));
+
+  auto d_partial = raft::make_device_scalar<DataT>(handle, DataT{0});
+
+  for (std::size_t p = 0; p < X_parts.size(); ++p) {
+    auto part_rows = static_cast<IndexT>(X_parts[p].extent(0));
+    if (part_rows == 0) { continue; }
+    auto x_slice = raft::make_device_matrix_view<const DataT, IndexT>(
+      X_parts[p].data_handle(), part_rows, n_features);
+    auto mcd_slice = raft::make_device_vector_view<DataT, IndexT>(
+      minClusterDistance.data_handle() + part_offsets[p], part_rows);
+    auto norm_slice = raft::make_device_vector_view<DataT, IndexT>(
+      L2NormX.data_handle() + part_offsets[p], part_rows);
+
+    cuvs::cluster::kmeans::min_cluster_distance<DataT, IndexT>(handle,
+                                                               x_slice,
+                                                               potentialCentroids,
+                                                               mcd_slice,
+                                                               norm_slice,
+                                                               L2NormBuf_OR_DistBuf,
+                                                               params.metric,
+                                                               params.batch_samples,
+                                                               params.batch_centroids,
+                                                               workspace);
+  }
+
+  if (n_local > 0) {
+    auto mcd_view =
+      raft::make_device_vector_view<DataT, IndexT>(minClusterDistance.data_handle(), n_local);
+    cuvs::cluster::kmeans::cluster_cost<DataT, IndexT>(
+      handle, mcd_view, workspace, d_partial.view(), raft::add_op{});
+  }
+
+  comms.allreduce(d_partial.data_handle(), d_partial.data_handle(), 1);
+
+  DataT psi_h = DataT{0};
+  raft::copy(&psi_h, d_partial.data_handle(), 1, stream);
+  raft::resource::sync_stream(handle);
+  return psi_h;
+}
+
+/**
  * @brief Truly distributed scalable KMeans++ initialization for the device path.
  *
  * Implements the multi-GPU variant of the scalable KMeans++ algorithm
@@ -119,9 +205,9 @@ void initKMeansPlusPlus_distributed(
   auto d_rp = raft::make_device_scalar<int>(handle, 0);
   int rp    = 0;
 
-  // Step 1.1 - choose the source rank deterministically (same seed -> same rp on all ranks).
-  if (rank == KMEANS_COMM_ROOT) {
-    // Only draw from ranks that actually own at least one row to avoid an
+  // Step 1.1 - choose the source rank.
+  if (rank == CUVS_KMEANS_COMM_ROOT) {
+    // Only draw from ranks that actually own at least one row.
     std::vector<int> non_empty_ranks;
     non_empty_ranks.reserve(static_cast<std::size_t>(num_ranks));
     for (int r = 0; r < num_ranks; ++r) {
@@ -135,7 +221,7 @@ void initKMeansPlusPlus_distributed(
     rp = non_empty_ranks[rank_dist(gen)];
     raft::copy(d_rp.data_handle(), &rp, 1, stream);
   }
-  comms.bcast(d_rp.data_handle(), static_cast<size_t>(1), KMEANS_COMM_ROOT);
+  comms.bcast(d_rp.data_handle(), static_cast<size_t>(1), CUVS_KMEANS_COMM_ROOT);
   raft::copy(&rp, d_rp.data_handle(), 1, stream);
   raft::resource::sync_stream(handle);
 
@@ -191,51 +277,18 @@ void initKMeansPlusPlus_distributed(
     raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(handle, x_slice, norm_slice);
   }
 
-  // Computes the global cluster cost (psi) by iterating over every local part,
-  // computing the per-row min cluster distance against the current candidate
-  // set, reducing locally and then allreducing across ranks.
-  auto d_partial           = raft::make_device_scalar<DataT>(handle, DataT{0});
-  auto compute_global_cost = [&]() -> DataT {
-    raft::matrix::fill(handle, d_partial.view(), DataT{0});
-    for (std::size_t p = 0; p < X_parts.size(); ++p) {
-      auto part_rows = static_cast<IndexT>(X_parts[p].extent(0));
-      if (part_rows == 0) { continue; }
-      auto x_slice = raft::make_device_matrix_view<const DataT, IndexT>(
-        X_parts[p].data_handle(), part_rows, n_features);
-      auto mcd_slice = raft::make_device_vector_view<DataT, IndexT>(
-        minClusterDistance.data_handle() + part_offsets[p], part_rows);
-      auto norm_slice = raft::make_device_vector_view<DataT, IndexT>(
-        L2NormX.data_handle() + part_offsets[p], part_rows);
-
-      cuvs::cluster::kmeans::min_cluster_distance<DataT, IndexT>(handle,
-                                                                 x_slice,
-                                                                 potentialCentroids,
-                                                                 mcd_slice,
-                                                                 norm_slice,
-                                                                 L2NormBuf_OR_DistBuf,
-                                                                 params.metric,
-                                                                 params.batch_samples,
-                                                                 params.batch_centroids,
-                                                                 workspace);
-    }
-
-    if (n_local > 0) {
-      auto mcd_view =
-        raft::make_device_vector_view<DataT, IndexT>(minClusterDistance.data_handle(), n_local);
-      cuvs::cluster::kmeans::cluster_cost<DataT, IndexT>(
-        handle, mcd_view, workspace, d_partial.view(), raft::add_op{});
-    }
-
-    comms.allreduce(d_partial.data_handle(), d_partial.data_handle(), 1);
-
-    DataT psi_h = DataT{0};
-    raft::copy(&psi_h, d_partial.data_handle(), 1, stream);
-    raft::resource::sync_stream(handle);
-    return psi_h;
-  };
-
   // Step 2: psi <- phi_X(C).
-  DataT psi = compute_global_cost();
+  DataT psi = compute_global_cluster_cost<DataT, IndexT>(handle,
+                                                         params,
+                                                         X_parts,
+                                                         part_offsets,
+                                                         n_local,
+                                                         L2NormX.view(),
+                                                         potentialCentroids,
+                                                         minClusterDistance.view(),
+                                                         L2NormBuf_OR_DistBuf,
+                                                         workspace,
+                                                         comms);
 
   const int niter = std::min(8, static_cast<int>(std::ceil(std::log(psi))));
   RAFT_LOG_DEBUG(
@@ -243,7 +296,18 @@ void initKMeansPlusPlus_distributed(
 
   // Steps 3-6: sample candidates `O(log psi)` times, gathering across ranks.
   for (int iter = 0; iter < niter; ++iter) {
-    psi = compute_global_cost();
+    if (iter > 0)
+      psi = compute_global_cluster_cost<DataT, IndexT>(handle,
+                                                       params,
+                                                       X_parts,
+                                                       part_offsets,
+                                                       n_local,
+                                                       L2NormX.view(),
+                                                       potentialCentroids,
+                                                       minClusterDistance.view(),
+                                                       L2NormBuf_OR_DistBuf,
+                                                       workspace,
+                                                       comms);
 
     if (n_local > 0) {
       auto rands_view =

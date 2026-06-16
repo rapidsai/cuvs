@@ -1120,6 +1120,8 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_double.cu
     src/cluster/kmeans_fit_float.cu
+    $<$<BOOL:${BUILD_MG_ALGOS}>:src/cluster/kmeans_fit_mg_float.cu>
+    $<$<BOOL:${BUILD_MG_ALGOS}>:src/cluster/kmeans_fit_mg_double.cu>
     src/cluster/kmeans_auto_find_k_float.cu
     src/cluster/kmeans_fit_predict_double.cu
     src/cluster/kmeans_fit_predict_float.cu
@@ -1293,10 +1295,6 @@ if(NOT BUILD_CPU_ONLY)
     )
     find_package(NCCL REQUIRED)
     target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
-
-    target_sources(
-      cuvs_objs PRIVATE src/cluster/kmeans_fit_mg_float.cu src/cluster/kmeans_fit_mg_double.cu
-    )
   endif()
 
   set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
