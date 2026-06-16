@@ -11,6 +11,22 @@
 #include <utility>
 
 namespace cuvs::neighbors::cagra::helpers {
+namespace {
+// Size in bytes of a single element of the given CUDA data type.
+size_t cuda_data_type_size(cudaDataType_t dtype)
+{
+  switch (dtype) {
+    case CUDA_R_32F: return 4;
+    case CUDA_R_16F: return 2;
+    case CUDA_R_8I:
+    case CUDA_R_8U: return 1;
+    default:
+      RAFT_FAIL("cagra_build_mem_usage: unsupported dataset element type %d",
+                static_cast<int>(dtype));
+  }
+}
+}  // namespace
+
 // Calculate CAGRA optimize workspace memory requirements.
 // This is the working memory on top of the input/output memory usage.
 std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows,
@@ -30,7 +46,8 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
     mst_host = n_rows * index_size;                  // mst_graph_num_edges
     mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in optimize
     mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in mst_optimize
-    mst_host += n_rows * index_size * 7;             // Five vectors _edges suffix, and label, cluster_size vectors.
+    mst_host +=
+      n_rows * index_size * 7;  // Five vectors _edges suffix, and label, cluster_size vectors.
     mst_host_fixed += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
     mst_host += mst_host_fixed;
   }
@@ -77,13 +94,15 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
 inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
   raft::resources const& res,
   raft::matrix_extent<int64_t> dataset,
-  size_t dtype_size,
-  bool input_is_float,
+  cudaDataType_t dtype,
   cuvs::neighbors::graph_build_params::ivf_pq_params params,
   size_t graph_degree,
   size_t intermediate_graph_degree,
   bool guarantee_connectivity)
 {
+  size_t dtype_size   = cuda_data_type_size(dtype);
+  bool input_is_float = (dtype == CUDA_R_32F);
+
   size_t n_rows = dataset.extent(0);
   size_t dim    = dataset.extent(1);
 
@@ -170,8 +189,7 @@ inline std::pair<size_t, size_t> nn_descent_build_mem_usage(raft::resources cons
 
 std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
                                                 raft::matrix_extent<int64_t> dataset,
-                                                size_t dtype_size,
-                                                bool input_is_float,
+                                                cudaDataType_t dtype,
                                                 cuvs::neighbors::cagra::index_params cparams)
 {
   using namespace cuvs::neighbors;
@@ -185,8 +203,7 @@ std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
       std::get<graph_build_params::ivf_pq_params>(cparams.graph_build_params);
     std::tie(total_host, total_dev) = ivf_pq_build_mem_usage(res,
                                                              dataset,
-                                                             dtype_size,
-                                                             input_is_float,
+                                                             dtype,
                                                              pq_params,
                                                              cparams.graph_degree,
                                                              cparams.intermediate_graph_degree,
@@ -202,13 +219,15 @@ std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
   } else {
     // iterative build
     // TODO(tfeher): proper estimate
-    total_host = dataset.extent(0) * dataset.extent(1) * dtype_size +
+    total_host = dataset.extent(0) * dataset.extent(1) * cuda_data_type_size(dtype) +
                  dataset.extent(0) * (cparams.graph_degree + cparams.intermediate_graph_degree) *
                    sizeof(uint32_t);
     total_dev = total_host;
   }
+
+  size_t extra_gpu_workspace_size = raft::resource::get_workspace_total_bytes(res);
   return std::make_pair(total_host + static_cast<size_t>(1e9),
-                        total_dev + static_cast<size_t>(1e9));
+                        total_dev + extra_gpu_workspace_size);
 }
 
 }  // namespace cuvs::neighbors::cagra::helpers

@@ -24,6 +24,8 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 
+#include <library_types.h>
+
 #include <cmath>
 #include <fcntl.h>
 #include <filesystem>
@@ -68,6 +70,31 @@ template <>
 struct hnsw_dist_t<int8_t> {
   using type = int;
 };
+
+// Map the dataset element type to a cudaDataType_t. This is a host-only helper that
+// intentionally avoids pulling CUDA/device dependencies.
+template <typename T>
+cudaDataType_t to_cuda_data_type();
+template <>
+inline cudaDataType_t to_cuda_data_type<float>()
+{
+  return CUDA_R_32F;
+}
+template <>
+inline cudaDataType_t to_cuda_data_type<half>()
+{
+  return CUDA_R_16F;
+}
+template <>
+inline cudaDataType_t to_cuda_data_type<int8_t>()
+{
+  return CUDA_R_8I;
+}
+template <>
+inline cudaDataType_t to_cuda_data_type<uint8_t>()
+{
+  return CUDA_R_8U;
+}
 
 template <typename T>
 struct index_impl : index<T> {
@@ -1519,7 +1546,13 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::build<ACE>");
 
-  cuvs::neighbors::cagra::index_params cagra_params;
+  cuvs::neighbors::cagra::index_params cagra_params =
+    cagra::index_params::from_hnsw_params(dataset.extents(),
+                                          params.M,
+                                          params.ef_construction,
+                                          cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
+                                          params.metric);
+  cagra_params.metric = params.metric;
 
   // If the user explicitly configured ACE, honor it. Otherwise (default params) apply a
   // heuristic that falls back to ACE only when an in-memory CAGRA build would not fit in
@@ -1527,15 +1560,8 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
   bool use_ace = std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params);
 
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
-    cagra_params = cagra::index_params::from_hnsw_params(
-      dataset.extents(),
-      params.M,
-      params.ef_construction,
-      cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,  // SIMILAR_SEARCH_PERFORMANCE,
-      params.metric);
-
     auto [required_host, required_dev] = cuvs::neighbors::cagra::helpers::cagra_build_mem_usage(
-      res, dataset.extents(), sizeof(T), std::is_same_v<T, float>, cagra_params);
+      res, dataset.extents(), to_cuda_data_type<T>(), cagra_params);
     auto [available_host, available_dev] = get_available_memory();
 
     RAFT_LOG_INFO("CAGRA in memory build, required host mem %4.1f GB, GPU mem %4.1f GB",
@@ -1557,14 +1583,6 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
       std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)
         ? std::get<graph_build_params::ace_params>(params.graph_build_params)
         : graph_build_params::ace_params{};
-
-    // Only override CAGRA params if user explicitly provided ACE params;
-    // otherwise preserve the values from from_hnsw_params computed above.
-    if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
-      cagra_params.metric                    = params.metric;
-      cagra_params.intermediate_graph_degree = params.M * 3;
-      cagra_params.graph_degree              = params.M * 2;
-    }
 
     // Configure ACE parameters for CAGRA
     cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;

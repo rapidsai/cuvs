@@ -3266,16 +3266,15 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
  *
  * @param[in] res raft resource
  * @param[in] dataset shape of the dataset
- * @param[in] dtype_size size of dataset datatype in bytes
- * @param[in] input_is_float whether the dataset element type is `float`
+ * @param[in] dtype element type of the dataset
+ *            (e.g. `CUDA_R_32F`, `CUDA_R_16F`, `CUDA_R_8I`, `CUDA_R_8U`)
  * @param[in] cparams CAGRA index building parameters
  *
  * @return pair of [host_size, device_size] memory sizes in bytes
  */
 std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
                                                 raft::matrix_extent<int64_t> dataset,
-                                                size_t dtype_size,
-                                                bool input_is_float,
+                                                cudaDataType_t dtype,
                                                 cuvs::neighbors::cagra::index_params cparams);
 
 /**

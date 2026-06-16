@@ -809,17 +809,19 @@ struct ace_memory_requirements {
   size_t available_gpu_memory;
 };
 
-// TODO: Adjust overhead factor if needed. Very conservative for now.
+// Amount of host memory that can be used for the build
 constexpr double usable_cpu_memory_fraction = 0.8;
-constexpr double usable_gpu_memory_fraction = 1.0;
-constexpr double imbalance_factor           = 3.0;
-constexpr double vector_expansion_factor    = 2.0;
-constexpr size_t extra_cpu_workspace_size   = 0;
-constexpr size_t extra_gpu_workspace_size   = 2e9;
+
+// Factor to account for imbalances in the partitions (maximum allowed is 3x the average)
+constexpr double imbalance_factor = 3.0;
+
+// Current partitioning adds each vector into 2 partitions (core and augmented)
+constexpr double vector_expansion_factor = 2.0;
 
 // Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
-bool ace_check_use_disk_mode(bool use_disk,
+bool ace_check_use_disk_mode(raft::resources const& res,
+                             bool use_disk,
                              std::string& build_dir,
                              size_t dataset_size,
                              size_t dataset_dim,
@@ -851,7 +853,8 @@ bool ace_check_use_disk_mode(bool use_disk,
     mem.available_host_memory = cuvs::util::get_free_host_memory();
   }
   size_t sub_partition_size =
-    static_cast<size_t>(imbalance_factor * vector_expansion_factor * (dataset_size / n_partitions));
+    static_cast<size_t>(imbalance_factor * vector_expansion_factor *
+                        raft::div_rounding_up_safe(dataset_size, n_partitions));
   auto [opt_host_ws_total, opt_dev_ws_total, opt_host_ws_fixed, opt_dev_ws_fixed] =
     helpers::optimize_workspace_size(
       sub_partition_size, graph_degree, intermediate_degree, sizeof(IdxT), guarantee_connectivity);
@@ -872,8 +875,7 @@ bool ace_check_use_disk_mode(bool use_disk,
   mem.sub_graph_size   = sub_partition_size * (intermediate_degree + graph_degree) * sizeof(IdxT);
   mem.cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
   mem.total_size       = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
-                   mem.sub_graph_size + mem.cagra_graph_size + opt_host_ws_total +
-                   extra_cpu_workspace_size;
+                   mem.sub_graph_size + mem.cagra_graph_size + opt_host_ws_total;
 
   RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GiB, available: %.2f GiB",
                 to_gib(mem.total_size),
@@ -907,11 +909,11 @@ bool ace_check_use_disk_mode(bool use_disk,
   // * IVF-PQ on partition  (sub_dataset_size, uncompressed upper bound)
   // * optimize workspace (opt_dev_ws_total)
   // + some extra workspace (IVF-PQ search, ...)
+  size_t extra_gpu_workspace_size = raft::resource::get_workspace_total_bytes(res);
   size_t gpu_memory_required =
     std::max(mem.sub_dataset_size, opt_dev_ws_total) + extra_gpu_workspace_size;
 
-  bool gpu_memory_limited = static_cast<size_t>(usable_gpu_memory_fraction *
-                                                mem.available_gpu_memory) < gpu_memory_required;
+  bool gpu_memory_limited = mem.available_gpu_memory < gpu_memory_required;
 
   RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
                 to_gib(gpu_memory_required),
@@ -958,7 +960,8 @@ bool ace_check_use_disk_mode(bool use_disk,
 
 // Validate and adjust partitions for disk mode memory requirements
 template <typename T, typename IdxT>
-void ace_validate_disk_mode_partitions(size_t& n_partitions,
+void ace_validate_disk_mode_partitions(raft::resources const& res,
+                                       size_t& n_partitions,
                                        size_t dataset_size,
                                        size_t dataset_dim,
                                        size_t intermediate_degree,
@@ -983,7 +986,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
   // Compute optimize workspace requirements
   size_t sub_partition_size =
-    static_cast<size_t>(imbalance_factor * vector_expansion_factor * (dataset_size / n_partitions));
+    static_cast<size_t>(imbalance_factor * vector_expansion_factor *
+                        raft::div_rounding_up_safe(dataset_size, n_partitions));
   auto [host_workspace_size_total,
         gpu_workspace_size_total,
         host_workspace_size_fixed,
@@ -994,7 +998,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   // Check host memory requirements
   size_t disk_mode_host_required = mem.partition_labels_size + mem.id_mapping_size +
                                    mem.sub_dataset_size + mem.sub_graph_size +
-                                   host_workspace_size_total + extra_cpu_workspace_size;
+                                   host_workspace_size_total;
 
   if (static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) <
       disk_mode_host_required) {
@@ -1006,11 +1010,11 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(mem.available_host_memory),
       to_gib(mem.sub_dataset_size),
       to_gib(mem.sub_graph_size),
-      to_gib(host_workspace_size_total + extra_cpu_workspace_size));
+      to_gib(host_workspace_size_total));
 
     // Calculate suggested number of partitions for host memory
-    size_t disk_mode_host_static = mem.partition_labels_size + mem.id_mapping_size +
-                                   host_workspace_size_fixed + extra_cpu_workspace_size;
+    size_t disk_mode_host_static =
+      mem.partition_labels_size + mem.id_mapping_size + host_workspace_size_fixed;
     size_t disk_mode_host_dynamic = disk_mode_host_required - disk_mode_host_static;
     double available_for_scaling =
       usable_cpu_memory_fraction * mem.available_host_memory - disk_mode_host_static;
@@ -1032,11 +1036,11 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   // * IVF-PQ on partition  (mem.sub_dataset_size) (compressed?)
   // * optimize workspace (gpu_workspace_size_total)
   // + some extra workspace (IVF-PQ search, ...)
+  size_t extra_gpu_workspace_size = raft::resource::get_workspace_total_bytes(res);
   size_t disk_mode_gpu_required =
     std::max(mem.sub_dataset_size, gpu_workspace_size_total) + extra_gpu_workspace_size;
 
-  if (static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
-      disk_mode_gpu_required) {
+  if (mem.available_gpu_memory < disk_mode_gpu_required) {
     gpu_memory_insufficient = true;
     RAFT_LOG_WARN(
       "ACE: GPU memory insufficient for per-partition processing. Required: %.2f GiB, "
@@ -1048,14 +1052,13 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
     size_t disk_mode_gpu_static  = gpu_workspace_size_fixed + extra_gpu_workspace_size;
     size_t disk_mode_gpu_dynamic = disk_mode_gpu_required - disk_mode_gpu_static;
-    double available_for_scaling =
-      usable_gpu_memory_fraction * mem.available_gpu_memory - disk_mode_gpu_static;
+    double available_for_scaling = mem.available_gpu_memory - disk_mode_gpu_static;
 
     RAFT_EXPECTS(available_for_scaling > 0,
                  "ACE: GPU memory insufficient even for constant overhead. Required: %.2f GiB, "
                  "available: %.2f GiB",
                  to_gib(disk_mode_gpu_static),
-                 to_gib(usable_gpu_memory_fraction * mem.available_gpu_memory));
+                 to_gib(mem.available_gpu_memory));
 
     gpu_suggested_partitions =
       static_cast<size_t>(std::ceil(disk_mode_gpu_dynamic * n_partitions / available_for_scaling));
@@ -1080,8 +1083,9 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
     n_partitions = new_n_partitions;
 
-    size_t new_sub_partition_size = static_cast<size_t>(imbalance_factor * vector_expansion_factor *
-                                                        (dataset_size / n_partitions));
+    size_t new_sub_partition_size =
+      static_cast<size_t>(imbalance_factor * vector_expansion_factor *
+                          raft::div_rounding_up_safe(dataset_size, n_partitions));
     auto [new_opt_host_ws, new_opt_dev_ws, new_opt_host_ws_fixed, new_opt_dev_ws_fixed] =
       helpers::optimize_workspace_size(new_sub_partition_size,
                                        graph_degree,
@@ -1093,15 +1097,14 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
     mem.sub_graph_size =
       new_sub_partition_size * (intermediate_degree + graph_degree) * sizeof(IdxT);
     mem.total_size = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
-                     mem.sub_graph_size + mem.cagra_graph_size + new_opt_host_ws +
-                     extra_cpu_workspace_size;
+                     mem.sub_graph_size + mem.cagra_graph_size + new_opt_host_ws;
 
     RAFT_LOG_INFO(
       "ACE: Updated per-partition memory estimates: dataset %.2f GiB, graph %.2f GiB, "
       "host workspace %.2f GiB, GPU workspace %.2f GiB",
       to_gib(mem.sub_dataset_size),
       to_gib(mem.sub_graph_size),
-      to_gib(new_opt_host_ws + extra_cpu_workspace_size),
+      to_gib(new_opt_host_ws),
       to_gib(new_opt_dev_ws + extra_gpu_workspace_size));
   }
 }
@@ -1184,7 +1187,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Check if disk mode should be used based on memory constraints
     ace_memory_requirements mem;
-    bool use_disk_mode = ace_check_use_disk_mode<T, IdxT>(use_disk,
+    bool use_disk_mode = ace_check_use_disk_mode<T, IdxT>(res,
+                                                          use_disk,
                                                           build_dir,
                                                           dataset_size,
                                                           dataset_dim,
@@ -1198,7 +1202,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Validate and adjust partitions if disk mode is enabled
     if (use_disk_mode) {
-      ace_validate_disk_mode_partitions<T, IdxT>(n_partitions,
+      ace_validate_disk_mode_partitions<T, IdxT>(res,
+                                                 n_partitions,
                                                  dataset_size,
                                                  dataset_dim,
                                                  intermediate_degree,

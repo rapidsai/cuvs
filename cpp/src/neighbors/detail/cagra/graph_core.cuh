@@ -846,7 +846,7 @@ void merge_graph_gpu(
 
   uint32_t batch_size =
     static_cast<uint32_t>(std::min<uint64_t>(graph_size, helpers::kOptimizeBatchSize));
-  const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
+  const uint32_t num_batch = raft::div_rounding_up_safe<uint64_t>(graph_size, batch_size);
 
   namespace bli                       = cuvs::spatial::knn::detail::utils;
   auto [copy_stream, enable_prefetch] = bli::get_prefetch_stream(res);
@@ -1607,7 +1607,7 @@ void prune_graph_gpu(
 
   uint32_t batch_size =
     static_cast<uint32_t>(std::min<uint64_t>(graph_size, helpers::kOptimizeBatchSize));
-  const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
+  const uint32_t num_batch = raft::div_rounding_up_safe<uint64_t>(graph_size, batch_size);
 
   RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
 
