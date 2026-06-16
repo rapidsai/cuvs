@@ -16,8 +16,6 @@ include(rapids-export)
 include(rapids-find)
 
 # ------------- configure project --------------#
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CUDA_STANDARD 20)
 
 rapids_cuda_init_architectures(test_cuvs)
 

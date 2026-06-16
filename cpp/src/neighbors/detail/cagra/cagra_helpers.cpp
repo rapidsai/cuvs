@@ -30,7 +30,7 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
     mst_host = n_rows * index_size;                  // mst_graph_num_edges
     mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in optimize
     mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in mst_optimize
-    mst_host += n_rows * index_size * 7;             // vectors with _max_edges suffix
+    mst_host += n_rows * index_size * 7;             // Five vectors _edges suffix, and label, cluster_size vectors.
     mst_host_fixed += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
     mst_host += mst_host_fixed;
   }
