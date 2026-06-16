@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "cagra_helpers.hpp"
 #include "utils.hpp"
 
 #include <raft/core/copy.cuh>

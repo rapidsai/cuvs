@@ -3300,9 +3300,6 @@ void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
 
-/** The batch size for the CAGRA optimize stage. */
-constexpr static size_t kOptimizeBatchSize = 256 * 1024;
-
 }  // namespace helpers
 }  // namespace cagra
 }  // namespace neighbors

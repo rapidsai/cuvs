@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "cagra_helpers.hpp"
+
 #include <algorithm>
 #include <cstdint>
 #include <cuvs/neighbors/cagra.hpp>
