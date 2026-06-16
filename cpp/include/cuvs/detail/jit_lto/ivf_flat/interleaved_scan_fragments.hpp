@@ -16,6 +16,7 @@ struct tag_acc_u32 {};
 // Tag types for distance metrics
 struct tag_metric_euclidean {};
 struct tag_metric_inner_product {};
+struct tag_metric_bitwise_hamming {};
 struct tag_metric_custom_udf {};
 
 // Tag types for post-processing

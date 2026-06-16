@@ -26,6 +26,9 @@
 
 #include <rmm/resource_ref.hpp>
 
+#include "../../distance/detail/distance_ops/bitwise_hamming.cuh"
+#include "../../distance/detail/pairwise_matrix/dispatch.cuh"
+
 #include <type_traits>
 
 namespace cuvs::neighbors::ivf_flat::detail {
@@ -102,78 +105,117 @@ void search_impl(raft::resources const& handle,
         raft::make_device_vector_view<const T>(queries, n_queries * index.dim())));
   }
 
-  float alpha = 1.0f;
-  float beta  = 0.0f;
+  if (effective_metric == cuvs::distance::DistanceType::BitwiseHamming) {
+    if constexpr (std::is_same_v<T, uint8_t>) {
+      cuvs::distance::detail::ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT> distance_op{
+        static_cast<IdxT>(index.dim())};
 
-  // todo(lsugy): raft distance? (if performance is similar/better than gemm)
-  switch (effective_metric) {
-    case cuvs::distance::DistanceType::L2Expanded:
-    case cuvs::distance::DistanceType::L2SqrtExpanded: {
-      alpha = -2.0f;
-      beta  = 1.0f;
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      rmm::device_uvector<uint32_t> uint32_distances(
+        n_queries * index.n_lists(), stream, search_mr);
+
+      cuvs::distance::detail::pairwise_matrix_dispatch<decltype(distance_op),
+                                                       uint8_t,
+                                                       uint32_t,
+                                                       uint32_t,
+                                                       raft::identity_op,
+                                                       IdxT>(distance_op,
+                                                             static_cast<IdxT>(n_queries),
+                                                             static_cast<IdxT>(index.n_lists()),
+                                                             static_cast<IdxT>(index.dim()),
+                                                             queries,
+                                                             index.binary_centers().data_handle(),
+                                                             nullptr,
+                                                             nullptr,
+                                                             uint32_distances.data(),
+                                                             raft::identity_op{},
+                                                             stream,
+                                                             true);
+
+      // Cast uint32_t distances to float for the rest of the IVF-Flat pipeline.
+      raft::linalg::map(
         handle,
-        raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
-          converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
-        raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
-                                                   static_cast<IdxT>(n_queries)));
-      utils::outer_add(query_norm_dev.data(),
-                       (IdxT)n_queries,
-                       index.center_norms()->data_handle(),
-                       (IdxT)index.n_lists(),
+        distance_buffer_dev_view,
+        raft::cast_op<float>{},
+        raft::make_const_mdspan(raft::make_device_matrix_view<const uint32_t, int64_t>(
+          uint32_distances.data(), n_queries, index.n_lists())));
+    } else {
+      RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type");
+    }
+  } else {
+    float alpha = 1.0f;
+    float beta  = 0.0f;
+
+    // todo(lsugy): raft distance? (if performance is similar/better than gemm)
+    switch (effective_metric) {
+      case cuvs::distance::DistanceType::L2Expanded:
+      case cuvs::distance::DistanceType::L2SqrtExpanded: {
+        alpha = -2.0f;
+        beta  = 1.0f;
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
+            converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
+          raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
+                                                     static_cast<IdxT>(n_queries)));
+        utils::outer_add(query_norm_dev.data(),
+                         (IdxT)n_queries,
+                         index.center_norms()->data_handle(),
+                         (IdxT)index.n_lists(),
+                         distance_buffer_dev.data(),
+                         stream);
+        RAFT_LOG_TRACE_VEC(index.center_norms()->data_handle(),
+                           std::min<uint32_t>(20, index.dim()));
+        RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
+        break;
+      }
+      case cuvs::distance::DistanceType::CosineExpanded: {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
+            converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
+          raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
+                                                     static_cast<IdxT>(n_queries)),
+          raft::sqrt_op{});
+        alpha = -1.0f;
+        beta  = 0.0f;
+        break;
+      }
+      default: {
+        alpha = 1.0f;
+        beta  = 0.0f;
+      }
+    }
+
+    raft::linalg::gemm(handle,
+                       true,
+                       false,
+                       index.n_lists(),
+                       n_queries,
+                       index.dim(),
+                       &alpha,
+                       index.centers().data_handle(),
+                       index.dim(),
+                       converted_queries_ptr,
+                       index.dim(),
+                       &beta,
                        distance_buffer_dev.data(),
+                       index.n_lists(),
                        stream);
-      RAFT_LOG_TRACE_VEC(index.center_norms()->data_handle(), std::min<uint32_t>(20, index.dim()));
-      RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
-      break;
-    }
-    case cuvs::distance::DistanceType::CosineExpanded: {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+
+    if (effective_metric == cuvs::distance::DistanceType::CosineExpanded) {
+      auto n_lists                      = index.n_lists();
+      const auto* q_norm_ptr            = query_norm_dev.data();
+      const auto* index_center_norm_ptr = index.center_norms()->data_handle();
+      raft::linalg::map_offset(
         handle,
-        raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
-          converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
-        raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
-                                                   static_cast<IdxT>(n_queries)),
-        raft::sqrt_op{});
-      alpha = -1.0f;
-      beta  = 0.0f;
-      break;
+        distance_buffer_dev_view,
+        [=] __device__(const uint32_t idx, const float dist) {
+          const auto query   = idx / n_lists;
+          const auto cluster = idx % n_lists;
+          return dist / (q_norm_ptr[query] * index_center_norm_ptr[cluster]);
+        },
+        raft::make_const_mdspan(distance_buffer_dev_view));
     }
-    default: {
-      alpha = 1.0f;
-      beta  = 0.0f;
-    }
-  }
-
-  raft::linalg::gemm(handle,
-                     true,
-                     false,
-                     index.n_lists(),
-                     n_queries,
-                     index.dim(),
-                     &alpha,
-                     index.centers().data_handle(),
-                     index.dim(),
-                     converted_queries_ptr,
-                     index.dim(),
-                     &beta,
-                     distance_buffer_dev.data(),
-                     index.n_lists(),
-                     stream);
-
-  if (effective_metric == cuvs::distance::DistanceType::CosineExpanded) {
-    auto n_lists                      = index.n_lists();
-    const auto* q_norm_ptr            = query_norm_dev.data();
-    const auto* index_center_norm_ptr = index.center_norms()->data_handle();
-    raft::linalg::map_offset(
-      handle,
-      distance_buffer_dev_view,
-      [=] __device__(const uint32_t idx, const float dist) {
-        const auto query   = idx / n_lists;
-        const auto cluster = idx % n_lists;
-        return dist / (q_norm_ptr[query] * index_center_norm_ptr[cluster]);
-      },
-      raft::make_const_mdspan(distance_buffer_dev_view));
   }
   RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
 
