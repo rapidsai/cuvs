@@ -397,13 +397,50 @@ __forceinline__ __device__ void enqueue_all_neighbors_warp(int num_neighbors,
   for (int i = 0; i < num_neighbors; i++) {
     const DataT* neighbor_vec = &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)];
     accT dist_out;
-    if constexpr (std::is_same_v<QueryT, float> && is_cuda_fp16_v<DataT>) {
+    if constexpr (std::is_same_v<QueryT, __half>) {
+      dist_out = dist_warp_half_query<accT, DataT>(
+        query_vec->coords, neighbor_vec, dim, metric, laneId);
+    } else if constexpr (std::is_same_v<QueryT, float> && is_cuda_fp16_v<DataT>) {
       dist_out = dist_warp<accT>(query_vec->coords, neighbor_vec, dim, metric, laneId);
     } else {
       static_assert(std::is_same_v<QueryT, DataT>);
       dist_out = dist_warp<QueryT, accT>(query_vec->coords, neighbor_vec, dim, metric, laneId);
     }
     if (laneId == 0) { heap_queue.insert_back(dist_out, neighbor_array[i]); }
+  }
+}
+
+template <typename T, typename accT, typename IdxT>
+__forceinline__ __device__ void enqueue_all_neighbors_warp(int num_neighbors,
+                                                             bool fp16_query_smem,
+                                                             __half* s_coords_half,
+                                                             typename greedy_search_query_coord<T>::type*
+                                                               s_coords,
+                                                             const T* vec_ptr,
+                                                             IdxT* neighbor_array,
+                                                             PriorityQueue<IdxT, accT>& heap_queue,
+                                                             int dim,
+                                                             cuvs::distance::DistanceType metric,
+                                                             int laneId)
+{
+  if (fp16_query_smem) {
+    Point<__half, accT> query_vec;
+    query_vec.coords = s_coords_half;
+    query_vec.Dim    = dim;
+    enqueue_all_neighbors_warp<__half, T, accT, IdxT>(
+      num_neighbors, &query_vec, vec_ptr, neighbor_array, heap_queue, dim, metric, laneId);
+  } else if constexpr (is_cuda_fp16_v<T>) {
+    Point<float, accT> query_vec;
+    query_vec.coords = reinterpret_cast<float*>(s_coords);
+    query_vec.Dim    = dim;
+    enqueue_all_neighbors_warp<float, T, accT, IdxT>(
+      num_neighbors, &query_vec, vec_ptr, neighbor_array, heap_queue, dim, metric, laneId);
+  } else {
+    Point<T, accT> query_vec;
+    query_vec.coords = reinterpret_cast<T*>(s_coords);
+    query_vec.Dim    = dim;
+    enqueue_all_neighbors_warp<T, T, accT, IdxT>(
+      num_neighbors, &query_vec, vec_ptr, neighbor_array, heap_queue, dim, metric, laneId);
   }
 }
 

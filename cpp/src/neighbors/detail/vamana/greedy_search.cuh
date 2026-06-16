@@ -111,23 +111,22 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
 
   using QueryCoordT = typename greedy_search_query_coord<T>::type;
 
-  union ShmemLayout {
-    QueryCoordT coords;
-    IdxT neighborhood_arr;
-    DistPair<IdxT, accT> candidate_queue;
-  };
   int align_padding = raft::alignTo(dim, 16) - dim;
 
-  extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
+  const bool fp16_query_smem = greedy_search_use_fp16_query_smem<T>(dim);
+
+  extern __shared__ __align__(16) char smem[];
 
   // Per-warp shared memory layout: coords, neighbor_array, candidate_queue
-  const int coords_size      = (dim + align_padding) * sizeof(QueryCoordT);
+  const int coords_size =
+    (dim + align_padding) * greedy_search_query_smem_elem_size<T>(dim);
   const int neighbor_size    = degree * sizeof(IdxT);
   const int queue_size_bytes = max_queue_size * sizeof(DistPair<IdxT, accT>);
   const int per_warp_size    = (coords_size + neighbor_size + queue_size_bytes + 15) & ~15;
 
   char* warp_smem = &smem[warpIdx * per_warp_size];
-  QueryCoordT* s_coords = reinterpret_cast<QueryCoordT*>(warp_smem);
+  __half* s_coords_half = reinterpret_cast<__half*>(warp_smem);
+  QueryCoordT* s_coords  = reinterpret_cast<QueryCoordT*>(warp_smem);
   IdxT* neighbor_array = reinterpret_cast<IdxT*>(warp_smem + coords_size);
   DistPair<IdxT, accT>* candidate_queue_smem =
     reinterpret_cast<DistPair<IdxT, accT>*>(warp_smem + coords_size + neighbor_size);
@@ -138,9 +137,15 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   static __shared__ int k_max_idx[4];
   static __shared__ int num_neighbors[4];
 
+  Point<__half, accT> s_query_half;
   Point<QueryCoordT, accT> s_query;
-  s_query.Dim    = dim;
-  s_query.coords = s_coords;
+  if (fp16_query_smem) {
+    s_query_half.Dim    = dim;
+    s_query_half.coords = s_coords_half;
+  } else {
+    s_query.Dim    = dim;
+    s_query.coords = s_coords;
+  }
 
   PriorityQueue<IdxT, accT> heap_queue;
   if (laneId == 0) {
@@ -153,35 +158,54 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   for (int i = blockIdx.x * 4 + warpIdx; i < num_queries; i += gridDim.x * 4) {
     query_list[i].reset_warp(laneId);
 
-    if constexpr (is_cuda_fp16_v<T>) {
+    int cur_query_id = query_list[i].queryId;
+    if (fp16_query_smem) {
+      if constexpr (is_cuda_fp16_v<T>) {
+        update_shared_point_warp_fp16_query_smem<accT>(
+          &s_query_half, vec_ptr, cur_query_id, dim, laneId);
+      } else if constexpr (std::is_same_v<T, float>) {
+        update_shared_point_warp_fp16_query_smem<accT>(
+          &s_query_half, vec_ptr, cur_query_id, dim, laneId);
+      } else {
+        update_shared_point_warp_fp16_query_smem<T, accT>(
+          &s_query_half, vec_ptr, cur_query_id, dim, laneId);
+      }
+    } else if constexpr (is_cuda_fp16_v<T>) {
       update_shared_point_warp_half_to_float<accT>(
-        &s_query, vec_ptr, query_list[i].queryId, dim, laneId);
+        &s_query, vec_ptr, cur_query_id, dim, laneId);
     } else {
-      update_shared_point_warp<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim, laneId);
+      update_shared_point_warp<T, accT>(&s_query, vec_ptr, cur_query_id, dim, laneId);
     }
 
     if (laneId == 0) {
       topk_q_size[warpIdx] = 0;
       cand_q_size[warpIdx] = 0;
-      s_query.id         = query_list[i].queryId;
+      if (fp16_query_smem) {
+        s_query_half.id = cur_query_id;
+      } else {
+        s_query.id = cur_query_id;
+      }
       cur_k_max[warpIdx] = 0;
       k_max_idx[warpIdx] = 0;
       heap_queue.reset();
     }
 
-    Point<QueryCoordT, accT>* query_vec = &s_query;
-    query_vec->Dim                      = dim;
-    query_vec->coords                   = s_coords;
     accT medoid_dist;
-    if constexpr (is_cuda_fp16_v<T>) {
-      medoid_dist = dist_warp<accT>(query_vec->coords,
+    if (fp16_query_smem) {
+      medoid_dist = dist_warp_half_query<accT, T>(s_coords_half,
+                                                  &vec_ptr[(size_t)medoid_id * (size_t)dim],
+                                                  dim,
+                                                  metric,
+                                                  laneId);
+    } else if constexpr (is_cuda_fp16_v<T>) {
+      medoid_dist = dist_warp<accT>(s_coords,
                                     &vec_ptr[(size_t)medoid_id * (size_t)dim],
                                     dim,
                                     metric,
                                     laneId);
     } else {
       medoid_dist = dist_warp<T, accT>(
-        query_vec->coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
+        s_coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
     }
 
     if (laneId == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
@@ -242,19 +266,21 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
           atomicMin(&num_neighbors[warpIdx], (int)j);
       }
 
-      enqueue_all_neighbors_warp<QueryCoordT, T, accT, IdxT>(num_neighbors[warpIdx],
-                                                             query_vec,
-                                                             vec_ptr,
-                                                             neighbor_array,
-                                                             heap_queue,
-                                                             dim,
-                                                             metric,
-                                                             laneId);
+      enqueue_all_neighbors_warp(num_neighbors[warpIdx],
+                                 fp16_query_smem,
+                                 s_coords_half,
+                                 s_coords,
+                                 vec_ptr,
+                                 neighbor_array,
+                                 heap_queue,
+                                 dim,
+                                 metric,
+                                 laneId);
     }
 
     bool self_found = false;
     for (int j = laneId; j < query_list[i].size; j += 32) {
-      if (query_list[i].ids[j] == query_vec->id) {
+      if (query_list[i].ids[j] == cur_query_id) {
         query_list[i].dists[j] = raft::upper_bound<accT>();
         query_list[i].ids[j]   = raft::upper_bound<IdxT>();
         self_found             = true;

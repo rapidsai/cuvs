@@ -217,12 +217,13 @@ void batched_insert_vamana(
   SELECT_SORT_SMEM_SIZE(degree, visited_size);  // Sets sort_smem_size based on dataset
 
   // GreedySearch: per-warp shared memory (4 warps): coords, neighbor_array, candidate_queue
-  // Half datasets promote query coords to float in smem.
+  const int search_coords_size =
+    (dim + align_padding) * greedy_search_query_smem_elem_size<T>(dim);
   const int coords_size      = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
   const int neighbor_size    = degree * sizeof(IdxT);
   const int queue_size_bytes = queue_size * sizeof(DistPair<IdxT, accT>);
   int search_smem_total_size =
-    static_cast<int>(4 * ((coords_size + neighbor_size + queue_size_bytes + 15) & ~15));
+    static_cast<int>(4 * ((search_coords_size + neighbor_size + queue_size_bytes + 15) & ~15));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
   const int cand_coords_smem_size =

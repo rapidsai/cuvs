@@ -47,6 +47,24 @@ struct greedy_search_query_coord {
   using type = std::conditional_t<is_cuda_fp16_v<T>, float, T>;
 };
 
+// Wide vectors: store cached GreedySearch query coords as __half in smem (dim >= 512 only).
+// Half dataset is excluded: it already caches query as float (promote once); fp16 smem would
+// re-widen on every distance and lose the vectorized float-query vs half-neighbor path.
+static constexpr int kGreedySearchFp16QuerySmemMinDim = 512;
+
+template <typename T>
+__host__ __device__ inline bool greedy_search_use_fp16_query_smem(int dim)
+{
+  return dim >= kGreedySearchFp16QuerySmemMinDim && !is_cuda_fp16_v<T>;
+}
+
+template <typename T>
+__host__ __device__ inline int greedy_search_query_smem_elem_size(int dim)
+{
+  if (greedy_search_use_fp16_query_smem<T>(dim)) { return static_cast<int>(sizeof(__half)); }
+  return static_cast<int>(sizeof(typename greedy_search_query_coord<T>::type));
+}
+
 // Currently supported values for graph_degree.
 static const int DEGREE_SIZES[4] = {32, 64, 128, 256};
 
@@ -607,6 +625,287 @@ l2_warp_float_half(const float* src, const __half* dest, int dim, int lane)
   }
 }
 
+/* half query vs float dataset: widen query coords to float at use (mirror of float_half) */
+__device__ __forceinline__ float2 l2_load_src2_half(const __half* src, int i)
+{
+  return __half22float2(*reinterpret_cast<const half2*>(&src[i]));
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_SEQ_warp_half_float(const __half* src, const float* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum = 0;
+  for (int i = lane * 2; i < dim; i += VAMANA_WARP_SIZE * 2) {
+    float2 src2 = l2_load_src2_half(src, i);
+    float2 dst2 = l2_load_src2(dst, i);
+    l2_fma_sq2(partial_sum, src2.x, src2.y, dst2);
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP2_warp_half_float(const __half* src, const float* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum[2] = {0, 0};
+  for (int i = lane * 2; i < dim; i += 2 * VAMANA_WARP_SIZE * 2) {
+    float2 temp_dst[2] = {{0, 0}, {0, 0}};
+    temp_dst[0]        = l2_load_src2(dst, i);
+    if (i + 64 < dim) temp_dst[1] = l2_load_src2(dst, i + 64);
+
+    float2 src0 = l2_load_src2_half(src, i);
+    l2_fma_sq2(partial_sum[0], src0.x, src0.y, temp_dst[0]);
+    if (i + 64 < dim) {
+      float2 src1 = l2_load_src2_half(src, i + 64);
+      l2_fma_sq2(partial_sum[1], src1.x, src1.y, temp_dst[1]);
+    }
+  }
+  partial_sum[0] += partial_sum[1];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP4_warp_half_float(const __half* src, const float* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum[4] = {0, 0, 0, 0};
+  for (int i = lane * 2; i < dim; i += 4 * VAMANA_WARP_SIZE * 2) {
+    float2 temp_dst[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
+    temp_dst[0]        = l2_load_src2(dst, i);
+    if (i + 64 < dim) temp_dst[1] = l2_load_src2(dst, i + 64);
+    if (i + 128 < dim) temp_dst[2] = l2_load_src2(dst, i + 128);
+    if (i + 192 < dim) temp_dst[3] = l2_load_src2(dst, i + 192);
+
+    float2 src0 = l2_load_src2_half(src, i);
+    l2_fma_sq2(partial_sum[0], src0.x, src0.y, temp_dst[0]);
+    if (i + 64 < dim) {
+      float2 src1 = l2_load_src2_half(src, i + 64);
+      l2_fma_sq2(partial_sum[1], src1.x, src1.y, temp_dst[1]);
+    }
+    if (i + 128 < dim) {
+      float2 src2 = l2_load_src2_half(src, i + 128);
+      l2_fma_sq2(partial_sum[2], src2.x, src2.y, temp_dst[2]);
+    }
+    if (i + 192 < dim) {
+      float2 src3 = l2_load_src2_half(src, i + 192);
+      l2_fma_sq2(partial_sum[3], src3.x, src3.y, temp_dst[3]);
+    }
+  }
+  partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__forceinline__ __device__ SUMTYPE
+l2_warp_half_float(const __half* src, const float* dest, int dim, int lane)
+{
+  if (dim >= 128) {
+    return l2_ILP4_warp_half_float<SUMTYPE>(src, dest, dim, lane);
+  } else if (dim >= 64) {
+    return l2_ILP2_warp_half_float<SUMTYPE>(src, dest, dim, lane);
+  } else {
+    return l2_SEQ_warp_half_float<SUMTYPE>(src, dest, dim, lane);
+  }
+}
+
+/* fp16 query smem vs half dataset: vectorized half2 loads, widen to float, float accumulate
+ * (mirror of l2_warp_float_half; avoids scalar smem loads and native half FMA) */
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_SEQ_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum = 0;
+  for (int i = lane * 2; i < dim; i += VAMANA_WARP_SIZE * 2) {
+    float2 dst2 = l2_load_dst2_half(dst, i);
+    float2 src2 = l2_load_src2_half(src, i);
+    l2_fma_sq2(partial_sum, src2.x, src2.y, dst2);
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP2_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum[2] = {0, 0};
+  for (int i = lane * 2; i < dim; i += 2 * VAMANA_WARP_SIZE * 2) {
+    float2 temp_dst[2] = {{0, 0}, {0, 0}};
+    temp_dst[0]        = l2_load_dst2_half(dst, i);
+    if (i + 64 < dim) temp_dst[1] = l2_load_dst2_half(dst, i + 64);
+
+    float2 src0 = l2_load_src2_half(src, i);
+    l2_fma_sq2(partial_sum[0], src0.x, src0.y, temp_dst[0]);
+    if (i + 64 < dim) {
+      float2 src1 = l2_load_src2_half(src, i + 64);
+      l2_fma_sq2(partial_sum[1], src1.x, src1.y, temp_dst[1]);
+    }
+  }
+  partial_sum[0] += partial_sum[1];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__device__ SUMTYPE l2_ILP4_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum[4] = {0, 0, 0, 0};
+  for (int i = lane * 2; i < dim; i += 4 * VAMANA_WARP_SIZE * 2) {
+    float2 temp_dst[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
+    temp_dst[0]        = l2_load_dst2_half(dst, i);
+    if (i + 64 < dim) temp_dst[1] = l2_load_dst2_half(dst, i + 64);
+    if (i + 128 < dim) temp_dst[2] = l2_load_dst2_half(dst, i + 128);
+    if (i + 192 < dim) temp_dst[3] = l2_load_dst2_half(dst, i + 192);
+
+    float2 src0 = l2_load_src2_half(src, i);
+    l2_fma_sq2(partial_sum[0], src0.x, src0.y, temp_dst[0]);
+    if (i + 64 < dim) {
+      float2 src1 = l2_load_src2_half(src, i + 64);
+      l2_fma_sq2(partial_sum[1], src1.x, src1.y, temp_dst[1]);
+    }
+    if (i + 128 < dim) {
+      float2 src2 = l2_load_src2_half(src, i + 128);
+      l2_fma_sq2(partial_sum[2], src2.x, src2.y, temp_dst[2]);
+    }
+    if (i + 192 < dim) {
+      float2 src3 = l2_load_src2_half(src, i + 192);
+      l2_fma_sq2(partial_sum[3], src3.x, src3.y, temp_dst[3]);
+    }
+  }
+  partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE>
+__forceinline__ __device__ SUMTYPE
+l2_warp_half_smem_half(const __half* src, const __half* dest, int dim, int lane)
+{
+  if (dim >= 128) {
+    return l2_ILP4_warp_half_smem_half<SUMTYPE>(src, dest, dim, lane);
+  } else if (dim >= 64) {
+    return l2_ILP2_warp_half_smem_half<SUMTYPE>(src, dest, dim, lane);
+  } else {
+    return l2_SEQ_warp_half_smem_half<SUMTYPE>(src, dest, dim, lane);
+  }
+}
+
+/* fp16 query smem vs int8 (or other native) dataset: same vectorized query widen, float accumulate */
+template <typename SUMTYPE, typename DataT>
+__device__ __forceinline__ void l2_fma_sq2_half_native(SUMTYPE& acc,
+                                                         float2 src2,
+                                                         const DataT* dst,
+                                                         int i)
+{
+  float dx = src2.x - static_cast<float>(dst[i]);
+  float dy = src2.y - static_cast<float>(dst[i + 1]);
+  acc      = fmaf(dx, dx, acc);
+  acc      = fmaf(dy, dy, acc);
+}
+
+template <typename SUMTYPE, typename DataT>
+__device__ SUMTYPE l2_SEQ_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum = 0;
+  for (int i = lane * 2; i < dim; i += VAMANA_WARP_SIZE * 2) {
+    float2 src2 = l2_load_src2_half(src, i);
+    l2_fma_sq2_half_native(partial_sum, src2, dst, i);
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
+template <typename SUMTYPE, typename DataT>
+__device__ SUMTYPE l2_ILP2_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum[2] = {0, 0};
+  for (int i = lane * 2; i < dim; i += 2 * VAMANA_WARP_SIZE * 2) {
+    float2 src0 = l2_load_src2_half(src, i);
+    l2_fma_sq2_half_native(partial_sum[0], src0, dst, i);
+    if (i + 64 < dim) {
+      float2 src1 = l2_load_src2_half(src, i + 64);
+      l2_fma_sq2_half_native(partial_sum[1], src1, dst, i + 64);
+    }
+  }
+  partial_sum[0] += partial_sum[1];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE, typename DataT>
+__device__ SUMTYPE l2_ILP4_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum[4] = {0, 0, 0, 0};
+  for (int i = lane * 2; i < dim; i += 4 * VAMANA_WARP_SIZE * 2) {
+    float2 src0 = l2_load_src2_half(src, i);
+    l2_fma_sq2_half_native(partial_sum[0], src0, dst, i);
+    if (i + 64 < dim) {
+      float2 src1 = l2_load_src2_half(src, i + 64);
+      l2_fma_sq2_half_native(partial_sum[1], src1, dst, i + 64);
+    }
+    if (i + 128 < dim) {
+      float2 src2 = l2_load_src2_half(src, i + 128);
+      l2_fma_sq2_half_native(partial_sum[2], src2, dst, i + 128);
+    }
+    if (i + 192 < dim) {
+      float2 src3 = l2_load_src2_half(src, i + 192);
+      l2_fma_sq2_half_native(partial_sum[3], src3, dst, i + 192);
+    }
+  }
+  partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
+  }
+  return partial_sum[0];
+}
+
+template <typename SUMTYPE, typename DataT>
+__forceinline__ __device__ SUMTYPE
+l2_warp_half_smem_native(const __half* src, const DataT* dest, int dim, int lane)
+{
+  if (dim >= 128) {
+    return l2_ILP4_warp_half_smem_native<SUMTYPE, DataT>(src, dest, dim, lane);
+  } else if (dim >= 64) {
+    return l2_ILP2_warp_half_smem_native<SUMTYPE, DataT>(src, dest, dim, lane);
+  } else {
+    return l2_SEQ_warp_half_smem_native<SUMTYPE, DataT>(src, dest, dim, lane);
+  }
+}
+
+template <typename SUMTYPE, typename DataT>
+__forceinline__ __device__ SUMTYPE
+dist_warp_half_query(
+  const __half* src, const DataT* dest, int dim, cuvs::distance::DistanceType metric, int lane)
+{
+  SUMTYPE d;
+  if constexpr (is_cuda_fp16_v<DataT>) {
+    d = l2_warp_half_smem_half<SUMTYPE>(src, reinterpret_cast<const __half*>(dest), dim, lane);
+  } else if constexpr (std::is_same_v<DataT, float>) {
+    d = l2_warp_half_float<SUMTYPE>(src, dest, dim, lane);
+  } else {
+    d = l2_warp_half_smem_native<SUMTYPE, DataT>(src, dest, dim, lane);
+  }
+  if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    return static_cast<SUMTYPE>(sqrtf(static_cast<float>(d)));
+  }
+  return d;
+}
+
 template <typename SUMTYPE>
 __forceinline__ __device__ SUMTYPE dist_warp(
   const float* src, const half* dest, int dim, cuvs::distance::DistanceType metric, int lane)
@@ -908,6 +1207,61 @@ __device__ void update_shared_point_warp_half_to_float(Point<float, accT>* share
   }
   if (((size_t)dim & 1u) != 0u && laneId == 0) {
     shared_point->coords[dim - 1] = __half2float(half_ptr[base + dim - 1]);
+  }
+}
+
+template <typename accT>
+__device__ void update_shared_point_warp_fp16_query_smem(Point<__half, accT>* shared_point,
+                                                         const half* data_ptr,
+                                                         int id,
+                                                         int dim,
+                                                         int laneId)
+{
+  const __half* half_ptr = reinterpret_cast<const __half*>(data_ptr);
+  shared_point->id       = id;
+  shared_point->Dim      = dim;
+  const size_t base      = (size_t)id * (size_t)dim;
+  for (size_t i = laneId * 2; i + 1 < (size_t)dim; i += 64) {
+    *reinterpret_cast<half2*>(&shared_point->coords[i]) =
+      *reinterpret_cast<const half2*>(&half_ptr[base + i]);
+  }
+  if (((size_t)dim & 1u) != 0u && laneId == 0) {
+    shared_point->coords[dim - 1] = half_ptr[base + dim - 1];
+  }
+}
+
+template <typename accT>
+__device__ void update_shared_point_warp_fp16_query_smem(Point<__half, accT>* shared_point,
+                                                         const float* data_ptr,
+                                                         int id,
+                                                         int dim,
+                                                         int laneId)
+{
+  shared_point->id  = id;
+  shared_point->Dim = dim;
+  const size_t base = (size_t)id * (size_t)dim;
+  for (size_t i = laneId * 2; i + 1 < (size_t)dim; i += 64) {
+    float2 v = *reinterpret_cast<const float2*>(&data_ptr[base + i]);
+    *reinterpret_cast<half2*>(&shared_point->coords[i]) = __float22half2_rn(v);
+  }
+  if (((size_t)dim & 1u) != 0u && laneId == 0) {
+    shared_point->coords[dim - 1] = __float2half(data_ptr[base + dim - 1]);
+  }
+}
+
+template <typename T, typename accT>
+__device__ std::enable_if_t<!is_cuda_fp16_v<T> && !std::is_same_v<T, float>, void>
+update_shared_point_warp_fp16_query_smem(Point<__half, accT>* shared_point,
+                                         const T* data_ptr,
+                                         int id,
+                                         int dim,
+                                         int laneId)
+{
+  shared_point->id  = id;
+  shared_point->Dim = dim;
+  const size_t base = (size_t)id * (size_t)dim;
+  for (size_t i = laneId; i < (size_t)dim; i += 32) {
+    shared_point->coords[i] = __float2half(static_cast<float>(data_ptr[base + i]));
   }
 }
 
