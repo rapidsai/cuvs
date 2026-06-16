@@ -261,6 +261,7 @@ __global__ void RobustPruneKernel(
           }
           __syncthreads();
 
+          // update_shared_point uses all block threads; barrier must be uniform across warps.
           if (s_do_accept && cache_cand_in_smem) {
             if constexpr (is_cuda_fp16_v<T>) {
               update_shared_point_half_to_float<accT>(
@@ -300,6 +301,7 @@ __global__ void RobustPruneKernel(
               }
             }
           }
+          // Publish occId occlusion updates before the next pass_start reads occlusion_list.
           __syncthreads();
         }
       }

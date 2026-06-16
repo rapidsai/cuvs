@@ -49,7 +49,6 @@ namespace cuvs::neighbors::vamana::detail {
 
 static const int blockD        = 32;
 static const int blockD_greedy = 128;  // 4 warps per block, each warp processes one query
-static const int blockD_prune  = 128;  // 4 warps per block, parallel occlusion per query
 static const int maxBlocks     = 10000;
 
 // generate random permutation of inserts - TODO do this on GPU / faster
@@ -235,11 +234,15 @@ void batched_insert_vamana(
                               degree * static_cast<int>(sizeof(accT)) +  // graph edge dist cache
                               degree * static_cast<int>(sizeof(IdxT));   // graph edge id cache
 
+  const int blockD_prune = robust_prune_block_dim<T>(dim, degree);
+
   RAFT_LOG_DEBUG(
-    "Dynamic shared memory usage (bytes): GreedySearch: %d, Segment Sort: %d, Robust Prune: %d",
+    "Dynamic shared memory usage (bytes): GreedySearch: %d, Segment Sort: %d, Robust Prune: %d, "
+    "RobustPrune blockDim: %d",
     search_smem_total_size,
     sort_smem_size,
-    prune_smem_total_size);
+    prune_smem_total_size,
+    blockD_prune);
 
 #if KERNEL_TIMING
   auto end_t                                    = std::chrono::system_clock::now();
