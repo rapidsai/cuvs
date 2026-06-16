@@ -4,6 +4,7 @@ These pages are generated from the documented public headers in the cuVS source 
 
 ## Cluster
 
+- [Gmm](/api-reference/c-api-cluster-gmm)
 - [K-Means](/api-reference/c-api-cluster-kmeans)
 
 ## Common
