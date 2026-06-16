@@ -143,6 +143,8 @@ void* _deserialize(cuvsResources_t res,
   cuvs::neighbors::hnsw::index<T>* index = nullptr;
   auto cpp_params                        = cuvs::neighbors::hnsw::index_params();
   cpp_params.hierarchy = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  // Required by GPU_LAYERED_ON_DISK deserialization to locate the original-ID-ordered vectors.
+  if (params->dataset_path != nullptr) { cpp_params.dataset_path = std::string(params->dataset_path); }
   auto metric_type     = static_cast<cuvs::distance::DistanceType>(metric);
   cuvs::neighbors::hnsw::deserialize(
     *res_ptr, cpp_params, std::string(filename), dim, metric_type, &index);
@@ -174,7 +176,8 @@ extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
                                       .num_threads     = 0,
                                       .M               = 32,
                                       .metric          = L2Expanded,
-                                      .ace_params      = nullptr};
+                                      .ace_params      = nullptr,
+                                      .dataset_path    = nullptr};
   });
 }
 
@@ -402,5 +405,43 @@ extern "C" cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
     } else {
       RAFT_FAIL("Unsupported dtype in file %s", filename);
     }
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswMaterializeParamsCreate(cuvsHnswMaterializeParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    *params = new cuvsHnswMaterializeParams{
+      .dataset_path = nullptr, .max_host_memory_gb = 0, .num_threads = 0};
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswMaterializeParamsDestroy(cuvsHnswMaterializeParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsHnswMaterializeToHnswlib(cuvsResources_t res,
+                                                    cuvsHnswMaterializeParams_t params,
+                                                    const char* layered_artifact_path,
+                                                    const char* output_path,
+                                                    int dim,
+                                                    cuvsDistanceType metric)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr    = reinterpret_cast<raft::resources*>(res);
+    auto cpp_params = cuvs::neighbors::hnsw::materialize_params();
+    if (params->dataset_path != nullptr) {
+      cpp_params.dataset_path = std::string(params->dataset_path);
+    }
+    cpp_params.max_host_memory_gb = params->max_host_memory_gb;
+    cpp_params.num_threads        = params->num_threads;
+    auto metric_type              = static_cast<cuvs::distance::DistanceType>(metric);
+    cuvs::neighbors::hnsw::materialize_to_hnswlib(*res_ptr,
+                                                  cpp_params,
+                                                  std::string(layered_artifact_path),
+                                                  std::string(output_path),
+                                                  dim,
+                                                  metric_type);
   });
 }

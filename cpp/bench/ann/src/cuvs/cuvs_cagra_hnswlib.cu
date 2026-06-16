@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../common/ann_types.hpp"
+#include "../common/conf.hpp"
 #include "cuvs_ann_bench_param_parser.h"
 #include "cuvs_cagra_hnswlib_wrapper.h"
 
@@ -27,6 +28,8 @@ auto parse_build_param(const nlohmann::json& conf) ->
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
     } else if (conf.at("hierarchy") == "gpu") {
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
+    } else if (conf.at("hierarchy") == "gpu_layered_on_disk") {
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU_LAYERED_ON_DISK;
     } else {
       THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
     }
@@ -35,6 +38,11 @@ auto parse_build_param(const nlohmann::json& conf) ->
   }
   if (conf.contains("ef_construction")) {
     hnsw_params.ef_construction = conf.at("ef_construction");
+  }
+  if (conf.contains("dataset_path")) {
+    hnsw_params.dataset_path = conf.at("dataset_path");
+  } else if (hnsw_params.hierarchy == cuvs::neighbors::hnsw::HnswHierarchy::GPU_LAYERED_ON_DISK) {
+    hnsw_params.dataset_path = configuration::singleton().get_dataset_conf().base_file;
   }
   if (conf.contains("num_threads")) { hnsw_params.num_threads = conf.at("num_threads"); }
 
@@ -55,16 +63,18 @@ auto parse_build_param(const nlohmann::json& conf) ->
         cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
         dist_type);
       ps.metric = dist_type;
-      // Parse ACE parameters if provided
-      if (conf.contains("npartitions") || conf.contains("build_dir") ||
-          conf.contains("ef_construction") || conf.contains("use_disk")) {
+      // Parse ACE parameters if provided.
+      auto ace_conf = collect_conf_with_prefix(conf, "ace_");
+      if (!ace_conf.empty()) {
         auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
-        if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
-        if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
-        if (conf.contains("ef_construction")) {
-          ace_params.ef_construction = conf.at("ef_construction");
+        if (ace_conf.contains("npartitions")) {
+          ace_params.npartitions = ace_conf.at("npartitions");
         }
-        if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
+        if (ace_conf.contains("build_dir")) { ace_params.build_dir = ace_conf.at("build_dir"); }
+        if (ace_conf.contains("ef_construction")) {
+          ace_params.ef_construction = ace_conf.at("ef_construction");
+        }
+        if (ace_conf.contains("use_disk")) { ace_params.use_disk = ace_conf.at("use_disk"); }
         ps.graph_build_params = ace_params;
       }
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.

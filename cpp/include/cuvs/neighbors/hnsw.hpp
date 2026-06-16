@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cuvs/core/export.hpp>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <variant>
 
@@ -41,9 +42,10 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
  */
 enum class HnswHierarchy {
-  NONE,  // base-layer-only index
-  CPU,   // full index with CPU-built hierarchy
-  GPU    // full index with GPU-built hierarchy
+  NONE,                // base-layer-only index
+  CPU,                 // full index with CPU-built hierarchy
+  GPU,                 // full index with GPU-built hierarchy
+  GPU_LAYERED_ON_DISK  // GPU-built hierarchy stored as layered on-disk topology
 };
 
 struct index_params : cuvs::neighbors::index_params {
@@ -63,6 +65,16 @@ struct index_params : cuvs::neighbors::index_params {
   /** HNSW M parameter: number of bi-directional links per node (used when building with ACE).
    */
   size_t M = 32;
+
+  /** Local dataset path used by layered HNSW deserialization.
+   *
+   * When `hierarchy == HnswHierarchy::GPU_LAYERED_ON_DISK`, the index artifact stores graph
+   * topology only. `deserialize` loads vectors from this local dataset path to reconstruct an
+   * in-memory HNSW index.
+   * Currently supported local dataset formats are `.npy` and ANN benchmark `*.bin` files with a
+   * `[uint32 rows, uint32 cols]` header.
+   */
+  std::string dataset_path;
 
   /** Parameters to fine tune GPU graph building. By default we select the parameters based on
    * dataset shape and HNSW build parameters. You can override these parameters to fine tune the
@@ -1229,6 +1241,75 @@ void deserialize(raft::resources const& res,
                  int dim,
                  cuvs::distance::DistanceType metric,
                  index<int8_t>** index);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup hnsw_cpp_index_materialize Materialize a layered HNSW artifact into an hnswlib index
+ * @{
+ */
+
+/**
+ * @brief Parameters for materializing a layered HNSW artifact into an hnswlib index on disk.
+ */
+struct materialize_params {
+  /** Local dataset path holding the original-ID-ordered vectors used to build the artifact.
+   *
+   * Supported formats match layered deserialization: `.npy` and ANN benchmark `*.bin` files with a
+   * `[uint32 rows, uint32 cols]` header (`.fbin`, `.f16bin`, `.u8bin`, `.i8bin`).
+   */
+  std::string dataset_path;
+
+  /** Upper bound on host memory (in GiB) used for the base-topology reorder buffer.
+   *
+   * When `<= 0`, the whole base topology is reordered in a single in-memory pass (no temporary
+   * files). When set, the base topology is reordered through bucketed temporary files so that
+   * peak host memory stays close to this budget, at the cost of writing and re-reading the
+   * (small) base-topology section once.
+   */
+  double max_host_memory_gb = 0;
+
+  /** Number of host threads to use. When `0`, the maximum number of threads is used. */
+  int num_threads = 0;
+};
+
+/**
+ * @brief Materialize a layered HNSW artifact into a standard hnswlib index file on disk.
+ *
+ * Materializes a `GPU_LAYERED_ON_DISK` artifact (graph topology only, stored in ACE order) plus a
+ * local dataset into a standard hnswlib index file, without ever holding the full materialized
+ * index in host memory. The materialization reorders the base topology from ACE order to
+ * original-id order and interleaves the vectors, emitting the output with sequential disk IO. The
+ * resulting file is compatible with the original hnswlib library (`loadIndex`) and can be read back
+ * through `cuvs::neighbors::hnsw::deserialize` with `hierarchy == HnswHierarchy::CPU`.
+ *
+ * The element data type (`float`, `half`, `uint8_t` or `int8_t`) is read from the artifact header,
+ * so a single entry point covers all supported dtypes.
+ *
+ * @param[in] res raft resources
+ * @param[in] params materialization parameters (dataset path, host-memory budget, threads)
+ * @param[in] layered_artifact_path path to the layered HNSW artifact
+ * @param[in] output_path path to the hnswlib index file to write
+ * @param[in] dim dimensions of the training dataset
+ * @param[in] metric distance metric. Supported metrics ("L2Expanded", "InnerProduct")
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   hnsw::materialize_params materialize_params;
+ *   materialize_params.dataset_path = "dataset.fbin";
+ *   hnsw::materialize_to_hnswlib(
+ *     res, materialize_params, "layered_artifact.cuvs", "index.bin", dim, metric);
+ * @endcode
+ */
+void materialize_to_hnswlib(raft::resources const& res,
+                            const materialize_params& params,
+                            const std::string& layered_artifact_path,
+                            const std::string& output_path,
+                            int dim,
+                            cuvs::distance::DistanceType metric);
 
 /**
  * @}

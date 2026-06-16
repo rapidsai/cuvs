@@ -35,7 +35,9 @@ enum cuvsHnswHierarchy {
   /* Full hierarchy is built using the CPU */
   CPU = 1,
   /* Full hierarchy is built using the GPU */
-  GPU = 2
+  GPU = 2,
+  /* GPU-built hierarchy stored as a layered on-disk topology artifact */
+  GPU_LAYERED_ON_DISK = 3
 };
 
 /**
@@ -130,6 +132,14 @@ struct cuvsHnswIndexParams {
    * Set to nullptr for default behavior (from_cagra conversion).
    */
   cuvsHnswAceParams_t ace_params;
+  /**
+   * Local dataset path used by layered HNSW deserialization.
+   *
+   * When `hierarchy == GPU_LAYERED_ON_DISK`, the index artifact stores graph topology only.
+   * `cuvsHnswDeserialize` loads the original-ID-ordered vectors from this local dataset path to
+   * reconstruct an in-memory HNSW index. Set to nullptr (default) for all other hierarchies.
+   */
+  const char* dataset_path;
 };
 
 typedef struct cuvsHnswIndexParams* cuvsHnswIndexParams_t;
@@ -597,6 +607,80 @@ CUVS_EXPORT cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
                                 int dim,
                                 cuvsDistanceType metric,
                                 cuvsHnswIndex_t index);
+/**
+ * @}
+ */
+
+/**
+ * @defgroup hnsw_c_index_materialize Materialize a layered HNSW artifact to an hnswlib index
+ * @{
+ */
+
+/**
+ * @brief Parameters for materializing a layered HNSW artifact into an hnswlib index on disk.
+ */
+struct cuvsHnswMaterializeParams {
+  /**
+   * Local dataset path holding the original-ID-ordered vectors used to build the artifact.
+   *
+   * Supported formats match layered deserialization: `.npy` and ANN benchmark `*.bin` files with a
+   * `[uint32 rows, uint32 cols]` header (`.fbin`, `.f16bin`, `.u8bin`, `.i8bin`).
+   */
+  const char* dataset_path;
+  /**
+   * Upper bound on host memory (in GiB) used for the base-topology reorder buffer.
+   *
+   * When `<= 0`, the whole base topology is reordered in a single in-memory pass (no temporary
+   * files). When set, the base topology is reordered through bucketed temporary files so that peak
+   * host memory stays close to this budget.
+   */
+  double max_host_memory_gb;
+  /** Number of host threads to use. When `0`, the maximum number of threads is used. */
+  int num_threads;
+};
+
+typedef struct cuvsHnswMaterializeParams* cuvsHnswMaterializeParams_t;
+
+/**
+ * @brief Allocate HNSW materialize params, and populate with default values
+ *
+ * @param[in] params cuvsHnswMaterializeParams_t to allocate
+ * @return cuvsError_t
+ */
+CUVS_EXPORT cuvsError_t cuvsHnswMaterializeParamsCreate(cuvsHnswMaterializeParams_t* params);
+
+/**
+ * @brief De-allocate HNSW materialize params
+ *
+ * @param[in] params cuvsHnswMaterializeParams_t to de-allocate
+ * @return cuvsError_t
+ */
+CUVS_EXPORT cuvsError_t cuvsHnswMaterializeParamsDestroy(cuvsHnswMaterializeParams_t params);
+
+/**
+ * @brief Materialize a layered HNSW artifact into a standard hnswlib index file on disk.
+ *
+ * Materializes a `GPU_LAYERED_ON_DISK` artifact (graph topology only, stored in ACE order) plus a
+ * local dataset into a standard hnswlib index file, without ever holding the full materialized
+ * index in host memory. The resulting file is compatible with the original hnswlib library and can
+ * be read back through `cuvsHnswDeserialize` with `hierarchy == CPU`. The element data type
+ * (`float`, `half`, `uint8_t` or `int8_t`) is read from the artifact header.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsHnswMaterializeParams_t materialization parameters
+ * @param[in] layered_artifact_path path to the layered HNSW artifact
+ * @param[in] output_path path to the hnswlib index file to write
+ * @param[in] dim the dimension of the vectors in the index
+ * @param[in] metric the distance metric used to build the index
+ * @return cuvsError_t
+ */
+CUVS_EXPORT cuvsError_t cuvsHnswMaterializeToHnswlib(cuvsResources_t res,
+                                                     cuvsHnswMaterializeParams_t params,
+                                                     const char* layered_artifact_path,
+                                                     const char* output_path,
+                                                     int dim,
+                                                     cuvsDistanceType metric);
+
 /**
  * @}
  */
