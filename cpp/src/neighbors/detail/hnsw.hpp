@@ -23,6 +23,7 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 
+#include <algorithm>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
@@ -820,6 +821,495 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   RAFT_LOG_INFO("HNSW serialization from disk complete in %ld ms", elapsed_time);
 }
 
+template <typename T, typename IdxT>
+std::pair<cuvs::util::file_descriptor, size_t> remap_disk_graph_to_original_ids(
+  const cuvs::neighbors::cagra::index<T, IdxT>& index_, const std::string& output_path)
+{
+  auto total_start           = std::chrono::high_resolution_clock::now();
+  const auto& graph_fd_opt   = index_.graph_fd();
+  const auto& mapping_fd_opt = index_.mapping_fd();
+
+  RAFT_EXPECTS(graph_fd_opt.has_value() && graph_fd_opt->is_valid(),
+               "Graph file descriptor is not available");
+  RAFT_EXPECTS(mapping_fd_opt.has_value() && mapping_fd_opt->is_valid(),
+               "Mapping file descriptor is not available");
+
+  const auto graph_path   = graph_fd_opt->get_path();
+  const auto mapping_path = mapping_fd_opt->get_path();
+  RAFT_EXPECTS(!graph_path.empty(), "Unable to get path from graph file descriptor");
+  RAFT_EXPECTS(!mapping_path.empty(), "Unable to get path from mapping file descriptor");
+
+  std::ifstream graph_stream(graph_path, std::ios::binary);
+  RAFT_EXPECTS(graph_stream.good(), "Failed to open graph file: %s", graph_path.c_str());
+  auto graph_header      = raft::detail::numpy_serializer::read_header(graph_stream);
+  auto graph_header_size = static_cast<size_t>(graph_stream.tellg());
+  RAFT_EXPECTS(graph_header.shape.size() == 2,
+               "Graph file should be 2D, got %zu dimensions",
+               graph_header.shape.size());
+
+  std::ifstream mapping_stream(mapping_path, std::ios::binary);
+  RAFT_EXPECTS(mapping_stream.good(), "Failed to open mapping file: %s", mapping_path.c_str());
+  auto mapping_header      = raft::detail::numpy_serializer::read_header(mapping_stream);
+  auto mapping_header_size = static_cast<size_t>(mapping_stream.tellg());
+  RAFT_EXPECTS(mapping_header.shape.size() == 1,
+               "Mapping file should be 1D, got %zu dimensions",
+               mapping_header.shape.size());
+
+  const auto n_rows       = graph_header.shape[0];
+  const auto graph_degree = graph_header.shape[1];
+  RAFT_EXPECTS(mapping_header.shape[0] == n_rows,
+               "Mapping size (%zu) must match graph rows (%zu)",
+               mapping_header.shape[0],
+               n_rows);
+
+  auto mapping = raft::make_host_vector<IdxT, int64_t>(n_rows);
+  cuvs::util::read_large_file(
+    *mapping_fd_opt, mapping.data_handle(), n_rows * sizeof(IdxT), mapping_header_size);
+  const auto* mapping_data = mapping.data_handle();
+
+  auto reordered_rows       = raft::make_host_vector<IdxT, int64_t>(n_rows);
+  auto* reordered_rows_data = reordered_rows.data_handle();
+#pragma omp parallel for
+  for (int64_t reordered_row = 0; reordered_row < static_cast<int64_t>(n_rows); ++reordered_row) {
+    reordered_rows_data[mapping_data[reordered_row]] = static_cast<IdxT>(reordered_row);
+  }
+
+  auto [output_fd, output_header_size] =
+    cuvs::util::create_numpy_file<IdxT>(output_path, {n_rows, graph_degree});
+
+  // Target batch size and coalescing thresholds. Larger batches require more RAM.
+  // Tune these values if you see performance issues.
+  const size_t target_batch_bytes       = 64 * 1024 * 1024;
+  const size_t max_coalesced_gap_bytes  = 128 * 1024;
+  const size_t max_coalesced_span_bytes = 8 * 1024 * 1024;
+  const size_t row_bytes                = graph_degree * sizeof(IdxT);
+  const size_t batch_size               = std::max<size_t>(1, target_batch_bytes / row_bytes);
+  const size_t max_coalesced_gap_rows   = std::max<size_t>(1, max_coalesced_gap_bytes / row_bytes);
+  const size_t max_coalesced_span_rows  = std::max<size_t>(1, max_coalesced_span_bytes / row_bytes);
+
+  // Limit the number of read threads. Larger values require more RAM. 4-8 should be able to
+  // saturate most NVMe disks. Tune this value if you see I/O performance issues.
+  const int read_parallelism = std::min(cuvs::core::omp::get_max_threads(), 8);
+  auto output_batch =
+    raft::make_host_matrix<IdxT, int64_t>(batch_size, static_cast<int64_t>(graph_degree));
+  auto span_buffer = raft::make_host_vector<IdxT, int64_t>(static_cast<int64_t>(read_parallelism) *
+                                                           max_coalesced_span_rows * graph_degree);
+  std::vector<size_t> read_order(batch_size);
+  auto* output_batch_data = output_batch.data_handle();
+  auto* span_buffer_data  = span_buffer.data_handle();
+
+  // Bucket sort read_order by coarse disk region if buckets are not too sparse.
+  const size_t bucket_size_rows = max_coalesced_span_rows;
+  const size_t num_buckets      = (n_rows + bucket_size_rows - 1) / bucket_size_rows;
+  const bool use_bucket_sort    = num_buckets > 0 && batch_size / num_buckets >= 4;
+  std::vector<size_t> bucket_offsets(use_bucket_sort ? num_buckets + 1 : 0);
+  std::vector<size_t> bucket_scatter(use_bucket_sort ? num_buckets : 0);
+
+  struct span_t {
+    size_t sorted_begin;
+    size_t sorted_end;
+    size_t first_reordered_row;
+    size_t span_rows;
+  };
+  std::vector<span_t> spans;
+  spans.reserve(batch_size);
+
+  size_t total_read_bytes  = 0;
+  size_t total_write_bytes = 0;
+  size_t total_span_count  = 0;
+
+  RAFT_LOG_INFO(
+    "HNSW remap: n_rows=%zu degree=%zu batch_size=%zu max_gap=%zu rows max_span=%zu rows "
+    "read_threads=%d",
+    n_rows,
+    graph_degree,
+    batch_size,
+    max_coalesced_gap_rows,
+    max_coalesced_span_rows,
+    read_parallelism);
+
+  for (size_t original_batch_start = 0; original_batch_start < n_rows;
+       original_batch_start += batch_size) {
+    const auto current_batch_size = std::min(batch_size, n_rows - original_batch_start);
+
+    const auto key_less = [&](size_t lhs, size_t rhs) {
+      return reordered_rows_data[original_batch_start + lhs] <
+             reordered_rows_data[original_batch_start + rhs];
+    };
+    if (use_bucket_sort) {
+      std::fill(bucket_offsets.begin(), bucket_offsets.end(), 0);
+      for (size_t k = 0; k < current_batch_size; ++k) {
+        const auto rr = reordered_rows_data[original_batch_start + k];
+        bucket_offsets[rr / bucket_size_rows + 1]++;
+      }
+      for (size_t b = 1; b <= num_buckets; ++b) {
+        bucket_offsets[b] += bucket_offsets[b - 1];
+      }
+      std::copy(
+        bucket_offsets.begin(), bucket_offsets.begin() + num_buckets, bucket_scatter.begin());
+      for (size_t k = 0; k < current_batch_size; ++k) {
+        const auto rr = reordered_rows_data[original_batch_start + k];
+        read_order[bucket_scatter[rr / bucket_size_rows]++] = k;
+      }
+      for (size_t b = 0; b < num_buckets; ++b) {
+        const auto lo = bucket_offsets[b];
+        const auto hi = bucket_offsets[b + 1];
+        if (hi - lo > 1) { std::sort(read_order.begin() + lo, read_order.begin() + hi, key_less); }
+      }
+    } else {
+      for (size_t k = 0; k < current_batch_size; ++k) {
+        read_order[k] = k;
+      }
+      std::sort(read_order.begin(), read_order.begin() + current_batch_size, key_less);
+    }
+
+    // Precompute coalesced spans so reads and remap can run in parallel across spans.
+    spans.clear();
+    for (size_t sorted_pos = 0; sorted_pos < current_batch_size;) {
+      const auto first_reordered_row =
+        static_cast<size_t>(reordered_rows_data[original_batch_start + read_order[sorted_pos]]);
+      size_t span_end_pos       = sorted_pos + 1;
+      size_t last_reordered_row = first_reordered_row;
+      while (span_end_pos < current_batch_size) {
+        const auto next_reordered_row =
+          static_cast<size_t>(reordered_rows_data[original_batch_start + read_order[span_end_pos]]);
+        const auto gap_rows  = next_reordered_row - last_reordered_row;
+        const auto span_rows = next_reordered_row - first_reordered_row + 1;
+        if (gap_rows > max_coalesced_gap_rows || span_rows > max_coalesced_span_rows) { break; }
+        last_reordered_row = next_reordered_row;
+        ++span_end_pos;
+      }
+      spans.push_back({sorted_pos,
+                       span_end_pos,
+                       first_reordered_row,
+                       last_reordered_row - first_reordered_row + 1});
+      sorted_pos = span_end_pos;
+    }
+
+    size_t batch_read_bytes = 0;
+#pragma omp parallel for num_threads(read_parallelism) reduction(+ : batch_read_bytes)
+    for (int64_t span_idx = 0; span_idx < static_cast<int64_t>(spans.size()); ++span_idx) {
+      const auto& s    = spans[span_idx];
+      const int tid    = cuvs::core::omp::get_thread_num();
+      IdxT* tid_buffer = span_buffer_data + tid * max_coalesced_span_rows * graph_degree;
+      const auto input_offset =
+        static_cast<uint64_t>(graph_header_size + s.first_reordered_row * row_bytes);
+      const auto bytes_to_read = s.span_rows * row_bytes;
+      cuvs::util::read_large_file(*graph_fd_opt, tid_buffer, bytes_to_read, input_offset);
+      batch_read_bytes += bytes_to_read;
+
+      for (size_t pos = s.sorted_begin; pos < s.sorted_end; ++pos) {
+        const auto batch_idx      = read_order[pos];
+        const auto original_row   = original_batch_start + batch_idx;
+        const auto reordered_row  = static_cast<size_t>(reordered_rows_data[original_row]);
+        const auto local_row      = reordered_row - s.first_reordered_row;
+        const auto* graph_row_ptr = tid_buffer + local_row * graph_degree;
+        auto* output_row_ptr      = output_batch_data + batch_idx * graph_degree;
+        for (size_t neighbor_idx = 0; neighbor_idx < graph_degree; ++neighbor_idx) {
+          output_row_ptr[neighbor_idx] = mapping_data[graph_row_ptr[neighbor_idx]];
+        }
+      }
+    }
+
+    const auto output_offset =
+      static_cast<uint64_t>(output_header_size + original_batch_start * row_bytes);
+    const auto batch_write_bytes = current_batch_size * row_bytes;
+    cuvs::util::write_large_file(output_fd, output_batch_data, batch_write_bytes, output_offset);
+
+    total_read_bytes += batch_read_bytes;
+    total_write_bytes += batch_write_bytes;
+    total_span_count += spans.size();
+  }
+
+  const auto total_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::high_resolution_clock::now() - total_start)
+                               .count();
+  const double gib = static_cast<double>(1 << 30);
+  RAFT_LOG_INFO(
+    "HNSW remap: completed in %ld ms: read %.2f GiB across %zu spans (%.2fx amplification), "
+    "wrote %.2f GiB",
+    total_elapsed,
+    total_read_bytes / gib,
+    total_span_count,
+    total_write_bytes > 0 ? static_cast<double>(total_read_bytes) / total_write_bytes : 0.0,
+    total_write_bytes / gib);
+
+  return {std::move(output_fd), output_header_size};
+}
+
+template <typename T, typename IdxT>
+void serialize_to_hnswlib_with_original_dataset(
+  raft::resources const& res,
+  std::ostream& os_raw,
+  const cuvs::neighbors::hnsw::index_params& params,
+  const cuvs::neighbors::cagra::index<T, IdxT>& index_,
+  raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+{
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "cagra::serialize_original_order");
+
+  auto start_time = std::chrono::system_clock::now();
+  cuvs::util::buffered_ofstream os(&os_raw, 1 << 20 /*1MB*/);
+
+  RAFT_EXPECTS(index_.graph_fd().has_value() && index_.mapping_fd().has_value(),
+               "Function only implements serialization from disk-backed ACE graph.");
+  RAFT_EXPECTS(params.hierarchy != HnswHierarchy::CPU,
+               "Disk2disk serialization not supported for CPU hierarchy.");
+  RAFT_EXPECTS(static_cast<size_t>(dataset.extent(0)) == static_cast<size_t>(index_.size()),
+               "Dataset rows (%zu) must match index size (%zu)",
+               static_cast<size_t>(dataset.extent(0)),
+               static_cast<size_t>(index_.size()));
+  RAFT_EXPECTS(static_cast<size_t>(dataset.extent(1)) == static_cast<size_t>(index_.dim()),
+               "Dataset cols (%zu) must match index dimensions (%zu)",
+               static_cast<size_t>(dataset.extent(1)),
+               static_cast<size_t>(index_.dim()));
+
+  const auto& graph_fd   = index_.graph_fd();
+  std::string graph_path = graph_fd->get_path();
+  RAFT_EXPECTS(!graph_path.empty(), "Unable to get path from graph file descriptor");
+  const auto index_directory = std::filesystem::path(graph_path).parent_path().string();
+  const auto remapped_graph_path =
+    (std::filesystem::path(index_directory) / "cagra_graph_original_ids.npy").string();
+
+  auto [remapped_graph_fd, graph_header_size] =
+    remap_disk_graph_to_original_ids(index_, remapped_graph_path);
+
+  auto n_rows           = index_.size();
+  auto dim              = index_.dim();
+  auto graph_degree_int = static_cast<int>(index_.graph_degree());
+
+  RAFT_LOG_INFO(
+    "Saving CAGRA index to hnswlib format with original dataset order, size %zu, dim %zu, "
+    "graph_degree %zu",
+    static_cast<size_t>(n_rows),
+    static_cast<size_t>(dim),
+    static_cast<size_t>(graph_degree_int));
+
+  // Size the per-batch graph read buffer around a 64 MiB read target.
+  const size_t target_batch_bytes = 64 * 1024 * 1024;
+  const size_t batch_size =
+    std::max<size_t>(1, target_batch_bytes / (graph_degree_int * sizeof(IdxT)));
+
+  auto graph_buffer = raft::make_host_matrix<IdxT, int64_t>(batch_size, graph_degree_int);
+
+  auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), params.hierarchy);
+
+  int odd_graph_degree = graph_degree_int % 2;
+  auto appr_algo       = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+    hnsw_index->get_space(), 1, (graph_degree_int + 1) / 2, params.ef_construction);
+
+  bool create_hierarchy = params.hierarchy != HnswHierarchy::NONE;
+
+  std::vector<size_t> hist;
+  std::vector<size_t> order(n_rows);
+  std::vector<size_t> order_bw(n_rows);
+  std::vector<int> levels(n_rows);
+  std::vector<size_t> offsets;
+
+  if (create_hierarchy) {
+    RAFT_LOG_INFO("Sort points by levels");
+    for (int64_t i = 0; i < n_rows; i++) {
+      auto pt_level = appr_algo->getRandomLevel(appr_algo->mult_);
+      while (pt_level >= static_cast<int32_t>(hist.size()))
+        hist.push_back(0);
+      hist[pt_level]++;
+      levels[i] = pt_level;
+    }
+
+    offsets.resize(hist.size() + 1, 0);
+    for (size_t i = 0; i < hist.size() - 1; i++) {
+      offsets[i + 1] = offsets[i] + hist[i];
+      RAFT_LOG_INFO("Level %zu : %zu", i + 1, size_t(n_rows) - offsets[i + 1]);
+    }
+
+    for (int64_t i = 0; i < n_rows; i++) {
+      auto pt_level              = levels[i];
+      order_bw[i]                = offsets[pt_level];
+      order[offsets[pt_level]++] = i;
+    }
+  }
+
+  appr_algo->enterpoint_node_ = create_hierarchy ? order.back() : n_rows / 2;
+  appr_algo->maxlevel_        = create_hierarchy ? hist.size() - 1 : 1;
+
+  os.write(reinterpret_cast<char*>(&appr_algo->offsetLevel0_), sizeof(std::size_t));
+  size_t num_elements = static_cast<size_t>(n_rows);
+  os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->size_data_per_element_), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->label_offset_), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->offsetData_), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->maxlevel_), sizeof(int));
+  os.write(reinterpret_cast<char*>(&appr_algo->enterpoint_node_), sizeof(int));
+  os.write(reinterpret_cast<char*>(&appr_algo->maxM_), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->maxM0_), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->M_), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&appr_algo->mult_), sizeof(double));
+  os.write(reinterpret_cast<char*>(&appr_algo->ef_construction_), sizeof(std::size_t));
+
+  auto host_query_set =
+    raft::make_host_matrix<T, int64_t>(create_hierarchy ? n_rows - hist[0] : 0, dim);
+
+  int64_t d_report_offset    = n_rows / 10;
+  int64_t next_report_offset = d_report_offset;
+  auto start_clock           = std::chrono::system_clock::now();
+
+  RAFT_EXPECTS(appr_algo->size_data_per_element_ ==
+                 dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t),
+               "Size data per element mismatch");
+
+  RAFT_LOG_INFO("Writing base level");
+  size_t bytes_written = 0;
+  float GiB            = 1 << 30;
+  IdxT zero            = 0;
+
+  for (int64_t batch_start = 0; batch_start < n_rows; batch_start += batch_size) {
+    const int64_t current_batch_size = std::min<int64_t>(batch_size, n_rows - batch_start);
+
+    const size_t graph_bytes = current_batch_size * graph_degree_int * sizeof(IdxT);
+    const off_t graph_offset = graph_header_size + batch_start * graph_degree_int * sizeof(IdxT);
+    auto bytes_read =
+      pread(remapped_graph_fd.get(), graph_buffer.data_handle(), graph_bytes, graph_offset);
+    RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(graph_bytes),
+                 "Failed to read remapped graph data: expected %zu, got %zd",
+                 graph_bytes,
+                 bytes_read);
+
+    for (int64_t batch_idx = 0; batch_idx < current_batch_size; batch_idx++) {
+      const int64_t i = batch_start + batch_idx;
+
+      os.write(reinterpret_cast<char*>(&graph_degree_int), sizeof(int));
+
+      const IdxT* graph_row = &graph_buffer(batch_idx, 0);
+      os.write(reinterpret_cast<const char*>(graph_row), sizeof(IdxT) * graph_degree_int);
+
+      if (odd_graph_degree) {
+        RAFT_EXPECTS(odd_graph_degree == static_cast<int>(appr_algo->maxM0_) - graph_degree_int,
+                     "Odd graph degree mismatch");
+        os.write(reinterpret_cast<char*>(&zero), sizeof(IdxT));
+      }
+
+      const T* data_row = &dataset(batch_start + batch_idx, 0);
+      os.write(reinterpret_cast<const char*>(data_row), sizeof(T) * dim);
+
+      if (create_hierarchy && levels[i] > 0) {
+        std::copy(data_row, data_row + dim, &host_query_set(order_bw[i] - hist[0], 0));
+      }
+
+      auto label = static_cast<size_t>(i);
+      os.write(reinterpret_cast<char*>(&label), sizeof(std::size_t));
+
+      bytes_written += appr_algo->size_data_per_element_;
+
+      const auto end_clock = std::chrono::system_clock::now();
+      if (i > next_report_offset) {
+        next_report_offset += d_report_offset;
+        const auto time =
+          std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
+          1e-6;
+        float throughput      = bytes_written / GiB / time;
+        float rows_throughput = i / time;
+        float ETA             = (n_rows - i) / rows_throughput;
+        RAFT_LOG_INFO(
+          "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f "
+          "GiB\r",
+          i,
+          n_rows,
+          i / static_cast<double>(n_rows) * 100,
+          throughput,
+          int(ETA / 60),
+          std::fmod(ETA, 60.0f),
+          bytes_written / GiB);
+      }
+    }
+  }
+
+  RAFT_LOG_INFO("Writing upper layers");
+  std::vector<std::optional<raft::host_matrix<uint32_t, int64_t>>> host_neighbors;
+  host_neighbors.resize(hist.size());
+  for (size_t pt_level = 1; create_hierarchy && pt_level < hist.size(); pt_level++) {
+    common::nvtx::range<common::nvtx::domain::cuvs> level_scope("level %zu", pt_level);
+    auto start_idx     = offsets[pt_level - 1];
+    auto end_idx       = offsets[hist.size() - 1];
+    auto num_pts       = end_idx - start_idx;
+    auto neighbor_size = num_pts > appr_algo->M_ ? appr_algo->M_ : num_pts - 1;
+    if (num_pts <= 1) {
+      host_neighbors[pt_level - 1] = std::nullopt;
+      continue;
+    }
+
+    auto view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
+      &host_query_set(start_idx - hist[0], 0), num_pts, dim);
+    host_neighbors[pt_level - 1].emplace(
+      raft::make_host_matrix<uint32_t, int64_t>(num_pts, neighbor_size));
+    all_neighbors_graph(res, view, host_neighbors[pt_level - 1]->view(), index_.metric());
+  }
+
+  next_report_offset = d_report_offset;
+  for (int64_t i = 0; i < n_rows; i++) {
+    size_t cur_level = create_hierarchy ? levels[i] : 0;
+    unsigned int linkListSize =
+      create_hierarchy && cur_level > 0 ? appr_algo->size_links_per_element_ * cur_level : 0;
+    os.write(reinterpret_cast<char*>(&linkListSize), sizeof(int));
+    bytes_written += sizeof(int);
+    if (linkListSize) {
+      for (size_t pt_level = 1; pt_level <= cur_level; pt_level++) {
+        unsigned int extent = 0;
+        if (host_neighbors[pt_level - 1].has_value()) {
+          auto neighbor_view = host_neighbors[pt_level - 1]->view();
+          auto my_row        = order_bw[i] - offsets[pt_level - 1];
+          IdxT* neighbors    = &neighbor_view(my_row, 0);
+          extent             = neighbor_view.extent(1);
+          os.write(reinterpret_cast<char*>(&extent), sizeof(int));
+          for (unsigned int j = 0; j < extent; j++) {
+            const IdxT converted = order[neighbors[j] + offsets[pt_level - 1]];
+            os.write(reinterpret_cast<const char*>(&converted), sizeof(IdxT));
+          }
+        } else {
+          os.write(reinterpret_cast<char*>(&extent), sizeof(int));
+        }
+        auto remainder = appr_algo->M_ - extent;
+        for (size_t j = 0; j < remainder; j++) {
+          os.write(reinterpret_cast<char*>(&zero), sizeof(IdxT));
+        }
+        bytes_written += (extent + remainder) * sizeof(IdxT) + sizeof(int);
+        RAFT_EXPECTS(
+          appr_algo->size_links_per_element_ == (extent + remainder) * sizeof(IdxT) + sizeof(int),
+          "Size links per element mismatch");
+      }
+    }
+
+    const auto end_clock = std::chrono::system_clock::now();
+    if (i > next_report_offset) {
+      next_report_offset += d_report_offset;
+      const auto time =
+        std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
+        1e-6;
+      float throughput      = bytes_written / GiB / time;
+      float rows_throughput = i / time;
+      float ETA             = (n_rows - i) / rows_throughput;
+      RAFT_LOG_INFO(
+        "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f GiB\r",
+        i,
+        n_rows,
+        i / static_cast<double>(n_rows) * 100,
+        throughput,
+        int(ETA / 60),
+        std::fmod(ETA, 60.0f),
+        bytes_written / GiB);
+    }
+  }
+
+  os.flush();
+  os_raw.flush();
+  if (!os_raw.good()) { RAFT_LOG_WARN("Output stream is not in good state after serialization"); }
+
+  auto end_time = std::chrono::system_clock::now();
+  auto elapsed_time =
+    std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+  RAFT_LOG_INFO("HNSW serialization with original dataset order complete in %ld ms", elapsed_time);
+}
+
 template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
@@ -1095,7 +1585,11 @@ std::unique_ptr<index<T>> from_cagra(
 
     RAFT_EXPECTS(of, "Cannot open file %s", index_filename.c_str());
 
-    serialize_to_hnswlib_from_disk(res, of, params, cagra_index);
+    if (dataset.has_value()) {
+      serialize_to_hnswlib_with_original_dataset(res, of, params, cagra_index, dataset.value());
+    } else {
+      serialize_to_hnswlib_from_disk(res, of, params, cagra_index);
+    }
 
     of.close();
     RAFT_EXPECTS(of, "Error writing output %s", index_filename.c_str());
@@ -1312,8 +1806,10 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
 
-  // Convert CAGRA index to HNSW index
-  return from_cagra<T>(res, params, cagra_index, dataset);
+  // Convert CAGRA index to HNSW index. The resulting HNSW index uses the partitioned ACE index
+  // order. See `cagra::build` and `hnsw::from_cagra` for more details on how to remap the graph to
+  // original ids.
+  return from_cagra<T>(res, params, cagra_index, std::nullopt);
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail

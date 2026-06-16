@@ -455,7 +455,8 @@ std::unique_ptr<index<int8_t>> build(
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
- * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
+ * @param[in] dataset optional dataset in the original row order. When provided for a disk-backed
+ *            ACE index, cuVS remaps the on-disk ACE graph back to original ids before exporting.
  *
  * Usage example:
  * @code{.cpp}
@@ -491,7 +492,8 @@ std::unique_ptr<index<float>> from_cagra(
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
- * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
+ * @param[in] dataset optional dataset in the original row order. When provided for a disk-backed
+ *            ACE index, cuVS remaps the on-disk ACE graph back to original ids before exporting.
  *
  * Usage example:
  * @code{.cpp}
@@ -527,7 +529,8 @@ std::unique_ptr<index<half>> from_cagra(
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
- * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
+ * @param[in] dataset optional dataset in the original row order. When provided for a disk-backed
+ *            ACE index, cuVS remaps the on-disk ACE graph back to original ids before exporting.
  *
  * Usage example:
  * @code{.cpp}
@@ -563,7 +566,8 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
- * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
+ * @param[in] dataset optional dataset in the original row order. When provided for a disk-backed
+ *            ACE index, cuVS remaps the on-disk ACE graph back to original ids before exporting.
  *
  * Usage example:
  * @code{.cpp}

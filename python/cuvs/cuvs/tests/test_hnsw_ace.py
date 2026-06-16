@@ -10,7 +10,7 @@ import pytest
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
-from cuvs.neighbors import hnsw
+from cuvs.neighbors import cagra, hnsw
 from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
@@ -266,4 +266,115 @@ def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
         )
         assert os.path.exists(reordered_file), (
             "Reordered dataset file should exist when disk mode is triggered"
+        )
+
+
+def test_hnsw_ace_from_cagra_remaps_graph_to_original_ids():
+    """Verify `hnsw.from_cagra` for a disk-backed ACE index including remapping."""
+    n_rows = 2048
+    n_cols = 32
+    n_queries = 64
+    k = 10
+    dtype = np.float32
+    metric = "sqeuclidean"
+
+    dataset = generate_data((n_rows, n_cols), dtype)
+    queries = generate_data((n_queries, n_cols), dtype)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cagra_ace_params = cagra.AceParams(
+            npartitions=4,
+            ef_construction=120,
+            build_dir=temp_dir,
+            use_disk=True,
+        )
+        cagra_build_params = cagra.IndexParams(
+            metric=metric,
+            intermediate_graph_degree=128,
+            graph_degree=64,
+            build_algo="ace",
+            ace_params=cagra_ace_params,
+        )
+
+        cagra_index = cagra.build(cagra_build_params, dataset)
+        assert cagra_index.trained
+
+        mapping = np.load(os.path.join(temp_dir, "dataset_mapping.npy"))
+        reordered_dataset = np.load(
+            os.path.join(temp_dir, "reordered_dataset.npy")
+        )
+        reordered_graph = np.load(os.path.join(temp_dir, "cagra_graph.npy"))
+
+        # The mapping must be a permutation of [0, n_rows), and the
+        # reordered dataset must be consistent with it: each reordered row
+        # is the original row at position mapping[i].
+        assert mapping.shape == (n_rows,)
+        assert np.array_equal(np.sort(mapping), np.arange(n_rows))
+        np.testing.assert_array_equal(reordered_dataset, dataset[mapping])
+
+        # Ground truth in the original id space.
+        nn_skl = NearestNeighbors(
+            n_neighbors=k, algorithm="brute", metric="sqeuclidean"
+        )
+        nn_skl.fit(dataset)
+        skl_idx = nn_skl.kneighbors(queries, return_distance=False)
+
+        hnsw_params = hnsw.IndexParams(hierarchy="gpu", metric=metric)
+        hnsw_bin_path = os.path.join(temp_dir, "hnsw_index.bin")
+        original_graph_path = os.path.join(
+            temp_dir, "cagra_graph_original_ids.npy"
+        )
+
+        # Path 1: from_cagra with reordered graph
+        hnsw.from_cagra(hnsw_params, cagra_index)
+        assert os.path.exists(hnsw_bin_path)
+        assert not os.path.exists(original_graph_path), (
+            "cagra_graph_original_ids.npy must not be produced on the "
+            "reordered from_cagra path"
+        )
+
+        reordered_bin_path = os.path.join(temp_dir, "hnsw_index_reordered.bin")
+        os.replace(hnsw_bin_path, reordered_bin_path)
+
+        # Path 2: from_cagra with remapped graph
+        hnsw.from_cagra(hnsw_params, cagra_index, dataset=dataset)
+        assert os.path.exists(hnsw_bin_path)
+        assert os.path.exists(original_graph_path), (
+            "cagra_graph_original_ids.npy must be produced when the "
+            "original dataset is passed to from_cagra"
+        )
+
+        original_graph = np.load(original_graph_path)
+
+        # Each row must be at the original row position and every neighbor
+        # id must be an original id.
+        assert original_graph.shape == reordered_graph.shape
+        expected_original_graph = np.empty_like(reordered_graph)
+        expected_original_graph[mapping] = mapping[reordered_graph]
+        np.testing.assert_array_equal(original_graph, expected_original_graph)
+        assert original_graph.min() >= 0
+        assert original_graph.max() < n_rows
+
+        search_params = hnsw.SearchParams(ef=200, num_threads=1)
+
+        original_hnsw_index = hnsw.load(
+            hnsw_params, hnsw_bin_path, n_cols, dtype, metric=metric
+        )
+        _, out_idx_original = hnsw.search(
+            search_params, original_hnsw_index, queries, k
+        )
+        recall_original = calc_recall(np.asarray(out_idx_original), skl_idx)
+        assert recall_original >= 0.7, (
+            f"Remapped HNSW recall {recall_original:.3f} below 0.7"
+        )
+
+        reordered_hnsw_index = hnsw.load(
+            hnsw_params, reordered_bin_path, n_cols, dtype, metric=metric
+        )
+        _, out_idx_reordered = hnsw.search(
+            search_params, reordered_hnsw_index, queries, k
+        )
+        recall_reordered = calc_recall(np.asarray(out_idx_reordered), skl_idx)
+        assert recall_reordered >= 0.7, (
+            f"Reordered HNSW recall {recall_reordered:.3f} below 0.7"
         )

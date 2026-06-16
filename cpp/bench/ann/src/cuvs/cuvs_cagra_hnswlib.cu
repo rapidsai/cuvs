@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,6 +20,9 @@ auto parse_build_param(const nlohmann::json& conf) ->
   typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param param;
   auto& hnsw_params  = param.hnsw_index_params;
   auto& cagra_params = param.cagra_build_params;
+  if (conf.contains("use_original_id_graph")) {
+    param.use_original_id_graph = conf.at("use_original_id_graph");
+  }
   if (conf.contains("hierarchy")) {
     if (conf.at("hierarchy") == "none") {
       hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;
@@ -57,7 +60,8 @@ auto parse_build_param(const nlohmann::json& conf) ->
       ps.metric = dist_type;
       // Parse ACE parameters if provided
       if (conf.contains("npartitions") || conf.contains("build_dir") ||
-          conf.contains("ef_construction") || conf.contains("use_disk")) {
+          conf.contains("ef_construction") || conf.contains("use_disk") ||
+          conf.contains("max_host_memory_gb") || conf.contains("max_gpu_memory_gb")) {
         auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
         if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
         if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
@@ -65,6 +69,12 @@ auto parse_build_param(const nlohmann::json& conf) ->
           ace_params.ef_construction = conf.at("ef_construction");
         }
         if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
+        if (conf.contains("max_host_memory_gb")) {
+          ace_params.max_host_memory_gb = conf.at("max_host_memory_gb");
+        }
+        if (conf.contains("max_gpu_memory_gb")) {
+          ace_params.max_gpu_memory_gb = conf.at("max_gpu_memory_gb");
+        }
         ps.graph_build_params = ace_params;
       }
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
