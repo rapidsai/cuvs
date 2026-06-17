@@ -22,6 +22,11 @@ rapids_cuda_init_architectures(test_cuvs)
 project(test_cuvs LANGUAGES CXX CUDA)
 find_package(Threads)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 # ------------- configure cuvs -----------------#
 
 rapids_cpm_init()
@@ -31,6 +36,7 @@ include(../cmake/thirdparty/get_cuvs.cmake)
 # -------------- compile tasks ----------------- #
 add_executable(BRUTE_FORCE_EXAMPLE src/brute_force_bitmap.cu)
 add_executable(CAGRA_EXAMPLE src/cagra_example.cu)
+add_executable(CAGRA_FILTER_UDF_EXAMPLE src/cagra_filter_udf_example.cu)
 add_executable(CAGRA_HNSW_ACE_EXAMPLE src/cagra_hnsw_ace_example.cu)
 add_executable(CAGRA_PERSISTENT_EXAMPLE src/cagra_persistent_example.cu)
 add_executable(DYNAMIC_BATCHING_EXAMPLE src/dynamic_batching_example.cu)
@@ -44,6 +50,9 @@ add_executable(SCANN_EXAMPLE src/scann_example.cu)
 # installed in a conda environment, if one exists
 target_link_libraries(BRUTE_FORCE_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
 target_link_libraries(CAGRA_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
+target_link_libraries(
+  CAGRA_FILTER_UDF_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>
+)
 target_link_libraries(CAGRA_HNSW_ACE_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
 target_link_libraries(
   CAGRA_PERSISTENT_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env> Threads::Threads

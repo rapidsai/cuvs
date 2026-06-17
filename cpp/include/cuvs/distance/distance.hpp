@@ -6,7 +6,7 @@
 #pragma once
 
 #include <cstdint>
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 #include <cuvs/core/export.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
