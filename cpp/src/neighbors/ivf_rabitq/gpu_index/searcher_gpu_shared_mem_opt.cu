@@ -28,11 +28,10 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-// Simpler non-optimized version with BF16
-__global__ void precomputeAllLUTs_fp16_simple(const float* d_query,
-                                              lut_dtype* d_lut_for_queries,
-                                              size_t num_queries,
-                                              size_t D)
+__global__ void precomputeAllLUTs_fp16(const float* d_query,
+                                       lut_dtype* d_lut_for_queries,
+                                       size_t num_queries,
+                                       size_t D)
 {
   const int query_idx = blockIdx.x;
   if (query_idx >= num_queries) return;
@@ -65,82 +64,18 @@ __global__ void precomputeAllLUTs_fp16_simple(const float* d_query,
   }
 }
 
-__global__ void precomputeAllLUTs_fp16_optimized(const float* d_query,
-                                                 lut_dtype* d_lut_for_queries,  // Output in FP16
-                                                 size_t num_queries,
-                                                 size_t D)
-{
-  const int query_idx = blockIdx.x;
-  if (query_idx >= num_queries) return;
-
-  const int tid         = threadIdx.x;
-  const int num_threads = blockDim.x;
-
-  // Shared memory for query chunk and temporary LUT storage (still use FP32 for computation)
-  extern __shared__ float shared_mem[];
-  float* shared_query = shared_mem;
-  float* shared_lut   = shared_mem + BITS_PER_CHUNK;
-
-  const size_t num_chunks         = D / BITS_PER_CHUNK;
-  const size_t lut_per_query_size = num_chunks * LUT_SIZE;
-
-  lut_dtype* query_lut   = d_lut_for_queries + query_idx * lut_per_query_size;
-  const float* query_vec = d_query + query_idx * D;
-
-  for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
-    size_t dim_start = chunk_idx * BITS_PER_CHUNK;
-
-    // Load query chunk into shared memory
-    if (tid < BITS_PER_CHUNK && dim_start + tid < D) {
-      shared_query[tid] = query_vec[dim_start + tid];
-    }
-    __syncthreads();
-
-    // Compute LUT entries in FP32
-    for (int lut_entry = tid; lut_entry < LUT_SIZE; lut_entry += num_threads) {
-      float sum = 0.0f;
-
-#pragma unroll
-      for (int bit_idx = 0; bit_idx < BITS_PER_CHUNK; bit_idx++) {
-        if (dim_start + bit_idx < D) {
-          if (lut_entry & (1 << (BITS_PER_CHUNK - 1 - bit_idx))) { sum += shared_query[bit_idx]; }
-        }
-      }
-
-      if (lut_entry < LUT_SIZE) { shared_lut[lut_entry] = sum; }
-    }
-    __syncthreads();
-
-    // Coalesced write to global memory with BF16 conversion
-    size_t base_offset = chunk_idx * LUT_SIZE;
-    for (int i = tid; i < LUT_SIZE; i += num_threads) {
-      query_lut[base_offset + i] = __float2half(shared_lut[i]);
-    }
-    __syncthreads();
-  }
-}
-
-// Optimized version with BF16
 void launchPrecomputeLUTs_fp16(const float* d_query,
                                lut_dtype* d_lut_for_queries,
                                size_t num_queries,
                                size_t D,
-                               cudaStream_t stream,
-                               bool use_optimized = false)
+                               cudaStream_t stream)
 {
   dim3 gridDim(num_queries, 1, 1);
   dim3 blockDim(256, 1, 1);
 
-  if (use_optimized) {
-    size_t shared_mem_size = (BITS_PER_CHUNK + LUT_SIZE) * sizeof(float);
-    precomputeAllLUTs_fp16_optimized<<<gridDim, blockDim, shared_mem_size, stream>>>(
-      d_query, d_lut_for_queries, num_queries, D);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  } else {
-    precomputeAllLUTs_fp16_simple<<<gridDim, blockDim, 0, stream>>>(
-      d_query, d_lut_for_queries, num_queries, D);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
-  }
+  precomputeAllLUTs_fp16<<<gridDim, blockDim, 0, stream>>>(
+    d_query, d_lut_for_queries, num_queries, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 // optimize shared memory usage using (1) fp16 (2) shared memory reuse in the kernel
@@ -157,7 +92,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   raft::device_matrix_view<float, int64_t, raft::row_major> d_final_dists,
   raft::device_matrix_view<uint32_t, int64_t, raft::row_major> d_final_pids)
 {
-  // Using BF16 for storage
+  // Using FP16 for storage
 
   // Allocate space for LUT with reduced precision
   size_t lut_elements = num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE;

@@ -942,10 +942,7 @@ __device__ float compute_best_rescale_parallel(
     __syncthreads();
   }
 
-  __shared__ float max_o;
-  if (tid == 0) { max_o = s_reduce[0]; }
-  __syncthreads();
-
+  float max_o = s_reduce[0];  // full max, already visible to all threads via the reduction's sync
   if (max_o < kEps) return 1.0f;
 
   //=========================================================================
@@ -1306,6 +1303,8 @@ __global__ void fully_fused_kernel(float* __restrict__ output_factors,
 
   float norm_squared = blockReduceSum(local_sum);
 
+  // full block sum only available on lane 0 of warp 0 (see definition of blockReduceSum); need to
+  // make inv_norm a shared variable
   __shared__ float inv_norm;
   if (tid == 0) { inv_norm = rsqrtf(norm_squared); }
   __syncthreads();
