@@ -6,8 +6,6 @@
 /*
  * CUDA kernels for the Gaussian mixture E- and M-steps, covering all four
  * covariance parameterizations (full, tied, diag, spherical).
- *
-
  */
 
 #pragma once
