@@ -55,6 +55,11 @@ public class CuVSResourcesImpl implements CuVSResources {
    * {@code memoryTrackingCsvPath} from a background thread, restoring the
    * global memory resources on {@link #close()}.
    *
+   * <p>Note: the ~8MB pinned host buffer backing this handle is allocated via a
+   * raw {@code cudaMallocHost} (see {@code PinnedMemoryBuffer.createPinnedBuffer()})
+   * outside the tracking infrastructure, so it is not reflected in the CSV
+   * samples.
+   *
    * @param tempDirectory                the temporary directory to use for
    *                                     intermediate operations
    * @param memoryTrackingCsvPath        path to the output CSV file

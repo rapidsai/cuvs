@@ -36,16 +36,14 @@ impl Resources {
     ///
     /// `sample_interval` controls the minimum time between successive CSV
     /// samples; when `None`, the C++ default of 10 ms is used.
-    pub fn with_memory_tracking<P: AsRef<Path>>(
-        csv_path: P,
+    pub fn with_memory_tracking(
+        csv_path: impl AsRef<Path>,
         sample_interval: Option<Duration>,
     ) -> Result<Resources> {
-        let path_str = csv_path.as_ref().to_str().ok_or_else(|| {
-            Error::InvalidArgument(format!("csv_path is not valid UTF-8: {:?}", csv_path.as_ref()))
-        })?;
-        let c_path = CString::new(path_str).map_err(|e| {
-            Error::InvalidArgument(format!("csv_path contains an interior NUL byte: {}", e))
-        })?;
+        let c_path =
+            CString::new(csv_path.as_ref().as_os_str().as_encoded_bytes()).map_err(|e| {
+                Error::InvalidArgument(format!("csv_path contains an interior NUL byte: {}", e))
+            })?;
         let sample_interval_ms =
             sample_interval.unwrap_or(Duration::from_millis(10)).as_millis() as i64;
         let mut res: ffi::cuvsResources_t = 0;
