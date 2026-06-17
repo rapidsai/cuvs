@@ -7,13 +7,7 @@
  * CUDA kernels for the Gaussian mixture E- and M-steps, covering all four
  * covariance parameterizations (full, tied, diag, spherical).
  *
- * The mathematics mirror scikit-learn's ``GaussianMixture``. For the ``full``
- * and ``tied`` cases the precision Cholesky factor ``prec_chol`` is the
- * upper-triangular ``U`` with precision ``= U @ Uᵀ``; for ``diag``/``spherical``
- * it holds the per-feature / per-component reciprocal standard deviations.
- *
- * The full-covariance fused E-step kernels are adapted from rapids-singlecell's
- * CellCharter GMM kernels.
+
  */
 
 #pragma once

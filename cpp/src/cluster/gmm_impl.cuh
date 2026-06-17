@@ -407,7 +407,7 @@ void e_step(raft::resources const& handle,
 
   if (ct == covariance_type::FULL || (ct == covariance_type::TIED && d > 128)) {
     int prec_pc = (ct == covariance_type::FULL) ? 1 : 0;
-    // Size-based solver selection (mirrors rapids-singlecell): the fused
+    // Size-based solver selection: the fused
     // shared-memory kernels are fastest for the moderate-d regime; wide
     // feature counts (and float64 above 64) route through a cuBLAS E-step that
     // forms (X - means_k) @ prec_chol_k with a GEMM per component.
