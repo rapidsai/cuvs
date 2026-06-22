@@ -47,7 +47,7 @@ else export LD_LIBRARY_PATH=$CMAKE_PREFIX_PATH:${LD_LIBRARY_PATH}
 fi
 
 cd cuvs-java
-mvn clean verify "${MAVEN_VERIFY_ARGS[@]}" -P "$BUILD_PROFILE" \
+mvn clean verify -e -X "${MAVEN_VERIFY_ARGS[@]}" -P "$BUILD_PROFILE" \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-"$BUILD_PROFILE".jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dclassifier="$BUILD_PROFILE" -Dpackaging=jar \
   && cp pom.xml ./target/
