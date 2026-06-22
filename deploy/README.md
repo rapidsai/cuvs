@@ -214,9 +214,6 @@ docker compose run --rm --no-deps \
     -e BUILDER_URL=http://remote-index-builder:1025 \
     -e S3_BUCKET=${S3_BUCKET} \
     -e AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} \
-    -e S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID} \
-    -e S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY} \
-    -e S3_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
     bench \
     pytest /opt/cuvs/python/cuvs_bench/cuvs_bench/tests/test_opensearch.py -v -m integration
 ```

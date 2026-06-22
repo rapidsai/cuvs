@@ -10,7 +10,7 @@ RUN apt-get update \
 # nvcc, and cuvs_bench declares a hard dep on the `cuvs` CUDA package).
 # The opensearch backend is pure Python and needs neither, so we add the
 # package directly to PYTHONPATH and install only the actual runtime deps.
-RUN git clone --depth=1 --filter=blob:none --sparse --branch cuvs-bench-opensearch https://github.com/jrbourbeau/cuvs.git /opt/cuvs \
+RUN git clone --depth=1 --filter=blob:none --sparse https://github.com/rapidsai/cuvs.git /opt/cuvs \
     && cd /opt/cuvs \
     && git sparse-checkout set python/cuvs_bench
 

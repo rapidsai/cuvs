@@ -53,7 +53,7 @@ sudo sysctl -w vm.max_map_count=262144
 Set the required bucket name:
 
 ```bash
-export S3_BUCKET=<your-s3-bucket>
+export S3_BUCKET=opensearch-cuvs-bench
 ```
 
 If you are using static credentials instead of a default AWS credential provider, also export:
@@ -78,17 +78,17 @@ docker compose --profile gpu up --build -d --wait opensearch remote-index-builde
 
 ## Connecting OpenSearch to the GPU builder
 
-Before any index can use GPU builds, you need to register your S3 bucket as a snapshot repository and apply the cluster settings that point OpenSearch at the builder service. Run these once against a live cluster.
+Before any index can use GPU builds, you need to register an S3-backed snapshot repository and apply the cluster settings that point OpenSearch at the builder service. Run these once against a live cluster.
 
 **Register S3 repository:**
 
 ```bash
-curl -X PUT http://localhost:9200/_snapshot/<your-s3-bucket> \
+curl -X PUT http://localhost:9200/_snapshot/vector-repo \
   -H "Content-Type: application/json" \
   -d '{
     "type": "s3",
     "settings": {
-      "bucket": "<your-s3-bucket>",
+      "bucket": "opensearch-cuvs-bench",
       "base_path": "knn-indexes",
       "region": "us-west-2"
     }
@@ -103,7 +103,7 @@ curl -X PUT http://localhost:9200/_cluster/settings \
   -d '{
     "persistent": {
       "knn.remote_index_build.enabled": true,
-      "knn.remote_index_build.repository": "<your-s3-bucket>",
+      "knn.remote_index_build.repository": "vector-repo",
       "knn.remote_index_build.service.endpoint": "http://remote-index-builder:1025"
     }
   }'
