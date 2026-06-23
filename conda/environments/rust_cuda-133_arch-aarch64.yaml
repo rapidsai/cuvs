@@ -16,6 +16,7 @@ dependencies:
 - cxx-compiler
 - gcc_linux-aarch64=14.*
 - libcublas-dev
+- libcufile-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev

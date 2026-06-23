@@ -22,6 +22,7 @@ dependencies:
 - go
 - libclang==20.1.8
 - libcublas-dev
+- libcufile-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev

@@ -14,6 +14,8 @@
 #include <cuvs/util/file_io.hpp>
 #include <cuvs/util/host_memory.hpp>
 
+#include <kvikio/file_handle.hpp>
+
 #include <raft/core/copy.cuh>
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -722,9 +724,12 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   RAFT_EXPECTS(!dataset_path.empty(), "Unable to get path from dataset file descriptor");
   RAFT_EXPECTS(!mapping_path.empty(), "Unable to get path from mapping file descriptor");
 
-  int graph_fd   = graph_fd_opt->get();
-  int dataset_fd = dataset_fd_opt->get();
-  int label_fd   = mapping_fd_opt->get();
+  // Open kvikio handles for the disk-backed artifacts. Reads here target host buffers (the hnswlib
+  // layout is assembled on the CPU), so kvikio uses its POSIX + threadpool backend, with O_DIRECT
+  // when available; it handles any alignment internally.
+  kvikio::FileHandle graph_kv(graph_path, "r");
+  kvikio::FileHandle dataset_kv(dataset_path, "r");
+  kvikio::FileHandle label_kv(mapping_path, "r");
 
   // Read headers from files to get dimensions
   size_t graph_header_size = 0;
@@ -813,44 +818,47 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
                         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_buf,
                         raft::host_matrix_view<T, int64_t, raft::row_major> dataset_buf,
                         raft::host_vector_view<uint32_t, int64_t> label_buf) {
-    const size_t graph_bytes   = rows_to_read * graph_degree_int * sizeof(IdxT);
-    const size_t dataset_bytes = rows_to_read * dim * sizeof(T);
-    const size_t label_bytes   = rows_to_read * sizeof(uint32_t);
+    RAFT_EXPECTS(start_row >= 0 && rows_to_read >= 0,
+                 "Batch start row and row count must be non-negative");
+    const size_t row          = static_cast<size_t>(start_row);
+    const size_t rows         = static_cast<size_t>(rows_to_read);
+    const size_t graph_degree = static_cast<size_t>(graph_degree_int);
+    const size_t dim_size     = static_cast<size_t>(dim);
 
-    const off_t graph_offset   = graph_header_size + start_row * graph_degree_int * sizeof(IdxT);
-    const off_t dataset_offset = dataset_header_size + start_row * dim * sizeof(T);
-    const off_t label_offset   = label_header_size + start_row * sizeof(uint32_t);
+    const size_t graph_bytes   = rows * graph_degree * sizeof(IdxT);
+    const size_t dataset_bytes = rows * dim_size * sizeof(T);
+    const size_t label_bytes   = rows * sizeof(uint32_t);
+
+    const size_t graph_offset   = graph_header_size + row * graph_degree * sizeof(IdxT);
+    const size_t dataset_offset = dataset_header_size + row * dim_size * sizeof(T);
+    const size_t label_offset   = label_header_size + row * sizeof(uint32_t);
 
     RAFT_LOG_DEBUG("Reading batch: row=%ld, rows=%ld", start_row, rows_to_read);
 
-#pragma omp parallel sections num_threads(3)
-    {
-#pragma omp section
-      {
-        ssize_t bytes_read = pread(graph_fd, graph_buf.data_handle(), graph_bytes, graph_offset);
-        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(graph_bytes),
-                     "Failed to read graph data: expected %zu, got %zd",
-                     graph_bytes,
-                     bytes_read);
-      }
-#pragma omp section
-      {
-        ssize_t bytes_read =
-          pread(dataset_fd, dataset_buf.data_handle(), dataset_bytes, dataset_offset);
-        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(dataset_bytes),
-                     "Failed to read dataset data: expected %zu, got %zd",
-                     dataset_bytes,
-                     bytes_read);
-      }
-#pragma omp section
-      {
-        ssize_t bytes_read = pread(label_fd, label_buf.data_handle(), label_bytes, label_offset);
-        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(label_bytes),
-                     "Failed to read label data: expected %zu, got %zd",
-                     label_bytes,
-                     bytes_read);
-      }
-    }
+    // Issue the three reads concurrently through kvikio (its threadpool parallelizes each), then
+    // wait for all to complete.
+    auto graph_future = graph_kv.pread(graph_buf.data_handle(), graph_bytes, graph_offset);
+    auto dataset_future =
+      dataset_kv.pread(dataset_buf.data_handle(), dataset_bytes, dataset_offset);
+    auto label_future         = label_kv.pread(label_buf.data_handle(), label_bytes, label_offset);
+    const size_t graph_read   = graph_future.get();
+    const size_t dataset_read = dataset_future.get();
+    const size_t label_read   = label_future.get();
+    RAFT_EXPECTS(graph_read == graph_bytes,
+                 "Short graph read at row %ld: expected %zu, got %zu",
+                 start_row,
+                 graph_bytes,
+                 graph_read);
+    RAFT_EXPECTS(dataset_read == dataset_bytes,
+                 "Short dataset read at row %ld: expected %zu, got %zu",
+                 start_row,
+                 dataset_bytes,
+                 dataset_read);
+    RAFT_EXPECTS(label_read == label_bytes,
+                 "Short label read at row %ld: expected %zu, got %zu",
+                 start_row,
+                 label_bytes,
+                 label_read);
   };
 
   serialize_to_hnswlib_batched<T, IdxT>(
@@ -1258,7 +1266,10 @@ std::unique_ptr<index<T>> from_cagra(
     std::string index_filename =
       (std::filesystem::path(index_directory) / "hnsw_index.bin").string();
 
-    std::ofstream of(index_filename, std::ios::out | std::ios::binary);
+    // Route the disk-backed hnswlib output through kvikio (bypassing the page cache via O_DIRECT
+    // when supported) so all ACE disk I/O goes through kvikio. kvikio_ofstream is a std::ostream
+    // backed by a kvikio writer, so it plugs into the shared serializer below.
+    cuvs::util::kvikio_ofstream of(index_filename);
 
     RAFT_EXPECTS(of, "Cannot open file %s", index_filename.c_str());
 

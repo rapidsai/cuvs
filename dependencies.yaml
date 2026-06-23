@@ -17,6 +17,7 @@ files:
       - depends_on_cuda_python
       - depends_on_cupy
       - depends_on_librmm
+      - depends_on_libkvikio
       - depends_on_pylibraft
       - depends_on_nccl
       - docs
@@ -140,6 +141,7 @@ files:
     includes:
       - depends_on_libraft
       - depends_on_librmm
+      - depends_on_libkvikio
       - depends_on_nccl
       - rapids_build
   py_run_libcuvs:
@@ -151,6 +153,7 @@ files:
       - cuda_wheels
       - depends_on_libraft
       - depends_on_librmm
+      - depends_on_libkvikio
       - depends_on_nccl
   py_build_cuvs:
     output: pyproject
@@ -400,6 +403,24 @@ dependencies:
           - libcusolver-dev
           - libcusparse-dev
           - libnvjitlink-dev
+    specific:
+      # libcufile provides the GPUDirect Storage (cuFile) backend that kvikio compiles against.
+      # It is packaged for CUDA 12 on x86_64 only, and for CUDA 13 on all arches.
+      - output_types: [conda]
+        matrices:
+          - matrix:
+              cuda: "12.*"
+              arch: x86_64
+            packages:
+              - libcufile-dev
+          - matrix:
+              cuda: "12.*"
+              arch: aarch64
+            packages:
+          - matrix:
+              cuda: "13.*"
+            packages:
+              - libcufile-dev
   cuda_wheels:
     specific:
       # cuVS needs 'nvJitLink>={whatever-cuvs-was-built-against}' at runtime, and mixing
@@ -686,6 +707,29 @@ dependencies:
             packages:
               - librmm-cu13==26.8.*,>=0.0.0a0
           - {matrix: null, packages: [*librmm_unsuffixed]}
+  depends_on_libkvikio:
+    common:
+      - output_types: conda
+        packages:
+          - &libkvikio_unsuffixed libkvikio==26.8.*,>=0.0.0a0
+      - output_types: requirements
+        packages:
+          # pip recognizes the index as a global option for the requirements.txt file
+          - --extra-index-url=https://pypi.anaconda.org/rapidsai-wheels-nightly/simple
+    specific:
+      - output_types: [requirements, pyproject]
+        matrices:
+          - matrix:
+              cuda: "12.*"
+              cuda_suffixed: "true"
+            packages:
+              - libkvikio-cu12==26.8.*,>=0.0.0a0
+          - matrix:
+              cuda: "13.*"
+              cuda_suffixed: "true"
+            packages:
+              - libkvikio-cu13==26.8.*,>=0.0.0a0
+          - {matrix: null, packages: [*libkvikio_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda

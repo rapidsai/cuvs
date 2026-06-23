@@ -75,6 +75,12 @@ cache:
       - libnvjitlink-dev
       - librmm =${{ minor_version }}
       - libraft-headers =${{ minor_version }}
+      - libkvikio =${{ minor_version }}
+      # libcufile (GPUDirect Storage backend that kvikio compiles against): CUDA 13 on all arches,
+      # CUDA 12 on x86_64 only.
+      - if: cuda_major == "13" or linux64
+        then:
+          - libcufile-dev
       - nccl ${{ nccl_version }}
       - cuda-version =${{ cuda_version }}
       - cuda-cudart-dev
@@ -174,6 +180,10 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - librmm =${{ minor_version }}
         - libraft-headers =${{ minor_version }}
+        - libkvikio =${{ minor_version }}
+        - if: cuda_major == "13" or linux64
+          then:
+            - libcufile-dev
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
         - cuda-cudart-dev
@@ -189,6 +199,10 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
+        - libkvikio =${{ minor_version }}
+        - if: cuda_major == "13" or linux64
+          then:
+            - libcufile
         - cuda-nvrtc
         - nccl
         - libcublas
@@ -235,6 +249,10 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - librmm =${{ minor_version }}
         - libraft-headers =${{ minor_version }}
+        - libkvikio =${{ minor_version }}
+        - if: cuda_major == "13" or linux64
+          then:
+            - libcufile-dev
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
         - cuda-cudart-dev
@@ -250,6 +268,10 @@ outputs:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
+        - libkvikio =${{ minor_version }}
+        - if: cuda_major == "13" or linux64
+          then:
+            - libcufile
         - cuda-nvrtc
         - nccl
         - libcublas
