@@ -410,6 +410,12 @@ void ace_adjust_sub_graph_ids(
       size_t j = sub_search_graph(i, k);
       size_t j_original;
 
+      if (j == kInvalidNeighbor<IdxT>) {
+        // Variable-degree padding / invalid-neighbor sentinel: propagate as-is.
+        search_graph(i_original, k) = kInvalidNeighbor<IdxT>;
+        continue;
+      }
+
       if (j < core_sub_dataset_size) {
         // core partition neighbor: local → core reordered → original
         size_t j_reordered = j + core_partition_offsets(partition_id);
@@ -442,6 +448,11 @@ void ace_adjust_sub_graph_ids_disk(
   for (size_t i = 0; i < core_sub_dataset_size; i++) {
     for (size_t k = 0; k < graph_degree; k++) {
       size_t j = sub_search_graph(i, k);
+      if (j == kInvalidNeighbor<IdxT>) {
+        // Variable-degree padding / invalid-neighbor sentinel: propagate as-is.
+        sub_search_graph(i, k) = kInvalidNeighbor<IdxT>;
+        continue;
+      }
       if (j < core_sub_dataset_size) {
         // core partition neighbor: local → core reordered
         sub_search_graph(i, k) = j + core_partition_offsets(partition_id);

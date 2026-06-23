@@ -145,6 +145,14 @@ enum class hnsw_heuristic_type : uint32_t {
   SAME_GRAPH_FOOTPRINT = 1
 };
 
+/**
+ * Sentinel marking an invalid / absent neighbor in a CAGRA graph. Variable-degree
+ * graphs (see index_params::variable_graph_degree_fraction) pad unused neighbor
+ * slots with this value, and consumers should treat it as "end of neighbor list".
+ */
+template <typename IdxT>
+constexpr static IdxT kInvalidNeighbor = static_cast<IdxT>(-1);
+
 struct index_params : cuvs::neighbors::index_params {
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree = 128;
@@ -160,7 +168,7 @@ struct index_params : cuvs::neighbors::index_params {
    * enable variable-degree graphs: the optimize step finds the minimum detour
    * threshold that covers at least ceil(graph_degree * fraction) edges per node,
    * then lets reverse edges expand the degree further. Unused slots are filled
-   * with a sentinel value (IdxT(-1)).
+   * with a sentinel value (`kInvalidNeighbor`).
    *
    * This is intended for the CAGRA-to-HNSW conversion pipeline: the resulting
    * graph, when imported into hnswlib, produces variable-degree neighbor lists

@@ -6,6 +6,8 @@
 
 #include "utils.hpp"
 
+#include <cuvs/neighbors/cagra.hpp>
+
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
@@ -420,7 +422,7 @@ __device__ void warp_shift_array_one_right(uint32_t lane_id, T* array, uint64_t 
 //
 // When VariableDegree is true, `d_natural_degree` (size graph_size) drives:
 //   * the per-node `effective_degree` used to cap `num_protected_edges`
-//   * the `-1` sentinel padding for slots past the final degree
+//   * the `kInvalidNeighbor` sentinel padding for slots past the final degree
 //   * the write-back of the final effective degree
 // When VariableDegree is false, the parameter is unused (and may be a default view).
 template <typename IdxT,
@@ -549,12 +551,13 @@ __global__ void kern_merge_graph(
     if (lane_id == 0) { d_natural_degree(nid) = effective_degree; }
   }
 
-  // Slots past the final effective degree are written with the -1 sentinel that downstream
-  // consumers (HNSW serialization, out-of-range check) recognize as "end of neighbor list".
-  // In the constant-degree path effective_degree == output_graph_degree, so no slot is padded.
+  // Slots past the final effective degree are written with the kInvalidNeighbor sentinel that
+  // downstream consumers (HNSW serialization, out-of-range check) recognize as "end of neighbor
+  // list". In the constant-degree path effective_degree == output_graph_degree, so no slot is
+  // padded.
   for (uint32_t i = lane_id; i < output_graph_degree; i += raft::WarpSize) {
     output_graph(nid_batch, i) =
-      (i < effective_degree) ? smem_sorted_output_graph[i] : static_cast<IdxT>(-1);
+      (i < effective_degree) ? smem_sorted_output_graph[i] : kInvalidNeighbor<IdxT>;
   }
 }
 
@@ -889,9 +892,9 @@ void check_duplicates_and_out_of_range(
     for (uint32_t j = 0; j < output_graph_degree; j++) {
       const auto neighbor_a = my_out_graph[j];
 
-      // The variable-degree path pads unused slots with IdxT(-1). Without this guard the
+      // The variable-degree path pads unused slots with kInvalidNeighbor. Without this guard the
       // sentinel would (correctly) trigger the `>= graph_size` out-of-range check below.
-      if (neighbor_a == static_cast<IdxT>(-1)) { continue; }
+      if (neighbor_a == kInvalidNeighbor<IdxT>) { continue; }
 
       if (neighbor_a >= graph_size) {
         num_oor++;
@@ -1038,7 +1041,7 @@ void make_reverse_graph_gpu(
   //
   // Make reverse graph
   //
-  raft::matrix::fill(res, d_rev_graph, IdxT(-1));
+  raft::matrix::fill(res, d_rev_graph, kInvalidNeighbor<IdxT>);
   raft::matrix::fill(res, d_rev_graph_count, uint32_t(0));
 
   if constexpr (AccessorOutputGraph::is_device_accessible) {
