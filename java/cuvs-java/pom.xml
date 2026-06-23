@@ -52,13 +52,6 @@ SPDX-License-Identifier: Apache-2.0
         <native.build.path>${project.build.directory}/../../../cpp/build</native.build.path>
     </properties>
 
-    <distributionManagement>
-        <snapshotRepository>
-            <id>central</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
-
     <repositories>
         <!-- Prefer Google Cloud mirror, which has higher rate limits -->
         <repository>
