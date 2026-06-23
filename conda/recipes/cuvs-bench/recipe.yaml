@@ -42,11 +42,12 @@ requirements:
   run:
     - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
     - click
-    - cupy >=13.6.0
+    - cupy >=13.6.0,!=14.0.0,!=14.1.0
     - cuvs =${{ version }}
     - h5py ${{ h5py_version }}
     - libcuvs-bench-ann =${{ version }}
     - matplotlib-base>=3.9
+    - opensearch-py>=2.4.0
     - pandas
     - pylibraft =${{ minor_version }}
     - python
