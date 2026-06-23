@@ -548,10 +548,8 @@ void compute_centroid_adjustments(
     // Materialize the (possibly lazy) labels iterator into a device buffer so
     // we can read it on host without disturbing the original sequence.
     rmm::device_uvector<IndexT> mat_labels(static_cast<std::size_t>(n_samples), stream);
-    thrust::copy_n(raft::resource::get_thrust_policy(handle),
-                   cluster_labels,
-                   n_samples,
-                   mat_labels.data());
+    thrust::copy_n(
+      raft::resource::get_thrust_policy(handle), cluster_labels, n_samples, mat_labels.data());
 
     const std::size_t n_X_elems =
       static_cast<std::size_t>(n_samples) * static_cast<std::size_t>(n_features);

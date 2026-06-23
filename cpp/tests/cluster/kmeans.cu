@@ -381,6 +381,9 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     params.tol                 = testparams.tol;
     params.rng_state.seed      = 1;
     params.oversampling_factor = 0;
+    // Limit the number of iterations to ensure same number of iterations for reference and batched
+    // code paths.
+    params.max_iter = 3;
 
     auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -656,7 +659,7 @@ const std::vector<KmeansBatchedInputs<float>> batched_inputsf2 = {
   {1000, 64, 5, 0.0001f, false, 500},
   {1000, 100, 20, 0.0001f, true, 30},
   {1000, 10, 20, 0.0001f, false, 30},
-  {10000, 16, 10, 0.001f, true, 1000},
+  {10000, 16, 10, 0.0001f, true, 1000},
   {10000, 96, 10, 0.0001f, false, 10000},
 };
 

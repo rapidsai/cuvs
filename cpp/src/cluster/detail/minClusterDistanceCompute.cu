@@ -154,9 +154,7 @@ void minClusterAndDistanceCompute(
   // whether outputs are bitwise identical across the K runs.
   {
     static std::atomic<bool> s_self_test_done{false};
-    if (!s_self_test_done.exchange(true)) {
-      runFusedNNDeterminismSelfTest<DataT, IndexT>(handle);
-    }
+    if (!s_self_test_done.exchange(true)) { runFusedNNDeterminismSelfTest<DataT, IndexT>(handle); }
   }
 
   // ----- Nondeterminism diagnostic: fingerprint INPUTS (X, centroids, L2NormX) -----
