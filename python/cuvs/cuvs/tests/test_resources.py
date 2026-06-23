@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
-import gc
 
 import cupy as cp
-import cuvs.common.resources as resources_mod
 
 from cuvs.common import Resources
 
