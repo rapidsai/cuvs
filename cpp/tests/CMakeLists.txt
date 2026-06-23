@@ -156,6 +156,13 @@ ConfigureTest(
 )
 
 ConfigureTest(
+  NAME NEIGHBORS_ANN_IVF_RABITQ_TEST
+  PATH neighbors/ann_ivf_rabitq/test_float_int64_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
   NAME NEIGHBORS_ANN_SCANN_TEST
   PATH neighbors/ann_scann/test_float_int64_t.cu
   GPUS 1
@@ -183,6 +190,13 @@ ConfigureTest(
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST
   PATH neighbors/ann_cagra/test_float_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_FILTER_UDF_TEST
+  PATH neighbors/ann_cagra/test_filter_udf.cu
   GPUS 1
   PERCENT 100
 )
