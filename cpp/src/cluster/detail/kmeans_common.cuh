@@ -43,23 +43,17 @@
 #include <cub/iterator/arg_index_input_iterator.cuh>
 #include <cuda.h>
 #include <cuda/iterator>
-#include <thrust/copy.h>
 #include <thrust/for_each.h>
 #include <thrust/iterator/transform_iterator.h>
 
 #include <raft/linalg/add.cuh>
 
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 #include <ctime>
 #include <optional>
 #include <random>
-#include <string>
-#include <type_traits>
-#include <vector>
 
 namespace cuvs::cluster::kmeans::detail {
 
@@ -534,73 +528,8 @@ void compute_centroid_adjustments(
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
-  auto n_features     = X.extent(1);
 
   workspace.resize(n_samples, stream);
-
-  // ----- Nondeterminism diagnostic: fingerprint INPUTS (X, labels, weights) -----
-  // Compare two test runs by diffing the resulting log. If INPUT hashes match
-  // across runs but OUTPUT hashes do not, the divergence is the non-associative
-  // atomic accumulation inside raft::linalg::reduce_rows_by_key.
-  static std::atomic<int> s_call_id{0};
-  const int call_id = s_call_id.fetch_add(1);
-  {
-    // Materialize the (possibly lazy) labels iterator into a device buffer so
-    // we can read it on host without disturbing the original sequence.
-    rmm::device_uvector<IndexT> mat_labels(static_cast<std::size_t>(n_samples), stream);
-    thrust::copy_n(
-      raft::resource::get_thrust_policy(handle), cluster_labels, n_samples, mat_labels.data());
-
-    const std::size_t n_X_elems =
-      static_cast<std::size_t>(n_samples) * static_cast<std::size_t>(n_features);
-    std::vector<IndexT> h_labels(static_cast<std::size_t>(n_samples));
-    std::vector<DataT> h_X(n_X_elems);
-    std::vector<DataT> h_w(static_cast<std::size_t>(n_samples));
-    raft::copy(h_labels.data(), mat_labels.data(), n_samples, stream);
-    raft::copy(h_X.data(), X.data_handle(), n_X_elems, stream);
-    raft::copy(h_w.data(), sample_weights.data_handle(), n_samples, stream);
-    raft::resource::sync_stream(handle, stream);
-
-    auto fnv = [](auto const& buf) {
-      std::uint64_t h = 1469598103934665603ULL;
-      for (auto v : buf) {
-        std::uint64_t bits = 0;
-        if constexpr (std::is_floating_point_v<std::decay_t<decltype(v)>>) {
-          std::memcpy(&bits, &v, sizeof(v));
-        } else {
-          bits = static_cast<std::uint64_t>(v);
-        }
-        h ^= bits;
-        h *= 1099511628211ULL;
-      }
-      return h;
-    };
-
-    auto fmt_head = [&](auto const& buf) {
-      std::string s;
-      std::size_t hd = std::min<std::size_t>(8, buf.size());
-      for (std::size_t i = 0; i < hd; ++i) {
-        if (i) s += ',';
-        s += std::to_string(static_cast<long long>(buf[i]));
-      }
-      return s;
-    };
-
-    RAFT_LOG_INFO(
-      "compute_centroid_adjustments[call=%d]: INPUTS n_samples=%lld n_features=%lld "
-      "n_clusters=%lld reset_sums=%d X_hash=0x%016llx labels_hash=0x%016llx "
-      "weights_hash=0x%016llx labels_head=[%s]",
-      call_id,
-      static_cast<long long>(n_samples),
-      static_cast<long long>(n_features),
-      static_cast<long long>(n_clusters),
-      static_cast<int>(reset_sums),
-      static_cast<unsigned long long>(fnv(h_X)),
-      static_cast<unsigned long long>(fnv(h_labels)),
-      static_cast<unsigned long long>(fnv(h_w)),
-      fmt_head(h_labels).c_str());
-  }
-  // ----- end diagnostic for INPUTS -----
 
   raft::linalg::reduce_rows_by_key(X.data_handle(),
                                    X.extent(1),
@@ -622,48 +551,6 @@ void compute_centroid_adjustments(
                                    n_clusters,
                                    stream,
                                    reset_sums);
-
-  // ----- Nondeterminism diagnostic: fingerprint OUTPUTS (centroid_sums, wpc) -----
-  {
-    const std::size_t n_sums_elems =
-      static_cast<std::size_t>(n_clusters) * static_cast<std::size_t>(n_features);
-    std::vector<DataT> h_sums(n_sums_elems);
-    std::vector<DataT> h_wpc(static_cast<std::size_t>(n_clusters));
-    raft::copy(h_sums.data(), centroid_sums.data_handle(), n_sums_elems, stream);
-    raft::copy(h_wpc.data(), weight_per_cluster.data_handle(), n_clusters, stream);
-    raft::resource::sync_stream(handle, stream);
-
-    auto fnv_fp = [](std::vector<DataT> const& buf) {
-      std::uint64_t h = 1469598103934665603ULL;
-      for (auto v : buf) {
-        std::uint64_t bits = 0;
-        std::memcpy(&bits, &v, sizeof(v));
-        h ^= bits;
-        h *= 1099511628211ULL;
-      }
-      return h;
-    };
-
-    auto fmt_head_fp = [](std::vector<DataT> const& buf) {
-      std::string s;
-      std::size_t hd = std::min<std::size_t>(8, buf.size());
-      for (std::size_t i = 0; i < hd; ++i) {
-        if (i) s += ',';
-        s += std::to_string(static_cast<double>(buf[i]));
-      }
-      return s;
-    };
-
-    RAFT_LOG_INFO(
-      "compute_centroid_adjustments[call=%d]: OUTPUTS sums_hash=0x%016llx wpc_hash=0x%016llx "
-      "sums_head=[%s] wpc_head=[%s]",
-      call_id,
-      static_cast<unsigned long long>(fnv_fp(h_sums)),
-      static_cast<unsigned long long>(fnv_fp(h_wpc)),
-      fmt_head_fp(h_sums).c_str(),
-      fmt_head_fp(h_wpc).c_str());
-  }
-  // ----- end diagnostic for OUTPUTS -----
 }
 /**
  * @brief Finalize centroids by dividing accumulated sums by counts.
