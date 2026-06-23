@@ -3271,6 +3271,38 @@ namespace neighbors {
 namespace cagra {
 namespace helpers {
 
+/** Calculates the workspace for graph optimization
+ *
+ * @param[in] n_rows number of rows in the dataset (or number of points in the graph)
+ * @param[in] graph_degree degree of the output graph
+ * @param[in] intermediate_graph_degree degree of the input graph for the optimization process
+ * @param[in] index_size
+ * @param[in] mst_optimize whether to use MST optimization
+ * @return tuple of [host_size, device_size, host_fixed_size, device_fixed_size] memory sizes in
+ * bytes
+ */
+std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows,
+                                                                   size_t graph_degree,
+                                                                   size_t intermediate_degree,
+                                                                   size_t index_size,
+                                                                   bool mst_optimize = false);
+
+/**
+ * Calculate memory usage of CAGRA build.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset shape of the dataset
+ * @param[in] dtype element type of the dataset
+ *            (e.g. `CUDA_R_32F`, `CUDA_R_16F`, `CUDA_R_8I`, `CUDA_R_8U`)
+ * @param[in] cparams CAGRA index building parameters
+ *
+ * @return pair of [host_size, device_size] memory sizes in bytes
+ */
+std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
+                                                raft::matrix_extent<int64_t> dataset,
+                                                cudaDataType_t dtype,
+                                                cuvs::neighbors::cagra::index_params cparams);
+
 /**
  * @brief Optimize a KNN graph into a CAGRA graph.
  *
