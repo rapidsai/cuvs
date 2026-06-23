@@ -183,14 +183,16 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
   auto vq_centers =
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, vq_n_centers, dim);
 
-  auto vq_centers_view =
-    raft::make_device_matrix_view<MathT, ix_t>(vq_centers.data_handle(), vq_n_centers, dim);
   auto vq_trainset_view = raft::make_device_matrix_view<const kmeans_in_type, ix_t>(
     vq_trainset.data_handle(), n_rows_train, dim);
 
   if (vq_n_centers == 1) {
+    auto vq_centers_view =
+      raft::make_device_vector_view<MathT, ix_t>(vq_centers.data_handle(), dim);
     raft::stats::mean(res, vq_trainset_view, vq_centers_view);
   } else {
+    auto vq_centers_view =
+      raft::make_device_matrix_view<MathT, ix_t>(vq_centers.data_handle(), vq_n_centers, dim);
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
