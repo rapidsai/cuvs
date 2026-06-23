@@ -684,6 +684,192 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/increment_score"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
+  set(ivf_rabitq_ns "cuvs::neighbors::ivf_rabitq::detail")
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_lut"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_lut"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_lut"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_lut_emit_distances_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/lut_emit_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/lut_emit_distances_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_lut_emit_distances<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/lut_emit_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_lut_block_sort"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut_block_sort_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut_block_sort_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_lut_block_sort"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_lut_block_sort"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_lut_block_sort_emit_topk_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/lut_block_sort_emit_topk_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/lut_block_sort_emit_topk_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_lut_block_sort_emit_topk<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/lut_block_sort_emit_topk"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_extract_code_@ex_bits@bit"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/extract_code_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/extract_code_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_extract_code<@ex_bits@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/extract_code"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_lut_ip_for_vec_@lut_dtype_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_lut_ip_for_vec_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_lut_ip_for_vec_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_rabitq_ns}::fragment_tag_compute_lut_ip_for_vec<${ivf_rabitq_ns}::tag_lut_dtype_@lut_dtype_descriptor@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_lut_ip_for_vec"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_bitwise_quantized_ip_for_vec_@num_bits@bit"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_bitwise_quantized_ip_for_vec_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_bitwise_quantized_ip_for_vec_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_rabitq_ns}::fragment_tag_compute_bitwise_quantized_ip_for_vec<@num_bits@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_bitwise_quantized_ip_for_vec"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_lut16_opt"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut16_opt_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut16_opt_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_lut16_opt"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_lut16_opt"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_lut16_opt_emit_distances_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/lut16_opt_emit_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/lut16_opt_emit_distances_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_lut16_opt_emit_distances<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/lut16_opt_emit_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_lut16_opt_block_sort_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut16_opt_block_sort_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_lut16_opt_block_sort_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_lut16_opt_block_sort<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_lut16_opt_block_sort"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_bitwise"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_bitwise_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_bitwise_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_bitwise"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_bitwise"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_bitwise_emit_distances_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/bitwise_emit_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/bitwise_emit_distances_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT "${ivf_rabitq_ns}::fragment_tag_bitwise_emit_distances<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/bitwise_emit_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_compute_inner_products_with_bitwise_block_sort"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_bitwise_block_sort_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/compute_inner_products_with_bitwise_block_sort_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_rabitq_ns}::fragment_tag_compute_inner_products_with_bitwise_block_sort"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/compute_inner_products_with_bitwise_block_sort"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_rabitq_bitwise_block_sort_emit_topk_@with_ex_descriptor@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/bitwise_block_sort_emit_topk_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_rabitq/jit_lto_kernels/bitwise_block_sort_emit_topk_kernel.cu.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_rabitq_ns}::fragment_tag_bitwise_block_sort_emit_topk<@with_ex_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_rabitq/ivf_rabitq_fragments.hpp>"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_rabitq/bitwise_block_sort_emit_topk"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
   set(cagra_ns "cuvs::neighbors::cagra::detail")
   generate_jit_lto_kernels(
     jit_lto_files
@@ -1201,6 +1387,15 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     ${ivf_pq_search_inst_files}
     ${ivf_pq_transform_inst_files}
+    src/neighbors/ivf_rabitq.cu
+    src/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_shared_mem_opt.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_quantize_query.cu
+    src/neighbors/ivf_rabitq/utils/searcher_gpu_utils.cu
     src/neighbors/ivf_sq_index.cpp
     src/neighbors/ivf_sq/ivf_sq_build_extend_float_uint8_t_int64_t.cu
     src/neighbors/ivf_sq/ivf_sq_build_extend_half_uint8_t_int64_t.cu
