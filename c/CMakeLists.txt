@@ -171,6 +171,7 @@ target_link_libraries(
           $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs> #
           $<COMPILE_ONLY:raft::raft> # enforce we shouldn't use raft symbols
           $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+          $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:kvikio::kvikio>>
 )
 
 # ##################################################################################################
