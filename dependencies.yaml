@@ -403,24 +403,6 @@ dependencies:
           - libcusolver-dev
           - libcusparse-dev
           - libnvjitlink-dev
-    specific:
-      # libcufile provides the GPUDirect Storage (cuFile) backend that kvikio compiles against.
-      # It is packaged for CUDA 12 on x86_64 only, and for CUDA 13 on all arches.
-      - output_types: [conda]
-        matrices:
-          - matrix:
-              cuda: "12.*"
-              arch: x86_64
-            packages:
-              - libcufile-dev
-          - matrix:
-              cuda: "12.*"
-              arch: aarch64
-            packages:
-          - matrix:
-              cuda: "13.*"
-            packages:
-              - libcufile-dev
   cuda_wheels:
     specific:
       # cuVS needs 'nvJitLink>={whatever-cuvs-was-built-against}' at runtime, and mixing

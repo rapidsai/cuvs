@@ -213,6 +213,29 @@ TEST(FileIO, InvalidArguments)
   ASSERT_NE(dup_fd, -1);
   file_descriptor pathless_fd(dup_fd);
   EXPECT_THROW(read_large_file(pathless_fd, buf, sizeof(buf), header_size), raft::exception);
+  EXPECT_THROW(write_large_file(pathless_fd, buf, sizeof(buf), header_size), raft::exception);
+}
+
+TEST(FileIO, RejectsReplacedPathForBulkIO)
+{
+  scratch_dir scratch;
+  const std::string path = scratch.file("replace.npy");
+  auto [fd, header_size] = create_numpy_file<float>(path, {16, 4});
+  char buf[8]            = {0};
+
+  std::error_code ec;
+  ASSERT_TRUE(std::filesystem::remove(path, ec));
+  ASSERT_FALSE(ec) << ec.message();
+
+  std::ofstream replacement(path, std::ios::out | std::ios::binary);
+  ASSERT_TRUE(replacement.good()) << "cannot create replacement " << path;
+  std::vector<char> replacement_data(header_size + sizeof(buf), 0);
+  replacement.write(replacement_data.data(), replacement_data.size());
+  replacement.close();
+  ASSERT_TRUE(replacement.good()) << "cannot write replacement " << path;
+
+  EXPECT_THROW(read_large_file(fd, buf, sizeof(buf), header_size), raft::exception);
+  EXPECT_THROW(write_large_file(fd, buf, sizeof(buf), header_size), raft::exception);
 }
 
 }  // namespace cuvs::util

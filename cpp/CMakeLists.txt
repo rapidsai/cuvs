@@ -1541,8 +1541,11 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
-              $<COMPILE_ONLY:cuco::cuco> CUDA::nvJitLink CUDA::nvrtc
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco>
+              CUDA::nvJitLink
+              CUDA::nvrtc
               $<BUILD_LOCAL_INTERFACE:kvikio::kvikio>
     )
 

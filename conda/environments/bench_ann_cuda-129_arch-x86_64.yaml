@@ -28,7 +28,6 @@ dependencies:
 - libboost-devel=1.87
 - libclang==20.1.8
 - libcublas-dev
-- libcufile-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev

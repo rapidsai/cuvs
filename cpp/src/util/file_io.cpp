@@ -11,9 +11,56 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <sys/stat.h>
 #include <vector>
 
 namespace cuvs::util {
+namespace {
+
+struct file_identity {
+  dev_t device;
+  ino_t inode;
+};
+
+file_identity get_file_identity(int fd, const char* description)
+{
+  struct stat status{};
+  RAFT_EXPECTS(::fstat(fd, &status) == 0,
+               "Failed to stat %s file descriptor: %s",
+               description,
+               std::strerror(errno));
+  return {status.st_dev, status.st_ino};
+}
+
+void expect_matching_file_identity(file_identity expected,
+                                   int actual_fd,
+                                   const char* actual_description,
+                                   const std::string& path)
+{
+  RAFT_EXPECTS(actual_fd >= 0, "kvikio did not open %s file descriptor", actual_description);
+
+  const auto actual = get_file_identity(actual_fd, actual_description);
+  RAFT_EXPECTS(actual.device == expected.device && actual.inode == expected.inode,
+               "File path changed while opening %s for kvikio I/O",
+               path.c_str());
+}
+
+void validate_kvikio_handle_matches_fd(const file_descriptor& fd,
+                                       const kvikio::FileHandle& handle,
+                                       const std::string& path)
+{
+  const auto expected = get_file_identity(fd.get(), "source");
+
+  const int buffered_fd = handle.fd(false);
+  expect_matching_file_identity(expected, buffered_fd, "kvikio buffered", path);
+
+  const int direct_fd = handle.fd(true);
+  if (direct_fd >= 0 && direct_fd != buffered_fd) {
+    expect_matching_file_identity(expected, direct_fd, "kvikio direct", path);
+  }
+}
+
+}  // namespace
 
 void read_large_file(const file_descriptor& fd,
                      void* dest_ptr,
@@ -30,6 +77,7 @@ void read_large_file(const file_descriptor& fd,
   // the POSIX + threadpool backend (with O_DIRECT when available) otherwise. The destination may be
   // host or device memory; kvikio detects which.
   kvikio::FileHandle handle(path, "r");
+  validate_kvikio_handle_matches_fd(fd, handle, path);
   const size_t bytes_read = handle.pread(dest_ptr, total_bytes, file_offset).get();
   RAFT_EXPECTS(bytes_read == total_bytes,
                "Incomplete read from %s: expected %zu bytes, got %zu",
@@ -52,6 +100,7 @@ void write_large_file(const file_descriptor& fd,
   // Open in read+write mode ("r+") so the existing numpy header and preallocation are preserved
   // (kvikio's "w" mode would truncate). The source may be host or device memory.
   kvikio::FileHandle handle(path, "r+");
+  validate_kvikio_handle_matches_fd(fd, handle, path);
   const size_t bytes_written = handle.pwrite(data_ptr, total_bytes, file_offset).get();
   RAFT_EXPECTS(bytes_written == total_bytes,
                "Incomplete write to %s: expected %zu bytes, wrote %zu",

@@ -29,6 +29,7 @@
 #include <library_types.h>
 
 #include <cmath>
+#include <exception>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
@@ -840,10 +841,22 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     auto graph_future = graph_kv.pread(graph_buf.data_handle(), graph_bytes, graph_offset);
     auto dataset_future =
       dataset_kv.pread(dataset_buf.data_handle(), dataset_bytes, dataset_offset);
-    auto label_future         = label_kv.pread(label_buf.data_handle(), label_bytes, label_offset);
-    const size_t graph_read   = graph_future.get();
-    const size_t dataset_read = dataset_future.get();
-    const size_t label_read   = label_future.get();
+    auto label_future = label_kv.pread(label_buf.data_handle(), label_bytes, label_offset);
+
+    // Drain all three futures before propagating any failure.
+    std::exception_ptr read_error;
+    auto drain = [&read_error](auto& fut) -> size_t {
+      try {
+        return fut.get();
+      } catch (...) {
+        if (!read_error) { read_error = std::current_exception(); }
+        return 0;
+      }
+    };
+    const size_t graph_read   = drain(graph_future);
+    const size_t dataset_read = drain(dataset_future);
+    const size_t label_read   = drain(label_future);
+    if (read_error) { std::rethrow_exception(read_error); }
     RAFT_EXPECTS(graph_read == graph_bytes,
                  "Short graph read at row %ld: expected %zu, got %zu",
                  start_row,
