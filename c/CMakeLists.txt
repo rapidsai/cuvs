@@ -71,10 +71,6 @@ if(BUILD_CAGRA_HNSWLIB)
   include(../cpp/cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
-if(CUVSC_STATIC_CUVS_LIBRARY AND NOT TARGET kvikio::kvikio)
-  include(../cpp/cmake/thirdparty/get_kvikio.cmake)
-endif()
-
 if(BUILD_MG_ALGOS AND CUVSC_STATIC_CUVS_LIBRARY)
   rapids_find_generate_module(
     NCCL
@@ -218,6 +214,10 @@ if(BUILD_TESTS)
   rapids_cuda_init_architectures(CUVS_C)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
+
+  if(CUVSC_STATIC_CUVS_LIBRARY AND NOT TARGET kvikio::kvikio)
+    include(../cpp/cmake/thirdparty/get_kvikio.cmake)
+  endif()
 
   enable_testing()
   add_subdirectory(tests)
