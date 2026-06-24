@@ -963,33 +963,21 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/fused_distance_nn/cutile")
   set(cutile_fused_1nn_generated_dir
       "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/fused_1nn/cutile")
-  generate_cutile_cubin_kernels(
+  generate_cutile_kernels(
     cutile_fused_1nn_files
     KERNEL_DIR "${fused_1nn_cutile_dir}"
     KERNEL_BASENAME "fused_1nn"
     KERNEL_PYTHON "fused_1nn_kernel.py"
     EXPORT_SCRIPT "export_fused_1nn.py"
     OUTPUT_DIRECTORY "${cutile_fused_1nn_generated_dir}"
-    MATRIX_JSON_FILE "${fused_1nn_cutile_dir}/fused_1nn_cutile_cubin_matrix.json"
-    FRAGMENT_TAG_FORMAT
+    MATRIX_JSON_FILE "${fused_1nn_cutile_dir}/fused_1nn_cutile_matrix.json"
+    FRAGMENT_TAG_FORMAT_CUBIN
       "cuvs::distance::detail::fragment_tag_fused_1nn_cubin<cuvs::neighbors::detail::tag_@data_abbrev@, cuvs::detail::jit_lto::@arch_tag@>"
-    FRAGMENT_TAG_HEADER_FILES
-      "<cuvs/detail/jit_lto/fused_distance_nn/fused_1nn_fragments.hpp>"
-      "<cuvs/detail/jit_lto/cutile_arch_tags.hpp>"
-      "<cuvs/detail/jit_lto/common_fragments.hpp>"
-  )
-  generate_cutile_tileir_kernels(
-    cutile_fused_1nn_files
-    KERNEL_DIR "${fused_1nn_cutile_dir}"
-    KERNEL_BASENAME "fused_1nn"
-    KERNEL_PYTHON "fused_1nn_kernel.py"
-    EXPORT_SCRIPT "export_fused_1nn.py"
-    OUTPUT_DIRECTORY "${cutile_fused_1nn_generated_dir}"
-    MATRIX_JSON_FILE "${fused_1nn_cutile_dir}/fused_1nn_cutile_tileir_matrix.json"
-    FRAGMENT_TAG_FORMAT
+    FRAGMENT_TAG_FORMAT_TILEIR
       "cuvs::distance::detail::fragment_tag_fused_1nn_tileir<cuvs::neighbors::detail::tag_@data_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES
       "<cuvs/detail/jit_lto/fused_distance_nn/fused_1nn_fragments.hpp>"
+      "<cuvs/detail/jit_lto/cutile_arch_tags.hpp>"
       "<cuvs/detail/jit_lto/common_fragments.hpp>"
   )
   if(NOT DEFINED CUVS_CUTILE_ENABLED)

@@ -77,13 +77,15 @@ function(_cutile_kernels_setup)
 
   file(MAKE_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}")
 
+  set(Python3_EXECUTABLE "${Python3_EXECUTABLE}" PARENT_SCOPE)
+  set(CUTILE_BIN2C "${CUTILE_BIN2C}" PARENT_SCOPE)
   set(_CUTILE_SETUP_OK
       TRUE
       PARENT_SCOPE
   )
 endfunction()
 
-function(process_cutile_cubin_matrix_entry source_list_var)
+function(process_cutile_matrix_entry source_list_var)
   set(options)
   set(one_value
       KERNEL_DIR
@@ -91,110 +93,75 @@ function(process_cutile_cubin_matrix_entry source_list_var)
       KERNEL_PYTHON
       EXPORT_SCRIPT
       OUTPUT_DIRECTORY
-      FRAGMENT_TAG_FORMAT
+      FRAGMENT_TAG_FORMAT_CUBIN
+      FRAGMENT_TAG_FORMAT_TILEIR
       MATRIX_JSON_ENTRY
   )
   set(multi_value FRAGMENT_TAG_HEADER_FILES)
   cmake_parse_arguments(_CUTILE "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
   populate_matrix_variables("${_CUTILE_MATRIX_JSON_ENTRY}")
+
+  if(register STREQUAL "cubin")
+    string(CONFIGURE "${_CUTILE_FRAGMENT_TAG_FORMAT_CUBIN}" fragment_tag @ONLY)
+    set(bin2c_symbol embedded_cubin)
+    set(fragment_entry_type "StaticCubinFragmentEntry<fragment_tag>")
+  elseif(register STREQUAL "tileir")
+    string(CONFIGURE "${_CUTILE_FRAGMENT_TAG_FORMAT_TILEIR}" fragment_tag @ONLY)
+    set(bin2c_symbol embedded_tileir)
+    set(fragment_entry_type "StaticTileIrBytecodeFragmentEntry<fragment_tag>")
+  else()
+    message(FATAL_ERROR "Unknown cuTile register kind '${register}'")
+  endif()
+
   _cutile_fragment_tag_header_files(
     fragment_tag_header_files ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
   )
 
-  string(CONFIGURE "${_CUTILE_FRAGMENT_TAG_FORMAT}" fragment_tag @ONLY)
+  string(CONFIGURE "${artifact_basename}" _artifact_basename @ONLY)
+  set(_artifact_stem "${_CUTILE_KERNEL_BASENAME}_${_artifact_basename}")
+  set(_artifact_file "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_stem}.${artifact_ext}")
+  set(_embedded_header "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_stem}_${register}.h")
+  set(_fragment_cpp "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_stem}_${register}.cpp")
+  set(embedded_header_file "${_artifact_stem}_${register}.h")
 
-  set(_artifact_basename "${_CUTILE_KERNEL_BASENAME}_${data_type}_${gpu_code}")
-  set(_cubin_file "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_basename}.cubin")
-  set(_cubin_header "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_basename}_cubin.h")
-  set(_cubin_cpp "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_basename}_cubin.cpp")
-  set(cubin_header_file "${_artifact_basename}_cubin.h")
+  set(_python_args --format "${output_format}" --data-type "${data_type}" --gpu-code "${gpu_code}")
+  if(DEFINED bytecode_version AND NOT "${bytecode_version}" STREQUAL "")
+    list(APPEND _python_args --bytecode-version "${bytecode_version}")
+  endif()
 
   add_custom_command(
-    OUTPUT "${_cubin_file}"
-    COMMAND
-      "${Python3_EXECUTABLE}" "${_CUTILE_KERNEL_DIR}/${_CUTILE_EXPORT_SCRIPT}" "${_cubin_file}"
-      --format cubin --data-type "${data_type}" --gpu-code "${gpu_code}"
+    OUTPUT "${_artifact_file}"
+    COMMAND "${Python3_EXECUTABLE}" "${_CUTILE_KERNEL_DIR}/${_CUTILE_EXPORT_SCRIPT}"
+            "${_artifact_file}" ${_python_args}
+    WORKING_DIRECTORY "${_CUTILE_KERNEL_DIR}"
     DEPENDS "${_CUTILE_KERNEL_DIR}/${_CUTILE_EXPORT_SCRIPT}"
             "${_CUTILE_KERNEL_DIR}/${_CUTILE_KERNEL_PYTHON}"
-    COMMENT "Exporting cuTile ${_CUTILE_KERNEL_BASENAME} cubin ${data_type} ${gpu_code}"
+    COMMENT "Exporting cuTile ${_CUTILE_KERNEL_BASENAME} ${output_format} ${data_type}"
     VERBATIM
   )
 
   add_custom_command(
-    OUTPUT "${_cubin_header}"
-    COMMAND "${CUTILE_BIN2C}" --const --name embedded_cubin --static "${_cubin_file}"
-            > "${_cubin_header}"
-    DEPENDS "${_cubin_file}"
+    OUTPUT "${_embedded_header}"
+    COMMAND "${CUTILE_BIN2C}" --const --name ${bin2c_symbol} --static "${_artifact_file}"
+            > "${_embedded_header}"
+    DEPENDS "${_artifact_file}"
     VERBATIM
   )
 
   configure_file(
-    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/register_cubin.cpp.in" "${_cubin_cpp}" @ONLY
+    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/register_cutile_fragment.cpp.in" "${_fragment_cpp}" @ONLY
   )
-  list(APPEND ${source_list_var} "${_cubin_header}" "${_cubin_cpp}")
+  list(APPEND ${source_list_var} "${_embedded_header}" "${_fragment_cpp}")
   set(${source_list_var}
       "${${source_list_var}}"
       PARENT_SCOPE
   )
 endfunction()
 
-function(process_cutile_tileir_matrix_entry source_list_var)
-  set(options)
-  set(one_value
-      KERNEL_DIR
-      KERNEL_BASENAME
-      KERNEL_PYTHON
-      EXPORT_SCRIPT
-      OUTPUT_DIRECTORY
-      FRAGMENT_TAG_FORMAT
-      MATRIX_JSON_ENTRY
-  )
-  set(multi_value FRAGMENT_TAG_HEADER_FILES)
-  cmake_parse_arguments(_CUTILE "${options}" "${one_value}" "${multi_value}" ${ARGN})
-
-  populate_matrix_variables("${_CUTILE_MATRIX_JSON_ENTRY}")
-  _cutile_fragment_tag_header_files(
-    fragment_tag_header_files ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
-  )
-
-  string(CONFIGURE "${_CUTILE_FRAGMENT_TAG_FORMAT}" fragment_tag @ONLY)
-  set(_tileir_file "${_CUTILE_OUTPUT_DIRECTORY}/${_CUTILE_KERNEL_BASENAME}_${data_type}.tilebc")
-  set(_tileir_header "${_CUTILE_OUTPUT_DIRECTORY}/${_CUTILE_KERNEL_BASENAME}_${data_type}_tileir.h")
-  set(_tileir_cpp "${_CUTILE_OUTPUT_DIRECTORY}/${_CUTILE_KERNEL_BASENAME}_${data_type}_tileir.cpp")
-  set(tileir_header_file "${_CUTILE_KERNEL_BASENAME}_${data_type}_tileir.h")
-
-  add_custom_command(
-    OUTPUT "${_tileir_file}"
-    COMMAND
-      "${Python3_EXECUTABLE}" "${_CUTILE_KERNEL_DIR}/${_CUTILE_EXPORT_SCRIPT}" "${_tileir_file}"
-      --format tileir_bytecode --data-type "${data_type}" --gpu-code "${export_gpu_code}"
-      --bytecode-version "${bytecode_version}"
-    DEPENDS "${_CUTILE_KERNEL_DIR}/${_CUTILE_EXPORT_SCRIPT}"
-            "${_CUTILE_KERNEL_DIR}/${_CUTILE_KERNEL_PYTHON}"
-    COMMENT "Exporting cuTile ${_CUTILE_KERNEL_BASENAME} TileIR bytecode ${data_type}"
-    VERBATIM
-  )
-
-  add_custom_command(
-    OUTPUT "${_tileir_header}"
-    COMMAND "${CUTILE_BIN2C}" --const --name embedded_tileir --static "${_tileir_file}"
-            > "${_tileir_header}"
-    DEPENDS "${_tileir_file}"
-    VERBATIM
-  )
-
-  configure_file(
-    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/register_tileir.cpp.in" "${_tileir_cpp}" @ONLY
-  )
-  list(APPEND ${source_list_var} "${_tileir_header}" "${_tileir_cpp}")
-  set(${source_list_var}
-      "${${source_list_var}}"
-      PARENT_SCOPE
-  )
-endfunction()
-
-function(generate_cutile_cubin_kernels source_list_var)
+function(generate_cutile_kernels source_list_var)
   set(options)
   set(one_value
       KERNEL_DIR
@@ -203,13 +170,14 @@ function(generate_cutile_cubin_kernels source_list_var)
       EXPORT_SCRIPT
       OUTPUT_DIRECTORY
       MATRIX_JSON_FILE
-      FRAGMENT_TAG_FORMAT
+      FRAGMENT_TAG_FORMAT_CUBIN
+      FRAGMENT_TAG_FORMAT_TILEIR
   )
   set(multi_value FRAGMENT_TAG_HEADER_FILES)
   cmake_parse_arguments(_CUTILE "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   if(NOT _CUTILE_KERNEL_BASENAME)
-    message(FATAL_ERROR "generate_cutile_cubin_kernels: KERNEL_BASENAME is required")
+    message(FATAL_ERROR "generate_cutile_kernels: KERNEL_BASENAME is required")
   endif()
   if(NOT _CUTILE_KERNEL_PYTHON)
     set(_CUTILE_KERNEL_PYTHON "fused_1nn_kernel.py")
@@ -236,72 +204,15 @@ function(generate_cutile_cubin_kernels source_list_var)
   # cmake-lint: disable=C0103,E1120
   foreach(i RANGE "${last}")
     string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
-    process_cutile_cubin_matrix_entry(
+    process_cutile_matrix_entry(
       "${source_list_var}"
       KERNEL_DIR "${_CUTILE_KERNEL_DIR}"
       KERNEL_BASENAME "${_CUTILE_KERNEL_BASENAME}"
       KERNEL_PYTHON "${_CUTILE_KERNEL_PYTHON}"
       EXPORT_SCRIPT "${_CUTILE_EXPORT_SCRIPT}"
       OUTPUT_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}"
-      FRAGMENT_TAG_FORMAT "${_CUTILE_FRAGMENT_TAG_FORMAT}"
-      FRAGMENT_TAG_HEADER_FILES ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
-      MATRIX_JSON_ENTRY "${matrix_json_entry}"
-    )
-  endforeach()
-
-  set(CUVS_CUTILE_ENABLED 1 PARENT_SCOPE)
-  set(${source_list_var}
-      "${${source_list_var}}"
-      PARENT_SCOPE
-  )
-endfunction()
-
-function(generate_cutile_tileir_kernels source_list_var)
-  set(options)
-  set(one_value
-      KERNEL_DIR
-      KERNEL_BASENAME
-      KERNEL_PYTHON
-      EXPORT_SCRIPT
-      OUTPUT_DIRECTORY
-      MATRIX_JSON_FILE
-      FRAGMENT_TAG_FORMAT
-  )
-  set(multi_value FRAGMENT_TAG_HEADER_FILES)
-  cmake_parse_arguments(_CUTILE "${options}" "${one_value}" "${multi_value}" ${ARGN})
-
-  if(NOT _CUTILE_KERNEL_BASENAME)
-    message(FATAL_ERROR "generate_cutile_tileir_kernels: KERNEL_BASENAME is required")
-  endif()
-  if(NOT _CUTILE_KERNEL_PYTHON)
-    set(_CUTILE_KERNEL_PYTHON "fused_1nn_kernel.py")
-  endif()
-
-  _cutile_kernels_setup(
-    MATRIX_JSON_FILE "${_CUTILE_MATRIX_JSON_FILE}"
-    OUTPUT_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}"
-  )
-  if(NOT _CUTILE_SETUP_OK)
-    generate_cutile_kernels_stub()
-    return()
-  endif()
-
-  compute_matrix_product(matrix_product MATRIX_JSON_FILE "${_CUTILE_MATRIX_JSON_FILE}")
-
-  string(JSON len LENGTH "${matrix_product}")
-  math(EXPR last "${len} - 1")
-
-  # cmake-lint: disable=C0103,E1120
-  foreach(i RANGE "${last}")
-    string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
-    process_cutile_tileir_matrix_entry(
-      "${source_list_var}"
-      KERNEL_DIR "${_CUTILE_KERNEL_DIR}"
-      KERNEL_BASENAME "${_CUTILE_KERNEL_BASENAME}"
-      KERNEL_PYTHON "${_CUTILE_KERNEL_PYTHON}"
-      EXPORT_SCRIPT "${_CUTILE_EXPORT_SCRIPT}"
-      OUTPUT_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}"
-      FRAGMENT_TAG_FORMAT "${_CUTILE_FRAGMENT_TAG_FORMAT}"
+      FRAGMENT_TAG_FORMAT_CUBIN "${_CUTILE_FRAGMENT_TAG_FORMAT_CUBIN}"
+      FRAGMENT_TAG_FORMAT_TILEIR "${_CUTILE_FRAGMENT_TAG_FORMAT_TILEIR}"
       FRAGMENT_TAG_HEADER_FILES ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
       MATRIX_JSON_ENTRY "${matrix_json_entry}"
     )
