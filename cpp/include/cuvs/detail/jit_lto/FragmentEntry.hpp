@@ -115,7 +115,10 @@ struct StaticTileIrBytecodeFragmentEntry final : TileIrBytecodeFragmentEntry {
     return StaticTileIrBytecodeFragmentEntry<FragmentTag>::data;
   }
 
-  size_t get_length() const override { return StaticTileIrBytecodeFragmentEntry<FragmentTag>::length; }
+  size_t get_length() const override
+  {
+    return StaticTileIrBytecodeFragmentEntry<FragmentTag>::length;
+  }
 
   const char* get_key() const override
   {

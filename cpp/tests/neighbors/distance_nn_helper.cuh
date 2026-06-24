@@ -91,8 +91,8 @@ RAFT_KERNEL ref_nn_kernel(
       if (metric == DistanceType::InnerProduct) {
         AccT score = inner_product_score<DataT, AccT, OutT, IdxT>(&A[m * K], &B[n * K], K);
         if (score > best_score) {
-          best_score  = score;
-          best_index  = n;
+          best_score = score;
+          best_index = n;
         }
         continue;
       }

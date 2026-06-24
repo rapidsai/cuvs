@@ -14,17 +14,23 @@ TILE_K = 64
 
 
 def _make_kernel(data_type: str):
-    if data_type == "half":
-        dtype = ct.float16
-        acc_dtype = ct.float32
-    elif data_type == "float":
-        dtype = ct.float32
-        acc_dtype = ct.float32
-    else:
+    if data_type not in ("half", "float"):
         raise ValueError(f"Unsupported data_type {data_type!r}")
+    acc_dtype = ct.float32
 
     @ct.kernel
-    def fused_1nn_kernel(A, B, OutIdx, OutDist, M, N, K, tm: ConstInt, tn: ConstInt, tk: ConstInt):
+    def fused_1nn_kernel(
+        A,
+        B,
+        OutIdx,
+        OutDist,
+        M,
+        N,
+        K,
+        tm: ConstInt,
+        tn: ConstInt,
+        tk: ConstInt,
+    ):
         bidm = ct.bid(0)
 
         best_dist = ct.full((tm,), -3.4e38, acc_dtype)
@@ -38,8 +44,12 @@ def _make_kernel(data_type: str):
             accumulator = ct.full((tm, tn), 0, dtype=acc_dtype)
 
             for k in range(num_tiles_k):
-                a = ct.load(A, index=(bidm, k), shape=(tm, tk), padding_mode=zero_pad)
-                b_T = ct.load(B, index=(n, k), shape=(tn, tk), padding_mode=zero_pad)
+                a = ct.load(
+                    A, index=(bidm, k), shape=(tm, tk), padding_mode=zero_pad
+                )
+                b_T = ct.load(
+                    B, index=(n, k), shape=(tn, tk), padding_mode=zero_pad
+                )
                 accumulator = ct.mma(a, ct.transpose(b_T), accumulator)
 
             curr_max = ct.max(accumulator, axis=1)

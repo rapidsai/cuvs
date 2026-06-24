@@ -960,32 +960,38 @@ if(NOT BUILD_CPU_ONLY)
 
   include(cmake/modules/generate_cutile_kernels.cmake)
   set(fused_1nn_cutile_dir
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/fused_distance_nn/cutile")
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/fused_distance_nn/cutile"
+  )
   set(cutile_fused_1nn_generated_dir
-      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/fused_1nn/cutile")
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/distance/fused_1nn/cutile"
+  )
   generate_cutile_kernels(
     cutile_fused_1nn_files
-    KERNEL_DIR "${fused_1nn_cutile_dir}"
-    KERNEL_BASENAME "fused_1nn"
-    KERNEL_PYTHON "fused_1nn_kernel.py"
-    EXPORT_SCRIPT "export_fused_1nn.py"
-    OUTPUT_DIRECTORY "${cutile_fused_1nn_generated_dir}"
-    MATRIX_JSON_FILE "${fused_1nn_cutile_dir}/fused_1nn_cutile_matrix.json"
+    KERNEL_DIR
+    "${fused_1nn_cutile_dir}"
+    KERNEL_BASENAME
+    "fused_1nn"
+    KERNEL_PYTHON
+    "fused_1nn_kernel.py"
+    EXPORT_SCRIPT
+    "export_fused_1nn.py"
+    OUTPUT_DIRECTORY
+    "${cutile_fused_1nn_generated_dir}"
+    MATRIX_JSON_FILE
+    "${fused_1nn_cutile_dir}/fused_1nn_cutile_matrix.json"
     FRAGMENT_TAG_FORMAT_CUBIN
-      "cuvs::distance::detail::fragment_tag_fused_1nn_cubin<cuvs::neighbors::detail::tag_@data_abbrev@, cuvs::detail::jit_lto::@arch_tag@>"
+    "cuvs::distance::detail::fragment_tag_fused_1nn_cubin<cuvs::neighbors::detail::tag_@data_abbrev@, cuvs::detail::jit_lto::@arch_tag@>"
     FRAGMENT_TAG_FORMAT_TILEIR
-      "cuvs::distance::detail::fragment_tag_fused_1nn_tileir<cuvs::neighbors::detail::tag_@data_abbrev@>"
+    "cuvs::distance::detail::fragment_tag_fused_1nn_tileir<cuvs::neighbors::detail::tag_@data_abbrev@>"
     FRAGMENT_TAG_HEADER_FILES
-      "<cuvs/detail/jit_lto/fused_distance_nn/fused_1nn_fragments.hpp>"
-      "<cuvs/detail/jit_lto/cutile_arch_tags.hpp>"
-      "<cuvs/detail/jit_lto/common_fragments.hpp>"
+    "<cuvs/detail/jit_lto/fused_distance_nn/fused_1nn_fragments.hpp>"
+    "<cuvs/detail/jit_lto/cutile_arch_tags.hpp>"
+    "<cuvs/detail/jit_lto/common_fragments.hpp>"
   )
   if(NOT DEFINED CUVS_CUTILE_ENABLED)
     set(CUVS_CUTILE_ENABLED 0)
   endif()
-  target_compile_definitions(
-    cuvs_cpp_headers INTERFACE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
-  )
+  target_compile_definitions(cuvs_cpp_headers INTERFACE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED})
   generate_inst_matrix(
     cagra_build_inst_files
     MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_build_matrix.json"
@@ -1288,9 +1294,9 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   target_compile_definitions(
-    cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
-                      CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
+    cuvs_objs
+    PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+            $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED> CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
   )
 
   target_link_libraries(
@@ -1308,8 +1314,7 @@ if(NOT BUILD_CPU_ONLY)
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
-            "${CMAKE_CURRENT_BINARY_DIR}/src"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/src"
             "${cutile_fused_1nn_generated_dir}"
   )
 

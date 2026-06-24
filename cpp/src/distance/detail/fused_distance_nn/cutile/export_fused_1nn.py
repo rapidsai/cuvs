@@ -100,7 +100,9 @@ def export_binary(
         "output_format": output_format,
     }
     if output_format == "tileir_bytecode":
-        export_kwargs["bytecode_version"] = bytecode_version or DEFAULT_TILEIR_BYTECODE_VERSION
+        export_kwargs["bytecode_version"] = (
+            bytecode_version or DEFAULT_TILEIR_BYTECODE_VERSION
+        )
 
     export_kernel(**export_kwargs)
 
@@ -110,14 +112,20 @@ def export_binary(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output_file", type=Path)
-    parser.add_argument("--format", choices=("cubin", "tileir_bytecode"), default="cubin")
-    parser.add_argument("--data-type", choices=tuple(KERNELS.keys()), required=True)
+    parser.add_argument(
+        "--format", choices=("cubin", "tileir_bytecode"), default="cubin"
+    )
+    parser.add_argument(
+        "--data-type", choices=tuple(KERNELS.keys()), required=True
+    )
     parser.add_argument(
         "--gpu-code",
         default=DEFAULT_TILEIR_EXPORT_GPU_CODE,
         help="Target SM for cubin export, or compile hint for TileIR bytecode export",
     )
-    parser.add_argument("--bytecode-version", default=DEFAULT_TILEIR_BYTECODE_VERSION)
+    parser.add_argument(
+        "--bytecode-version", default=DEFAULT_TILEIR_BYTECODE_VERSION
+    )
     args = parser.parse_args()
 
     print(

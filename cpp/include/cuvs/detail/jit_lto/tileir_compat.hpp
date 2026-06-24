@@ -88,8 +88,8 @@ inline bool query_current_device_arch(int& cc_major, int& cc_minor)
 
 inline bool cutile_launch_available_on_current_device()
 {
-  int cc_major = 0;
-  int cc_minor = 0;
+  int cc_major       = 0;
+  int cc_minor       = 0;
   int driver_version = 0;
   if (!query_current_device_arch(cc_major, cc_minor)) { return false; }
   if (!query_driver_version(driver_version)) { return false; }

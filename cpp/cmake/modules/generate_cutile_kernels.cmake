@@ -10,7 +10,10 @@ include_guard(GLOBAL)
 include(${CMAKE_CURRENT_LIST_DIR}/compute_matrix_product.cmake)
 
 function(generate_cutile_kernels_stub)
-  set(CUVS_CUTILE_ENABLED 0 PARENT_SCOPE)
+  set(CUVS_CUTILE_ENABLED
+      0
+      PARENT_SCOPE
+  )
 endfunction()
 
 function(_cutile_fragment_tag_header_files output_var)
@@ -51,15 +54,13 @@ function(_cutile_kernels_setup)
   find_program(
     CUTILE_BIN2C
     NAMES bin2c
-    PATHS ${CUDAToolkit_BIN_DIR}
-    REQUIRED
+    PATHS ${CUDAToolkit_BIN_DIR} REQUIRED
   )
 
   execute_process(
     COMMAND "${Python3_EXECUTABLE}" -c "import cuda.tile"
     RESULT_VARIABLE _cutile_import_result
-    OUTPUT_QUIET
-    ERROR_QUIET
+    OUTPUT_QUIET ERROR_QUIET
   )
   if(NOT _cutile_import_result EQUAL 0)
     message(
@@ -77,8 +78,14 @@ function(_cutile_kernels_setup)
 
   file(MAKE_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}")
 
-  set(Python3_EXECUTABLE "${Python3_EXECUTABLE}" PARENT_SCOPE)
-  set(CUTILE_BIN2C "${CUTILE_BIN2C}" PARENT_SCOPE)
+  set(Python3_EXECUTABLE
+      "${Python3_EXECUTABLE}"
+      PARENT_SCOPE
+  )
+  set(CUTILE_BIN2C
+      "${CUTILE_BIN2C}"
+      PARENT_SCOPE
+  )
   set(_CUTILE_SETUP_OK
       TRUE
       PARENT_SCOPE
@@ -87,15 +94,8 @@ endfunction()
 
 function(process_cutile_matrix_entry source_list_var)
   set(options)
-  set(one_value
-      KERNEL_DIR
-      KERNEL_BASENAME
-      KERNEL_PYTHON
-      EXPORT_SCRIPT
-      OUTPUT_DIRECTORY
-      FRAGMENT_TAG_FORMAT_CUBIN
-      FRAGMENT_TAG_FORMAT_TILEIR
-      MATRIX_JSON_ENTRY
+  set(one_value KERNEL_DIR KERNEL_BASENAME KERNEL_PYTHON EXPORT_SCRIPT OUTPUT_DIRECTORY
+                FRAGMENT_TAG_FORMAT_CUBIN FRAGMENT_TAG_FORMAT_TILEIR MATRIX_JSON_ENTRY
   )
   set(multi_value FRAGMENT_TAG_HEADER_FILES)
   cmake_parse_arguments(_CUTILE "${options}" "${one_value}" "${multi_value}" ${ARGN})
@@ -116,9 +116,7 @@ function(process_cutile_matrix_entry source_list_var)
     message(FATAL_ERROR "Unknown cuTile register kind '${register}'")
   endif()
 
-  _cutile_fragment_tag_header_files(
-    fragment_tag_header_files ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
-  )
+  _cutile_fragment_tag_header_files(fragment_tag_header_files ${_CUTILE_FRAGMENT_TAG_HEADER_FILES})
 
   string(CONFIGURE "${artifact_basename}" _artifact_basename @ONLY)
   set(_artifact_stem "${_CUTILE_KERNEL_BASENAME}_${_artifact_basename}")
@@ -145,8 +143,8 @@ function(process_cutile_matrix_entry source_list_var)
 
   add_custom_command(
     OUTPUT "${_embedded_header}"
-    COMMAND "${CUTILE_BIN2C}" --const --name ${bin2c_symbol} --static "${_artifact_file}"
-            > "${_embedded_header}"
+    COMMAND "${CUTILE_BIN2C}" --const --name ${bin2c_symbol} --static "${_artifact_file}" >
+            "${_embedded_header}"
     DEPENDS "${_artifact_file}"
     VERBATIM
   )
@@ -163,15 +161,8 @@ endfunction()
 
 function(generate_cutile_kernels source_list_var)
   set(options)
-  set(one_value
-      KERNEL_DIR
-      KERNEL_BASENAME
-      KERNEL_PYTHON
-      EXPORT_SCRIPT
-      OUTPUT_DIRECTORY
-      MATRIX_JSON_FILE
-      FRAGMENT_TAG_FORMAT_CUBIN
-      FRAGMENT_TAG_FORMAT_TILEIR
+  set(one_value KERNEL_DIR KERNEL_BASENAME KERNEL_PYTHON EXPORT_SCRIPT OUTPUT_DIRECTORY
+                MATRIX_JSON_FILE FRAGMENT_TAG_FORMAT_CUBIN FRAGMENT_TAG_FORMAT_TILEIR
   )
   set(multi_value FRAGMENT_TAG_HEADER_FILES)
   cmake_parse_arguments(_CUTILE "${options}" "${one_value}" "${multi_value}" ${ARGN})
@@ -184,8 +175,7 @@ function(generate_cutile_kernels source_list_var)
   endif()
 
   _cutile_kernels_setup(
-    MATRIX_JSON_FILE "${_CUTILE_MATRIX_JSON_FILE}"
-    OUTPUT_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}"
+    MATRIX_JSON_FILE "${_CUTILE_MATRIX_JSON_FILE}" OUTPUT_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}"
   )
   if(NOT _CUTILE_SETUP_OK)
     generate_cutile_kernels_stub()
@@ -206,19 +196,31 @@ function(generate_cutile_kernels source_list_var)
     string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
     process_cutile_matrix_entry(
       "${source_list_var}"
-      KERNEL_DIR "${_CUTILE_KERNEL_DIR}"
-      KERNEL_BASENAME "${_CUTILE_KERNEL_BASENAME}"
-      KERNEL_PYTHON "${_CUTILE_KERNEL_PYTHON}"
-      EXPORT_SCRIPT "${_CUTILE_EXPORT_SCRIPT}"
-      OUTPUT_DIRECTORY "${_CUTILE_OUTPUT_DIRECTORY}"
-      FRAGMENT_TAG_FORMAT_CUBIN "${_CUTILE_FRAGMENT_TAG_FORMAT_CUBIN}"
-      FRAGMENT_TAG_FORMAT_TILEIR "${_CUTILE_FRAGMENT_TAG_FORMAT_TILEIR}"
-      FRAGMENT_TAG_HEADER_FILES ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
-      MATRIX_JSON_ENTRY "${matrix_json_entry}"
+      KERNEL_DIR
+      "${_CUTILE_KERNEL_DIR}"
+      KERNEL_BASENAME
+      "${_CUTILE_KERNEL_BASENAME}"
+      KERNEL_PYTHON
+      "${_CUTILE_KERNEL_PYTHON}"
+      EXPORT_SCRIPT
+      "${_CUTILE_EXPORT_SCRIPT}"
+      OUTPUT_DIRECTORY
+      "${_CUTILE_OUTPUT_DIRECTORY}"
+      FRAGMENT_TAG_FORMAT_CUBIN
+      "${_CUTILE_FRAGMENT_TAG_FORMAT_CUBIN}"
+      FRAGMENT_TAG_FORMAT_TILEIR
+      "${_CUTILE_FRAGMENT_TAG_FORMAT_TILEIR}"
+      FRAGMENT_TAG_HEADER_FILES
+      ${_CUTILE_FRAGMENT_TAG_HEADER_FILES}
+      MATRIX_JSON_ENTRY
+      "${matrix_json_entry}"
     )
   endforeach()
 
-  set(CUVS_CUTILE_ENABLED 1 PARENT_SCOPE)
+  set(CUVS_CUTILE_ENABLED
+      1
+      PARENT_SCOPE
+  )
   set(${source_list_var}
       "${${source_list_var}}"
       PARENT_SCOPE

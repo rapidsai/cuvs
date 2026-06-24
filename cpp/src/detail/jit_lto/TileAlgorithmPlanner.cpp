@@ -23,9 +23,7 @@ std::shared_ptr<AlgorithmLauncher> TileAlgorithmPlanner::build()
 {
   int cc_major = 0;
   int cc_minor = 0;
-  if (!cuvs::detail::jit_lto::get_device_compute_capability(cc_major, cc_minor)) {
-    return nullptr;
-  }
+  if (!cuvs::detail::jit_lto::get_device_compute_capability(cc_major, cc_minor)) { return nullptr; }
 
   int driver_version = 0;
   if (cudaDriverGetVersion(&driver_version) != cudaSuccess) { return nullptr; }

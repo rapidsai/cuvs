@@ -8,10 +8,10 @@
 
 @fragment_tag_header_files@
 
-namespace {
-
-using fragment_tag   = @fragment_tag@;
-using fragment_entry = @fragment_entry_type@;
+  namespace
+{
+  using fragment_tag   = @fragment_tag@;
+  using fragment_entry = @fragment_entry_type@;
 
 }  // namespace
 

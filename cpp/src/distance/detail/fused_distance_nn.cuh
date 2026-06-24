@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,8 +19,8 @@
 #include "fused_distance_nn/helper_structs.cuh"
 #include "fused_distance_nn/simt_kernel.cuh"
 #include "pairwise_distance_base.cuh"  // PairwiseDistances
-#include <cuvs/distance/distance.hpp>
 #include <cuvs/detail/jit_lto/tileir_compat.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
 #include <raft/linalg/contractions.cuh>  // Policy
