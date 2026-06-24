@@ -88,10 +88,11 @@ cdef class GMMParams:
     cdef cuvsGMMParams* params
 
     def __cinit__(self):
-        cuvsGMMParamsCreate(&self.params)
+        check_cuvs(cuvsGMMParamsCreate(&self.params))
 
     def __dealloc__(self):
-        check_cuvs(cuvsGMMParamsDestroy(self.params))
+        if self.params is not NULL:
+            check_cuvs(cuvsGMMParamsDestroy(self.params))
 
     def __init__(self, *,
                  n_components=None,
@@ -226,8 +227,7 @@ def fit(GMMParams params, X, weights=None, means=None, covariances=None,
     ...                             dtype=cp.float32)
 
     >>> params = GMMParams(n_components=n_components)
-    >>> out = fit(params, X)
-    >>> means = out.means
+    >>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
     """
 
     x_ai = wrap_array(X)
@@ -344,10 +344,9 @@ def predict(GMMParams params, X, weights, means, precisions_chol,
     >>>
     >>> X = cp.random.random_sample((5000, 50), dtype=cp.float32)
     >>> params = GMMParams(n_components=3)
-    >>> out = fit(params, X)
+    >>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
     >>>
-    >>> labels = predict(params, X, out.weights, out.means,
-    ...                  out.precisions_chol)
+    >>> labels = predict(params, X, weights, means, precisions_chol)
     """
 
     x_ai = wrap_array(X)
@@ -425,10 +424,9 @@ def predict_proba(GMMParams params, X, weights, means, precisions_chol,
     >>>
     >>> X = cp.random.random_sample((5000, 50), dtype=cp.float32)
     >>> params = GMMParams(n_components=3)
-    >>> out = fit(params, X)
+    >>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
     >>>
-    >>> resp = predict_proba(params, X, out.weights, out.means,
-    ...                      out.precisions_chol)
+    >>> resp = predict_proba(params, X, weights, means, precisions_chol)
     """
 
     x_ai = wrap_array(X)
@@ -507,10 +505,9 @@ def score_samples(GMMParams params, X, weights, means, precisions_chol,
     >>>
     >>> X = cp.random.random_sample((5000, 50), dtype=cp.float32)
     >>> params = GMMParams(n_components=3)
-    >>> out = fit(params, X)
+    >>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
     >>>
-    >>> log_prob = score_samples(params, X, out.weights, out.means,
-    ...                          out.precisions_chol)
+    >>> log_prob = score_samples(params, X, weights, means, precisions_chol)
     """
 
     x_ai = wrap_array(X)

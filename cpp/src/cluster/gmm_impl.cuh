@@ -1109,18 +1109,27 @@ void fit_impl(raft::resources const& handle,
 
   raft::random::RngState rng(params.seed, raft::random::GeneratorType::GenPhilox);
 
+  // FULL's M-step runs the E-step twice (first to accumulate weights/means, then
+  // a second centered pass for the covariances). m_finalize overwrites
+  // weights/means between the two passes, so the covariance pass must re-run the
+  // E-step with the *pre-update* params to reproduce the same responsibilities
+  // the means/weights were built from; snapshot them here. Sized 0 (unused) for
+  // the other covariance types, which need no second pass.
+  rmm::device_uvector<T> estep_w((ct == covariance_type::FULL) ? K : 0, stream);
+  rmm::device_uvector<T> estep_m((ct == covariance_type::FULL) ? (size_t)K * d : 0, stream);
+
   // One E-step (+ optional M-step) over all data, streamed in tiles; returns the
-  // mean lower bound. FULL needs a second centered pass (means first); both passes
-  // re-run e_step with the same (pre-update) params, so the resp is identical.
-  auto estep_tile = [&](int t0, int nt) {
+  // mean lower bound. The E-step weights/means are passed in so FULL's covariance
+  // pass can feed the snapshot above and reproduce the first pass's resp exactly.
+  auto estep_tile = [&](int t0, int nt, const T* e_weights, const T* e_means) {
     e_step<T>(handle,
               params,
               X + (size_t)t0 * d,
               nt,
               d,
               K,
-              weights,
-              means,
+              e_weights,
+              e_means,
               precisions_chol,
               log_det.data(),
               resp.data(),
@@ -1131,18 +1140,24 @@ void fit_impl(raft::resources const& handle,
     double lb_sum = 0.0;
     for (int t0 = 0; t0 < n; t0 += tile) {
       int nt = std::min(tile, n - t0);
-      estep_tile(t0, nt);
+      estep_tile(t0, nt, weights, means);
       if (do_mstep)
         m_accumulate<T>(
           handle, params, X + (size_t)t0 * d, nt, d, K, resp.data(), ws, (t0 == 0) ? T(0) : T(1));
       lb_sum += (double)mean_device<T>(handle, lpn.data(), nt) * nt;
     }
     if (do_mstep) {
+      if (ct == covariance_type::FULL) {
+        // Snapshot the params the E-step above used; m_finalize is about to
+        // overwrite weights/means and the covariance pass must reproduce this resp.
+        raft::copy(estep_w.data(), weights, K, stream);
+        raft::copy(estep_m.data(), means, (size_t)K * d, stream);
+      }
       m_finalize<T>(handle, params, n, d, K, ws, weights, means, covariances);
       if (ct == covariance_type::FULL) {
         for (int t0 = 0; t0 < n; t0 += tile) {
           int nt = std::min(tile, n - t0);
-          estep_tile(t0, nt);
+          estep_tile(t0, nt, estep_w.data(), estep_m.data());
           m_cov_full_pass<T>(handle,
                              X + (size_t)t0 * d,
                              nt,
@@ -1185,7 +1200,13 @@ void fit_impl(raft::resources const& handle,
       }
       auto fill_init_resp = [&](int t0, int nt) {
         if (im == init_method::Random) {
-          raft::random::uniform(handle, rng, resp.data(), (size_t)nt * K, T(0), T(1));
+          // Deterministic per-(init, tile): FULL fills the responsibilities twice
+          // (means pass, then centered-covariance pass) and both must match. A
+          // shared rng would advance between them and desync cov from the means.
+          raft::random::RngState tile_rng(
+            init_seed ^ (static_cast<uint64_t>(t0) * 0x9E3779B97F4A7C15ULL),
+            raft::random::GeneratorType::GenPhilox);
+          raft::random::uniform(handle, tile_rng, resp.data(), (size_t)nt * K, T(0), T(1));
           detail::normalize_rows_kernel<T>
             <<<dim3((nt + 255) / 256), dim3(256), 0, stream>>>(resp.data(), nt, K);
         } else if (im == init_method::RandomFromData) {

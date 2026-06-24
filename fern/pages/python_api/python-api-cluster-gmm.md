@@ -148,8 +148,7 @@ Fit a Gaussian mixture model with the EM algorithm
 
 ```python
 >>> params = GMMParams(n_components=n_components)
->>> out = fit(params, X)
->>> means = out.means
+>>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
 ```
 
 ## predict
@@ -190,10 +189,9 @@ Hard component labels (argmax responsibility) for new data
 >>>
 >>> X = cp.random.random_sample((5000, 50), dtype=cp.float32)
 >>> params = GMMParams(n_components=3)
->>> out = fit(params, X)
+>>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
 >>>
->>> labels = predict(params, X, out.weights, out.means,
-...                  out.precisions_chol)
+>>> labels = predict(params, X, weights, means, precisions_chol)
 ```
 
 ## predict_proba
@@ -234,10 +232,9 @@ Posterior responsibilities for new data
 >>>
 >>> X = cp.random.random_sample((5000, 50), dtype=cp.float32)
 >>> params = GMMParams(n_components=3)
->>> out = fit(params, X)
+>>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
 >>>
->>> resp = predict_proba(params, X, out.weights, out.means,
-...                      out.precisions_chol)
+>>> resp = predict_proba(params, X, weights, means, precisions_chol)
 ```
 
 ## score_samples
@@ -278,8 +275,7 @@ Per-sample log-likelihood log p(x_i) for new data
 >>>
 >>> X = cp.random.random_sample((5000, 50), dtype=cp.float32)
 >>> params = GMMParams(n_components=3)
->>> out = fit(params, X)
+>>> weights, means, covariances, precisions_chol, *_ = fit(params, X)
 >>>
->>> log_prob = score_samples(params, X, out.weights, out.means,
-...                          out.precisions_chol)
+>>> log_prob = score_samples(params, X, weights, means, precisions_chol)
 ```

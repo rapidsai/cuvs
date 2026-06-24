@@ -62,6 +62,9 @@ void test_fit_predict()
 
   cuvsResources_t res;
   ASSERT_EQ(cuvsResourcesCreate(&res), CUVS_SUCCESS);
+  // Bind the resource to the same stream the data was copied on; raft::copy above
+  // is async and cuvsGMMFit would otherwise race it on the resource's own stream.
+  ASSERT_EQ(cuvsStreamSet(res, stream), CUVS_SUCCESS);
 
   cuvsGMMParams_t params;
   ASSERT_EQ(cuvsGMMParamsCreate(&params), CUVS_SUCCESS);
@@ -185,6 +188,9 @@ void test_fit_score_double_diag()
 
   cuvsResources_t res;
   ASSERT_EQ(cuvsResourcesCreate(&res), CUVS_SUCCESS);
+  // Bind the resource to the same stream the data was copied on; raft::copy above
+  // is async and cuvsGMMFit would otherwise race it on the resource's own stream.
+  ASSERT_EQ(cuvsStreamSet(res, stream), CUVS_SUCCESS);
   cuvsGMMParams_t params;
   ASSERT_EQ(cuvsGMMParamsCreate(&params), CUVS_SUCCESS);
   params->n_components    = kNComponents;
