@@ -7,8 +7,8 @@
 #include <cuvs/core/cuda_fp16.hpp>
 #include <cuvs/core/export.hpp>
 
-#include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/error.hpp>
+#include <raft/core/numpy_serializer.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -28,8 +28,8 @@ namespace detail {
  * @tparam T Scalar type to describe.
  *
  * @return A NumPy dtype descriptor string, for example `"<f2"` for `half`. `half` is handled
- * explicitly because RAFT's NumPy dtype helper does not currently accept CUDA `half`; all other
- * types are delegated to RAFT.
+ * explicitly to preserve the standard NumPy half descriptor; all other types are delegated to
+ * RAFT's public NumPy serializer.
  *
  * @note This helper performs no I/O and has no side effects.
  */
@@ -39,7 +39,7 @@ inline auto numpy_dtype_string() -> std::string
   if constexpr (std::is_same_v<T, half>) {
     return "<f2";
   } else {
-    return raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+    return raft::numpy_serializer::get_numpy_dtype<T>().to_string();
   }
 }
 
@@ -105,7 +105,7 @@ inline auto make_numpy_header_from_dtype(const std::string& dtype, const std::ve
  * length, padded dictionary payload, and trailing newline.
  *
  * @throws raft::exception when the generated half-precision header is too large for NumPy v1.
- * Other scalar types use RAFT's header writer and propagate any exceptions from that path.
+ * Other scalar types use RAFT's public header writer and propagate any exceptions from that path.
  *
  * @note `half` uses cuVS's explicit `"<f2"` dtype mapping; other scalar types preserve RAFT's
  * existing header serialization behavior. This helper performs no file I/O.
@@ -116,12 +116,12 @@ inline auto make_numpy_header_string(const std::vector<size_t>& shape) -> std::s
   if constexpr (std::is_same_v<T, half>) {
     return make_numpy_header_from_dtype(numpy_dtype_string<T>(), shape);
   } else {
-    const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-    const bool fortran_order = false;
-    const raft::detail::numpy_serializer::header_t header = {dtype, fortran_order, shape};
+    const auto dtype                              = raft::numpy_serializer::get_numpy_dtype<T>();
+    const bool fortran_order                      = false;
+    const raft::numpy_serializer::header_t header = {dtype, fortran_order, shape};
 
     std::stringstream ss;
-    raft::detail::numpy_serializer::write_header(ss, header);
+    raft::numpy_serializer::write_header(ss, header);
     return ss.str();
   }
 }

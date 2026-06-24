@@ -12,8 +12,8 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 
 #include <raft/core/copy.cuh>
-#include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/mdarray.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/util/pow2_utils.cuh>

@@ -8,6 +8,7 @@
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resource/nccl_comm.hpp>
 #include <raft/core/serialize.hpp>

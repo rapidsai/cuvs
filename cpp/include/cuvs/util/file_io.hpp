@@ -5,6 +5,7 @@
 #pragma once
 
 #include <raft/core/error.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/serialize.hpp>
 
 #include <cuvs/util/numpy_dtype.hpp>

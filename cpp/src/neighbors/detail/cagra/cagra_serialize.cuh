@@ -11,6 +11,7 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/util/cudart_utils.hpp>

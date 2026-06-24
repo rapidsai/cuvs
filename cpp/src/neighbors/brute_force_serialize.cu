@@ -8,6 +8,7 @@
 #include <cuvs/neighbors/brute_force.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 

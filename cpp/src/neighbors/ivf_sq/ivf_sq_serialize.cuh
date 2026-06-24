@@ -11,7 +11,6 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_sq.hpp>
 
-#include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
