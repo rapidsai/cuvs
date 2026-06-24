@@ -928,21 +928,6 @@ dist_warp(const T* src, const T* dest, int dim, cuvs::distance::DistanceType met
   return d;
 }
 
-/* Block/warp L2: float query vs half dataset (RobustPrune uses blockDim=32) */
-template <typename SUMTYPE>
-__forceinline__ __device__ SUMTYPE dist(const float* src,
-                                        const half* dest,
-                                        int dim,
-                                        cuvs::distance::DistanceType metric)
-{
-  SUMTYPE d =
-    l2_warp_float_half<SUMTYPE>(src, reinterpret_cast<const __half*>(dest), dim, threadIdx.x);
-  if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    return static_cast<SUMTYPE>(sqrtf(static_cast<float>(d)));
-  }
-  return d;
-}
-
 // Warp-cooperative id lookup in a GreedySearch visited list (sorted by distance, not id).
 // All lanes execute the same number of ballot rounds to avoid warp deadlock.
 template <typename IdxT, typename accT>
@@ -1107,23 +1092,6 @@ __global__ void set_query_ids(void* query_list_ptr, IdxT* d_query_ids, int step_
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < step_size; i += blockDim.x * gridDim.x) {
     query_list[i].queryId = d_query_ids[i];
     query_list[i].size    = 0;
-  }
-}
-
-// Compute prefix sums on sizes. Currently only works with 1 thread
-// TODO replace with parallel version
-template <typename accT, typename IdxT = uint32_t>
-__global__ void prefix_sums_sizes(QueryCandidates<IdxT, accT>* query_list,
-                                  int num_queries,
-                                  int* total_edges)
-{
-  if (threadIdx.x == 0 && blockIdx.x == 0) {
-    int sum = 0;
-    for (int i = 0; i < num_queries + 1; i++) {
-      sum += query_list[i].size;
-      query_list[i].size = sum - query_list[i].size;  // exclusive prefix sum
-    }
-    *total_edges = query_list[num_queries].size;
   }
 }
 

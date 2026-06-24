@@ -287,8 +287,7 @@ struct index : cuvs::neighbors::index {
  * to improve graph quality. The index_params struct controls the degree of the final graph.
  *
  * The following distance metrics are supported:
- * - L2Expanded (squared L2)
- * - L2SqrtExpanded (Euclidean distance)
+ * - L2
  *
  * Usage example:
  * @code{.cpp}

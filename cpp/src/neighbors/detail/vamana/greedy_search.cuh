@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -113,6 +113,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
 
   int align_padding = raft::alignTo(dim, 16) - dim;
 
+  // Only use fp16 coords in shared memory if type is fp16 and dim >= 512
   const bool fp16_query_smem = greedy_search_use_fp16_query_smem<T>(dim);
 
   extern __shared__ __align__(16) char smem[];
@@ -131,12 +132,14 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   DistPair<IdxT, accT>* candidate_queue_smem =
     reinterpret_cast<DistPair<IdxT, accT>*>(warp_smem + coords_size + neighbor_size);
 
+  // 4 warps per block
   static __shared__ int topk_q_size[4];
   static __shared__ int cand_q_size[4];
   static __shared__ accT cur_k_max[4];
   static __shared__ int k_max_idx[4];
   static __shared__ int num_neighbors[4];
 
+  // Different code path for fp16 since it is gated by dim and datatype
   Point<__half, accT> s_query_half;
   Point<QueryCoordT, accT> s_query;
   if (fp16_query_smem) {
@@ -263,7 +266,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
       for (size_t j = laneId; j < degree; j += 32) {
         neighbor_array[j] = graph(cand_num, j);
         if (neighbor_array[j] == raft::upper_bound<IdxT>())
-          atomicMin(&num_neighbors[warpIdx], (int)j);
+          atomicMin(&num_neighbors[warpIdx], (int)j); // warp-wide min to find the number of neighbors
       }
 
       enqueue_all_neighbors_warp(num_neighbors[warpIdx],
@@ -283,7 +286,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
       if (query_list[i].ids[j] == cur_query_id) {
         query_list[i].dists[j] = raft::upper_bound<accT>();
         query_list[i].ids[j]   = raft::upper_bound<IdxT>();
-        self_found             = true;
+        self_found             = true; // Flat to reduce size by 1
       }
     }
     self_found = (raft::ballot(self_found) != 0);
