@@ -180,8 +180,9 @@ repos:
                 cpp/src/neighbors/detail/faiss_distance_utils[.]h$
               )
           - id: verify-alpha-spec
-          - id: verify-codeowners
-            args: [--fix, --project-prefix=cuvs]
+          # TODO: Re-enable once org is configurable
+          # - id: verify-codeowners
+          #   args: [--fix, --project-prefix=cuvs]
           - id: verify-pyproject-license
             # ignore the top-level pyproject.toml, which doesn't
             # have or need a [project] table
