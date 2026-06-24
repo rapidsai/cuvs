@@ -191,6 +191,19 @@ if(PROJECT_IS_TOP_LEVEL)
     COMPONENT c_api
     EXPORT cuvs-c-exports
   )
+  if(CUVSC_STATIC_CUVS_LIBRARY AND TARGET kvikio::kvikio)
+    get_target_property(_cuvs_kvikio_aliased_target kvikio::kvikio ALIASED_TARGET)
+    if(_cuvs_kvikio_aliased_target)
+      set(_cuvs_kvikio_runtime_target "${_cuvs_kvikio_aliased_target}")
+    else()
+      set(_cuvs_kvikio_runtime_target kvikio::kvikio)
+    endif()
+    install(
+      FILES "$<TARGET_FILE:${_cuvs_kvikio_runtime_target}>"
+      DESTINATION ${lib_dir}
+      COMPONENT c_api
+    )
+  endif()
   install(
     DIRECTORY include/cuvs
     COMPONENT c_api
