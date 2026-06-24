@@ -17,9 +17,9 @@
 #include <kvikio/file_handle.hpp>
 
 #include <raft/core/copy.cuh>
-#include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
+#include <raft/core/numpy_serializer.hpp>
 #include <raft/core/pinned_mdarray.hpp>
 #include <raft/util/cudart_utils.hpp>
 
@@ -740,7 +740,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     std::ifstream graph_stream(graph_path, std::ios::binary);
     RAFT_EXPECTS(graph_stream.good(), "Failed to open graph file: %s", graph_path.c_str());
 
-    auto header       = raft::detail::numpy_serializer::read_header(graph_stream);
+    auto header       = raft::numpy_serializer::read_header(graph_stream);
     graph_header_size = static_cast<size_t>(graph_stream.tellg());
     RAFT_EXPECTS(
       header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
@@ -760,7 +760,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     std::ifstream dataset_stream(dataset_path, std::ios::binary);
     RAFT_EXPECTS(dataset_stream.good(), "Failed to open dataset file: %s", dataset_path.c_str());
 
-    auto header         = raft::detail::numpy_serializer::read_header(dataset_stream);
+    auto header         = raft::numpy_serializer::read_header(dataset_stream);
     dataset_header_size = static_cast<size_t>(dataset_stream.tellg());
     RAFT_EXPECTS(header.shape.size() == 2,
                  "Dataset file should be 2D, got %zu dimensions",
@@ -780,7 +780,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     std::ifstream mapping_stream(mapping_path, std::ios::binary);
     RAFT_EXPECTS(mapping_stream.good(), "Failed to open mapping file: %s", mapping_path.c_str());
 
-    auto header       = raft::detail::numpy_serializer::read_header(mapping_stream);
+    auto header       = raft::numpy_serializer::read_header(mapping_stream);
     label_header_size = static_cast<size_t>(mapping_stream.tellg());
     RAFT_EXPECTS(header.shape.size() == 1,
                  "Mapping file should be 1D, got %zu dimensions",
