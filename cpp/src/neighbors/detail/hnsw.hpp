@@ -43,6 +43,7 @@
 #include <optional>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <type_traits>
 #include <unistd.h>
@@ -722,6 +723,8 @@ struct npy_file {
   cuvs::util::file_descriptor fd;
   size_t header_size = 0;
   std::vector<size_t> shape;
+  std::string dtype;
+  bool fortran_order = false;
 };
 
 inline auto open_npy_file(const std::string& path) -> npy_file
@@ -731,7 +734,21 @@ inline auto open_npy_file(const std::string& path) -> npy_file
   auto header      = raft::detail::numpy_serializer::read_header(stream);
   auto header_size = static_cast<size_t>(stream.tellg());
   auto fd          = cuvs::util::file_descriptor(path, O_RDONLY);
-  return {std::move(fd), header_size, header.shape};
+  return {std::move(fd), header_size, header.shape, header.dtype.to_string(), header.fortran_order};
+}
+
+template <typename T>
+inline void validate_npy_file(const npy_file& file, const std::string& path, const char* name)
+{
+  const auto expected_dtype = raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+  RAFT_EXPECTS(file.dtype == expected_dtype,
+               "%s dtype (%s) does not match expected dtype (%s): %s",
+               name,
+               file.dtype.c_str(),
+               expected_dtype.c_str(),
+               path.c_str());
+  RAFT_EXPECTS(
+    !file.fortran_order, "%s must be row-major, got Fortran-order layout: %s", name, path.c_str());
 }
 
 inline auto ends_with(const std::string& value, const std::string& suffix) -> bool
@@ -782,7 +799,11 @@ inline auto open_layered_dataset_file(const std::string& path) -> npy_file
   }
 
   auto fd = cuvs::util::file_descriptor(path, O_RDONLY);
-  return {std::move(fd), sizeof(uint32_t) * header.size(), {header[0], header[1]}};
+  return {std::move(fd),
+          sizeof(uint32_t) * header.size(),
+          {header[0], header[1]},
+          raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string(),
+          false};
 }
 
 template <typename T, typename IdxT>
@@ -810,6 +831,8 @@ void write_layered_base_links_from_disk(const cuvs::neighbors::cagra::index<T, I
   auto graph_npy   = open_npy_file(graph_path);
   auto mapping_npy = open_npy_file(mapping_path);
 
+  validate_npy_file<IdxT>(graph_npy, graph_path, "Graph file");
+  validate_npy_file<IdxT>(mapping_npy, mapping_path, "Mapping file");
   RAFT_EXPECTS(graph_npy.shape.size() == 2, "Graph file should be 2D");
   RAFT_EXPECTS(mapping_npy.shape.size() == 1, "Mapping file should be 1D");
   const auto n_rows = graph_npy.shape[0];
@@ -2395,6 +2418,11 @@ auto deserialize_layered_hnswlib(raft::resources const& res,
 
   RAFT_EXPECTS(metadata.n_rows > 0, "Layered HNSW artifact must contain at least one row");
   RAFT_EXPECTS(metadata.dim > 0, "Layered HNSW artifact must contain at least one dimension");
+  RAFT_EXPECTS(metadata.enterpoint_node >= 0 &&
+                 static_cast<size_t>(metadata.enterpoint_node) < metadata.n_rows,
+               "Layered HNSW enterpoint node (%d) outside valid range [0, %zu)",
+               metadata.enterpoint_node,
+               metadata.n_rows);
   RAFT_EXPECTS(static_cast<size_t>(dim) == metadata.dim,
                "Layered HNSW artifact dim (%zu) does not match requested dim (%d)",
                metadata.dim,
@@ -2438,6 +2466,7 @@ auto deserialize_layered_hnswlib(raft::resources const& res,
                dataset_file.shape.size() > 0 ? dataset_file.shape[0] : 0,
                dataset_file.shape.size() > 1 ? dataset_file.shape[1] : 0,
                params.dataset_path.c_str());
+  validate_npy_file<T>(dataset_file, params.dataset_path, "Layered HNSW dataset");
   RAFT_EXPECTS(metadata.levels_bytes == metadata.n_rows * sizeof(uint8_t),
                "Layered HNSW levels section size mismatch");
   RAFT_EXPECTS(metadata.base_nodes_bytes == metadata.n_rows * sizeof(uint32_t),
