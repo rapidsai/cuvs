@@ -537,6 +537,35 @@ __device__ __forceinline__ void l2_fma_sq2(SUMTYPE& acc, float sx, float sy, flo
   acc      = fmaf(dy, dy, acc);
 }
 
+// Widen any supported operand type to float for the scalar fallback path.
+template <typename X>
+__device__ __forceinline__ float l2_widen_to_float(X x)
+{
+  return static_cast<float>(x);
+}
+__device__ __forceinline__ float l2_widen_to_float(__half x) { return __half2float(x); }
+
+// Scalar, alignment-agnostic warp L2 used as a fallback when `dim` is ODD. The
+// vectorized float2/half2 comparators below assume each dataset row begins on a
+// vector-aligned boundary, which only holds when dim is even (row stride =
+// dim * sizeof(elem) is then a multiple of the vector width). For odd dim, odd
+// rows are under-aligned and a float2/half2 load raises cudaErrorMisalignedAddress,
+// so we widen both operands to float and accumulate one element per lane instead.
+template <typename SUMTYPE, typename SrcT, typename DstT>
+__device__ __forceinline__ SUMTYPE
+l2_warp_scalar_widen(const SrcT* src, const DstT* dst, int dim, int lane)
+{
+  SUMTYPE partial_sum = 0;
+  for (int i = lane; i < dim; i += VAMANA_WARP_SIZE) {
+    float diff  = l2_widen_to_float(src[i]) - l2_widen_to_float(dst[i]);
+    partial_sum = fmaf(diff, diff, partial_sum);
+  }
+  for (int offset = 16; offset > 0; offset /= 2) {
+    partial_sum += __shfl_down_sync(FULL_BITMASK, partial_sum, offset);
+  }
+  return partial_sum;
+}
+
 template <typename SUMTYPE>
 __device__ SUMTYPE l2_SEQ_warp_float_half(const float* src, const __half* dst, int dim, int lane)
 {
@@ -612,6 +641,7 @@ template <typename SUMTYPE>
 __forceinline__ __device__ SUMTYPE
 l2_warp_float_half(const float* src, const __half* dest, int dim, int lane)
 {
+  if (dim & 1) { return l2_warp_scalar_widen<SUMTYPE>(src, dest, dim, lane); }
   if (dim >= 128) {
     return l2_ILP4_warp_float_half<SUMTYPE>(src, dest, dim, lane);
   } else if (dim >= 64) {
@@ -702,6 +732,7 @@ template <typename SUMTYPE>
 __forceinline__ __device__ SUMTYPE
 l2_warp_half_float(const __half* src, const float* dest, int dim, int lane)
 {
+  if (dim & 1) { return l2_warp_scalar_widen<SUMTYPE>(src, dest, dim, lane); }
   if (dim >= 128) {
     return l2_ILP4_warp_half_float<SUMTYPE>(src, dest, dim, lane);
   } else if (dim >= 64) {
@@ -791,6 +822,7 @@ template <typename SUMTYPE>
 __forceinline__ __device__ SUMTYPE
 l2_warp_half_smem_half(const __half* src, const __half* dest, int dim, int lane)
 {
+  if (dim & 1) { return l2_warp_scalar_widen<SUMTYPE>(src, dest, dim, lane); }
   if (dim >= 128) {
     return l2_ILP4_warp_half_smem_half<SUMTYPE>(src, dest, dim, lane);
   } else if (dim >= 64) {
@@ -881,6 +913,7 @@ template <typename SUMTYPE, typename DataT>
 __forceinline__ __device__ SUMTYPE
 l2_warp_half_smem_native(const __half* src, const DataT* dest, int dim, int lane)
 {
+  if (dim & 1) { return l2_warp_scalar_widen<SUMTYPE>(src, dest, dim, lane); }
   if (dim >= 128) {
     return l2_ILP4_warp_half_smem_native<SUMTYPE, DataT>(src, dest, dim, lane);
   } else if (dim >= 64) {
@@ -1146,13 +1179,18 @@ __device__ void update_shared_point_half_to_float(Point<float, accT>* shared_poi
   shared_point->id       = id;
   shared_point->Dim      = dim;
   const size_t base      = (size_t)id * (size_t)dim;
+  // Odd dim => odd rows start at an under-aligned address; half2 loads would
+  // fault (cudaErrorMisalignedAddress). Use scalar promotion in that case.
+  if ((dim & 1) != 0) {
+    for (size_t i = threadIdx.x; i < (size_t)dim; i += blockDim.x) {
+      shared_point->coords[i] = __half2float(half_ptr[base + i]);
+    }
+    return;
+  }
   for (size_t i = threadIdx.x * 2; i + 1 < (size_t)dim; i += (size_t)blockDim.x * 2) {
     float2 promoted    = __half22float2(*reinterpret_cast<const half2*>(&half_ptr[base + i]));
     float2* coord_pair = reinterpret_cast<float2*>(&shared_point->coords[i]);
     *coord_pair        = promoted;
-  }
-  if (((size_t)dim & 1u) != 0u && threadIdx.x == 0) {
-    shared_point->coords[dim - 1] = __half2float(half_ptr[base + dim - 1]);
   }
 }
 
@@ -1164,13 +1202,17 @@ __device__ void update_shared_point_warp_half_to_float(
   shared_point->id       = id;
   shared_point->Dim      = dim;
   const size_t base      = (size_t)id * (size_t)dim;
+  // Odd dim => odd rows are under-aligned for half2 loads; promote scalar.
+  if ((dim & 1) != 0) {
+    for (size_t i = laneId; i < (size_t)dim; i += 32) {
+      shared_point->coords[i] = __half2float(half_ptr[base + i]);
+    }
+    return;
+  }
   for (size_t i = laneId * 2; i + 1 < (size_t)dim; i += 64) {
     float2 promoted    = __half22float2(*reinterpret_cast<const half2*>(&half_ptr[base + i]));
     float2* coord_pair = reinterpret_cast<float2*>(&shared_point->coords[i]);
     *coord_pair        = promoted;
-  }
-  if (((size_t)dim & 1u) != 0u && laneId == 0) {
-    shared_point->coords[dim - 1] = __half2float(half_ptr[base + dim - 1]);
   }
 }
 
@@ -1182,12 +1224,16 @@ __device__ void update_shared_point_warp_fp16_query_smem(
   shared_point->id       = id;
   shared_point->Dim      = dim;
   const size_t base      = (size_t)id * (size_t)dim;
+  // Odd dim => odd rows are under-aligned for half2 loads; copy scalar.
+  if ((dim & 1) != 0) {
+    for (size_t i = laneId; i < (size_t)dim; i += 32) {
+      shared_point->coords[i] = half_ptr[base + i];
+    }
+    return;
+  }
   for (size_t i = laneId * 2; i + 1 < (size_t)dim; i += 64) {
     *reinterpret_cast<half2*>(&shared_point->coords[i]) =
       *reinterpret_cast<const half2*>(&half_ptr[base + i]);
-  }
-  if (((size_t)dim & 1u) != 0u && laneId == 0) {
-    shared_point->coords[dim - 1] = half_ptr[base + dim - 1];
   }
 }
 
@@ -1198,12 +1244,16 @@ __device__ void update_shared_point_warp_fp16_query_smem(
   shared_point->id  = id;
   shared_point->Dim = dim;
   const size_t base = (size_t)id * (size_t)dim;
+  // Odd dim => odd rows are under-aligned for float2 loads; convert scalar.
+  if ((dim & 1) != 0) {
+    for (size_t i = laneId; i < (size_t)dim; i += 32) {
+      shared_point->coords[i] = __float2half(data_ptr[base + i]);
+    }
+    return;
+  }
   for (size_t i = laneId * 2; i + 1 < (size_t)dim; i += 64) {
     float2 v = *reinterpret_cast<const float2*>(&data_ptr[base + i]);
     *reinterpret_cast<half2*>(&shared_point->coords[i]) = __float22half2_rn(v);
-  }
-  if (((size_t)dim & 1u) != 0u && laneId == 0) {
-    shared_point->coords[dim - 1] = __float2half(data_ptr[base + dim - 1]);
   }
 }
 
