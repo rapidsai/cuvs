@@ -29,7 +29,7 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<Code
   RAFT_LOG_DEBUG(
     "Saving IVF-SQ index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
 
-  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<CodeT>().to_string();
+  std::string dtype_string = cuvs::util::numpy_dtype_string<CodeT>();
   dtype_string.resize(4);
   os << dtype_string;
 

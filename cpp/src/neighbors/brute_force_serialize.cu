@@ -26,7 +26,7 @@ void serialize(raft::resources const& handle,
   RAFT_LOG_DEBUG(
     "Saving brute force index, size %zu, dim %u", static_cast<size_t>(index.size()), index.dim());
 
-  auto dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+  auto dtype_string = cuvs::util::numpy_dtype_string<T>();
   dtype_string.resize(4);
   os << dtype_string;
 
