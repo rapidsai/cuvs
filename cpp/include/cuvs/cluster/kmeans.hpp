@@ -1532,14 +1532,16 @@ void transform(raft::resources const& handle,
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
- *
+ * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
+ *                            When provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
   raft::device_matrix_view<const float, int> X,
   raft::device_matrix_view<const float, int> centroids,
-  raft::host_scalar_view<float> cost,
-  std::optional<raft::device_vector_view<const float, int>> sample_weight = std::nullopt);
+  raft::device_scalar_view<float> cost,
+  std::optional<raft::device_vector_view<const float, int>> sample_weight = std::nullopt,
+  std::optional<raft::device_vector_view<const float, int>> X_norm        = std::nullopt);
 
 /**
  * @brief Compute cluster cost
@@ -1554,13 +1556,16 @@ void cluster_cost(
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
+ * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
+ *                            When provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
   raft::device_matrix_view<const double, int> X,
   raft::device_matrix_view<const double, int> centroids,
-  raft::host_scalar_view<double> cost,
-  std::optional<raft::device_vector_view<const double, int>> sample_weight = std::nullopt);
+  raft::device_scalar_view<double> cost,
+  std::optional<raft::device_vector_view<const double, int>> sample_weight = std::nullopt,
+  std::optional<raft::device_vector_view<const double, int>> X_norm        = std::nullopt);
 
 /**
  * @brief Compute (optionally weighted) cluster cost
@@ -1575,13 +1580,16 @@ void cluster_cost(
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
+ * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
+ *                            When provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
   raft::device_matrix_view<const float, int64_t> X,
   raft::device_matrix_view<const float, int64_t> centroids,
-  raft::host_scalar_view<float> cost,
-  std::optional<raft::device_vector_view<const float, int64_t>> sample_weight = std::nullopt);
+  raft::device_scalar_view<float> cost,
+  std::optional<raft::device_vector_view<const float, int64_t>> sample_weight = std::nullopt,
+  std::optional<raft::device_vector_view<const float, int64_t>> X_norm        = std::nullopt);
 
 /**
  * @brief Compute (optionally weighted) cluster cost
@@ -1596,13 +1604,16 @@ void cluster_cost(
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
+ * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
+ *                            When provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
   raft::device_matrix_view<const double, int64_t> X,
   raft::device_matrix_view<const double, int64_t> centroids,
-  raft::host_scalar_view<double> cost,
-  std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = std::nullopt);
+  raft::device_scalar_view<double> cost,
+  std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = std::nullopt,
+  std::optional<raft::device_vector_view<const double, int64_t>> X_norm        = std::nullopt);
 /**
  * @}
  */

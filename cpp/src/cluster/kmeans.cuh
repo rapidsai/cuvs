@@ -404,6 +404,7 @@ void cluster_cost(
   std::optional<raft::device_vector<DataT, IndexT>> x_norms_buf;
   DataT* x_norms_ptr;
   if (X_norm.has_value()) {
+    RAFT_EXPECTS(X_norm->extent(0) == n_samples, "X_norm size !=n_samples");
     x_norms_ptr = const_cast<DataT*>(X_norm->data_handle());
   } else {
     x_norms_buf.emplace(raft::make_device_vector<DataT, IndexT>(handle, n_samples));
@@ -441,38 +442,6 @@ void cluster_cost(
 
   cuvs::cluster::kmeans::cluster_cost(
     handle, min_cluster_distance.view(), workspace, cost, raft::add_op{});
-}
-
-/**
- * @brief Compute (optionally weighted) cluster cost (inertia) — host-scalar output.
- *
- * Convenience wrapper that copies the result to host and synchronizes.
- *
- * @tparam DataT  float or double
- * @tparam IndexT Index type
- *
- * @param[in]  handle         The raft handle
- * @param[in]  X              Input data [n_samples x n_features]
- * @param[in]  centroids      Cluster centroids [n_clusters x n_features]
- * @param[out] cost           Sum of squared distances to nearest centroid (host)
- * @param[in]  sample_weight  Optional per-sample weights [n_samples]
- * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
- *                            When provided, the internal norm computation is skipped.
- */
-template <typename DataT, typename IndexT>
-void cluster_cost(
-  raft::resources const& handle,
-  raft::device_matrix_view<const DataT, IndexT> X,
-  raft::device_matrix_view<const DataT, IndexT> centroids,
-  raft::host_scalar_view<DataT> cost,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight = std::nullopt,
-  std::optional<raft::device_vector_view<const DataT, IndexT>> X_norm        = std::nullopt)
-{
-  auto device_cost = raft::make_device_scalar<DataT>(handle, DataT(0));
-  cuvs::cluster::kmeans::cluster_cost(
-    handle, X, centroids, device_cost.view(), sample_weight, X_norm);
-  raft::copy(handle, cost, raft::make_const_mdspan(device_cost.view()));
-  raft::resource::sync_stream(handle);
 }
 
 /**

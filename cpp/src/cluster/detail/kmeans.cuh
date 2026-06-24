@@ -965,7 +965,7 @@ void kmeans_fit(
           if constexpr (data_on_device) {
             batch_xnorm = raft::make_device_vector_view<const DataT, IndexT>(
               L2NormBatch.data_handle() + data_batch.offset(), cur_batch_size);
-          } else {
+          } else if (norms_cached) {
             raft::copy(L2NormBatch.data_handle(),
                        h_norm_cache.data_handle() + data_batch.offset(),
                        cur_batch_size,
