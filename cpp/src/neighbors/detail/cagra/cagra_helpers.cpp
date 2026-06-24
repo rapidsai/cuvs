@@ -89,6 +89,7 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
     debug_host_size = n_rows * graph_degree * sizeof(uint32_t)  // host_copy_output_graph
                       + n_rows * sizeof(uint32_t)               // in_edge_count
                       + graph_degree * sizeof(uint32_t);        // hist
+  }
 
   size_t total_host       = mst_host + combine_host + debug_host_size;
   size_t total_host_fixed = mst_host_fixed + combine_host_fixed;
@@ -111,6 +112,8 @@ inline size_t ivf_pq_extend_mem_usage(raft::matrix_extent<int64_t> dataset,
   size_t pq_bits    = params.build_params.pq_bits;
   size_t rot_dim    = raft::round_up_safe<size_t>(dim, pq_dim);
   size_t n_clusters = params.build_params.n_lists;
+
+  RAFT_EXPECTS(pq_dim > 0, "pq_dim should not be 0");
 
   size_t max_batch_size = std::min<size_t>(n_rows, kReasonableMaxBatchSize);
   size_t workspace_size = max_batch_size * dim * dtype_size           // vec_batches
@@ -143,7 +146,8 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
   cuvs::neighbors::graph_build_params::ivf_pq_params params,
   size_t graph_degree,
   size_t intermediate_graph_degree,
-  bool guarantee_connectivity)
+  bool guarantee_connectivity,
+  bool attach_dataset_on_build)
 {
   size_t dtype_size   = cuda_data_type_size(dtype);
   bool input_is_float = (dtype == CUDA_R_32F);
@@ -181,10 +185,10 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
   size_t kmeans_host_mem    = kmeans_indices_host + kmeans_pinned_host;
 
   // Extend phase
-  size_t extend_gpu_mem = 0;
-  if (pq_params.build_params.add_data_on_build) {
-    extend_gpu_mem = ivf_pq_extend_mem_usage(dataset, params, dtype_size);
-  }
+  size_t extend_gpu_mem = params.build_params.add_data_on_build ? ivf_pq_extend_mem_usage(dataset, params, dtype_size) : 0;
+  
+  // Add graph to index on GPU
+  size_t attach_graph_gpu_mem = attach_dataset_on_build ? n_rows * graph_degree * sizeof(uint32_t) : 0;
 
   // Search phase (build_knn_graph):
   constexpr size_t kWorkspaceRatio = 5;
@@ -204,7 +208,7 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
                                          + (sizeof(float) + sizeof(int64_t)) * top_k);  // refined_*
 
   // Phases run sequentially (train/extend -> search -> optimize)
-  size_t total_dev = std::max({kmeans_gpu_mem, extend_gpu_mem, search_phase_dev, gpu_workspace_size});
+  size_t total_dev = std::max({kmeans_gpu_mem, extend_gpu_mem, attach_graph_gpu_mem, search_phase_dev, gpu_workspace_size});
 
   // The graph (and its optimize workspace) stays resident across phases
   size_t total_host =
@@ -258,7 +262,8 @@ std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
                                                              pq_params,
                                                              cparams.graph_degree,
                                                              cparams.intermediate_graph_degree,
-                                                             cparams.guarantee_connectivity);
+                                                             cparams.guarantee_connectivity,
+                                                             cparams.attach_dataset_on_build);
   } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
                cparams.graph_build_params)) {
     RAFT_LOG_INFO("Considering CAGRA in memory build with NN-descent");
