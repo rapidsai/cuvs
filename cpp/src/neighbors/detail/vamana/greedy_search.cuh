@@ -119,16 +119,15 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   extern __shared__ __align__(16) char smem[];
 
   // Per-warp shared memory layout: coords, neighbor_array, candidate_queue
-  const int coords_size =
-    (dim + align_padding) * greedy_search_query_smem_elem_size<T>(dim);
+  const int coords_size      = (dim + align_padding) * greedy_search_query_smem_elem_size<T>(dim);
   const int neighbor_size    = degree * sizeof(IdxT);
   const int queue_size_bytes = max_queue_size * sizeof(DistPair<IdxT, accT>);
   const int per_warp_size    = (coords_size + neighbor_size + queue_size_bytes + 15) & ~15;
 
-  char* warp_smem = &smem[warpIdx * per_warp_size];
+  char* warp_smem       = &smem[warpIdx * per_warp_size];
   __half* s_coords_half = reinterpret_cast<__half*>(warp_smem);
-  QueryCoordT* s_coords  = reinterpret_cast<QueryCoordT*>(warp_smem);
-  IdxT* neighbor_array = reinterpret_cast<IdxT*>(warp_smem + coords_size);
+  QueryCoordT* s_coords = reinterpret_cast<QueryCoordT*>(warp_smem);
+  IdxT* neighbor_array  = reinterpret_cast<IdxT*>(warp_smem + coords_size);
   DistPair<IdxT, accT>* candidate_queue_smem =
     reinterpret_cast<DistPair<IdxT, accT>*>(warp_smem + coords_size + neighbor_size);
 
@@ -156,7 +155,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
   }
 
   Node<accT>* topk_pq = &topk_pq_mem[(blockIdx.x * 4 + warpIdx) * topk];
-  const T* vec_ptr   = &dataset(0, 0);
+  const T* vec_ptr    = &dataset(0, 0);
 
   for (int i = blockIdx.x * 4 + warpIdx; i < num_queries; i += gridDim.x * 4) {
     query_list[i].reset_warp(laneId);
@@ -174,8 +173,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
           &s_query_half, vec_ptr, cur_query_id, dim, laneId);
       }
     } else if constexpr (is_cuda_fp16_v<T>) {
-      update_shared_point_warp_half_to_float<accT>(
-        &s_query, vec_ptr, cur_query_id, dim, laneId);
+      update_shared_point_warp_half_to_float<accT>(&s_query, vec_ptr, cur_query_id, dim, laneId);
     } else {
       update_shared_point_warp<T, accT>(&s_query, vec_ptr, cur_query_id, dim, laneId);
     }
@@ -195,17 +193,11 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
 
     accT medoid_dist;
     if (fp16_query_smem) {
-      medoid_dist = dist_warp_half_query<accT, T>(s_coords_half,
-                                                  &vec_ptr[(size_t)medoid_id * (size_t)dim],
-                                                  dim,
-                                                  metric,
-                                                  laneId);
+      medoid_dist = dist_warp_half_query<accT, T>(
+        s_coords_half, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
     } else if constexpr (is_cuda_fp16_v<T>) {
-      medoid_dist = dist_warp<accT>(s_coords,
-                                    &vec_ptr[(size_t)medoid_id * (size_t)dim],
-                                    dim,
-                                    metric,
-                                    laneId);
+      medoid_dist =
+        dist_warp<accT>(s_coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
     } else {
       medoid_dist = dist_warp<T, accT>(
         s_coords, &vec_ptr[(size_t)medoid_id * (size_t)dim], dim, metric, laneId);
@@ -266,7 +258,8 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
       for (size_t j = laneId; j < degree; j += 32) {
         neighbor_array[j] = graph(cand_num, j);
         if (neighbor_array[j] == raft::upper_bound<IdxT>())
-          atomicMin(&num_neighbors[warpIdx], (int)j); // warp-wide min to find the number of neighbors
+          atomicMin(&num_neighbors[warpIdx],
+                    (int)j);  // warp-wide min to find the number of neighbors
       }
 
       enqueue_all_neighbors_warp(num_neighbors[warpIdx],
@@ -286,7 +279,7 @@ __global__ __launch_bounds__(128, 12) void GreedySearchKernel(
       if (query_list[i].ids[j] == cur_query_id) {
         query_list[i].dists[j] = raft::upper_bound<accT>();
         query_list[i].ids[j]   = raft::upper_bound<IdxT>();
-        self_found             = true; // Flat to reduce size by 1
+        self_found             = true;  // Flat to reduce size by 1
       }
     }
     self_found = (raft::ballot(self_found) != 0);

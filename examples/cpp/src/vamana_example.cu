@@ -142,13 +142,13 @@ int main(int argc, char* argv[])
 
     // Simple build example to create graph and write to a file
     vamana_build_and_write<__half>(dev_resources,
-                                  raft::make_const_mdspan(dataset.view()),
-                                  out_fname,
-                                  degree,
-                                  max_visited,
-                                  max_fraction,
-                                  iters,
-                                  codebook_prefix);
+                                   raft::make_const_mdspan(dataset.view()),
+                                   out_fname,
+                                   degree,
+                                   max_visited,
+                                   max_fraction,
+                                   iters,
+                                   codebook_prefix);
   } else {
     usage();
   }

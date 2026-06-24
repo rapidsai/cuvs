@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -92,7 +92,7 @@ __device__ __host__ void swap(DistPair<IdxT, accT>* a, DistPair<IdxT, accT>* b)
 template <typename IdxT, typename accT>
 struct CmpDist {
   __host__ __device__ bool operator()(const DistPair<IdxT, accT>& lhs,
-                                        const DistPair<IdxT, accT>& rhs)
+                                      const DistPair<IdxT, accT>& rhs)
   {
     return lhs.dist < rhs.dist;
   }
@@ -255,8 +255,8 @@ __device__ SUMTYPE l2_SEQ_half(Point<__half, SUMTYPE>* src_vec, Point<__half, SU
 template <typename SUMTYPE>
 __device__ SUMTYPE l2_ILP2_half(Point<__half, SUMTYPE>* src_vec, Point<__half, SUMTYPE>* dst_vec)
 {
-  __half temp_dst[2]          = {__float2half(0.0f), __float2half(0.0f)};
-  __half partial_sum[2]       = {__float2half(0.0f), __float2half(0.0f)};
+  __half temp_dst[2]    = {__float2half(0.0f), __float2half(0.0f)};
+  __half partial_sum[2] = {__float2half(0.0f), __float2half(0.0f)};
   for (int i = threadIdx.x; i < src_vec->Dim; i += 2 * blockDim.x) {
     temp_dst[0] = dst_vec->coords[i];
     if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
@@ -273,14 +273,10 @@ __device__ SUMTYPE l2_ILP2_half(Point<__half, SUMTYPE>* src_vec, Point<__half, S
 template <typename SUMTYPE>
 __device__ SUMTYPE l2_ILP4_half(Point<__half, SUMTYPE>* src_vec, Point<__half, SUMTYPE>* dst_vec)
 {
-  __half temp_dst[4]          = {__float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f)};
-  __half partial_sum[4]       = {__float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f)};
+  __half temp_dst[4] = {
+    __float2half(0.0f), __float2half(0.0f), __float2half(0.0f), __float2half(0.0f)};
+  __half partial_sum[4] = {
+    __float2half(0.0f), __float2half(0.0f), __float2half(0.0f), __float2half(0.0f)};
   for (int i = threadIdx.x; i < src_vec->Dim; i += 4 * blockDim.x) {
     temp_dst[0] = dst_vec->coords[i];
     if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
@@ -295,7 +291,8 @@ __device__ SUMTYPE l2_ILP4_half(Point<__half, SUMTYPE>* src_vec, Point<__half, S
     if (i + 96 < src_vec->Dim)
       l2_half_fma_sq(partial_sum[3], src_vec[0].coords[i + 96], temp_dst[3]);
   }
-  partial_sum[0] = __hadd(partial_sum[0], __hadd(partial_sum[1], __hadd(partial_sum[2], partial_sum[3])));
+  partial_sum[0] =
+    __hadd(partial_sum[0], __hadd(partial_sum[1], __hadd(partial_sum[2], partial_sum[3])));
 
   return l2_half_warp_reduce<SUMTYPE>(partial_sum[0]);
 }
@@ -460,14 +457,10 @@ __device__ SUMTYPE l2_ILP4_half_warp(Point<__half, SUMTYPE>* src_vec,
                                      Point<__half, SUMTYPE>* dst_vec,
                                      int lane)
 {
-  __half temp_dst[4]    = {__float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f)};
-  __half partial_sum[4] = {__float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f),
-                         __float2half(0.0f)};
+  __half temp_dst[4] = {
+    __float2half(0.0f), __float2half(0.0f), __float2half(0.0f), __float2half(0.0f)};
+  __half partial_sum[4] = {
+    __float2half(0.0f), __float2half(0.0f), __float2half(0.0f), __float2half(0.0f)};
   for (int i = lane; i < src_vec->Dim; i += 4 * VAMANA_WARP_SIZE) {
     temp_dst[0] = dst_vec->coords[i];
     if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
@@ -482,12 +475,15 @@ __device__ SUMTYPE l2_ILP4_half_warp(Point<__half, SUMTYPE>* src_vec,
     if (i + 96 < src_vec->Dim)
       l2_half_fma_sq(partial_sum[3], src_vec[0].coords[i + 96], temp_dst[3]);
   }
-  partial_sum[0] = __hadd(partial_sum[0], __hadd(partial_sum[1], __hadd(partial_sum[2], partial_sum[3])));
+  partial_sum[0] =
+    __hadd(partial_sum[0], __hadd(partial_sum[1], __hadd(partial_sum[2], partial_sum[3])));
   return l2_half_warp_reduce<SUMTYPE>(partial_sum[0]);
 }
 
 template <typename T, typename SUMTYPE>
-__forceinline__ __device__ SUMTYPE l2_warp(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec, int lane)
+__forceinline__ __device__ SUMTYPE l2_warp(Point<T, SUMTYPE>* src_vec,
+                                           Point<T, SUMTYPE>* dst_vec,
+                                           int lane)
 {
   if constexpr (std::is_same_v<std::remove_cv_t<T>, __half>) {
     if (src_vec->Dim >= 128) {
@@ -718,7 +714,8 @@ l2_warp_half_float(const __half* src, const float* dest, int dim, int lane)
 /* fp16 query smem vs half dataset: vectorized half2 loads, widen to float, float accumulate
  * (mirror of l2_warp_float_half; avoids scalar smem loads and native half FMA) */
 template <typename SUMTYPE>
-__device__ SUMTYPE l2_SEQ_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
+__device__ SUMTYPE
+l2_SEQ_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
 {
   SUMTYPE partial_sum = 0;
   for (int i = lane * 2; i < dim; i += VAMANA_WARP_SIZE * 2) {
@@ -733,7 +730,8 @@ __device__ SUMTYPE l2_SEQ_warp_half_smem_half(const __half* src, const __half* d
 }
 
 template <typename SUMTYPE>
-__device__ SUMTYPE l2_ILP2_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
+__device__ SUMTYPE
+l2_ILP2_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
 {
   SUMTYPE partial_sum[2] = {0, 0};
   for (int i = lane * 2; i < dim; i += 2 * VAMANA_WARP_SIZE * 2) {
@@ -756,7 +754,8 @@ __device__ SUMTYPE l2_ILP2_warp_half_smem_half(const __half* src, const __half* 
 }
 
 template <typename SUMTYPE>
-__device__ SUMTYPE l2_ILP4_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
+__device__ SUMTYPE
+l2_ILP4_warp_half_smem_half(const __half* src, const __half* dst, int dim, int lane)
 {
   SUMTYPE partial_sum[4] = {0, 0, 0, 0};
   for (int i = lane * 2; i < dim; i += 4 * VAMANA_WARP_SIZE * 2) {
@@ -801,12 +800,13 @@ l2_warp_half_smem_half(const __half* src, const __half* dest, int dim, int lane)
   }
 }
 
-/* fp16 query smem vs int8 (or other native) dataset: same vectorized query widen, float accumulate */
+/* fp16 query smem vs int8 (or other native) dataset: same vectorized query widen, float accumulate
+ */
 template <typename SUMTYPE, typename DataT>
 __device__ __forceinline__ void l2_fma_sq2_half_native(SUMTYPE& acc,
-                                                         float2 src2,
-                                                         const DataT* dst,
-                                                         int i)
+                                                       float2 src2,
+                                                       const DataT* dst,
+                                                       int i)
 {
   float dx = src2.x - static_cast<float>(dst[i]);
   float dy = src2.y - static_cast<float>(dst[i + 1]);
@@ -815,7 +815,8 @@ __device__ __forceinline__ void l2_fma_sq2_half_native(SUMTYPE& acc,
 }
 
 template <typename SUMTYPE, typename DataT>
-__device__ SUMTYPE l2_SEQ_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
+__device__ SUMTYPE
+l2_SEQ_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
 {
   SUMTYPE partial_sum = 0;
   for (int i = lane * 2; i < dim; i += VAMANA_WARP_SIZE * 2) {
@@ -829,7 +830,8 @@ __device__ SUMTYPE l2_SEQ_warp_half_smem_native(const __half* src, const DataT* 
 }
 
 template <typename SUMTYPE, typename DataT>
-__device__ SUMTYPE l2_ILP2_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
+__device__ SUMTYPE
+l2_ILP2_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
 {
   SUMTYPE partial_sum[2] = {0, 0};
   for (int i = lane * 2; i < dim; i += 2 * VAMANA_WARP_SIZE * 2) {
@@ -848,7 +850,8 @@ __device__ SUMTYPE l2_ILP2_warp_half_smem_native(const __half* src, const DataT*
 }
 
 template <typename SUMTYPE, typename DataT>
-__device__ SUMTYPE l2_ILP4_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
+__device__ SUMTYPE
+l2_ILP4_warp_half_smem_native(const __half* src, const DataT* dst, int dim, int lane)
 {
   SUMTYPE partial_sum[4] = {0, 0, 0, 0};
   for (int i = lane * 2; i < dim; i += 4 * VAMANA_WARP_SIZE * 2) {
@@ -888,8 +891,7 @@ l2_warp_half_smem_native(const __half* src, const DataT* dest, int dim, int lane
 }
 
 template <typename SUMTYPE, typename DataT>
-__forceinline__ __device__ SUMTYPE
-dist_warp_half_query(
+__forceinline__ __device__ SUMTYPE dist_warp_half_query(
   const __half* src, const DataT* dest, int dim, cuvs::distance::DistanceType metric, int lane)
 {
   SUMTYPE d;
@@ -934,13 +936,13 @@ template <typename IdxT, typename accT>
 __forceinline__ __device__ bool lookup_visited_dist_warp(
   const IdxT* ids, const accT* dists, int size, IdxT target, accT& out_dist, int laneId)
 {
-  bool found      = false;
-  accT found_dist = static_cast<accT>(0);
+  bool found          = false;
+  accT found_dist     = static_cast<accT>(0);
   const int num_iters = (size + 31) >> 5;
   for (int k = 0; k < num_iters; ++k) {
-    const int j        = (k << 5) + laneId;
-    const bool hit     = (j < size) && (ids[j] == target);
-    accT my_dist       = hit ? dists[j] : static_cast<accT>(0);
+    const int j         = (k << 5) + laneId;
+    const bool hit      = (j < size) && (ids[j] == target);
+    accT my_dist        = hit ? dists[j] : static_cast<accT>(0);
     const unsigned hits = raft::ballot(hit);
     if (hits != 0 && !found) {
       const int src_lane = __ffs(hits) - 1;
@@ -1123,11 +1125,8 @@ __device__ void update_shared_point(Point<T, accT>* shared_point,
 
 // Warp-level: uses laneId and stride 32 for coordinate copy
 template <typename T, typename accT>
-__device__ void update_shared_point_warp(Point<T, accT>* shared_point,
-                                         const T* data_ptr,
-                                         int id,
-                                         int dim,
-                                         int laneId)
+__device__ void update_shared_point_warp(
+  Point<T, accT>* shared_point, const T* data_ptr, int id, int dim, int laneId)
 {
   shared_point->id  = id;
   shared_point->Dim = dim;
@@ -1148,9 +1147,9 @@ __device__ void update_shared_point_half_to_float(Point<float, accT>* shared_poi
   shared_point->Dim      = dim;
   const size_t base      = (size_t)id * (size_t)dim;
   for (size_t i = threadIdx.x * 2; i + 1 < (size_t)dim; i += (size_t)blockDim.x * 2) {
-    float2 promoted     = __half22float2(*reinterpret_cast<const half2*>(&half_ptr[base + i]));
-    float2* coord_pair  = reinterpret_cast<float2*>(&shared_point->coords[i]);
-    *coord_pair         = promoted;
+    float2 promoted    = __half22float2(*reinterpret_cast<const half2*>(&half_ptr[base + i]));
+    float2* coord_pair = reinterpret_cast<float2*>(&shared_point->coords[i]);
+    *coord_pair        = promoted;
   }
   if (((size_t)dim & 1u) != 0u && threadIdx.x == 0) {
     shared_point->coords[dim - 1] = __half2float(half_ptr[base + dim - 1]);
@@ -1158,11 +1157,8 @@ __device__ void update_shared_point_half_to_float(Point<float, accT>* shared_poi
 }
 
 template <typename accT>
-__device__ void update_shared_point_warp_half_to_float(Point<float, accT>* shared_point,
-                                                       const half* data_ptr,
-                                                       int id,
-                                                       int dim,
-                                                       int laneId)
+__device__ void update_shared_point_warp_half_to_float(
+  Point<float, accT>* shared_point, const half* data_ptr, int id, int dim, int laneId)
 {
   const __half* half_ptr = reinterpret_cast<const __half*>(data_ptr);
   shared_point->id       = id;
@@ -1179,11 +1175,8 @@ __device__ void update_shared_point_warp_half_to_float(Point<float, accT>* share
 }
 
 template <typename accT>
-__device__ void update_shared_point_warp_fp16_query_smem(Point<__half, accT>* shared_point,
-                                                         const half* data_ptr,
-                                                         int id,
-                                                         int dim,
-                                                         int laneId)
+__device__ void update_shared_point_warp_fp16_query_smem(
+  Point<__half, accT>* shared_point, const half* data_ptr, int id, int dim, int laneId)
 {
   const __half* half_ptr = reinterpret_cast<const __half*>(data_ptr);
   shared_point->id       = id;
@@ -1199,11 +1192,8 @@ __device__ void update_shared_point_warp_fp16_query_smem(Point<__half, accT>* sh
 }
 
 template <typename accT>
-__device__ void update_shared_point_warp_fp16_query_smem(Point<__half, accT>* shared_point,
-                                                         const float* data_ptr,
-                                                         int id,
-                                                         int dim,
-                                                         int laneId)
+__device__ void update_shared_point_warp_fp16_query_smem(
+  Point<__half, accT>* shared_point, const float* data_ptr, int id, int dim, int laneId)
 {
   shared_point->id  = id;
   shared_point->Dim = dim;
@@ -1219,11 +1209,8 @@ __device__ void update_shared_point_warp_fp16_query_smem(Point<__half, accT>* sh
 
 template <typename T, typename accT>
 __device__ std::enable_if_t<!is_cuda_fp16_v<T> && !std::is_same_v<T, float>, void>
-update_shared_point_warp_fp16_query_smem(Point<__half, accT>* shared_point,
-                                         const T* data_ptr,
-                                         int id,
-                                         int dim,
-                                         int laneId)
+update_shared_point_warp_fp16_query_smem(
+  Point<__half, accT>* shared_point, const T* data_ptr, int id, int dim, int laneId)
 {
   shared_point->id  = id;
   shared_point->Dim = dim;

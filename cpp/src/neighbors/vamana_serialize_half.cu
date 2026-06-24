@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuda_fp16.h>
 #include "vamana_serialize.cuh"
+#include <cuda_fp16.h>
 
 namespace cuvs::neighbors::vamana {
 

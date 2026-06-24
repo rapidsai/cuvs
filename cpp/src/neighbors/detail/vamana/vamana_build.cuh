@@ -129,11 +129,11 @@ void batched_insert_vamana(
   IdxT* medoid_id,
   cuvs::distance::DistanceType metric)
 {
-  auto stream       = raft::resource::get_cuda_stream(res);
-  cudaStream_t cs   = stream;
-  int N       = dataset.extent(0);
-  int dim     = dataset.extent(1);
-  int degree  = graph.extent(1);
+  auto stream     = raft::resource::get_cuda_stream(res);
+  cudaStream_t cs = stream;
+  int N           = dataset.extent(0);
+  int dim         = dataset.extent(1);
+  int degree      = graph.extent(1);
 
   // Algorithm params
   int max_batchsize = (int)(params.max_fraction * (float)N);
@@ -216,18 +216,16 @@ void batched_insert_vamana(
   SELECT_SORT_SMEM_SIZE(degree, visited_size);  // Sets sort_smem_size based on dataset
 
   // GreedySearch: per-warp shared memory (4 warps): coords, neighbor_array, candidate_queue
-  const int search_coords_size =
-    (dim + align_padding) * greedy_search_query_smem_elem_size<T>(dim);
-  const int coords_size      = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
-  const int neighbor_size    = degree * sizeof(IdxT);
-  const int queue_size_bytes = queue_size * sizeof(DistPair<IdxT, accT>);
+  const int search_coords_size = (dim + align_padding) * greedy_search_query_smem_elem_size<T>(dim);
+  const int coords_size        = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
+  const int neighbor_size      = degree * sizeof(IdxT);
+  const int queue_size_bytes   = queue_size * sizeof(DistPair<IdxT, accT>);
   int search_smem_total_size =
     static_cast<int>(4 * ((search_coords_size + neighbor_size + queue_size_bytes + 15) & ~15));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
-  const int cand_coords_smem_size =
-    (dim >= kRobustPruneCandCacheMinDim) ? coords_size : 0;
-  int prune_smem_total_size = (degree + visited_size) * sizeof(float) +  // Occlusion list
+  const int cand_coords_smem_size = (dim >= kRobustPruneCandCacheMinDim) ? coords_size : 0;
+  int prune_smem_total_size       = (degree + visited_size) * sizeof(float) +  // Occlusion list
                               (degree + visited_size) * sizeof(DistPair<IdxT, accT>) +
                               visited_size * sizeof(DistPair<IdxT, accT>) +  // merge query cache
                               cand_coords_smem_size +
@@ -268,10 +266,10 @@ void batched_insert_vamana(
   auto edge_src =
     raft::make_device_mdarray<IdxT>(res, large_ws, raft::make_extents<int64_t>(max_total_edges));
 
-  auto edge_counts = raft::make_device_mdarray<int>(
-    res, large_ws, raft::make_extents<int64_t>(max_batchsize + 1));
-  auto edge_offsets = raft::make_device_mdarray<int>(
-    res, large_ws, raft::make_extents<int64_t>(max_batchsize + 1));
+  auto edge_counts =
+    raft::make_device_mdarray<int>(res, large_ws, raft::make_extents<int64_t>(max_batchsize + 1));
+  auto edge_offsets =
+    raft::make_device_mdarray<int>(res, large_ws, raft::make_extents<int64_t>(max_batchsize + 1));
 
   size_t temp_storage_bytes_dist = 0;
   size_t temp_storage_bytes_edge = 0;
@@ -289,9 +287,8 @@ void batched_insert_vamana(
                                   max_total_edges,
                                   CmpEdge<IdxT>(),
                                   cs);
-  size_t temp_storage_bytes =
-    std::max(temp_storage_bytes_dist, temp_storage_bytes_edge);
-  auto temp_sort_storage = raft::make_device_mdarray<uint8_t>(
+  size_t temp_storage_bytes = std::max(temp_storage_bytes_dist, temp_storage_bytes_edge);
+  auto temp_sort_storage    = raft::make_device_mdarray<uint8_t>(
     res, large_ws, raft::make_extents<int64_t>(std::max(temp_storage_bytes, size_t{1})));
 
   size_t scan_temp_bytes = 0;
@@ -335,7 +332,7 @@ void batched_insert_vamana(
     if (start + step_size > N) { step_size = N - start; }
     RAFT_LOG_DEBUG("Starting batch of inserts indices_start:%d, batch_size:%d", start, step_size);
 
-    int num_blocks = min(maxBlocks, step_size);
+    int num_blocks        = min(maxBlocks, step_size);
     int num_blocks_greedy = min(maxBlocks, (step_size + 3) / 4);
 
     // Copy ids to be inserted for this batch
@@ -345,15 +342,16 @@ void batched_insert_vamana(
 
     // Call greedy search to get candidates for every vector being inserted
     GreedySearchKernel<T, accT, IdxT, Accessor>
-      <<<num_blocks_greedy, blockD_greedy, search_smem_total_size, stream>>>(d_graph.view(),
-                                                               dataset,
-                                                               query_list_ptr.data_handle(),
-                                                               step_size,
-                                                               *medoid_id,
-                                                               visited_size,
-                                                               metric,
-                                                               queue_size,
-                                                               topk_pq_mem.data_handle());
+      <<<num_blocks_greedy, blockD_greedy, search_smem_total_size, stream>>>(
+        d_graph.view(),
+        dataset,
+        query_list_ptr.data_handle(),
+        step_size,
+        *medoid_id,
+        visited_size,
+        metric,
+        queue_size,
+        topk_pq_mem.data_handle());
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #if KERNEL_TIMING
@@ -380,13 +378,13 @@ void batched_insert_vamana(
     // Run on candidates of vectors being inserted
     RobustPruneKernel<T, accT, IdxT>
       <<<num_blocks, blockD_prune, prune_smem_total_size, stream>>>(d_graph.view(),
-                                                                     dataset,
-                                                                     query_list_ptr.data_handle(),
-                                                                     step_size,
-                                                                     visited_size,
-                                                                     metric,
-                                                                     alpha,
-                                                                     s_coords_mem.data_handle());
+                                                                    dataset,
+                                                                    query_list_ptr.data_handle(),
+                                                                    step_size,
+                                                                    visited_size,
+                                                                    metric,
+                                                                    alpha,
+                                                                    s_coords_mem.data_handle());
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     // Segmented sort on query list
@@ -417,8 +415,8 @@ void batched_insert_vamana(
 
     // compute prefix sums of query_list sizes
     const int prefix_count = step_size + 1;
-    gather_query_sizes<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
-      query_list, edge_counts.data_handle(), prefix_count);
+    gather_query_sizes<accT, IdxT>
+      <<<num_blocks, blockD, 0, stream>>>(query_list, edge_counts.data_handle(), prefix_count);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     cub::DeviceScan::ExclusiveSum(scan_temp_storage.data_handle(),
@@ -429,8 +427,8 @@ void batched_insert_vamana(
                                   cs);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-    scatter_prefix_offsets<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
-      query_list, edge_offsets.data_handle(), prefix_count);
+    scatter_prefix_offsets<accT, IdxT>
+      <<<num_blocks, blockD, 0, stream>>>(query_list, edge_offsets.data_handle(), prefix_count);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     int total_edges;
@@ -485,9 +483,8 @@ void batched_insert_vamana(
     auto unique_indices = raft::make_device_vector<int>(res, total_edges);
     raft::linalg::map_offset(res, unique_indices.view(), raft::identity_op{});
 
-    thrust::unique_by_key(edge_dest_vec.begin(),
-                          edge_dest_vec.begin() + total_edges,
-                          unique_indices.data_handle());
+    thrust::unique_by_key(
+      edge_dest_vec.begin(), edge_dest_vec.begin() + total_edges, unique_indices.data_handle());
 
 #if KERNEL_TIMING
     RAFT_CUDA_TRY(cudaDeviceSynchronize());
@@ -532,16 +529,15 @@ void batched_insert_vamana(
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Call 2nd RobustPrune on reverse query_list
-      RobustPruneKernel<T, accT, IdxT>
-        <<<num_blocks, blockD_prune, prune_smem_total_size, stream>>>(d_graph.view(),
-                                                                       raft::make_const_mdspan(
-                                                                         dataset),
-                                                                       reverse_list_ptr.data_handle(),
-                                                                       reverse_batch,
-                                                                       visited_size,
-                                                                       metric,
-                                                                       alpha,
-                                                                       s_coords_mem.data_handle());
+      RobustPruneKernel<T, accT, IdxT><<<num_blocks, blockD_prune, prune_smem_total_size, stream>>>(
+        d_graph.view(),
+        raft::make_const_mdspan(dataset),
+        reverse_list_ptr.data_handle(),
+        reverse_batch,
+        visited_size,
+        metric,
+        alpha,
+        s_coords_mem.data_handle());
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Segmented sort on reverse_list

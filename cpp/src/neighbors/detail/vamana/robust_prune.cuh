@@ -84,7 +84,7 @@ __global__ void RobustPruneKernel(
 
   int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
 
-  float* occlusion_list = reinterpret_cast<float*>(smem);
+  float* occlusion_list     = reinterpret_cast<float*>(smem);
   const int nbh_list_offset = (degree + visited_size) * sizeof(float);
   DistPair<IdxT, accT>* new_nbh_list =
     reinterpret_cast<DistPair<IdxT, accT>*>(&smem[nbh_list_offset]);
@@ -92,18 +92,17 @@ __global__ void RobustPruneKernel(
     nbh_list_offset + (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
   DistPair<IdxT, accT>* query_cache =
     reinterpret_cast<DistPair<IdxT, accT>*>(&smem[query_cache_offset]);
-  const int cand_coords_offset =
-    query_cache_offset + visited_size * sizeof(DistPair<IdxT, accT>);
-  const int coord_bytes = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
-  int graph_dists_offset = cand_coords_offset;
-  QueryCoordT* s_cand_coords = nullptr;
+  const int cand_coords_offset = query_cache_offset + visited_size * sizeof(DistPair<IdxT, accT>);
+  const int coord_bytes        = (dim + align_padding) * static_cast<int>(sizeof(QueryCoordT));
+  int graph_dists_offset       = cand_coords_offset;
+  QueryCoordT* s_cand_coords   = nullptr;
   if (dim >= kRobustPruneCandCacheMinDim) {
     s_cand_coords      = reinterpret_cast<QueryCoordT*>(&smem[cand_coords_offset]);
     graph_dists_offset = cand_coords_offset + coord_bytes;
   }
-  accT* graph_dists = reinterpret_cast<accT*>(&smem[graph_dists_offset]);
+  accT* graph_dists          = reinterpret_cast<accT*>(&smem[graph_dists_offset]);
   const int graph_ids_offset = graph_dists_offset + degree * sizeof(accT);
-  IdxT* graph_ids   = reinterpret_cast<IdxT*>(&smem[graph_ids_offset]);
+  IdxT* graph_ids            = reinterpret_cast<IdxT*>(&smem[graph_ids_offset]);
 
   static __shared__ Point<QueryCoordT, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
@@ -113,8 +112,8 @@ __global__ void RobustPruneKernel(
   static __shared__ int s_do_accept;
   static __shared__ int s_res_size;
 
-  const int laneId   = threadIdx.x & 31;
-  const int warpId   = threadIdx.x >> 5;
+  const int laneId    = threadIdx.x & 31;
+  const int warpId    = threadIdx.x >> 5;
   const int num_warps = blockDim.x >> 5;
 
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
@@ -147,25 +146,22 @@ __global__ void RobustPruneKernel(
     __syncthreads();
 
     // Precompute graph-edge distances in parallel; reuse GreedySearch dists when bit-exact.
-    const int visited_count     = query_list[i].size;
-    const IdxT* visited_ids     = query_list[i].ids;
-    const accT* visited_dists   = query_list[i].dists;
+    const int visited_count       = query_list[i].size;
+    const IdxT* visited_ids       = query_list[i].ids;
+    const accT* visited_dists     = query_list[i].dists;
     const bool reuse_search_dists = (dim >= kRobustPruneCandCacheMinDim);
     for (int j = warpId; j < prev_edges; j += num_warps) {
       IdxT gid = graph(queryId, j);
       accT d;
       bool found = false;
       if (reuse_search_dists) {
-        found = lookup_visited_dist_warp(
-          visited_ids, visited_dists, visited_count, gid, d, laneId);
+        found = lookup_visited_dist_warp(visited_ids, visited_dists, visited_count, gid, d, laneId);
       }
       if (!found) {
         if constexpr (is_cuda_fp16_v<T>) {
-          d = dist_warp<accT>(
-            s_query.coords, &dataset((size_t)gid, 0), dim, metric, laneId);
+          d = dist_warp<accT>(s_query.coords, &dataset((size_t)gid, 0), dim, metric, laneId);
         } else {
-          d = dist_warp<T, accT>(
-            s_query.coords, &dataset((size_t)gid, 0), dim, metric, laneId);
+          d = dist_warp<T, accT>(s_query.coords, &dataset((size_t)gid, 0), dim, metric, laneId);
         }
       }
       if (laneId == 0) {
@@ -249,15 +245,14 @@ __global__ void RobustPruneKernel(
       }
 
       // Go through different alpha values. These constants are hard-coded in the MSFT DiskANN code
-      for (float cur_alpha = 1.0; cur_alpha <= alpha && s_accept_count < degree;
-           cur_alpha *= 1.2) {
+      for (float cur_alpha = 1.0; cur_alpha <= alpha && s_accept_count < degree; cur_alpha *= 1.2) {
         for (int pass_start = 0; pass_start < s_res_size && s_accept_count < degree; pass_start++) {
           if (threadIdx.x == 0) {
-            s_do_accept = (occlusion_list[pass_start] != raft::lower_bound<float>() &&
-                           occlusion_list[pass_start] <= cur_alpha &&
-                           new_nbh_list[pass_start].idx != queryId)
-                            ? 1
-                            : 0;
+            s_do_accept =
+              (occlusion_list[pass_start] != raft::lower_bound<float>() &&
+               occlusion_list[pass_start] <= cur_alpha && new_nbh_list[pass_start].idx != queryId)
+                ? 1
+                : 0;
           }
           __syncthreads();
 
@@ -295,7 +290,7 @@ __global__ void RobustPruneKernel(
                   djk = dist_warp<T, accT>(cand_ptr, k_ptr, dim, metric, laneId);
                 }
                 if (laneId == 0) {
-                  accT new_occ = (float)(new_nbh_list[occId].dist / djk);
+                  accT new_occ          = (float)(new_nbh_list[occId].dist / djk);
                   occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
                 }
               }
