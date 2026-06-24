@@ -190,7 +190,7 @@ std::pair<file_descriptor, size_t> create_numpy_file(const std::string& path,
   // Open file
   file_descriptor fd(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
 
-  const std::string header_str = make_numpy_header_string<T>(shape);
+  const std::string header_str = detail::make_numpy_header_string<T>(shape);
   size_t header_size           = header_str.size();
 
   // Calculate data size from shape

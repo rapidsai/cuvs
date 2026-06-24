@@ -44,7 +44,7 @@ inline bool validate_serialized_dtype(const char* dtype_prefix, std::size_t dtyp
 {
   if (dtype_prefix == nullptr || dtype_prefix_size != 4) { return false; }
 
-  auto expected_dtype = cuvs::util::numpy_dtype_string<T>();
+  auto expected_dtype = cuvs::util::detail::numpy_dtype_string<T>();
   expected_dtype.resize(dtype_prefix_size, '\0');
 
   return std::equal(dtype_prefix, dtype_prefix + dtype_prefix_size, expected_dtype.begin());

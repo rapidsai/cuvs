@@ -20,7 +20,19 @@
 
 namespace CUVS_EXPORT cuvs {
 namespace util {
+namespace detail {
 
+/**
+ * @brief Return the NumPy dtype descriptor for a cuVS scalar type.
+ *
+ * @tparam T Scalar type to describe.
+ *
+ * @return A NumPy dtype descriptor string, for example `"<f2"` for `half`. `half` is handled
+ * explicitly because RAFT's NumPy dtype helper does not currently accept CUDA `half`; all other
+ * types are delegated to RAFT.
+ *
+ * @note This helper performs no I/O and has no side effects.
+ */
 template <typename T>
 inline auto numpy_dtype_string() -> std::string
 {
@@ -31,6 +43,22 @@ inline auto numpy_dtype_string() -> std::string
   }
 }
 
+/**
+ * @brief Build a complete NumPy v1 `.npy` header for a known dtype descriptor and shape.
+ *
+ * @param dtype NumPy dtype descriptor to serialize into the header dictionary, such as `"<f2"` or
+ * `"<f4"`.
+ * @param shape Row-major array extents to serialize in NumPy shape syntax.
+ *
+ * @return Serialized NumPy v1 header bytes, including magic string, version, little-endian header
+ * length, padded dictionary payload, and trailing newline.
+ *
+ * @throws raft::exception if the generated header does not fit in the NumPy v1 16-bit header length
+ * field.
+ *
+ * @note This helper does not write to disk. Callers append the returned bytes before array payload
+ * data.
+ */
 inline auto make_numpy_header_from_dtype(const std::string& dtype, const std::vector<size_t>& shape)
   -> std::string
 {
@@ -66,6 +94,22 @@ inline auto make_numpy_header_from_dtype(const std::string& dtype, const std::ve
   return result;
 }
 
+/**
+ * @brief Build a complete NumPy v1 `.npy` header for a cuVS scalar type and shape.
+ *
+ * @tparam T Scalar type of the serialized array.
+ *
+ * @param shape Row-major array extents to serialize in NumPy shape syntax.
+ *
+ * @return Serialized NumPy v1 header bytes, including magic string, version, little-endian header
+ * length, padded dictionary payload, and trailing newline.
+ *
+ * @throws raft::exception when the generated half-precision header is too large for NumPy v1.
+ * Other scalar types use RAFT's header writer and propagate any exceptions from that path.
+ *
+ * @note `half` uses cuVS's explicit `"<f2"` dtype mapping; other scalar types preserve RAFT's
+ * existing header serialization behavior. This helper performs no file I/O.
+ */
 template <typename T>
 inline auto make_numpy_header_string(const std::vector<size_t>& shape) -> std::string
 {
@@ -82,5 +126,6 @@ inline auto make_numpy_header_string(const std::vector<size_t>& shape) -> std::s
   }
 }
 
+}  // namespace detail
 }  // namespace util
 }  // namespace CUVS_EXPORT cuvs

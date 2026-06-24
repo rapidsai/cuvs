@@ -740,7 +740,7 @@ inline auto open_npy_file(const std::string& path) -> npy_file
 template <typename T>
 inline void validate_npy_file(const npy_file& file, const std::string& path, const char* name)
 {
-  const auto expected_dtype = cuvs::util::numpy_dtype_string<T>();
+  const auto expected_dtype = cuvs::util::detail::numpy_dtype_string<T>();
   RAFT_EXPECTS(file.dtype == expected_dtype,
                "%s dtype (%s) does not match expected dtype (%s): %s",
                name,
@@ -802,7 +802,7 @@ inline auto open_layered_dataset_file(const std::string& path) -> npy_file
   return {std::move(fd),
           sizeof(uint32_t) * header.size(),
           {header[0], header[1]},
-          cuvs::util::numpy_dtype_string<T>(),
+          cuvs::util::detail::numpy_dtype_string<T>(),
           false};
 }
 
