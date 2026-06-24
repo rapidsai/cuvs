@@ -18,8 +18,9 @@ namespace detail {
 
 template <typename OutT, typename IdxT, typename DataT>
 inline constexpr bool is_fused_1nn_kvp_output_v =
-  std::is_same_v<OutT, raft::KeyValuePair<IdxT, float>> ||
-  std::is_same_v<OutT, raft::KeyValuePair<IdxT, DataT>>;
+  (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) &&
+  (std::is_same_v<OutT, raft::KeyValuePair<IdxT, float>> ||
+   std::is_same_v<OutT, raft::KeyValuePair<IdxT, DataT>>);
 
 template <typename DataT,
           typename OutT,
@@ -38,14 +39,8 @@ template <typename DataT,
           typename OutT,
           typename IdxT,
           std::enable_if_t<!is_fused_1nn_kvp_output_v<OutT, IdxT, DataT>, int> = 0>
-bool try_fused_1nn_tile(OutT*,
-                        const DataT*,
-                        const DataT*,
-                        IdxT,
-                        IdxT,
-                        IdxT,
-                        cuvs::distance::DistanceType,
-                        cudaStream_t)
+bool try_fused_1nn_tile(
+  OutT*, const DataT*, const DataT*, IdxT, IdxT, IdxT, cuvs::distance::DistanceType, cudaStream_t)
 {
   return false;
 }

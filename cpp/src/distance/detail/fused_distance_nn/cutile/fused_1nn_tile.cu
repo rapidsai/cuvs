@@ -16,6 +16,8 @@ namespace detail {
 
 namespace {
 
+constexpr int64_t TILE_M = 128;
+
 template <typename IdxT, typename OutT>
 __global__ void pack_fused_1nn_kvp(OutT* out, const int64_t* idx, const float* dist, IdxT len)
 {
@@ -27,13 +29,8 @@ __global__ void pack_fused_1nn_kvp(OutT* out, const int64_t* idx, const float* d
 }
 
 template <typename DataTag, typename DataT, typename IdxT, typename OutT>
-bool launch_fused_1nn_tile(const DataT* x,
-                           const DataT* y,
-                           OutT* out,
-                           IdxT m,
-                           IdxT n,
-                           IdxT k,
-                           cudaStream_t stream)
+bool launch_fused_1nn_tile(
+  const DataT* x, const DataT* y, OutT* out, IdxT m, IdxT n, IdxT k, cudaStream_t stream)
 {
   Fused1nnTilePlanner<DataTag> planner;
   planner.add_entrypoint();
@@ -46,67 +43,70 @@ bool launch_fused_1nn_tile(const DataT* x,
   RAFT_CUDA_TRY(cudaMallocAsync(&d_idx, m * sizeof(int64_t), stream));
   RAFT_CUDA_TRY(cudaMallocAsync(&d_dist, m * sizeof(float), stream));
 
-  int64_t shape_x[2]     = {m, k};
-  int64_t stride_x[2]    = {k, 1};
-  int64_t shape_y[2]     = {n, k};
-  int64_t stride_y[2]    = {k, 1};
-  int64_t shape_idx[1]   = {m};
-  int64_t stride_idx[1]  = {1};
-  int64_t shape_dist[1]  = {m};
-  int64_t stride_dist[1] = {1};
+  int64_t shape_x[2]  = {m, k};
+  int64_t stride_x[2] = {k, 1};
+  int64_t shape_y[2]  = {n, k};
+  int64_t stride_y[2] = {k, 1};
+  int64_t shape_idx   = m;
+  int64_t stride_idx  = 1;
+  int64_t shape_dist  = m;
+  int64_t stride_dist = 1;
 
   int64_t M = m, N = n, K = k;
-  constexpr int64_t tm = 128, tn = 256, tk = 64;
 
   void* x_ptr    = const_cast<DataT*>(x);
   void* y_ptr    = const_cast<DataT*>(y);
   void* idx_ptr  = d_idx;
   void* dist_ptr = d_dist;
 
-  dim3 grid((m + tm - 1) / tm, 1, 1);
+  dim3 grid((m + TILE_M - 1) / TILE_M, 1, 1);
   dim3 block(1, 1, 1);
 
+  // cutile_python_v1 (see fused_1nn_float PTX): each 2D array is (ptr, shape0, shape1,
+  // stride0, stride1); each 1D array is (ptr, shape, stride); ConstantConstraint tile sizes
+  // are embedded in the module.
   using fused_1nn_cutile_kernel_t = void(void*,
-                                         int64_t*,
-                                         int64_t*,
-                                         void*,
-                                         int64_t*,
-                                         int64_t*,
-                                         void*,
-                                         int64_t*,
-                                         int64_t*,
-                                         void*,
-                                         int64_t*,
-                                         int64_t*,
                                          int64_t,
+                                         int64_t,
+                                         int64_t,
+                                         int64_t,
+                                         void*,
+                                         int64_t,
+                                         int64_t,
+                                         int64_t,
+                                         int64_t,
+                                         void*,
+                                         int64_t,
+                                         int64_t,
+                                         void*,
                                          int64_t,
                                          int64_t,
                                          int64_t,
                                          int64_t,
                                          int64_t);
-  launcher->template dispatch<fused_1nn_cutile_kernel_t>(
-    stream,
-    grid,
-    block,
-    0,
-    x_ptr,
-    shape_x,
-    stride_x,
-    y_ptr,
-    shape_y,
-    stride_y,
-    idx_ptr,
-    shape_idx,
-    stride_idx,
-    dist_ptr,
-    shape_dist,
-    stride_dist,
-    M,
-    N,
-    K,
-    tm,
-    tn,
-    tk);
+  launcher->template dispatch<fused_1nn_cutile_kernel_t>(stream,
+                                                         grid,
+                                                         block,
+                                                         0,
+                                                         x_ptr,
+                                                         shape_x[0],
+                                                         shape_x[1],
+                                                         stride_x[0],
+                                                         stride_x[1],
+                                                         y_ptr,
+                                                         shape_y[0],
+                                                         shape_y[1],
+                                                         stride_y[0],
+                                                         stride_y[1],
+                                                         idx_ptr,
+                                                         shape_idx,
+                                                         stride_idx,
+                                                         dist_ptr,
+                                                         shape_dist,
+                                                         stride_dist,
+                                                         M,
+                                                         N,
+                                                         K);
 
   pack_fused_1nn_kvp<IdxT, OutT><<<(m + 255) / 256, 256, 0, stream>>>(out, d_idx, d_dist, m);
   RAFT_CUDA_TRY(cudaGetLastError());
@@ -148,13 +148,13 @@ using kvp_i64_f = raft::KeyValuePair<int64_t, float>;
 using kvp_i_h   = raft::KeyValuePair<int, half>;
 using kvp_i64_h = raft::KeyValuePair<int64_t, half>;
 
-#define CUVS_INST_TRY_FUSED_1NN_TILE(DataT, OutT, IdxT)                                          \
+#define CUVS_INST_TRY_FUSED_1NN_TILE(DataT, OutT, IdxT)                                         \
   template CUVS_EXPORT bool try_fused_1nn_tile<DataT, OutT, IdxT>(OutT*,                        \
-                                                                  const DataT*,                  \
-                                                                  const DataT*,                  \
-                                                                  IdxT,                          \
-                                                                  IdxT,                          \
-                                                                  IdxT,                          \
+                                                                  const DataT*,                 \
+                                                                  const DataT*,                 \
+                                                                  IdxT,                         \
+                                                                  IdxT,                         \
+                                                                  IdxT,                         \
                                                                   cuvs::distance::DistanceType, \
                                                                   cudaStream_t)
 
