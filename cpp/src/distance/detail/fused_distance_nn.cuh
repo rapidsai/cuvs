@@ -5,14 +5,22 @@
 
 #pragma once
 
+#ifndef CUVS_CUTILE_ENABLED
+#define CUVS_CUTILE_ENABLED 0
+#endif
+
 #include "distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
 #include "fused_distance_nn/cutlass_base.cuh"
+#if CUVS_CUTILE_ENABLED
+#include "fused_distance_nn/cutile/fused_1nn_tile.hpp"
+#endif
 #include "fused_distance_nn/fused_cosine_nn.cuh"
 #include "fused_distance_nn/fused_l2_nn.cuh"
 #include "fused_distance_nn/helper_structs.cuh"
 #include "fused_distance_nn/simt_kernel.cuh"
 #include "pairwise_distance_base.cuh"  // PairwiseDistances
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/detail/jit_lto/tileir_compat.hpp>
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
 #include <raft/linalg/contractions.cuh>  // Policy
@@ -53,6 +61,13 @@ void fusedDistanceNNImpl(OutT* min,
 {
   // The kernel policy is determined by fusedDistanceNN.
   typedef Policy P;
+
+#if CUVS_CUTILE_ENABLED
+  if (cuvs::detail::jit_lto::cutile_launch_available_on_current_device() &&
+      try_fused_1nn_tile<DataT, OutT, IdxT>(min, x, y, m, n, k, metric, stream)) {
+    return;
+  }
+#endif
 
   dim3 blk(P::Nthreads);
   auto nblks            = raft::ceildiv<int>(m, P::Nthreads);

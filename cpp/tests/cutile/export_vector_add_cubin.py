@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
-"""Export the cuTile vector-add kernel to a cubin for a single GPU target."""
+"""Export the cuTile vector-add kernel to cubin or TileIR bytecode."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
+from typing import Literal
 
 import cuda.tile as ct
 from cuda.tile.compilation import (
@@ -28,6 +29,9 @@ from vector_add_kernel import TILE_SIZE, vector_add
 #   sm_120 -> 120a-real
 SUPPORTED_GPU_CODES = ("sm_80", "sm_86", "sm_90", "sm_100", "sm_120")
 
+# Minimum TileIR bytecode version supported by cuTile; also the most portable choice.
+DEFAULT_TILEIR_BYTECODE_VERSION = "13.1"
+
 
 def _kernel_signature() -> KernelSignature:
     array = ArrayConstraint(
@@ -45,20 +49,31 @@ def _kernel_signature() -> KernelSignature:
     ).with_mangled_symbol("vector_add")
 
 
-def export_cubin(output_file: Path, gpu_code: str, symbol_header: Path | None) -> str:
-    if gpu_code not in SUPPORTED_GPU_CODES:
+def export_kernel_binary(
+    output_file: Path,
+    *,
+    output_format: Literal["cubin", "tileir_bytecode"],
+    gpu_code: str,
+    bytecode_version: str | None = None,
+    symbol_header: Path | None = None,
+) -> str:
+    if output_format == "cubin" and gpu_code not in SUPPORTED_GPU_CODES:
         raise ValueError(
             f"Unsupported gpu_code {gpu_code!r}; expected one of {SUPPORTED_GPU_CODES}"
         )
 
     signature = _kernel_signature()
-    export_kernel(
-        vector_add,
-        signatures=[signature],
-        output_file=str(output_file),
-        gpu_code=gpu_code,
-        output_format="cubin",
-    )
+    export_kwargs: dict = {
+        "kernel": vector_add,
+        "signatures": [signature],
+        "output_file": str(output_file),
+        "gpu_code": gpu_code,
+        "output_format": output_format,
+    }
+    if output_format == "tileir_bytecode":
+        export_kwargs["bytecode_version"] = bytecode_version or DEFAULT_TILEIR_BYTECODE_VERSION
+
+    export_kernel(**export_kwargs)
 
     if symbol_header is not None:
         symbol_header.write_text(
@@ -77,12 +92,23 @@ def export_cubin(output_file: Path, gpu_code: str, symbol_header: Path | None) -
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("output_file", type=Path, help="Output cubin path")
+    parser.add_argument("output_file", type=Path, help="Output cubin or .tilebc path")
+    parser.add_argument(
+        "--format",
+        choices=("cubin", "tileir_bytecode"),
+        default="cubin",
+        help="Export format (default: cubin)",
+    )
     parser.add_argument(
         "--gpu-code",
         required=True,
         choices=SUPPORTED_GPU_CODES,
-        help="tileiras / export_kernel target (e.g. sm_120)",
+        help="tileiras / export_kernel compile target (e.g. sm_120)",
+    )
+    parser.add_argument(
+        "--bytecode-version",
+        default=DEFAULT_TILEIR_BYTECODE_VERSION,
+        help="TileIR bytecode version when --format=tileir_bytecode (default: 13.1)",
     )
     parser.add_argument(
         "--symbol-header",
@@ -92,7 +118,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    symbol = export_cubin(args.output_file, args.gpu_code, args.symbol_header)
+    symbol = export_kernel_binary(
+        args.output_file,
+        output_format=args.format,
+        gpu_code=args.gpu_code,
+        bytecode_version=args.bytecode_version,
+        symbol_header=args.symbol_header,
+    )
     print(symbol)
     return 0
 

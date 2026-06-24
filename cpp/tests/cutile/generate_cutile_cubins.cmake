@@ -78,6 +78,33 @@ function(generate_cutile_vector_add_cubins output_include_dir_var)
     list(APPEND _generated_headers "${_cubin_header}")
   endforeach()
 
+  # Portable TileIR bytecode for driver JIT on architectures without a prebuilt cubin.
+  # Requires a CUDA 13.1+ driver (>= 590.44); see Tile IR bytecode docs.
+  set(_tileir_file "${_cutile_binary_dir}/vector_add.tilebc")
+  set(_tileir_header "${_cutile_binary_dir}/vector_add_tileir_bytecode.h")
+
+  add_custom_command(
+    OUTPUT "${_tileir_file}"
+    COMMAND
+      "${Python3_EXECUTABLE}" "${_cutile_source_dir}/export_vector_add_cubin.py"
+      "${_tileir_file}" --format tileir_bytecode --gpu-code sm_80 --bytecode-version 13.1
+    DEPENDS "${_cutile_source_dir}/export_vector_add_cubin.py"
+            "${_cutile_source_dir}/vector_add_kernel.py"
+    COMMENT "Exporting cuTile vector_add TileIR bytecode (v13.1)"
+    VERBATIM
+  )
+
+  add_custom_command(
+    OUTPUT "${_tileir_header}"
+    COMMAND "${CUTILE_BIN2C}" --const --name vector_add_tileir_bytecode --static "${_tileir_file}"
+            > "${_tileir_header}"
+    DEPENDS "${_tileir_file}"
+    COMMENT "Embedding vector_add TileIR bytecode via bin2c"
+    VERBATIM
+  )
+
+  list(APPEND _generated_headers "${_tileir_header}")
+
   add_custom_target(
     cutile_vector_add_cubins
     DEPENDS "${_symbol_header}" ${_generated_headers}

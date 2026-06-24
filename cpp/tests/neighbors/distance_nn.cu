@@ -187,6 +187,7 @@ const std::vector<NNInputs<IdxT>> input_fp32 = {
   {4096, 16384, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
   {4096, 16384, 128, DistanceType::L2SqrtExpanded, false, uint64_t(31415926), 0.1},
+  {512, 1024, 64, DistanceType::InnerProduct, false, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   {8192, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   // Fused implementation for cosine distance ignores the sqrt parameter, therefore

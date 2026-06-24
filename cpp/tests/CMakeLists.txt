@@ -386,7 +386,8 @@ ConfigureTest(
   PERCENT 100
 )
 
-add_subdirectory(cutile)
+# cuTile vector-add example test disabled; fused 1-NN cuTile is covered via libcuvs integration.
+# add_subdirectory(cutile)
 
 # ##################################################################################################
 # Install tests ####################################################################################

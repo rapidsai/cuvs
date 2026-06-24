@@ -11,10 +11,15 @@
 #include "vector_add_sm_80_cubin.h"
 #include "vector_add_sm_86_cubin.h"
 #include "vector_add_sm_90_cubin.h"
+#include "vector_add_tileir_bytecode.h"
+
+#include <cuvs/detail/jit_lto/tileir_compat.hpp>
 
 #include <cuda_runtime_api.h>
 
 #include <cstdint>
+#include <optional>
+#include <utility>
 
 namespace cuvs {
 namespace {
@@ -26,7 +31,7 @@ struct EmbeddedCubin {
   size_t size;
 };
 
-// Lookup table for cubins built at configure time (see export_vector_add_cubin.py).
+// Prebuilt cubins for known library targets (see export_vector_add_cubin.py).
 constexpr EmbeddedCubin kEmbeddedCubins[] = {
   {8, 0, vector_add_sm_80_cubin, sizeof(vector_add_sm_80_cubin)},
   {8, 6, vector_add_sm_86_cubin, sizeof(vector_add_sm_86_cubin)},
@@ -35,53 +40,128 @@ constexpr EmbeddedCubin kEmbeddedCubins[] = {
   {12, 0, vector_add_sm_120_cubin, sizeof(vector_add_sm_120_cubin)},
 };
 
-const EmbeddedCubin* find_embedded_cubin(int cc_major, int cc_minor)
-{
-  for (const auto& entry : kEmbeddedCubins) {
-    if (entry.cc_major == cc_major && entry.cc_minor == cc_minor) { return &entry; }
-  }
-  // Fall back to a cubin for the same major version (e.g. minor SKUs within a generation).
-  for (const auto& entry : kEmbeddedCubins) {
-    if (entry.cc_major == cc_major) { return &entry; }
-  }
-  return nullptr;
-}
-
-class CutileVectorAddTest : public ::testing::Test {
- protected:
-  void SetUp() override
-  {
-    int device = 0;
-    RAFT_CUDA_TRY(cudaGetDevice(&device));
-    RAFT_CUDA_TRY(
-      cudaDeviceGetAttribute(&cc_major_, cudaDevAttrComputeCapabilityMajor, device));
-    RAFT_CUDA_TRY(
-      cudaDeviceGetAttribute(&cc_minor_, cudaDevAttrComputeCapabilityMinor, device));
-  }
-
-  int cc_major_{};
-  int cc_minor_{};
+constexpr EmbeddedCubin kTileIrBytecode = {
+  -1,
+  -1,
+  vector_add_tileir_bytecode,
+  sizeof(vector_add_tileir_bytecode),
 };
 
-}  // namespace
+struct CutileModuleImage {
+  const uint8_t* data;
+  size_t size;
+};
 
-TEST_F(CutileVectorAddTest, EmbeddedCubinVectorAdd)
+std::optional<CutileModuleImage> resolve_vector_add_module(int cc_major, int cc_minor)
 {
-  const EmbeddedCubin* cubin = find_embedded_cubin(cc_major_, cc_minor_);
-  ASSERT_NE(cubin, nullptr)
-    << "No embedded cuTile cubin for compute capability " << cc_major_ << "." << cc_minor_;
+  for (const auto& entry : kEmbeddedCubins) {
+    if (entry.cc_major == cc_major && entry.cc_minor == cc_minor) {
+      return CutileModuleImage{reinterpret_cast<const uint8_t*>(entry.data), entry.size};
+    }
+  }
 
-  cudaLibrary_t library{};
-  ASSERT_EQ(cudaSuccess,
-            cudaLibraryLoadData(
-              &library, cubin->data, nullptr, nullptr, 0, nullptr, nullptr, 0))
-    << "cudaLibraryLoadData failed: " << cudaGetErrorString(cudaGetLastError());
+  int driver_version = 0;
+  if (cudaDriverGetVersion(&driver_version) != cudaSuccess) { return std::nullopt; }
+  if (!cuvs::detail::jit_lto::tileir_fallback_available(driver_version)) {
+    return std::nullopt;
+  }
+  return CutileModuleImage{
+    reinterpret_cast<const uint8_t*>(kTileIrBytecode.data), kTileIrBytecode.size};
+}
 
-  cudaKernel_t kernel{};
-  ASSERT_EQ(cudaSuccess,
-            cudaLibraryGetKernel(&kernel, library, CUTILE_VECTOR_ADD_KERNEL_SYMBOL))
-    << "cudaLibraryGetKernel failed: " << cudaGetErrorString(cudaGetLastError());
+struct LoadedKernel {
+  cudaLibrary_t library = nullptr;
+  cudaKernel_t kernel     = nullptr;
+  bool used_tileir_jit{false};
+  const char* skip_reason{nullptr};
 
+  LoadedKernel() = default;
+
+  LoadedKernel(LoadedKernel&& other) noexcept { *this = std::move(other); }
+
+  LoadedKernel& operator=(LoadedKernel&& other) noexcept
+  {
+    if (this != &other) {
+      unload();
+      library         = other.library;
+      kernel          = other.kernel;
+      used_tileir_jit = other.used_tileir_jit;
+      skip_reason     = other.skip_reason;
+      other.library   = nullptr;
+      other.kernel    = nullptr;
+    }
+    return *this;
+  }
+
+  LoadedKernel(const LoadedKernel&)            = delete;
+  LoadedKernel& operator=(const LoadedKernel&) = delete;
+
+  ~LoadedKernel() { unload(); }
+
+  explicit operator bool() const { return kernel != nullptr; }
+
+ private:
+  void unload()
+  {
+    if (library != nullptr) {
+      RAFT_CUDA_TRY(cudaLibraryUnload(library));
+      library = nullptr;
+      kernel  = nullptr;
+    }
+  }
+};
+
+LoadedKernel load_vector_add_kernel(int cc_major, int cc_minor)
+{
+  LoadedKernel result{};
+  result.used_tileir_jit = !cuvs::detail::jit_lto::is_embedded_cubin_arch(cc_major, cc_minor);
+
+  auto image = resolve_vector_add_module(cc_major, cc_minor);
+  if (!image) {
+    if (result.used_tileir_jit) {
+      result.skip_reason =
+        "TileIR driver JIT unavailable for this GPU. Requires CUDA 13.1+ driver (>= 590.44).";
+    } else {
+      ADD_FAILURE() << "No embedded cuTile module for compute capability " << cc_major << "."
+                    << cc_minor;
+    }
+    return result;
+  }
+
+  const cudaError_t load_status =
+    cudaLibraryLoadData(&result.library, image->data, nullptr, nullptr, 0, nullptr, nullptr, 0);
+  if (load_status != cudaSuccess) {
+    if (result.used_tileir_jit) {
+      result.skip_reason =
+        "TileIR driver JIT unavailable for this GPU (requires CUDA 13.1+ driver >= 590.44).";
+      SCOPED_TRACE(cudaGetErrorString(load_status));
+    } else {
+      ADD_FAILURE() << "cudaLibraryLoadData failed: " << cudaGetErrorString(load_status);
+    }
+    return result;
+  }
+
+  const cudaError_t kernel_status =
+    cudaLibraryGetKernel(&result.kernel, result.library, CUTILE_VECTOR_ADD_KERNEL_SYMBOL);
+  if (kernel_status != cudaSuccess) {
+    if (result.library != nullptr) {
+      RAFT_CUDA_TRY(cudaLibraryUnload(result.library));
+      result.library = nullptr;
+    }
+    result.kernel = nullptr;
+    if (result.used_tileir_jit) {
+      result.skip_reason =
+        "TileIR driver JIT unavailable for this GPU (requires CUDA 13.1+ driver >= 590.44).";
+      SCOPED_TRACE(cudaGetErrorString(kernel_status));
+    } else {
+      ADD_FAILURE() << "cudaLibraryGetKernel failed: " << cudaGetErrorString(kernel_status);
+    }
+  }
+  return result;
+}
+
+void run_vector_add(cudaKernel_t kernel)
+{
   constexpr int kN       = 1024;
   constexpr int kTile    = 256;
   constexpr int kGridDim = (kN + kTile - 1) / kTile;
@@ -122,7 +202,35 @@ TEST_F(CutileVectorAddTest, EmbeddedCubinVectorAdd)
   RAFT_CUDA_TRY(cudaFree(d_a));
   RAFT_CUDA_TRY(cudaFree(d_b));
   RAFT_CUDA_TRY(cudaFree(d_c));
-  RAFT_CUDA_TRY(cudaLibraryUnload(library));
+}
+
+class CutileVectorAddTest : public ::testing::Test {
+ protected:
+  void SetUp() override
+  {
+    int device = 0;
+    RAFT_CUDA_TRY(cudaGetDevice(&device));
+    RAFT_CUDA_TRY(
+      cudaDeviceGetAttribute(&cc_major_, cudaDevAttrComputeCapabilityMajor, device));
+    RAFT_CUDA_TRY(
+      cudaDeviceGetAttribute(&cc_minor_, cudaDevAttrComputeCapabilityMinor, device));
+  }
+
+  int cc_major_{};
+  int cc_minor_{};
+};
+
+}  // namespace
+
+TEST_F(CutileVectorAddTest, EmbeddedCubinVectorAdd)
+{
+  LoadedKernel loaded = load_vector_add_kernel(cc_major_, cc_minor_);
+  if (loaded.skip_reason) { GTEST_SKIP() << loaded.skip_reason; }
+  if (!loaded) { return; }
+
+  SCOPED_TRACE(loaded.used_tileir_jit ? "loaded via TileIR driver JIT"
+                                      : "loaded via prebuilt cubin");
+  run_vector_add(loaded.kernel);
 }
 
 }  // namespace cuvs

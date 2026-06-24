@@ -62,3 +62,66 @@ struct UDFFatbinFragment final : FatbinFragmentEntry {
   std::string key_;
   std::vector<uint8_t> bytes_;
 };
+
+/** Embedded CUDA binary module (cubin), loaded directly via cudaLibraryLoadData. */
+struct CubinFragmentEntry {
+  virtual ~CubinFragmentEntry() = default;
+
+  virtual const uint8_t* get_data() const = 0;
+
+  virtual size_t get_length() const = 0;
+
+  virtual const char* get_key() const = 0;
+
+  virtual int get_cc_major() const = 0;
+
+  virtual int get_cc_minor() const = 0;
+};
+
+template <typename FragmentTag>
+struct StaticCubinFragmentEntry final : CubinFragmentEntry {
+  const uint8_t* get_data() const override { return StaticCubinFragmentEntry<FragmentTag>::data; }
+
+  size_t get_length() const override { return StaticCubinFragmentEntry<FragmentTag>::length; }
+
+  const char* get_key() const override
+  {
+    return typeid(StaticCubinFragmentEntry<FragmentTag>).name();
+  }
+
+  int get_cc_major() const override { return FragmentTag::cc_major; }
+
+  int get_cc_minor() const override { return FragmentTag::cc_minor; }
+
+  static const uint8_t* const data;
+  static const size_t length;
+};
+
+/** Embedded TileIR bytecode, JIT-compiled by the driver when no matching cubin exists. */
+struct TileIrBytecodeFragmentEntry {
+  virtual ~TileIrBytecodeFragmentEntry() = default;
+
+  virtual const uint8_t* get_data() const = 0;
+
+  virtual size_t get_length() const = 0;
+
+  virtual const char* get_key() const = 0;
+};
+
+template <typename FragmentTag>
+struct StaticTileIrBytecodeFragmentEntry final : TileIrBytecodeFragmentEntry {
+  const uint8_t* get_data() const override
+  {
+    return StaticTileIrBytecodeFragmentEntry<FragmentTag>::data;
+  }
+
+  size_t get_length() const override { return StaticTileIrBytecodeFragmentEntry<FragmentTag>::length; }
+
+  const char* get_key() const override
+  {
+    return typeid(StaticTileIrBytecodeFragmentEntry<FragmentTag>).name();
+  }
+
+  static const uint8_t* const data;
+  static const size_t length;
+};
