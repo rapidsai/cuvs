@@ -13,14 +13,15 @@ rapids-logger "Create test conda environment"
 rapids-logger "Configuring conda strict channel priority"
 conda config --set channel_priority strict
 
+source ./ci/use_conda_packages_from_prs.sh
 rapids-dependency-file-generator \
   --output conda \
   --file-key go \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" \
+  --prepend-channel "${LIBRAFT_CHANNEL}" \ 
+  --prepend-channel "${RAFT_CHANNEL}" \ 
   --prepend-channel "${CPP_CHANNEL}" \
   | tee env.yaml
-
-source ./ci/use_conda_packages_from_prs.sh
 
 rapids-mamba-retry env create --yes -f env.yaml -n go
 

@@ -32,13 +32,14 @@ rapids-logger "Generate Java testing dependencies"
 
 ENV_YAML_DIR="$(mktemp -d)"
 
+source ./ci/use_conda_packages_from_prs.sh
 rapids-dependency-file-generator \
   --output conda \
   --file-key java \
+  --prepend-channel "${LIBRAFT_CHANNEL}" \ 
+  --prepend-channel "${RAFT_CHANNEL}" \ 
   --prepend-channel "${CPP_CHANNEL}" \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch)" | tee "${ENV_YAML_DIR}/env.yaml"
-
-source ./ci/use_conda_packages_from_prs.sh
 
 rapids-mamba-retry env create --yes -f "${ENV_YAML_DIR}/env.yaml" -n java
 
