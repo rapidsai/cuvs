@@ -17,7 +17,7 @@ RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 export RAPIDS_CUDA_MAJOR
 
 # TODO: switch to installing pre-built artifacts instead of rebuilding in test jobs
-#       ref: https://github.com/rapidsai/cuvs/issues/868
+#       ref: https://github.com/nvidia/cuvs/issues/868
 ci/build_java.sh --run-java-tests
 
 rapids-logger "Test script exiting with value: $EXITCODE"

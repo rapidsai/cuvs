@@ -34,7 +34,7 @@ RUN echo "  Building cuVS Docker image with:" && \
 # Container metadata
 LABEL maintainer="RAPIDS cuVS Team"
 LABEL description="RAPIDS cuVS - Vector Search and Clustering on GPU"
-LABEL org.opencontainers.image.source="https://github.com/rapidsai/cuvs"
+LABEL org.opencontainers.image.source="https://github.com/nvidia/cuvs"
 LABEL org.opencontainers.image.usage="docker run --gpus all -it <image>"
 
 # Environment setup

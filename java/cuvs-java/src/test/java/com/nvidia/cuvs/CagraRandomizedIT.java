@@ -35,7 +35,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     DEVICE
   }
 
-  @Ignore // https://github.com/rapidsai/cuvs/issues/1468
+  @Ignore // https://github.com/nvidia/cuvs/issues/1468
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
     TestDatasetMemoryKind[] testDatasetMemoryKinds = {

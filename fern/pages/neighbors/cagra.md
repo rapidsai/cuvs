@@ -106,8 +106,8 @@ fn build_cagra_index(dataset: &ndarray::Array2<f32>) -> Result<Index> {
 package main
 
 import (
-	cuvs "github.com/rapidsai/cuvs/go"
-	"github.com/rapidsai/cuvs/go/cagra"
+	cuvs "github.com/nvidia/cuvs/go"
+	"github.com/nvidia/cuvs/go/cagra"
 )
 
 func buildCagraIndex(dataset cuvs.Tensor[float32]) (*cagra.CagraIndex, error) {
@@ -204,8 +204,8 @@ index = cagra.extend(cagra.ExtendParams(), index, additional_dataset)
 package main
 
 import (
-	cuvs "github.com/rapidsai/cuvs/go"
-	"github.com/rapidsai/cuvs/go/cagra"
+	cuvs "github.com/nvidia/cuvs/go"
+	"github.com/nvidia/cuvs/go/cagra"
 )
 
 func extendCagraIndex(
