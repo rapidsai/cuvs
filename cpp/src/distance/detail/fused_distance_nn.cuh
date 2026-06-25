@@ -64,7 +64,7 @@ void fusedDistanceNNImpl(OutT* min,
 
 #if CUVS_CUTILE_ENABLED
   if (cuvs::detail::jit_lto::cutile_launch_available_on_current_device() &&
-      try_fused_1nn_tile<DataT, OutT, IdxT>(min, x, y, m, n, k, metric, stream)) {
+      try_fused_1nn_tile<DataT, OutT, IdxT>(min, x, y, xn, yn, m, n, k, metric, sqrt, stream)) {
     return;
   }
 #endif

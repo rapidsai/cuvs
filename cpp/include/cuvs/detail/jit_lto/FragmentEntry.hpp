@@ -63,6 +63,13 @@ struct UDFFatbinFragment final : FatbinFragmentEntry {
   std::vector<uint8_t> bytes_;
 };
 
+/** cuTile GEMM-style block geometry embedded in generated Static*FragmentEntry specializations. */
+struct CutileTileConfig {
+  int tile_m;
+  int tile_n;
+  int tile_k;
+};
+
 /** Embedded CUDA binary module (cubin), loaded directly via cudaLibraryLoadData. */
 struct CubinFragmentEntry {
   virtual ~CubinFragmentEntry() = default;
@@ -76,6 +83,12 @@ struct CubinFragmentEntry {
   virtual int get_cc_major() const = 0;
 
   virtual int get_cc_minor() const = 0;
+
+  virtual int get_tile_m() const { return 0; }
+
+  virtual int get_tile_n() const { return 0; }
+
+  virtual int get_tile_k() const { return 0; }
 };
 
 template <typename FragmentTag>
@@ -93,6 +106,16 @@ struct StaticCubinFragmentEntry final : CubinFragmentEntry {
 
   int get_cc_minor() const override { return FragmentTag::cc_minor; }
 
+  int get_tile_m() const override { return tile_m; }
+
+  int get_tile_n() const override { return tile_n; }
+
+  int get_tile_k() const override { return tile_k; }
+
+  static const int tile_m;
+  static const int tile_n;
+  static const int tile_k;
+
   static const uint8_t* const data;
   static const size_t length;
 };
@@ -106,6 +129,12 @@ struct TileIrBytecodeFragmentEntry {
   virtual size_t get_length() const = 0;
 
   virtual const char* get_key() const = 0;
+
+  virtual int get_tile_m() const { return 0; }
+
+  virtual int get_tile_n() const { return 0; }
+
+  virtual int get_tile_k() const { return 0; }
 };
 
 template <typename FragmentTag>
@@ -124,6 +153,16 @@ struct StaticTileIrBytecodeFragmentEntry final : TileIrBytecodeFragmentEntry {
   {
     return typeid(StaticTileIrBytecodeFragmentEntry<FragmentTag>).name();
   }
+
+  int get_tile_m() const override { return tile_m; }
+
+  int get_tile_n() const override { return tile_n; }
+
+  int get_tile_k() const override { return tile_k; }
+
+  static const int tile_m;
+  static const int tile_n;
+  static const int tile_k;
 
   static const uint8_t* const data;
   static const size_t length;

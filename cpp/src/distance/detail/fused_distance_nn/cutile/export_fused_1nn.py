@@ -19,7 +19,7 @@ from cuda.tile.compilation import (
     export_kernel,
 )
 
-from fused_1nn_kernel import KERNELS, KERNEL_SYMBOLS, TILE_CONSTANTS
+from fused_1nn_kernel import METRICS, kernel_symbol, make_kernel, metric_abbrev
 
 DEFAULT_TILEIR_BYTECODE_VERSION = "13.1"
 # cuTile requires a gpu_code even for TileIR bytecode export: it selects the compilation
@@ -35,50 +35,75 @@ def _dtype_for(data_type: str):
     raise ValueError(f"Unsupported data_type {data_type!r}")
 
 
-def _kernel_signature(data_type: str) -> KernelSignature:
+def _data_abbrev(data_type: str) -> str:
+    return {"half": "h", "float": "f"}[data_type]
+
+
+def _relaxed_matrix_constraint(elem_dtype):
+    """Array constraints matching the relaxed TMA-friendly layout from gemm_nn_cutile."""
+    return ArrayConstraint(
+        elem_dtype,
+        ndim=2,
+        index_dtype=ct.int64,
+        stride_lower_bound_incl=(0, None),
+        alias_groups=(),
+        may_alias_internally=False,
+        stride_constant=(None, 1),
+        stride_divisible_by=(8, 1),
+        shape_divisible_by=(1, 1),
+        base_addr_divisible_by=16,
+    )
+
+
+def _relaxed_vector_constraint(elem_dtype, *, tma_friendly: bool = False):
+    base_div = 16 if tma_friendly else 1
+    return ArrayConstraint(
+        elem_dtype,
+        ndim=1,
+        index_dtype=ct.int64,
+        stride_lower_bound_incl=(None,),
+        alias_groups=(),
+        may_alias_internally=False,
+        stride_constant=(1,),
+        stride_divisible_by=(1,),
+        shape_divisible_by=(1,),
+        base_addr_divisible_by=base_div,
+    )
+
+
+def _kernel_signature(
+    data_type: str,
+    metric: str,
+    tile_m: int,
+    tile_n: int,
+    tile_k: int,
+) -> KernelSignature:
     elem = _dtype_for(data_type)
-    array = ArrayConstraint(
-        elem,
-        2,
-        index_dtype=ct.int64,
-        stride_lower_bound_incl=0,
-        alias_groups=(),
-        may_alias_internally=False,
-    )
-    idx_array = ArrayConstraint(
-        ct.int64,
-        1,
-        index_dtype=ct.int64,
-        stride_lower_bound_incl=0,
-        alias_groups=(),
-        may_alias_internally=False,
-        stride_constant=(1,),
-    )
-    dist_array = ArrayConstraint(
-        ct.float32,
-        1,
-        index_dtype=ct.int64,
-        stride_lower_bound_incl=0,
-        alias_groups=(),
-        may_alias_internally=False,
-        stride_constant=(1,),
-    )
-    tm, tn, tk = TILE_CONSTANTS
+    matrix = _relaxed_matrix_constraint(elem)
+    norm_array = _relaxed_vector_constraint(elem, tma_friendly=True)
+    idx_array = _relaxed_vector_constraint(ct.int64)
+    dist_array = _relaxed_vector_constraint(ct.float32)
+
+    abbrev = _data_abbrev(data_type)
+    symbol = kernel_symbol(abbrev, metric_abbrev(metric))
+
     return KernelSignature(
         parameters=[
-            array,
-            array,
+            matrix,
+            matrix,
+            norm_array,
+            norm_array,
             idx_array,
             dist_array,
             ScalarConstraint(ct.int64),
             ScalarConstraint(ct.int64),
             ScalarConstraint(ct.int64),
-            ConstantConstraint(tm),
-            ConstantConstraint(tn),
-            ConstantConstraint(tk),
+            ConstantConstraint(tile_m),
+            ConstantConstraint(tile_n),
+            ConstantConstraint(tile_k),
         ],
         calling_convention=CallingConvention.cutile_python_v1(),
-    ).with_symbol(KERNEL_SYMBOLS[data_type])
+    ).with_symbol(symbol)
 
 
 def export_binary(
@@ -86,11 +111,15 @@ def export_binary(
     *,
     output_format: Literal["cubin", "tileir_bytecode"],
     data_type: str,
+    metric: str,
+    tile_m: int,
+    tile_n: int,
+    tile_k: int,
     gpu_code: str,
     bytecode_version: str | None = None,
 ) -> str:
-    kernel = KERNELS[data_type]
-    signature = _kernel_signature(data_type)
+    kernel = make_kernel(data_type, metric, tile_m, tile_n, tile_k)
+    signature = _kernel_signature(data_type, metric, tile_m, tile_n, tile_k)
 
     export_kwargs = {
         "kernel": kernel,
@@ -116,8 +145,12 @@ def main() -> int:
         "--format", choices=("cubin", "tileir_bytecode"), default="cubin"
     )
     parser.add_argument(
-        "--data-type", choices=tuple(KERNELS.keys()), required=True
+        "--data-type", choices=("half", "float"), required=True
     )
+    parser.add_argument("--metric", choices=METRICS, required=True)
+    parser.add_argument("--tile-m", type=int, required=True)
+    parser.add_argument("--tile-n", type=int, required=True)
+    parser.add_argument("--tile-k", type=int, required=True)
     parser.add_argument(
         "--gpu-code",
         default=DEFAULT_TILEIR_EXPORT_GPU_CODE,
@@ -133,6 +166,10 @@ def main() -> int:
             args.output_file,
             output_format=args.format,
             data_type=args.data_type,
+            metric=args.metric,
+            tile_m=args.tile_m,
+            tile_n=args.tile_n,
+            tile_k=args.tile_k,
             gpu_code=args.gpu_code,
             bytecode_version=args.bytecode_version,
         )

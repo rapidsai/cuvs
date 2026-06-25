@@ -20,3 +20,12 @@ const uint8_t* const fragment_entry::data = @bin2c_symbol@;
 
 template <>
 const size_t fragment_entry::length = sizeof(@bin2c_symbol@);
+
+template <>
+const int fragment_entry::tile_m = @tile_m@;
+
+template <>
+const int fragment_entry::tile_n = @tile_n@;
+
+template <>
+const int fragment_entry::tile_k = @tile_k@;

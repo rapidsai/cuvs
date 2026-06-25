@@ -92,6 +92,30 @@ function(_cutile_kernels_setup)
   )
 endfunction()
 
+function(_cutile_generate_matrix_tiles_header header_path matrix_json_file)
+  file(READ "${matrix_json_file}" _matrix_json)
+  string(JSON _tile0 GET "${_matrix_json}" 0 "_tile" 0)
+  string(JSON _tile_m GET "${_tile0}" "tile_m")
+  string(JSON _tile_n GET "${_tile0}" "tile_n")
+  string(JSON _tile_k GET "${_tile0}" "tile_k")
+  file(
+    WRITE "${header_path}"
+    "/*
+ * Generated from ${matrix_json_file} by generate_cutile_kernels.cmake — do not edit.
+ */
+#pragma once
+
+#include <cuvs/detail/jit_lto/fused_distance_nn/fused_1nn_fragments.hpp>
+
+namespace cuvs::distance::detail {
+
+using fused_1nn_matrix_tile = cutile_tile_config<${_tile_m}, ${_tile_n}, ${_tile_k}>;
+
+}  // namespace cuvs::distance::detail
+"
+  )
+endfunction()
+
 function(process_cutile_matrix_entry source_list_var)
   set(options)
   set(one_value KERNEL_DIR KERNEL_BASENAME KERNEL_PYTHON EXPORT_SCRIPT OUTPUT_DIRECTORY
@@ -125,7 +149,10 @@ function(process_cutile_matrix_entry source_list_var)
   set(_fragment_cpp "${_CUTILE_OUTPUT_DIRECTORY}/${_artifact_stem}_${register}.cpp")
   set(embedded_header_file "${_artifact_stem}_${register}.h")
 
-  set(_python_args --format "${output_format}" --data-type "${data_type}" --gpu-code "${gpu_code}")
+  set(_python_args
+      --format "${output_format}" --data-type "${data_type}" --metric "${metric}" --tile-m
+      "${tile_m}" --tile-n "${tile_n}" --tile-k "${tile_k}" --gpu-code "${gpu_code}"
+  )
   if(DEFINED bytecode_version AND NOT "${bytecode_version}" STREQUAL "")
     list(APPEND _python_args --bytecode-version "${bytecode_version}")
   endif()
@@ -187,6 +214,9 @@ function(generate_cutile_kernels source_list_var)
   endif()
 
   compute_matrix_product(matrix_product MATRIX_JSON_FILE "${_CUTILE_MATRIX_JSON_FILE}")
+
+  set(_matrix_tiles_header "${_CUTILE_OUTPUT_DIRECTORY}/fused_1nn_cutile_tiles.hpp")
+  _cutile_generate_matrix_tiles_header("${_matrix_tiles_header}" "${_CUTILE_MATRIX_JSON_FILE}")
 
   string(JSON len LENGTH "${matrix_product}")
   math(EXPR last "${len} - 1")

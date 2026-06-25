@@ -97,6 +97,9 @@ struct TileAlgorithmPlanner : AlgorithmPlanner {
     tileir_fragment_ = std::make_unique<StaticTileIrBytecodeFragmentEntry<FragmentTag>>();
   }
 
+  /** Tile geometry from the cubin or TileIR fragment that would load on this device. */
+  CutileTileConfig tile_config() const;
+
  protected:
   std::vector<std::unique_ptr<CubinFragmentEntry>> cubin_fragments_;
   std::unique_ptr<TileIrBytecodeFragmentEntry> tileir_fragment_;
