@@ -1532,7 +1532,7 @@ void transform(raft::resources const& handle,
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
- * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
+ * @param[in]  X_norm         Optional precomputed squared L2 row norms of X (||x||^2) [n_samples].
  *                            When provided, the internal norm computation is skipped.
  */
 void cluster_cost(
@@ -1556,8 +1556,9 @@ void cluster_cost(
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
- * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
- *                            When provided, the internal norm computation is skipped.
+ * @param[in]  X_norm         Optional precomputed squared L2 row norms of X (||x||^2,
+ *                            i.e. sum of squares without the sqrt) [n_samples]. When
+ *                            provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
@@ -1580,8 +1581,9 @@ void cluster_cost(
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
- * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
- *                            When provided, the internal norm computation is skipped.
+ * @param[in]  X_norm         Optional precomputed squared L2 row norms of X (||x||^2,
+ *                            i.e. sum of squares without the sqrt) [n_samples]. When
+ *                            provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
@@ -1604,8 +1606,9 @@ void cluster_cost(
  * @param[out] cost           Resulting cluster cost
  * @param[in]  sample_weight  Optional per-sample weights.
  *                            [len = n_samples]
- * @param[in]  X_norm         Optional precomputed L2 norms of X rows [n_samples].
- *                            When provided, the internal norm computation is skipped.
+ * @param[in]  X_norm         Optional precomputed squared L2 row norms of X (||x||^2,
+ *                            i.e. sum of squares without the sqrt) [n_samples]. When
+ *                            provided, the internal norm computation is skipped.
  */
 void cluster_cost(
   const raft::resources& handle,
