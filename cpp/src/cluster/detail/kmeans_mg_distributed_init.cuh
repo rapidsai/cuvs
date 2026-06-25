@@ -234,7 +234,7 @@ void initKMeansPlusPlus_distributed(
   auto potentialCentroids =
     raft::make_device_matrix_view<DataT, IndexT>(centroidsBuf.data(), IndexT{1}, n_features);
   DataT* initialCentroid = centroidsBuf.data();
-    if (rank == rp) {
+  if (rank == rp) {
     RAFT_EXPECTS(n_local > 0,
                  "selected source rank %d has no local rows; cannot pick an initial centroid",
                  rp);
@@ -441,15 +441,13 @@ void initKMeansPlusPlus_distributed(
     recluster_params.n_init = 1;
 
     auto weight_opt = std::make_optional(raft::make_const_mdspan(weight.view()));
-    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-      handle,
-      recluster_params,
-      raft::make_const_mdspan(potentialCentroids),
-      weight_opt,
-      centroidsRawData,
-      inertia_out.view(),
-      n_iter_out.view(),
-      std::ref(workspace));
+    cuvs::cluster::kmeans::fit(handle,
+                               recluster_params,
+                               raft::make_const_mdspan(potentialCentroids),
+                               weight_opt,
+                               centroidsRawData,
+                               inertia_out.view(),
+                               n_iter_out.view());
 
   } else if (static_cast<IndexT>(potentialCentroids.extent(0)) < n_clusters) {
     const IndexT n_random = n_clusters - static_cast<IndexT>(potentialCentroids.extent(0));

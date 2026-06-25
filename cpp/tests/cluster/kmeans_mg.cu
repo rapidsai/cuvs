@@ -7,11 +7,13 @@
 #include "kmeans_test_blobs.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
+#include <raft/common/nccl_macros.hpp>
+#include <raft/comms/std_comms.hpp>
+#include <raft/core/device_resources.hpp>
 #include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
-#include <raft/core/resource/nccl_comm.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -21,11 +23,13 @@
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
+#include <nccl.h>
 #include <omp.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -36,7 +40,7 @@ namespace {
 constexpr int kMaxRanksForNcclTest = 4;
 
 template <typename T>
-int run_mg_fit_omp(raft::device_resources_snmg& clique,
+int run_mg_fit_omp(const std::vector<int>& device_ids,
                    const cuvs::cluster::kmeans::params& kp,
                    const T* h_X,
                    const std::vector<T>* h_w,
@@ -50,8 +54,38 @@ int run_mg_fit_omp(raft::device_resources_snmg& clique,
                    T& out_inertia,
                    int64_t& out_n_iter)
 {
-  const int num_ranks = raft::resource::get_num_ranks(clique);
-  raft::resource::get_nccl_comms(clique);
+  const int num_ranks = static_cast<int>(device_ids.size());
+
+  int current_device = 0;
+  RAFT_CUDA_TRY(cudaGetDevice(&current_device));
+
+  std::vector<std::unique_ptr<raft::device_resources>> rank_resources;
+  rank_resources.reserve(static_cast<size_t>(num_ranks));
+  for (int r = 0; r < num_ranks; ++r) {
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids[static_cast<size_t>(r)]));
+    rank_resources.push_back(std::make_unique<raft::device_resources>());
+  }
+
+  std::vector<ncclComm_t> nccl_comms(static_cast<size_t>(num_ranks), nullptr);
+  ncclUniqueId nccl_id;
+  RAFT_NCCL_TRY(ncclGetUniqueId(&nccl_id));
+  RAFT_NCCL_TRY(ncclGroupStart());
+  for (int r = 0; r < num_ranks; ++r) {
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids[static_cast<size_t>(r)]));
+    RAFT_NCCL_TRY(ncclCommInitRank(&nccl_comms[static_cast<size_t>(r)], num_ranks, nccl_id, r));
+  }
+  RAFT_NCCL_TRY(ncclGroupEnd());
+
+  for (int r = 0; r < num_ranks; ++r) {
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids[static_cast<size_t>(r)]));
+    raft::comms::build_comms_nccl_only(rank_resources[static_cast<size_t>(r)].get(),
+                                       nccl_comms[static_cast<size_t>(r)],
+                                       num_ranks,
+                                       r);
+  }
+
+  RAFT_CUDA_TRY(cudaSetDevice(current_device));
+
   partitions_per_rank = std::max(1, partitions_per_rank);
   out_h_centroids.assign(static_cast<size_t>(n_clusters) * n_features, T{0});
   T inertia          = T{0};
@@ -65,8 +99,9 @@ int run_mg_fit_omp(raft::device_resources_snmg& clique,
       actual_threads = omp_get_num_threads();
     }
     if (actual_threads == num_ranks) {
-      const int r          = omp_get_thread_num();
-      auto const& rank_res = raft::resource::set_current_device_to_rank(clique, r);
+      const int r = omp_get_thread_num();
+      RAFT_CUDA_TRY(cudaSetDevice(device_ids[static_cast<size_t>(r)]));
+      auto const& rank_res = *rank_resources[static_cast<size_t>(r)];
       auto rank_stream     = raft::resource::get_cuda_stream(rank_res);
 
       const int base     = n_samples / num_ranks;
@@ -137,7 +172,7 @@ int run_mg_fit_omp(raft::device_resources_snmg& clique,
           }
         }
 
-        cuvs::cluster::kmeans::mg::fit(clique,
+        cuvs::cluster::kmeans::mg::fit(rank_res,
                                        kp,
                                        X_parts,
                                        sw_parts,
@@ -188,7 +223,7 @@ int run_mg_fit_omp(raft::device_resources_snmg& clique,
           }
         }
 
-        cuvs::cluster::kmeans::mg::fit(clique,
+        cuvs::cluster::kmeans::mg::fit(rank_res,
                                        kp,
                                        X_parts,
                                        sw_parts,
@@ -197,8 +232,11 @@ int run_mg_fit_omp(raft::device_resources_snmg& clique,
                                        raft::make_host_scalar_view(&local_n_iter));
       }
 
+      // Ensure all ranks have completed the fit before writing outputs.
+      raft::resource::sync_stream(rank_res);
+#pragma omp barrier
       if (r == 0) {
-        // mnmg_fit writes outputs only on rank 0.
+        // Copy rank 0's outputs for comparison.
         raft::update_host(
           out_h_centroids.data(), d_rank_centroids.data(), out_h_centroids.size(), rank_stream);
         raft::resource::sync_stream(rank_res);
@@ -207,6 +245,21 @@ int run_mg_fit_omp(raft::device_resources_snmg& clique,
       }
     }
   }
+
+  for (int r = 0; r < num_ranks; ++r) {
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids[static_cast<size_t>(r)]));
+    rank_resources[static_cast<size_t>(r)].reset();
+  }
+  rank_resources.clear();
+
+  RAFT_NCCL_TRY(ncclGroupStart());
+  for (int r = 0; r < num_ranks; ++r) {
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids[static_cast<size_t>(r)]));
+    auto comm = nccl_comms[static_cast<size_t>(r)];
+    if (comm != nullptr) { RAFT_NCCL_TRY(ncclCommDestroy(comm)); }
+  }
+  RAFT_NCCL_TRY(ncclGroupEnd());
+  RAFT_CUDA_TRY(cudaSetDevice(current_device));
 
   out_inertia = inertia;
   out_n_iter  = n_iter;
@@ -568,9 +621,9 @@ struct KmeansMGNcclInputs {
 template <typename T>
 class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> {
  protected:
-  KmeansMGNcclTest() : clique_(make_clique_device_ids()) { clique_.set_memory_pool(50); }
+  KmeansMGNcclTest() : device_ids_(make_nccl_test_device_ids()) {}
 
-  static std::vector<int> make_clique_device_ids()
+  static std::vector<int> make_nccl_test_device_ids()
   {
     int num_devices = 0;
     RAFT_CUDA_TRY(cudaGetDeviceCount(&num_devices));
@@ -586,10 +639,8 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
   {
     testparams_ = ::testing::TestWithParam<KmeansMGNcclInputs<T>>::GetParam();
 
-    const int num_ranks = raft::resource::get_num_ranks(clique_);
+    const int num_ranks = static_cast<int>(device_ids_.size());
     if (num_ranks < 1) { GTEST_SKIP() << "No CUDA devices available."; }
-
-    raft::resource::get_nccl_comms(clique_);
 
     const int n_samples           = testparams_.n_row;
     const int n_features          = testparams_.n_col;
@@ -653,7 +704,7 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
     const std::vector<T>* h_w_ptr = has_weights ? &h_w : nullptr;
     const std::vector<T>* h_init_ptr =
       testparams_.init == cuvs::cluster::kmeans::params::Array ? &h_initial_centroids : nullptr;
-    const int actual_threads = run_mg_fit_omp<T>(clique_,
+    const int actual_threads = run_mg_fit_omp<T>(device_ids_,
                                                  kp,
                                                  h_X,
                                                  h_w_ptr,
@@ -786,7 +837,7 @@ class KmeansMGNcclTest : public ::testing::TestWithParam<KmeansMGNcclInputs<T>> 
     }
   }
 
-  raft::device_resources_snmg clique_;
+  std::vector<int> device_ids_;
   KmeansMGNcclInputs<T> testparams_;
   double ari_vs_ref_ = 0;
   double ari_vs_sg_  = 0;
@@ -928,9 +979,9 @@ INSTANTIATE_TEST_SUITE_P(KmeansMGNcclTests,
 template <typename T>
 class KmeansMGOversamplingTest : public ::testing::Test {
  protected:
-  KmeansMGOversamplingTest() : clique_(make_clique_device_ids()) { clique_.set_memory_pool(50); }
+  KmeansMGOversamplingTest() : device_ids_(make_nccl_test_device_ids()) {}
 
-  static std::vector<int> make_clique_device_ids()
+  static std::vector<int> make_nccl_test_device_ids()
   {
     int num_devices = 0;
     RAFT_CUDA_TRY(cudaGetDeviceCount(&num_devices));
@@ -944,7 +995,7 @@ class KmeansMGOversamplingTest : public ::testing::Test {
 
   void run_test_body()
   {
-    const int num_ranks = raft::resource::get_num_ranks(clique_);
+    const int num_ranks = static_cast<int>(device_ids_.size());
     if (num_ranks < 1) { GTEST_SKIP() << "No CUDA devices available."; }
 
     constexpr int n_samples  = 2000;
@@ -995,7 +1046,7 @@ class KmeansMGOversamplingTest : public ::testing::Test {
     kp.oversampling_factor  = oversampling_factor;
 
     std::vector<T> h_centroids;
-    const int actual_threads = run_mg_fit_omp<T>(clique_,
+    const int actual_threads = run_mg_fit_omp<T>(device_ids_,
                                                  kp,
                                                  h_X.data(),
                                                  /*h_w=*/nullptr,
@@ -1008,10 +1059,10 @@ class KmeansMGOversamplingTest : public ::testing::Test {
                                                  h_centroids,
                                                  inertia,
                                                  n_iter);
-    ASSERT_EQ(actual_threads, raft::resource::get_num_ranks(clique_));
+    ASSERT_EQ(actual_threads, static_cast<int>(device_ids_.size()));
   }
 
-  raft::device_resources_snmg clique_;
+  std::vector<int> device_ids_;
 };
 
 typedef KmeansMGOversamplingTest<float> KmeansMGOversamplingTestF;
