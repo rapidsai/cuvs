@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_SQ "Include faiss' ivf sq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA "Include faiss' cagra algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA_HNSW
        "Include faiss' cagra algorithm for build and hnsw for search in benchmark" ON
@@ -22,8 +23,13 @@ option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algori
        ON
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ
+       "Include faiss' cpu ivf rabitq algorithm in benchmark" ON
+)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_SQ "Include faiss' cpu ivf sq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ "Include cuVS ivf sq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ "Include cuVS ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA "Include cuVS CAGRA in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
@@ -45,6 +51,7 @@ option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
 option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ "Include cuVS ivf RaBitQ algorithm in benchmark" ON)
 
 # ##################################################################################################
 # * Process options ----------------------------------------------------------
@@ -80,7 +87,9 @@ set(CUVS_USE_FAISS_STATIC ON)
 if(BUILD_CPU_ONLY)
   set(CUVS_FAISS_ENABLE_GPU OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
@@ -97,6 +106,8 @@ set(CUVS_ANN_BENCH_USE_CUVS OFF)
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
+   OR CUVS_ANN_BENCH_USE_CUVS_IVF_SQ
+   OR CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
@@ -177,9 +188,9 @@ function(ConfigureAnnBench)
   set_target_properties(
     ${BENCH_NAME}
     PROPERTIES # set target compile options
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
                INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -244,6 +255,18 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
+  ConfigureAnnBench(
+    NAME CUVS_IVF_RABITQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_rabitq.cu LINKS cuvs
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ)
+  ConfigureAnnBench(
+    NAME CUVS_IVF_SQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_sq.cu LINKS cuvs
+  )
+endif()
+
 if(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE)
   ConfigureAnnBench(NAME CUVS_BRUTE_FORCE PATH src/cuvs/cuvs_benchmark.cu LINKS cuvs)
 endif()
@@ -255,14 +278,13 @@ if(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE)
   )
 endif()
 
-# Cluster assignment benchmark: brute force vs CAGRA for assigning vectors to clusters (IVF training)
+# Cluster assignment benchmark: brute force vs CAGRA for assigning vectors to clusters (IVF
+# training)
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
   add_executable(CUVS_CLUSTER_ASSIGNMENT_BENCH src/cuvs/cuvs_cluster_assignment_bench.cu)
   target_link_libraries(
     CUVS_CLUSTER_ASSIGNMENT_BENCH
-    PRIVATE cuvs
-            benchmark::benchmark
-            $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
+    PRIVATE cuvs benchmark::benchmark $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
             $<COMPILE_ONLY:nvidia::cutlass::cutlass>
   )
   target_include_directories(
@@ -278,19 +300,19 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
                CUDA_STANDARD 17
                CUDA_STANDARD_REQUIRED ON
   )
-  install(TARGETS CUVS_CLUSTER_ASSIGNMENT_BENCH COMPONENT ann_bench DESTINATION bin/ann)
+  install(
+    TARGETS CUVS_CLUSTER_ASSIGNMENT_BENCH
+    COMPONENT ann_bench
+    DESTINATION bin/ann
+  )
   add_dependencies(CUVS_ANN_BENCH_ALL CUVS_CLUSTER_ASSIGNMENT_BENCH)
 
   # IVF-PQ build benchmarks: k-means fit and extend cluster-assignment (brute vs CAGRA)
   add_executable(CUVS_IVFPQ_BUILD_BENCH src/cuvs/cuvs_ivf_pq_build_bench.cu)
-  target_link_libraries(
-    CUVS_IVFPQ_BUILD_BENCH
-    PRIVATE cuvs benchmark::benchmark
-  )
+  target_link_libraries(CUVS_IVFPQ_BUILD_BENCH PRIVATE cuvs benchmark::benchmark)
   target_include_directories(
-    CUVS_IVFPQ_BUILD_BENCH
-    PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
-           "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/../c/include>"
+    CUVS_IVFPQ_BUILD_BENCH PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+                                  "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/../c/include>"
   )
   set_target_properties(
     CUVS_IVFPQ_BUILD_BENCH
@@ -299,7 +321,11 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
                CUDA_STANDARD 17
                CUDA_STANDARD_REQUIRED ON
   )
-  install(TARGETS CUVS_IVFPQ_BUILD_BENCH COMPONENT ann_bench DESTINATION bin/ann)
+  install(
+    TARGETS CUVS_IVFPQ_BUILD_BENCH
+    COMPONENT ann_bench
+    DESTINATION bin/ann
+  )
   add_dependencies(CUVS_ANN_BENCH_ALL CUVS_IVFPQ_BUILD_BENCH)
 endif()
 
@@ -357,6 +383,18 @@ if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ)
+  ConfigureAnnBench(
+    NAME FAISS_CPU_IVF_RABITQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_SQ)
+  ConfigureAnnBench(
+    NAME FAISS_CPU_IVF_SQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
+  )
+endif()
+
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT)
   ConfigureAnnBench(
     NAME FAISS_CPU_HNSW_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
@@ -373,6 +411,13 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_SQ AND CUVS_FAISS_ENABLE_GPU)
+  ConfigureAnnBench(
+    NAME FAISS_GPU_IVF_SQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
     raft::raft
   )
 endif()
@@ -438,9 +483,9 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   set_target_properties(
     ANN_BENCH
     PROPERTIES # set target compile options
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
                INTERFACE_POSITION_INDEPENDENT_CODE ON

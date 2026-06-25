@@ -3,12 +3,13 @@
 
 repos:
       - repo: https://github.com/pre-commit/pre-commit-hooks
-        rev: v5.0.0
+        rev: v6.0.0
         hooks:
               - id: check-json
               - id: trailing-whitespace
               - id: end-of-file-fixer
               - id: check-symlinks
+              - id: check-xml
       - repo: https://github.com/PyCQA/isort
         rev: 5.12.0
         hooks:
@@ -32,7 +33,8 @@ repos:
                 args: ["--config-file=pyproject.toml",
                        "python/cuvs/cuvs",
                        "cpp/cmake/modules",
-                       "cpp/tests/python"]
+                       "cpp/tests/python",
+                       "ci/checks"]
                 pass_filenames: false
       - repo: https://github.com/PyCQA/pydocstyle
         rev: 6.1.1
@@ -42,7 +44,7 @@ repos:
                 additional_dependencies: [toml]
                 args: ["--config=pyproject.toml"]
       - repo: https://github.com/pre-commit/mirrors-clang-format
-        rev: v20.1.4
+        rev: v20.1.8
         hooks:
               - id: clang-format
                 types_or: [c, c++, cuda]
@@ -91,8 +93,20 @@ repos:
                 pass_filenames: false
                 files: rust/.*
                 language: rust
+              - id: clang-format-with-cmake-placeholders
+                name: clang-format-with-cmake-placeholders
+                entry: python3 ci/checks/clang_format_with_cmake_placeholders.py
+                language: python
+                additional_dependencies: [clang_format==20.1.8]
+                files: |
+                  (?x)
+                    [.](cpp|cu|hpp|cuh)[.]in$
+                # clang-format struggles with one of the placeholders in register_fatbin.cpp.in, so exclude it
+                exclude: |
+                  (?x)
+                    ^cpp/cmake/modules/register_fatbin[.]cpp[.]in$
       - repo: https://github.com/codespell-project/codespell
-        rev: v2.2.2
+        rev: v2.4.1
         hooks:
               - id: codespell
                 additional_dependencies: [tomli]
@@ -100,7 +114,8 @@ repos:
                 exclude: |
                   (?x)
                     ^CHANGELOG[.]md$|
-                    ^cpp/cmake/patches/cutlass/build-export[.]patch$
+                    ^cpp/cmake/patches/cutlass/build-export[.]patch$|
+                    ^rust/cuvs-sys/src/bindings[.]rs$
       - repo: https://github.com/rapidsai/pre-commit-hooks
         rev: v1.3.3
         hooks:
@@ -109,7 +124,7 @@ repos:
             args: [--fix, --spdx]
             files: |
               (?x)
-                [.](cmake|c|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs|java)$|
+                [.](cmake|c|cpp([.]in)?|cu([.]in)?|cuh([.]in)?|h|hpp([.]in)?|sh|pxd|py|pyx|rs|java)$|
                 CMakeLists[.]txt$|
                 CMakeLists_standalone[.]txt$|
                 meta[.]yaml$|
@@ -134,7 +149,8 @@ repos:
                 cpp/src/distance/detail/fused_distance_nn/persistent_gemm[.]h$|
                 cpp/src/distance/detail/fused_distance_nn/epilogue_elementwise[.]cuh$|
                 cpp/src/distance/detail/fused_distance_nn/predicated_tile_iterator_reduced_vec[.]h$|
-                cpp/src/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast[.]h$
+                cpp/src/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast[.]h$|
+                rust/cuvs-sys/src/bindings[.]rs$
               )
           - id: verify-copyright
             name: verify-copyright-scikit-learn
@@ -164,8 +180,9 @@ repos:
                 cpp/src/neighbors/detail/faiss_distance_utils[.]h$
               )
           - id: verify-alpha-spec
-          - id: verify-codeowners
-            args: [--fix, --project-prefix=cuvs]
+          # TODO: Re-enable once org is configurable
+          # - id: verify-codeowners
+          #   args: [--fix, --project-prefix=cuvs]
           - id: verify-pyproject-license
             # ignore the top-level pyproject.toml, which doesn't
             # have or need a [project] table
@@ -181,6 +198,10 @@ repos:
         rev: v0.10.0.1
         hooks:
           - id: shellcheck
+      - repo: https://github.com/zizmorcore/zizmor-pre-commit
+        rev: v1.24.1
+        hooks:
+          - id: zizmor
 
 default_language_version:
       python: python3

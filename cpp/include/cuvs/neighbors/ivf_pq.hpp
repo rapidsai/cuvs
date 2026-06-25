@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 
 #include <cuvs/neighbors/common.hpp>
 
@@ -16,12 +16,15 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 
+#include <cuvs/core/export.hpp>
 #include <optional>
 #include <tuple>
 #include <variant>
 #include <vector>
 
-namespace cuvs::neighbors::ivf_pq {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace ivf_pq {
 
 /**
  * @defgroup ivf_pq_cpp_index_params IVF-PQ index build parameters
@@ -137,7 +140,8 @@ struct index_params : cuvs::neighbors::index_params {
   std::optional<bool> use_ann_for_extend;
 
   /**
-   * Use CAGRA vs brute force for balanced k-means *fit* (training centroids; they move each EM iter).
+   * Use CAGRA vs brute force for balanced k-means *fit* (training centroids; they move each EM
+   * iter).
    * - std::nullopt (default): brute-force assignment during fit.
    * - true: ANN-based assignment during fit (CAGRA with periodic index rebuilds).
    * - false: brute-force assignment during fit (explicit).
@@ -435,7 +439,8 @@ class index_iface {
   virtual raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
     const raft::resources& res) const = 0;
 
-  /** Stored IVF-PQ build param: CAGRA vs brute for extend/add_data cluster assignment (nullopt => brute). */
+  /** Stored IVF-PQ build param: CAGRA vs brute for extend/add_data cluster assignment (nullopt =>
+   * brute). */
   virtual std::optional<bool> use_ann_for_extend() const = 0;
 };
 
@@ -586,7 +591,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   uint32_t n_lists() const noexcept;
 
   /**
-   * Whether to use convervative memory allocation when extending the list (cluster) data
+   * Whether to use conservative memory allocation when extending the list (cluster) data
    * (see index_params.conservative_memory_allocation).
    */
   bool conservative_memory_allocation() const noexcept override;
@@ -3312,6 +3317,18 @@ void make_rotation_matrix(
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
   bool force_random_rotation);
 
+/** Calculate the size of the compressed dataset.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset shape of the dataset
+ * @param[in] param ivf-pq compression params
+ *
+ * @return compressed dataset size in bytes
+ */
+size_t compressed_dataset_size(raft::resources const& res,
+                               raft::matrix_extent<int64_t> dataset,
+                               cuvs::neighbors::ivf_pq::index_params params);
+
 /**
  * @brief Resize an IVF-PQ list with flat layout.
  *
@@ -3373,14 +3390,19 @@ void resize_list(raft::resources const& res,
                  const list_spec_interleaved<uint32_t, int64_t>& spec,
                  uint32_t new_used_size,
                  uint32_t old_used_size);
+
 /**
  * @}
  */
 }  // namespace helpers
 
-}  // namespace cuvs::neighbors::ivf_pq
+}  // namespace ivf_pq
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs
 
-namespace cuvs::neighbors::graph_build_params {
+namespace CUVS_EXPORT cuvs {
+namespace neighbors {
+namespace graph_build_params {
 /** Specialized parameters utilizing IVF-PQ to build knn graph */
 struct ivf_pq_params {
   cuvs::neighbors::ivf_pq::index_params build_params;
@@ -3447,4 +3469,6 @@ struct ivf_pq_params {
     refinement_rate = 1;
   }
 };
-}  // namespace cuvs::neighbors::graph_build_params
+}  // namespace graph_build_params
+}  // namespace neighbors
+}  // namespace CUVS_EXPORT cuvs

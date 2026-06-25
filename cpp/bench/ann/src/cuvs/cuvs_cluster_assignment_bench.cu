@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Benchmark: brute force vs CAGRA-based cluster assignment for IVF training.
@@ -8,8 +8,8 @@
  */
 #include <benchmark/benchmark.h>
 
-// kmeans_balanced.cuh lives in src/cluster/, not in public include/
-#include "cluster/kmeans_balanced.cuh"
+// kmeans_balanced.cuh is under cpp/src/; CUVS_CLUSTER_ASSIGNMENT_BENCH adds that to include path
+#include <cluster/kmeans_balanced.cuh>
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
