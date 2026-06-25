@@ -1117,8 +1117,8 @@ void extend(raft::resources const& handle,
     kmeans_params.metric = coarse_clustering_metric(index->metric());
 
     // Default: brute-force assignment; set use_ann_for_extend to opt in to CAGRA.
-    bool use_cagra = index->use_ann_for_extend().value_or(false);
-    if (use_cagra) {
+    const bool use_cagra_for_cluster_assignment = index->use_ann_for_extend().value_or(false);
+    if (use_cagra_for_cluster_assignment) {
       // Use CAGRA for cluster assignment when K is large (build once, search per batch).
       // Same centroid index + 1-NN search path as kmeans::detail (extend batches; fit uses
       // predict_cagra_with_index_reuse).
