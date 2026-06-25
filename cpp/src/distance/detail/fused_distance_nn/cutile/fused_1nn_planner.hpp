@@ -20,25 +20,28 @@ namespace cuvs::distance::detail {
 template <typename DataTag, typename MetricTag>
 inline const char* fused_1nn_kernel_entrypoint()
 {
-  if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_f>) {
-    if constexpr (std::is_same_v<MetricTag, metric_tag_ip>) {
-      return "fused_1nn_f_ip";
-    } else if constexpr (std::is_same_v<MetricTag, metric_tag_l2>) {
-      return "fused_1nn_f_l2";
-    } else if constexpr (std::is_same_v<MetricTag, metric_tag_cos>) {
-      return "fused_1nn_f_cos";
-    }
-  } else if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_h>) {
-    if constexpr (std::is_same_v<MetricTag, metric_tag_ip>) {
-      return "fused_1nn_h_ip";
-    } else if constexpr (std::is_same_v<MetricTag, metric_tag_l2>) {
-      return "fused_1nn_h_l2";
-    } else if constexpr (std::is_same_v<MetricTag, metric_tag_cos>) {
-      return "fused_1nn_h_cos";
-    }
+  if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_f> &&
+                std::is_same_v<MetricTag, metric_tag_ip>) {
+    return "fused_1nn_f_ip";
+  } else if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_f> &&
+                       std::is_same_v<MetricTag, metric_tag_l2>) {
+    return "fused_1nn_f_l2";
+  } else if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_f> &&
+                       std::is_same_v<MetricTag, metric_tag_cos>) {
+    return "fused_1nn_f_cos";
+  } else if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_h> &&
+                       std::is_same_v<MetricTag, metric_tag_ip>) {
+    return "fused_1nn_h_ip";
+  } else if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_h> &&
+                       std::is_same_v<MetricTag, metric_tag_l2>) {
+    return "fused_1nn_h_l2";
+  } else if constexpr (std::is_same_v<DataTag, cuvs::neighbors::detail::tag_h> &&
+                       std::is_same_v<MetricTag, metric_tag_cos>) {
+    return "fused_1nn_h_cos";
+  } else {
+    static_assert(sizeof(DataTag) == 0, "unsupported fused 1-NN cuTile data/metric combination");
+    return "";
   }
-  static_assert(sizeof(DataTag) == 0, "unsupported fused 1-NN cuTile data/metric combination");
-  return "";
 }
 
 template <typename DataT, cuvs::distance::DistanceType Metric>
