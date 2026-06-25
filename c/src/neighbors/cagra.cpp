@@ -738,7 +738,7 @@ extern "C" cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
     auto distances_view     = cuvs::core::from_dlpack<dist_view_t>(distances);
 
     if (filter.type == NO_FILTER) {
-      cuvs::neighbors::cagra::search_multi_partition(*res_ptr,
+      cuvs::neighbors::cagra::search(*res_ptr,
                                                      search_params,
                                                      idx_vec,
                                                      queries_view,
@@ -759,7 +759,7 @@ extern "C" cuvsError_t cuvsCagraSearchMultiPartition(cuvsResources_t res,
       cuvs::neighbors::filtering::multi_partition_bitset_filter<uint32_t, int64_t> mp_filter(
         combined_bitset_view, offsets_mds.data_handle());
 
-      cuvs::neighbors::cagra::search_multi_partition(*res_ptr,
+      cuvs::neighbors::cagra::search(*res_ptr,
                                                      search_params,
                                                      idx_vec,
                                                      queries_view,
