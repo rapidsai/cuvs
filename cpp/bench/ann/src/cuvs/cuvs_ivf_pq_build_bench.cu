@@ -1,16 +1,20 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  *
- * IVF-PQ benchmarks (two scenarios):
+ * IVF-PQ nearest-centroid lookup benchmarks (two scenarios):
  *
- * 1) Full build — k-means *fit* ANN vs brute (shifting centroids). Both runs use brute cluster
- *    assignment for extend/add_data_on_build (`use_ann_for_extend = false`) so the comparison
- *    isolates the balanced k-means training path, not extend-time assignment.
+ * Both compare brute force vs CAGRA for the same primitive: given centroid vectors, find the
+ * nearest centroid for each data vector. CAGRA never computes centroids; it only accelerates
+ * lookup.
  *
- * 2) Extend only — brute vs CAGRA for assigning vectors to *fixed* trained centroids. Empty
- *    trained indices are restored each iteration via deserialize (setup not timed). This matches
- *    the assumption that centroids do not move during extend, unlike k-means fit.
+ * Main difference between build and extend:
+ *  - Build: lookup runs during k-means fit (E-step). Centroids shift every iteration, so the CAGRA
+ *    index is rebuilt periodically (`ann_rebuild_interval`). Times full `build()`; toggles
+ *    `use_ann_for_fit`. `use_ann_for_extend = false` so add_data_on_build stays brute.
+ *  - Extend: centroids are fixed (trained index). CAGRA is built once, then each new vector gets
+ *    a fast 1-NN lookup. Times `extend()` only; toggles `use_ann_for_extend`. Setup deserialize
+ *    is not timed.
  */
 #include <benchmark/benchmark.h>
 
@@ -18,25 +22,22 @@
 
 #include <chrono>
 #include <memory>
-#include <sstream>
-#include <string>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
+#include <raft/core/resources.hpp>
 #include <raft/random/rng.cuh>
 #include <raft/random/rng_state.hpp>
 #include <raft/util/cudart_utils.hpp>
+#include <sstream>
+#include <string>
 
 #include <rmm/cuda_stream_pool.hpp>
 #include <rmm/device_uvector.hpp>
 
 namespace {
 
-void init_random_dataset(raft::resources const& handle,
-                         float* data,
-                         int64_t n_rows,
-                         int64_t dim)
+void init_random_dataset(raft::resources const& handle, float* data, int64_t n_rows, int64_t dim)
 {
   raft::random::RngState rng(12345ULL);
   raft::random::uniform(handle, rng, data, n_rows * dim, float(-1), float(1));
@@ -45,7 +46,7 @@ void init_random_dataset(raft::resources const& handle,
 
 /** Serialize an empty trained index to a string for benchmark reset. */
 std::string serialize_index_blob(raft::resources const& handle,
-                                   cuvs::neighbors::ivf_pq::index<int64_t> const& index)
+                                 cuvs::neighbors::ivf_pq::index<int64_t> const& index)
 {
   std::ostringstream os(std::ios::binary);
   cuvs::neighbors::ivf_pq::serialize(handle, os, index);
@@ -64,8 +65,12 @@ void deserialize_index_from_blob(raft::resources const& handle,
 
 }  // namespace
 
-/** Full IVF-PQ build: compare brute vs ANN for balanced k-means *fit* only. */
-static void BM_IVFPQ_Build_KMeansFit_Speedup(benchmark::State& state)
+/**
+ * Full IVF-PQ build: brute vs CAGRA nearest-centroid lookup during k-means fit E-step
+ * (`use_ann_for_fit`). Centroids move each iteration, so CAGRA is rebuilt across fit iterations.
+ * Times all of `build()`; PQ training and other steps dilute the measured speedup.
+ */
+static void BM_IVFPQ_Build_NearestCentroidLookup_Speedup(benchmark::State& state)
 {
   int64_t n_rows   = static_cast<int64_t>(state.range(0));
   uint32_t n_lists = static_cast<uint32_t>(state.range(1));
@@ -96,14 +101,14 @@ static void BM_IVFPQ_Build_KMeansFit_Speedup(benchmark::State& state)
   double total_bf_ms = 0.0, total_ann_ms = 0.0;
 
   for (auto _ : state) {
-    auto start = std::chrono::steady_clock::now();
+    auto start  = std::chrono::steady_clock::now();
     auto idx_bf = cuvs::neighbors::ivf_pq::build(handle, params_bf_fit, dataset_view);
     benchmark::DoNotOptimize(idx_bf.size());
     raft::resource::sync_stream(handle);
     auto end = std::chrono::steady_clock::now();
     total_bf_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
 
-    start = std::chrono::steady_clock::now();
+    start        = std::chrono::steady_clock::now();
     auto idx_ann = cuvs::neighbors::ivf_pq::build(handle, params_ann_fit, dataset_view);
     benchmark::DoNotOptimize(idx_ann.size());
     raft::resource::sync_stream(handle);
@@ -111,20 +116,19 @@ static void BM_IVFPQ_Build_KMeansFit_Speedup(benchmark::State& state)
     total_ann_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
   }
 
-  if (total_ann_ms > 0) {
-    state.counters["speedup_fit"] = total_bf_ms / total_ann_ms;
-  }
-  state.counters["bf_fit_ms"] =
+  if (total_ann_ms > 0) { state.counters["speedup_build"] = total_bf_ms / total_ann_ms; }
+  state.counters["bf_build_ms"] =
     benchmark::Counter(total_bf_ms, benchmark::Counter::kAvgIterations);
-  state.counters["ann_fit_ms"] =
+  state.counters["cagra_build_ms"] =
     benchmark::Counter(total_ann_ms, benchmark::Counter::kAvgIterations);
 }
 
 /**
- * extend() only: brute vs CAGRA cluster assignment with fixed centroids (trained empty index).
- * Deserialize is not timed.
+ * extend() only: brute vs CAGRA nearest-centroid lookup with fixed trained centroids
+ * (`use_ann_for_extend`). CAGRA is built once; new vectors are assigned via fast 1-NN search.
+ * Empty trained indices are restored each iteration via deserialize (not timed).
  */
-static void BM_IVFPQ_Extend_ClusterAssign_Speedup(benchmark::State& state)
+static void BM_IVFPQ_Extend_NearestCentroidLookup_Speedup(benchmark::State& state)
 {
   int64_t n_rows   = static_cast<int64_t>(state.range(0));
   uint32_t n_lists = static_cast<uint32_t>(state.range(1));
@@ -143,18 +147,18 @@ static void BM_IVFPQ_Extend_ClusterAssign_Speedup(benchmark::State& state)
   params_common.metric                   = cuvs::distance::DistanceType::L2Expanded;
   params_common.use_ann_for_fit          = false;
 
-  cuvs::neighbors::ivf_pq::index_params params_bf_ext  = params_common;
-  params_bf_ext.use_ann_for_extend                     = false;
+  cuvs::neighbors::ivf_pq::index_params params_bf_ext    = params_common;
+  params_bf_ext.use_ann_for_extend                       = false;
   cuvs::neighbors::ivf_pq::index_params params_cagra_ext = params_common;
-  params_cagra_ext.use_ann_for_extend                   = true;
+  params_cagra_ext.use_ann_for_extend                    = true;
 
   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
 
   auto dataset_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     dataset.data(), n_rows, dim);
 
-  auto idx_bf  = cuvs::neighbors::ivf_pq::build(handle, params_bf_ext, dataset_view);
-  auto idx_cag = cuvs::neighbors::ivf_pq::build(handle, params_cagra_ext, dataset_view);
+  auto idx_bf          = cuvs::neighbors::ivf_pq::build(handle, params_bf_ext, dataset_view);
+  auto idx_cag         = cuvs::neighbors::ivf_pq::build(handle, params_cagra_ext, dataset_view);
   std::string blob_bf  = serialize_index_blob(handle, idx_bf);
   std::string blob_cag = serialize_index_blob(handle, idx_cag);
 
@@ -181,9 +185,7 @@ static void BM_IVFPQ_Extend_ClusterAssign_Speedup(benchmark::State& state)
     total_cagra_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
   }
 
-  if (total_cagra_ms > 0) {
-    state.counters["speedup_extend"] = total_bf_ms / total_cagra_ms;
-  }
+  if (total_cagra_ms > 0) { state.counters["speedup_extend"] = total_bf_ms / total_cagra_ms; }
   state.counters["bf_extend_ms"] =
     benchmark::Counter(total_bf_ms, benchmark::Counter::kAvgIterations);
   state.counters["cagra_extend_ms"] =
@@ -192,85 +194,85 @@ static void BM_IVFPQ_Extend_ClusterAssign_Speedup(benchmark::State& state)
 
 constexpr int64_t kDim = 128;
 
-// Full build: k-means fit brute vs ANN (same problem sizes as before).
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+// build(): nearest-centroid lookup in k-means fit E-step (full build timed).
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({327680, 65536, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({1000000, 200000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({1500000, 300000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({1750000, 350000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({2000000, 400000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({3000000, 600000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({4000000, 800000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
   ->Args({5000000, 1000000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
 
-// extend(): fixed-centroid assignment brute vs CAGRA.
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+// extend(): fixed-centroid nearest-centroid lookup, CAGRA built once per extend.
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({327680, 65536, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({1000000, 200000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({1500000, 300000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({1750000, 350000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({2000000, 400000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({3000000, 600000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({4000000, 800000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
   ->Args({5000000, 1000000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
