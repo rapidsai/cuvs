@@ -11,7 +11,6 @@ import warnings
 
 from .utils import (
     add_jitter,
-    is_l2_normalized,
     groundtruth_neighbors_filename,
     memmap_bin_file,
     offset_neighbor_indices,
@@ -114,9 +113,8 @@ def choose_random_queries(dataset, n_queries):
 
 
 def choose_random_queries_with_jitter(dataset, n_queries, seed=12345):
-    """Pick ``n_queries`` random rows from ``dataset``, add Gaussian jitter at
-    scale ``0.1 * std(sample)``, and re-normalize to unit norm iff the
-    original dataset rows already are.
+    """Pick ``n_queries`` random rows from ``dataset`` and add Gaussian jitter
+    at scale ``0.1 * std(sample)``.
     """
     import numpy as _np
 
@@ -127,9 +125,7 @@ def choose_random_queries_with_jitter(dataset, n_queries, seed=12345):
     query_idx = _np.sort(rng.choice(n_rows, size=n_queries, replace=False))
     sampled = dataset[query_idx, :].astype(_np.float32, copy=True)
 
-    normalize = is_l2_normalized(sampled)
-
-    return add_jitter(sampled, rng, normalize)
+    return add_jitter(sampled, rng, normalize=False)
 
 
 def cpu_search(dataset, queries, k, metric="squeclidean"):
@@ -284,9 +280,8 @@ def main():
         help="Queries file name, or one of 'random-choice', 'random-jitter', "
         "or 'random' (default). 'random-choice': select n_queries vectors "
         "from the input dataset. 'random-jitter': same as 'random-choice', "
-        "but add std-relative Gaussian noise to each query and re-normalize "
-        "if the dataset rows are unit-norm. 'random': generate n_queries "
-        "as uniform random numbers.",
+        "but add std-relative Gaussian noise to each query. 'random': generate "
+        "n_queries as uniform random numbers.",
     )
     parser.add_argument(
         "--output",
