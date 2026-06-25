@@ -172,6 +172,10 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
                               params.build_params.n_lists));
   size_t kmeans_n_rows  = n_rows / kmeans_trainset_ratio;
   size_t kmeans_gpu_mem = kmeans_n_rows * dim * sizeof(float);
+  if (dtype != CUDA_R_32F) {
+    // kmeans trainset tmp allocation
+    kmeans_gpu_mem += kmeans_n_rows * dim * dtype_size;
+  }
 
   // For non-float input, ivf_pq::build first samples into a temporary trainset of type T
   if (!input_is_float) { kmeans_gpu_mem += kmeans_n_rows * dim * dtype_size; }
