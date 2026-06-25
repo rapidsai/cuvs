@@ -5,21 +5,14 @@
 
 #pragma once
 
-#ifndef CUVS_CUTILE_ENABLED
-#define CUVS_CUTILE_ENABLED 0
-#endif
-
 #include "distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
-#include "fused_distance_nn/cutlass_base.cuh"
-#if CUVS_CUTILE_ENABLED
 #include "fused_distance_nn/cutile/fused_1nn_tile.hpp"
-#endif
+#include "fused_distance_nn/cutlass_base.cuh"
 #include "fused_distance_nn/fused_cosine_nn.cuh"
 #include "fused_distance_nn/fused_l2_nn.cuh"
 #include "fused_distance_nn/helper_structs.cuh"
 #include "fused_distance_nn/simt_kernel.cuh"
 #include "pairwise_distance_base.cuh"  // PairwiseDistances
-#include <cuvs/detail/jit_lto/tileir_compat.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
@@ -62,12 +55,16 @@ void fusedDistanceNNImpl(OutT* min,
   // The kernel policy is determined by fusedDistanceNN.
   typedef Policy P;
 
-#if CUVS_CUTILE_ENABLED
-  if (cuvs::detail::jit_lto::cutile_launch_available_on_current_device() &&
-      try_fused_1nn_tile<DataT, OutT, IdxT>(min, x, y, xn, yn, m, n, k, metric, sqrt, stream)) {
-    return;
+  // Callers (e.g. use_fused) enable this API for CUTLASS fused as well as cuTile; only try cuTile
+  // for float/half KVP output so double and other types never instantiate cuTile symbols here.
+  if constexpr (is_fused_1nn_cutile_data_v<DataT>) {
+    if constexpr (cuvs::detail::jit_lto::library_built_with_cutile() &&
+                  is_fused_1nn_kvp_output_v<OutT, IdxT, DataT>) {
+      if (try_fused_1nn_tile<DataT, OutT, IdxT>(min, x, y, xn, yn, m, n, k, metric, sqrt, stream)) {
+        return;
+      }
+    }
   }
-#endif
 
   dim3 blk(P::Nthreads);
   auto nblks            = raft::ceildiv<int>(m, P::Nthreads);
@@ -88,9 +85,11 @@ void fusedDistanceNNImpl(OutT* min,
       break;
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded:
-      // initOutBuffer is take care by fusedDistanceNNImpl() so we set it false to fusedL2NNImpl.
       fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
         min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
+      break;
+    case cuvs::distance::DistanceType::InnerProduct:
+      // cuTile is the only fused InnerProduct implementation; callers must gate on availability.
       break;
     default: assert("only cosine/l2 metric is supported with fusedDistanceNN\n"); break;
   }

@@ -61,12 +61,16 @@ inline bool tileir_fallback_available(int driver_version)
  * is CUDA 13+, and either a matching embedded cubin exists (no driver JIT required) or the driver
  * can JIT the embedded TileIR bytecode fallback.
  */
+#if CUVS_CUTILE_ENABLED
 inline bool cutile_launch_available_for_arch(int cc_major, int cc_minor, int driver_version)
 {
-  if (!cutile_integration_enabled()) { return false; }
+  if (!runtime_cuda13_or_newer()) { return false; }
   if (has_embedded_cubin_for_arch(cc_major, cc_minor)) { return true; }
   return tileir_fallback_available(driver_version);
 }
+#else
+inline constexpr bool cutile_launch_available_for_arch(int, int, int) { return false; }
+#endif
 
 inline bool query_driver_version(int& driver_version)
 {
@@ -86,6 +90,7 @@ inline bool query_current_device_arch(int& cc_major, int& cc_minor)
   return true;
 }
 
+#if CUVS_CUTILE_ENABLED
 inline bool cutile_launch_available_on_current_device()
 {
   int cc_major       = 0;
@@ -95,5 +100,9 @@ inline bool cutile_launch_available_on_current_device()
   if (!query_driver_version(driver_version)) { return false; }
   return cutile_launch_available_for_arch(cc_major, cc_minor, driver_version);
 }
+#else
+/** Compile-time false when cuTile is not built; use in if constexpr to skip cuTile-only paths. */
+inline constexpr bool cutile_launch_available_on_current_device() { return false; }
+#endif
 
 }  // namespace cuvs::detail::jit_lto

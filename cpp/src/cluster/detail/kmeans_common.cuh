@@ -7,6 +7,7 @@
 #include "../../distance/distance.cuh"
 #include <cstdint>
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/detail/jit_lto/tileir_compat.hpp>
 #include <cuvs/distance/distance.hpp>
 
 #include <raft/core/copy.cuh>
@@ -57,29 +58,49 @@
 
 namespace cuvs::cluster::kmeans::detail {
 
+template <typename MathT>
+inline constexpr bool is_cutile_fused_data_type_v =
+  std::is_same_v<MathT, float> || std::is_same_v<MathT, half>;
+
 /**
- * @brief Returns true if the fused distance NN implementation should be used.
+ * @brief Returns true if the fused distance NN implementation should be used (CUTLASS and/or
+ * cuTile).
  *
- * On Ampere (SM <= 8.x) always use fused.
- * On Hopper (SM 9.x) use fused when m or n >= 4096.
- * On Blackwell (SM >= 10.x) use unfused.
+ * Float/half: use fused whenever cuTile can launch (any architecture and problem size). If cuTile
+ * is unavailable, fall back to legacy CUTLASS fused on Ampere and Hopper only. Double and other
+ * types never use cuTile; they keep the historical CUTLASS/unfused heuristics on pre-Blackwell
+ * GPUs.
+ *
+ * Callers route through fusedDistanceNNMinReduce when this returns true; cuTile dispatch inside
+ * that API is gated separately by dtype (see fusedDistanceNNImpl).
  */
 template <typename MathT, typename IdxT, typename LabelT>
 bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
 {
+  (void)k;
   cudaDeviceProp prop;
   prop = raft::resource::get_device_properties(handle);
-  if (prop.major <= 8) {
-    // Use fused for Ampere or before
-    return true;
-  } else if (prop.major == 9 && (m >= 4096 || n >= 4096)) {
-    // On Hopper if m, n are bigger than 4096, use fused
-    return true;
-  } else if (prop.major >= 10) {
-    // On Blackwell onwards, use unfused
-    return false;
+
+  if constexpr (is_cutile_fused_data_type_v<MathT>) {
+    if constexpr (cuvs::detail::jit_lto::library_built_with_cutile()) {
+      if (cuvs::detail::jit_lto::cutile_launch_available_on_current_device()) { return true; }
+    }
+    return prop.major <= 9;
   }
+
+  if (prop.major >= 10) { return false; }
+  if (prop.major <= 8) { return true; }
+  if (prop.major == 9 && (m >= 4096 || n >= 4096)) { return true; }
   return false;
+}
+
+/** True when assignment should use the cuTile fused 1-NN kernel (float/half only). */
+template <typename MathT, typename IdxT, typename LabelT>
+bool use_cutile_fused_nn(const raft::resources& /*handle*/, IdxT /*m*/, IdxT /*n*/, IdxT /*k*/)
+{
+  if constexpr (!is_cutile_fused_data_type_v<MathT>) { return false; }
+  if constexpr (!cuvs::detail::jit_lto::library_built_with_cutile()) { return false; }
+  return cuvs::detail::jit_lto::cutile_launch_available_on_current_device();
 }
 
 template <typename DataT, typename IndexT>

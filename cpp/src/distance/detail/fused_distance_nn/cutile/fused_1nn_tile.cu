@@ -110,6 +110,7 @@ bool launch_fused_1nn_tile(const DataT* x,
                                          int64_t,
                                          int64_t,
                                          int64_t);
+  std::cout << "Launching cuTile kernel" << std::endl;
   launcher->template dispatch<fused_1nn_cutile_kernel_t>(stream,
                                                          grid,
                                                          block,
@@ -194,6 +195,7 @@ bool try_fused_1nn_tile(OutT* min,
                         bool is_sqrt,
                         cudaStream_t stream)
 {
+  if (!cuvs::detail::jit_lto::cutile_launch_available_on_current_device()) { return false; }
   return try_fused_1nn_tile_dispatch<DataT, OutT, IdxT>(
     min, x, y, xn, yn, m, n, k, metric, is_sqrt, stream);
 }

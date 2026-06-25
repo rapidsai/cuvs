@@ -27,32 +27,40 @@ void minClusterAndDistanceCompute(
   int batch_centroids,
   rmm::device_uvector<char>& workspace)
 {
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto n_samples      = X.extent(0);
-  auto n_features     = X.extent(1);
-  auto n_clusters     = centroids.extent(0);
-  bool is_fused       = metric == cuvs::distance::DistanceType::L2Expanded ||
-                  metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                  metric == cuvs::distance::DistanceType::CosineExpanded;
+  cudaStream_t stream  = raft::resource::get_cuda_stream(handle);
+  auto n_samples       = X.extent(0);
+  auto n_features      = X.extent(1);
+  auto n_clusters      = centroids.extent(0);
+  bool is_l2_cos_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
+                         metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                         metric == cuvs::distance::DistanceType::CosineExpanded;
+  const bool is_ip_cutile =
+    metric == cuvs::distance::DistanceType::InnerProduct &&
+    use_cutile_fused_nn<DataT, IndexT, IndexT>(handle, n_samples, n_clusters, n_features);
 
-  if (is_fused) {
+  if (is_l2_cos_fused || is_ip_cutile) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
     auto centroidsNorm =
       raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
-    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, centroids, centroidsNorm, raft::sqrt_op{});
-    } else {
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle, centroids, centroidsNorm);
+    if (is_l2_cos_fused) {
+      if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centroids, centroidsNorm, raft::sqrt_op{});
+      } else {
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centroids, centroidsNorm);
+      }
     }
 
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
     raft::matrix::fill(handle, minClusterAndDistance, initial_value);
 
-    bool should_use_fused =
+    const bool should_use_fused =
       use_fused<DataT, IndexT, IndexT>(handle, n_samples, n_clusters, n_features);
+
+    auto centroidsNormConst =
+      raft::make_device_vector_view<const DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
     if (should_use_fused) {
       workspace.resize((sizeof(int)) * n_samples, stream);
@@ -62,7 +70,7 @@ void minClusterAndDistanceCompute(
         X.data_handle(),
         centroids.data_handle(),
         L2NormX.data_handle(),
-        centroidsNorm.data_handle(),
+        centroidsNormConst.data_handle(),
         n_samples,
         n_clusters,
         n_features,
@@ -83,7 +91,7 @@ void minClusterAndDistanceCompute(
           X.data_handle(),
           centroids.data_handle(),
           L2NormX.data_handle(),
-          centroidsNorm.data_handle(),
+          centroidsNormConst.data_handle(),
           n_samples,
           n_clusters,
           n_features,

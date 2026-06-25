@@ -93,6 +93,16 @@ def make_kernel(
                     denom = a_norm[:, None] * b_norm[None, :]
                     score = 1.0 - (accumulator / denom)
 
+            # Only the final N-tile can include zero-padded centroid columns.
+            if n == num_tiles_n - 1:
+                col = ct.arange(tn, dtype=ct.int64)
+                global_col = n * tn + col
+                valid = global_col < N
+                if is_ip:
+                    score = ct.where(valid[None, :], score, -3.4e38)
+                else:
+                    score = ct.where(valid[None, :], score, 3.4e38)
+
             if is_ip:
                 curr_best = ct.max(score, axis=1)
                 curr_idx = ct.argmax(score, axis=1)
