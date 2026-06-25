@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal.common;
@@ -74,8 +74,14 @@ public class Util {
 
   private static final Linker LINKER = Linker.nativeLinker();
 
+  // The cudart entry and the static tryLoadCudart() initializer above are complementary, not
+  // redundant: the static block loads libcudart into the process so cudart symbols can be resolved
+  // when libcuvs_c.so is built with static CUDA, while this explicit libraryLookup resolves them
+  // directly here rather than relying on that load reaching loaderLookup(). Keeping both makes
+  // symbol resolution robust across dynamic and static CUDA linkage.
   static final SymbolLookup SYMBOL_LOOKUP =
       SymbolLookup.libraryLookup(System.mapLibraryName("cuvs_c"), Arena.ofAuto())
+          .or(SymbolLookup.libraryLookup(System.mapLibraryName("cudart"), Arena.ofAuto()))
           .or(SymbolLookup.loaderLookup())
           .or(Linker.nativeLinker().defaultLookup());
 
