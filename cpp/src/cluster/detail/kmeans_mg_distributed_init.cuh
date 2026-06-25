@@ -233,8 +233,8 @@ void initKMeansPlusPlus_distributed(
   rmm::device_uvector<DataT> centroidsBuf(static_cast<std::size_t>(n_features), stream);
   auto potentialCentroids =
     raft::make_device_matrix_view<DataT, IndexT>(centroidsBuf.data(), IndexT{1}, n_features);
-  DataT* initialCentroid = nullptr;
-  if (rank == rp) {
+  DataT* initialCentroid = centroidsBuf.data();
+    if (rank == rp) {
     RAFT_EXPECTS(n_local > 0,
                  "selected source rank %d has no local rows; cannot pick an initial centroid",
                  rp);
