@@ -692,7 +692,7 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - &libucxx_unsuffixed libucxx
+          - &libucxx_unsuffixed libucxx=="0.51.*"
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -704,12 +704,12 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - libucxx-cu12
+              - libucxx-cu12>=0.0.0a0
           - matrix:
               cuda: "13.*"
               cuda_suffixed: "true"
             packages:
-              - libucxx-cu13
+              - libucxx-cu13>=0.0.0a0
           - {matrix: null, packages: [*libucxx_unsuffixed]}
   depends_on_pylibraft:
     common:
