@@ -147,8 +147,7 @@ Filtering for ANN Types
 enum class FilterType {
   None,
   Bitmap,
-  Bitset,
-  UDF
+  Bitset
 };
 ```
 
@@ -159,7 +158,6 @@ enum class FilterType {
 | `None` | `` |
 | `Bitmap` | `` |
 | `Bitset` | `` |
-| `UDF` | `` |
 
 <a id="neighbors-filtering-none-sample-filter-operator"></a>
 ### neighbors::filtering::none_sample_filter::operator
@@ -319,33 +317,6 @@ FilterType get_filter_type() const override;
 **Returns**
 
 [`FilterType`](/api-reference/cpp-api-neighbors-common#neighbors-filtering-filtertype)
-
-<a id="neighbors-filtering-udf-filter"></a>
-### neighbors::filtering::udf_filter
-
-JIT-LTO user-defined filter predicate.
-
-The source must define a device function named by `function_name` with signature:
-
-Return `true` to allow a source vector to appear in the results and `false` to reject it. UDF dereferences it. CAGRA currently provides `source_index_t` as `uint32_t` in the generated JIT fragment.
-
-```cpp
-struct udf_filter : public base_filter {
-  std::string source;
-  void* filter_data;
-  float filtering_rate;
-  std::string function_name;
-};
-```
-
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `source` | `std::string` | CUDA C++ source containing the device predicate. |
-| `filter_data` | `void*` | Opaque device-accessible pointer passed to the predicate. |
-| `filtering_rate` | `float` | Estimated fraction of rows rejected by the predicate, or negative if unknown. |
-| `function_name` | `std::string` | Device function name to call from the generated CAGRA sample filter. |
 
 ## ANN MG index build parameters
 
