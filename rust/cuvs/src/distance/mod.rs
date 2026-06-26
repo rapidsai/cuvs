@@ -6,13 +6,13 @@
 //! Pairwise distance computation.
 //!
 //! [`pairwise_distance`] computes all pairwise distances between two device
-//! matrices. Inputs and output are passed through the
-//! [`IntoDlTensor`] /
-//! [`IntoDlTensorMut`] traits; see the
+//! matrices. Inputs and output are borrowed through the
+//! [`AsDlTensor`] /
+//! [`AsDlTensorMut`] traits; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model.
 
 use crate::distance_type::DistanceType;
-use crate::dlpack::{IntoDlTensor, IntoDlTensorMut};
+use crate::dlpack::{AsDlTensor, AsDlTensorMut};
 use crate::error::{Result, check_cuvs};
 use crate::resources::Resources;
 
@@ -20,20 +20,25 @@ use crate::resources::Resources;
 /// `y` (shape `n × k`), writing the `m × n` result into `distances`.
 ///
 /// `x`, `y`, and `distances` reside in device memory and implement
-/// [`IntoDlTensor`] /
-/// [`IntoDlTensorMut`]. `metric` selects the distance;
+/// [`AsDlTensor`] /
+/// [`AsDlTensorMut`]. `metric` selects the distance;
 /// `metric_arg` is the optional `p` for Minkowski distances (defaults to 2).
-pub fn pairwise_distance<'a>(
+pub fn pairwise_distance<X, Y, D>(
     res: &Resources,
-    x: impl IntoDlTensor<'a>,
-    y: impl IntoDlTensor<'a>,
-    distances: impl IntoDlTensorMut<'a>,
+    x: &X,
+    y: &Y,
+    distances: &mut D,
     metric: DistanceType,
     metric_arg: Option<f32>,
-) -> Result<()> {
-    let x = x.into_dl_tensor()?;
-    let y = y.into_dl_tensor()?;
-    let distances = distances.into_dl_tensor_mut()?;
+) -> Result<()>
+where
+    X: AsDlTensor + ?Sized,
+    Y: AsDlTensor + ?Sized,
+    D: AsDlTensorMut + ?Sized,
+{
+    let x = x.as_dl_tensor()?;
+    let y = y.as_dl_tensor()?;
+    let distances = distances.as_dl_tensor_mut()?;
     unsafe {
         check_cuvs(ffi::cuvsPairwiseDistance(
             res.0,

@@ -5,7 +5,7 @@
 
 use std::io::{Write, stderr};
 
-use crate::dlpack::{IntoDlTensor, IntoDlTensorMut};
+use crate::dlpack::{AsDlTensor, AsDlTensorMut};
 use crate::error::{Result, check_cuvs};
 use crate::ivf_pq::{IndexParams, SearchParams};
 use crate::resources::Resources;
@@ -18,18 +18,17 @@ impl Index {
     /// Builds an IVF-PQ index over `dataset` for efficient search.
     ///
     /// `dataset` is a row-major matrix on the host or device implementing
-    /// [`IntoDlTensor`](crate::IntoDlTensor). It is copied (and quantized) into
+    /// [`AsDlTensor`]. It is copied (and quantized) into
     /// the index, so the caller may free it once this call returns (hence
     /// `Index` carries no lifetime).
     ///
     /// Supported dataset/query dtypes in the current C-backed implementation are
     /// `f32`, `f16`, `i8`, and `u8`.
-    pub fn build<'a>(
-        res: &Resources,
-        params: &IndexParams,
-        dataset: impl IntoDlTensor<'a>,
-    ) -> Result<Index> {
-        let dataset = dataset.into_dl_tensor()?;
+    pub fn build<T>(res: &Resources, params: &IndexParams, dataset: &T) -> Result<Index>
+    where
+        T: AsDlTensor + ?Sized,
+    {
+        let dataset = dataset.as_dl_tensor()?;
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsIvfPqBuild(res.0, params.0, dataset.to_c().as_mut_ptr(), index.0))?;
@@ -49,21 +48,26 @@ impl Index {
     /// Searches the index for the `k` nearest neighbors of each query.
     ///
     /// `queries`, `neighbors`, and `distances` must reside in device memory and
-    /// implement [`IntoDlTensor`](crate::IntoDlTensor) /
-    /// [`IntoDlTensorMut`](crate::IntoDlTensorMut). `neighbors` receives the
+    /// implement [`AsDlTensor`] /
+    /// [`AsDlTensorMut`]. `neighbors` receives the
     /// neighbor indices and `distances` their distances; both are written in
     /// place.
-    pub fn search<'a>(
+    pub fn search<Q, N, D>(
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: impl IntoDlTensor<'a>,
-        neighbors: impl IntoDlTensorMut<'a>,
-        distances: impl IntoDlTensorMut<'a>,
-    ) -> Result<()> {
-        let queries = queries.into_dl_tensor()?;
-        let neighbors = neighbors.into_dl_tensor_mut()?;
-        let distances = distances.into_dl_tensor_mut()?;
+        queries: &Q,
+        neighbors: &mut N,
+        distances: &mut D,
+    ) -> Result<()>
+    where
+        Q: AsDlTensor + ?Sized,
+        N: AsDlTensorMut + ?Sized,
+        D: AsDlTensorMut + ?Sized,
+    {
+        let queries = queries.as_dl_tensor()?;
+        let neighbors = neighbors.as_dl_tensor_mut()?;
+        let distances = distances.as_dl_tensor_mut()?;
         unsafe {
             check_cuvs(ffi::cuvsIvfPqSearch(
                 res.0,

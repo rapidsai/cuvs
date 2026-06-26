@@ -5,9 +5,9 @@
 //! Brute-force (exact) k-NN.
 //!
 //! Build an [`Index`] over a dataset, then [`search`](Index::search) it with
-//! device-resident queries and output buffers. Tensors are passed through the
-//! [`IntoDlTensor`] /
-//! [`IntoDlTensorMut`] traits; see the
+//! device-resident queries and output buffers. Tensors are borrowed through the
+//! [`AsDlTensor`] /
+//! [`AsDlTensorMut`] traits; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model and `examples/cagra.rs`
 //! for the same build/search workflow.
 
@@ -15,7 +15,7 @@ use std::io::{Write, stderr};
 use std::marker::PhantomData;
 
 use crate::distance_type::DistanceType;
-use crate::dlpack::{IntoDlTensor, IntoDlTensorMut};
+use crate::dlpack::{AsDlTensor, AsDlTensorMut};
 use crate::error::{Result, check_cuvs};
 use crate::resources::Resources;
 
@@ -33,16 +33,19 @@ impl<'d> Index<'d> {
     ///
     /// `metric` selects the distance and `metric_arg` is the optional `p` for
     /// Minkowski distances (defaults to 2). `dataset` is a row-major matrix on
-    /// the host or device implementing [`IntoDlTensor`]; the
+    /// the host or device implementing [`AsDlTensor`]; the
     /// C++ index keeps a non-owning view of it, so the returned [`Index`] borrows
     /// it for `'d` and cannot outlive it.
-    pub fn build(
+    pub fn build<T>(
         res: &Resources,
         metric: DistanceType,
         metric_arg: Option<f32>,
-        dataset: impl IntoDlTensor<'d>,
-    ) -> Result<Index<'d>> {
-        let dataset = dataset.into_dl_tensor()?;
+        dataset: &'d T,
+    ) -> Result<Index<'d>>
+    where
+        T: AsDlTensor + ?Sized,
+    {
+        let dataset = dataset.as_dl_tensor()?;
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsBruteForceBuild(
@@ -68,20 +71,25 @@ impl<'d> Index<'d> {
     /// Searches the index for the `k` nearest neighbors of each query.
     ///
     /// `queries`, `neighbors`, and `distances` must reside in device memory and
-    /// implement [`IntoDlTensor`] /
-    /// [`IntoDlTensorMut`]. `neighbors` receives the
+    /// implement [`AsDlTensor`] /
+    /// [`AsDlTensorMut`]. `neighbors` receives the
     /// neighbor indices and `distances` their distances; both are written in
     /// place.
-    pub fn search<'a>(
+    pub fn search<Q, N, D>(
         &self,
         res: &Resources,
-        queries: impl IntoDlTensor<'a>,
-        neighbors: impl IntoDlTensorMut<'a>,
-        distances: impl IntoDlTensorMut<'a>,
-    ) -> Result<()> {
-        let queries = queries.into_dl_tensor()?;
-        let neighbors = neighbors.into_dl_tensor_mut()?;
-        let distances = distances.into_dl_tensor_mut()?;
+        queries: &Q,
+        neighbors: &mut N,
+        distances: &mut D,
+    ) -> Result<()>
+    where
+        Q: AsDlTensor + ?Sized,
+        N: AsDlTensorMut + ?Sized,
+        D: AsDlTensorMut + ?Sized,
+    {
+        let queries = queries.as_dl_tensor()?;
+        let neighbors = neighbors.as_dl_tensor_mut()?;
+        let distances = distances.as_dl_tensor_mut()?;
         unsafe {
             let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
 

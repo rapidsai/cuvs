@@ -5,7 +5,7 @@
 //! Vamana: builds a DiskANN-style Vamana graph over a dataset.
 //!
 //! Build an [`Index`] from a dataset (then typically serialize it). The dataset
-//! is passed through the [`IntoDlTensor`](crate::IntoDlTensor) trait; see the
+//! is borrowed through the [`AsDlTensor`](crate::AsDlTensor) trait; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model.
 
 mod index;

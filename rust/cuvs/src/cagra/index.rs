@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use std::path::Path;
 
 use crate::cagra::{IndexParams, SearchParams};
-use crate::dlpack::{IntoDlTensor, IntoDlTensorMut};
+use crate::dlpack::{AsDlTensor, AsDlTensorMut};
 use crate::error::{Error, Result, check_cuvs};
 use crate::resources::Resources;
 
@@ -41,15 +41,14 @@ impl<'d> Index<'d> {
     /// Builds a CAGRA index over `dataset` for efficient search.
     ///
     /// `dataset` is a row-major matrix on the host or device implementing
-    /// [`IntoDlTensor`](crate::IntoDlTensor). The C++ index keeps a non-owning
+    /// [`AsDlTensor`]. The C++ index keeps a non-owning
     /// view of it, so the returned [`Index`] borrows `dataset` for `'d` and
     /// cannot outlive it.
-    pub fn build(
-        res: &Resources,
-        params: &IndexParams,
-        dataset: impl IntoDlTensor<'d>,
-    ) -> Result<Index<'d>> {
-        let dataset = dataset.into_dl_tensor()?;
+    pub fn build<T>(res: &Resources, params: &IndexParams, dataset: &'d T) -> Result<Index<'d>>
+    where
+        T: AsDlTensor + ?Sized,
+    {
+        let dataset = dataset.as_dl_tensor()?;
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsCagraBuild(
@@ -74,21 +73,26 @@ impl<'d> Index<'d> {
     /// Searches the index for the `k` nearest neighbors of each query.
     ///
     /// `queries`, `neighbors`, and `distances` must reside in device memory and
-    /// implement [`IntoDlTensor`](crate::IntoDlTensor) /
-    /// [`IntoDlTensorMut`](crate::IntoDlTensorMut). `neighbors` (shape
+    /// implement [`AsDlTensor`] /
+    /// [`AsDlTensorMut`]. `neighbors` (shape
     /// `n_queries × k`) receives the neighbor indices and `distances` their
     /// distances; both are written in place.
-    pub fn search<'a>(
+    pub fn search<Q, N, D>(
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: impl IntoDlTensor<'a>,
-        neighbors: impl IntoDlTensorMut<'a>,
-        distances: impl IntoDlTensorMut<'a>,
-    ) -> Result<()> {
-        let queries = queries.into_dl_tensor()?;
-        let neighbors = neighbors.into_dl_tensor_mut()?;
-        let distances = distances.into_dl_tensor_mut()?;
+        queries: &Q,
+        neighbors: &mut N,
+        distances: &mut D,
+    ) -> Result<()>
+    where
+        Q: AsDlTensor + ?Sized,
+        N: AsDlTensorMut + ?Sized,
+        D: AsDlTensorMut + ?Sized,
+    {
+        let queries = queries.as_dl_tensor()?;
+        let neighbors = neighbors.as_dl_tensor_mut()?;
+        let distances = distances.as_dl_tensor_mut()?;
         unsafe {
             let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
 
@@ -113,19 +117,25 @@ impl<'d> Index<'d> {
     /// `queries`, `neighbors`, and `distances` are as in [`search`](Self::search).
     /// `bitset` is a 1-D `uint32` device tensor of `ceil(n_rows / 32)` elements,
     /// where each bit maps to a dataset row (1 = include, 0 = exclude).
-    pub fn search_with_filter<'a>(
+    pub fn search_with_filter<Q, N, D, B>(
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: impl IntoDlTensor<'a>,
-        neighbors: impl IntoDlTensorMut<'a>,
-        distances: impl IntoDlTensorMut<'a>,
-        bitset: impl IntoDlTensor<'a>,
-    ) -> Result<()> {
-        let queries = queries.into_dl_tensor()?;
-        let neighbors = neighbors.into_dl_tensor_mut()?;
-        let distances = distances.into_dl_tensor_mut()?;
-        let bitset = bitset.into_dl_tensor()?;
+        queries: &Q,
+        neighbors: &mut N,
+        distances: &mut D,
+        bitset: &B,
+    ) -> Result<()>
+    where
+        Q: AsDlTensor + ?Sized,
+        N: AsDlTensorMut + ?Sized,
+        D: AsDlTensorMut + ?Sized,
+        B: AsDlTensor + ?Sized,
+    {
+        let queries = queries.as_dl_tensor()?;
+        let neighbors = neighbors.as_dl_tensor_mut()?;
+        let distances = distances.as_dl_tensor_mut()?;
+        let bitset = bitset.as_dl_tensor()?;
         // The bitset pointer is cast to `usize` and stored in `prefilter`, then read
         // by the search call, so its `ManagedTensorRef` must outlive both.
         // Hence we keep it bound instead of chaining `to_c().as_mut_ptr()`.

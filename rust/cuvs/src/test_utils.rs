@@ -6,14 +6,12 @@
 //! Test-only tensor adapters.
 //!
 //! [`DeviceTensor`] is an RMM-backed device matrix, and the `ndarray` host
-//! adapters below implement [`IntoDlTensor`]/[`IntoDlTensorMut`] for plain host
+//! adapters below implement [`AsDlTensor`]/[`AsDlTensorMut`] for plain host
 //! arrays. We use `ndarray` only as a dev-dependency to assist with unit tests.
 
 use std::marker::PhantomData;
 
-use crate::dlpack::{
-    DLPackError, DLTensorView, DLTensorViewMut, DType, IntoDlTensor, IntoDlTensorMut,
-};
+use crate::dlpack::{AsDlTensor, AsDlTensorMut, DLPackError, DLTensorView, DLTensorViewMut, DType};
 use crate::error::{Result, check_cuvs};
 use crate::ffi;
 use crate::resources::Resources;
@@ -65,7 +63,7 @@ impl<'res, T: DType> DeviceTensor<'res, T> {
                 T::dl_dtype(),
             )?
         };
-        let device_view = (&mut device).into_dl_tensor_mut()?;
+        let device_view = device.as_dl_tensor_mut()?;
         unsafe {
             check_cuvs(ffi::cuvsMatrixCopy(
                 res.0,
@@ -100,7 +98,7 @@ impl<'res, T: DType> DeviceTensor<'res, T> {
                 T::dl_dtype(),
             )?
         };
-        let device = self.into_dl_tensor()?;
+        let device = self.as_dl_tensor()?;
         unsafe {
             check_cuvs(ffi::cuvsMatrixCopy(
                 res.0,
@@ -121,8 +119,8 @@ impl<T: DType> Drop for DeviceTensor<'_, T> {
     }
 }
 
-impl<'a, 'res, T: DType> IntoDlTensor<'a> for &'a DeviceTensor<'res, T> {
-    fn into_dl_tensor(self) -> std::result::Result<DLTensorView<'a>, DLPackError> {
+impl<T: DType> AsDlTensor for DeviceTensor<'_, T> {
+    fn as_dl_tensor(&self) -> std::result::Result<DLTensorView<'_>, DLPackError> {
         unsafe {
             DLTensorView::from_raw_parts(
                 self.data,
@@ -135,8 +133,8 @@ impl<'a, 'res, T: DType> IntoDlTensor<'a> for &'a DeviceTensor<'res, T> {
     }
 }
 
-impl<'a, 'res, T: DType> IntoDlTensorMut<'a> for &'a mut DeviceTensor<'res, T> {
-    fn into_dl_tensor_mut(self) -> std::result::Result<DLTensorViewMut<'a>, DLPackError> {
+impl<T: DType> AsDlTensorMut for DeviceTensor<'_, T> {
+    fn as_dl_tensor_mut(&mut self) -> std::result::Result<DLTensorViewMut<'_>, DLPackError> {
         unsafe {
             DLTensorViewMut::from_raw_parts(
                 self.data,
@@ -166,12 +164,12 @@ where
     (shape, strides)
 }
 
-impl<'a, A, D> IntoDlTensor<'a> for &'a ndarray::ArrayRef<A, D>
+impl<A, D> AsDlTensor for ndarray::ArrayRef<A, D>
 where
     A: DType,
     D: ndarray::Dimension,
 {
-    fn into_dl_tensor(self) -> std::result::Result<DLTensorView<'a>, DLPackError> {
+    fn as_dl_tensor(&self) -> std::result::Result<DLTensorView<'_>, DLPackError> {
         let (shape, strides) = array_layout(self);
         unsafe {
             DLTensorView::from_raw_parts(
@@ -185,12 +183,12 @@ where
     }
 }
 
-impl<'a, A, D> IntoDlTensorMut<'a> for &'a mut ndarray::ArrayRef<A, D>
+impl<A, D> AsDlTensorMut for ndarray::ArrayRef<A, D>
 where
     A: DType,
     D: ndarray::Dimension,
 {
-    fn into_dl_tensor_mut(self) -> std::result::Result<DLTensorViewMut<'a>, DLPackError> {
+    fn as_dl_tensor_mut(&mut self) -> std::result::Result<DLTensorViewMut<'_>, DLPackError> {
         let (shape, strides) = array_layout(self);
         unsafe {
             DLTensorViewMut::from_raw_parts(
@@ -213,7 +211,7 @@ mod tests {
     #[test]
     fn ndarray_contiguous_view_omits_strides() {
         let arr = ndarray::Array2::<f32>::zeros((10, 20));
-        let view = (&arr).into_dl_tensor().unwrap();
+        let view = arr.as_dl_tensor().unwrap();
 
         assert_eq!(view.shape(), &[10, 20]);
         assert!(view.strides().is_none());
@@ -228,7 +226,7 @@ mod tests {
     fn ndarray_transposed_view_reports_strides() {
         let arr = ndarray::Array2::<f32>::zeros((10, 20));
         let transposed = arr.t();
-        let view = (&transposed).into_dl_tensor().unwrap();
+        let view = transposed.as_dl_tensor().unwrap();
 
         assert_eq!(view.shape(), &[20, 10]);
         assert_eq!(view.strides(), Some(&[1i64, 20][..]));

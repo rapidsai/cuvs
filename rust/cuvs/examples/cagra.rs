@@ -6,7 +6,7 @@
 //! CAGRA example with a user-provided GPU tensor.
 //!
 //! This demonstrates how to feed your own device memory into cuVS by
-//! implementing the public [`IntoDlTensor`]/[`IntoDlTensorMut`] traits. The
+//! implementing the public [`AsDlTensor`]/[`AsDlTensorMut`] traits. The
 //! [`CudaTensor`] type manages device memory directly through the CUDA runtime
 //! (`cudaMalloc`/`cudaFree`) and copies to/from host arrays with `cudaMemcpyAsync`
 //! on the cuVS stream, reusing the resources handle's `get_cuda_stream`/
@@ -22,8 +22,8 @@ use std::os::raw::c_int;
 use cuvs::Resources;
 use cuvs::cagra::{Index, IndexParams, SearchParams};
 use cuvs::dlpack::{
-    DLDevice, DLDeviceType, DLPackError, DLTensorView, DLTensorViewMut, DType, IntoDlTensor,
-    IntoDlTensorMut,
+    AsDlTensor, AsDlTensorMut, DLDevice, DLDeviceType, DLPackError, DLTensorView, DLTensorViewMut,
+    DType,
 };
 
 use ndarray::s;
@@ -146,8 +146,8 @@ impl<T: DType> Drop for CudaTensor<T> {
     }
 }
 
-impl<'a, T: DType> IntoDlTensor<'a> for &'a CudaTensor<T> {
-    fn into_dl_tensor(self) -> std::result::Result<DLTensorView<'a>, DLPackError> {
+impl<T: DType> AsDlTensor for CudaTensor<T> {
+    fn as_dl_tensor(&self) -> std::result::Result<DLTensorView<'_>, DLPackError> {
         unsafe {
             DLTensorView::from_raw_parts(
                 self.data,
@@ -160,8 +160,8 @@ impl<'a, T: DType> IntoDlTensor<'a> for &'a CudaTensor<T> {
     }
 }
 
-impl<'a, T: DType> IntoDlTensorMut<'a> for &'a mut CudaTensor<T> {
-    fn into_dl_tensor_mut(self) -> std::result::Result<DLTensorViewMut<'a>, DLPackError> {
+impl<T: DType> AsDlTensorMut for CudaTensor<T> {
+    fn as_dl_tensor_mut(&mut self) -> std::result::Result<DLTensorViewMut<'_>, DLPackError> {
         unsafe {
             DLTensorViewMut::from_raw_parts(
                 self.data,

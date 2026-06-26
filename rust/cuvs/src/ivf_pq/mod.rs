@@ -9,8 +9,8 @@
 //!
 //! Build an [`Index`] from a dataset, then [`search`](Index::search) it with
 //! device-resident queries and output buffers. Tensors are passed through the
-//! [`IntoDlTensor`](crate::IntoDlTensor) /
-//! [`IntoDlTensorMut`](crate::IntoDlTensorMut) traits; see the
+//! [`AsDlTensor`](crate::AsDlTensor) /
+//! [`AsDlTensorMut`](crate::AsDlTensorMut) traits; see the
 //! [`dlpack`](crate::dlpack) module for the tensor model and `examples/cagra.rs`
 //! for the same build/search workflow.
 

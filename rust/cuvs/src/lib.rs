@@ -23,8 +23,6 @@ mod resources;
 pub(crate) mod test_utils;
 pub mod vamana;
 
-pub use dlpack::{
-    DLPackError, DLTensorView, DLTensorViewMut, DType, IntoDlTensor, IntoDlTensorMut,
-};
+pub use dlpack::{AsDlTensor, AsDlTensorMut, DLPackError, DLTensorView, DLTensorViewMut, DType};
 pub use error::{Error, Result};
 pub use resources::Resources;

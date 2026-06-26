@@ -6,7 +6,7 @@
 use std::ffi::CString;
 use std::io::{Write, stderr};
 
-use crate::dlpack::IntoDlTensor;
+use crate::dlpack::AsDlTensor;
 use crate::error::{Result, check_cuvs};
 use crate::resources::Resources;
 use crate::vamana::IndexParams;
@@ -25,13 +25,12 @@ impl Index {
     /// to improve graph quality. The index_params struct controls the degree of the final graph.
     ///
     /// `dataset` is a row-major matrix on the host or device implementing
-    /// [`IntoDlTensor`](crate::IntoDlTensor); it is copied into the index.
-    pub fn build<'a>(
-        res: &Resources,
-        params: &IndexParams,
-        dataset: impl IntoDlTensor<'a>,
-    ) -> Result<Index> {
-        let dataset = dataset.into_dl_tensor()?;
+    /// [`AsDlTensor`]; it is copied into the index.
+    pub fn build<T>(res: &Resources, params: &IndexParams, dataset: &T) -> Result<Index>
+    where
+        T: AsDlTensor + ?Sized,
+    {
+        let dataset = dataset.as_dl_tensor()?;
         let index = Index::new()?;
         // `cuvsVamanaBuild` copies the dataset into the index, so the index does not
         // retain a view into `dataset`; the borrow only needs to be valid for the
