@@ -698,14 +698,15 @@ void balancing_em_iters(const raft::resources& handle,
       }
       default: break;
     }
-    // E: Expectation step - predict labels (optionally via CAGRA with batched index rebuild)
+    // E: Expectation step - predict labels (optionally via CAGRA with batched index rebuild).
+    // build fit E-step: moving-centroid CAGRA with index reuse (use_ann_for_build_fit).
     const bool use_cagra_for_cluster_assignment =
       params.use_ann_for_build_fit &&
       n_clusters >= cuvs::cluster::kmeans::detail::kMinClustersForAnnFit &&
       std::is_same_v<MathT, float> && std::is_same_v<T, float>;
     if (use_cagra_for_cluster_assignment) {
       bool rebuild = (iter % params.ann_rebuild_interval == 0);
-      cuvs::cluster::kmeans::detail::predict_cagra_with_index_reuse<IdxT, LabelT>(
+      cuvs::cluster::kmeans::detail::assign_nearest_centroid_cagra_with_index_reuse<IdxT, LabelT>(
         handle,
         params,
         cluster_centers,

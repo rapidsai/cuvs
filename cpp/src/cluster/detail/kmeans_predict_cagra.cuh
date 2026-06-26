@@ -7,9 +7,10 @@
  * Used for scaling IVF training when the number of clusters K is very large.
  *
  * Shared helpers (build index on centroids, 1-NN search -> labels) are used by:
- * - predict_cagra_with_index_reuse (k-means fit: optional index reuse; pass rebuild=true every call
- *   for one-shot assign on float data, same work as a former predict_cagra path)
- * - ivf_pq extend (batched queries: build once + search_cagra_1nn per batch)
+ * - assign_nearest_centroid_cagra_with_index_reuse (k-means fit: optional index reuse on shifting
+ *   centroids)
+ * - ivf_pq extend / build post-fit predict (fixed centroids: build_cagra_index_for_centroids +
+ *   assign_nearest_centroid_cagra)
  */
 #pragma once
 
@@ -36,8 +37,8 @@ inline cuvs::neighbors::cagra::search_params default_cagra_centroid_search_param
 }
 
 /**
- * @brief Build a CAGRA index on centroid vectors (shared by extend, search_cagra_1nn callers, and
- * predict_cagra_with_index_reuse).
+ * @brief Build a CAGRA index on centroid vectors (shared by extend,
+ * assign_nearest_centroid_cagra callers, and assign_nearest_centroid_cagra_with_index_reuse).
  */
 inline cuvs::neighbors::cagra::index<float, uint32_t> build_cagra_index_for_centroids(
   raft::resources const& handle,
@@ -57,25 +58,28 @@ inline cuvs::neighbors::cagra::index<float, uint32_t> build_cagra_index_for_cent
 }
 
 /**
- * @brief Run 1-NN search with an existing CAGRA index and write cluster labels (and optional
- * per-query distances). Queries must be float row-major [n_queries, dim].
+ * @brief Assign each query to its nearest centroid using an existing CAGRA index built on
+ * centroids. Writes cluster labels (and optional per-query distances). Queries must be float
+ * row-major [n_queries, dim].
  *
  * Uses explicit row_major matrix view and raw label pointer so this compiles when
  * raft::make_device_*_view returns layout_c_contiguous mdspan (not assignable to the view types
  * required by cagra::search / device_vector_view).
  */
 template <typename LabelT>
-void search_cagra_1nn(raft::resources const& handle,
-                      cuvs::neighbors::cagra::search_params const& search_params,
-                      cuvs::neighbors::cagra::index<float, uint32_t> const& cagra_index,
-                      raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
-                      LabelT* labels_out,
-                      int64_t n_labels,
-                      float* distances_out = nullptr)
+void assign_nearest_centroid_cagra(
+  raft::resources const& handle,
+  cuvs::neighbors::cagra::search_params const& search_params,
+  cuvs::neighbors::cagra::index<float, uint32_t> const& cagra_index,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+  LabelT* labels_out,
+  int64_t n_labels,
+  float* distances_out = nullptr)
 {
   using namespace cuvs::neighbors::cagra;
   int64_t n_rows = queries.extent(0);
-  RAFT_EXPECTS(n_labels == n_rows, "search_cagra_1nn: labels length must match n_queries");
+  RAFT_EXPECTS(n_labels == n_rows,
+               "assign_nearest_centroid_cagra: labels length must match n_queries");
   auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(handle, n_rows, 1);
   auto distances = raft::make_device_matrix<float, int64_t>(handle, n_rows, 1);
   search(handle, search_params, cagra_index, queries, neighbors.view(), distances.view());
@@ -103,14 +107,10 @@ constexpr uint32_t kMinClustersForAnnFit = 5000;
  * memory may have shifted since that build (k-means M-step), so the graph still indexes a stale
  * snapshot — assignments are intentionally approximate between rebuilds.
  *
- * For a one-shot assign on float data (same work as building a fresh index then searching once),
- * pass rebuild=true each time (e.g. each benchmark iteration). For k-means fit, pass
- * rebuild=(iter % ann_rebuild_interval == 0) to amortize builds. Centroids and dataset must be
- * float. For k-means ANN path, call only when use_ann_for_build_fit and n_clusters >=
- * kMinClustersForAnnFit.
+ * Used by k-means fit when use_ann_for_build_fit and n_clusters >= kMinClustersForAnnFit.
  */
 template <typename IdxT, typename LabelT>
-void predict_cagra_with_index_reuse(
+void assign_nearest_centroid_cagra_with_index_reuse(
   raft::resources const& handle,
   cuvs::cluster::kmeans::balanced_params const& params,
   const float* centers,
@@ -124,9 +124,9 @@ void predict_cagra_with_index_reuse(
 {
   RAFT_EXPECTS(
     centers != nullptr && dataset != nullptr && labels != nullptr && index_opt != nullptr,
-    "predict_cagra_with_index_reuse: null argument");
+    "assign_nearest_centroid_cagra_with_index_reuse: null argument");
   RAFT_EXPECTS(n_clusters >= 1 && dim >= 1 && n_rows >= 1,
-               "predict_cagra_with_index_reuse: bad extents");
+               "assign_nearest_centroid_cagra_with_index_reuse: bad extents");
 
   raft::device_matrix_view<const float, int64_t, raft::row_major> centers_view(
     centers, static_cast<int64_t>(n_clusters), static_cast<int64_t>(dim));
@@ -137,13 +137,13 @@ void predict_cagra_with_index_reuse(
     *index_opt = build_cagra_index_for_centroids(handle, params, centers_view);
   }
 
-  search_cagra_1nn(handle,
-                   default_cagra_centroid_search_params(),
-                   index_opt->value(),
-                   queries_view,
-                   labels,
-                   static_cast<int64_t>(n_rows),
-                   nullptr);
+  assign_nearest_centroid_cagra(handle,
+                                default_cagra_centroid_search_params(),
+                                index_opt->value(),
+                                queries_view,
+                                labels,
+                                static_cast<int64_t>(n_rows),
+                                nullptr);
 }
 
 }  // namespace cuvs::cluster::kmeans::detail

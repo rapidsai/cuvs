@@ -1117,18 +1117,18 @@ void extend(raft::resources const& handle,
     kmeans_params.metric = coarse_clustering_metric(index->metric());
 
     // Default: brute-force assignment; set use_ann_for_extend to opt in to CAGRA.
+    // extend(): fixed-centroid CAGRA nearest-centroid assignment — build index once, assign per
+    // batch.
     const bool use_cagra_for_cluster_assignment = index->use_ann_for_extend().value_or(false);
     if (use_cagra_for_cluster_assignment) {
-      // Use CAGRA for cluster assignment when K is large (build once, search per batch).
-      // Same centroid index + 1-NN search path as kmeans::detail (extend batches; fit uses
-      // predict_cagra_with_index_reuse).
       raft::device_matrix_view<const float, int64_t, raft::row_major> centers_view(
         cluster_centers.data(),
         static_cast<int64_t>(n_clusters),
         static_cast<int64_t>(index->dim()));
-      auto cagra_idx = cuvs::cluster::kmeans::detail::build_cagra_index_for_centroids(
+      const auto cagra_index = cuvs::cluster::kmeans::detail::build_cagra_index_for_centroids(
         handle, kmeans_params, centers_view);
-      auto search_params = cuvs::cluster::kmeans::detail::default_cagra_centroid_search_params();
+      const auto cagra_search_params =
+        cuvs::cluster::kmeans::detail::default_cagra_centroid_search_params();
 
       for (const auto& batch : vec_batches) {
         auto batch_size = batch.size();
@@ -1147,13 +1147,13 @@ void extend(raft::resources const& handle,
           queries_float.data(),
           static_cast<int64_t>(batch_size),
           static_cast<int64_t>(index->dim()));
-        cuvs::cluster::kmeans::detail::search_cagra_1nn(handle,
-                                                        search_params,
-                                                        cagra_idx,
-                                                        queries_view,
-                                                        new_data_labels.data() + batch.offset(),
-                                                        static_cast<int64_t>(batch_size),
-                                                        nullptr);
+        cuvs::cluster::kmeans::detail::assign_nearest_centroid_cagra(
+          handle,
+          cagra_search_params,
+          cagra_index,
+          queries_view,
+          new_data_labels.data() + batch.offset(),
+          static_cast<int64_t>(batch_size));
         vec_batches.prefetch_next_batch();
         raft::resource::sync_stream(handle);
       }
@@ -1378,8 +1378,8 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = coarse_clustering_metric(impl->metric());
-    // ANN nearest-centroid lookup during build (k-means fit E-step; centroids change each iter).
-    // Default (nullopt / false) is brute-force assignment so benchmarks can sweep cluster counts.
+    // Propagate use_ann_for_build_fit into k-means; CAGRA runs inside fit's E-step
+    // (balancing_em_iters → assign_nearest_centroid_cagra_with_index_reuse), not here.
     if (params.use_ann_for_build_fit.value_or(false)) {
       kmeans_params.use_ann_for_build_fit = true;
       kmeans_params.ann_rebuild_interval  = 3;
@@ -1400,8 +1400,29 @@ auto build(raft::resources const& handle,
     }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
-    cuvs::cluster::kmeans::predict(
-      handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
+    // build post-fit: fixed-centroid CAGRA nearest-centroid assignment (use_ann_for_build_postfit).
+    const bool use_cagra_for_cluster_assignment =
+      params.use_ann_for_build_postfit.value_or(false) &&
+      impl->n_lists() >= cuvs::cluster::kmeans::detail::kMinClustersForAnnFit;
+    if (use_cagra_for_cluster_assignment) {
+      raft::device_matrix_view<const float, int64_t, raft::row_major> centers_view(
+        cluster_centers, static_cast<int64_t>(impl->n_lists()), static_cast<int64_t>(impl->dim()));
+      raft::device_matrix_view<const float, int64_t, raft::row_major> queries_view(
+        trainset.data_handle(),
+        static_cast<int64_t>(n_rows_train),
+        static_cast<int64_t>(impl->dim()));
+      cuvs::cluster::kmeans::detail::assign_nearest_centroid_cagra(
+        handle,
+        cuvs::cluster::kmeans::detail::default_cagra_centroid_search_params(),
+        cuvs::cluster::kmeans::detail::build_cagra_index_for_centroids(
+          handle, kmeans_params, centers_view),
+        queries_view,
+        labels.data(),
+        static_cast<int64_t>(n_rows_train));
+    } else {
+      cuvs::cluster::kmeans::predict(
+        handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
+    }
 
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, impl->rotation_matrix(), params.force_random_rotation);

@@ -93,12 +93,13 @@ static void BM_ClusterAssignment_CAGRA(benchmark::State& state)
   cuvs::cluster::kmeans::balanced_params params;
   params.metric = cuvs::distance::DistanceType::L2Expanded;
 
-  // Same timing as former predict_cagra: rebuild CAGRA on centroids + 1-NN each iteration
-  // (rebuild=true). float X/centroids only; predict_cagra_with_index_reuse matches that path.
+  // Same timing as assign_nearest_centroid_cagra_with_index_reuse with rebuild=true each iteration.
+  // float X/centroids only.
   std::optional<cuvs::neighbors::cagra::index<float, uint32_t>> cagra_index_opt;
 
   for (auto _ : state) {
-    cuvs::cluster::kmeans::detail::predict_cagra_with_index_reuse<int64_t, uint32_t>(
+    cuvs::cluster::kmeans::detail::assign_nearest_centroid_cagra_with_index_reuse<int64_t,
+                                                                                  uint32_t>(
       handle,
       params,
       centroids.data(),

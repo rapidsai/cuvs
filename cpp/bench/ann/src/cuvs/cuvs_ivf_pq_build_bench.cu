@@ -2,19 +2,19 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  *
- * IVF-PQ nearest-centroid lookup benchmarks (two scenarios):
+ * IVF-PQ nearest-centroid lookup benchmarks (three scenarios):
  *
- * Both compare brute force vs CAGRA for the same primitive: given centroid vectors, find the
+ * All compare brute force vs CAGRA for the same primitive: given centroid vectors, find the
  * nearest centroid for each data vector. CAGRA never computes centroids; it only accelerates
  * lookup.
  *
- * Main difference between build and extend:
- *  - Build: lookup runs during k-means fit (E-step). Centroids shift every iteration, so the CAGRA
- *    index is rebuilt periodically (`ann_rebuild_interval`). Times full `build()`; toggles
- *    `use_ann_for_build_fit`. `use_ann_for_extend = false` so add_data_on_build stays brute.
- *  - Extend: centroids are fixed (trained index). CAGRA is built once, then each new vector gets
- *    a fast 1-NN lookup. Times `extend()` only; toggles `use_ann_for_extend`. Setup deserialize
- *    is not timed.
+ *  - Build fit: lookup during k-means fit E-step (`use_ann_for_build_fit`). Centroids move each
+ *    EM iteration; CAGRA index is rebuilt periodically. Times full `build()`.
+ *  - Build post-fit: lookup after fit to label the train subsample for PQ codebooks
+ *    (`use_ann_for_build_postfit`). Fixed centroids; CAGRA built once per build. Times full
+ *    `build()`.
+ *  - Extend: fixed trained centroids (`use_ann_for_extend`). CAGRA built once per extend batch
+ *    loop. Times `extend()` only; setup deserialize is not timed.
  */
 #include <benchmark/benchmark.h>
 
@@ -84,14 +84,30 @@ void set_common_index_params(cuvs::neighbors::ivf_pq::index_params& params, uint
   params.metric                   = cuvs::distance::DistanceType::L2Expanded;
 }
 
-cuvs::neighbors::ivf_pq::index_params make_build_lookup_params(uint32_t n_lists,
-                                                               bool use_ann_for_build_fit)
+/** build() fit E-step only: toggles use_ann_for_build_fit; post-fit and extend stay brute. */
+cuvs::neighbors::ivf_pq::index_params make_build_fit_lookup_params(uint32_t n_lists,
+                                                                   bool use_ann_for_build_fit)
 {
   cuvs::neighbors::ivf_pq::index_params params;
   set_common_index_params(params, n_lists);
-  params.add_data_on_build     = true;
-  params.use_ann_for_extend    = false;
-  params.use_ann_for_build_fit = use_ann_for_build_fit;
+  params.add_data_on_build         = true;
+  params.use_ann_for_build_fit     = use_ann_for_build_fit;
+  params.use_ann_for_build_postfit = false;
+  params.use_ann_for_extend        = false;
+  return params;
+}
+
+/** build() post-fit predict only: toggles use_ann_for_build_postfit; fit E-step and extend stay
+ * brute. */
+cuvs::neighbors::ivf_pq::index_params make_build_postfit_lookup_params(
+  uint32_t n_lists, bool use_ann_for_build_postfit)
+{
+  cuvs::neighbors::ivf_pq::index_params params;
+  set_common_index_params(params, n_lists);
+  params.add_data_on_build         = true;
+  params.use_ann_for_build_fit     = false;
+  params.use_ann_for_build_postfit = use_ann_for_build_postfit;
+  params.use_ann_for_extend        = false;
   return params;
 }
 
@@ -100,9 +116,10 @@ cuvs::neighbors::ivf_pq::index_params make_extend_lookup_params(uint32_t n_lists
 {
   cuvs::neighbors::ivf_pq::index_params params;
   set_common_index_params(params, n_lists);
-  params.add_data_on_build     = false;
-  params.use_ann_for_build_fit = false;
-  params.use_ann_for_extend    = use_ann_for_extend;
+  params.add_data_on_build         = false;
+  params.use_ann_for_build_fit     = false;
+  params.use_ann_for_build_postfit = false;
+  params.use_ann_for_extend        = use_ann_for_extend;
   return params;
 }
 
@@ -191,20 +208,14 @@ void set_speedup_counters(benchmark::State& state,
     benchmark::Counter(total_cagra_ms, benchmark::Counter::kAvgIterations);
 }
 
-}  // namespace
-
-/**
- * Full IVF-PQ build: brute vs CAGRA nearest-centroid lookup during k-means fit E-step
- * (`use_ann_for_build_fit`). Centroids move each iteration, so CAGRA is rebuilt across fit
- * iterations. Times all of `build()`; PQ training and other steps dilute the measured speedup.
- */
-static void BM_IVFPQ_Build_NearestCentroidLookup_Speedup(benchmark::State& state)
+void run_build_bf_vs_cagra_speedup(benchmark::State& state,
+                                   DatasetFixture const& fixture,
+                                   cuvs::neighbors::ivf_pq::index_params const& params_bf,
+                                   cuvs::neighbors::ivf_pq::index_params const& params_cagra,
+                                   char const* speedup_key,
+                                   char const* bf_key,
+                                   char const* cagra_key)
 {
-  auto ranges = read_ranges(state);
-  DatasetFixture fixture(ranges);
-  auto params_bf    = make_build_lookup_params(ranges.n_lists, false);
-  auto params_cagra = make_build_lookup_params(ranges.n_lists, true);
-
   double total_bf_ms = 0.0, total_cagra_ms = 0.0;
   accumulate_bf_vs_cagra_ms(
     state,
@@ -220,8 +231,47 @@ static void BM_IVFPQ_Build_NearestCentroidLookup_Speedup(benchmark::State& state
     },
     total_bf_ms,
     total_cagra_ms);
-  set_speedup_counters(
-    state, "speedup_build", "bf_build_ms", "cagra_build_ms", total_bf_ms, total_cagra_ms);
+  set_speedup_counters(state, speedup_key, bf_key, cagra_key, total_bf_ms, total_cagra_ms);
+}
+
+}  // namespace
+
+/**
+ * Full IVF-PQ build: brute vs CAGRA nearest-centroid lookup during k-means fit E-step only
+ * (`use_ann_for_build_fit`). Post-fit predict and add_data_on_build stay brute. Centroids move
+ * each fit iteration, so CAGRA is rebuilt across EM iterations. Times all of `build()`; PQ
+ * training and other steps dilute the measured speedup.
+ */
+static void BM_IVFPQ_BuildFit_NearestCentroidLookup_Speedup(benchmark::State& state)
+{
+  auto ranges = read_ranges(state);
+  DatasetFixture fixture(ranges);
+  run_build_bf_vs_cagra_speedup(state,
+                                fixture,
+                                make_build_fit_lookup_params(ranges.n_lists, false),
+                                make_build_fit_lookup_params(ranges.n_lists, true),
+                                "speedup_build_fit",
+                                "bf_build_fit_ms",
+                                "cagra_build_fit_ms");
+}
+
+/**
+ * Full IVF-PQ build: brute vs CAGRA nearest-centroid lookup during post-fit predict only
+ * (`use_ann_for_build_postfit`). Fit E-step and add_data_on_build stay brute. Centroids are
+ * fixed; CAGRA is built once per build for train-subsample labeling. Times all of `build()`;
+ * k-means fit, PQ training, and other steps dilute the measured speedup.
+ */
+static void BM_IVFPQ_BuildPostfit_NearestCentroidLookup_Speedup(benchmark::State& state)
+{
+  auto ranges = read_ranges(state);
+  DatasetFixture fixture(ranges);
+  run_build_bf_vs_cagra_speedup(state,
+                                fixture,
+                                make_build_postfit_lookup_params(ranges.n_lists, false),
+                                make_build_postfit_lookup_params(ranges.n_lists, true),
+                                "speedup_build_postfit",
+                                "bf_build_postfit_ms",
+                                "cagra_build_postfit_ms");
 }
 
 /**
@@ -262,88 +312,55 @@ static void BM_IVFPQ_Extend_NearestCentroidLookup_Speedup(benchmark::State& stat
 
 constexpr int64_t kDim = 128;
 
-// build(): nearest-centroid lookup in k-means fit E-step (full build timed).
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({327680, 65536, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({1000000, 200000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({1500000, 300000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({1750000, 350000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({2000000, 400000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({3000000, 600000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({4000000, 800000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Build_NearestCentroidLookup_Speedup)
-  ->Args({5000000, 1000000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
+#define IVFPQ_LOOKUP_BENCH_ARGS(BM)              \
+  BENCHMARK(BM)                                  \
+    ->Args({327680, 65536, kDim})                \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({1000000, 200000, kDim})              \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({1500000, 300000, kDim})              \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({1750000, 350000, kDim})              \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({2000000, 400000, kDim})              \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({3000000, 600000, kDim})              \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({4000000, 800000, kDim})              \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"}); \
+  BENCHMARK(BM)                                  \
+    ->Args({5000000, 1000000, kDim})             \
+    ->Unit(benchmark::kMillisecond)              \
+    ->UseRealTime()                              \
+    ->ArgNames({"n_vectors", "n_lists", "dim"});
+
+// build() fit E-step only (full build timed).
+IVFPQ_LOOKUP_BENCH_ARGS(BM_IVFPQ_BuildFit_NearestCentroidLookup_Speedup)
+
+// build() post-fit predict only (full build timed).
+IVFPQ_LOOKUP_BENCH_ARGS(BM_IVFPQ_BuildPostfit_NearestCentroidLookup_Speedup)
 
 // extend(): fixed-centroid nearest-centroid lookup, CAGRA built once per extend.
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({327680, 65536, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({1000000, 200000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({1500000, 300000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({1750000, 350000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({2000000, 400000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({3000000, 600000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({4000000, 800000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
-BENCHMARK(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
-  ->Args({5000000, 1000000, kDim})
-  ->Unit(benchmark::kMillisecond)
-  ->UseRealTime()
-  ->ArgNames({"n_vectors", "n_lists", "dim"});
+IVFPQ_LOOKUP_BENCH_ARGS(BM_IVFPQ_Extend_NearestCentroidLookup_Speedup)
 
 BENCHMARK_MAIN();

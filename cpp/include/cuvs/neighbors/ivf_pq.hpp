@@ -149,6 +149,15 @@ struct index_params : cuvs::neighbors::index_params {
   std::optional<bool> use_ann_for_build_fit;
 
   /**
+   * Use CAGRA vs brute force for nearest-centroid lookup during `build()` post-fit predict
+   * (assign train subsample labels for PQ codebook training; centroids are fixed).
+   * - std::nullopt (default): brute-force assignment.
+   * - true: ANN-based assignment for the post-fit labeling step.
+   * - false: brute-force assignment (explicit).
+   */
+  std::optional<bool> use_ann_for_build_postfit;
+
+  /**
    * Creates index_params based on shape of the input dataset.
    * Usage example:
    * @code{.cpp}
