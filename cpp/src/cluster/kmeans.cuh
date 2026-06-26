@@ -444,6 +444,19 @@ void cluster_cost(
     handle, min_cluster_distance.view(), workspace, cost, raft::add_op{});
 }
 
+template <typename DataT, typename IndexT>
+void cluster_cost_host(const raft::resources& handle,
+                       raft::device_matrix_view<const DataT, IndexT> X,
+                       raft::device_matrix_view<const DataT, IndexT> centroids,
+                       raft::host_scalar_view<DataT> cost,
+                       std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight)
+{
+  auto d_cost = raft::make_device_scalar<DataT>(handle, DataT{0});
+  cluster_cost(handle, X, centroids, d_cost.view(), sample_weight, std::nullopt);
+  raft::copy(handle, cost, raft::make_const_mdspan(d_cost.view()));
+  raft::resource::sync_stream(handle);
+}
+
 /**
  * @brief Calculates a <key, value> pair for every sample in input 'X' where key is an
  * index of one of the 'centroids' (index of the nearest centroid) and 'value'
