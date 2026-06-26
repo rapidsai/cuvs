@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Cluster assignment via CAGRA: assign each data point to nearest centroid using an
@@ -45,7 +45,7 @@ inline cuvs::neighbors::cagra::index<float, uint32_t> build_cagra_index_for_cent
   raft::device_matrix_view<const float, int64_t, raft::row_major> centroids)
 {
   using namespace cuvs::neighbors::cagra;
-  int64_t n_clusters = centroids.extent(0);
+  int64_t n_clusters  = centroids.extent(0);
   size_t graph_degree = std::min<size_t>(64, std::max<int64_t>(1, n_clusters - 1));
   size_t inter_degree = std::min<size_t>(128, std::max<int64_t>(1, n_clusters - 1));
   index_params build_params;
@@ -85,9 +85,10 @@ void search_cagra_1nn(raft::resources const& handle,
   raft::linalg::map(
     handle, raft::make_const_mdspan(neighbors_col), labels_view, raft::cast_op<LabelT>());
   if (distances_out != nullptr) {
-    raft::copy(handle,
-               raft::make_device_vector_view<float, int64_t>(distances_out, n_rows),
-               raft::make_device_vector_view<const float, int64_t>(distances.data_handle(), n_rows));
+    raft::copy(
+      handle,
+      raft::make_device_vector_view<float, int64_t>(distances_out, n_rows),
+      raft::make_device_vector_view<const float, int64_t>(distances.data_handle(), n_rows));
   }
 }
 
@@ -105,7 +106,8 @@ constexpr uint32_t kMinClustersForAnnFit = 5000;
  * For a one-shot assign on float data (same work as building a fresh index then searching once),
  * pass rebuild=true each time (e.g. each benchmark iteration). For k-means fit, pass
  * rebuild=(iter % ann_rebuild_interval == 0) to amortize builds. Centroids and dataset must be
- * float. For k-means ANN path, call only when use_ann_for_fit and n_clusters >= kMinClustersForAnnFit.
+ * float. For k-means ANN path, call only when use_ann_for_build_fit and n_clusters >=
+ * kMinClustersForAnnFit.
  */
 template <typename IdxT, typename LabelT>
 void predict_cagra_with_index_reuse(
@@ -120,9 +122,11 @@ void predict_cagra_with_index_reuse(
   std::optional<cuvs::neighbors::cagra::index<float, uint32_t>>* index_opt,
   bool rebuild)
 {
-  RAFT_EXPECTS(centers != nullptr && dataset != nullptr && labels != nullptr && index_opt != nullptr,
-               "predict_cagra_with_index_reuse: null argument");
-  RAFT_EXPECTS(n_clusters >= 1 && dim >= 1 && n_rows >= 1, "predict_cagra_with_index_reuse: bad extents");
+  RAFT_EXPECTS(
+    centers != nullptr && dataset != nullptr && labels != nullptr && index_opt != nullptr,
+    "predict_cagra_with_index_reuse: null argument");
+  RAFT_EXPECTS(n_clusters >= 1 && dim >= 1 && n_rows >= 1,
+               "predict_cagra_with_index_reuse: bad extents");
 
   raft::device_matrix_view<const float, int64_t, raft::row_major> centers_view(
     centers, static_cast<int64_t>(n_clusters), static_cast<int64_t>(dim));

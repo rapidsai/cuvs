@@ -140,13 +140,13 @@ struct index_params : cuvs::neighbors::index_params {
   std::optional<bool> use_ann_for_extend;
 
   /**
-   * Use CAGRA vs brute force for balanced k-means *fit* (training centroids; they move each EM
-   * iter).
+   * Use CAGRA vs brute force for nearest-centroid lookup during `build()` k-means fit (E-step;
+   * centroids move each EM iter). This is the main ANN-accelerated step in build.
    * - std::nullopt (default): brute-force assignment during fit.
    * - true: ANN-based assignment during fit (CAGRA with periodic index rebuilds).
    * - false: brute-force assignment during fit (explicit).
    */
-  std::optional<bool> use_ann_for_fit;
+  std::optional<bool> use_ann_for_build_fit;
 
   /**
    * Creates index_params based on shape of the input dataset.

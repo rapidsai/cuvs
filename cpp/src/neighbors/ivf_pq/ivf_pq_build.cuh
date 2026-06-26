@@ -1378,11 +1378,11 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = coarse_clustering_metric(impl->metric());
-    // ANN for k-means fit (centroids change each iteration): only when use_ann_for_fit == true.
+    // ANN nearest-centroid lookup during build (k-means fit E-step; centroids change each iter).
     // Default (nullopt / false) is brute-force assignment so benchmarks can sweep cluster counts.
-    if (params.use_ann_for_fit.value_or(false)) {
-      kmeans_params.use_ann_for_fit      = true;
-      kmeans_params.ann_rebuild_interval = 3;
+    if (params.use_ann_for_build_fit.value_or(false)) {
+      kmeans_params.use_ann_for_build_fit = true;
+      kmeans_params.ann_rebuild_interval  = 3;
     }
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {

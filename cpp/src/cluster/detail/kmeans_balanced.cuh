@@ -700,7 +700,7 @@ void balancing_em_iters(const raft::resources& handle,
     }
     // E: Expectation step - predict labels (optionally via CAGRA with batched index rebuild)
     const bool use_cagra_for_cluster_assignment =
-      params.use_ann_for_fit &&
+      params.use_ann_for_build_fit &&
       n_clusters >= cuvs::cluster::kmeans::detail::kMinClustersForAnnFit &&
       std::is_same_v<MathT, float> && std::is_same_v<T, float>;
     if (use_cagra_for_cluster_assignment) {

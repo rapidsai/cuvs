@@ -11,7 +11,7 @@
  * Main difference between build and extend:
  *  - Build: lookup runs during k-means fit (E-step). Centroids shift every iteration, so the CAGRA
  *    index is rebuilt periodically (`ann_rebuild_interval`). Times full `build()`; toggles
- *    `use_ann_for_fit`. `use_ann_for_extend = false` so add_data_on_build stays brute.
+ *    `use_ann_for_build_fit`. `use_ann_for_extend = false` so add_data_on_build stays brute.
  *  - Extend: centroids are fixed (trained index). CAGRA is built once, then each new vector gets
  *    a fast 1-NN lookup. Times `extend()` only; toggles `use_ann_for_extend`. Setup deserialize
  *    is not timed.
@@ -21,6 +21,7 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
@@ -37,6 +38,19 @@
 
 namespace {
 
+struct BenchRanges {
+  int64_t n_rows;
+  uint32_t n_lists;
+  int64_t dim;
+};
+
+BenchRanges read_ranges(benchmark::State const& state)
+{
+  return BenchRanges{static_cast<int64_t>(state.range(0)),
+                     static_cast<uint32_t>(state.range(1)),
+                     static_cast<int64_t>(state.range(2))};
+}
+
 void init_random_dataset(raft::resources const& handle, float* data, int64_t n_rows, int64_t dim)
 {
   raft::random::RngState rng(12345ULL);
@@ -44,7 +58,54 @@ void init_random_dataset(raft::resources const& handle, float* data, int64_t n_r
   raft::resource::sync_stream(handle);
 }
 
-/** Serialize an empty trained index to a string for benchmark reset. */
+/** Shared dataset + handle setup for both benchmarks. */
+struct DatasetFixture {
+  raft::device_resources handle;
+  rmm::device_uvector<float> dataset;
+  raft::device_matrix_view<const float, int64_t, raft::row_major> view;
+
+  explicit DatasetFixture(BenchRanges const& ranges)
+    : handle{},
+      dataset(static_cast<size_t>(ranges.n_rows) * static_cast<size_t>(ranges.dim),
+              raft::resource::get_cuda_stream(handle))
+  {
+    init_random_dataset(handle, dataset.data(), ranges.n_rows, ranges.dim);
+    raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+    view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+      dataset.data(), ranges.n_rows, ranges.dim);
+  }
+};
+
+void set_common_index_params(cuvs::neighbors::ivf_pq::index_params& params, uint32_t n_lists)
+{
+  params.n_lists                  = n_lists;
+  params.kmeans_n_iters           = 3;
+  params.kmeans_trainset_fraction = 0.2;
+  params.metric                   = cuvs::distance::DistanceType::L2Expanded;
+}
+
+cuvs::neighbors::ivf_pq::index_params make_build_lookup_params(uint32_t n_lists,
+                                                               bool use_ann_for_build_fit)
+{
+  cuvs::neighbors::ivf_pq::index_params params;
+  set_common_index_params(params, n_lists);
+  params.add_data_on_build     = true;
+  params.use_ann_for_extend    = false;
+  params.use_ann_for_build_fit = use_ann_for_build_fit;
+  return params;
+}
+
+cuvs::neighbors::ivf_pq::index_params make_extend_lookup_params(uint32_t n_lists,
+                                                                bool use_ann_for_extend)
+{
+  cuvs::neighbors::ivf_pq::index_params params;
+  set_common_index_params(params, n_lists);
+  params.add_data_on_build     = false;
+  params.use_ann_for_build_fit = false;
+  params.use_ann_for_extend    = use_ann_for_extend;
+  return params;
+}
+
 std::string serialize_index_blob(raft::resources const& handle,
                                  cuvs::neighbors::ivf_pq::index<int64_t> const& index)
 {
@@ -63,64 +124,104 @@ void deserialize_index_from_blob(raft::resources const& handle,
   raft::resource::sync_stream(handle);
 }
 
+/** Serialized empty trained indices for per-iteration extend reset (setup, not timed). */
+struct ExtendIndexSnapshots {
+  std::string empty_index_snapshot_bf;
+  std::string empty_index_snapshot_cagra;
+
+  static ExtendIndexSnapshots create(
+    raft::resources const& handle,
+    cuvs::neighbors::ivf_pq::index_params const& params_bf,
+    cuvs::neighbors::ivf_pq::index_params const& params_cagra,
+    raft::device_matrix_view<const float, int64_t, raft::row_major> dataset_view)
+  {
+    ExtendIndexSnapshots snapshots;
+    auto idx_bf    = cuvs::neighbors::ivf_pq::build(handle, params_bf, dataset_view);
+    auto idx_cagra = cuvs::neighbors::ivf_pq::build(handle, params_cagra, dataset_view);
+    snapshots.empty_index_snapshot_bf    = serialize_index_blob(handle, idx_bf);
+    snapshots.empty_index_snapshot_cagra = serialize_index_blob(handle, idx_cagra);
+    return snapshots;
+  }
+
+  void restore(raft::resources const& handle,
+               cuvs::neighbors::ivf_pq::index<int64_t>* index_bf,
+               cuvs::neighbors::ivf_pq::index<int64_t>* index_cagra) const
+  {
+    deserialize_index_from_blob(handle, empty_index_snapshot_bf, index_bf);
+    deserialize_index_from_blob(handle, empty_index_snapshot_cagra, index_cagra);
+  }
+};
+
+double time_synced_ms(raft::resources const& handle, std::function<void()> const& op)
+{
+  auto start = std::chrono::steady_clock::now();
+  op();
+  raft::resource::sync_stream(handle);
+  auto end = std::chrono::steady_clock::now();
+  return 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
+}
+
+/** Run brute vs CAGRA paths each iteration; `before_timed_work` runs outside the chrono window. */
+template <typename PreIterationFn, typename BfFn, typename CagraFn>
+void accumulate_bf_vs_cagra_ms(benchmark::State& state,
+                               raft::resources const& handle,
+                               PreIterationFn&& before_timed_work,
+                               BfFn&& run_bf,
+                               CagraFn&& run_cagra,
+                               double& total_bf_ms,
+                               double& total_cagra_ms)
+{
+  for (auto _ : state) {
+    before_timed_work(state);
+    total_bf_ms += time_synced_ms(handle, run_bf);
+    total_cagra_ms += time_synced_ms(handle, run_cagra);
+  }
+}
+
+void set_speedup_counters(benchmark::State& state,
+                          char const* speedup_key,
+                          char const* bf_key,
+                          char const* cagra_key,
+                          double total_bf_ms,
+                          double total_cagra_ms)
+{
+  if (total_cagra_ms > 0) { state.counters[speedup_key] = total_bf_ms / total_cagra_ms; }
+  state.counters[bf_key] = benchmark::Counter(total_bf_ms, benchmark::Counter::kAvgIterations);
+  state.counters[cagra_key] =
+    benchmark::Counter(total_cagra_ms, benchmark::Counter::kAvgIterations);
+}
+
 }  // namespace
 
 /**
  * Full IVF-PQ build: brute vs CAGRA nearest-centroid lookup during k-means fit E-step
- * (`use_ann_for_fit`). Centroids move each iteration, so CAGRA is rebuilt across fit iterations.
- * Times all of `build()`; PQ training and other steps dilute the measured speedup.
+ * (`use_ann_for_build_fit`). Centroids move each iteration, so CAGRA is rebuilt across fit
+ * iterations. Times all of `build()`; PQ training and other steps dilute the measured speedup.
  */
 static void BM_IVFPQ_Build_NearestCentroidLookup_Speedup(benchmark::State& state)
 {
-  int64_t n_rows   = static_cast<int64_t>(state.range(0));
-  uint32_t n_lists = static_cast<uint32_t>(state.range(1));
-  int64_t dim      = static_cast<int64_t>(state.range(2));
+  auto ranges = read_ranges(state);
+  DatasetFixture fixture(ranges);
+  auto params_bf    = make_build_lookup_params(ranges.n_lists, false);
+  auto params_cagra = make_build_lookup_params(ranges.n_lists, true);
 
-  raft::device_resources handle;
-  rmm::device_uvector<float> dataset(static_cast<size_t>(n_rows) * static_cast<size_t>(dim),
-                                     raft::resource::get_cuda_stream(handle));
-  init_random_dataset(handle, dataset.data(), n_rows, dim);
-
-  cuvs::neighbors::ivf_pq::index_params params_bf_fit;
-  params_bf_fit.n_lists                  = n_lists;
-  params_bf_fit.kmeans_n_iters           = 3;
-  params_bf_fit.kmeans_trainset_fraction = 0.2;
-  params_bf_fit.add_data_on_build        = true;
-  params_bf_fit.metric                   = cuvs::distance::DistanceType::L2Expanded;
-  params_bf_fit.use_ann_for_extend       = false;
-  params_bf_fit.use_ann_for_fit          = false;
-
-  cuvs::neighbors::ivf_pq::index_params params_ann_fit = params_bf_fit;
-  params_ann_fit.use_ann_for_fit                       = true;
-
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-
-  auto dataset_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    dataset.data(), n_rows, dim);
-
-  double total_bf_ms = 0.0, total_ann_ms = 0.0;
-
-  for (auto _ : state) {
-    auto start  = std::chrono::steady_clock::now();
-    auto idx_bf = cuvs::neighbors::ivf_pq::build(handle, params_bf_fit, dataset_view);
-    benchmark::DoNotOptimize(idx_bf.size());
-    raft::resource::sync_stream(handle);
-    auto end = std::chrono::steady_clock::now();
-    total_bf_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
-
-    start        = std::chrono::steady_clock::now();
-    auto idx_ann = cuvs::neighbors::ivf_pq::build(handle, params_ann_fit, dataset_view);
-    benchmark::DoNotOptimize(idx_ann.size());
-    raft::resource::sync_stream(handle);
-    end = std::chrono::steady_clock::now();
-    total_ann_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
-  }
-
-  if (total_ann_ms > 0) { state.counters["speedup_build"] = total_bf_ms / total_ann_ms; }
-  state.counters["bf_build_ms"] =
-    benchmark::Counter(total_bf_ms, benchmark::Counter::kAvgIterations);
-  state.counters["cagra_build_ms"] =
-    benchmark::Counter(total_ann_ms, benchmark::Counter::kAvgIterations);
+  double total_bf_ms = 0.0, total_cagra_ms = 0.0;
+  accumulate_bf_vs_cagra_ms(
+    state,
+    fixture.handle,
+    [](benchmark::State&) {},
+    [&] {
+      auto idx = cuvs::neighbors::ivf_pq::build(fixture.handle, params_bf, fixture.view);
+      benchmark::DoNotOptimize(idx.size());
+    },
+    [&] {
+      auto idx = cuvs::neighbors::ivf_pq::build(fixture.handle, params_cagra, fixture.view);
+      benchmark::DoNotOptimize(idx.size());
+    },
+    total_bf_ms,
+    total_cagra_ms);
+  set_speedup_counters(
+    state, "speedup_build", "bf_build_ms", "cagra_build_ms", total_bf_ms, total_cagra_ms);
 }
 
 /**
@@ -130,66 +231,33 @@ static void BM_IVFPQ_Build_NearestCentroidLookup_Speedup(benchmark::State& state
  */
 static void BM_IVFPQ_Extend_NearestCentroidLookup_Speedup(benchmark::State& state)
 {
-  int64_t n_rows   = static_cast<int64_t>(state.range(0));
-  uint32_t n_lists = static_cast<uint32_t>(state.range(1));
-  int64_t dim      = static_cast<int64_t>(state.range(2));
+  auto ranges = read_ranges(state);
+  DatasetFixture fixture(ranges);
+  auto params_bf    = make_extend_lookup_params(ranges.n_lists, false);
+  auto params_cagra = make_extend_lookup_params(ranges.n_lists, true);
+  auto snapshots =
+    ExtendIndexSnapshots::create(fixture.handle, params_bf, params_cagra, fixture.view);
 
-  raft::device_resources handle;
-  rmm::device_uvector<float> dataset(static_cast<size_t>(n_rows) * static_cast<size_t>(dim),
-                                     raft::resource::get_cuda_stream(handle));
-  init_random_dataset(handle, dataset.data(), n_rows, dim);
-
-  cuvs::neighbors::ivf_pq::index_params params_common;
-  params_common.n_lists                  = n_lists;
-  params_common.kmeans_n_iters           = 3;
-  params_common.kmeans_trainset_fraction = 0.2;
-  params_common.add_data_on_build        = false;
-  params_common.metric                   = cuvs::distance::DistanceType::L2Expanded;
-  params_common.use_ann_for_fit          = false;
-
-  cuvs::neighbors::ivf_pq::index_params params_bf_ext    = params_common;
-  params_bf_ext.use_ann_for_extend                       = false;
-  cuvs::neighbors::ivf_pq::index_params params_cagra_ext = params_common;
-  params_cagra_ext.use_ann_for_extend                    = true;
-
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-
-  auto dataset_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    dataset.data(), n_rows, dim);
-
-  auto idx_bf          = cuvs::neighbors::ivf_pq::build(handle, params_bf_ext, dataset_view);
-  auto idx_cag         = cuvs::neighbors::ivf_pq::build(handle, params_cagra_ext, dataset_view);
-  std::string blob_bf  = serialize_index_blob(handle, idx_bf);
-  std::string blob_cag = serialize_index_blob(handle, idx_cag);
+  cuvs::neighbors::ivf_pq::index<int64_t> index_bf(fixture.handle);
+  cuvs::neighbors::ivf_pq::index<int64_t> index_cagra(fixture.handle);
 
   double total_bf_ms = 0.0, total_cagra_ms = 0.0;
-
-  for (auto _ : state) {
-    state.PauseTiming();
-    cuvs::neighbors::ivf_pq::index<int64_t> empty_bf(handle);
-    cuvs::neighbors::ivf_pq::index<int64_t> empty_cag(handle);
-    deserialize_index_from_blob(handle, blob_bf, &empty_bf);
-    deserialize_index_from_blob(handle, blob_cag, &empty_cag);
-    state.ResumeTiming();
-
-    auto start = std::chrono::steady_clock::now();
-    cuvs::neighbors::ivf_pq::extend(handle, dataset_view, std::nullopt, &empty_bf);
-    raft::resource::sync_stream(handle);
-    auto end = std::chrono::steady_clock::now();
-    total_bf_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
-
-    start = std::chrono::steady_clock::now();
-    cuvs::neighbors::ivf_pq::extend(handle, dataset_view, std::nullopt, &empty_cag);
-    raft::resource::sync_stream(handle);
-    end = std::chrono::steady_clock::now();
-    total_cagra_ms += 1e-6 * std::chrono::duration<double, std::nano>(end - start).count();
-  }
-
-  if (total_cagra_ms > 0) { state.counters["speedup_extend"] = total_bf_ms / total_cagra_ms; }
-  state.counters["bf_extend_ms"] =
-    benchmark::Counter(total_bf_ms, benchmark::Counter::kAvgIterations);
-  state.counters["cagra_extend_ms"] =
-    benchmark::Counter(total_cagra_ms, benchmark::Counter::kAvgIterations);
+  accumulate_bf_vs_cagra_ms(
+    state,
+    fixture.handle,
+    [&](benchmark::State& st) {
+      st.PauseTiming();
+      snapshots.restore(fixture.handle, &index_bf, &index_cagra);
+      st.ResumeTiming();
+    },
+    [&] { cuvs::neighbors::ivf_pq::extend(fixture.handle, fixture.view, std::nullopt, &index_bf); },
+    [&] {
+      cuvs::neighbors::ivf_pq::extend(fixture.handle, fixture.view, std::nullopt, &index_cagra);
+    },
+    total_bf_ms,
+    total_cagra_ms);
+  set_speedup_counters(
+    state, "speedup_extend", "bf_extend_ms", "cagra_extend_ms", total_bf_ms, total_cagra_ms);
 }
 
 constexpr int64_t kDim = 128;
