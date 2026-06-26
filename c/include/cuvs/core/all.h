@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cuvs/core/c_config.h>
+#include <cuvs/core/export.h>
 #include <cuvs/core/c_api.h>
 
 #include <cuvs/cluster/kmeans.h>
@@ -22,6 +23,7 @@
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/neighbors/ivf_sq.h>
 #include <cuvs/neighbors/nn_descent.h>
 #include <cuvs/neighbors/refine.h>
 #include <cuvs/neighbors/tiered_index.h>
@@ -38,6 +40,7 @@
   #include <cuvs/neighbors/mg_ivf_pq.h>
 #endif
 
+#include <cuvs/preprocessing/pca.h>
 #include <cuvs/preprocessing/quantize/binary.h>
 #include <cuvs/preprocessing/quantize/pq.h>
 #include <cuvs/preprocessing/quantize/scalar.h>

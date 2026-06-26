@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,8 +7,8 @@ use cuvs::cagra::{Index, IndexParams, SearchParams};
 use cuvs::{ManagedTensor, Resources, Result};
 
 use ndarray::s;
-use ndarray_rand::rand_distr::Uniform;
 use ndarray_rand::RandomExt;
+use ndarray_rand::rand_distr::Uniform;
 
 /// Example showing how to index and search data with CAGRA
 fn cagra_example() -> Result<()> {
@@ -23,10 +23,7 @@ fn cagra_example() -> Result<()> {
     // build the cagra index
     let build_params = IndexParams::new()?;
     let index = Index::build(&res, &build_params, &dataset)?;
-    println!(
-        "Indexed {}x{} datapoints into cagra index",
-        n_datapoints, n_features
-    );
+    println!("Indexed {}x{} datapoints into cagra index", n_datapoints, n_features);
 
     // use the first 4 points from the dataset as queries : will test that we get them back
     // as their own nearest neighbor

@@ -1,11 +1,18 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "kmeans.cuh"
 #include "kmeans_impl.cuh"
+#include <raft/core/logger.hpp>
+#include <raft/core/resource/comms.hpp>
+#include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
+
+#ifdef CUVS_BUILD_MG_ALGOS
+#include "detail/kmeans_mg_batched.cuh"
+#endif
 
 namespace cuvs::cluster::kmeans {
 
@@ -62,4 +69,33 @@ void fit(raft::resources const& handle,
   cuvs::cluster::kmeans::fit<float, int64_t>(
     handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
+
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::host_matrix_view<const float, int64_t> X,
+         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float> inertia,
+         raft::host_scalar_view<int64_t> n_iter)
+{
+#ifdef CUVS_BUILD_MG_ALGOS
+  if (raft::resource::is_multi_gpu(handle)) {
+    mg::detail::batched_fit_omp<float, int64_t>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  } else if (raft::resource::comms_initialized(handle)) {
+    mg::detail::mnmg_fit<float, int64_t>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  } else
+#else
+  if (raft::resource::is_multi_gpu(handle) || raft::resource::comms_initialized(handle)) {
+    RAFT_LOG_WARN(
+      "MG handle detected but cuVS built without MG support; falling back to single-GPU.");
+  }
+#endif
+  {
+    cuvs::cluster::kmeans::detail::fit<float, int64_t>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  }
+}
+
 }  // namespace cuvs::cluster::kmeans

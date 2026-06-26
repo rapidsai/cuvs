@@ -5,7 +5,7 @@
 # cmake-format: on
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
 
 include(../../cmake/rapids_config.cmake)
 
@@ -31,7 +31,6 @@ endif()
 unset(cuvs_FOUND)
 
 # --- CUDA --- #
-set(CUDA_STATIC_RUNTIME ON)
 set(CUDA_STATIC_MATH_LIBRARIES OFF)
 
 # --- RAFT ---#
