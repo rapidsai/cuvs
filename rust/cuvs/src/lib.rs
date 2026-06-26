@@ -19,6 +19,7 @@ mod error;
 pub mod ivf_flat;
 pub mod ivf_pq;
 mod resources;
+pub mod tiered_index;
 pub mod vamana;
 
 pub use dlpack::ManagedTensor;
