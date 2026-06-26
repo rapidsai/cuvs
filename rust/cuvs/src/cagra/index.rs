@@ -35,12 +35,12 @@ impl Index {
     /// * `res` - Resources to use
     /// * `params` - Parameters for building the index
     /// * `dataset` - A row-major matrix on either the host or device to index
-    pub fn build<T: Into<ManagedTensor>>(
+    pub fn build<'a, T: Into<ManagedTensor<'a>>>(
         res: &Resources,
         params: &IndexParams,
         dataset: T,
     ) -> Result<Index> {
-        let dataset: ManagedTensor = dataset.into();
+        let dataset: ManagedTensor<'a> = dataset.into();
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsCagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
@@ -70,9 +70,9 @@ impl Index {
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: &ManagedTensor,
-        neighbors: &ManagedTensor,
-        distances: &ManagedTensor,
+        queries: &ManagedTensor<'_>,
+        neighbors: &ManagedTensor<'_>,
+        distances: &ManagedTensor<'_>,
     ) -> Result<()> {
         unsafe {
             let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
@@ -108,10 +108,10 @@ impl Index {
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: &ManagedTensor,
-        neighbors: &ManagedTensor,
-        distances: &ManagedTensor,
-        bitset: &ManagedTensor,
+        queries: &ManagedTensor<'_>,
+        neighbors: &ManagedTensor<'_>,
+        distances: &ManagedTensor<'_>,
+        bitset: &ManagedTensor<'_>,
     ) -> Result<()> {
         unsafe {
             let prefilter = ffi::cuvsFilter {
@@ -212,7 +212,9 @@ mod tests {
     ) -> (ndarray::Array2<f32>, Index) {
         let dataset =
             ndarray::Array::<f32, _>::random((N_DATAPOINTS, N_FEATURES), Uniform::new(0., 1.0));
-        let index = Index::build(res, build_params, &dataset).expect("failed to build cagra index");
+        let dataset_device = ManagedTensor::from_ndarray(&dataset).unwrap().to_device(res).unwrap();
+        let index =
+            Index::build(res, build_params, dataset_device).expect("failed to build cagra index");
         (dataset, index)
     }
 
@@ -227,13 +229,15 @@ mod tests {
         k: usize,
     ) {
         let queries = dataset.slice(s![0..n_queries, ..]);
-        let queries = ManagedTensor::from(&queries).to_device(res).unwrap();
+        let queries = ManagedTensor::from_ndarray(&queries).unwrap().to_device(res).unwrap();
 
         let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host).to_device(res).unwrap();
+        let neighbors =
+            ManagedTensor::from_ndarray(&neighbors_host).unwrap().to_device(res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host).to_device(res).unwrap();
+        let distances =
+            ManagedTensor::from_ndarray(&distances_host).unwrap().to_device(res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
         index.search(res, &search_params, &queries, &neighbors, &distances).expect("search failed");
@@ -281,8 +285,10 @@ mod tests {
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let index =
-            Index::build(&res, &build_params, &dataset).expect("failed to create cagra index");
+        let dataset_device =
+            ManagedTensor::from_ndarray(&dataset).unwrap().to_device(&res).unwrap();
+        let index = Index::build(&res, &build_params, dataset_device)
+            .expect("failed to create cagra index");
 
         // Build a bitset that includes only even-indexed rows
         let n_words = (n_datapoints + 31) / 32;
@@ -292,18 +298,20 @@ mod tests {
                 bitset_host[i / 32] |= 1u32 << (i % 32);
             }
         }
-        let bitset = ManagedTensor::from(&bitset_host).to_device(&res).unwrap();
+        let bitset = ManagedTensor::from_ndarray(&bitset_host).unwrap().to_device(&res).unwrap();
 
         // Query with the first 4 even-indexed rows
         let n_queries = 4;
-        let queries = dataset.slice(s![0..n_queries * 2;2, ..]); // rows 0, 2, 4, 6
-        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+        let queries = dataset.slice(s![0..n_queries * 2;2, ..]).to_owned(); // rows 0, 2, 4, 6
+        let queries = ManagedTensor::from_ndarray(&queries).unwrap().to_device(&res).unwrap();
 
         let k = 10;
         let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
-        let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+        let neighbors =
+            ManagedTensor::from_ndarray(&neighbors_host).unwrap().to_device(&res).unwrap();
+        let distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+        let distances =
+            ManagedTensor::from_ndarray(&distances_host).unwrap().to_device(&res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
 

@@ -20,9 +20,9 @@ use crate::resources::Resources;
 /// * `metric_arg` - Optional value of `p` for Minkowski distances
 pub fn pairwise_distance(
     res: &Resources,
-    x: &ManagedTensor,
-    y: &ManagedTensor,
-    distances: &ManagedTensor,
+    x: &ManagedTensor<'_>,
+    y: &ManagedTensor<'_>,
+    distances: &ManagedTensor<'_>,
     metric: DistanceType,
     metric_arg: Option<f32>,
 ) -> Result<()> {
@@ -53,10 +53,12 @@ mod tests {
         let n_features = 16;
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
-        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset_device =
+            ManagedTensor::from_ndarray(&dataset).unwrap().to_device(&res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_datapoints, n_datapoints));
-        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+        let distances =
+            ManagedTensor::from_ndarray(&distances_host).unwrap().to_device(&res).unwrap();
 
         pairwise_distance(
             &res,

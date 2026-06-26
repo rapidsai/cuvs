@@ -13,14 +13,14 @@ use crate::resources::Resources;
 
 /// Brute Force KNN Index
 #[derive(Debug)]
-pub struct Index {
+pub struct Index<'a> {
     inner: ffi::cuvsBruteForceIndex_t,
     // cuVS brute_force::index stores a non-owning view into the dataset.
     // Keep the Rust tensor alive for as long as the C++ index may read it.
-    _dataset: Option<ManagedTensor>,
+    _dataset: Option<ManagedTensor<'a>>,
 }
 
-impl Index {
+impl<'a> Index<'a> {
     /// Builds a new Brute Force KNN Index from the dataset for efficient search.
     ///
     /// # Arguments
@@ -29,13 +29,13 @@ impl Index {
     /// * `metric` - DistanceType to use for building the index
     /// * `metric_arg` - Optional value of `p` for Minkowski distances
     /// * `dataset` - A row-major matrix on either the host or device to index
-    pub fn build<T: Into<ManagedTensor>>(
+    pub fn build<T: Into<ManagedTensor<'a>>>(
         res: &Resources,
         metric: DistanceType,
         metric_arg: Option<f32>,
         dataset: T,
-    ) -> Result<Index> {
-        let dataset: ManagedTensor = dataset.into();
+    ) -> Result<Index<'a>> {
+        let dataset: ManagedTensor<'a> = dataset.into();
         let mut index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsBruteForceBuild(
@@ -51,7 +51,7 @@ impl Index {
     }
 
     /// Creates a new empty index
-    pub fn new() -> Result<Index> {
+    pub fn new() -> Result<Index<'a>> {
         unsafe {
             let mut index = std::mem::MaybeUninit::<ffi::cuvsBruteForceIndex_t>::uninit();
             check_cuvs(ffi::cuvsBruteForceIndexCreate(index.as_mut_ptr()))?;
@@ -70,9 +70,9 @@ impl Index {
     pub fn search(
         &self,
         res: &Resources,
-        queries: &ManagedTensor,
-        neighbors: &ManagedTensor,
-        distances: &ManagedTensor,
+        queries: &ManagedTensor<'_>,
+        neighbors: &ManagedTensor<'_>,
+        distances: &ManagedTensor<'_>,
     ) -> Result<()> {
         unsafe {
             let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
@@ -89,7 +89,7 @@ impl Index {
     }
 }
 
-impl Drop for Index {
+impl Drop for Index<'_> {
     fn drop(&mut self) {
         if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.inner) }) {
             write!(stderr(), "failed to call bruteForceIndexDestroy {:?}", e)
@@ -114,7 +114,7 @@ mod tests {
         let dataset_host =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let dataset = ManagedTensor::from(&dataset_host).to_device(&res).unwrap();
+        let dataset = ManagedTensor::from_ndarray(&dataset_host).unwrap().to_device(&res).unwrap();
 
         println!("dataset {:#?}", dataset_host);
 
@@ -132,12 +132,14 @@ mod tests {
         let k = 4;
 
         println!("queries! {:#?}", queries);
-        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+        let queries = ManagedTensor::from_ndarray(&queries).unwrap().to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+        let neighbors =
+            ManagedTensor::from_ndarray(&neighbors_host).unwrap().to_device(&res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+        let distances =
+            ManagedTensor::from_ndarray(&distances_host).unwrap().to_device(&res).unwrap();
 
         index.search(&res, &queries, &neighbors, &distances).unwrap();
 

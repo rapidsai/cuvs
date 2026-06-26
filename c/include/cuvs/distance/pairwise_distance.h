@@ -41,9 +41,10 @@ extern "C" {
  * @endcode
  *
  * @param[in] res cuvs resources object for managing expensive resources
- * @param[in] x first set of points (size n*k)
- * @param[in] y second set of points (size m*k)
- * @param[out] dist output distance matrix (size n*m)
+ * @param[in] x first set of points (size n*k). Must have the same floating point dtype as `y`
+ * @param[in] y second set of points (size m*k). Must have the same floating point dtype as `x`
+ * @param[out] dist output distance matrix (size n*m). Must be float32 for float16 inputs, and
+ *                  match the input dtype otherwise
  * @param[in] metric distance to evaluate
  * @param[in] metric_arg metric argument (used for Minkowski distance)
  */

@@ -22,12 +22,12 @@ impl Index {
     /// * `res` - Resources to use
     /// * `params` - Parameters for building the index
     /// * `dataset` - A row-major matrix on either the host or device to index
-    pub fn build<T: Into<ManagedTensor>>(
+    pub fn build<'a, T: Into<ManagedTensor<'a>>>(
         res: &Resources,
         params: &IndexParams,
         dataset: T,
     ) -> Result<Index> {
-        let dataset: ManagedTensor = dataset.into();
+        let dataset: ManagedTensor<'a> = dataset.into();
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsIvfFlatBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
@@ -57,9 +57,9 @@ impl Index {
         &self,
         res: &Resources,
         params: &SearchParams,
-        queries: &ManagedTensor,
-        neighbors: &ManagedTensor,
-        distances: &ManagedTensor,
+        queries: &ManagedTensor<'_>,
+        neighbors: &ManagedTensor<'_>,
+        distances: &ManagedTensor<'_>,
     ) -> Result<()> {
         unsafe {
             let prefilter = ffi::cuvsFilter { addr: 0, type_: ffi::cuvsFilterType::NO_FILTER };
@@ -105,7 +105,8 @@ mod tests {
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset_device =
+            ManagedTensor::from_ndarray(&dataset).unwrap().to_device(&res).unwrap();
 
         // build the ivf-flat index
         let index = Index::build(&res, &build_params, dataset_device)
@@ -121,12 +122,14 @@ mod tests {
         // IvfFlat search API requires queries and outputs to be on device memory
         // copy query data over, and allocate new device memory for the distances/ neighbors
         // outputs
-        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+        let queries = ManagedTensor::from_ndarray(&queries).unwrap().to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+        let neighbors =
+            ManagedTensor::from_ndarray(&neighbors_host).unwrap().to_device(&res).unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+        let distances =
+            ManagedTensor::from_ndarray(&distances_host).unwrap().to_device(&res).unwrap();
 
         let search_params = SearchParams::new().unwrap();
 
@@ -157,7 +160,8 @@ mod tests {
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let dataset_device =
+            ManagedTensor::from_ndarray(&dataset).unwrap().to_device(&res).unwrap();
 
         // Build the index once
         let index = Index::build(&res, &build_params, dataset_device)
@@ -170,13 +174,15 @@ mod tests {
         for search_iter in 0..3 {
             let n_queries = 4;
             let queries = dataset.slice(s![0..n_queries, ..]);
-            let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+            let queries = ManagedTensor::from_ndarray(&queries).unwrap().to_device(&res).unwrap();
 
             let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
-            let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res).unwrap();
+            let neighbors =
+                ManagedTensor::from_ndarray(&neighbors_host).unwrap().to_device(&res).unwrap();
 
             let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-            let distances = ManagedTensor::from(&distances_host).to_device(&res).unwrap();
+            let distances =
+                ManagedTensor::from_ndarray(&distances_host).unwrap().to_device(&res).unwrap();
 
             // This should work on every iteration because search() takes &self
             index
