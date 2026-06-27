@@ -14,7 +14,17 @@ _Source header: `cuvs/neighbors/vamana.h`_
 Supplemental parameters to build Vamana Index
 
 ```c
-struct cuvsVamanaIndexParams { ... };
+struct cuvsVamanaIndexParams {
+  cuvsDistanceType metric;
+  uint32_t graph_degree;
+  uint32_t visited_size;
+  float vamana_iters;
+  float alpha;
+  float max_fraction;
+  float batch_base;
+  uint32_t queue_size;
+  uint32_t reverse_batchsize;
+};
 ```
 
 **Fields**
@@ -37,7 +47,7 @@ struct cuvsVamanaIndexParams { ... };
 Allocate Vamana Index params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
+cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params);
 ```
 
 **Parameters**
@@ -48,7 +58,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* par
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsvamanaindexparamsdestroy"></a>
 ### cuvsVamanaIndexParamsDestroy
@@ -56,7 +66,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* par
 De-allocate Vamana Index params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
+cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
 ```
 
 **Parameters**
@@ -67,7 +77,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t par
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Vamana index
 
@@ -77,7 +87,10 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t par
 Struct to hold address of cuvs::neighbors::vamana::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsVamanaIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsVamanaIndex;
 ```
 
 **Fields**
@@ -93,7 +106,7 @@ typedef struct { ... } cuvsVamanaIndex;
 Allocate Vamana index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
+cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 ```
 
 **Parameters**
@@ -104,7 +117,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsvamanaindexdestroy"></a>
 ### cuvsVamanaIndexDestroy
@@ -112,7 +125,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index);
 De-allocate Vamana index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
+cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 ```
 
 **Parameters**
@@ -123,7 +136,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsvamanaindexgetdims"></a>
 ### cuvsVamanaIndexGetDims
@@ -131,7 +144,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index);
 Get the dimension of the index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
+cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
 ```
 
 **Parameters**
@@ -143,7 +156,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Vamana index build
 
@@ -153,7 +166,7 @@ CUVS_EXPORT cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim
 Build Vamana index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
+cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
 cuvsVamanaIndexParams_t params,
 DLManagedTensor* dataset,
 cuvsVamanaIndex_t index);
@@ -180,7 +193,7 @@ Usage example:
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Vamana index serialize
 
@@ -190,7 +203,7 @@ Usage example:
 Save Vamana index to file
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
+cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
 const char* filename,
 cuvsVamanaIndex_t index,
 bool include_dataset);
@@ -211,4 +224,4 @@ Serialized Index is to be used by the DiskANN open-source repository for graph s
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

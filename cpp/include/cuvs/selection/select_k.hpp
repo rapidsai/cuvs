@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <cuda_fp16.h>
+#include <cuvs/core/cuda_fp16.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>

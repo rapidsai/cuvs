@@ -18,7 +18,7 @@ y: &ManagedTensor,
 distances: &ManagedTensor,
 metric: DistanceType,
 metric_arg: Option<f32>,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Compute pairwise distances between X and Y

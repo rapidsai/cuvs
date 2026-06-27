@@ -1,6 +1,6 @@
 # Java Installation
 
-Use this page when you need the NVIDIA cuVS Java API. The Java API uses Panama bindings and requires matching native cuVS libraries at runtime.
+Use this page when you need the NVIDIA cuVS Java API. The Java API uses Panama bindings and requires matching native NVIDIA cuVS libraries at runtime.
 
 All NVIDIA cuVS routine implementations live in the C++ core. The Java bindings call into the native C and C++ libraries, so install both `libcuvs_c` and `libcuvs`.
 
@@ -10,7 +10,7 @@ Install the native C and C++ libraries first. For most users, conda is the simpl
 
 ```bash
 # CUDA 13
-conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.2
+conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.3
 
 # CUDA 12
 conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9

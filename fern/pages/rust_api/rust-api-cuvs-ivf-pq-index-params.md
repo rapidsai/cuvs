@@ -27,7 +27,9 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:12`_
 ## IndexParams
 
 ```rust
-pub struct IndexParams(pub ffi::cuvsIvfPqIndexParams_t);
+pub struct IndexParams(pub ffi::cuvsIvfPqIndexParams_t); {
+    /* private fields */
+}
 ```
 
 **Methods**
@@ -51,7 +53,7 @@ pub struct IndexParams(pub ffi::cuvsIvfPqIndexParams_t);
 ### new
 
 ```rust
-pub fn new() -> Result<IndexParams> { ... }
+pub fn new() -> Result<IndexParams>
 ```
 
 Returns a new IndexParams
@@ -61,7 +63,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:18`_
 ### set_n_lists
 
 ```rust
-pub fn set_n_lists(self, n_lists: u32) -> IndexParams { ... }
+pub fn set_n_lists(self, n_lists: u32) -> IndexParams
 ```
 
 The number of clusters used in the coarse quantizer.
@@ -71,7 +73,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:27`_
 ### set_metric
 
 ```rust
-pub fn set_metric(self, metric: DistanceType) -> IndexParams { ... }
+pub fn set_metric(self, metric: DistanceType) -> IndexParams
 ```
 
 DistanceType to use for building the index
@@ -81,7 +83,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:35`_
 ### set_metric_arg
 
 ```rust
-pub fn set_metric_arg(self, metric_arg: f32) -> IndexParams { ... }
+pub fn set_metric_arg(self, metric_arg: f32) -> IndexParams
 ```
 
 The number of iterations searching for kmeans centers during index building.
@@ -91,7 +93,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:43`_
 ### set_kmeans_n_iters
 
 ```rust
-pub fn set_kmeans_n_iters(self, kmeans_n_iters: u32) -> IndexParams { ... }
+pub fn set_kmeans_n_iters(self, kmeans_n_iters: u32) -> IndexParams
 ```
 
 The number of iterations searching for kmeans centers during index building.
@@ -101,7 +103,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:51`_
 ### set_kmeans_trainset_fraction
 
 ```rust
-pub fn set_kmeans_trainset_fraction(self, kmeans_trainset_fraction: f64) -> IndexParams { ... }
+pub fn set_kmeans_trainset_fraction(self, kmeans_trainset_fraction: f64) -> IndexParams
 ```
 
 If kmeans_trainset_fraction is less than 1, then the dataset is
@@ -113,7 +115,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:61`_
 ### set_pq_bits
 
 ```rust
-pub fn set_pq_bits(self, pq_bits: u32) -> IndexParams { ... }
+pub fn set_pq_bits(self, pq_bits: u32) -> IndexParams
 ```
 
 The bit length of the vector element after quantization.
@@ -123,7 +125,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:69`_
 ### set_pq_dim
 
 ```rust
-pub fn set_pq_dim(self, pq_dim: u32) -> IndexParams { ... }
+pub fn set_pq_dim(self, pq_dim: u32) -> IndexParams
 ```
 
 The dimensionality of a the vector after product quantization.
@@ -141,7 +143,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:85`_
 ### set_codebook_kind
 
 ```rust
-pub fn set_codebook_kind(self, codebook_kind: cuvsIvfPqCodebookGen) -> IndexParams { ... }
+pub fn set_codebook_kind(self, codebook_kind: cuvsIvfPqCodebookGen) -> IndexParams
 ```
 
 _Source: `rust/cuvs/src/ivf_pq/index_params.rs:92`_
@@ -149,7 +151,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:92`_
 ### set_codes_layout
 
 ```rust
-pub fn set_codes_layout(self, codes_layout: cuvsIvfPqListLayout) -> IndexParams { ... }
+pub fn set_codes_layout(self, codes_layout: cuvsIvfPqListLayout) -> IndexParams
 ```
 
 Memory layout of the IVF-PQ list data.
@@ -162,7 +164,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:103`_
 ### set_force_random_rotation
 
 ```rust
-pub fn set_force_random_rotation(self, force_random_rotation: bool) -> IndexParams { ... }
+pub fn set_force_random_rotation(self, force_random_rotation: bool) -> IndexParams
 ```
 
 Apply a random rotation matrix on the input data and queries even
@@ -182,7 +184,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:121`_
 ### set_max_train_points_per_pq_code
 
 ```rust
-pub fn set_max_train_points_per_pq_code(self, max_pq_points: u32) -> IndexParams { ... }
+pub fn set_max_train_points_per_pq_code(self, max_pq_points: u32) -> IndexParams
 ```
 
 The max number of data points to use per PQ code during PQ codebook training. Using more data
@@ -196,7 +198,7 @@ _Source: `rust/cuvs/src/ivf_pq/index_params.rs:133`_
 ### set_add_data_on_build
 
 ```rust
-pub fn set_add_data_on_build(self, add_data_on_build: bool) -> IndexParams { ... }
+pub fn set_add_data_on_build(self, add_data_on_build: bool) -> IndexParams
 ```
 
 After training the coarse and fine quantizers, we will populate

@@ -8,7 +8,7 @@ These pages are generated from the Rust crate sources under `rust/cuvs/src`.
 - [`cuvs::cluster::kmeans`](/api-reference/rust-api-cuvs-cluster-kmeans)
 - [`cuvs::cluster::kmeans::params`](/api-reference/rust-api-cuvs-cluster-kmeans-params)
 
-## Core
+## Common
 
 - [`cuvs`](/api-reference/rust-api-cuvs)
 - [`cuvs::dlpack`](/api-reference/rust-api-cuvs-dlpack)

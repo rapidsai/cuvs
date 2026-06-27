@@ -1,6 +1,6 @@
 # Multi-GPU
 
-Multi-GPU indexing is a coordination layer for supported nearest-neighbor indexes. It does not define a new index family. Instead, it lets APIs such as [CAGRA](cagra.md), [IVF-Flat](ivfflat.md), and [IVF-PQ](ivfpq.md) build, store, search, extend, serialize, and deserialize indexes across multiple GPUs.
+Multi-GPU indexing is a coordination layer for supported nearest-neighbor indexes. It does not define a new index family. Instead, it lets APIs such as [CAGRA](/user-guide/api-guides/indexing-guide/cagra), [IVF-Flat](/user-guide/api-guides/indexing-guide/ivf-flat), and [IVF-PQ](/user-guide/api-guides/indexing-guide/ivf-pq) build, store, search, extend, serialize, and deserialize indexes across multiple GPUs.
 
 Use multi-GPU indexing when a single GPU is not enough for the desired dataset size, build speed, or query throughput. The same index-specific parameters still matter; multi-GPU adds resource management, distribution mode, and result-merging behavior on top.
 
@@ -123,9 +123,78 @@ resources.sync()
 </Tab>
 </Tabs>
 
+### Extending an index
+
+<Tabs>
+<Tab title="C">
+
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/mg_cagra.h>
+
+cuvsResources_t res;
+cuvsMultiGpuCagraIndex_t index;
+DLManagedTensor *new_vectors;
+DLManagedTensor *new_indices;
+
+load_host_additional_dataset(new_vectors);
+load_host_additional_indices(new_indices);
+
+cuvsMultiGpuResourcesCreate(&res);
+cuvsMultiGpuCagraIndexCreate(&index);
+
+// ... build or load index ...
+cuvsMultiGpuCagraExtend(res, index, new_vectors, new_indices);
+
+cuvsMultiGpuCagraIndexDestroy(index);
+cuvsMultiGpuResourcesDestroy(res);
+```
+
+</Tab>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+
+#include <raft/core/device_resources_snmg.hpp>
+
+using namespace cuvs::neighbors;
+
+raft::device_resources_snmg clique;
+mg_index_params<cagra::index_params> index_params;
+auto dataset = load_host_dataset<float, int64_t>();
+auto new_vectors = load_host_additional_dataset<float, int64_t>();
+
+auto index = cagra::build(clique, index_params, dataset.view());
+cagra::extend(clique, index, new_vectors.view(), std::nullopt);
+```
+
+</Tab>
+<Tab title="Python">
+
+```python
+import numpy as np
+
+from cuvs.common import MultiGpuResources
+from cuvs.neighbors.mg import cagra
+
+dataset = np.asarray(load_dataset(), dtype=np.float32)
+new_vectors = np.asarray(load_additional_data(), dtype=np.float32)
+new_indices = np.asarray(load_additional_indices(), dtype=np.uint32)
+
+resources = MultiGpuResources()
+index = cagra.build(cagra.IndexParams(), dataset, resources=resources)
+cagra.extend(index, new_vectors, new_indices, resources=resources)
+```
+
+</Tab>
+</Tabs>
+
+The same pattern applies to multi-GPU IVF-Flat and IVF-PQ. See the [CAGRA C](/api-reference/c-api-neighbors-mg-cagra#cuvsmultigpucagraextend), [IVF-Flat C](/api-reference/c-api-neighbors-mg-ivf-flat#cuvsmultigpuivfflatextend), [IVF-PQ C](/api-reference/c-api-neighbors-mg-ivf-pq#cuvsmultigpuivfpqextend), [CAGRA Python](/api-reference/python-api-neighbors-mg-cagra#extend), [IVF-Flat Python](/api-reference/python-api-neighbors-mg-ivf-flat#extend), and [IVF-PQ Python](/api-reference/python-api-neighbors-mg-ivf-pq#extend) API references for the full signatures.
+
 ## How Multi-GPU indexing works
 
-The multi-GPU APIs use a resource object that owns the participating GPU set and the communication state needed by the operation. In C++, this is typically a `raft::device_resources_snmg`. In C and Python, create the corresponding cuVS multi-GPU resources object.
+The multi-GPU APIs use a resource object that owns the participating GPU set and the communication state needed by the operation. In C++, this is typically a `raft::device_resources_snmg`. In C and Python, create the corresponding NVIDIA cuVS multi-GPU resources object.
 
 The build parameters extend the single-GPU index parameters. For example, a multi-GPU CAGRA build parameter object contains normal CAGRA settings plus a distribution mode. This means you tune graph degree, IVF list count, PQ settings, metrics, and other index-specific choices in the same way as the single-GPU guide, then decide how the index should be placed across GPUs.
 
@@ -135,10 +204,10 @@ The search parameters also extend the single-GPU search parameters. Multi-GPU se
 
 | Index | Multi-GPU support | Notes |
 | --- | --- | --- |
-| [CAGRA](cagra.md) | C, C++, Python | Graph index build, search, extend, serialization, deserialization, and single-GPU index distribution are exposed through the multi-GPU APIs. |
-| [IVF-Flat](ivfflat.md) | C, C++, Python | Full-precision inverted-file indexes can be sharded or replicated across GPUs. |
-| [IVF-PQ](ivfpq.md) | C, C++, Python | Compressed inverted-file indexes can be sharded or replicated across GPUs. |
-| [All-neighbors](all_neighbors.md) | Python resource support | The Python all-neighbors API can use `MultiGpuResources`, but it is not exposed as a `mg_index` wrapper. |
+| [CAGRA](/user-guide/api-guides/indexing-guide/cagra) | C, C++, Python | Graph index build, search, extend, serialization, deserialization, and single-GPU index distribution are exposed through the multi-GPU APIs. |
+| [IVF-Flat](/user-guide/api-guides/indexing-guide/ivf-flat) | C, C++, Python | Full-precision inverted-file indexes can be sharded or replicated across GPUs. |
+| [IVF-PQ](/user-guide/api-guides/indexing-guide/ivf-pq) | C, C++, Python | Compressed inverted-file indexes can be sharded or replicated across GPUs. |
+| [All-neighbors](/user-guide/api-guides/indexing-guide/all-neighbors) | Python resource support | The Python all-neighbors API can use `MultiGpuResources`, but it is not exposed as a `mg_index` wrapper. |
 
 ## Distribution modes
 
@@ -159,7 +228,7 @@ The multi-GPU build parameter wrapper contains the selected index's normal build
 | --- | --- | --- |
 | `mode` / `distribution_mode` | `sharded`, `replicated` | Controls whether the index is split across GPUs or copied to each GPU. The default is sharded. |
 
-Use the base parameter object for the underlying index-specific settings. For CAGRA, tune the fields described in [CAGRA build parameters](cagra.md#build-parameters). For IVF-Flat and IVF-PQ, tune the fields described in their corresponding guide pages.
+Use the base parameter object for the underlying index-specific settings. For CAGRA, tune the fields described in [CAGRA build parameters](/user-guide/api-guides/indexing-guide/cagra#build-parameters). For IVF-Flat and IVF-PQ, tune the fields described in their corresponding guide pages.
 
 ### Search parameters
 
@@ -219,4 +288,4 @@ This estimate is intentionally conservative. Actual peak memory depends on the s
 
 The multi-GPU C, C++, and Python APIs expose serialization and deserialization for supported indexes. CAGRA, IVF-Flat, and IVF-PQ also expose a distribution path that loads a local single-GPU index file and creates a multi-GPU index from it.
 
-Use serialization when you want to persist the multi-GPU index layout. Use distribution when you already have a single-GPU index artifact and want cuVS to place it across the multi-GPU resources for serving.
+Use serialization when you want to persist the multi-GPU index layout. Use distribution when you already have a single-GPU index artifact and want NVIDIA cuVS to place it across the multi-GPU resources for serving.

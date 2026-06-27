@@ -118,6 +118,72 @@ fn fit_kmeans(dataset: &ndarray::Array2<f32>, n_clusters: usize) -> Result<()> {
 </Tab>
 </Tabs>
 
+### Fitting clusters on multiple GPUs
+
+Multi-GPU K-Means is exposed through the C++ API. Configure a RAFT handle with NCCL communications, pass each rank's local dataset shard to `fit()`, and NVIDIA cuVS coordinates centroid updates across the participating GPUs.
+
+<Tabs>
+<Tab title="C++">
+
+```cpp
+#include <cuvs/cluster/kmeans.hpp>
+
+#include <raft/comms/std_comms.hpp>
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/handle.hpp>
+
+#include <nccl.h>
+#include <optional>
+
+using namespace cuvs::cluster;
+
+void fit_kmeans_multi_gpu(ncclComm_t nccl_comm, int rank, int world_size)
+{
+  raft::handle_t handle;
+  raft::comms::build_comms_nccl_only(&handle, nccl_comm, world_size, rank);
+
+  // Each rank owns one row-major shard of the full dataset on its GPU.
+  raft::device_matrix_view<const float, int> local_dataset =
+      load_local_dataset(rank);
+
+  kmeans::params params;
+  params.n_clusters = 1024;
+  params.max_iter = 300;
+  params.tol = 1e-4;
+
+  auto centroids =
+      raft::make_device_matrix<float, int>(
+          handle, params.n_clusters, local_dataset.extent(1));
+  auto labels =
+      raft::make_device_vector<int, int>(handle, local_dataset.extent(0));
+
+  float inertia;
+  int n_iter;
+
+  kmeans::fit(handle,
+              params,
+              local_dataset,
+              std::nullopt,
+              centroids.view(),
+              raft::make_host_scalar_view(&inertia),
+              raft::make_host_scalar_view(&n_iter));
+
+  kmeans::predict(handle,
+                  params,
+                  local_dataset,
+                  std::nullopt,
+                  centroids.view(),
+                  labels.view(),
+                  true,
+                  raft::make_host_scalar_view(&inertia));
+}
+```
+
+</Tab>
+</Tabs>
+
+The NCCL communicator setup depends on the application runtime. The important NVIDIA cuVS requirement is that every participating rank uses a handle with the same communicator, world size, and rank metadata before calling the K-Means API.
+
 ### Assigning labels
 
 Prediction assigns each row to the nearest learned centroid. Use it after fitting when you need a cluster label per row.
@@ -282,7 +348,7 @@ K-Means works best when clusters are roughly spherical under the selected distan
 
 Standard K-Means minimizes inertia. It can produce uneven cluster sizes if the data distribution is uneven.
 
-Balanced K-Means encourages more even cluster sizes. It is useful when clusters will be used as partitions for later work and very large clusters would create load imbalance. In cuVS, balanced K-Means is exposed through `balanced_params` in C++ and through `hierarchical=True` in C and Python.
+Balanced K-Means encourages more even cluster sizes. It is useful when clusters will be used as partitions for later work and very large clusters would create load imbalance. In NVIDIA cuVS, balanced K-Means is exposed through `balanced_params` in C++ and through `hierarchical=True` in C and Python.
 
 ## Configuration parameters
 
@@ -418,7 +484,7 @@ $$
 
 ### Host streaming fit
 
-For host-resident data, cuVS can stream rows to the GPU in batches. If `streaming_batch_size = 0`, then `S = N`; otherwise `S = streaming_batch_size`.
+For host-resident data, NVIDIA cuVS can stream rows to the GPU in batches. If `streaming_batch_size = 0`, then `S = N`; otherwise `S = streaming_batch_size`.
 
 $$
 \begin{aligned}

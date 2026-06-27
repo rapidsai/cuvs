@@ -1,11 +1,11 @@
-# cuVS API Basics
+# NVIDIA cuVS API Basics
 
 - [Memory management](#memory-management)
 - [Resource management](#resource-management)
 
 ## Memory management
 
-Centralized memory management allows flexible configuration of allocation strategies, such as sharing the same CUDA memory pool across library boundaries. cuVS uses the [RMM](https://github.com/rapidsai/rmm) library, which eases the burden of configuring different allocation strategies globally across GPU-accelerated libraries.
+Centralized memory management allows flexible configuration of allocation strategies, such as sharing the same CUDA memory pool across library boundaries. NVIDIA cuVS uses the [RMM](https://github.com/rapidsai/rmm) library, which eases the burden of configuring different allocation strategies globally across GPU-accelerated libraries.
 
 RMM currently has APIs for C++ and Python.
 
@@ -38,7 +38,7 @@ rmm.mr.set_current_device_resource(pool)
 
 ## Resource management
 
-cuVS uses an API from the [RAFT](https://github.com/rapidsai/raft) library of ML and data mining primitives to centralize and reuse expensive resources, such as memory management. The below code examples demonstrate how to create these resources for use throughout this guide.
+NVIDIA cuVS uses an API from the [RAFT](https://github.com/rapidsai/raft) library of ML and data mining primitives to centralize and reuse expensive resources, such as memory management. The below code examples demonstrate how to create these resources for use throughout this guide.
 
 See RAFT's [resource API documentation](https://docs.rapids.ai/api/raft/nightly/cpp_api/core_resources/) for more information.
 

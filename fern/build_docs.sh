@@ -52,8 +52,22 @@ require_node_22() {
 
 require_node_22
 
+fern_config_version() {
+  python3 - "${SCRIPT_DIR}/fern.config.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    print(json.load(f).get("version", "*"))
+PY
+}
+
+FERN_VERSION="$(fern_config_version)"
+
 if [[ -n "${FERN_CLI:-}" ]]; then
   FERN_CMD=("${FERN_CLI}")
+elif [[ "${FERN_VERSION}" != "*" ]]; then
+  FERN_CMD=("npx" "--yes" "fern-api@${FERN_VERSION}")
 elif command -v fern >/dev/null 2>&1; then
   FERN_CMD=("fern")
 else

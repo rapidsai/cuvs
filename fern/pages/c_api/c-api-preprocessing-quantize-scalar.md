@@ -14,7 +14,7 @@ _Source header: `cuvs/preprocessing/quantize/scalar.h`_
 Scalar quantizer parameters.
 
 ```c
-struct cuvsScalarQuantizerParams { ... };
+struct cuvsScalarQuantizerParams;
 ```
 
 <a id="cuvsscalarquantizerparamscreate"></a>
@@ -23,7 +23,7 @@ struct cuvsScalarQuantizerParams { ... };
 Allocate Scalar Quantizer params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params);
+cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params);
 ```
 
 **Parameters**
@@ -34,7 +34,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParam
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsscalarquantizerparamsdestroy"></a>
 ### cuvsScalarQuantizerParamsDestroy
@@ -42,7 +42,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParam
 De-allocate Scalar Quantizer params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params);
+cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params);
 ```
 
 **Parameters**
@@ -53,7 +53,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerPara
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsscalarquantizer"></a>
 ### cuvsScalarQuantizer
@@ -63,7 +63,10 @@ Defines and stores scalar for quantisation upon training
 The quantization is performed by a linear mapping of an interval in the float data type to the full range of the quantized int type.
 
 ```c
-typedef struct { ... } cuvsScalarQuantizer;
+typedef struct {
+  double min_;
+  double max_;
+} cuvsScalarQuantizer;
 ```
 
 **Fields**
@@ -79,7 +82,7 @@ typedef struct { ... } cuvsScalarQuantizer;
 Allocate Scalar Quantizer and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer);
+cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer);
 ```
 
 **Parameters**
@@ -90,7 +93,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantiz
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsscalarquantizerdestroy"></a>
 ### cuvsScalarQuantizerDestroy
@@ -98,7 +101,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantiz
 De-allocate Scalar Quantizer
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer);
+cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer);
 ```
 
 **Parameters**
@@ -109,7 +112,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantiz
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsscalarquantizertrain"></a>
 ### cuvsScalarQuantizerTrain
@@ -117,7 +120,7 @@ CUVS_EXPORT cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantiz
 Trains a scalar quantizer to be used later for quantizing the dataset.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
+cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
 cuvsScalarQuantizerParams_t params,
 DLManagedTensor* dataset,
 cuvsScalarQuantizer_t quantizer);
@@ -134,7 +137,7 @@ cuvsScalarQuantizer_t quantizer);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsscalarquantizertransform"></a>
 ### cuvsScalarQuantizerTransform
@@ -142,7 +145,7 @@ cuvsScalarQuantizer_t quantizer);
 Applies quantization transform to given dataset
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
+cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
 cuvsScalarQuantizer_t quantizer,
 DLManagedTensor* dataset,
 DLManagedTensor* out);
@@ -159,7 +162,7 @@ DLManagedTensor* out);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsscalarquantizerinversetransform"></a>
 ### cuvsScalarQuantizerInverseTransform
@@ -167,7 +170,7 @@ DLManagedTensor* out);
 Perform inverse quantization step on previously quantized dataset
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
+cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
 cuvsScalarQuantizer_t quantizer,
 DLManagedTensor* dataset,
 DLManagedTensor* out);
@@ -186,4 +189,4 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

@@ -1,12 +1,12 @@
 # Integrations
 
-cuVS can be adopted at several layers of a vector-search stack. Applications can call cuVS directly, use a database or search engine with cuVS-backed indexing, rely on data platforms that bring NVIDIA accelerated computing closer to enterprise data, or use libraries that expose cuVS algorithms through familiar APIs.
+NVIDIA cuVS can be adopted at several layers of a vector-search stack. Applications can call NVIDIA cuVS directly, use a database or search engine with NVIDIA cuVS-backed indexing, rely on data platforms that bring NVIDIA accelerated computing closer to enterprise data, or use libraries that expose NVIDIA cuVS algorithms through familiar APIs.
 
 This page summarizes where each integration fits and links to vendor documentation for setup, supported configurations, and operational details.
 
 ## Databases
 
-Use these integrations when vector search should be managed by a database or search engine. The system owns ingestion, indexing, query APIs, and operations, while cuVS-backed paths accelerate supported index build or search workflows.
+Use these integrations when vector search should be managed by a database or search engine. The system owns ingestion, indexing, query APIs, and operations, while NVIDIA cuVS-backed paths accelerate supported index build or search workflows.
 
 ### Amazon OpenSearch Service
 
@@ -14,7 +14,7 @@ Use these integrations when vector search should be managed by a database or sea
 
 ### CyborgDB
 
-[CyborgDB](https://docs.cyborg.co/) is an encrypted vector database proxy for confidential vector search across backing stores such as PostgreSQL, Redis, S3, and in-memory storage. Cyborg and NVIDIA demonstrated a cuVS-accelerated proof of concept that speeds encrypted vector index build and retrieval while preserving CyborgDB's confidentiality model. See the CyborgDB [overview](https://docs.cyborg.co/versions/v0.16.x/intro/about), [quickstart](https://docs.cyborg.co/versions/v0.16.x/intro/quickstart), [embedded deployment docs](https://docs.cyborg.co/embedded), and NVIDIA's [Cyborg and cuVS technical blog](https://developer.nvidia.com/blog/bringing-confidentiality-to-vector-search-with-cyborg-and-nvidia-cuvs/).
+[CyborgDB](https://docs.cyborg.co/) is an encrypted vector database proxy for confidential vector search across backing stores such as PostgreSQL, Redis, S3, and in-memory storage. Cyborg and NVIDIA demonstrated a proof of concept accelerated by NVIDIA cuVS that speeds encrypted vector index build and retrieval while preserving CyborgDB's confidentiality model. See the CyborgDB [overview](https://docs.cyborg.co/versions/v0.16.x/intro/about), [quickstart](https://docs.cyborg.co/versions/v0.16.x/intro/quickstart), [embedded deployment docs](https://docs.cyborg.co/embedded), and NVIDIA's [technical blog about Cyborg and NVIDIA cuVS](https://developer.nvidia.com/blog/bringing-confidentiality-to-vector-search-with-cyborg-and-nvidia-cuvs/).
 
 ### Elasticsearch
 
@@ -26,7 +26,7 @@ Use these integrations when vector search should be managed by a database or sea
 
 ### KX / KDB.AI
 
-[KDB.AI](https://code.kx.com/kdbai/integrations/nvidia-cuvs-cagra.html) is KX's vector database for AI applications and similarity search workflows. The cuVS-enabled KDB.AI Server image, `kdbai-db-cuvs`, bundles the GPU dependencies needed to build and search CAGRA indexes with NVIDIA cuVS while keeping the standard KDB.AI client APIs. KDB.AI also integrates with [kdb+](https://code.kx.com/kdbai/integrations/kdb.html), allowing existing q and kdb+ datasets to participate in vector search workflows. See KX's [kdb+ product page](https://kx.com/products/kdb/) and [NVIDIA partner page](https://kx.com/partners/nvidia/) for broader KX and NVIDIA integration context.
+[KDB.AI](https://code.kx.com/kdbai/integrations/nvidia-cuvs-cagra.html) is KX's vector database for AI applications and similarity search workflows. The NVIDIA cuVS-enabled KDB.AI Server image, `kdbai-db-cuvs`, bundles the GPU dependencies needed to build and search CAGRA indexes with NVIDIA cuVS while keeping the standard KDB.AI client APIs. KDB.AI also integrates with [kdb+](https://code.kx.com/kdbai/integrations/kdb.html), allowing existing q and kdb+ datasets to participate in vector search workflows. See KX's [kdb+ product page](https://kx.com/products/kdb/) and [NVIDIA partner page](https://kx.com/partners/nvidia/) for broader KX and NVIDIA integration context.
 
 ### Milvus
 
@@ -34,7 +34,7 @@ Use these integrations when vector search should be managed by a database or sea
 
 ### OpenSearch
 
-[OpenSearch Vector Engine](https://opensearch.org/platform/vector-search/) supports vector search, hybrid search, and RAG-oriented retrieval in OpenSearch. The OpenSearch GPU indexing design offloads vector index builds to GPU workers, uses cuVS through Faiss to build CAGRA graphs, converts those graphs into an HNSW-compatible form for CPU search, and falls back to CPU index building when needed. See the OpenSearch [vector search docs](https://docs.opensearch.org/latest/vector-search/), [GPU-accelerated vector search blog](https://opensearch.org/blog/GPU-Accelerated-Vector-Search-OpenSearch-New-Frontier/), k-NN RFCs for [GPU acceleration](https://github.com/opensearch-project/k-NN/issues/2293) and [remote vector index build](https://github.com/opensearch-project/k-NN/issues/2294), and Amazon OpenSearch Service [GPU acceleration docs](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/gpu-acceleration-vector-index.html).
+[OpenSearch Vector Engine](https://opensearch.org/platform/vector-search/) supports vector search, hybrid search, and RAG-oriented retrieval in OpenSearch. The OpenSearch GPU indexing design offloads vector index builds to GPU workers, uses NVIDIA cuVS through Faiss to build CAGRA graphs, converts those graphs into an HNSW-compatible form for CPU search, and falls back to CPU index building when needed. See the OpenSearch [vector search docs](https://docs.opensearch.org/latest/vector-search/), [GPU-accelerated vector search blog](https://opensearch.org/blog/GPU-Accelerated-Vector-Search-OpenSearch-New-Frontier/), k-NN RFCs for [GPU acceleration](https://github.com/opensearch-project/k-NN/issues/2293) and [remote vector index build](https://github.com/opensearch-project/k-NN/issues/2294), and Amazon OpenSearch Service [GPU acceleration docs](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/gpu-acceleration-vector-index.html).
 
 ### Oracle AI Database 26ai
 
@@ -42,11 +42,11 @@ Use these integrations when vector search should be managed by a database or sea
 
 ### Solr
 
-[Apache Solr dense vector search](https://solr.apache.org/guide/solr/latest/query-guide/dense-vector-search.html#gpu-acceleration) can use cuVS through the `cuvs-lucene` vector format. Solr exposes this through `CuVSCodecFactory` and the [`CuVSCodec`](https://solr.apache.org/docs/10_0_0/modules/cuvs/org/apache/solr/cuvs/CuVSCodec.html) module, allowing CAGRA graph construction on GPU and serialization into an HNSW graph for search. The Solr guide covers setup steps, including the `cuvs` module jars, `knnAlgorithm="cagra_hnsw"` on `DenseVectorField`, and codec configuration in `solrconfig.xml`.
+[Apache Solr dense vector search](https://solr.apache.org/guide/solr/latest/query-guide/dense-vector-search.html#gpu-acceleration) can use NVIDIA cuVS through the `cuvs-lucene` vector format. Solr exposes this through `CuVSCodecFactory` and the [`CuVSCodec`](https://solr.apache.org/docs/10_0_0/modules/cuvs/org/apache/solr/cuvs/CuVSCodec.html) module, allowing CAGRA graph construction on GPU and serialization into an HNSW graph for search. The Solr guide covers setup steps, including the `cuvs` module jars, `knnAlgorithm="cagra_hnsw"` on `DenseVectorField`, and codec configuration in `solrconfig.xml`.
 
 ## Data Platforms
 
-Use these integrations when data locality, storage throughput, and RAG pipeline architecture are central to the deployment. These platforms usually do not expose cuVS APIs directly; they bring NVIDIA accelerated computing, networking, and AI software closer to enterprise data through the [NVIDIA AI Data Platform](https://nvidianews.nvidia.com/news/nvidia-and-storage-industry-leaders-unveil-new-class-of-enterprise-infrastructure-for-the-age-of-ai) reference design.
+Use these integrations when data locality, storage throughput, and RAG pipeline architecture are central to the deployment. These platforms usually do not expose NVIDIA cuVS APIs directly; they bring NVIDIA accelerated computing, networking, and AI software closer to enterprise data through the [NVIDIA AI Data Platform](https://nvidianews.nvidia.com/news/nvidia-and-storage-industry-leaders-unveil-new-class-of-enterprise-infrastructure-for-the-age-of-ai) reference design.
 
 ### Cloudian
 
@@ -62,15 +62,15 @@ Use these integrations when data locality, storage throughput, and RAG pipeline 
 
 ### MinIO
 
-[MinIO AIStor](https://www.min.io/partners/nvidia) is an S3-compatible object data platform for NVIDIA AI Factory and NVIDIA STX deployments. In vector-search and RAG pipelines, AIStor provides the durable object layer for embeddings, segment objects, index artifacts, and retrieval data while GPU-accelerated services such as Milvus and cuVS perform index construction and search. MinIO has published a [Milvus and cuVS benchmark](https://www.min.io/blog/accelerating-vector-indexing-with-minio-aistor-milvus-and-nvidia-cuvs) showing how AIStor, NVIDIA GPUDirect RDMA for S3-compatible storage, and cuVS fit together in large-scale vector index creation. See also MinIO's [NVIDIA STX announcement](https://www.min.io/press/minio-aistor-nvidia-stx-ai-factory) and [GPUDirect RDMA overview](https://www.min.io/blog/minio-aistor-with-nvidia-gpudirect-r-rdma-for-s3-compatible-storage-unlocking-performance-for-ai-factory-workloads).
+[MinIO AIStor](https://www.min.io/partners/nvidia) is an S3-compatible object data platform for NVIDIA AI Factory and NVIDIA STX deployments. In vector-search and RAG pipelines, AIStor provides the durable object layer for embeddings, segment objects, index artifacts, and retrieval data while GPU-accelerated services such as Milvus and NVIDIA cuVS perform index construction and search. MinIO has published a [Milvus and NVIDIA cuVS benchmark](https://www.min.io/blog/accelerating-vector-indexing-with-minio-aistor-milvus-and-nvidia-cuvs) showing how AIStor, NVIDIA GPUDirect RDMA for S3-compatible storage, and NVIDIA cuVS fit together in large-scale vector index creation. See also MinIO's [NVIDIA STX announcement](https://www.min.io/press/minio-aistor-nvidia-stx-ai-factory) and [GPUDirect RDMA overview](https://www.min.io/blog/minio-aistor-with-nvidia-gpudirect-r-rdma-for-s3-compatible-storage-unlocking-performance-for-ai-factory-workloads).
 
 ### NetApp
 
 [NetApp AIPod](https://www.netapp.com/nvidia/) supports NVIDIA AI Data Platform deployments with NetApp ONTAP data management, scalable storage, and NVIDIA accelerated computing. The integration is designed for governed RAG and inference pipelines that scan, index, classify, and retrieve enterprise documents for AI agents. See NetApp's [AI Data Platform announcement](https://www.netapp.com/newsroom/press-releases/news-rel-20250518-700517/) and [AI infrastructure documentation](https://docs.netapp.com/us-en/netapp-solutions-ai/ai-infrastructures/).
 
-### Pure Storage
+### Everpure
 
-[Pure Storage FlashBlade](https://www.purestorage.com/company/newsroom/press-releases/pure-storage-integrates-nvidia-ai-data-platform-into-flashblade.html?Social+Account=Pure+Storage+%28Default%29) integrates with the NVIDIA AI Data Platform reference design for agentic AI, RAG, and inference workflows. Pure Storage positions FlashBlade as a high-throughput storage layer for NVIDIA accelerated compute and NVIDIA AI Enterprise software, while [FlashBlade//EXA](https://www.pure.ai/flashblade-exa.html) targets large-scale AI and HPC workloads that need high metadata performance and low-latency access to multimodal data.
+[Everpure FlashBlade](https://www.purestorage.com/company/newsroom/press-releases/pure-storage-integrates-nvidia-ai-data-platform-into-flashblade.html?Social+Account=Pure+Storage+%28Default%29) integrates with the NVIDIA AI Data Platform reference design for agentic AI, RAG, and inference workflows. Everpure positions FlashBlade as a high-throughput storage layer for NVIDIA accelerated compute and NVIDIA AI Enterprise software, while [FlashBlade//EXA](https://www.pure.ai/flashblade-exa.html) targets large-scale AI and HPC workloads that need high metadata performance and low-latency access to multimodal data.
 
 ### WEKA
 
@@ -78,16 +78,16 @@ Use these integrations when data locality, storage throughput, and RAG pipeline 
 
 ## Libraries
 
-Use these integrations when you want library-level control inside an application or service. These options expose familiar APIs while letting developers use cuVS-backed indexing or search paths where supported.
+Use these integrations when you want library-level control inside an application or service. These options expose familiar APIs while letting developers use NVIDIA cuVS-backed indexing or search paths where supported.
 
 ### Faiss
 
-[Faiss](https://github.com/facebookresearch/faiss) integrates NVIDIA cuVS as an optional backend for GPU vector indexes. The cuVS-backed path keeps the Faiss API model while accelerating supported GPU indexes such as `GpuIndexFlat`, `GpuIndexIVFFlat`, `GpuIndexIVFPQ`, and `GpuIndexCagra`. Faiss can also move between CPU and GPU indexes, including converting GPU-built CAGRA indexes into HNSW-compatible CPU indexes with `IndexHNSWCagra`. See the [Faiss installation guide](https://github.com/facebookresearch/faiss/blob/main/INSTALL.md), [GPU Faiss with cuVS](https://github.com/facebookresearch/faiss/wiki/GPU-Faiss-with-cuVS), [cuVS usage guide](https://github.com/facebookresearch/faiss/wiki/GPU-Faiss-with-cuVS-usage), and [example notebook](https://github.com/facebookresearch/faiss/blob/main/tutorial/python/10-FaissCuvsExample.ipynb).
+[Faiss](https://github.com/facebookresearch/faiss) integrates NVIDIA cuVS as an optional backend for GPU vector indexes. The NVIDIA cuVS-backed path keeps the Faiss API model while accelerating supported GPU indexes such as `GpuIndexFlat`, `GpuIndexIVFFlat`, `GpuIndexIVFPQ`, and `GpuIndexCagra`. Faiss can also move between CPU and GPU indexes, including converting GPU-built CAGRA indexes into HNSW-compatible CPU indexes with `IndexHNSWCagra`. See the [Faiss installation guide](https://github.com/facebookresearch/faiss/blob/main/INSTALL.md), [GPU Faiss with NVIDIA cuVS](https://github.com/facebookresearch/faiss/wiki/GPU-Faiss-with-cuVS), [NVIDIA cuVS usage guide](https://github.com/facebookresearch/faiss/wiki/GPU-Faiss-with-cuVS-usage), and [example notebook](https://github.com/facebookresearch/faiss/blob/main/tutorial/python/10-FaissCuvsExample.ipynb).
 
 ### KIOXIA AiSAQ
 
-[KIOXIA AiSAQ](https://github.com/kioxia-jp/aisaq-diskann) is an SSD-oriented ANN library based on DiskANN and Vamana for vector collections that are too large to keep entirely in DRAM. AiSAQ can use cuVS to accelerate index build, including Vamana graph construction and k-means workflows. It is also available as a disk-based vector index in [Milvus 2.6.4 and newer](https://milvus.io/docs/aisaq.md). See KIOXIA's [4.8B-vector scaling demo](https://americas.kioxia.com/en-us/business/news/2026/ssd-20260316-2.html), [technical blog](https://blog-us.kioxia.com/post/2026/03/16/kioxia-aisaq-achieves-4-8-billion-high-dimensional-vector-search-on-a-single-server-with-7-8x-index-build-time-acceleration-via-gpus), and the cuVS [Vamana indexing guide](neighbors/vamana.md).
+[KIOXIA AiSAQ](https://github.com/kioxia-jp/aisaq-diskann) is an SSD-oriented ANN library based on DiskANN and Vamana for vector collections that are too large to keep entirely in DRAM. AiSAQ can use NVIDIA cuVS to accelerate index build, including Vamana graph construction and k-means workflows. It is also available as a disk-based vector index in [Milvus 2.6.4 and newer](https://milvus.io/docs/aisaq.md). See KIOXIA's [4.8B-vector scaling demo](https://americas.kioxia.com/en-us/business/news/2026/ssd-20260316-2.html), [technical blog](https://blog-us.kioxia.com/post/2026/03/16/kioxia-aisaq-achieves-4-8-billion-high-dimensional-vector-search-on-a-single-server-with-7-8x-index-build-time-acceleration-via-gpus), and the NVIDIA cuVS [Vamana indexing guide](/user-guide/api-guides/indexing-guide/vamana).
 
 ### Lucene
 
-[cuVS Lucene](https://github.com/rapidsai/cuvs-lucene) provides a Lucene `KnnVectorFormat` that lets Java search applications use NVIDIA cuVS through Lucene codecs. The package is published as [`com.nvidia.cuvs.lucene:cuvs-lucene`](https://central.sonatype.com/artifact/com.nvidia.cuvs.lucene/cuvs-lucene) and builds on the cuVS Java APIs. The integration targets GPU-accelerated vector indexing and search paths for Lucene-based systems, including CAGRA graph construction, filtering, index merge support, and off-heap data movement. See the SearchScale and NVIDIA writeup on [Apache Lucene accelerated with cuVS](https://searchscale.com/blog/apache-lucene-accelerated-with-nvidia-cuvs-25.06-release/).
+[NVIDIA cuVS Lucene](https://github.com/rapidsai/cuvs-lucene) provides a Lucene `KnnVectorFormat` that lets Java search applications use NVIDIA cuVS through Lucene codecs. The package is published as [`com.nvidia.cuvs.lucene:cuvs-lucene`](https://central.sonatype.com/artifact/com.nvidia.cuvs.lucene/cuvs-lucene) and builds on the NVIDIA cuVS Java APIs. The integration targets GPU-accelerated vector indexing and search paths for Lucene-based systems, including CAGRA graph construction, filtering, index merge support, and off-heap data movement. See the SearchScale and NVIDIA writeup on [Apache Lucene accelerated with NVIDIA cuVS](https://searchscale.com/blog/apache-lucene-accelerated-with-nvidia-cuvs-25.06-release/).

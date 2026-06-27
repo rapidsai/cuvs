@@ -16,7 +16,10 @@ Multi-GPU parameters to build CAGRA Index
 This structure extends the base CAGRA index parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuCagraIndexParams { ... };
+struct cuvsMultiGpuCagraIndexParams {
+  cuvsCagraIndexParams_t base_params;
+  cuvsMultiGpuDistributionMode mode;
+};
 ```
 
 **Fields**
@@ -32,7 +35,7 @@ struct cuvsMultiGpuCagraIndexParams { ... };
 Allocate Multi-GPU CAGRA Index params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(cuvsMultiGpuCagraIndexParams_t* index_params);
+cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(cuvsMultiGpuCagraIndexParams_t* index_params);
 ```
 
 **Parameters**
@@ -43,7 +46,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(cuvsMultiGpuCagraInde
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpucagraindexparamsdestroy"></a>
 ### cuvsMultiGpuCagraIndexParamsDestroy
@@ -51,7 +54,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(cuvsMultiGpuCagraInde
 De-allocate Multi-GPU CAGRA Index params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(cuvsMultiGpuCagraIndexParams_t index_params);
+cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(cuvsMultiGpuCagraIndexParams_t index_params);
 ```
 
 **Parameters**
@@ -62,7 +65,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(cuvsMultiGpuCagraInd
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index search parameters
 
@@ -74,7 +77,12 @@ Multi-GPU parameters to search CAGRA index
 This structure extends the base CAGRA search parameters with multi-GPU specific settings.
 
 ```c
-struct cuvsMultiGpuCagraSearchParams { ... };
+struct cuvsMultiGpuCagraSearchParams {
+  cuvsCagraSearchParams_t base_params;
+  cuvsMultiGpuReplicatedSearchMode search_mode;
+  cuvsMultiGpuShardedMergeMode merge_mode;
+  int64_t n_rows_per_batch;
+};
 ```
 
 **Fields**
@@ -92,7 +100,7 @@ struct cuvsMultiGpuCagraSearchParams { ... };
 Allocate Multi-GPU CAGRA search params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSearchParams_t* params);
+cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSearchParams_t* params);
 ```
 
 **Parameters**
@@ -103,7 +111,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSea
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpucagrasearchparamsdestroy"></a>
 ### cuvsMultiGpuCagraSearchParamsDestroy
@@ -111,7 +119,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSea
 De-allocate Multi-GPU CAGRA search params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSearchParams_t params);
+cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSearchParams_t params);
 ```
 
 **Parameters**
@@ -122,19 +130,20 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSe
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index
 
 <a id="cuvsmultigpucagraindex"></a>
 ### cuvsMultiGpuCagraIndex
 
-Struct to hold address of cuvs::neighbors::mg_index&lt;cagra::index&gt; and its active trained
-
-dtype
+Struct to hold address of cuvs::neighbors::mg_index&lt;cagra::index&gt; and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsMultiGpuCagraIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsMultiGpuCagraIndex;
 ```
 
 **Fields**
@@ -150,7 +159,7 @@ typedef struct { ... } cuvsMultiGpuCagraIndex;
 Allocate Multi-GPU CAGRA index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* index);
+cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* index);
 ```
 
 **Parameters**
@@ -161,7 +170,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* i
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsmultigpucagraindexdestroy"></a>
 ### cuvsMultiGpuCagraIndexDestroy
@@ -169,7 +178,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* i
 De-allocate Multi-GPU CAGRA index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t index);
+cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t index);
 ```
 
 **Parameters**
@@ -180,7 +189,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t i
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index build
 
@@ -190,7 +199,7 @@ CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t i
 Build a Multi-GPU CAGRA index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraBuild(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuCagraBuild(cuvsResources_t res,
 cuvsMultiGpuCagraIndexParams_t params,
 DLManagedTensor* dataset_tensor,
 cuvsMultiGpuCagraIndex_t index);
@@ -207,7 +216,7 @@ cuvsMultiGpuCagraIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index search
 
@@ -217,7 +226,7 @@ cuvsMultiGpuCagraIndex_t index);
 Search a Multi-GPU CAGRA index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSearch(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuCagraSearch(cuvsResources_t res,
 cuvsMultiGpuCagraSearchParams_t params,
 cuvsMultiGpuCagraIndex_t index,
 DLManagedTensor* queries_tensor,
@@ -238,7 +247,7 @@ DLManagedTensor* distances_tensor);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index extend
 
@@ -248,7 +257,7 @@ DLManagedTensor* distances_tensor);
 Extend a Multi-GPU CAGRA index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraExtend(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuCagraExtend(cuvsResources_t res,
 cuvsMultiGpuCagraIndex_t index,
 DLManagedTensor* new_vectors_tensor,
 DLManagedTensor* new_indices_tensor);
@@ -265,7 +274,7 @@ DLManagedTensor* new_indices_tensor);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index serialize
 
@@ -275,7 +284,7 @@ DLManagedTensor* new_indices_tensor);
 Serialize a Multi-GPU CAGRA index to file
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraSerialize(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuCagraSerialize(cuvsResources_t res,
 cuvsMultiGpuCagraIndex_t index,
 const char* filename);
 ```
@@ -290,7 +299,7 @@ const char* filename);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index deserialize
 
@@ -300,7 +309,7 @@ const char* filename);
 Deserialize a Multi-GPU CAGRA index from file
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraDeserialize(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuCagraDeserialize(cuvsResources_t res,
 const char* filename,
 cuvsMultiGpuCagraIndex_t index);
 ```
@@ -315,7 +324,7 @@ cuvsMultiGpuCagraIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Multi-GPU CAGRA index distribute
 
@@ -325,7 +334,7 @@ cuvsMultiGpuCagraIndex_t index);
 Distribute a local CAGRA index to create a Multi-GPU index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsMultiGpuCagraDistribute(cuvsResources_t res,
+cuvsError_t cuvsMultiGpuCagraDistribute(cuvsResources_t res,
 const char* filename,
 cuvsMultiGpuCagraIndex_t index);
 ```
@@ -340,4 +349,4 @@ cuvsMultiGpuCagraIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

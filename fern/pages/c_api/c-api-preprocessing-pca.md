@@ -14,7 +14,10 @@ _Source header: `cuvs/preprocessing/pca.h`_
 Solver algorithm for PCA eigen decomposition.
 
 ```c
-enum cuvsPcaSolver { ... };
+enum cuvsPcaSolver {
+  CUVS_PCA_COV_EIG_DQ = 0,
+  CUVS_PCA_COV_EIG_JACOBI = 1
+};
 ```
 
 **Values**
@@ -30,7 +33,14 @@ enum cuvsPcaSolver { ... };
 Parameters for PCA decomposition.
 
 ```c
-struct cuvsPcaParams { ... };
+struct cuvsPcaParams {
+  int n_components;
+  bool copy;
+  bool whiten;
+  enum cuvsPcaSolver algorithm;
+  float tol;
+  int n_iterations;
+};
 ```
 
 **Fields**
@@ -50,7 +60,7 @@ struct cuvsPcaParams { ... };
 Allocate PCA params and populate with default values.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
+cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 ```
 
 **Parameters**
@@ -61,7 +71,7 @@ CUVS_EXPORT cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvspcaparamsdestroy"></a>
 ### cuvsPcaParamsDestroy
@@ -69,7 +79,7 @@ CUVS_EXPORT cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params);
 De-allocate PCA params.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
+cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 ```
 
 **Parameters**
@@ -80,7 +90,7 @@ CUVS_EXPORT cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvspcafit"></a>
 ### cuvsPcaFit
@@ -88,7 +98,7 @@ CUVS_EXPORT cuvsError_t cuvsPcaParamsDestroy(cuvsPcaParams_t params);
 Perform PCA fit operation.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsPcaFit(cuvsResources_t res,
+cuvsError_t cuvsPcaFit(cuvsResources_t res,
 cuvsPcaParams_t params,
 DLManagedTensor* input,
 DLManagedTensor* components,
@@ -119,7 +129,7 @@ Computes the principal components, explained variances, singular values, and col
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvspcafittransform"></a>
 ### cuvsPcaFitTransform
@@ -127,7 +137,7 @@ Computes the principal components, explained variances, singular values, and col
 Perform PCA fit and transform in a single operation.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsPcaFitTransform(cuvsResources_t res,
+cuvsError_t cuvsPcaFitTransform(cuvsResources_t res,
 cuvsPcaParams_t params,
 DLManagedTensor* input,
 DLManagedTensor* trans_input,
@@ -160,7 +170,7 @@ Computes the principal components and transforms the input data into the eigensp
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvspcatransform"></a>
 ### cuvsPcaTransform
@@ -168,7 +178,7 @@ Computes the principal components and transforms the input data into the eigensp
 Perform PCA transform operation.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsPcaTransform(cuvsResources_t res,
+cuvsError_t cuvsPcaTransform(cuvsResources_t res,
 cuvsPcaParams_t params,
 DLManagedTensor* input,
 DLManagedTensor* components,
@@ -193,7 +203,7 @@ Transforms the input data into the eigenspace using previously computed principa
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvspcainversetransform"></a>
 ### cuvsPcaInverseTransform
@@ -201,7 +211,7 @@ Transforms the input data into the eigenspace using previously computed principa
 Perform PCA inverse transform operation.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsPcaInverseTransform(cuvsResources_t res,
+cuvsError_t cuvsPcaInverseTransform(cuvsResources_t res,
 cuvsPcaParams_t params,
 DLManagedTensor* trans_input,
 DLManagedTensor* components,
@@ -226,4 +236,4 @@ Transforms data from the eigenspace back to the original space.
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

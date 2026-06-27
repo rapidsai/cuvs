@@ -2,9 +2,9 @@
 
 Vector search indexes and vector databases solve related but different problems. A vector search index is the algorithmic structure used to find nearest neighbors. A vector database is a production system that stores vectors, manages writes, handles failures, scales across machines, and uses one or more vector search indexes internally.
 
-For guidance on choosing an index, see [What is Vector Search?](what_is_vector_search.md).
+For guidance on choosing an index, see [What is Vector Search?](/getting-started/introduction/vector-search).
 
-If you are looking for cuVS-powered vector databases and search engines, see the [Databases section of Integrations](integrations.md#databases).
+If you are looking for NVIDIA cuVS-powered vector databases and search engines, see the [Databases section of Integrations](/getting-started/integrations#databases).
 
 This page explains how vector databases use indexes internally, why local and global partitioning behave differently, and how hybrid designs combine both approaches. By the end, you should understand which database architecture you are tuning and why that changes the search, ingestion, and compaction tradeoffs.
 
@@ -13,7 +13,7 @@ This page explains how vector databases use indexes internally, why local and gl
 | Capability | Vector search index | Vector database |
 | --- | --- | --- |
 | Primary job | Find nearest neighbors quickly | Store, query, update, and operate vector data in production |
-| Examples | cuVS, FAISS, HNSW libraries | Milvus, Vespa, Elasticsearch, MongoDB, OpenSearch |
+| Examples | NVIDIA cuVS, FAISS, HNSW libraries | Milvus, Vespa, Elasticsearch, MongoDB, OpenSearch |
 | Scope | Build and search an index | Durability, metadata, filtering, replication, sharding, APIs, operations |
 | Tuning focus | Recall, latency, throughput, memory, build time | Index tuning plus ingestion, consistency, scaling, and operational constraints |
 | Best fit | Embedded search, custom systems, benchmarks, controlled pipelines | Applications that need database features around vector search |
@@ -54,7 +54,7 @@ In a hybrid design, the long-lived segments are allocated up front, one per glob
 
 In an IVF-style design, a partition does not need to be a flat list of vectors. Each partition can contain another ANN index, including graph-based indexes such as CAGRA, HNSW, or Vamana.
 
-[KIOXIA AiSAQ](integrations.md#kioxia-aisaq) is an example of this hybrid model: it can use globally assigned partitions inside a segment-oriented database architecture, while using Vamana/DiskANN-style graph ANN inside each partition.
+[KIOXIA AiSAQ](/getting-started/integrations#kioxia-aisaq) is an example of this hybrid model: it can use globally assigned partitions inside a segment-oriented database architecture, while using Vamana/DiskANN-style graph ANN inside each partition.
 
 ## Tuning implication
 
@@ -62,7 +62,7 @@ Vector indexes are often tuned like machine learning models: sample representati
 
 Locally partitioned indexes are usually easier to tune for index quality and latency because each segment can be treated as a smaller local problem. Globally partitioned indexes are harder to tune at scale because parameters such as `n_lists` and `n_probes` depend on the full dataset size and vector distribution, so the problem cannot be broken into independent segments as easily.
 
-Refer to [Tuning Indexes](tuning_guide.md) for more detail.
+Refer to [Tuning Indexes](/getting-started/introduction/tuning-indexes) for more detail.
 
 ## Conclusion
 

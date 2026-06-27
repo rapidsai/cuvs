@@ -14,15 +14,25 @@ _Source header: `cuvs/preprocessing/quantize/pq.h`_
 Product quantizer parameters.
 
 ```c
-struct cuvsProductQuantizerParams { ... };
+struct cuvsProductQuantizerParams {
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+  bool use_subspaces;
+  bool use_vq;
+  uint32_t vq_n_centers;
+  uint32_t kmeans_n_iters;
+  cuvsKMeansType pq_kmeans_type;
+  uint32_t max_train_points_per_pq_code;
+  uint32_t max_train_points_per_vq_cluster;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ. Possible values: within [4, 16]. Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
-| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic. TODO: at the moment `dim` must be a multiple `pq_dim`. |
+| `pq_bits` | `uint32_t` | The bit length of the vector element after compression by PQ.<br /><br />Possible values: within [4, 16].<br /><br />Hint: the smaller the 'pq_bits', the smaller the index size and the better the search performance, but the lower the recall. |
+| `pq_dim` | `uint32_t` | The dimensionality of the vector after compression by PQ. When zero, an optimal value is selected using a heuristic.<br /><br />TODO: at the moment `dim` must be a multiple `pq_dim`. |
 | `use_subspaces` | `bool` | Whether to use subspaces for product quantization (PQ). When true, one PQ codebook is used for each subspace. Otherwise, a single PQ codebook is used. |
 | `use_vq` | `bool` | Whether to use Vector Quantization (KMeans) before product quantization (PQ). When true, VQ is used before PQ. When false, only product quantization is used. |
 | `vq_n_centers` | `uint32_t` | Vector Quantization (VQ) codebook size - number of "coarse cluster centers". When zero, an optimal value is selected using a heuristic. When one, only product quantization is used. |
@@ -37,7 +47,7 @@ struct cuvsProductQuantizerParams { ... };
 Allocate Product Quantizer params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerParams_t* params);
+cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerParams_t* params);
 ```
 
 **Parameters**
@@ -48,7 +58,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerPar
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizerparamsdestroy"></a>
 ### cuvsProductQuantizerParamsDestroy
@@ -56,7 +66,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerPar
 De-allocate Product Quantizer params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params);
+cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params);
 ```
 
 **Parameters**
@@ -67,7 +77,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerPa
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizer"></a>
 ### cuvsProductQuantizer
@@ -77,7 +87,10 @@ Defines and stores product quantizer upon training
 The quantization is performed by a linear mapping of an interval in the float data type to the full range of the quantized int type.
 
 ```c
-typedef struct { ... } cuvsProductQuantizer;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsProductQuantizer;
 ```
 
 **Fields**
@@ -93,7 +106,7 @@ typedef struct { ... } cuvsProductQuantizer;
 Allocate Product Quantizer
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quantizer);
+cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quantizer);
 ```
 
 **Parameters**
@@ -104,7 +117,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quant
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizerdestroy"></a>
 ### cuvsProductQuantizerDestroy
@@ -112,7 +125,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quant
 De-allocate Product Quantizer
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quantizer);
+cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quantizer);
 ```
 
 **Parameters**
@@ -123,7 +136,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quant
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizerbuild"></a>
 ### cuvsProductQuantizerBuild
@@ -131,7 +144,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quant
 Builds a product quantizer to be used later for quantizing the dataset.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
+cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
 cuvsProductQuantizerParams_t params,
 DLManagedTensor* dataset,
 cuvsProductQuantizer_t quantizer);
@@ -148,7 +161,7 @@ cuvsProductQuantizer_t quantizer);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizertransform"></a>
 ### cuvsProductQuantizerTransform
@@ -156,7 +169,7 @@ cuvsProductQuantizer_t quantizer);
 Applies product quantization transform to the given dataset
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
+cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
 cuvsProductQuantizer_t quantizer,
 DLManagedTensor* dataset,
 DLManagedTensor* codes_out,
@@ -177,7 +190,7 @@ This applies product quantization to a dataset.
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizerinversetransform"></a>
 ### cuvsProductQuantizerInverseTransform
@@ -185,7 +198,7 @@ This applies product quantization to a dataset.
 Applies product quantization inverse transform to the given quantized codes
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
+cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
 cuvsProductQuantizer_t quantizer,
 DLManagedTensor* pq_codes,
 DLManagedTensor* out,
@@ -206,7 +219,7 @@ This applies product quantization inverse transform to the given quantized codes
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizergetpqbits"></a>
 ### cuvsProductQuantizerGetPqBits
@@ -214,7 +227,7 @@ This applies product quantization inverse transform to the given quantized codes
 Get the bit length of the vector element after compression by PQ.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quantizer, uint32_t* pq_bits);
+cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quantizer, uint32_t* pq_bits);
 ```
 
 **Parameters**
@@ -226,7 +239,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t qua
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizergetpqdim"></a>
 ### cuvsProductQuantizerGetPqDim
@@ -234,7 +247,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t qua
 Get the dimensionality of the vector after compression by PQ.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer, uint32_t* pq_dim);
+cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer, uint32_t* pq_dim);
 ```
 
 **Parameters**
@@ -246,7 +259,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quan
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizergetpqcodebook"></a>
 ### cuvsProductQuantizerGetPqCodebook
@@ -254,7 +267,7 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quan
 Get the PQ codebook.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
+cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
 DLManagedTensor* pq_codebook);
 ```
 
@@ -267,7 +280,7 @@ DLManagedTensor* pq_codebook);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizergetvqcodebook"></a>
 ### cuvsProductQuantizerGetVqCodebook
@@ -275,7 +288,7 @@ DLManagedTensor* pq_codebook);
 Get the VQ codebook.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
+cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
 DLManagedTensor* vq_codebook);
 ```
 
@@ -288,7 +301,7 @@ DLManagedTensor* vq_codebook);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizergetencodeddim"></a>
 ### cuvsProductQuantizerGetEncodedDim
@@ -296,7 +309,7 @@ DLManagedTensor* vq_codebook);
 Get the encoded dimension of the quantized dataset.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
+cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
 uint32_t* encoded_dim);
 ```
 
@@ -309,7 +322,7 @@ uint32_t* encoded_dim);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvsproductquantizergetusevq"></a>
 ### cuvsProductQuantizerGetUseVq
@@ -317,7 +330,7 @@ uint32_t* encoded_dim);
 Get whether VQ is used.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetUseVq(cuvsProductQuantizer_t quantizer, bool* use_vq);
+cuvsError_t cuvsProductQuantizerGetUseVq(cuvsProductQuantizer_t quantizer, bool* use_vq);
 ```
 
 **Parameters**
@@ -329,4 +342,4 @@ CUVS_EXPORT cuvsError_t cuvsProductQuantizerGetUseVq(cuvsProductQuantizer_t quan
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

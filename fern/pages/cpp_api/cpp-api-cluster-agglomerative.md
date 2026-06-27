@@ -14,7 +14,10 @@ _Source header: `cuvs/cluster/agglomerative.hpp`_
 Determines the method for computing the minimum spanning tree (MST)
 
 ```cpp
-enum Linkage { ... };
+enum Linkage {
+  PAIRWISE = 0,
+  KNN_GRAPH = 1
+};
 ```
 
 **Values**
@@ -35,7 +38,7 @@ mirrors the trained instance variables populated in Scikit-learn's Agglomerative
 
 ```cpp
 template <typename idx_t>
-class single_linkage_output { ... };
+class single_linkage_output;
 ```
 
 ## single-linkage clustering APIs
@@ -69,8 +72,8 @@ scale the algorithm beyond the n^2 memory consumption of implementations that us
 | `labels` | out | `raft::device_vector_view<int, int>` | output labels vector (size n_rows) |
 | `metric` | in | [`cuvs::distance::DistanceType`](/api-reference/cpp-api-distance-distance#distance-distancetype) | distance metric to use when constructing connectivities graph |
 | `n_clusters` | in | `size_t` | number of clusters to assign data samples |
-| `linkage` | in | [`cuvs::cluster::agglomerative::Linkage`](/api-reference/cpp-api-cluster-agglomerative#cluster-agglomerative-linkage) | strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller datasets. KNN_GRAPH allows the memory usage to be controlled (using parameter c) at the expense of potentially additional minimum spanning tree iterations. Default: `cuvs::cluster::agglomerative::Linkage::KNN_GRAPH`. |
-| `c` | in | `std::optional<int>` | a constant used when constructing linkage from knn graph. Allows the indirect control of k. The algorithm will set `k = log(n) + c` Default: `std::make_optional&lt;int&gt;(DEFAULT_CONST_C)`. |
+| `linkage` | in | [`cuvs::cluster::agglomerative::Linkage`](/api-reference/cpp-api-cluster-agglomerative#cluster-agglomerative-linkage) | strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller datasets. KNN_GRAPH allows the memory usage to be controlled (using parameter c) at the expense of potentially additional minimum spanning tree iterations.<br />Default: `cuvs::cluster::agglomerative::Linkage::KNN_GRAPH`. |
+| `c` | in | `std::optional<int>` | a constant used when constructing linkage from knn graph. Allows the indirect control of k. The algorithm will set `k = log(n) + c`<br />Default: `std::make_optional&lt;int&gt;(DEFAULT_CONST_C)`. |
 
 **Returns**
 
@@ -82,7 +85,10 @@ scale the algorithm beyond the n^2 memory consumption of implementations that us
 Specialized parameters to build the KNN graph with regular distances
 
 ```cpp
-struct distance_params { ... };
+struct distance_params {
+  int c;
+  cuvs::cluster::agglomerative::Linkage dist_type;
+};
 ```
 
 **Fields**
@@ -98,7 +104,11 @@ struct distance_params { ... };
 Specialized parameters to build the Mutual Reachability graph
 
 ```cpp
-struct mutual_reachability_params { ... };
+struct mutual_reachability_params {
+  int min_samples;
+  float alpha;
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params:: brute_force_params;
+};
 ```
 
 **Fields**
@@ -107,7 +117,7 @@ struct mutual_reachability_params { ... };
 | --- | --- | --- |
 | `min_samples` | `int` | this neighborhood will be selected for core distances. |
 | `alpha` | `float` | weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables the weighting) |
-| `brute_force_params` | [`cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params::`](/api-reference/cpp-api-neighbors-all-neighbors#neighbors-all-neighbors-all-neighbors-params) | Parameters for building the mutual reachability graph using an underlying KNN algorithm. The all-neighbors graph construction algorithm enables building the mutual reachability graph on datasets larger than device memory by:<br />1. Partitioning the dataset into overlapping clusters,<br />2. Computing local KNN graphs within each cluster, and<br />3. Merging the local graphs into a single global graph. Key fields:<br />- graph_build_params: Selects the KNN construction method (Brute Force or NN Descent) and controls algorithm-specific parameters.<br />- n_clusters: Number of partitions (batches) to split the data into. Larger `n_clusters` reduces memory usage but may reduce accuracy if `overlap_factor` is too low. Recommended starting value: `n_clusters = 4`. Increase progressively (4 → 8 → 16 ...) to reduce memory usage at the cost of some accuracy. This is independent of `overlap_factor` as long as `overlap_factor &lt; n_clusters`.<br />- overlap_factor: Number of nearest clusters each data point is assigned to. Higher `overlap_factor` improves accuracy at the cost of memory and performance. Recommended starting value: `overlap_factor = 2`. Increase gradually (2 → 3 → 4 ...) for better accuracy with higher device memory usage.<br />- metric: Distance metric to use when computing nearest neighbors. |
+| `brute_force_params` | [`cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{ cuvs::neighbors::graph_build_params::`](/api-reference/cpp-api-neighbors-all-neighbors#neighbors-all-neighbors-all-neighbors-params) | Parameters for building the mutual reachability graph using an underlying KNN algorithm.<br /><br />The all-neighbors graph construction algorithm enables building the mutual reachability graph on datasets larger than device memory by:<br />1. Partitioning the dataset into overlapping clusters,<br />2. Computing local KNN graphs within each cluster, and<br />3. Merging the local graphs into a single global graph.<br /><br />Key fields:<br />- graph_build_params: Selects the KNN construction method (Brute Force or NN Descent) and controls algorithm-specific parameters.<br /><br />- n_clusters: Number of partitions (batches) to split the data into. Larger `n_clusters` reduces memory usage but may reduce accuracy if `overlap_factor` is too low. Recommended starting value: `n_clusters = 4`. Increase progressively (4 → 8 → 16 ...) to reduce memory usage at the cost of some accuracy. This is independent of `overlap_factor` as long as `overlap_factor &lt; n_clusters`.<br /><br />- overlap_factor: Number of nearest clusters each data point is assigned to. Higher `overlap_factor` improves accuracy at the cost of memory and performance. Recommended starting value: `overlap_factor = 2`. Increase gradually (2 → 3 → 4 ...) for better accuracy with higher device memory usage.<br /><br />- metric: Distance metric to use when computing nearest neighbors. |
 
 <a id="cluster-agglomerative-helpers-build-linkage"></a>
 ### cluster::agglomerative::helpers::build_linkage
@@ -128,7 +138,7 @@ raft::device_vector_view<int64_t, int64_t> out_sizes,
 std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 ```
 
-(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram. Reachability space
+(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
 
 **Parameters**
 
@@ -142,7 +152,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
 | `out_distances` | out | `raft::device_vector_view<float, int64_t>` | distances for output |
 | `out_sizes` | out | `raft::device_vector_view<int64_t, int64_t>` | cluster sizes of output |
-| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual |
+| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual Reachability space |
 
 **Returns**
 
@@ -166,7 +176,7 @@ raft::device_vector_view<int64_t, int64_t> out_sizes,
 std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 ```
 
-(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram. Reachability space
+(dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
 
 **Parameters**
 
@@ -180,7 +190,7 @@ std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 | `dendrogram` | out | `raft::device_matrix_view<int64_t, int64_t>` | output dendrogram (size [n_rows - 1] * 2) |
 | `out_distances` | out | `raft::device_vector_view<float, int64_t>` | distances for output |
 | `out_sizes` | out | `raft::device_vector_view<int64_t, int64_t>` | cluster sizes of output |
-| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual |
+| `core_dists` | out | `std::optional<raft::device_vector_view<float, int64_t>>` | (optional) core distances (size m). Must be supplied in the Mutual Reachability space |
 
 **Returns**
 
@@ -203,8 +213,6 @@ raft::device_vector_view<int64_t, int64_t> out_size);
 
 This function takes a sorted MST (represented as edges with source, destination, and weights) and constructs a dendrogram (hierarchical clustering tree) on the host.
 
-nnz)
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -214,7 +222,7 @@ nnz)
 | `cols` | in | `raft::device_vector_view<const int64_t, int64_t>` | Destination nodes of the MST edges (device memory, size: nnz) |
 | `data` | in | `raft::device_vector_view<const float, int64_t>` | Edge weights/distances of the MST (device memory, size: nnz) |
 | `children` | out | `raft::device_matrix_view<int64_t, int64_t, raft::row_major>` | Output dendrogram children array (device memory, size: nnz * 2) Each pair of consecutive elements represents the two children merged at each step of the hierarchy |
-| `out_delta` | out | `raft::device_vector_view<float, int64_t>` | Output distances/heights at which clusters are merged (device memory, size: |
+| `out_delta` | out | `raft::device_vector_view<float, int64_t>` | Output distances/heights at which clusters are merged (device memory, size: nnz) |
 | `out_size` | out | `raft::device_vector_view<int64_t, int64_t>` | Output cluster sizes at each merge step (device memory, size: nnz) |
 
 **Returns**

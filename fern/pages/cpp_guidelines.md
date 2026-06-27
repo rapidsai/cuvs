@@ -4,11 +4,11 @@ slug: developer-guide/coding-guidelines/cpp-guidelines
 
 # C++ Guidelines
 
-This page collects the engineering conventions that keep cuVS APIs stable, predictable, and easy to maintain. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when designing public APIs, writing CUDA/C++ implementation code, or preparing a change for review.
+This page collects the engineering conventions that keep NVIDIA cuVS APIs stable, predictable, and easy to maintain. Start with the [Contributor Guide](/developer-guide/contributing), then use this page when designing public APIs, writing CUDA/C++ implementation code, or preparing a change for review.
 
 ## Local Development
 
-Most cuVS changes can be developed directly in this repository. Cross-project CUDA/C++ work may also require a local RAFT build or temporary downstream pin.
+Most NVIDIA cuVS changes can be developed directly in this repository. Cross-project CUDA/C++ work may also require a local RAFT build or temporary downstream pin.
 
 If a consuming project supports source builds, pass `CPM_raft_SOURCE=/path/to/raft/source` to its CMake configuration. If the downstream project must pin a RAFT branch while related changes are under review, update the `FORK` and `PINNED_TAG` arguments to `find_and_configure_raft`, then revert that pin before the downstream change merges.
 
@@ -93,6 +93,22 @@ void deserialize(raft::resources const& res, std::istream& is, index<int64_t>* i
 }  // namespace cuvs::neighbors::ivf_pq
 ```
 
+### Working With Dense Arrays
+
+Use RAFT array types consistently in public C++ APIs and implementation code. For user-facing examples of passing dense arrays into NVIDIA cuVS APIs, see [Dense Arrays](/user-guide/api-guides/core-types/array-types/dense-arrays).
+
+Keep data layout explicit. Most NVIDIA cuVS APIs expect row-major dense matrices unless the API says otherwise.
+
+Prefer public API signatures that accept non-owning views, not owning arrays. This keeps NVIDIA cuVS functions flexible because callers can pass memory owned by RAFT, another RAPIDS library, or an application-specific allocator.
+
+Prefer `device_matrix_view` and `device_vector_view` over raw pointers for public NVIDIA cuVS C++ APIs. Views carry shape, layout, memory-space, and constness information, making incorrect dimensions and accidental writes easier to catch.
+
+Use owning arrays such as `raft::device_matrix`, `raft::host_matrix`, and `raft::pinned_matrix` when implementation code, tests, or examples need RAFT to allocate storage.
+
+Synchronize appropriately before reading data on the host. Many NVIDIA cuVS operations enqueue GPU work asynchronously on the stream owned by `raft::device_resources`.
+
+Use pinned arrays only when their transfer or coordination benefits matter. Ordinary host arrays are simpler and should be the default for CPU-only data.
+
 ## Common Design Considerations
 
 1. Use `.hpp` for headers that can be compiled by `gcc` against the CUDA runtime. Use `.cuh` when a header requires `nvcc`.
@@ -110,7 +126,7 @@ Prefer small, explicit choices that avoid hidden overhead:
 
 ### Threading Model
 
-cuVS algorithms should be safe to call from multiple host threads when each thread uses its own `raft::resources` instance. Treat `raft::resources` as the boundary for CUDA streams, memory resources, communication handles, and library handles.
+NVIDIA cuVS algorithms should be safe to call from multiple host threads when each thread uses its own `raft::resources` instance. Treat `raft::resources` as the boundary for CUDA streams, memory resources, communication handles, and library handles.
 
 Inside an algorithm, host threads are acceptable only when they help keep CUDA streams busy. Keep them bounded, prefer OpenMP, and make sure the algorithm still works when OpenMP is disabled.
 
@@ -142,7 +158,7 @@ If there is no CPU work before the first kernel, make the internal streams wait 
 
 ### Asynchronous Operations And Stream Ordering
 
-cuVS algorithms should be asynchronous whenever possible and should avoid the default CUDA stream. For single-stream work, use the stream on `raft::resources`:
+NVIDIA cuVS algorithms should be asynchronous whenever possible and should avoid the default CUDA stream. For single-stream work, use the stream on `raft::resources`:
 
 ```cpp
 #include <raft/core/resource/cuda_stream.hpp>
@@ -159,7 +175,7 @@ When an algorithm uses internal streams, preserve ordering with the caller's str
 1. Work already queued on `raft::resource::get_cuda_stream(res)` must complete before internal stream work starts.
 2. Work queued by the caller after the API returns must wait until all internal stream work is complete.
 
-Use CUDA events and `cudaStreamWaitEvent` to create those dependencies. This lets users compose cuVS operations with their own asynchronous copies and kernels without accidental races.
+Use CUDA events and `cudaStreamWaitEvent` to create those dependencies. This lets users compose NVIDIA cuVS operations with their own asynchronous copies and kernels without accidental races.
 
 #### Using Thrust
 
@@ -210,7 +226,7 @@ int main()
 
 ### Multi-GPU
 
-cuVS multi-GPU APIs generally use one of two execution strategies:
+NVIDIA cuVS multi-GPU APIs generally use one of two execution strategies:
 
 1. Single-process multi-GPU: one host process owns and coordinates multiple GPUs. Use `raft::device_resources_snmg` in examples and public API documentation for this model. It owns the selected devices, streams, communication resources, and per-device execution state.
 2. One-process-per-GPU: each process owns one GPU and participates as a communication rank. Use `raft::device_resources` or `raft::resources` with an initialized `raft::comms::comms_t`. Access communication through `raft::resource::get_comms`, and guard optional communication paths with `raft::resource::comms_initialized`.
@@ -238,15 +254,15 @@ void foo(raft::resources const& res)
 
 ### Using Just-in-Time Link-Time Optimization
 
-cuVS is moving new kernels toward JIT link-time optimization. Instead of compiling every kernel variant into the binary, JIT LTO compiles fragments and links the needed combination at runtime.
+NVIDIA cuVS is moving new kernels toward JIT link-time optimization. Instead of compiling every kernel variant into the binary, JIT LTO compiles fragments and links the needed combination at runtime.
 
-This helps reduce binary size and enables user-defined functions in cuVS CUDA kernels. For runtime and cache behavior, see [JIT Compilation](jit_compilation.md). For implementation guidance, see [Link-time Optimization](jit_lto_guide.md).
+This helps reduce binary size and enables user-defined functions in NVIDIA cuVS CUDA kernels. For runtime and cache behavior, see [JIT Compilation](/user-guide/field-guide/jit-compilation). For implementation guidance, see [Link-time Optimization](/developer-guide/advanced-topics/link-time-optimization).
 
 ## Coding Style
 
 ### Formatting
 
-cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
+NVIDIA cuVS uses [pre-commit](https://pre-commit.com/) to run formatting, linting, spelling, and copyright checks. Install it with conda:
 
 ```bash
 conda install -c conda-forge pre-commit
@@ -272,7 +288,7 @@ pre-commit install
 
 ### Core Hooks
 
-C++ and CUDA code are formatted with [clang-format](https://clang.llvm.org/docs/ClangFormat.html). cuVS follows the Google C++ style with a few local adjustments documented in [cpp/.clang-format](https://github.com/rapidsai/cuvs/blob/main/cpp/.clang-format):
+C++ and CUDA code are formatted with [clang-format](https://clang.llvm.org/docs/ClangFormat.html). NVIDIA cuVS follows the Google C++ style with a few local adjustments documented in [cpp/.clang-format](https://github.com/rapidsai/cuvs/blob/main/cpp/.clang-format):
 
 1. Empty functions, records, and namespaces are not split.
 2. Indentation is two spaces, including line continuations.
@@ -316,7 +332,7 @@ Public APIs need direct test coverage because downstream projects rely on their 
 
 ### Performance Benchmarking
 
-The most important implementation details in cuVS are written in C++ and CUDA, so performance-sensitive changes need benchmarks with clear baselines. Benchmarks should show that regressions have not occurred, intended improvements can be reproduced consistently, and the implementation scales as expected across problem sizes and hardware configurations. For relevant indexing APIs, it is often preferable to use the [cuVS Bench Tool](cuvs_bench/index.md) for reproducible benchmarks.
+The most important implementation details in NVIDIA cuVS are written in C++ and CUDA, so performance-sensitive changes need benchmarks with clear baselines. Benchmarks should show that regressions have not occurred, intended improvements can be reproduced consistently, and the implementation scales as expected across problem sizes and hardware configurations. For relevant indexing APIs, it is often preferable to use the [cuVS Bench Tool](/user-guide/benchmarking-guide/cu-vs-bench-tool) for reproducible benchmarks.
 
 Attach benchmark results to the relevant GitHub pull request so future reviewers and contributors have an audit trail. Pull requests that change performance-critical code should not be merged without proper benchmarks in place.
 

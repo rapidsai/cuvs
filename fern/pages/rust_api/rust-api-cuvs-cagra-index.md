@@ -12,7 +12,9 @@ _Source: `rust/cuvs/src/cagra/index.rs`_
 
 ```rust
 #[derive(Debug)]
-pub struct Index(ffi::cuvsCagraIndex_t);
+pub struct Index(ffi::cuvsCagraIndex_t); {
+    /* private fields */
+}
 ```
 
 CAGRA ANN Index
@@ -36,7 +38,7 @@ pub fn build<T: Into<ManagedTensor>>(
 res: &Resources,
 params: &IndexParams,
 dataset: T,
-) -> Result<Index> { ... }
+) -> Result<Index>
 ```
 
 Builds a new Index from the dataset for efficient search.
@@ -52,7 +54,7 @@ _Source: `rust/cuvs/src/cagra/index.rs:38`_
 ### new
 
 ```rust
-pub fn new() -> Result<Index> { ... }
+pub fn new() -> Result<Index>
 ```
 
 Creates a new empty index
@@ -69,7 +71,7 @@ params: &SearchParams,
 queries: &ManagedTensor,
 neighbors: &ManagedTensor,
 distances: &ManagedTensor,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Perform a Approximate Nearest Neighbors search on the Index
@@ -95,7 +97,7 @@ queries: &ManagedTensor,
 neighbors: &ManagedTensor,
 distances: &ManagedTensor,
 bitset: &ManagedTensor,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Perform a filtered Approximate Nearest Neighbors search on the Index
@@ -124,7 +126,7 @@ pub fn serialize<P: AsRef<Path>>(
 res: &Resources,
 filename: P,
 include_dataset: bool,
-) -> Result<()> { ... }
+) -> Result<()>
 ```
 
 Save the CAGRA index to file.
@@ -142,7 +144,7 @@ _Source: `rust/cuvs/src/cagra/index.rs:143`_
 ### serialize_to_hnswlib
 
 ```rust
-pub fn serialize_to_hnswlib<P: AsRef<Path>>(&self, res: &Resources, filename: P) -> Result<()> { ... }
+pub fn serialize_to_hnswlib<P: AsRef<Path>>(&self, res: &Resources, filename: P) -> Result<()>
 ```
 
 Save the CAGRA index to file in hnswlib format.
@@ -162,7 +164,7 @@ _Source: `rust/cuvs/src/cagra/index.rs:166`_
 ### deserialize
 
 ```rust
-pub fn deserialize<P: AsRef<Path>>(res: &Resources, filename: P) -> Result<Index> { ... }
+pub fn deserialize<P: AsRef<Path>>(res: &Resources, filename: P) -> Result<Index>
 ```
 
 Load a CAGRA index from file.

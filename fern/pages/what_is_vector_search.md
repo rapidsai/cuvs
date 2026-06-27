@@ -8,13 +8,13 @@ The simplest way to find nearest neighbors is exact search: compare the query wi
 
 Approximate nearest-neighbor (ANN) indexes make that work cheaper. They usually do this in one or both of two ways: make each vector comparison cheaper, or reduce the number of vector comparisons that need to be computed. These trade exactness for speed, memory efficiency, or scale.
 
-In vector search, [recall](comparing_indexes.md#recall) is the main quality metric. It measures how many of the exact nearest neighbors were returned by the approximate search. Higher recall usually costs more build time, more search time, more memory, or some combination of all three.
+In vector search, [recall](/user-guide/benchmarking-guide/methodologies#recall) is the main quality metric. It measures how many of the exact nearest neighbors were returned by the approximate search. Higher recall usually costs more build time, more search time, more memory, or some combination of all three.
 
 This page introduces the main techniques used to reduce vector search cost, then explains how those techniques scale into larger index and database architectures. By the end, you should have a practical starting point for choosing an index type and understanding the key attributes, benefits, and tradeoffs of each option.
 
 ## Reducing the Footprint
 
-Reducing the footprint means making each vector cheaper to store, move, or compare. This can reduce memory use, improve cache behavior, and lower memory bandwidth pressure during search. The main tradeoff is that smaller representations are often less precise, so they may need refinement or more careful tuning. For a broader overview of vector compression methods, see [Compression](quantization.md).
+Reducing the footprint means making each vector cheaper to store, move, or compare. This can reduce memory use, improve cache behavior, and lower memory bandwidth pressure during search. The main tradeoff is that smaller representations are often less precise, so they may need refinement or more careful tuning. For a broader overview of vector compression methods, see [Compression](/getting-started/introduction/compression).
 
 ### Quantization
 
@@ -28,7 +28,7 @@ IVF indexes usually apply quantization inside the partitioned structure. Because
 
 Dimensionality reduction makes vectors shorter by projecting them into fewer dimensions. Shorter vectors require fewer operations per distance calculation and less memory per vector. This is useful when the original vectors contain redundant or noisy dimensions, or when the search system is limited by memory bandwidth.
 
-[PCA](preprocessing/pca.md) is a common linear method that preserves the directions with the most variance. [Spectral Embedding](preprocessing/spectral_embedding.md) is graph-based and can preserve local neighborhood structure when the data lies on a lower-dimensional manifold. These methods can reduce search cost, but they add preprocessing work and may remove information that matters for nearest-neighbor quality.
+[PCA](/user-guide/api-guides/preprocessing-guide/pca) is a common linear method that preserves the directions with the most variance. [Spectral Embedding](/user-guide/api-guides/preprocessing-guide/spectral-embedding) is graph-based and can preserve local neighborhood structure when the data lies on a lower-dimensional manifold. These methods can reduce search cost, but they add preprocessing work and may remove information that matters for nearest-neighbor quality.
 
 Dimensionality reduction can also be combined with quantization. A workflow might first project vectors into a smaller space, then quantize the result to reduce memory bandwidth even further.
 
@@ -84,7 +84,7 @@ This is easy to operate because each partition can be built, stored, and updated
 
 <img alt="A simple hash-partitioned index diagram showing build-time assignment by hash and search-time fanout to every partition before merging results." src="/assets/images/hash_partition_build_search.png" />
 
-This is similar to the [locally partitioned indexes](vector_databases_vs_vector_search.md#locally-partitioned-indexes) architecture used by many vector databases. Local partitioning is useful for scaling storage, ingestion, and operations, but it does not reduce search work the way IVF or other similarity-aware routing structures can.
+This is similar to the [locally partitioned indexes](/getting-started/introduction/vector-database#locally-partitioned-indexes) architecture used by many vector databases. Local partitioning is useful for scaling storage, ingestion, and operations, but it does not reduce search work the way IVF or other similarity-aware routing structures can.
 
 ### Semantic Partitioning
 
@@ -120,7 +120,7 @@ GPU acceleration can help across the vector-search pipeline, not only during que
 
 Some systems use GPUs only where they are most valuable. For example, a graph index can be built quickly on the GPU and converted to a CPU-searchable format such as HNSW, or a database can offload index builds to a GPU worker while keeping serving in its existing CPU runtime. These hybrid patterns let products shorten ingest or rebuild time without requiring every query-serving node to have a GPU.
 
-For more integration details, see [Hybrid GPU-build and CPU-search](/user-guide/integration-patterns#hybrid-gpu-build-and-cpu-search) and [Offloaded index builds](/user-guide/integration-patterns#offloaded-index-builds).
+For more integration details, see [Hybrid GPU-build and CPU-search](/user-guide/field-guide/integration-patterns#hybrid-gpu-build-and-cpu-search) and [Offloaded index builds](/user-guide/field-guide/integration-patterns#offloaded-index-builds).
 
 ## Choosing Index Types
 

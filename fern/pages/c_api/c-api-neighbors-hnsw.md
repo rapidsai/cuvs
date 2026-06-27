@@ -16,7 +16,10 @@ Hierarchy for HNSW index when converting from CAGRA index
 NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
 
 ```c
-enum cuvsHnswHierarchy { ... };
+enum cuvsHnswHierarchy {
+  CPU = 1,
+  GPU = 2
+};
 ```
 
 **Values**
@@ -38,14 +41,20 @@ ACE enables building indexes for datasets too large to fit in GPU memory by:
 3. Concatenating sub-graphs into a final unified index
 
 ```c
-struct cuvsHnswAceParams { ... };
+struct cuvsHnswAceParams {
+  size_t npartitions;
+  const char* build_dir;
+  bool use_disk;
+  double max_host_memory_gb;
+  double max_gpu_memory_gb;
+};
 ```
 
 **Fields**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `npartitions` | `size_t` | Number of partitions for ACE partitioned build. When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory. Small values might improve recall but potentially degrade performance and increase memory usage. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests). If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
+| `npartitions` | `size_t` | Number of partitions for ACE partitioned build.<br /><br />When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory.<br /><br />Small values might improve recall but potentially degrade performance and increase memory usage. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).<br /><br />If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
 | `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in memory. |
 | `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
 | `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. Useful for testing or when running alongside other memory-intensive processes. |
@@ -57,7 +66,7 @@ struct cuvsHnswAceParams { ... };
 Allocate HNSW ACE params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
+cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
 ```
 
 **Parameters**
@@ -68,7 +77,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswaceparamsdestroy"></a>
 ### cuvsHnswAceParamsDestroy
@@ -76,7 +85,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params);
 De-allocate HNSW ACE params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
+cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
 ```
 
 **Parameters**
@@ -87,7 +96,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswindexparamscreate"></a>
 ### cuvsHnswIndexParamsCreate
@@ -95,7 +104,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params);
 Allocate HNSW Index params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
+cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
 ```
 
 **Parameters**
@@ -106,7 +115,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswindexparamsdestroy"></a>
 ### cuvsHnswIndexParamsDestroy
@@ -114,7 +123,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
 De-allocate HNSW Index params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
+cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
 ```
 
 **Parameters**
@@ -125,7 +134,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params)
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## C API for hnswlib wrapper index
 
@@ -135,7 +144,10 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params)
 Struct to hold address of cuvs::neighbors::Hnsw::index and its active trained dtype
 
 ```c
-typedef struct { ... } cuvsHnswIndex;
+typedef struct {
+  uintptr_t addr;
+  DLDataType dtype;
+} cuvsHnswIndex;
 ```
 
 **Fields**
@@ -151,7 +163,7 @@ typedef struct { ... } cuvsHnswIndex;
 Allocate HNSW index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
+cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 ```
 
 **Parameters**
@@ -162,7 +174,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswindexdestroy"></a>
 ### cuvsHnswIndexDestroy
@@ -170,7 +182,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 De-allocate HNSW index
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
+cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 ```
 
 **Parameters**
@@ -181,7 +193,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Parameters for extending HNSW index
 
@@ -191,7 +203,9 @@ CUVS_EXPORT cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 Parameters for extending HNSW index
 
 ```c
-struct cuvsHnswExtendParams { ... };
+struct cuvsHnswExtendParams {
+  int num_threads;
+};
 ```
 
 **Fields**
@@ -206,7 +220,7 @@ struct cuvsHnswExtendParams { ... };
 Allocate HNSW extend params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
+cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
 ```
 
 **Parameters**
@@ -217,7 +231,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* param
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswextendparamsdestroy"></a>
 ### cuvsHnswExtendParamsDestroy
@@ -225,7 +239,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* param
 De-allocate HNSW extend params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
+cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
 ```
 
 **Parameters**
@@ -236,26 +250,24 @@ CUVS_EXPORT cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t param
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Load CAGRA index as hnswlib index
 
 <a id="cuvshnswfromcagra"></a>
 ### cuvsHnswFromCagra
 
-Convert a CAGRA Index to an HNSW index.
+Convert a CAGRA Index to an HNSW index. NOTE: When hierarchy is:
+
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
 cuvsHnswIndexParams_t params,
 cuvsCagraIndex_t cagra_index,
 cuvsHnswIndex_t hnsw_index);
 ```
-
-NOTE: When hierarchy is:
-
-1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
-2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 **Parameters**
 
@@ -268,7 +280,7 @@ NOTE: When hierarchy is:
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Build HNSW index using ACE algorithm
 
@@ -278,7 +290,7 @@ NOTE: When hierarchy is:
 Build an HNSW index using ACE (Augmented Core Extraction) algorithm.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswBuild(cuvsResources_t res,
+cuvsError_t cuvsHnswBuild(cuvsResources_t res,
 cuvsHnswIndexParams_t params,
 DLManagedTensor* dataset,
 cuvsHnswIndex_t index);
@@ -303,23 +315,21 @@ NOTE: This function requires CUDA to be available at runtime.
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## Extend HNSW index with additional vectors
 
 <a id="cuvshnswextend"></a>
 ### cuvsHnswExtend
 
-Add new vectors to an HNSW index
+Add new vectors to an HNSW index NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when converting from a CAGRA index.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswExtend(cuvsResources_t res,
+cuvsError_t cuvsHnswExtend(cuvsResources_t res,
 cuvsHnswExtendParams_t params,
 DLManagedTensor* additional_dataset,
 cuvsHnswIndex_t index);
 ```
-
-NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when converting from a CAGRA index.
 
 **Parameters**
 
@@ -332,7 +342,7 @@ NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when conve
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## C API for hnswlib wrapper search params
 
@@ -342,7 +352,10 @@ NOTE: The HNSW index can only be extended when the hierarchy is `CPU` when conve
 C API for hnswlib wrapper search params
 
 ```c
-struct cuvsHnswSearchParams { ... };
+struct cuvsHnswSearchParams {
+  int32_t ef;
+  int32_t num_threads;
+};
 ```
 
 **Fields**
@@ -358,7 +371,7 @@ struct cuvsHnswSearchParams { ... };
 Allocate HNSW search params, and populate with default values
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
+cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
 ```
 
 **Parameters**
@@ -369,7 +382,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* param
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswsearchparamsdestroy"></a>
 ### cuvsHnswSearchParamsDestroy
@@ -377,7 +390,7 @@ CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* param
 De-allocate HNSW search params
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
+cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
 ```
 
 **Parameters**
@@ -388,29 +401,27 @@ CUVS_EXPORT cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t param
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## C API for CUDA ANN Graph-based nearest neighbor search
 
 <a id="cuvshnswsearch"></a>
 ### cuvsHnswSearch
 
-Search a HNSW index with a `DLManagedTensor` which has underlying
+Search a HNSW index with a `DLManagedTensor` which has underlying `DLDeviceType` equal to `kDLCPU`, `kDLCUDAHost`, or `kDLCUDAManaged`. It is also important to note that the HNSW Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Supported types for input are:
+
+1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64`
+3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` NOTE: When hierarchy is `NONE`, the HNSW index can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswSearch(cuvsResources_t res,
+cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 cuvsHnswSearchParams_t params,
 cuvsHnswIndex_t index,
 DLManagedTensor* queries,
 DLManagedTensor* neighbors,
 DLManagedTensor* distances);
 ```
-
-`DLDeviceType` equal to `kDLCPU`, `kDLCUDAHost`, or `kDLCUDAManaged`. It is also important to note that the HNSW Index must have been built with the same type of `queries`, such that `index.dtype.code == queries.dl_tensor.dtype.code` Supported types for input are:
-
-1. `queries`: a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8` c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
-2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64`
-3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` NOTE: When hierarchy is `NONE`, the HNSW index can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 
 **Parameters**
 
@@ -425,20 +436,18 @@ DLManagedTensor* distances);
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 ## HNSW C-API serialize functions
 
 <a id="cuvshnswserialize"></a>
 ### cuvsHnswSerialize
 
-Serialize a CAGRA index to a file as an hnswlib index
+Serialize a CAGRA index to a file as an hnswlib index NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHnswIndex_t index);
+cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHnswIndex_t index);
 ```
-
-NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib library.
 
 **Parameters**
 
@@ -450,7 +459,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
 <a id="cuvshnswdeserialize"></a>
 ### cuvsHnswDeserialize
@@ -458,7 +467,7 @@ NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can onl
 Load hnswlib index from file which was serialized from a HNSW index.
 
 ```c
-CUVS_EXPORT cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
+cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
 cuvsHnswIndexParams_t params,
 const char* filename,
 int dim,
@@ -481,4 +490,4 @@ NOTE: When hierarchy is `NONE`, the loaded hnswlib index is immutable, and only 
 
 **Returns**
 
-[`CUVS_EXPORT cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)

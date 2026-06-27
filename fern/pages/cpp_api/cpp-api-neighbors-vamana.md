@@ -11,13 +11,16 @@ _Source header: `cuvs/neighbors/vamana.hpp`_
 <a id="neighbors-vamana-codebook-params"></a>
 ### neighbors::vamana::codebook_params
 
-Parameters used to build quantized DiskANN index; to be generated using
-
-deserialize_codebooks()
+Parameters used to build quantized DiskANN index; to be generated using deserialize_codebooks()
 
 ```cpp
 template <typename T = float>
-struct codebook_params { ... };
+struct codebook_params {
+  int pq_codebook_size;
+  int pq_dim;
+  std::vector<T> pq_encoding_table;
+  std::vector<T> rotation_matrix;
+};
 ```
 
 **Fields**
@@ -35,7 +38,17 @@ struct codebook_params { ... };
 Parameters used to build DiskANN index
 
 ```cpp
-struct index_params : cuvs::neighbors::index_params { ... };
+struct index_params : cuvs::neighbors::index_params {
+  uint32_t graph_degree;
+  uint32_t visited_size;
+  float vamana_iters;
+  float alpha;
+  float max_fraction;
+  float batch_base;
+  uint32_t queue_size;
+  uint32_t reverse_batchsize;
+  std::optional<codebook_params<float>> codebooks;
+};
 ```
 
 **Fields**
@@ -63,7 +76,7 @@ The index stores the dataset and the Vamana graph in device memory.
 
 ```cpp
 template <typename T, typename IdxT>
-struct index : cuvs::neighbors::index { ... };
+struct index;
 ```
 
 <a id="neighbors-vamana-index-metric"></a>
@@ -195,8 +208,7 @@ Construct an empty index.
 
 ```cpp
 index(raft::resources const& res,
-cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
-: cuvs::neighbors::index(),
+cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 ```
 
 **Parameters**
@@ -221,8 +233,7 @@ cuvs::distance::DistanceType metric,
 raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
 raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
 vamana_graph,
-IdxT medoid_id)
-: cuvs::neighbors::index(),
+IdxT medoid_id);
 ```
 
 **Parameters**
@@ -521,8 +532,8 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `file_prefix` | in | `const std::string&` | prefix of path and name of index files |
 | `index` | in | [`const cuvs::neighbors::vamana::index<float, uint32_t>&`](/api-reference/cpp-api-neighbors-vamana#neighbors-vamana-index) | Vamana index |
-| `include_dataset` | in | `bool` | whether or not to serialize the dataset Default: `true`. |
-| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes Default: `false`. |
+| `include_dataset` | in | `bool` | whether or not to serialize the dataset<br />Default: `true`. |
+| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes<br />Default: `false`. |
 
 **Returns**
 
@@ -549,8 +560,8 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `file_prefix` | in | `const std::string&` | prefix of path and name of index files |
 | `index` | in | [`const cuvs::neighbors::vamana::index<int8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-vamana#neighbors-vamana-index) | Vamana index |
-| `include_dataset` | in | `bool` | whether or not to serialize the dataset Default: `true`. |
-| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes Default: `false`. |
+| `include_dataset` | in | `bool` | whether or not to serialize the dataset<br />Default: `true`. |
+| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes<br />Default: `false`. |
 
 **Returns**
 
@@ -577,8 +588,8 @@ Matches the file format used by the DiskANN open-source repository, allowing cro
 | `handle` | in | `raft::resources const&` | the raft handle |
 | `file_prefix` | in | `const std::string&` | prefix of path and name of index files |
 | `index` | in | [`const cuvs::neighbors::vamana::index<uint8_t, uint32_t>&`](/api-reference/cpp-api-neighbors-vamana#neighbors-vamana-index) | Vamana index |
-| `include_dataset` | in | `bool` | whether or not to serialize the dataset Default: `true`. |
-| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes Default: `false`. |
+| `include_dataset` | in | `bool` | whether or not to serialize the dataset<br />Default: `true`. |
+| `sector_aligned` | in | `bool` | whether output file should be aligned to disk sectors of 4096 bytes<br />Default: `false`. |
 
 **Returns**
 
