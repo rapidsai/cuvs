@@ -149,6 +149,14 @@ struct index_params : cuvs::neighbors::index_params {
   std::optional<bool> use_ann_for_build_fit;
 
   /**
+   * Rebuild interval for the CAGRA index during k-means fit E-step (when
+   * `use_ann_for_build_fit` is true). std::nullopt uses the balanced k-means default (3).
+   * R=1 rebuilds the index every EM iteration; larger R reuses the index for R-1 iterations
+   * before rebuilding.
+   */
+  std::optional<uint32_t> ann_rebuild_interval;
+
+  /**
    * Use CAGRA vs brute force for nearest-centroid lookup during `build()` post-fit predict
    * (assign train subsample labels for PQ codebook training; centroids are fixed).
    * - std::nullopt (default): brute-force assignment.

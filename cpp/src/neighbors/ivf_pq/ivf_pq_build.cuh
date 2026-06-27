@@ -1382,7 +1382,9 @@ auto build(raft::resources const& handle,
     // (balancing_em_iters → assign_nearest_centroid_cagra_with_index_reuse), not here.
     if (params.use_ann_for_build_fit.value_or(false)) {
       kmeans_params.use_ann_for_build_fit = true;
-      kmeans_params.ann_rebuild_interval  = 3;
+      if (params.ann_rebuild_interval.has_value()) {
+        kmeans_params.ann_rebuild_interval = params.ann_rebuild_interval.value();
+      }
     }
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {

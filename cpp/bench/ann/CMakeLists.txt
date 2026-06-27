@@ -327,6 +327,32 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
     DESTINATION bin/ann
   )
   add_dependencies(CUVS_ANN_BENCH_ALL CUVS_IVFPQ_BUILD_BENCH)
+
+  add_executable(CUVS_FIT_ANN_REBUILD_TUNING_BENCH src/cuvs/cuvs_fit_ann_rebuild_tuning_bench.cu)
+  target_link_libraries(
+    CUVS_FIT_ANN_REBUILD_TUNING_BENCH
+    PRIVATE cuvs benchmark::benchmark $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
+            $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+  )
+  target_include_directories(
+    CUVS_FIT_ANN_REBUILD_TUNING_BENCH
+    PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/../c/include>"
+    PRIVATE "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/src>"
+  )
+  set_target_properties(
+    CUVS_FIT_ANN_REBUILD_TUNING_BENCH
+    PROPERTIES CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+  )
+  install(
+    TARGETS CUVS_FIT_ANN_REBUILD_TUNING_BENCH
+    COMPONENT ann_bench
+    DESTINATION bin/ann
+  )
+  add_dependencies(CUVS_ANN_BENCH_ALL CUVS_FIT_ANN_REBUILD_TUNING_BENCH)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
