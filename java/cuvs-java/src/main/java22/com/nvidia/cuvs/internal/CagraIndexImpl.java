@@ -47,7 +47,7 @@ import java.util.*;
  *
  * @since 25.02
  */
-public class CagraIndexImpl implements CagraIndex, BufferedCagraSearch {
+public class CagraIndexImpl implements CagraIndex {
   private final CuVSResources resources;
   private final IndexReference cagraIndexReference;
   private boolean destroyed;
@@ -339,7 +339,6 @@ public class CagraIndexImpl implements CagraIndex, BufferedCagraSearch {
   }
 
   /** Returns the underlying {@code cuvsCagraIndex_t} handle for native-side index passing. */
-  @Override
   public MemorySegment getIndexHandle() {
     return cagraIndexReference.getMemorySegment();
   }

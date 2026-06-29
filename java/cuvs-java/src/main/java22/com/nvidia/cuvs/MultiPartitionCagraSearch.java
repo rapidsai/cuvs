@@ -18,7 +18,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.kDLInt;
 import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 
 import com.nvidia.cuvs.FilterBitsetHandle.DeviceData;
-import com.nvidia.cuvs.internal.BufferedCagraSearch;
+import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSMatrixInternal;
 import com.nvidia.cuvs.internal.CuVSParamsHelper;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
@@ -87,14 +87,14 @@ public class MultiPartitionCagraSearch {
       return new MultiPartitionSearchResults(0, new int[0], new int[0], new float[0]);
     }
 
-    BufferedCagraSearch[] buffered = new BufferedCagraSearch[numPartitions];
+    CagraIndexImpl[] buffered = new CagraIndexImpl[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
       CagraIndex idx = indices.get(i);
-      if (!(idx instanceof BufferedCagraSearch)) {
+      if (!(idx instanceof CagraIndexImpl)) {
         throw new IllegalArgumentException(
             "Index at position " + i + " does not support buffered search");
       }
-      buffered[i] = (BufferedCagraSearch) idx;
+      buffered[i] = (CagraIndexImpl) idx;
     }
 
     var queryVectors = (CuVSMatrixInternal) query.getQueryVectors();
