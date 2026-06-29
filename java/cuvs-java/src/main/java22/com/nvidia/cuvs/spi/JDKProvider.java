@@ -257,8 +257,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public HnswIndex hnswIndexBuild(
-      CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset) throws Throwable {
+  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable {
     return HnswIndexImpl.build(resources, hnswParams, dataset);
   }
 
