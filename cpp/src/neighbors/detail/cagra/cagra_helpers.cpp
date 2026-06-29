@@ -86,6 +86,8 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
 
   size_t debug_host_size = 0;
   if (raft::default_logger().should_log(rapids_logger::level_enum::debug)) {
+  // cagra::detail::graph::optimize() allocates extra memory to calculate
+  // graph metrics when debug logging is enabled
     debug_host_size = n_rows * graph_degree * sizeof(uint32_t)  // host_copy_output_graph
                       + n_rows * sizeof(uint32_t)               // in_edge_count
                       + graph_degree * sizeof(uint32_t);        // hist
