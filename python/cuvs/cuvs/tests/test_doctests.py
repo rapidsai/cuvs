@@ -21,7 +21,7 @@ import cuvs.preprocessing.quantize
 
 def _name_in_all(parent, name):
     # Skip multi-GPU (mg) modules - they require special multi-GPU setup
-    # See: https://github.com/rapidsai/cuvs/issues/1647
+    # See: https://github.com/nvidia/cuvs/issues/1647
     if name == "mg" or name == "mg_resources" or name == "MultiGpuResources":
         return False
     return name in getattr(parent, "__all__", [])
