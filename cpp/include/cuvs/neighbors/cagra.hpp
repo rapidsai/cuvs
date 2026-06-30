@@ -1044,11 +1044,25 @@ void extend(
  */
 
 // Concrete non-template overloads for all supported index types.
-// Previously a single template <T, IdxT, DatasetViewT, OutputIdxT> covered all index types; it
-// has been replaced with explicit overloads to maintain a stable non-template ABI. When a new
-// index type is added, add corresponding overloads here. Index types whose search is not yet
-// implemented (e.g. vpq_f32_index) are still declared so the symbols exist when the
-// implementation lands.
+// Explicit overloads (not a single template) keep a stable link ABI for the C API.
+// When a new index type is added, add matching overloads here and in cagra_search_inst.cu.in.
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with uint32_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& index,
@@ -1058,6 +1072,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with uint32_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<half, uint32_t>& index,
@@ -1067,6 +1097,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with uint32_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>& index,
@@ -1076,6 +1122,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with uint32_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& index,
@@ -1085,6 +1147,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with int64_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<float, uint32_t>& index,
@@ -1094,6 +1172,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with int64_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<half, uint32_t>& index,
@@ -1103,6 +1197,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with int64_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>& index,
@@ -1112,6 +1222,22 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built device_padded_index with int64_t neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>& index,
@@ -1121,7 +1247,24 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
-// VPQ f16 index overloads (OutputIdxT = uint32_t)
+// vpq_f16_index overloads (uint32_t neighbor indices)
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<float, uint32_t>& index,
@@ -1131,6 +1274,23 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<half, uint32_t>& index,
@@ -1140,6 +1300,23 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<int8_t, uint32_t>& index,
@@ -1149,6 +1326,23 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<uint8_t, uint32_t>& index,
@@ -1158,7 +1352,24 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
-// VPQ f16 index overloads (OutputIdxT = int64_t)
+// vpq_f16_index overloads (int64_t neighbor indices)
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<float, uint32_t>& index,
@@ -1168,6 +1379,23 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<half, uint32_t>& index,
@@ -1177,6 +1405,23 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<int8_t, uint32_t>& index,
@@ -1186,6 +1431,23 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f16_index (CAGRA-Q, VPQ f16-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f16_index<uint8_t, uint32_t>& index,
@@ -1195,7 +1457,26 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
-// VPQ f32 index overloads (OutputIdxT = uint32_t)
+// vpq_f32_index overloads (uint32_t neighbor indices)
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<float, uint32_t>& index,
@@ -1205,6 +1486,25 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<half, uint32_t>& index,
@@ -1214,6 +1514,25 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<int8_t, uint32_t>& index,
@@ -1223,6 +1542,25 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with uint32_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<uint8_t, uint32_t>& index,
@@ -1232,7 +1570,26 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
-// VPQ f32 index overloads (OutputIdxT = int64_t)
+// vpq_f32_index overloads (int64_t neighbor indices)
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<float, uint32_t>& index,
@@ -1242,6 +1599,25 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<half, uint32_t>& index,
@@ -1251,6 +1627,25 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<int8_t, uint32_t>& index,
@@ -1260,6 +1655,25 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index pre-built vpq_f32_index (CAGRA-Q, VPQ f32-compressed dataset) with int64_t
+ * neighbor indices
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index.dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering).
+ *
+ * @note FP32 VPQ search is declared for ABI stability but fails at runtime until implemented.
+ */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::vpq_f32_index<uint8_t, uint32_t>& index,
