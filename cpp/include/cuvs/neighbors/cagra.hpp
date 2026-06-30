@@ -6,7 +6,6 @@
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/cagra_dataset_view_dispatch.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/dataset_view_concepts.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -438,11 +437,8 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     return dataset_fd_.has_value() ? graph_degree_ : graph_view_.extent(1);
   }
 
-  [[nodiscard]] inline auto dataset() const
-    -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
-  {
-    return cuvs::neighbors::cagra::dataset_view_to_strided_device_matrix<T>(dataset_);
-  }
+  [[nodiscard]] auto dataset() const
+    -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>;
 
   /** Non-owning dataset binding stored by the index. */
   [[nodiscard]] inline auto data() const noexcept -> DatasetViewT const& { return dataset_; }
@@ -2869,19 +2865,15 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
+namespace detail {
+
 /**
- * @brief Convert a host-resident CAGRA index to a device-resident index (graph only).
+ * @brief Copy a host-resident CAGRA index graph into a new device-resident index (graph only).
  *
- * Copies the graph host → device. The returned device index has no dataset attached;
- * call `index::update_dataset(res, device_view)` or `attach_device_dataset_on_host_index`
- * before search.
+ * The returned device index has no dataset attached. Prefer `attach_device_dataset_on_host_index`
+ * for the public host-build → search workflow.
  *
- * @tparam T      element type
- * @tparam IdxT   index type
- * @tparam HostViewT  any host-resident dataset view type
- * @param[in] res   RAFT resources
- * @param[in] src   host index (graph only, no dataset needed)
- * @return device index with graph copied from src
+ * @internal
  */
 template <typename T, typename IdxT, typename HostViewT>
   requires cuvs::neighbors::is_host_dataset_view_v<HostViewT>
@@ -2907,11 +2899,12 @@ auto convert_host_to_device_index(raft::resources const& res, index<T, IdxT, Hos
   return out;
 }
 
+}  // namespace detail
+
 /**
  * @brief Convert a host index to device and attach a device dataset in one step.
  *
- * Equivalent to `convert_host_to_device_index(res, host_idx)` followed by
- * `device_idx.update_dataset(res, device_dataset)`.
+ * Copies the graph from `host_idx` into a new device index and attaches `device_dataset`.
  *
  * @tparam T          element type
  * @tparam IdxT       index type
@@ -2929,7 +2922,7 @@ auto attach_device_dataset_on_host_index(raft::resources const& res,
                                          DeviceViewT const& device_dataset)
   -> index<T, IdxT, DeviceViewT>
 {
-  auto device_idx = convert_host_to_device_index(res, host_idx);
+  auto device_idx = detail::convert_host_to_device_index(res, host_idx);
   device_idx.update_dataset(res, device_dataset);
   return device_idx;
 }

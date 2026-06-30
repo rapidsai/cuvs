@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,5 +42,20 @@ CUVS_INST_CAGRA_SEARCH_ALL_VIEWS(data_t, int64_t);
 
 #undef CUVS_INST_CAGRA_SEARCH_ALL_VIEWS
 #undef CUVS_INST_CAGRA_SEARCH
+
+#define CUVS_INST_CAGRA_DATASET(T, IdxT, DatasetViewT)        \
+  template auto index<T, IdxT, DatasetViewT>::dataset() const \
+    -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
+
+#define CUVS_INST_CAGRA_DATASET_ALL_VIEWS(T)                       \
+  CUVS_INST_CAGRA_DATASET(T, uint32_t, inst_device_padded_view_t); \
+  CUVS_INST_CAGRA_DATASET(T, uint32_t, inst_vpq_f16_view_t);       \
+  CUVS_INST_CAGRA_DATASET(T, uint32_t, inst_vpq_f32_view_t);       \
+  CUVS_INST_CAGRA_DATASET(T, uint32_t, inst_empty_view_t)
+
+CUVS_INST_CAGRA_DATASET_ALL_VIEWS(data_t);
+
+#undef CUVS_INST_CAGRA_DATASET_ALL_VIEWS
+#undef CUVS_INST_CAGRA_DATASET
 
 }  // namespace cuvs::neighbors::cagra

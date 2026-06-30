@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,6 +19,7 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 
+#include "detail/cagra/cagra_dataset_view_dispatch.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
@@ -35,6 +36,13 @@
 namespace cuvs::neighbors::cagra {
 
 // Member function implementations for cagra::index
+template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
+auto index<T, IdxT, DatasetViewT>::dataset() const
+  -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
+{
+  return detail::dataset_view_to_strided_device_matrix<T>(dataset_);
+}
+
 template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 void index<T, IdxT, DatasetViewT>::compute_dataset_norms_(raft::resources const& res)
 {

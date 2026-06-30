@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,7 +7,7 @@
 
 /**
  * @file cagra_dataset_view_dispatch.hpp
- * @brief Template helpers for concrete CAGRA dataset views (no variant dispatch).
+ * @brief Internal template helpers for concrete CAGRA dataset views (no variant dispatch).
  */
 
 #include <cuvs/neighbors/common.hpp>
@@ -15,7 +15,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
 
-namespace cuvs::neighbors::cagra {
+namespace cuvs::neighbors::cagra::detail {
 
 template <typename T>
 void expect_cagra_row_width_for_graph(uint32_t logical_dim, int64_t pitch)
@@ -94,4 +94,4 @@ auto dataset_view_to_strided_device_matrix(device_empty_dataset_view<IdxT> const
   return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
 }
 
-}  // namespace cuvs::neighbors::cagra
+}  // namespace cuvs::neighbors::cagra::detail

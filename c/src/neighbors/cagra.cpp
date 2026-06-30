@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -230,8 +230,9 @@ void _build(cuvsResources_t res,
       cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_view(
         mds, static_cast<uint32_t>(mds.extent(1)));
       auto host_idx = cuvs::neighbors::cagra::build(*res_ptr, index_params, host_view);
-      auto device_idx = cuvs::neighbors::cagra::convert_host_to_device_index(*res_ptr, host_idx);
-      // convert_host_to_device_index now makes an owned copy of the graph (D→H→D), so
+      auto device_idx =
+        cuvs::neighbors::cagra::detail::convert_host_to_device_index(*res_ptr, host_idx);
+      // detail::convert_host_to_device_index makes an owned copy of the graph (D→H→D), so
       // device_idx.graph_ is self-contained and does not borrow from host_idx.
       std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> padded_owner = nullptr;
       if (host_idx.dataset_fd().has_value()) {

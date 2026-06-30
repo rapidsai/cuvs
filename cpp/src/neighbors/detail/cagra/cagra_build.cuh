@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -21,10 +21,10 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/integer_utils.hpp>
 
+#include "cagra_dataset_view_dispatch.hpp"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/cagra_dataset_view_dispatch.hpp>
 #include <cuvs/neighbors/dataset_view_concepts.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
