@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -579,6 +579,11 @@ void search_multi_partition(
   auto positions_view = raft::make_device_matrix_view<uint32_t, int64_t, raft::row_major>(
     positions_buf.data(), n_queries, topk);
 
+  // Post-processing above restores each metric's natural ordering: distance metrics (L2, and the
+  // Cosine transform applied here) are smaller-is-closer, while InnerProduct is larger-is-closer.
+  // Pick the merge direction accordingly rather than assuming smaller-is-closer.
+  const bool select_min = cuvs::distance::is_min_close(indices[0]->metric());
+
   raft::matrix::select_k<DistanceT, uint32_t>(
     res,
     raft::make_device_matrix_view<const DistanceT, int64_t, raft::row_major>(
@@ -588,7 +593,7 @@ void search_multi_partition(
     std::nullopt,
     distances,
     positions_view,
-    /*select_min=*/true);
+    select_min);
 
   // Decode positions into partition_ids and neighbors.
   // positions[q, j_out] ∈ [0, num_partitions * per_partition_topk) encodes
