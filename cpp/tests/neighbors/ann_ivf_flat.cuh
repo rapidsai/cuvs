@@ -307,7 +307,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto& list_inds           = extend_index.lists()[label]->indices;
 
         // fetch the flat codes
-        auto flat_codes = raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.dim());
+        auto flat_codes = raft::make_device_matrix<DataT, int32_t>(handle_, list_size, idx.dim());
 
         raft::matrix::gather(
           handle_,
