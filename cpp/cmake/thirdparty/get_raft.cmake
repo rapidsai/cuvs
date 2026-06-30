@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 
@@ -8,6 +8,9 @@
 set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
 set(RAFT_FORK "rapidsai")
 set(RAFT_PINNED_TAG "${rapids-cmake-checkout-tag}")
+set(LIBRAFT_LOGGING_LEVEL "INFO"
+    CACHE STRING "Choose the RAFT logging level compiled into cuVS."
+)
 
 function(find_and_configure_raft)
     set(oneValueArgs VERSION FORK PINNED_TAG BUILD_STATIC_DEPS ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
@@ -55,6 +58,24 @@ function(find_and_configure_raft)
             )
 endfunction()
 
+# RAFT target is shipped together with the RAFT_LOG_ACTIVE_LEVEL macro. Simply redefining the macro
+# would yield a redefine error. We instead query and modify the definition list of the RAFT target manually.
+function(overwrite_raft_log_active_level)
+    set(oneValueArgs LEVEL)
+    cmake_parse_arguments(PKG "" "${oneValueArgs}" "" ${ARGN})
+    if(TARGET raft::raft)
+        get_target_property(_defs raft::raft INTERFACE_COMPILE_DEFINITIONS)
+        if(_defs)
+            # Get definitions without previous logging level
+            list(FILTER _defs EXCLUDE REGEX "^RAFT_LOG_ACTIVE_LEVEL=")
+            # Append the new logging level
+            list(APPEND _defs "RAFT_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LOG_LEVEL_${PKG_LEVEL}")
+            # Set the modified definitions back to the raft target
+            set_target_properties(raft::raft PROPERTIES INTERFACE_COMPILE_DEFINITIONS "${_defs}")
+            message(STATUS "cuVS: set RAFT_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LOG_LEVEL_${PKG_LEVEL}")
+        endif()
+    endif()
+endfunction()
 
 # Change pinned tag here to test a commit in CI
 # To use a different RAFT locally, set the CMake variable
@@ -71,3 +92,5 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         CLONE_ON_PIN     ${CUVS_RAFT_CLONE_ON_PIN}
 
 )
+
+overwrite_raft_log_active_level(LEVEL ${LIBRAFT_LOGGING_LEVEL})
