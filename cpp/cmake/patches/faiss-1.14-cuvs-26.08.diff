@@ -260,3 +260,16 @@ index a10e9fb..b5c2bcd 100644
      /// Instance of trained cuVS CAGRA index
      std::shared_ptr<cuvs::neighbors::cagra::index<data_t, uint32_t>> cuvs_index{
              nullptr};
+diff --git a/faiss/gpu/impl/CuvsFlatIndex.cu b/faiss/gpu/impl/CuvsFlatIndex.cu
+index d4a2d99fe..fd364add0 100644
+--- a/faiss/gpu/impl/CuvsFlatIndex.cu
++++ b/faiss/gpu/impl/CuvsFlatIndex.cu
+@@ -30,7 +30,7 @@
+ #include <vector>
+
+ #include <cuvs/core/bitset.hpp>
+-#include <cuvs/distance/distance.h>
++#include <cuvs/distance/distance.hpp>
+ #include <cuvs/neighbors/brute_force.hpp>
+ #include <raft/core/device_mdspan.hpp>
+ #include <raft/core/logger.hpp>
