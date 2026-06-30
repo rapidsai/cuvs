@@ -1,8 +1,8 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-package com.nvidia.cuvs;
+package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.DEVICE_TO_HOST;
@@ -17,10 +17,12 @@ import static com.nvidia.cuvs.internal.panama.headers_h.kDLFloat;
 import static com.nvidia.cuvs.internal.panama.headers_h.kDLInt;
 import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 
-import com.nvidia.cuvs.FilterBitsetHandle.DeviceData;
-import com.nvidia.cuvs.internal.CagraIndexImpl;
-import com.nvidia.cuvs.internal.CuVSMatrixInternal;
-import com.nvidia.cuvs.internal.CuVSParamsHelper;
+import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CagraQuery;
+import com.nvidia.cuvs.CagraSearchParams;
+import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.FilterBitsetHandle;
+import com.nvidia.cuvs.MultiPartitionSearchResults;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -28,10 +30,8 @@ import java.lang.foreign.ValueLayout;
 import java.util.List;
 
 /**
- * Performs an approximate nearest neighbor search across multiple CAGRA index partitions in a
- * single native call. The caller supplies one {@link CagraQuery} whose query matrix is searched
- * against every partition; cuVS performs the per-partition searches, the cross-partition top-k
- * merge, and the post-processing internally, then returns the merged results.
+ * JDK/Panama implementation of multi-partition CAGRA search. The public entry point
+ * {@code com.nvidia.cuvs.MultiPartitionCagraSearch} delegates here via {@code CuVSProvider}.
  *
  * <h3>Algorithm (executed natively)</h3>
  * <ol>
@@ -41,40 +41,11 @@ import java.util.List;
  *   <li>Run a batched {@code raft::matrix::select_k} to pick the global top-k per query.</li>
  *   <li>Decode the select_k positions into {@code partition_ids} and {@code neighbors} outputs.</li>
  * </ol>
- *
- * @since 25.10
  */
-public class MultiPartitionCagraSearch {
+public final class MultiPartitionCagraSearchImpl {
 
-  private MultiPartitionCagraSearch() {}
+  private MultiPartitionCagraSearchImpl() {}
 
-  /**
-   * Searches multiple CAGRA index partitions for the global top-k nearest neighbors.
-   *
-   * @param resources shared {@link CuVSResources} handle
-   * @param indices   one {@link CagraIndex} per partition, in partition order
-   * @param query     a single {@link CagraQuery} whose query matrix is searched against every
-   *                  partition; its search parameters are shared across all partitions
-   * @param k         number of global nearest neighbors to return per query
-   */
-  public static MultiPartitionSearchResults search(
-      CuVSResources resources, List<CagraIndex> indices, CagraQuery query, int k) throws Throwable {
-    return search(resources, indices, query, k, /* filter= */ null);
-  }
-
-  /**
-   * Searches multiple CAGRA index partitions with an optional pre-cached device-side filter.
-   *
-   * <p>When {@code filter} is non-null, the filter is applied via the pre-uploaded combined
-   * bitset, avoiding both host-side O(N) bit evaluation and H2D transfers on cache hits.
-   *
-   * @param resources shared {@link CuVSResources} handle
-   * @param indices   one {@link CagraIndex} per partition, in partition order
-   * @param query     a single {@link CagraQuery} whose query matrix is searched against every
-   *                  partition
-   * @param k         number of global nearest neighbors to return per query
-   * @param filter    pre-built combined bitset handle, or {@code null} for unfiltered search
-   */
   public static MultiPartitionSearchResults search(
       CuVSResources resources,
       List<CagraIndex> indices,
@@ -114,7 +85,11 @@ public class MultiPartitionCagraSearch {
           var neighborsDP = allocateRMMSegment(cuvsRes, neighborsBytes);
           var distancesDP = allocateRMMSegment(cuvsRes, distancesBytes)) {
 
-        try (var arena = Arena.ofConfined()) {
+        // Upload host queries to device (the native call needs a device tensor). toDevice is a
+        // cheap delegate wrapper when the matrix is already on device, so device callers pay
+        // nothing; for host matrices it builds an owned device copy that this block closes.
+        try (var arena = Arena.ofConfined();
+            var deviceQueryVectors = (CuVSMatrixInternal) queryVectors.toDevice(resources)) {
           MemorySegment sp = CuVSParamsHelper.buildCagraSearchParams(arena, searchParameters);
 
           MemorySegment indexArray = arena.allocate(ValueLayout.ADDRESS, numPartitions);
@@ -122,7 +97,7 @@ public class MultiPartitionCagraSearch {
             indexArray.setAtIndex(ValueLayout.ADDRESS, i, buffered[i].getIndexHandle());
           }
 
-          MemorySegment queriesTensor = queryVectors.toTensor(arena);
+          MemorySegment queriesTensor = deviceQueryVectors.toTensor(arena);
 
           long[] outShape = {nQueries, k};
           MemorySegment partitionIdsTensor =
@@ -134,7 +109,8 @@ public class MultiPartitionCagraSearch {
 
           MemorySegment filterSeg = cuvsFilter.allocate(arena);
           if (filter != null) {
-            DeviceData dev = filter.getOrUpload(cuvsRes);
+            FilterBitsetHandleImpl.DeviceData dev =
+                ((FilterBitsetHandleImpl) filter).getOrUpload(cuvsRes);
             buildCuvsFilterStruct(
                 arena,
                 filterSeg,

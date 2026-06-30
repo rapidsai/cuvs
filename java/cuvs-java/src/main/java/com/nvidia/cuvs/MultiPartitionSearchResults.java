@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -25,7 +25,7 @@ public class MultiPartitionSearchResults {
   private final int[] ordinals;
   private final float[] distances;
 
-  MultiPartitionSearchResults(
+  public MultiPartitionSearchResults(
       int count, int[] partitionIndices, int[] ordinals, float[] distances) {
     this.count = count;
     this.partitionIndices = partitionIndices;

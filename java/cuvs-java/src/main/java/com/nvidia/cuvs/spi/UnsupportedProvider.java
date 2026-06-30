@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -7,6 +7,7 @@ package com.nvidia.cuvs.spi;
 import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.logging.Level;
 
 /**
@@ -31,6 +32,22 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public FilterBitsetHandle newFilterBitsetHandle(
+      long[] combinedLongs, long[] partBitOffsets, long totalBits) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public MultiPartitionSearchResults searchCagraMultiPartition(
+      CuVSResources resources,
+      List<CagraIndex> indices,
+      CagraQuery query,
+      int k,
+      FilterBitsetHandle filter) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public CagraIndex.Builder newCagraIndexBuilder(CuVSResources cuVSResources) {
     throw new UnsupportedOperationException(reasons);
   }
@@ -47,8 +64,8 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
-      throws Throwable {
+  public HnswIndex hnswIndexBuild(
+      CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset) throws Throwable {
     throw new UnsupportedOperationException(reasons);
   }
 

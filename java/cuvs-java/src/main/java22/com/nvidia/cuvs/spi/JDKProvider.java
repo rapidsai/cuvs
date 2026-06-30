@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -25,6 +25,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.jar.JarFile;
@@ -246,6 +247,23 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public FilterBitsetHandle newFilterBitsetHandle(
+      long[] combinedLongs, long[] partBitOffsets, long totalBits) {
+    return new FilterBitsetHandleImpl(combinedLongs, partBitOffsets, totalBits);
+  }
+
+  @Override
+  public MultiPartitionSearchResults searchCagraMultiPartition(
+      CuVSResources resources,
+      List<CagraIndex> indices,
+      CagraQuery query,
+      int k,
+      FilterBitsetHandle filter)
+      throws Throwable {
+    return MultiPartitionCagraSearchImpl.search(resources, indices, query, k, filter);
+  }
+
+  @Override
   public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
     return HnswIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
   }
@@ -257,8 +275,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
-      throws Throwable {
+  public HnswIndex hnswIndexBuild(
+      CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset) throws Throwable {
     return HnswIndexImpl.build(resources, hnswParams, dataset);
   }
 

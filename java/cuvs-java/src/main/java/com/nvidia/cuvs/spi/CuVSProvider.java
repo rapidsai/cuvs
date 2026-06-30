@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -8,6 +8,7 @@ import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * A provider of low-level cuvs resources and builders.
@@ -161,6 +162,34 @@ public interface CuVSProvider {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
+
+  /**
+   * Creates a device-backed multi-partition filter handle from pre-packed host bitset arrays.
+   *
+   * @param combinedLongs  packed bitset words for all partitions concatenated (64-bit aligned)
+   * @param partBitOffsets per-partition bit offsets into {@code combinedLongs}
+   * @param totalBits      total number of logical bits in {@code combinedLongs}
+   */
+  FilterBitsetHandle newFilterBitsetHandle(
+      long[] combinedLongs, long[] partBitOffsets, long totalBits);
+
+  /**
+   * Searches multiple CAGRA index partitions for the global top-k nearest neighbors per query.
+   *
+   * @param resources shared resources handle
+   * @param indices   one CAGRA index per partition, in partition order
+   * @param query     query whose vectors are searched against every partition
+   * @param k         number of global nearest neighbors to return per query
+   * @param filter    pre-built combined bitset handle, or {@code null} for unfiltered search
+   * @throws Throwable if an error occurs during the search
+   */
+  MultiPartitionSearchResults searchCagraMultiPartition(
+      CuVSResources resources,
+      List<CagraIndex> indices,
+      CagraQuery query,
+      int k,
+      FilterBitsetHandle filter)
+      throws Throwable;
 
   /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
   GPUInfoProvider gpuInfoProvider();
