@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -86,8 +86,8 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
 
   size_t debug_host_size = 0;
   if (raft::default_logger().should_log(rapids_logger::level_enum::debug)) {
-  // cagra::detail::graph::optimize() allocates extra memory to calculate
-  // graph metrics when debug logging is enabled
+    // cagra::detail::graph::optimize() allocates extra memory to calculate
+    // graph metrics when debug logging is enabled
     debug_host_size = n_rows * graph_degree * sizeof(uint32_t)  // host_copy_output_graph
                       + n_rows * sizeof(uint32_t)               // in_edge_count
                       + graph_degree * sizeof(uint32_t);        // hist
@@ -191,10 +191,13 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
   size_t kmeans_host_mem    = kmeans_indices_host + kmeans_pinned_host;
 
   // Extend phase
-  size_t extend_gpu_mem = params.build_params.add_data_on_build ? ivf_pq_extend_mem_usage(dataset, params, dtype_size) : 0;
-  
+  size_t extend_gpu_mem = params.build_params.add_data_on_build
+                            ? ivf_pq_extend_mem_usage(dataset, params, dtype_size)
+                            : 0;
+
   // Add graph to index on GPU
-  size_t attach_graph_gpu_mem = attach_dataset_on_build ? n_rows * graph_degree * sizeof(uint32_t) : 0;
+  size_t attach_graph_gpu_mem =
+    attach_dataset_on_build ? n_rows * graph_degree * sizeof(uint32_t) : 0;
 
   // Search phase (build_knn_graph):
   constexpr size_t kWorkspaceRatio = 5;
@@ -214,7 +217,8 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
                                          + (sizeof(float) + sizeof(int64_t)) * top_k);  // refined_*
 
   // Phases run sequentially (train/extend -> search -> optimize)
-  size_t total_dev = std::max({kmeans_gpu_mem, extend_gpu_mem, attach_graph_gpu_mem, search_phase_dev, gpu_workspace_size});
+  size_t total_dev = std::max(
+    {kmeans_gpu_mem, extend_gpu_mem, attach_graph_gpu_mem, search_phase_dev, gpu_workspace_size});
 
   // The graph (and its optimize workspace) stays resident across phases
   size_t total_host =
