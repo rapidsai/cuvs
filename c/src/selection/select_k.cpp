@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/core/c_api.h>
 #include "../core/exceptions.hpp"
+#include <cuvs/selection/select_k.h>   // C declaration with CUVS_EXPORT (default visibility)
 #include <cuvs/selection/select_k.hpp>
 #include <dlpack/dlpack.h>
 
