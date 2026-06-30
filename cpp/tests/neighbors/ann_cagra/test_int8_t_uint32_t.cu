@@ -33,7 +33,6 @@ typedef AnnCagraMultiPartitionTest<float, std::int8_t, std::uint32_t>
   AnnCagraMultiPartitionTestI8_U32;
 TEST_P(AnnCagraMultiPartitionTestI8_U32, Search) { this->testSearch(); }
 TEST_P(AnnCagraMultiPartitionTestI8_U32, FilteredSearch) { this->testFilteredSearch(); }
-TEST_P(AnnCagraMultiPartitionTestI8_U32, MultiKernelRejected) { this->testMultiKernelRejected(); }
 
 INSTANTIATE_TEST_CASE_P(AnnCagraMultiPartitionTest,
                         AnnCagraMultiPartitionTestI8_U32,

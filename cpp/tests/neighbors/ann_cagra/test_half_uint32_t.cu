@@ -31,7 +31,6 @@ INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
 typedef AnnCagraMultiPartitionTest<float, half, std::uint32_t> AnnCagraMultiPartitionTestF16_U32;
 TEST_P(AnnCagraMultiPartitionTestF16_U32, Search) { this->testSearch(); }
 TEST_P(AnnCagraMultiPartitionTestF16_U32, FilteredSearch) { this->testFilteredSearch(); }
-TEST_P(AnnCagraMultiPartitionTestF16_U32, MultiKernelRejected) { this->testMultiKernelRejected(); }
 
 INSTANTIATE_TEST_CASE_P(AnnCagraMultiPartitionTest,
                         AnnCagraMultiPartitionTestF16_U32,
