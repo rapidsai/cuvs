@@ -150,8 +150,22 @@ function(process_cutile_matrix_entry source_list_var)
   set(embedded_header_file "${_artifact_stem}_${register}.h")
 
   set(_python_args
-      --format "${output_format}" --data-type "${data_type}" --metric "${metric}" --tile-m
-      "${tile_m}" --tile-n "${tile_n}" --tile-k "${tile_k}" --gpu-code "${gpu_code}"
+      --format
+      "${output_format}"
+      --data-type
+      "${data_type}"
+      --metric
+      "${metric}"
+      --index-type
+      "${index_type}"
+      --tile-m
+      "${tile_m}"
+      --tile-n
+      "${tile_n}"
+      --tile-k
+      "${tile_k}"
+      --gpu-code
+      "${gpu_code}"
   )
   if(DEFINED bytecode_version AND NOT "${bytecode_version}" STREQUAL "")
     list(APPEND _python_args --bytecode-version "${bytecode_version}")

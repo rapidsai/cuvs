@@ -8,6 +8,7 @@
 #include "fused_1nn_planner.hpp"
 
 #include <cuvs/core/export.hpp>
+#include <cuvs/detail/jit_lto/fused_distance_nn/fused_1nn_fragments.hpp>
 #include <raft/util/cuda_utils.cuh>
 
 namespace cuvs {
@@ -16,25 +17,13 @@ namespace detail {
 
 namespace {
 
-template <typename IdxT, typename OutT>
-__global__ void pack_fused_1nn_kvp(
-  OutT* out, const int64_t* idx, const float* dist, IdxT len, bool apply_sqrt)
-{
-  IdxT i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < len) {
-    out[i].key  = static_cast<IdxT>(idx[i]);
-    float value = dist[i];
-    if (apply_sqrt) { value = sqrtf(value); }
-    out[i].value = static_cast<decltype(out[i].value)>(value);
-  }
-}
-
-template <cuvs::distance::DistanceType Metric, typename DataT, typename IdxT, typename OutT>
-bool launch_fused_1nn_tile(const DataT* x,
+template <cuvs::distance::DistanceType Metric, typename DataT, typename IdxT>
+bool launch_fused_1nn_tile(IdxT* nearest_idx,
+                           DataT* nearest_dist,
+                           const DataT* x,
                            const DataT* y,
                            const DataT* xn,
                            const DataT* yn,
-                           OutT* out,
                            IdxT m,
                            IdxT n,
                            IdxT k,
@@ -43,7 +32,9 @@ bool launch_fused_1nn_tile(const DataT* x,
 {
   if constexpr (!std::is_same_v<DataT, float> && !std::is_same_v<DataT, half>) { return false; }
 
-  Fused1nnTilePlanner<DataT, Metric> planner;
+  if (nearest_dist == nullptr) { return false; }
+
+  Fused1nnTilePlanner<DataT, Metric, IdxT> planner;
   planner.add_entrypoint();
   planner.add_tileir_fallback();
   const CutileTileConfig tile_cfg = planner.tile_config();
@@ -51,11 +42,6 @@ bool launch_fused_1nn_tile(const DataT* x,
   if (!launcher) { return false; }
 
   const bool apply_sqrt = fused_1nn_apply_sqrt_at_pack<Metric>(is_sqrt);
-
-  int64_t* d_idx = nullptr;
-  float* d_dist  = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_idx, m * sizeof(int64_t), stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_dist, m * sizeof(float), stream));
 
   int64_t shape_x[2]  = {m, k};
   int64_t stride_x[2] = {k, 1};
@@ -72,19 +58,21 @@ bool launch_fused_1nn_tile(const DataT* x,
 
   int64_t M = m, N = n, K = k;
 
-  void* x_ptr    = const_cast<DataT*>(x);
-  void* y_ptr    = const_cast<DataT*>(y);
-  void* xn_ptr   = const_cast<DataT*>(xn);
-  void* yn_ptr   = const_cast<DataT*>(yn);
-  void* idx_ptr  = d_idx;
-  void* dist_ptr = d_dist;
+  void* x_ptr  = const_cast<DataT*>(x);
+  void* y_ptr  = const_cast<DataT*>(y);
+  void* xn_ptr = const_cast<DataT*>(xn);
+  void* yn_ptr = const_cast<DataT*>(yn);
+  // OutIdx must be a valid device pointer for the launch ABI; when store_idx is 0 the kernel
+  // does not write it (dist-only callers pass nearest_dist as a stand-in).
+  const int64_t store_idx = nearest_idx != nullptr ? 1 : 0;
+  void* idx_ptr =
+    nearest_idx != nullptr ? static_cast<void*>(nearest_idx) : static_cast<void*>(nearest_dist);
+  void* dist_ptr = nearest_dist;
 
   const int64_t tile_m = tile_cfg.tile_m;
   dim3 grid((m + tile_m - 1) / tile_m, 1, 1);
   dim3 block(1, 1, 1);
 
-  // cutile_python_v1: 2D array (ptr, shape0, shape1, stride0, stride1);
-  // 1D array (ptr, shape, stride); tile sizes are embedded constants.
   using fused_1nn_cutile_kernel_t = void(void*,
                                          int64_t,
                                          int64_t,
@@ -109,8 +97,9 @@ bool launch_fused_1nn_tile(const DataT* x,
                                          int64_t,
                                          int64_t,
                                          int64_t,
+                                         int64_t,
+                                         int64_t,
                                          int64_t);
-  std::cout << "Launching cuTile kernel" << std::endl;
   launcher->template dispatch<fused_1nn_cutile_kernel_t>(stream,
                                                          grid,
                                                          block,
@@ -139,18 +128,16 @@ bool launch_fused_1nn_tile(const DataT* x,
                                                          stride_dist,
                                                          M,
                                                          N,
-                                                         K);
-
-  pack_fused_1nn_kvp<IdxT, OutT>
-    <<<(m + 255) / 256, 256, 0, stream>>>(out, d_idx, d_dist, m, apply_sqrt);
+                                                         K,
+                                                         static_cast<int64_t>(apply_sqrt),
+                                                         store_idx);
   RAFT_CUDA_TRY(cudaGetLastError());
-  RAFT_CUDA_TRY(cudaFreeAsync(d_idx, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_dist, stream));
   return true;
 }
 
-template <typename DataT, typename OutT, typename IdxT>
-bool try_fused_1nn_tile_dispatch(OutT* min,
+template <typename DataT, typename IdxT>
+bool try_fused_1nn_tile_dispatch(IdxT* nearest_idx,
+                                 DataT* nearest_dist,
                                  const DataT* x,
                                  const DataT* y,
                                  const DataT* xn,
@@ -164,26 +151,27 @@ bool try_fused_1nn_tile_dispatch(OutT* min,
 {
   switch (metric) {
     case cuvs::distance::DistanceType::InnerProduct:
-      return launch_fused_1nn_tile<cuvs::distance::DistanceType::InnerProduct, DataT, IdxT, OutT>(
-        x, y, xn, yn, min, m, n, k, is_sqrt, stream);
+      return launch_fused_1nn_tile<cuvs::distance::DistanceType::InnerProduct, DataT, IdxT>(
+        nearest_idx, nearest_dist, x, y, xn, yn, m, n, k, is_sqrt, stream);
     case cuvs::distance::DistanceType::L2Expanded:
-      return launch_fused_1nn_tile<cuvs::distance::DistanceType::L2Expanded, DataT, IdxT, OutT>(
-        x, y, xn, yn, min, m, n, k, is_sqrt, stream);
+      return launch_fused_1nn_tile<cuvs::distance::DistanceType::L2Expanded, DataT, IdxT>(
+        nearest_idx, nearest_dist, x, y, xn, yn, m, n, k, is_sqrt, stream);
     case cuvs::distance::DistanceType::L2SqrtExpanded:
-      return launch_fused_1nn_tile<cuvs::distance::DistanceType::L2SqrtExpanded, DataT, IdxT, OutT>(
-        x, y, xn, yn, min, m, n, k, is_sqrt, stream);
+      return launch_fused_1nn_tile<cuvs::distance::DistanceType::L2SqrtExpanded, DataT, IdxT>(
+        nearest_idx, nearest_dist, x, y, xn, yn, m, n, k, is_sqrt, stream);
     case cuvs::distance::DistanceType::CosineExpanded:
-      return launch_fused_1nn_tile<cuvs::distance::DistanceType::CosineExpanded, DataT, IdxT, OutT>(
-        x, y, xn, yn, min, m, n, k, is_sqrt, stream);
+      return launch_fused_1nn_tile<cuvs::distance::DistanceType::CosineExpanded, DataT, IdxT>(
+        nearest_idx, nearest_dist, x, y, xn, yn, m, n, k, is_sqrt, stream);
     default: return false;
   }
 }
 
 }  // namespace
 
-template <typename DataT, typename OutT, typename IdxT>
-  requires Fused1nnKvpOutput<OutT, IdxT, DataT>
-bool try_fused_1nn_tile(OutT* min,
+template <typename DataT, typename IdxT>
+  requires is_fused_1nn_cutile_data_v<DataT>
+bool try_fused_1nn_tile(IdxT* nearest_idx,
+                        DataT* nearest_dist,
                         const DataT* x,
                         const DataT* y,
                         const DataT* xn,
@@ -196,35 +184,28 @@ bool try_fused_1nn_tile(OutT* min,
                         cudaStream_t stream)
 {
   if (!cuvs::detail::jit_lto::cutile_launch_available_on_current_device()) { return false; }
-  return try_fused_1nn_tile_dispatch<DataT, OutT, IdxT>(
-    min, x, y, xn, yn, m, n, k, metric, is_sqrt, stream);
+  return try_fused_1nn_tile_dispatch<DataT, IdxT>(
+    nearest_idx, nearest_dist, x, y, xn, yn, m, n, k, metric, is_sqrt, stream);
 }
 
-using kvp_i_f   = raft::KeyValuePair<int, float>;
-using kvp_i64_f = raft::KeyValuePair<int64_t, float>;
-using kvp_i_h   = raft::KeyValuePair<int, half>;
-using kvp_i64_h = raft::KeyValuePair<int64_t, half>;
+#define CUVS_INST_TRY_FUSED_1NN_TILE(DataT, IdxT)                                         \
+  template CUVS_EXPORT bool try_fused_1nn_tile<DataT, IdxT>(IdxT*,                        \
+                                                            DataT*,                       \
+                                                            const DataT*,                 \
+                                                            const DataT*,                 \
+                                                            const DataT*,                 \
+                                                            const DataT*,                 \
+                                                            IdxT,                         \
+                                                            IdxT,                         \
+                                                            IdxT,                         \
+                                                            cuvs::distance::DistanceType, \
+                                                            bool,                         \
+                                                            cudaStream_t)
 
-#define CUVS_INST_TRY_FUSED_1NN_TILE(DataT, OutT, IdxT)                                         \
-  template CUVS_EXPORT bool try_fused_1nn_tile<DataT, OutT, IdxT>(OutT*,                        \
-                                                                  const DataT*,                 \
-                                                                  const DataT*,                 \
-                                                                  const DataT*,                 \
-                                                                  const DataT*,                 \
-                                                                  IdxT,                         \
-                                                                  IdxT,                         \
-                                                                  IdxT,                         \
-                                                                  cuvs::distance::DistanceType, \
-                                                                  bool,                         \
-                                                                  cudaStream_t)
-
-// int and int64_t are the same on LP64; one instantiation covers both.
-CUVS_INST_TRY_FUSED_1NN_TILE(float, kvp_i_f, int);
-CUVS_INST_TRY_FUSED_1NN_TILE(float, kvp_i64_f, int64_t);
-CUVS_INST_TRY_FUSED_1NN_TILE(half, kvp_i_f, int);
-CUVS_INST_TRY_FUSED_1NN_TILE(half, kvp_i64_f, int64_t);
-CUVS_INST_TRY_FUSED_1NN_TILE(half, kvp_i_h, int);
-CUVS_INST_TRY_FUSED_1NN_TILE(half, kvp_i64_h, int64_t);
+CUVS_INST_TRY_FUSED_1NN_TILE(float, int);
+CUVS_INST_TRY_FUSED_1NN_TILE(float, int64_t);
+CUVS_INST_TRY_FUSED_1NN_TILE(half, int);
+CUVS_INST_TRY_FUSED_1NN_TILE(half, int64_t);
 
 #undef CUVS_INST_TRY_FUSED_1NN_TILE
 

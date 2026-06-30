@@ -19,7 +19,14 @@ from cuda.tile.compilation import (
     export_kernel,
 )
 
-from fused_1nn_kernel import METRICS, kernel_symbol, make_kernel, metric_abbrev
+from fused_1nn_kernel import (
+    INDEX_TYPES,
+    METRICS,
+    index_abbrev,
+    kernel_symbol,
+    make_kernel,
+    metric_abbrev,
+)
 
 DEFAULT_TILEIR_BYTECODE_VERSION = "13.1"
 # cuTile requires a gpu_code even for TileIR bytecode export: it selects the compilation
@@ -39,53 +46,82 @@ def _data_abbrev(data_type: str) -> str:
     return {"half": "h", "float": "f"}[data_type]
 
 
-def _relaxed_matrix_constraint(elem_dtype):
-    """Array constraints matching the relaxed TMA-friendly layout from gemm_nn_cutile."""
+def _elem_stride_divisible_for_tma(elem_dtype) -> tuple[int, int]:
+    """Row stride (dim 0) divisible enough for 16-byte TMA access; last dim stride 1."""
+    bytes_per_elem = 2 if elem_dtype == ct.float16 else 4
+    return (16 // bytes_per_elem, 1)
+
+
+def _cuvs_matrix_constraint(elem_dtype):
+    """Row-major device matrices for cuVS KMeans benchmarks.
+
+      Assumes raft/cupy-style contiguous layout: stride[-1]==1, stride[0]==D,
+      16-byte base alignment, and row pitch 16-byte aligned (float32 D%4==0,
+      float16 D%8==0). Applies to both points and centroids matrices.
+
+    shape_divisible_by is (1, 1); tail tiles are masked in the kernel.
+      Odd D or general layouts need a separate relaxed export profile.
+    """
     return ArrayConstraint(
         elem_dtype,
         ndim=2,
-        index_dtype=ct.int64,
+        index_dtype=ct.int32,
         stride_lower_bound_incl=(0, None),
         alias_groups=(),
         may_alias_internally=False,
         stride_constant=(None, 1),
-        stride_divisible_by=(8, 1),
+        stride_divisible_by=_elem_stride_divisible_for_tma(elem_dtype),
         shape_divisible_by=(1, 1),
         base_addr_divisible_by=16,
     )
 
 
-def _relaxed_vector_constraint(elem_dtype, *, tma_friendly: bool = False):
-    base_div = 16 if tma_friendly else 1
+def _cuvs_vector_constraint(elem_dtype):
+    """1-D device vectors: contiguous, 16-byte base. Length need not be divisible by 16."""
     return ArrayConstraint(
         elem_dtype,
         ndim=1,
-        index_dtype=ct.int64,
+        index_dtype=ct.int32,
         stride_lower_bound_incl=(None,),
         alias_groups=(),
         may_alias_internally=False,
         stride_constant=(1,),
         stride_divisible_by=(1,),
         shape_divisible_by=(1,),
-        base_addr_divisible_by=base_div,
+        base_addr_divisible_by=16,
     )
+
+
+def _relaxed_matrix_constraint(elem_dtype):
+    """Deprecated alias; use _cuvs_matrix_constraint."""
+    return _cuvs_matrix_constraint(elem_dtype)
+
+
+def _relaxed_vector_constraint(elem_dtype, *, tma_friendly: bool = False):
+    """Deprecated alias; use _cuvs_vector_constraint."""
+    del tma_friendly
+    return _cuvs_vector_constraint(elem_dtype)
 
 
 def _kernel_signature(
     data_type: str,
     metric: str,
+    index_type: str,
     tile_m: int,
     tile_n: int,
     tile_k: int,
 ) -> KernelSignature:
     elem = _dtype_for(data_type)
-    matrix = _relaxed_matrix_constraint(elem)
-    norm_array = _relaxed_vector_constraint(elem, tma_friendly=True)
-    idx_array = _relaxed_vector_constraint(ct.int64)
-    dist_array = _relaxed_vector_constraint(ct.float32)
+    matrix = _cuvs_matrix_constraint(elem)
+    norm_array = _cuvs_vector_constraint(elem)
+    idx_elem = ct.int32 if index_type == "int32" else ct.int64
+    idx_array = _cuvs_vector_constraint(idx_elem)
+    dist_array = _cuvs_vector_constraint(elem)
 
     abbrev = _data_abbrev(data_type)
-    symbol = kernel_symbol(abbrev, metric_abbrev(metric))
+    symbol = kernel_symbol(
+        abbrev, metric_abbrev(metric), index_abbrev(index_type)
+    )
 
     return KernelSignature(
         parameters=[
@@ -95,6 +131,8 @@ def _kernel_signature(
             norm_array,
             idx_array,
             dist_array,
+            ScalarConstraint(ct.int64),
+            ScalarConstraint(ct.int64),
             ScalarConstraint(ct.int64),
             ScalarConstraint(ct.int64),
             ScalarConstraint(ct.int64),
@@ -112,14 +150,19 @@ def export_binary(
     output_format: Literal["cubin", "tileir_bytecode"],
     data_type: str,
     metric: str,
+    index_type: str,
     tile_m: int,
     tile_n: int,
     tile_k: int,
     gpu_code: str,
     bytecode_version: str | None = None,
 ) -> str:
-    kernel = make_kernel(data_type, metric, tile_m, tile_n, tile_k)
-    signature = _kernel_signature(data_type, metric, tile_m, tile_n, tile_k)
+    kernel = make_kernel(
+        data_type, metric, tile_m, tile_n, tile_k, index_type=index_type
+    )
+    signature = _kernel_signature(
+        data_type, metric, index_type, tile_m, tile_n, tile_k
+    )
 
     export_kwargs = {
         "kernel": kernel,
@@ -148,6 +191,7 @@ def main() -> int:
         "--data-type", choices=("half", "float"), required=True
     )
     parser.add_argument("--metric", choices=METRICS, required=True)
+    parser.add_argument("--index-type", choices=INDEX_TYPES, required=True)
     parser.add_argument("--tile-m", type=int, required=True)
     parser.add_argument("--tile-n", type=int, required=True)
     parser.add_argument("--tile-k", type=int, required=True)
@@ -167,6 +211,7 @@ def main() -> int:
             output_format=args.format,
             data_type=args.data_type,
             metric=args.metric,
+            index_type=args.index_type,
             tile_m=args.tile_m,
             tile_n=args.tile_n,
             tile_k=args.tile_k,

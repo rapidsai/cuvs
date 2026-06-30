@@ -9,11 +9,20 @@ import cuda.tile as ct
 ConstInt = ct.Constant[int]
 
 # Default tile geometry; overridden per export via make_kernel(..., tile_m, tile_n, tile_k).
-DEFAULT_TILE_M = 128
-DEFAULT_TILE_N = 128
-DEFAULT_TILE_K = 64
+DEFAULT_TILE_M = 256
+DEFAULT_TILE_N = 64
+DEFAULT_TILE_K = 32
 
 METRICS = ("inner_product", "l2_expanded", "cosine_expanded")
+INDEX_TYPES = ("int32", "int64")
+
+
+def _idx_dtype(index_type: str):
+    if index_type == "int32":
+        return ct.int32
+    if index_type == "int64":
+        return ct.int64
+    raise ValueError(f"Unsupported index_type {index_type!r}")
 
 
 def make_kernel(
@@ -22,14 +31,20 @@ def make_kernel(
     tile_m: int = DEFAULT_TILE_M,
     tile_n: int = DEFAULT_TILE_N,
     tile_k: int = DEFAULT_TILE_K,
+    *,
+    index_type: str = "int32",
 ):
-    """Build a cuTile kernel with metric and tile sizes baked in at compile time."""
+    """Build a cuTile kernel with metric, index width, and tile sizes baked in at compile time."""
     if data_type not in ("half", "float"):
         raise ValueError(f"Unsupported data_type {data_type!r}")
     if metric not in METRICS:
         raise ValueError(f"Unsupported metric {metric!r}")
+    if index_type not in INDEX_TYPES:
+        raise ValueError(f"Unsupported index_type {index_type!r}")
 
     acc_dtype = ct.float32
+    idx_dtype = _idx_dtype(index_type)
+    out_dist_dtype = ct.float16 if data_type == "half" else ct.float32
     is_ip = metric == "inner_product"
     is_l2 = metric == "l2_expanded"
     is_cos = metric == "cosine_expanded"
@@ -45,6 +60,8 @@ def make_kernel(
         M,
         N,
         K,
+        apply_sqrt,
+        store_idx,
         tm: ConstInt,
         tn: ConstInt,
         tk: ConstInt,
@@ -55,7 +72,7 @@ def make_kernel(
             best_dist = ct.full((tm,), -3.4e38, acc_dtype)
         else:
             best_dist = ct.full((tm,), 3.4e38, acc_dtype)
-        best_idx = ct.zeros((tm,), ct.int64)
+        best_idx = ct.zeros((tm,), idx_dtype)
 
         num_tiles_k = ct.num_tiles(A, axis=1, shape=(tm, tk))
         num_tiles_n = ct.num_tiles(B, axis=0, shape=(tn, tk))
@@ -65,12 +82,15 @@ def make_kernel(
             accumulator = ct.full((tm, tn), 0, dtype=acc_dtype)
 
             for k in range(num_tiles_k):
+                dtype = ct.tfloat32 if A.dtype == ct.float32 else A.dtype
+
                 a = ct.load(
                     A, index=(bidm, k), shape=(tm, tk), padding_mode=zero_pad
-                )
+                ).astype(dtype)
                 b_T = ct.load(
                     B, index=(n, k), shape=(tn, tk), padding_mode=zero_pad
-                )
+                ).astype(dtype)
+
                 accumulator = ct.mma(a, ct.transpose(b_T), accumulator)
 
             if is_ip:
@@ -89,14 +109,13 @@ def make_kernel(
                     )
                 elif is_cos:
                     # Cosine expanded distance: 1 - dot / (||x|| * ||y||); norms are L2 (not squared).
-                    # No sqrt during the reduction — only arithmetic on stored distance if needed.
                     denom = a_norm[:, None] * b_norm[None, :]
                     score = 1.0 - (accumulator / denom)
 
             # Only the final N-tile can include zero-padded centroid columns.
             if n == num_tiles_n - 1:
-                col = ct.arange(tn, dtype=ct.int64)
-                global_col = n * tn + col
+                col = ct.arange(tn, dtype=idx_dtype)
+                global_col = (n * tn + col).astype(idx_dtype)
                 valid = global_col < N
                 if is_ip:
                     score = ct.where(valid[None, :], score, -3.4e38)
@@ -114,17 +133,25 @@ def make_kernel(
                 update = curr_best < best_dist
                 best_dist = ct.where(update, curr_best, best_dist)
 
-            best_idx = ct.where(update, n * tn + curr_idx, best_idx)
+            best_idx = ct.where(
+                update, (n * tn + curr_idx).astype(idx_dtype), best_idx
+            )
 
-        ct.store(OutIdx, index=(bidm,), tile=best_idx)
-        ct.store(OutDist, index=(bidm,), tile=best_dist)
+        out_dist = best_dist
+        if is_l2:
+            out_dist = ct.where(apply_sqrt != 0, ct.sqrt(best_dist), best_dist)
+        if store_idx != 0:
+            ct.store(OutIdx, index=(bidm,), tile=best_idx)
+        ct.store(OutDist, index=(bidm,), tile=out_dist.astype(out_dist_dtype))
 
     return fused_1nn_kernel
 
 
-def kernel_symbol(data_abbrev: str, metric_abbrev: str) -> str:
+def kernel_symbol(
+    data_abbrev: str, metric_abbrev: str, index_abbrev: str
+) -> str:
     """Must stay in sync with fused_1nn_kernel_entrypoint() in fused_1nn_planner.hpp."""
-    return f"fused_1nn_{data_abbrev}_{metric_abbrev}"
+    return f"fused_1nn_{data_abbrev}_{metric_abbrev}_{index_abbrev}"
 
 
 def metric_abbrev(metric: str) -> str:
@@ -133,3 +160,7 @@ def metric_abbrev(metric: str) -> str:
         "l2_expanded": "l2",
         "cosine_expanded": "cos",
     }[metric]
+
+
+def index_abbrev(index_type: str) -> str:
+    return {"int32": "i32", "int64": "i64"}[index_type]

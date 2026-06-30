@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <cuvs/detail/jit_lto/common_fragments.hpp>
 #include <cuvs/distance/distance.hpp>
 
@@ -75,13 +77,33 @@ struct fused_1nn_data_tag<half> {
 template <typename DataT>
 using fused_1nn_data_tag_t = typename fused_1nn_data_tag<DataT>::type;
 
-template <typename DataTag, typename MetricTag, typename TileTag, typename ArchTag>
+template <typename IdxT>
+struct fused_1nn_index_tag;
+
+template <>
+struct fused_1nn_index_tag<int32_t> {
+  using type = cuvs::neighbors::detail::tag_index_i32;
+};
+
+template <>
+struct fused_1nn_index_tag<int64_t> {
+  using type = cuvs::neighbors::detail::tag_index_i64;
+};
+
+template <typename IdxT>
+using fused_1nn_index_tag_t = typename fused_1nn_index_tag<IdxT>::type;
+
+template <typename DataTag,
+          typename MetricTag,
+          typename IndexTag,
+          typename TileTag,
+          typename ArchTag>
 struct fragment_tag_fused_1nn_cubin {
   static constexpr int cc_major = ArchTag::cc_major;
   static constexpr int cc_minor = ArchTag::cc_minor;
 };
 
-template <typename DataTag, typename MetricTag, typename TileTag>
+template <typename DataTag, typename MetricTag, typename IndexTag, typename TileTag>
 struct fragment_tag_fused_1nn_tileir {};
 
 }  // namespace cuvs::distance::detail

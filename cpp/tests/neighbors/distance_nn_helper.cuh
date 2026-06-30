@@ -209,6 +209,34 @@ class ComparisonSummary {
   }
 };
 
+template <typename AccT, typename IdxT>
+void vector_compare_soa(raft::resources const& handle,
+                        const raft::KeyValuePair<IdxT, AccT>* ref,
+                        const IdxT* out_idx,
+                        const AccT* out_dist,
+                        IdxT n,
+                        ComparisonSummary& summary)
+{
+  auto ref_h  = raft::make_host_vector<raft::KeyValuePair<IdxT, AccT>, IdxT>(n);
+  auto idx_h  = raft::make_host_vector<IdxT, IdxT>(n);
+  auto dist_h = raft::make_host_vector<AccT, IdxT>(n);
+
+  raft::copy(ref_h.data_handle(), ref, n, raft::resource::get_cuda_stream(handle));
+  raft::copy(idx_h.data_handle(), out_idx, n, raft::resource::get_cuda_stream(handle));
+  raft::copy(dist_h.data_handle(), out_dist, n, raft::resource::get_cuda_stream(handle));
+  raft::resource::sync_stream(handle, raft::resource::get_cuda_stream(handle));
+
+  summary.init();
+
+  for (IdxT i = 0; i < n; i++) {
+    const double a_val = double(dist_h(i));
+    const double b_val = double(ref_h(i).value);
+    const bool missed  = idx_h(i) != ref_h(i).key;
+    const double diff  = std::abs(a_val - b_val);
+    summary.update(diff, i, a_val, b_val, missed);
+  }
+}
+
 template <typename OutT, typename IdxT>
 void vector_compare(
   raft::resources const& handle, const OutT* a, const OutT* b, IdxT n, ComparisonSummary& summary)
