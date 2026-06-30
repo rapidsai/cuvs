@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -526,6 +526,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
  * @tparam CounterT counter type supported by CUDA's native atomicAdd
  * @tparam MappingOpT type of the mapping operation
  *
+ * @param[in] handle The raft handle
  * @param[inout] centers cluster centers [n_clusters, dim]
  * @param[in] n_clusters number of rows in `centers`
  * @param[in] dim number of columns in `centers` and `dataset`
@@ -541,7 +542,6 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
  *                   balance_upper_tolerance > 1
  * @param[in] centroid_offset offset from the donor cluster centroid towards a donor point
  * @param[in] mapping_op Mapping operation from T to MathT
- * @param[in] stream CUDA stream
  * @param[inout] device_memory  memory resource to use for temporary allocations
  *
  * @return whether any of the centers has been updated (and thus, `labels` need to be recalculated).
@@ -552,8 +552,8 @@ template <typename T,
           typename LabelT,
           typename CounterT,
           typename MappingOpT>
-auto adjust_centers(MathT* centers,
-                    const raft::resources& handle,
+auto adjust_centers(const raft::resources& handle,
+                    MathT* centers,
                     IdxT n_clusters,
                     IdxT dim,
                     const T* dataset,
@@ -564,12 +564,12 @@ auto adjust_centers(MathT* centers,
                     MathT balance_upper_tolerance,
                     MathT centroid_offset,
                     MappingOpT mapping_op,
-                    rmm::cuda_stream_view stream,
                     rmm::device_async_resource_ref device_memory) -> bool
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "adjust_centers(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
   if (n_clusters == 0) { return false; }
+  auto stream = raft::resource::get_cuda_stream(handle);
   constexpr static std::array kPrimes{29,   71,   113,  173,  229,  281,  349,  409,  463,  541,
                                       601,  659,  733,  809,  863,  941,  1013, 1069, 1151, 1223,
                                       1291, 1373, 1451, 1511, 1583, 1657, 1733, 1811, 1889, 1987,
@@ -711,13 +711,12 @@ void balancing_em_iters(const raft::resources& handle,
   RAFT_EXPECTS(params.centroid_offset > 0.0f && params.centroid_offset <= 1.0f,
                "Balanced k-means centroid offset must be in the range (0, 1]");
 
-  auto stream                = raft::resource::get_cuda_stream(handle);
   uint32_t balancing_counter = balancing_pullback;
   for (uint32_t iter = 0; iter < n_iters; iter++) {
     // Balancing step - move the centers around to equalize cluster sizes
     // (but not on the first iteration)
-    if (iter > 0 && adjust_centers(cluster_centers,
-                                   handle,
+    if (iter > 0 && adjust_centers(handle,
+                                   cluster_centers,
                                    n_clusters,
                                    dim,
                                    dataset,
@@ -728,7 +727,6 @@ void balancing_em_iters(const raft::resources& handle,
                                    balance_upper_tolerance,
                                    static_cast<MathT>(params.centroid_offset),
                                    mapping_op,
-                                   stream,
                                    device_memory)) {
       if (balancing_counter++ >= balancing_pullback) {
         balancing_counter -= balancing_pullback;
