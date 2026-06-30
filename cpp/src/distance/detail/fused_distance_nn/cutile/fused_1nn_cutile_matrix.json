@@ -36,8 +36,8 @@
     ],
     "_tile": [
       {
-        "tile_m": 256,
-        "tile_n": 64,
+        "tile_m": 128,
+        "tile_n": 128,
         "tile_k": 32
       }
     ],

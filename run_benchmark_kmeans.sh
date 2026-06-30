@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Compare baseline / cuTile / flash-kmeans for one shape.
+# Compare baseline / cuTile / flash-kmeans for one shape or the default sweep.
 #
 # Usage:
 #   export BENCH_CONDA=/path/to/miniforge3
@@ -11,18 +11,21 @@
 #   export BENCH_ENV_FLASH=...
 #   export MAX_ITER=5 TOL=1e-4 SEED=42
 #   export WARMUP_FIT=1 ITERS_FIT=3 WARMUP_PRED=1 ITERS_PRED=3
-#   ./run_benchmark_kmeans.sh N D K
+#   export BENCH_PHASE=both          # fit | predict | both (default: both)
+#   ./run_benchmark_kmeans.sh              # default sweep (M=1M, all D and K below)
+#   ./run_benchmark_kmeans.sh N D K          # single shape
+#   ./run_benchmark_kmeans.sh fit              # sweep, fit only
+#   ./run_benchmark_kmeans.sh predict N D K    # single shape, predict only
+#
+# Default sweep grid:
+#   M (n_samples)  = 1_000_000
+#   D (n_features) = 16 64 128 384 768 1024 1536   # GEMM inner (K) dimension
+#   K (n_clusters) = 10 100 1000 10000 100000      # GEMM N dimension
 #
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-if [[ $# -ne 3 ]]; then
-  echo "usage: $0 N D K" >&2
-  echo "See script header for required env vars and examples." >&2
-  exit 2
-fi
 
 : "${BENCH_CONDA:?set BENCH_CONDA to conda/miniforge root}"
 : "${BENCH_ENV_BASE:?set BENCH_ENV_BASE}"
@@ -36,12 +39,42 @@ fi
 : "${ITERS_PRED:?set ITERS_PRED}"
 : "${TOL:?set TOL}"
 
-N=$1
-D=$2
-K=$3
+PHASE="${BENCH_PHASE:-both}"
+if [[ $# -ge 1 && $1 =~ ^(fit|predict|both)$ ]]; then
+  PHASE=$1
+  shift
+fi
 
-exec python3 "$SCRIPT_DIR/benchmark_kmeans.py" --compare \
-  --n "$N" --d "$D" --k "$K" \
-  --max-iter "$MAX_ITER" --tol "$TOL" --seed "$SEED" \
-  --warmup-fit "$WARMUP_FIT" --iters-fit "$ITERS_FIT" \
-  --warmup-pred "$WARMUP_PRED" --iters-pred "$ITERS_PRED"
+run_shape() {
+  local n=$1 d=$2 k=$3
+  echo "=== benchmark M=${n} D=${d} K=${k} phase=${PHASE} ==="
+  python3 "$SCRIPT_DIR/benchmark_kmeans.py" --compare \
+    --n "$n" --d "$d" --k "$k" \
+    --phase "$PHASE" \
+    --max-iter "$MAX_ITER" --tol "$TOL" --seed "$SEED" \
+    --warmup-fit "$WARMUP_FIT" --iters-fit "$ITERS_FIT" \
+    --warmup-pred "$WARMUP_PRED" --iters-pred "$ITERS_PRED"
+}
+
+if [[ $# -eq 3 ]]; then
+  run_shape "$1" "$2" "$3"
+  exit $?
+fi
+
+if [[ $# -ne 0 ]]; then
+  echo "usage: $0 [fit|predict|both] [N D K]" >&2
+  echo "  no args           — sweep all shapes, phase=\${BENCH_PHASE:-both}" >&2
+  echo "  fit|predict|both  — optional phase override, then sweep" >&2
+  echo "  [phase] N D K     — run one shape" >&2
+  exit 2
+fi
+
+M=1000000
+D_VALUES=(16 64 128 384 768 1024 1536)
+K_VALUES=(10 100 1000 10000 100000)
+
+for d in "${D_VALUES[@]}"; do
+  for k in "${K_VALUES[@]}"; do
+    run_shape "$M" "$d" "$k" || true
+  done
+done
