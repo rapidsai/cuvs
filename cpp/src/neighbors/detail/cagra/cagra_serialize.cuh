@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -110,15 +110,17 @@ void serialize(raft::resources const& res,
   if (!of) { RAFT_FAIL("Error writing output %s", filename.c_str()); }
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename CagraIndexT>
 void serialize_to_hnswlib(
   raft::resources const& res,
   std::ostream& os,
-  const cuvs::neighbors::cagra::device_padded_index<T, IdxT>& index_,
+  CagraIndexT const& index_,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
-  // static_assert(std::is_same_v<IdxT, int> or std::is_same_v<IdxT, uint32_t>,
-  //               "An hnswlib index can only be trained with int32 or uint32 IdxT");
+  static_assert(std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, IdxT>> ||
+                  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, IdxT>>,
+                "serialize_to_hnswlib requires a padded CAGRA index");
+
   int dim = (dataset) ? dataset->extent(1) : index_.dim();
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
   RAFT_LOG_DEBUG("Saving CAGRA index to hnswlib format, size %zu, dim %u",
@@ -173,22 +175,26 @@ void serialize_to_hnswlib(
   raft::host_matrix_view<const T, int64_t> host_dataset_view;
   if (dataset) {
     host_dataset_view = *dataset;
-  } else {
-    auto dataset = index_.dataset();
-    RAFT_EXPECTS(dataset.size() > 0,
+  } else if constexpr (std::is_same_v<CagraIndexT,
+                                      cuvs::neighbors::cagra::device_padded_index<T, IdxT>>) {
+    auto device_dataset = index_.dataset();
+    RAFT_EXPECTS(device_dataset.size() > 0,
                  "Invalid CAGRA dataset of size 0 during serialization, shape %zux%zu",
-                 static_cast<size_t>(dataset.extent(0)),
-                 static_cast<size_t>(dataset.extent(1)));
-    host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
+                 static_cast<size_t>(device_dataset.extent(0)),
+                 static_cast<size_t>(device_dataset.extent(1)));
+    host_dataset =
+      raft::make_host_matrix<T, int64_t>(device_dataset.extent(0), device_dataset.extent(1));
     raft::copy_matrix(host_dataset.data_handle(),
                       host_dataset.extent(1),
-                      dataset.data_handle(),
-                      dataset.stride(0),
+                      device_dataset.data_handle(),
+                      device_dataset.stride(0),
                       host_dataset.extent(1),
-                      dataset.extent(0),
+                      device_dataset.extent(0),
                       raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = raft::make_const_mdspan(host_dataset.view());
+  } else {
+    RAFT_FAIL("serialize_to_hnswlib requires dataset for host_padded_index");
   }
   auto graph = index_.graph();
   auto host_graph =
@@ -247,11 +253,11 @@ void serialize_to_hnswlib(
   }
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename CagraIndexT>
 void serialize_to_hnswlib(
   raft::resources const& res,
   const std::string& filename,
-  const cuvs::neighbors::cagra::device_padded_index<T, IdxT>& index_,
+  CagraIndexT const& index_,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   std::ofstream of(filename, std::ios::out | std::ios::binary);
