@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -199,9 +199,6 @@ __global__ void kern_make_rev_graph_k(
   const uint32_t rev_graph_degree = rev_graph.extent(1);
 
   for (uint64_t src_id = tid; src_id < graph_size; src_id += tnum) {
-    if constexpr (VariableDegree) {
-      if (k >= natural_degree(src_id)) continue;
-    }
     IdxT dest_id;
     if constexpr (OutputView::rank() == 2) {
       dest_id = output_graph(src_id, k);
@@ -427,6 +424,7 @@ __device__ void warp_shift_array_one_right(uint32_t lane_id, T* array, uint64_t 
 //   * the per-node `effective_degree` used to cap `num_protected_edges`
 //   * the `kInvalidNeighbor` sentinel padding for slots past the final degree
 //   * the write-back of the final effective degree
+//   * popularity-based thinning of reverse-graph candidates (see the merge loop)
 // When VariableDegree is false, the parameter is unused (and may be a default view).
 template <typename IdxT,
           uint32_t num_warps,
@@ -532,6 +530,10 @@ __global__ void kern_merge_graph(
     kr -= 1;
     const auto rev_graph_value = rev_graph(nid, kr);
     if (rev_graph_value < graph_size) {
+      if constexpr (VariableDegree) {
+        const uint32_t in_degree = rev_graph_count(rev_graph_value);
+        if (in_degree < output_graph_degree) { continue; }
+      }
       uint64_t pos =
         warp_pos_in_array<IdxT>(rev_graph_value, smem_sorted_output_graph, output_graph_degree);
       if (pos < num_protected_edges) { continue; }
