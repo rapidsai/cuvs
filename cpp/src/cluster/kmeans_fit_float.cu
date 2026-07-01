@@ -10,22 +10,7 @@
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
 
-#ifdef CUVS_BUILD_MG_ALGOS
-#include "detail/kmeans_mg_batched.cuh"
-#endif
-
 namespace cuvs::cluster::kmeans {
-
-#define INSTANTIATE_FIT_MAIN(DataT, IndexT)                       \
-  template void fit_main<DataT, IndexT>(                          \
-    raft::resources const& handle,                                \
-    const kmeans::params& params,                                 \
-    raft::device_matrix_view<const DataT, IndexT> X,              \
-    raft::device_vector_view<const DataT, IndexT> sample_weights, \
-    raft::device_matrix_view<DataT, IndexT> centroids,            \
-    raft::host_scalar_view<DataT> inertia,                        \
-    raft::host_scalar_view<IndexT> n_iter,                        \
-    rmm::device_uvector<char>& workspace);
 
 #define INSTANTIATE_FIT(DataT, IndexT)                                          \
   template void fit<DataT, IndexT>(                                             \
@@ -37,13 +22,9 @@ namespace cuvs::cluster::kmeans {
     raft::host_scalar_view<DataT> inertia,                                      \
     raft::host_scalar_view<IndexT> n_iter);
 
-INSTANTIATE_FIT_MAIN(float, int)
-INSTANTIATE_FIT_MAIN(float, int64_t)
-
 INSTANTIATE_FIT(float, int)
 INSTANTIATE_FIT(float, int64_t)
 
-#undef INSTANTIATE_FIT_MAIN
 #undef INSTANTIATE_FIT
 
 void fit(raft::resources const& handle,
@@ -78,24 +59,13 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<float> inertia,
          raft::host_scalar_view<int64_t> n_iter)
 {
-#ifdef CUVS_BUILD_MG_ALGOS
-  if (raft::resource::is_multi_gpu(handle)) {
-    mg::detail::batched_fit_omp<float, int64_t>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
-  } else if (raft::resource::comms_initialized(handle)) {
-    mg::detail::mnmg_fit<float, int64_t>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
-  } else
-#else
   if (raft::resource::is_multi_gpu(handle) || raft::resource::comms_initialized(handle)) {
     RAFT_LOG_WARN(
-      "MG handle detected but cuVS built without MG support; falling back to single-GPU.");
+      "Multi-GPU handle detected on single-GPU kmeans::fit() entry; "
+      "falling back to single-GPU. Use cuvs::cluster::kmeans::mg::fit(...) for multi-GPU.");
   }
-#endif
-  {
-    cuvs::cluster::kmeans::detail::fit<float, int64_t>(
-      handle, params, X, sample_weight, centroids, inertia, n_iter);
-  }
+  cuvs::cluster::kmeans::detail::fit<float, int64_t>(
+    handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
 
 }  // namespace cuvs::cluster::kmeans

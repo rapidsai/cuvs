@@ -15,8 +15,8 @@ rapids_test_init()
 function(ConfigureTest)
 
   set(options NOCUDA FETCH_CODEBOOKS)
-  set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
-  set(multiValueArgs PATH)
+  set(oneValueArgs NAME GPUS PERCENT)
+  set(multiValueArgs PATH ADDITIONAL_DEP)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   if(NOT DEFINED _CUVS_TEST_GPUS AND NOT DEFINED _CUVS_TEST_PERCENT)
@@ -332,6 +332,9 @@ if(BUILD_CAGRA_HNSWLIB)
 endif()
 
 if(BUILD_MG_ALGOS)
+  find_package(ucx REQUIRED)
+  find_package(ucxx REQUIRED)
+
   ConfigureTest(
     NAME NEIGHBORS_MG_TEST
     PATH neighbors/mg/test_float.cu
@@ -341,11 +344,15 @@ if(BUILD_MG_ALGOS)
   )
 
   ConfigureTest(
-    NAME CLUSTER_KMEANS_MG_BATCHED_TEST
-    PATH cluster/kmeans_mg_batched.cu
-    GPUS 1
+    NAME CLUSTER_KMEANS_MG_TEST
+    PATH cluster/kmeans_mg.cu
+    GPUS 2
     PERCENT 100
-    ADDITIONAL_DEP NCCL::NCCL
+    ADDITIONAL_DEP
+      NCCL::NCCL
+      ucx::ucp
+      ucx::ucs
+      ucxx::ucxx
   )
 endif()
 
