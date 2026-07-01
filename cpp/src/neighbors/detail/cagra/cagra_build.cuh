@@ -2209,6 +2209,17 @@ auto iterative_build_graph(
   RAFT_LOG_DEBUG("# graph_degree = %lu", (uint64_t)graph_degree);
   RAFT_LOG_DEBUG("# topk = %lu", (uint64_t)topk);
 
+  // A fixed itopk_size (0 = auto) governs the growing iterations, which build graphs of degree
+  // ~graph_degree/2 and thus request topk ~= graph_degree/2 + 1; the search planner requires
+  // topk <= itopk_size. (The full-size iterations override itopk internally, so they are not
+  // constrained by this value.)
+  RAFT_EXPECTS(iter_params.itopk_size == 0 ||
+                 iter_params.itopk_size >= graph_degree / 2 + 1,
+               "iterative build search itopk_size (%zu) must be 0 (auto) or >= "
+               "graph_degree / 2 + 1 (%zu)",
+               (size_t)iter_params.itopk_size,
+               (size_t)(graph_degree / 2 + 1));
+
   // Create an initial graph. The initial graph created here is not suitable for
   // searching, but connectivity is guaranteed.
   auto offset = raft::make_host_vector<IdxT, int64_t>(small_graph_degree);
@@ -2344,8 +2355,16 @@ auto iterative_build_graph(
     // The search count (topk) is set to the next graph degree + 1, because
     // pruning is not used except in the last iteration.
     // (*) The appropriate setting for itopk_size requires careful consideration.
-    auto curr_topk       = next_graph_degree + 1;
-    auto curr_itopk_size = std::max(next_graph_degree + 32, (uint64_t)128);
+    auto curr_topk = next_graph_degree + 1;
+    // The configurable itopk (iter_params.itopk_size, 0 = auto) applies only to the true growing
+    // iterations, where the degree being built is small_graph_degree. When the graph reaches its
+    // full size the search builds a graph_degree-degree graph (topk = graph_degree + 1); that
+    // iteration needs a larger itopk, so it overrides the configured value with the auto formula.
+    // The final iteration (flag_last) uses a fixed itopk tied to the output topk.
+    auto curr_itopk_size =
+      (iter_params.itopk_size > 0 && next_graph_degree == small_graph_degree)
+        ? (uint64_t)iter_params.itopk_size
+        : std::max(next_graph_degree + 32, (uint64_t)128);
     if (flag_last) {
       curr_topk       = topk;
       curr_itopk_size = curr_topk + 32;

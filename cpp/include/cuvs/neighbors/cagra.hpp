@@ -190,6 +190,11 @@ struct iterative_search_params : cuvs::neighbors::cagra::search_params {
   {
     this->search_width   = 1;
     this->max_iterations = 8;
+    // itopk_size controls the search during the *growing* iterations of the build loop.
+    // 0 (default) means auto-select per iteration (max(graph_degree + 32, 128)); a nonzero
+    // value overrides it for the growing iterations. The final iteration always uses a fixed
+    // itopk tied to the output topk, regardless of this value.
+    this->itopk_size = 0;
   }
 };
 
