@@ -1739,6 +1739,9 @@ void search(raft::resources const& res,
  * @brief Search multiple CAGRA index partitions concurrently and return the global top-k per
  * query.
  *
+ * TODO: Create an abstraction for multi-partition indices. Reference issue:
+ * https://github.com/NVIDIA/cuvs/issues/2281
+ *
  * For each query row in @p queries, the kernel searches all partitions in parallel into an
  * internal intermediate buffer, applies per-partition distance post-processing, runs a batched
  * top-k merge across partitions, and writes the final outputs. The call returns when all work
