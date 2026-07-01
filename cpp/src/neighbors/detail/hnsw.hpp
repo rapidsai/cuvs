@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -1135,14 +1135,21 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   // iterate over the points in the descending order of their levels
   for (size_t pt_level = hist.size() - 1; pt_level >= 1; pt_level--) {
     common::nvtx::range<common::nvtx::domain::cuvs> level_scope("level %zu", pt_level);
-    auto start_idx     = offsets[pt_level - 1];
-    auto end_idx       = offsets[hist.size() - 1];
-    auto num_pts       = end_idx - start_idx;
-    auto neighbor_size = num_pts > appr_algo->M_ ? appr_algo->M_ : num_pts - 1;
+    auto start_idx = offsets[pt_level - 1];
+    auto end_idx   = offsets[hist.size() - 1];
+    auto num_pts   = end_idx - start_idx;
     if (num_pts <= 1) {
       // this means only 1 point in the level
       continue;
     }
+
+    // Final per-layer degree (capped at the upper-layer limit maxM_ == M_) and the
+    // denser intermediate kNN degree we prune from (capped at maxM0_ == 2*M_). This
+    // mirrors CAGRA's own build_knn_graph -> optimize pipeline: build a richer kNN
+    // graph, then prune detourable edges and add reverse edges down to the target
+    // degree. Both are clamped so a tiny top layer is at most fully connected.
+    const int64_t knn_degree = std::min<int64_t>(appr_algo->maxM0_, num_pts - 1);
+    const int64_t out_degree = std::min<int64_t>(appr_algo->maxM_, knn_degree);
 
     // gather points from dataset to form query set on host
     auto host_query_set = raft::make_host_matrix<T, int64_t>(num_pts, dim);
@@ -1157,11 +1164,21 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     }
 
     // find neighbors of the query set
-    auto host_neighbors = raft::make_host_matrix<uint32_t, int64_t>(num_pts, neighbor_size);
-    all_neighbors_graph(res,
-                        raft::make_const_mdspan(host_query_set.view()),
-                        host_neighbors.view(),
-                        cagra_index.metric());
+    auto host_neighbors = raft::make_host_matrix<uint32_t, int64_t>(num_pts, out_degree);
+    if (knn_degree > out_degree) {
+      // Build a denser intermediate kNN graph, then prune it down to out_degree with
+      // variable degree disabled (mirrors CAGRA's build_knn_graph -> optimize). The
+      // constant-degree optimize output is full fixed degree with no invalid padding.
+      auto host_knn = raft::make_host_matrix<uint32_t, int64_t>(num_pts, knn_degree);
+      all_neighbors_graph(
+        res, raft::make_const_mdspan(host_query_set.view()), host_knn.view(), cagra_index.metric());
+      cuvs::neighbors::cagra::helpers::optimize(res, host_knn.view(), host_neighbors.view());
+    } else {
+      all_neighbors_graph(res,
+                          raft::make_const_mdspan(host_query_set.view()),
+                          host_neighbors.view(),
+                          cagra_index.metric());
+    }
 
     {
       common::nvtx::range<common::nvtx::domain::cuvs> copy_scope(
