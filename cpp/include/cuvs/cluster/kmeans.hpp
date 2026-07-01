@@ -161,6 +161,33 @@ struct balanced_params : base_params {
    * Number of training iterations
    */
   uint32_t n_iters = 20;
+
+  /**
+   * Lower balance tolerance used during hierarchical training. Clusters smaller than
+   * `average_cluster_size * balance_lower_tolerance` are underfull. The default value of `0.333`
+   * targets clusters smaller than roughly one third of the average size.
+   *
+   * Valid range: (0, 1).
+   */
+  float balance_lower_tolerance = 0.333f;
+
+  /**
+   * Upper balance tolerance used during hierarchical training. Clusters larger than
+   * `average_cluster_size * balance_upper_tolerance` are overfull donors. The default value of
+   * `3.0` targets clusters larger than roughly three times the average size. Very strict upper
+   * values around `1.4` or lower can be difficult for this heuristic rebalancing method to satisfy.
+   *
+   * Valid range: (1, infinity).
+   */
+  float balance_upper_tolerance = 3.0f;
+
+  /**
+   * Offset used when reinitializing an underfull cluster near an overfull cluster. The new center
+   * is placed at `donor_center + centroid_offset * (donor_point - donor_center)`.
+   *
+   * Valid range: (0, 1].
+   */
+  float centroid_offset = 0.01f;
 };
 
 /**
