@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include "../../../core/nvtx.hpp"
 #include "../../../preprocessing/quantize/vpq_build-ext.cuh"
+#include "../../ivf_pq/ivf_pq_fp16_overflow.cuh"
 #include "graph_core.cuh"
 
 #include <raft/core/copy.cuh>
@@ -2215,6 +2216,24 @@ index<T, IdxT> build(
     } else {
       RAFT_LOG_DEBUG("Selecting IVF-PQ solver");
       knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), params.metric);
+    }
+  }
+
+  // Predict potential FP16 distance overflow for large-magnitude (e.g. unnormalized) datasets
+  // -> fall back to FP32.
+  if (auto* pq = std::get_if<cagra::graph_build_params::ivf_pq_params>(&knn_build_params)) {
+    const bool using_fp16_distance = pq->search_params.internal_distance_dtype == CUDA_R_16F ||
+                                     pq->search_params.coarse_search_dtype == CUDA_R_16F;
+    if (using_fp16_distance &&
+        ivf_pq::helpers::estimate_fp16_overflow(res, dataset, params.metric)) {
+      RAFT_LOG_WARN(
+        "IVF-PQ internal type of FP16 is likely insufficient for this dataset to avoid overflow in "
+        "distance computations -> "
+        "Switching 'internal_distance_dtype' and 'coarse_search_dtype' to FP32");
+      pq->search_params.internal_distance_dtype = CUDA_R_32F;
+      pq->search_params.coarse_search_dtype     = CUDA_R_32F;
+      // lut_dtype is left unchanged because its per-subspace terms are smaller by a factor of
+      // pq_dim and therefore, less likely to overflow.
     }
   }
   RAFT_EXPECTS(
