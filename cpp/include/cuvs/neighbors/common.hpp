@@ -142,9 +142,10 @@ enum class MergeStrategy {
  * @brief Tags selecting dataset representation for `dataset` / `dataset_view`.
  *
  * Each container defines nested `owning_storage` then `view_storage` (aliases into `detail::*`
- * storage types shared by device/host). Empty owning and view share one storage type; padded and
- * VPQ differ between owning and view. Layout kinds appear in order empty, padded, VPQ; within
- * each kind, device precedes host. `dataset` / `dataset_view` only express ownership vs view.
+ * storage types shared by device/host). Empty owning and view share one storage type; padded,
+ * standard, and VPQ differ between owning and view. Layout kinds appear in order empty, padded,
+ * standard, VPQ; within each kind, device precedes host. `dataset` / `dataset_view` only express
+ * ownership vs view.
  */
 
 template <typename containertype, typename DataT, typename IdxT>
@@ -177,12 +178,16 @@ using empty_dataset_view_storage = empty_dataset_storage<IdxT>;
 // padded (row-major with logical dim vs stride)
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// dense row-major (logical dim may differ from row pitch; shared by padded & standard)
+// -----------------------------------------------------------------------------
+
 template <typename MatrixT, typename ViewT, typename DataT, typename IdxT>
-struct padded_dataset_owning_storage {
+struct dense_row_major_dataset_owning_storage {
   MatrixT data_;
   uint32_t logical_dim_;
 
-  padded_dataset_owning_storage(MatrixT&& data, uint32_t logical_dim) noexcept
+  dense_row_major_dataset_owning_storage(MatrixT&& data, uint32_t logical_dim) noexcept
     : data_{std::move(data)}, logical_dim_{logical_dim}
   {
   }
@@ -199,21 +204,21 @@ struct padded_dataset_owning_storage {
 };
 
 template <typename ViewT, typename DataT, typename IdxT>
-struct padded_dataset_view_storage {
+struct dense_row_major_dataset_view_storage {
   ViewT data_;
   uint32_t logical_dim_;
 
-  explicit padded_dataset_view_storage(ViewT v) noexcept
+  explicit dense_row_major_dataset_view_storage(ViewT v) noexcept
     : data_(v), logical_dim_(static_cast<uint32_t>(v.extent(1)))
   {
   }
 
-  padded_dataset_view_storage(ViewT v, uint32_t logical_dim) noexcept
+  dense_row_major_dataset_view_storage(ViewT v, uint32_t logical_dim) noexcept
     : data_(v), logical_dim_(logical_dim)
   {
   }
 
-  padded_dataset_view_storage(padded_dataset_view_storage const& other) noexcept
+  dense_row_major_dataset_view_storage(dense_row_major_dataset_view_storage const& other) noexcept
     : data_(other.data_), logical_dim_(other.logical_dim_)
   {
   }
@@ -226,6 +231,20 @@ struct padded_dataset_view_storage {
   }
   [[nodiscard]] auto view() const noexcept -> ViewT { return data_; }
 };
+
+template <typename MatrixT, typename ViewT, typename DataT, typename IdxT>
+using padded_dataset_owning_storage =
+  dense_row_major_dataset_owning_storage<MatrixT, ViewT, DataT, IdxT>;
+
+template <typename ViewT, typename DataT, typename IdxT>
+using padded_dataset_view_storage = dense_row_major_dataset_view_storage<ViewT, DataT, IdxT>;
+
+template <typename MatrixT, typename ViewT, typename DataT, typename IdxT>
+using standard_dataset_owning_storage =
+  dense_row_major_dataset_owning_storage<MatrixT, ViewT, DataT, IdxT>;
+
+template <typename ViewT, typename DataT, typename IdxT>
+using standard_dataset_view_storage = dense_row_major_dataset_view_storage<ViewT, DataT, IdxT>;
 
 // -----------------------------------------------------------------------------
 // VPQ compressed
@@ -370,6 +389,38 @@ struct host_padded_dataset_container {
 };
 
 // -----------------------------------------------------------------------------
+// standard (row-major with arbitrary stride; no CAGRA alignment requirement)
+// -----------------------------------------------------------------------------
+
+struct device_standard_dataset_container {
+  template <typename DataT, typename IdxT>
+  using owning_storage = detail::standard_dataset_owning_storage<
+    raft::device_matrix<DataT, IdxT, raft::row_major>,
+    raft::device_matrix_view<const DataT, IdxT, raft::row_major>,
+    DataT,
+    IdxT>;
+  template <typename DataT, typename IdxT>
+  using view_storage = detail::standard_dataset_view_storage<
+    raft::device_matrix_view<const DataT, IdxT, raft::row_major>,
+    DataT,
+    IdxT>;
+};
+
+struct host_standard_dataset_container {
+  template <typename DataT, typename IdxT>
+  using owning_storage = detail::standard_dataset_owning_storage<
+    raft::host_matrix<DataT, IdxT, raft::row_major>,
+    raft::host_matrix_view<const DataT, IdxT, raft::row_major>,
+    DataT,
+    IdxT>;
+  template <typename DataT, typename IdxT>
+  using view_storage = detail::standard_dataset_view_storage<
+    raft::host_matrix_view<const DataT, IdxT, raft::row_major>,
+    DataT,
+    IdxT>;
+};
+
+// -----------------------------------------------------------------------------
 // VPQ compressed
 // -----------------------------------------------------------------------------
 
@@ -454,6 +505,54 @@ struct dataset_view<host_empty_dataset_container, void, IdxT>
   : host_empty_dataset_container::view_storage<IdxT> {
   using container_type    = host_empty_dataset_container;
   using view_storage_type = typename container_type::template view_storage<IdxT>;
+  using view_storage_type::view_storage_type;
+};
+
+// -----------------------------------------------------------------------------
+// standard (device / host row-major with arbitrary stride)
+// -----------------------------------------------------------------------------
+
+template <typename DataT, typename IdxT>
+struct dataset<device_standard_dataset_container, DataT, IdxT>
+  : device_standard_dataset_container::owning_storage<DataT, IdxT> {
+  using container_type      = device_standard_dataset_container;
+  using owning_storage_type = typename container_type::template owning_storage<DataT, IdxT>;
+  using owning_storage_type::owning_storage_type;
+
+  [[nodiscard]] auto as_dataset_view() const noexcept
+    -> dataset_view<device_standard_dataset_container, DataT, IdxT>
+  {
+    return dataset_view<device_standard_dataset_container, DataT, IdxT>(this->view(), this->dim());
+  }
+};
+
+template <typename DataT, typename IdxT>
+struct dataset_view<device_standard_dataset_container, DataT, IdxT>
+  : device_standard_dataset_container::view_storage<DataT, IdxT> {
+  using container_type    = device_standard_dataset_container;
+  using view_storage_type = typename container_type::template view_storage<DataT, IdxT>;
+  using view_storage_type::view_storage_type;
+};
+
+template <typename DataT, typename IdxT>
+struct dataset<host_standard_dataset_container, DataT, IdxT>
+  : host_standard_dataset_container::owning_storage<DataT, IdxT> {
+  using container_type      = host_standard_dataset_container;
+  using owning_storage_type = typename container_type::template owning_storage<DataT, IdxT>;
+  using owning_storage_type::owning_storage_type;
+
+  [[nodiscard]] auto as_dataset_view() const noexcept
+    -> dataset_view<host_standard_dataset_container, DataT, IdxT>
+  {
+    return dataset_view<host_standard_dataset_container, DataT, IdxT>(this->view(), this->dim());
+  }
+};
+
+template <typename DataT, typename IdxT>
+struct dataset_view<host_standard_dataset_container, DataT, IdxT>
+  : host_standard_dataset_container::view_storage<DataT, IdxT> {
+  using container_type    = host_standard_dataset_container;
+  using view_storage_type = typename container_type::template view_storage<DataT, IdxT>;
   using view_storage_type::view_storage_type;
 };
 
@@ -581,6 +680,18 @@ template <typename DataT, typename IdxT>
 using host_padded_dataset_view = dataset_view<host_padded_dataset_container, DataT, IdxT>;
 
 template <typename DataT, typename IdxT>
+using device_standard_dataset = dataset<device_standard_dataset_container, DataT, IdxT>;
+
+template <typename DataT, typename IdxT>
+using device_standard_dataset_view = dataset_view<device_standard_dataset_container, DataT, IdxT>;
+
+template <typename DataT, typename IdxT>
+using host_standard_dataset = dataset<host_standard_dataset_container, DataT, IdxT>;
+
+template <typename DataT, typename IdxT>
+using host_standard_dataset_view = dataset_view<host_standard_dataset_container, DataT, IdxT>;
+
+template <typename DataT, typename IdxT>
 using device_vpq_dataset = dataset<device_vpq_dataset_container, DataT, IdxT>;
 
 template <typename DataT, typename IdxT>
@@ -601,6 +712,11 @@ struct owning_dataset_for_view;
 template <typename DataT, typename IdxT>
 struct owning_dataset_for_view<device_padded_dataset_view<DataT, IdxT>> {
   using type = device_padded_dataset<DataT, IdxT>;
+};
+
+template <typename DataT, typename IdxT>
+struct owning_dataset_for_view<device_standard_dataset_view<DataT, IdxT>> {
+  using type = device_standard_dataset<DataT, IdxT>;
 };
 
 template <typename DataT, typename IdxT>
@@ -628,6 +744,24 @@ struct is_padded_dataset<host_padded_dataset_view<DataT, IdxT>> : std::true_type
 
 template <typename DatasetT>
 inline constexpr bool is_padded_dataset_v = is_padded_dataset<DatasetT>::value;
+
+template <typename DatasetT>
+struct is_standard_dataset : std::false_type {};
+
+template <typename DataT, typename IdxT>
+struct is_standard_dataset<device_standard_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_standard_dataset<host_standard_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_standard_dataset<device_standard_dataset_view<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_standard_dataset<host_standard_dataset_view<DataT, IdxT>> : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_standard_dataset_v = is_standard_dataset<DatasetT>::value;
 
 template <typename DatasetT>
 struct is_vpq_dataset : std::false_type {};
@@ -704,6 +838,51 @@ template <typename T, typename I, typename L>
   return matrix_actual_row_width(m) == need;
 }
 
+namespace detail {
+
+template <typename SrcT>
+[[nodiscard]] inline uint32_t mdspan_row_stride_elements(SrcT const& src)
+{
+  return src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0))
+                           : static_cast<uint32_t>(src.extent(1));
+}
+
+template <typename ValueT, typename SrcT>
+[[nodiscard]] inline ValueT* expect_device_accessible_data_handle(SrcT const& src,
+                                                                  char const* error_msg)
+{
+  cudaPointerAttributes ptr_attrs;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
+  auto* device_ptr = reinterpret_cast<ValueT*>(ptr_attrs.devicePointer);
+  RAFT_EXPECTS(device_ptr != nullptr, error_msg);
+  return device_ptr;
+}
+
+template <typename ValueT, typename IndexT, typename ViewT, typename SrcT>
+[[nodiscard]] inline ViewT make_device_dense_row_major_view_from_src(SrcT const& src,
+                                                                     uint32_t logical_dim)
+{
+  auto* device_ptr = expect_device_accessible_data_handle<ValueT>(
+    src, "make_device_*_dataset_view: source must be device-accessible.");
+  auto v = raft::make_device_matrix_view(
+    device_ptr, src.extent(0), static_cast<IndexT>(mdspan_row_stride_elements(src)));
+  return ViewT(v, logical_dim);
+}
+
+template <typename ValueT, typename IndexT, typename ViewT, typename SrcT>
+[[nodiscard]] inline ViewT make_host_dense_row_major_view_from_src(SrcT const& src,
+                                                                   uint32_t logical_dim)
+{
+  RAFT_EXPECTS(raft::get_device_for_address(src.data_handle()) == -1,
+               "make_host_*_dataset_view: source must be host-accessible.");
+  auto v = raft::make_host_matrix_view(const_cast<ValueT*>(src.data_handle()),
+                                       src.extent(0),
+                                       static_cast<IndexT>(mdspan_row_stride_elements(src)));
+  return ViewT(v, logical_dim);
+}
+
+}  // namespace detail
+
 template <typename SrcT>
 auto make_device_padded_dataset_view(const raft::resources& res,
                                      SrcT const& src,
@@ -714,20 +893,14 @@ auto make_device_padded_dataset_view(const raft::resources& res,
   using index_type = typename SrcT::index_type;
   uint32_t required_stride =
     cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
-  uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
-  cudaPointerAttributes ptr_attrs;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
-  auto* device_ptr = reinterpret_cast<value_type*>(ptr_attrs.devicePointer);
-  RAFT_EXPECTS(device_ptr != nullptr,
-               "make_device_padded_dataset_view: source must be device-accessible. "
-               "Use make_device_padded_dataset() to get an owning copy.");
   RAFT_EXPECTS(
-    src_stride == required_stride,
+    detail::mdspan_row_stride_elements(src) == required_stride,
     "make_device_padded_dataset_view: stride is incorrect (required stride for alignment). "
     "Use make_device_padded_dataset() to get an owning padded copy.");
-  auto v =
-    raft::make_device_matrix_view(device_ptr, src.extent(0), static_cast<index_type>(src_stride));
-  return device_padded_dataset_view<value_type, index_type>(v, src.extent(1));
+  return detail::make_device_dense_row_major_view_from_src<
+    value_type,
+    index_type,
+    device_padded_dataset_view<value_type, index_type>>(src, static_cast<uint32_t>(src.extent(1)));
 }
 
 template <typename SrcT>
@@ -740,7 +913,7 @@ auto make_device_padded_dataset(const raft::resources& res,
   using index_type = typename SrcT::index_type;
   uint32_t required_stride =
     cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
-  uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
+  uint32_t src_stride = detail::mdspan_row_stride_elements(src);
   cudaPointerAttributes ptr_attrs;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src.data_handle()));
   bool const device_src =
@@ -777,17 +950,14 @@ auto make_host_padded_dataset_view(SrcT const& src, uint32_t align_bytes = 16)
   using index_type = typename SrcT::index_type;
   uint32_t required_stride =
     cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
-  uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
-  RAFT_EXPECTS(raft::get_device_for_address(src.data_handle()) == -1,
-               "make_host_padded_dataset_view: source must be host-accessible. "
-               "Use make_host_padded_dataset() to get an owning copy.");
   RAFT_EXPECTS(
-    src_stride == required_stride,
+    detail::mdspan_row_stride_elements(src) == required_stride,
     "make_host_padded_dataset_view: stride is incorrect (required stride for alignment). "
     "Use make_host_padded_dataset() to get an owning padded copy.");
-  auto v = raft::make_host_matrix_view(
-    const_cast<value_type*>(src.data_handle()), src.extent(0), static_cast<index_type>(src_stride));
-  return host_padded_dataset_view<value_type, index_type>(v, src.extent(1));
+  return detail::make_host_dense_row_major_view_from_src<
+    value_type,
+    index_type,
+    host_padded_dataset_view<value_type, index_type>>(src, static_cast<uint32_t>(src.extent(1)));
 }
 
 template <typename SrcT>
@@ -800,7 +970,7 @@ auto make_host_padded_dataset(const raft::resources& res,
   using index_type = typename SrcT::index_type;
   uint32_t required_stride =
     cagra_required_row_width<value_type>(static_cast<uint32_t>(src.extent(1)), align_bytes);
-  uint32_t src_stride = src.stride(0) > 0 ? static_cast<uint32_t>(src.stride(0)) : src.extent(1);
+  uint32_t src_stride = detail::mdspan_row_stride_elements(src);
   RAFT_EXPECTS(raft::get_device_for_address(src.data_handle()) == -1,
                "make_host_padded_dataset: source must be host-accessible. "
                "Use make_device_padded_dataset() for device sources.");
@@ -822,6 +992,31 @@ auto make_host_padded_dataset(const raft::resources& res,
                     raft::resource::get_cuda_stream(res));
   return std::make_unique<host_padded_dataset<value_type, index_type>>(
     std::move(out_array), static_cast<uint32_t>(src.extent(1)));
+}
+
+template <typename SrcT>
+auto make_device_standard_dataset_view(SrcT const& src)
+  -> device_standard_dataset_view<typename SrcT::value_type, typename SrcT::index_type>
+{
+  using value_type = typename SrcT::value_type;
+  using index_type = typename SrcT::index_type;
+  return detail::make_device_dense_row_major_view_from_src<
+    value_type,
+    index_type,
+    device_standard_dataset_view<value_type, index_type>>(src,
+                                                          static_cast<uint32_t>(src.extent(1)));
+}
+
+template <typename SrcT>
+auto make_host_standard_dataset_view(SrcT const& src)
+  -> host_standard_dataset_view<typename SrcT::value_type, typename SrcT::index_type>
+{
+  using value_type = typename SrcT::value_type;
+  using index_type = typename SrcT::index_type;
+  return detail::make_host_dense_row_major_view_from_src<
+    value_type,
+    index_type,
+    host_standard_dataset_view<value_type, index_type>>(src, static_cast<uint32_t>(src.extent(1)));
 }
 
 namespace filtering {

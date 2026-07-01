@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -238,6 +238,11 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
+  } else if constexpr (cuvs::neighbors::is_device_standard_dataset_view_v<DatasetViewT>) {
+    RAFT_FAIL(
+      "CAGRA search requires a padded device dataset. Build from a standard dataset view, then "
+      "call "
+      "cagra::attach_padded_dataset_for_search(res, index, padded_view) before search.");
   } else if constexpr (cuvs::neighbors::is_device_padded_dataset_view_v<DatasetViewT>) {
     run_strided_like(index.data());
   } else if constexpr (cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>) {
