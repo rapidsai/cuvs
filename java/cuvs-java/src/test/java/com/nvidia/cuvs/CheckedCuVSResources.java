@@ -57,6 +57,11 @@ public class CheckedCuVSResources implements CuVSResources {
   }
 
   @Override
+  public void setWorkspacePool(long sizeBytes) {
+    inner.setWorkspacePool(sizeBytes);
+  }
+
+  @Override
   public Path tempDirectory() {
     return inner.tempDirectory();
   }

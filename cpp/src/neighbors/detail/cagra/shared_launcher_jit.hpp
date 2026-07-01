@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,8 +8,9 @@
 #include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 #include <cuvs/detail/jit_lto/common_fragments.hpp>
 
-#include "../../sample_filter.cuh"   // For none_sample_filter, bitset_filter
-#include "cagra_filter_payload.hpp"  // sample-filter payload helpers
+#include "../../sample_filter.cuh"           // For none_sample_filter, bitset_filter
+#include "cagra_filter_payload.hpp"          // sample-filter payload helpers
+#include "jit_lto_kernels/cagra_bitset.cuh"  // is_mp_bitset_filter
 
 #include <cstdint>
 #include <iostream>
@@ -100,6 +101,8 @@ struct sample_filter_jit_tag {
       using namespace cuvs::neighbors::filtering;
       if constexpr (std::is_same_v<U, none_sample_filter>) {
         return cuvs::neighbors::detail::tag_filter_none{};
+      } else if constexpr (is_mp_bitset_filter<U>::value) {
+        return cuvs::neighbors::detail::tag_filter_mp_bitset{};
       } else if constexpr (is_udf_filter<U>::value) {
         return cuvs::neighbors::detail::tag_filter_udf{};
       } else if constexpr (requires { std::declval<U>().filter; }) {

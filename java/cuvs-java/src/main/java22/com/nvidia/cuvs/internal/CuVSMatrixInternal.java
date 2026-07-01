@@ -38,7 +38,7 @@ public interface CuVSMatrixInternal extends CuVSMatrix {
 
   static int code(DataType dataType) {
     return switch (dataType) {
-      case FLOAT -> kDLFloat();
+      case FLOAT, HALF -> kDLFloat();
       case INT -> kDLInt();
       case UINT, BYTE -> kDLUInt();
     };

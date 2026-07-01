@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -784,5 +784,382 @@ TEST(CagraC, BuildSearchACEDisk)
   cuvsHnswSearchParamsDestroy(search_params);
   cuvsHnswIndexParamsDestroy(hnsw_params);
   cuvsHnswIndexDestroy(hnsw_index);
+  cuvsResourcesDestroy(res);
+}
+
+// Multi-partition search splits the known 4-row dataset into two contiguous 2-row partitions
+// (partition p holds global rows [2*p, 2*p+2)). The result is reported as a per-partition
+// (partition_id, local ordinal) pair, which decodes to the global index as 2*partition_id +
+// neighbor. So the global answers stay neighbors_exp = {3, 0, 3, 1}, i.e.:
+//   partition_ids = {1, 0, 1, 0}, local neighbors = {1, 0, 1, 1}.
+TEST(CagraC, BuildSearchMultiPartition)
+{
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+  cudaStream_t stream;
+  cuvsStreamGet(res, &stream);
+
+  constexpr uint32_t num_partitions = 2;
+  constexpr int part_rows = 2, dim = 2, n_queries = 4, k = 1;
+
+  // Build one index per contiguous 2-row slice of the host dataset.
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
+
+  cuvsCagraIndex_t indices[num_partitions];
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    DLManagedTensor part_tensor;
+    part_tensor.dl_tensor.data               = &dataset[p * part_rows][0];
+    part_tensor.dl_tensor.device.device_type = kDLCPU;
+    part_tensor.dl_tensor.ndim               = 2;
+    part_tensor.dl_tensor.dtype.code         = kDLFloat;
+    part_tensor.dl_tensor.dtype.bits         = 32;
+    part_tensor.dl_tensor.dtype.lanes        = 1;
+    int64_t part_shape[2]                    = {part_rows, dim};
+    part_tensor.dl_tensor.shape              = part_shape;
+    part_tensor.dl_tensor.strides            = nullptr;
+
+    cuvsCagraIndexCreate(&indices[p]);
+    cuvsCagraBuild(res, build_params, &part_tensor, indices[p]);
+  }
+
+  // queries (device)
+  rmm::device_uvector<float> queries_d(n_queries * dim, stream);
+  raft::copy(queries_d.data(), (float*)queries, n_queries * dim, stream);
+  DLManagedTensor queries_tensor;
+  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.device.device_type = kDLCUDA;
+  queries_tensor.dl_tensor.ndim               = 2;
+  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits         = 32;
+  queries_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t queries_shape[2]                    = {n_queries, dim};
+  queries_tensor.dl_tensor.shape              = queries_shape;
+  queries_tensor.dl_tensor.strides            = nullptr;
+
+  // partition_ids output (device, uint32)
+  rmm::device_uvector<uint32_t> partition_ids_d(n_queries * k, stream);
+  DLManagedTensor partition_ids_tensor;
+  partition_ids_tensor.dl_tensor.data               = partition_ids_d.data();
+  partition_ids_tensor.dl_tensor.device.device_type = kDLCUDA;
+  partition_ids_tensor.dl_tensor.ndim               = 2;
+  partition_ids_tensor.dl_tensor.dtype.code         = kDLUInt;
+  partition_ids_tensor.dl_tensor.dtype.bits         = 32;
+  partition_ids_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t out_shape[2]                              = {n_queries, k};
+  partition_ids_tensor.dl_tensor.shape              = out_shape;
+  partition_ids_tensor.dl_tensor.strides            = nullptr;
+
+  // neighbors output (device, uint32 local ordinal)
+  rmm::device_uvector<uint32_t> neighbors_d(n_queries * k, stream);
+  DLManagedTensor neighbors_tensor;
+  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
+  neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
+  neighbors_tensor.dl_tensor.ndim               = 2;
+  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits         = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
+  neighbors_tensor.dl_tensor.shape              = out_shape;
+  neighbors_tensor.dl_tensor.strides            = nullptr;
+
+  // distances output (device, float)
+  rmm::device_uvector<float> distances_d(n_queries * k, stream);
+  DLManagedTensor distances_tensor;
+  distances_tensor.dl_tensor.data               = distances_d.data();
+  distances_tensor.dl_tensor.device.device_type = kDLCUDA;
+  distances_tensor.dl_tensor.ndim               = 2;
+  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits         = 32;
+  distances_tensor.dl_tensor.dtype.lanes        = 1;
+  distances_tensor.dl_tensor.shape              = out_shape;
+  distances_tensor.dl_tensor.strides            = nullptr;
+
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
+  ASSERT_EQ(cuvsCagraSearchMultiPartition(res,
+                                          search_params,
+                                          num_partitions,
+                                          indices,
+                                          &queries_tensor,
+                                          &partition_ids_tensor,
+                                          &neighbors_tensor,
+                                          &distances_tensor,
+                                          filter),
+            CUVS_SUCCESS);
+
+  uint32_t partition_ids_exp[4] = {1, 0, 1, 0};
+  uint32_t neighbors_exp_mp[4]  = {1, 0, 1, 1};
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    partition_ids_exp, partition_ids_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(
+    cuvs::devArrMatchHost(neighbors_exp_mp, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    distances_exp, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraIndexParamsDestroy(build_params);
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    cuvsCagraIndexDestroy(indices[p]);
+  }
+  cuvsResourcesDestroy(res);
+}
+
+// Filtered multi-partition search: the combined bitset is addressed by the global index
+// (partition_offset[p] + local), so filtering global rows 1 and 2 (bitset 0b1001) matches the
+// single-index filtered case. Global answers stay neighbors_exp_filtered = {3, 0, 3, 0}:
+//   partition_ids = {1, 0, 1, 0}, local neighbors = {1, 0, 1, 0}.
+TEST(CagraC, BuildSearchMultiPartitionFiltered)
+{
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+  cudaStream_t stream;
+  cuvsStreamGet(res, &stream);
+
+  constexpr uint32_t num_partitions = 2;
+  constexpr int part_rows = 2, dim = 2, n_queries = 4, k = 1;
+
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
+
+  cuvsCagraIndex_t indices[num_partitions];
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    DLManagedTensor part_tensor;
+    part_tensor.dl_tensor.data               = &dataset[p * part_rows][0];
+    part_tensor.dl_tensor.device.device_type = kDLCPU;
+    part_tensor.dl_tensor.ndim               = 2;
+    part_tensor.dl_tensor.dtype.code         = kDLFloat;
+    part_tensor.dl_tensor.dtype.bits         = 32;
+    part_tensor.dl_tensor.dtype.lanes        = 1;
+    int64_t part_shape[2]                    = {part_rows, dim};
+    part_tensor.dl_tensor.shape              = part_shape;
+    part_tensor.dl_tensor.strides            = nullptr;
+
+    cuvsCagraIndexCreate(&indices[p]);
+    cuvsCagraBuild(res, build_params, &part_tensor, indices[p]);
+  }
+
+  rmm::device_uvector<float> queries_d(n_queries * dim, stream);
+  raft::copy(queries_d.data(), (float*)queries, n_queries * dim, stream);
+  DLManagedTensor queries_tensor;
+  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.device.device_type = kDLCUDA;
+  queries_tensor.dl_tensor.ndim               = 2;
+  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits         = 32;
+  queries_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t queries_shape[2]                    = {n_queries, dim};
+  queries_tensor.dl_tensor.shape              = queries_shape;
+  queries_tensor.dl_tensor.strides            = nullptr;
+
+  rmm::device_uvector<uint32_t> partition_ids_d(n_queries * k, stream);
+  int64_t out_shape[2] = {n_queries, k};
+  DLManagedTensor partition_ids_tensor;
+  partition_ids_tensor.dl_tensor.data               = partition_ids_d.data();
+  partition_ids_tensor.dl_tensor.device.device_type = kDLCUDA;
+  partition_ids_tensor.dl_tensor.ndim               = 2;
+  partition_ids_tensor.dl_tensor.dtype.code         = kDLUInt;
+  partition_ids_tensor.dl_tensor.dtype.bits         = 32;
+  partition_ids_tensor.dl_tensor.dtype.lanes        = 1;
+  partition_ids_tensor.dl_tensor.shape              = out_shape;
+  partition_ids_tensor.dl_tensor.strides            = nullptr;
+
+  rmm::device_uvector<uint32_t> neighbors_d(n_queries * k, stream);
+  DLManagedTensor neighbors_tensor;
+  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
+  neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
+  neighbors_tensor.dl_tensor.ndim               = 2;
+  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits         = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
+  neighbors_tensor.dl_tensor.shape              = out_shape;
+  neighbors_tensor.dl_tensor.strides            = nullptr;
+
+  rmm::device_uvector<float> distances_d(n_queries * k, stream);
+  DLManagedTensor distances_tensor;
+  distances_tensor.dl_tensor.data               = distances_d.data();
+  distances_tensor.dl_tensor.device.device_type = kDLCUDA;
+  distances_tensor.dl_tensor.ndim               = 2;
+  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits         = 32;
+  distances_tensor.dl_tensor.dtype.lanes        = 1;
+  distances_tensor.dl_tensor.shape              = out_shape;
+  distances_tensor.dl_tensor.strides            = nullptr;
+
+  // Combined bitset over all 4 global rows (0b1001 keeps rows 0 and 3, removes 1 and 2).
+  rmm::device_uvector<uint32_t> combined_bitset_d(1, stream);
+  raft::copy(combined_bitset_d.data(), filter, 1, stream);
+  DLManagedTensor combined_bitset_tensor;
+  combined_bitset_tensor.dl_tensor.data               = combined_bitset_d.data();
+  combined_bitset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  combined_bitset_tensor.dl_tensor.ndim               = 1;
+  combined_bitset_tensor.dl_tensor.dtype.code         = kDLUInt;
+  combined_bitset_tensor.dl_tensor.dtype.bits         = 32;
+  combined_bitset_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t combined_bitset_shape[1]                    = {1};
+  combined_bitset_tensor.dl_tensor.shape              = combined_bitset_shape;
+  combined_bitset_tensor.dl_tensor.strides            = nullptr;
+
+  // Per-partition bit offsets into the combined bitset (== global row offsets).
+  int64_t partition_offsets[num_partitions] = {0, part_rows};
+  rmm::device_uvector<int64_t> partition_offsets_d(num_partitions, stream);
+  raft::copy(partition_offsets_d.data(), partition_offsets, num_partitions, stream);
+  DLManagedTensor partition_offsets_tensor;
+  partition_offsets_tensor.dl_tensor.data               = partition_offsets_d.data();
+  partition_offsets_tensor.dl_tensor.device.device_type = kDLCUDA;
+  partition_offsets_tensor.dl_tensor.ndim               = 1;
+  partition_offsets_tensor.dl_tensor.dtype.code         = kDLInt;
+  partition_offsets_tensor.dl_tensor.dtype.bits         = 64;
+  partition_offsets_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t partition_offsets_shape[1]                    = {num_partitions};
+  partition_offsets_tensor.dl_tensor.shape              = partition_offsets_shape;
+  partition_offsets_tensor.dl_tensor.strides            = nullptr;
+
+  cuvsMultiPartitionBitsetFilter mp_filter;
+  mp_filter.combined_bitset   = &combined_bitset_tensor;
+  mp_filter.total_bitset_bits = num_partitions * part_rows;
+  mp_filter.partition_offsets = &partition_offsets_tensor;
+
+  cuvsFilter filter_obj;
+  filter_obj.type = MULTI_PARTITION_BITSET;
+  filter_obj.addr = (uintptr_t)&mp_filter;
+
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
+  ASSERT_EQ(cuvsCagraSearchMultiPartition(res,
+                                          search_params,
+                                          num_partitions,
+                                          indices,
+                                          &queries_tensor,
+                                          &partition_ids_tensor,
+                                          &neighbors_tensor,
+                                          &distances_tensor,
+                                          filter_obj),
+            CUVS_SUCCESS);
+
+  uint32_t partition_ids_exp[4] = {1, 0, 1, 0};
+  uint32_t neighbors_exp_mp[4]  = {1, 0, 1, 0};
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    partition_ids_exp, partition_ids_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(
+    cuvs::devArrMatchHost(neighbors_exp_mp, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    distances_exp_filtered, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraIndexParamsDestroy(build_params);
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    cuvsCagraIndexDestroy(indices[p]);
+  }
+  cuvsResourcesDestroy(res);
+}
+
+// MULTI_KERNEL is intentionally unsupported in the multi-partition path; the call must return an
+// error rather than silently falling back. (cuvsError_t: CUVS_SUCCESS == 1, CUVS_ERROR == 0.)
+TEST(CagraC, SearchMultiPartitionMultiKernelRejected)
+{
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+  cudaStream_t stream;
+  cuvsStreamGet(res, &stream);
+
+  constexpr uint32_t num_partitions = 2;
+  constexpr int part_rows = 2, dim = 2, n_queries = 4, k = 1;
+
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
+
+  cuvsCagraIndex_t indices[num_partitions];
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    DLManagedTensor part_tensor;
+    part_tensor.dl_tensor.data               = &dataset[p * part_rows][0];
+    part_tensor.dl_tensor.device.device_type = kDLCPU;
+    part_tensor.dl_tensor.ndim               = 2;
+    part_tensor.dl_tensor.dtype.code         = kDLFloat;
+    part_tensor.dl_tensor.dtype.bits         = 32;
+    part_tensor.dl_tensor.dtype.lanes        = 1;
+    int64_t part_shape[2]                    = {part_rows, dim};
+    part_tensor.dl_tensor.shape              = part_shape;
+    part_tensor.dl_tensor.strides            = nullptr;
+
+    cuvsCagraIndexCreate(&indices[p]);
+    cuvsCagraBuild(res, build_params, &part_tensor, indices[p]);
+  }
+
+  rmm::device_uvector<float> queries_d(n_queries * dim, stream);
+  raft::copy(queries_d.data(), (float*)queries, n_queries * dim, stream);
+  DLManagedTensor queries_tensor;
+  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.device.device_type = kDLCUDA;
+  queries_tensor.dl_tensor.ndim               = 2;
+  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits         = 32;
+  queries_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t queries_shape[2]                    = {n_queries, dim};
+  queries_tensor.dl_tensor.shape              = queries_shape;
+  queries_tensor.dl_tensor.strides            = nullptr;
+
+  rmm::device_uvector<uint32_t> partition_ids_d(n_queries * k, stream);
+  rmm::device_uvector<uint32_t> neighbors_d(n_queries * k, stream);
+  rmm::device_uvector<float> distances_d(n_queries * k, stream);
+  int64_t out_shape[2] = {n_queries, k};
+
+  DLManagedTensor partition_ids_tensor;
+  partition_ids_tensor.dl_tensor.data               = partition_ids_d.data();
+  partition_ids_tensor.dl_tensor.device.device_type = kDLCUDA;
+  partition_ids_tensor.dl_tensor.ndim               = 2;
+  partition_ids_tensor.dl_tensor.dtype.code         = kDLUInt;
+  partition_ids_tensor.dl_tensor.dtype.bits         = 32;
+  partition_ids_tensor.dl_tensor.dtype.lanes        = 1;
+  partition_ids_tensor.dl_tensor.shape              = out_shape;
+  partition_ids_tensor.dl_tensor.strides            = nullptr;
+
+  DLManagedTensor neighbors_tensor;
+  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
+  neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
+  neighbors_tensor.dl_tensor.ndim               = 2;
+  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits         = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
+  neighbors_tensor.dl_tensor.shape              = out_shape;
+  neighbors_tensor.dl_tensor.strides            = nullptr;
+
+  DLManagedTensor distances_tensor;
+  distances_tensor.dl_tensor.data               = distances_d.data();
+  distances_tensor.dl_tensor.device.device_type = kDLCUDA;
+  distances_tensor.dl_tensor.ndim               = 2;
+  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits         = 32;
+  distances_tensor.dl_tensor.dtype.lanes        = 1;
+  distances_tensor.dl_tensor.shape              = out_shape;
+  distances_tensor.dl_tensor.strides            = nullptr;
+
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
+  search_params->algo = MULTI_KERNEL;
+
+  ASSERT_EQ(cuvsCagraSearchMultiPartition(res,
+                                          search_params,
+                                          num_partitions,
+                                          indices,
+                                          &queries_tensor,
+                                          &partition_ids_tensor,
+                                          &neighbors_tensor,
+                                          &distances_tensor,
+                                          filter),
+            CUVS_ERROR);
+
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraIndexParamsDestroy(build_params);
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    cuvsCagraIndexDestroy(indices[p]);
+  }
   cuvsResourcesDestroy(res);
 }
