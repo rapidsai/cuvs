@@ -63,17 +63,20 @@ endfunction()
 function(overwrite_raft_log_active_level)
     set(oneValueArgs LEVEL)
     cmake_parse_arguments(PKG "" "${oneValueArgs}" "" ${ARGN})
-    if(TARGET raft::raft)
-        get_target_property(_defs raft::raft INTERFACE_COMPILE_DEFINITIONS)
-        if(_defs)
-            # Get definitions without previous logging level
-            list(FILTER _defs EXCLUDE REGEX "^RAFT_LOG_ACTIVE_LEVEL=")
-            # Append the new logging level
-            list(APPEND _defs "RAFT_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LOG_LEVEL_${PKG_LEVEL}")
-            # Set the modified definitions back to the raft target
-            set_target_properties(raft::raft PROPERTIES INTERFACE_COMPILE_DEFINITIONS "${_defs}")
-            message(STATUS "cuVS: set RAFT_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LOG_LEVEL_${PKG_LEVEL}")
-        endif()
+
+    get_target_property(_tgt raft::raft ALIASED_TARGET)
+    if(NOT _tgt)
+        set(_tgt raft::raft)
+    endif()
+    get_target_property(_defs ${_tgt} INTERFACE_COMPILE_DEFINITIONS)
+    if(_defs)
+        # Get definitions without previous logging level
+        list(FILTER _defs EXCLUDE REGEX "^RAFT_LOG_ACTIVE_LEVEL=")
+        # Append the new logging level
+        list(APPEND _defs "RAFT_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LOG_LEVEL_${PKG_LEVEL}")
+        # Set the modified definitions back to the raft target
+        set_target_properties(${_tgt} PROPERTIES INTERFACE_COMPILE_DEFINITIONS "${_defs}")
+        message(STATUS "cuVS: set RAFT_LOG_ACTIVE_LEVEL=RAPIDS_LOGGER_LOG_LEVEL_${PKG_LEVEL}")
     endif()
 endfunction()
 
@@ -93,4 +96,7 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
 
 )
 
+if(NOT LIBRAFT_LOGGING_LEVEL MATCHES "^(TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL|OFF)$")
+    message(FATAL_ERROR "cuVS: invalid LIBRAFT_LOGGING_LEVEL '${LIBRAFT_LOGGING_LEVEL}'. Valid are: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, OFF")
+endif()
 overwrite_raft_log_active_level(LEVEL ${LIBRAFT_LOGGING_LEVEL})
