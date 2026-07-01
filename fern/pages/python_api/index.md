@@ -4,6 +4,7 @@ These pages are generated from the Python and Cython sources under `python/cuvs/
 
 ## Cluster
 
+- [Gmm](/api-reference/python-api-cluster-gmm)
 - [Kmeans](/api-reference/python-api-cluster-kmeans)
 
 ## Common

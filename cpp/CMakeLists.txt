@@ -1303,6 +1303,8 @@ if(NOT BUILD_CPU_ONLY)
     cuvs_objs OBJECT
     src/cluster/detail/minClusterDistanceCompute.cu
     src/cluster/agglomerative.cu
+    src/cluster/gmm_double.cu
+    src/cluster/gmm_float.cu
     src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
