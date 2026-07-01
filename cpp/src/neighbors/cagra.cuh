@@ -19,7 +19,6 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 
-#include "detail/cagra/cagra_dataset_view_dispatch.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
@@ -35,12 +34,25 @@
 
 namespace cuvs::neighbors::cagra {
 
-// Member function implementations for cagra::index
+// Legacy mdspan adapter: index stores DatasetViewT in dataset_; use data() for the native API.
+// Downstream code (HNSW bridge, serialize, extend/add_nodes, norm fallback) has not been migrated
+// yet and still expects layout_stride with logical dim (extent(1)) separate from row pitch
+// (stride(0)). TODO: migrate those call sites to index.data() / dataset_view and remove this.
+// Exposes logical dim vs row pitch via layout_stride; padded/standard storage is unchanged.
 template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
 auto index<T, IdxT, DatasetViewT>::dataset() const
   -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
 {
-  return detail::dataset_view_to_strided_device_matrix<T>(dataset_);
+  namespace nb = cuvs::neighbors;
+  if constexpr (nb::is_padded_dataset_view_v<DatasetViewT> ||
+                nb::is_standard_dataset_view_v<DatasetViewT>) {
+    return raft::make_device_strided_matrix_view<const T, int64_t>(
+      dataset_.view().data_handle(), dataset_.n_rows(), dataset_.dim(), dataset_.stride());
+  } else {
+    // VPQ, empty, graph-only, and other non-dense views have no T matrix to expose.
+    auto d = dataset_.dim();
+    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
+  }
 }
 
 template <typename T, typename IdxT, cuvs::neighbors::cagra_dataset_view DatasetViewT>
@@ -54,7 +66,8 @@ void index<T, IdxT, DatasetViewT>::compute_dataset_norms_(raft::resources const&
   bool skip_norms = false;
   std::optional<raft::device_matrix_view<const T, int64_t, raft::row_major>> rm_dataset;
 
-  if constexpr (nb::is_padded_dataset_view_v<DatasetViewT>) {
+  if constexpr (nb::is_padded_dataset_view_v<DatasetViewT> ||
+                nb::is_standard_dataset_view_v<DatasetViewT>) {
     rm_dataset = dataset_.view();
   } else if constexpr (nb::is_vpq_dataset_view_v<DatasetViewT>) {
     skip_norms = true;
@@ -294,7 +307,8 @@ void optimize(
 }
 
 /**
- * @brief Build the index from a `dataset_view` (device padded, device VPQ, or host padded).
+ * @brief Build the index from a `dataset_view` (device padded/standard, device VPQ, or host
+ * padded/standard).
  *
  * When `index_params.attach_dataset_on_build = true` (the default) **and the input is a device
  * view**, the `dataset` view is stored in the returned index as a non-owning view — no copy is
@@ -316,7 +330,9 @@ auto build(raft::resources const& res, const index_params& params, DatasetViewT 
   // Device path: build graph, optionally attach dataset view.
   // attach_dataset_on_build is only meaningful for device builds — a host_padded_index cannot
   // be searched regardless; the caller must call attach_device_dataset_on_host_index.
-  if constexpr (cuvs::neighbors::is_device_dataset_view_v<DatasetViewT>) {
+  if constexpr (cuvs::neighbors::is_device_vpq_dataset_view_v<DatasetViewT>) {
+    RAFT_FAIL("cagra::build: VPQ-compressed dataset cannot be used for dense graph construction.");
+  } else if constexpr (cuvs::neighbors::is_dense_row_major_device_dataset_view_v<DatasetViewT>) {
     auto idx = cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT, DatasetViewT>(
       res, params, dataset);
     if (params.attach_dataset_on_build) { idx.update_dataset(res, dataset); }
@@ -327,7 +343,7 @@ auto build(raft::resources const& res, const index_params& params, DatasetViewT 
         res, params, dataset.view());
     }
     return cuvs::neighbors::cagra::detail::build_from_host_matrix<T, IdxT, DatasetViewT>(
-      res, params, dataset.view());
+      res, params, dataset);
   }
 }
 

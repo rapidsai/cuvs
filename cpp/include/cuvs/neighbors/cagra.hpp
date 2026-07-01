@@ -437,6 +437,12 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     return dataset_fd_.has_value() ? graph_degree_ : graph_view_.extent(1);
   }
 
+  /**
+   * Legacy dense dataset mdspan for callers not yet on the dataset_view API.
+   *
+   * Prefer `data()` for new code. Downstream paths (HNSW export, serialize, extend) still use
+   * this strided view. TODO: migrate them to `data()` and deprecate this accessor.
+   */
   [[nodiscard]] auto dataset() const
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>;
 
@@ -544,7 +550,15 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
           auto v = raft::make_device_matrix_view<const T, int64_t>(
             static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
           return DatasetViewT(v, uint32_t{0});
+        } else if constexpr (cuvs::neighbors::is_device_standard_dataset_view_v<DatasetViewT>) {
+          auto v = raft::make_device_matrix_view<const T, int64_t>(
+            static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
+          return DatasetViewT(v, uint32_t{0});
         } else if constexpr (cuvs::neighbors::is_host_padded_dataset_view_v<DatasetViewT>) {
+          auto v = raft::make_host_matrix_view<const T, int64_t>(
+            static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
+          return DatasetViewT(v, uint32_t{0});
+        } else if constexpr (cuvs::neighbors::is_host_standard_dataset_view_v<DatasetViewT>) {
           auto v = raft::make_host_matrix_view<const T, int64_t>(
             static_cast<const T*>(nullptr), int64_t{0}, uint32_t{0});
           return DatasetViewT(v, uint32_t{0});
@@ -855,6 +869,15 @@ using device_padded_index = index<T, IdxT, cuvs::neighbors::device_padded_datase
 template <typename T, typename IdxT = uint32_t>
 using host_padded_index = index<T, IdxT, cuvs::neighbors::host_padded_dataset_view<T, int64_t>>;
 
+/** CAGRA index with a device-resident standard (arbitrary stride) dataset view. */
+template <typename T, typename IdxT = uint32_t>
+using device_standard_index =
+  index<T, IdxT, cuvs::neighbors::device_standard_dataset_view<T, int64_t>>;
+
+/** CAGRA index with a host-resident standard dataset view. */
+template <typename T, typename IdxT = uint32_t>
+using host_standard_index = index<T, IdxT, cuvs::neighbors::host_standard_dataset_view<T, int64_t>>;
+
 /** CAGRA index with a device-resident VPQ dataset (f16 codebook vectors). */
 template <typename T, typename IdxT = uint32_t>
 using vpq_f16_index = index<T, IdxT, cuvs::neighbors::device_vpq_dataset_view<half, int64_t>>;
@@ -908,7 +931,10 @@ struct merged_dataset_storage {
  */
 
 /**
- * @brief Build the index from a `dataset_view` (device padded, device VPQ, or host padded).
+ * @brief Build the index from a `dataset_view` (device padded/standard or host padded/standard).
+ *
+ * VPQ-compressed device views are rejected: dense graph construction requires uncompressed data.
+ * Use a separate VPQ index workflow after building the graph from an uncompressed dataset.
  *
  * When `index_params.attach_dataset_on_build = true` (the default) **and the input is a device
  * view**, the `dataset` view is stored in the returned index as a **non-owning view** — no copy is
@@ -3339,6 +3365,51 @@ auto attach_device_dataset_on_host_index(raft::resources const& res,
   auto device_idx = detail::convert_host_to_device_index(res, host_idx);
   device_idx.update_dataset(res, device_dataset);
   return device_idx;
+}
+
+/**
+ * @brief Attach a padded device dataset to a standard-device index for search.
+ *
+ * Copies the graph from `standard_idx` into a new `device_padded_index` and attaches
+ * `padded_dataset`. CAGRA search kernels require CAGRA-aligned row pitch; build from a
+ * `device_standard_dataset_view` (any stride), then call this before `search`.
+ *
+ * @param[in] res             RAFT resources
+ * @param[in] standard_idx    index returned by `build` with a standard device dataset view
+ * @param[in] padded_dataset  device padded dataset view (caller owns underlying memory)
+ * @return device padded index with graph and dataset ready for search
+ */
+template <typename T, typename IdxT>
+auto attach_padded_dataset_for_search(
+  raft::resources const& res,
+  index<T, IdxT, cuvs::neighbors::device_standard_dataset_view<T, int64_t>> const& standard_idx,
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& padded_dataset)
+  -> device_padded_index<T, IdxT>
+{
+  RAFT_EXPECTS(padded_dataset.n_rows() == standard_idx.size(),
+               "Padded dataset row count must match the index size");
+  RAFT_EXPECTS(padded_dataset.dim() == standard_idx.dim(),
+               "Padded dataset dimension must match the index dimension");
+
+  device_padded_index<T, IdxT> out(res, standard_idx.metric());
+  if (standard_idx.graph().extent(0) > 0) {
+    using GraphIndexType =
+      typename index<T, IdxT, cuvs::neighbors::device_standard_dataset_view<T, int64_t>>::
+        graph_index_type;
+    auto graph_host = raft::make_host_matrix<GraphIndexType, int64_t>(
+      standard_idx.graph().extent(0), standard_idx.graph().extent(1));
+    raft::copy(graph_host.data_handle(),
+               standard_idx.graph().data_handle(),
+               standard_idx.graph().size(),
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    out.update_graph(res, raft::make_const_mdspan(graph_host.view()));
+  }
+  if (standard_idx.source_indices().has_value()) {
+    out.update_source_indices(res, standard_idx.source_indices().value());
+  }
+  out.update_dataset(res, padded_dataset);
+  return out;
 }
 
 }  // namespace cagra

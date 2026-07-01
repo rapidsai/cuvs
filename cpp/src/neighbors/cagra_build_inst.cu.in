@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,12 +12,14 @@
 
 namespace {
 
-using data_t                    = @data_type@;
-using index_t                   = @index_type@;
-using inst_device_padded_view_t = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
-using inst_host_padded_view_t   = cuvs::neighbors::host_padded_dataset_view<data_t, int64_t>;
-using inst_vpq_f16_view_t       = cuvs::neighbors::device_vpq_dataset_view<half, int64_t>;
-using inst_vpq_f32_view_t       = cuvs::neighbors::device_vpq_dataset_view<float, int64_t>;
+using data_t                      = @data_type@;
+using index_t                     = @index_type@;
+using inst_device_padded_view_t   = cuvs::neighbors::device_padded_dataset_view<data_t, int64_t>;
+using inst_device_standard_view_t = cuvs::neighbors::device_standard_dataset_view<data_t, int64_t>;
+using inst_host_padded_view_t     = cuvs::neighbors::host_padded_dataset_view<data_t, int64_t>;
+using inst_host_standard_view_t   = cuvs::neighbors::host_standard_dataset_view<data_t, int64_t>;
+using inst_vpq_f16_view_t         = cuvs::neighbors::device_vpq_dataset_view<half, int64_t>;
+using inst_vpq_f32_view_t         = cuvs::neighbors::device_vpq_dataset_view<float, int64_t>;
 
 }  // namespace
 
@@ -38,7 +40,9 @@ void build_knn_graph(raft::resources const& handle,
     DatasetViewT const& dataset) -> cuvs::neighbors::cagra::cagra_index_t<DatasetViewT>
 
 CUVS_INST_CAGRA_BUILD(inst_device_padded_view_t);
+CUVS_INST_CAGRA_BUILD(inst_device_standard_view_t);
 CUVS_INST_CAGRA_BUILD(inst_host_padded_view_t);
+CUVS_INST_CAGRA_BUILD(inst_host_standard_view_t);
 CUVS_INST_CAGRA_BUILD(inst_vpq_f16_view_t);
 CUVS_INST_CAGRA_BUILD(inst_vpq_f32_view_t);
 

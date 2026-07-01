@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -38,6 +38,8 @@ enum class dataset_view_kind {
   host_empty,
   device_padded,
   host_padded,
+  device_standard,
+  host_standard,
   device_vpq_f16,
   host_vpq_f16,
   device_vpq_f32,
@@ -69,6 +71,16 @@ struct dataset_view_kind_of<device_padded_dataset_view<DataT, IdxT>> {
 template <typename DataT, typename IdxT>
 struct dataset_view_kind_of<host_padded_dataset_view<DataT, IdxT>> {
   static constexpr dataset_view_kind value = dataset_view_kind::host_padded;
+};
+
+template <typename DataT, typename IdxT>
+struct dataset_view_kind_of<device_standard_dataset_view<DataT, IdxT>> {
+  static constexpr dataset_view_kind value = dataset_view_kind::device_standard;
+};
+
+template <typename DataT, typename IdxT>
+struct dataset_view_kind_of<host_standard_dataset_view<DataT, IdxT>> {
+  static constexpr dataset_view_kind value = dataset_view_kind::host_standard;
 };
 
 template <typename IdxT>
@@ -125,6 +137,19 @@ inline constexpr bool is_padded_dataset_view_v =
   is_device_padded_dataset_view_v<V> || is_host_padded_dataset_view_v<V>;
 
 template <typename V>
+inline constexpr bool is_device_standard_dataset_view_v =
+  dataset_view_kind_v<V> == dataset_view_kind::device_standard;
+
+template <typename V>
+inline constexpr bool is_host_standard_dataset_view_v =
+  dataset_view_kind_v<V> == dataset_view_kind::host_standard;
+
+/** True for either `device_standard_dataset_view` or `host_standard_dataset_view`. */
+template <typename V>
+inline constexpr bool is_standard_dataset_view_v =
+  is_device_standard_dataset_view_v<V> || is_host_standard_dataset_view_v<V>;
+
+template <typename V>
 inline constexpr bool is_device_vpq_f16_dataset_view_v =
   dataset_view_kind_v<V> == dataset_view_kind::device_vpq_f16;
 
@@ -164,13 +189,13 @@ inline constexpr bool is_vpq_dataset_view_v =
 template <typename V>
 inline constexpr bool is_device_dataset_view_v =
   is_device_empty_dataset_view_v<V> || is_device_padded_dataset_view_v<V> ||
-  is_device_vpq_dataset_view_v<V>;
+  is_device_standard_dataset_view_v<V> || is_device_vpq_dataset_view_v<V>;
 
 /** True for any host-resident dataset view. */
 template <typename V>
 inline constexpr bool is_host_dataset_view_v =
   is_host_empty_dataset_view_v<V> || is_host_padded_dataset_view_v<V> ||
-  is_host_vpq_dataset_view_v<V>;
+  is_host_standard_dataset_view_v<V> || is_host_vpq_dataset_view_v<V>;
 
 /**
  * True when a host view `H` and device view `D` represent the same storage kind and differ
@@ -179,6 +204,7 @@ inline constexpr bool is_host_dataset_view_v =
 template <typename HostViewT, typename DeviceViewT>
 inline constexpr bool compatible_host_device_dataset_views_v =
   (is_host_padded_dataset_view_v<HostViewT> && is_device_padded_dataset_view_v<DeviceViewT>) ||
+  (is_host_standard_dataset_view_v<HostViewT> && is_device_standard_dataset_view_v<DeviceViewT>) ||
   (is_host_vpq_f16_dataset_view_v<HostViewT> && is_device_vpq_f16_dataset_view_v<DeviceViewT>) ||
   (is_host_vpq_f32_dataset_view_v<HostViewT> && is_device_vpq_f32_dataset_view_v<DeviceViewT>) ||
   (is_host_empty_dataset_view_v<HostViewT> && is_device_empty_dataset_view_v<DeviceViewT>);
@@ -190,6 +216,11 @@ struct device_counterpart;
 template <typename DataT, typename IdxT>
 struct device_counterpart<host_padded_dataset_view<DataT, IdxT>> {
   using type = device_padded_dataset_view<DataT, IdxT>;
+};
+
+template <typename DataT, typename IdxT>
+struct device_counterpart<host_standard_dataset_view<DataT, IdxT>> {
+  using type = device_standard_dataset_view<DataT, IdxT>;
 };
 
 template <typename MathT, typename IdxT>
@@ -205,6 +236,16 @@ struct device_counterpart<host_empty_dataset_view<IdxT>> {
 template <typename HostViewT>
 using device_counterpart_t = typename device_counterpart<dataset_view_type_t<HostViewT>>::type;
 
+/** True for device padded or standard views accepted by dense graph build (VPQ excluded). */
+template <typename V>
+inline constexpr bool is_dense_row_major_device_dataset_view_v =
+  is_device_padded_dataset_view_v<V> || is_device_standard_dataset_view_v<V>;
+
+/** True for host or device padded/standard views (iterative graph build; VPQ excluded). */
+template <typename V>
+inline constexpr bool is_dense_row_major_dataset_view_v =
+  is_padded_dataset_view_v<V> || is_standard_dataset_view_v<V>;
+
 /** Element type `T` for `cagra::build(res, params, dataset_view)` (deduced, not a template arg). */
 template <typename V, typename = void>
 struct cagra_view_element_type;
@@ -216,6 +257,16 @@ struct cagra_view_element_type<device_padded_dataset_view<DataT, IdxT>> {
 
 template <typename DataT, typename IdxT>
 struct cagra_view_element_type<host_padded_dataset_view<DataT, IdxT>> {
+  using type = DataT;
+};
+
+template <typename DataT, typename IdxT>
+struct cagra_view_element_type<device_standard_dataset_view<DataT, IdxT>> {
+  using type = DataT;
+};
+
+template <typename DataT, typename IdxT>
+struct cagra_view_element_type<host_standard_dataset_view<DataT, IdxT>> {
   using type = DataT;
 };
 
