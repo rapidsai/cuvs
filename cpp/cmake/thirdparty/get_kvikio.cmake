@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 
@@ -29,6 +29,8 @@ function(find_and_configure_kvikio)
     GIT_TAG ${PKG_PINNED_TAG}
     GIT_SHALLOW TRUE
     SOURCE_SUBDIR cpp
+    # Force KvikIO checkout to get public headers.
+    PATCH_COMMAND ""
     OPTIONS "KvikIO_BUILD_EXAMPLES OFF" "KvikIO_REMOTE_SUPPORT OFF"
   )
 endfunction()

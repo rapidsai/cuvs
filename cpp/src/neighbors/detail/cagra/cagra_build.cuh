@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include "../../../core/nvtx.hpp"
 #include "../../../preprocessing/quantize/vpq_build-ext.cuh"
+#include "../../../util/kvikio_io.hpp"
 #include "graph_core.cuh"
 
 #include <raft/core/copy.cuh>
@@ -746,8 +747,10 @@ void ace_load_partition_dataset_from_disk(
     RAFT_LOG_DEBUG("ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
     RAFT_LOG_DEBUG(
       "ACE: Reading %lu augmented vectors from offset %lu", augmented_size, augmented_file_offset);
-    kvikio::FileHandle reordered_handle(reordered_path, "r");
-    kvikio::FileHandle augmented_handle(augmented_path, "r");
+    auto reordered_handle =
+      cuvs::util::detail::open_kvikio_file_for_ace_io(reordered_path, "r", sub_dataset_ptr);
+    auto augmented_handle =
+      cuvs::util::detail::open_kvikio_file_for_ace_io(augmented_path, "r", augmented_dest);
     auto core_future = reordered_handle.pread(sub_dataset_ptr, core_bytes, core_file_offset);
     auto augmented_future =
       augmented_handle.pread(augmented_dest, augmented_bytes, augmented_file_offset);
@@ -769,13 +772,15 @@ void ace_load_partition_dataset_from_disk(
     expect_complete_read("augmented", augmented_bytes, augmented_read);
   } else if (core_bytes > 0) {
     RAFT_LOG_DEBUG("ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
-    kvikio::FileHandle reordered_handle(reordered_path, "r");
+    auto reordered_handle =
+      cuvs::util::detail::open_kvikio_file_for_ace_io(reordered_path, "r", sub_dataset_ptr);
     auto core_future = reordered_handle.pread(sub_dataset_ptr, core_bytes, core_file_offset);
     expect_complete_read("core", core_bytes, core_future.get());
   } else if (augmented_bytes > 0) {
     RAFT_LOG_DEBUG(
       "ACE: Reading %lu augmented vectors from offset %lu", augmented_size, augmented_file_offset);
-    kvikio::FileHandle augmented_handle(augmented_path, "r");
+    auto augmented_handle =
+      cuvs::util::detail::open_kvikio_file_for_ace_io(augmented_path, "r", augmented_dest);
     auto augmented_future =
       augmented_handle.pread(augmented_dest, augmented_bytes, augmented_file_offset);
     expect_complete_read("augmented", augmented_bytes, augmented_future.get());

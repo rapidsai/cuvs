@@ -1,9 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/util/file_io.hpp>
+
+#include "kvikio_io.hpp"
 
 #include <kvikio/file_handle.hpp>
 
@@ -76,7 +78,7 @@ void read_large_file(const file_descriptor& fd,
   // kvikio selects GPUDirect Storage (cuFile) for device destinations on a GDS-capable system, and
   // the POSIX + threadpool backend (with O_DIRECT when available) otherwise. The destination may be
   // host or device memory; kvikio detects which.
-  kvikio::FileHandle handle(path, "r");
+  auto handle = detail::open_kvikio_file_for_ace_io(path, "r", dest_ptr);
   validate_kvikio_handle_matches_fd(fd, handle, path);
   const size_t bytes_read = handle.pread(dest_ptr, total_bytes, file_offset).get();
   RAFT_EXPECTS(bytes_read == total_bytes,
@@ -99,7 +101,7 @@ void write_large_file(const file_descriptor& fd,
 
   // Open in read+write mode ("r+") so the existing numpy header and preallocation are preserved
   // (kvikio's "w" mode would truncate). The source may be host or device memory.
-  kvikio::FileHandle handle(path, "r+");
+  auto handle = detail::open_kvikio_file_for_ace_io(path, "r+", data_ptr);
   validate_kvikio_handle_matches_fd(fd, handle, path);
   const size_t bytes_written = handle.pwrite(data_ptr, total_bytes, file_offset).get();
   RAFT_EXPECTS(bytes_written == total_bytes,
