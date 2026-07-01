@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <raft/core/logger.hpp>
+
 #if __has_include(<kvikio/compat_mode.hpp>)
 #include <kvikio/compat_mode.hpp>
 #define CUVS_KVIKIO_HAS_COMPAT_MODE_HEADER 1
@@ -21,6 +23,7 @@
 #endif
 
 #include <exception>
+#include <mutex>
 #include <string>
 
 namespace cuvs::util::detail {
@@ -67,7 +70,15 @@ inline kvikio::FileHandle open_kvikio_file_for_ace_io(const std::string& path,
   // current system cannot open the file with compatibility mode disabled.
   try {
     return open_kvikio_file_compat_off(path, flags, 0);
-  } catch (const std::exception&) {
+  } catch (const std::exception& e) {
+    static std::once_flag warning_once;
+    std::call_once(warning_once, [&] {
+      RAFT_LOG_WARN(
+        "ACE: GDS is unavailable for %s (%s); falling back to KvikIO's default I/O mode. "
+        "Further GDS fallback warnings are suppressed.",
+        path.c_str(),
+        e.what());
+    });
     return kvikio::FileHandle(path, flags);
   }
 }
