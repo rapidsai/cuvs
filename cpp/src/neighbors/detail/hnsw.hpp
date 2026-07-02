@@ -44,11 +44,19 @@ namespace cuvs::neighbors::hnsw::detail {
 template <typename T, typename CagraIndexT>
 inline constexpr bool is_cagra_hnsw_export_index_v =
   std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, uint32_t>> ||
-  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, uint32_t>>;
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_standard_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_standard_index<T, uint32_t>>;
 
 template <typename T, typename CagraIndexT>
 inline constexpr bool is_host_cagra_hnsw_export_index_v =
-  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, uint32_t>>;
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_standard_index<T, uint32_t>>;
+
+template <typename T, typename CagraIndexT>
+inline constexpr bool is_device_cagra_hnsw_export_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_standard_index<T, uint32_t>>;
 
 // This is needed as hnswlib hardcodes the distance type to float
 // or int32_t in certain places. However, we can solve uint8 or int8
@@ -268,7 +276,7 @@ from_cagra(raft::resources const& res,
   if (dataset.has_value()) {
     host_dataset_view = dataset.value();
   } else if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
-    RAFT_FAIL("hnsw::from_cagra<CPU> requires dataset for host_padded_index");
+    RAFT_FAIL("hnsw::from_cagra<CPU> requires dataset for host CAGRA index");
   } else {
     // move dataset to host, remove padding
     auto cagra_dataset = cagra_index.dataset();
@@ -904,7 +912,7 @@ void serialize_to_hnswlib_from_inmem(
     source_dataset = dataset->data_handle();
     source_stride  = dim;
   } else if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
-    RAFT_FAIL("serialize_to_hnswlib_from_inmem requires dataset for host_padded_index");
+    RAFT_FAIL("serialize_to_hnswlib_from_inmem requires dataset for host CAGRA index");
   } else if (auto cagra_dataset = index_.dataset(); cagra_dataset.data_handle() != nullptr) {
     n_rows         = cagra_dataset.extent(0);
     dim            = cagra_dataset.extent(1);
@@ -1029,7 +1037,7 @@ from_cagra(raft::resources const& res,
     source_dataset = dataset->data_handle();
     source_stride  = dim;
   } else if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
-    RAFT_FAIL("hnsw::from_cagra<GPU> requires dataset for host_padded_index");
+    RAFT_FAIL("hnsw::from_cagra<GPU> requires dataset for host CAGRA index");
   } else if (auto cagra_dataset = cagra_index.dataset(); cagra_dataset.data_handle() != nullptr) {
     n_rows         = cagra_dataset.extent(0);
     dim            = cagra_dataset.extent(1);
@@ -1269,7 +1277,7 @@ std::unique_ptr<index<T>> from_cagra(
 {
   if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
     if (!cagra_index.dataset_fd().has_value() && !dataset.has_value()) {
-      RAFT_FAIL("hnsw::from_cagra requires dataset for host_padded_index");
+      RAFT_FAIL("hnsw::from_cagra requires dataset for host CAGRA index");
     }
   }
 

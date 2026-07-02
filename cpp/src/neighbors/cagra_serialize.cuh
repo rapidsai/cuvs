@@ -84,6 +84,46 @@ namespace cuvs::neighbors::cagra {
   {                                                                                               \
     cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \
       handle, filename, index, dataset);                                                          \
+  }                                                                                               \
+                                                                                                  \
+  void serialize_to_hnswlib(                                                                      \
+    raft::resources const& handle,                                                                \
+    std::ostream& os,                                                                             \
+    const cuvs::neighbors::cagra::device_standard_index<DTYPE, uint32_t>& index,                  \
+    std::optional<raft::host_matrix_view<const DTYPE, int64_t, raft::row_major>> dataset)         \
+  {                                                                                               \
+    cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \
+      handle, os, index, dataset);                                                                \
+  }                                                                                               \
+                                                                                                  \
+  void serialize_to_hnswlib(                                                                      \
+    raft::resources const& handle,                                                                \
+    const std::string& filename,                                                                  \
+    const cuvs::neighbors::cagra::device_standard_index<DTYPE, uint32_t>& index,                  \
+    std::optional<raft::host_matrix_view<const DTYPE, int64_t, raft::row_major>> dataset)         \
+  {                                                                                               \
+    cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \
+      handle, filename, index, dataset);                                                          \
+  }                                                                                               \
+                                                                                                  \
+  void serialize_to_hnswlib(                                                                      \
+    raft::resources const& handle,                                                                \
+    std::ostream& os,                                                                             \
+    const cuvs::neighbors::cagra::host_standard_index<DTYPE, uint32_t>& index,                    \
+    std::optional<raft::host_matrix_view<const DTYPE, int64_t, raft::row_major>> dataset)         \
+  {                                                                                               \
+    cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \
+      handle, os, index, dataset);                                                                \
+  }                                                                                               \
+                                                                                                  \
+  void serialize_to_hnswlib(                                                                      \
+    raft::resources const& handle,                                                                \
+    const std::string& filename,                                                                  \
+    const cuvs::neighbors::cagra::host_standard_index<DTYPE, uint32_t>& index,                    \
+    std::optional<raft::host_matrix_view<const DTYPE, int64_t, raft::row_major>> dataset)         \
+  {                                                                                               \
+    cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                        \
+      handle, filename, index, dataset);                                                          \
   }
 
 }  // namespace cuvs::neighbors::cagra

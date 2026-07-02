@@ -2452,6 +2452,62 @@ void serialize_to_hnswlib(
   std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
     std::nullopt);
 
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::device_standard_index<float>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::device_standard_index<float>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::device_standard_index<half>& index,
+  std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::device_standard_index<half>& index,
+  std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::device_standard_index<int8_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::device_standard_index<int8_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::device_standard_index<uint8_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::device_standard_index<uint8_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream.
  * Requires `dataset` — host builds do not store vectors in the index.
@@ -2509,6 +2565,66 @@ void serialize_to_hnswlib(
   raft::resources const& handle,
   const std::string& filename,
   const cuvs::neighbors::cagra::host_padded_index<uint8_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+/**
+ * Write the CAGRA built index as a base layer HNSW index to an output stream.
+ * Requires `dataset` — host builds do not store vectors in the index.
+ */
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::host_standard_index<float>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::host_standard_index<float>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::host_standard_index<half>& index,
+  std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::host_standard_index<half>& index,
+  std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::host_standard_index<int8_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::host_standard_index<int8_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::host_standard_index<uint8_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::host_standard_index<uint8_t>& index,
   std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
     std::nullopt);
 

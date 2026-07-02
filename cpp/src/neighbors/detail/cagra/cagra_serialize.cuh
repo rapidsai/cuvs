@@ -28,6 +28,23 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+template <typename T, typename IdxT, typename CagraIndexT>
+inline constexpr bool is_cagra_hnsw_serialize_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, IdxT>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_standard_index<T, IdxT>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, IdxT>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_standard_index<T, IdxT>>;
+
+template <typename T, typename IdxT, typename CagraIndexT>
+inline constexpr bool is_device_cagra_hnsw_serialize_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, IdxT>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_standard_index<T, IdxT>>;
+
+template <typename T, typename IdxT, typename CagraIndexT>
+inline constexpr bool is_host_cagra_hnsw_serialize_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, IdxT>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_standard_index<T, IdxT>>;
+
 constexpr int serialization_version = 5;
 
 /**
@@ -117,9 +134,8 @@ void serialize_to_hnswlib(
   CagraIndexT const& index_,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
-  static_assert(std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, IdxT>> ||
-                  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, IdxT>>,
-                "serialize_to_hnswlib requires a padded CAGRA index");
+  static_assert(is_cagra_hnsw_serialize_index_v<T, IdxT, CagraIndexT>,
+                "serialize_to_hnswlib requires a dense device or host padded CAGRA index");
 
   int dim = (dataset) ? dataset->extent(1) : index_.dim();
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
@@ -175,8 +191,7 @@ void serialize_to_hnswlib(
   raft::host_matrix_view<const T, int64_t> host_dataset_view;
   if (dataset) {
     host_dataset_view = *dataset;
-  } else if constexpr (std::is_same_v<CagraIndexT,
-                                      cuvs::neighbors::cagra::device_padded_index<T, IdxT>>) {
+  } else if constexpr (is_device_cagra_hnsw_serialize_index_v<T, IdxT, CagraIndexT>) {
     auto device_dataset = index_.dataset();
     RAFT_EXPECTS(device_dataset.size() > 0,
                  "Invalid CAGRA dataset of size 0 during serialization, shape %zux%zu",
@@ -193,8 +208,11 @@ void serialize_to_hnswlib(
                       raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = raft::make_const_mdspan(host_dataset.view());
+  } else if constexpr (is_host_cagra_hnsw_serialize_index_v<T, IdxT, CagraIndexT>) {
+    RAFT_FAIL("serialize_to_hnswlib requires dataset for host CAGRA index");
   } else {
-    RAFT_FAIL("serialize_to_hnswlib requires dataset for host_padded_index");
+    static_assert(is_cagra_hnsw_serialize_index_v<T, IdxT, CagraIndexT>,
+                  "serialize_to_hnswlib: unsupported CagraIndexT");
   }
   auto graph = index_.graph();
   auto host_graph =
