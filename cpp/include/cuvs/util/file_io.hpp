@@ -8,6 +8,8 @@
 #include <raft/core/numpy_serializer.hpp>
 #include <raft/core/serialize.hpp>
 
+#include <cuvs/util/numpy_dtype.hpp>
+
 #include <algorithm>
 #include <cstring>
 #include <istream>
@@ -189,15 +191,8 @@ std::pair<file_descriptor, size_t> create_numpy_file(const std::string& path,
   // Open file
   file_descriptor fd(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
 
-  // Build header
-  const auto dtype                              = raft::numpy_serializer::get_numpy_dtype<T>();
-  const bool fortran_order                      = false;
-  const raft::numpy_serializer::header_t header = {dtype, fortran_order, shape};
-
-  std::stringstream ss;
-  raft::numpy_serializer::write_header(ss, header);
-  std::string header_str = ss.str();
-  size_t header_size     = header_str.size();
+  const std::string header_str = detail::make_numpy_header_string<T>(shape);
+  size_t header_size           = header_str.size();
 
   // Calculate data size from shape
   size_t data_bytes = sizeof(T);
