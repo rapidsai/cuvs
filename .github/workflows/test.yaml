@@ -39,6 +39,7 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       symbol_exclusions: (void (thrust::|cub::))
+      package_name: libcuvs
   conda-cpp-tests:
     permissions:
       actions: read
@@ -67,6 +68,7 @@ jobs:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
+      run_codecov: false
       script: ci/test_python.sh
       sha: ${{ inputs.sha }}
   conda-java-tests:
@@ -85,7 +87,7 @@ jobs:
       matrix:
         cuda_version:
           - '12.9.1'
-          - '13.1.1'
+          - '13.3.0'
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -93,7 +95,7 @@ jobs:
       sha: ${{ inputs.sha }}
       node_type: "gpu-l4-latest-1"
       arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.06-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.08-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/test_java.sh"
   wheel-tests-cuvs:
     permissions:
