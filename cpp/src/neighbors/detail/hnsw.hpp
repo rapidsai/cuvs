@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -40,6 +40,23 @@
 #include <unistd.h>
 
 namespace cuvs::neighbors::hnsw::detail {
+
+template <typename T, typename CagraIndexT>
+inline constexpr bool is_cagra_hnsw_export_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_standard_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_standard_index<T, uint32_t>>;
+
+template <typename T, typename CagraIndexT>
+inline constexpr bool is_host_cagra_hnsw_export_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::host_standard_index<T, uint32_t>>;
+
+template <typename T, typename CagraIndexT>
+inline constexpr bool is_device_cagra_hnsw_export_index_v =
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_padded_index<T, uint32_t>> ||
+  std::is_same_v<CagraIndexT, cuvs::neighbors::cagra::device_standard_index<T, uint32_t>>;
 
 // This is needed as hnswlib hardcodes the distance type to float
 // or int32_t in certain places. However, we can solve uint8 or int8
@@ -215,12 +232,13 @@ struct index_impl : index<T> {
   std::optional<cuvs::util::file_descriptor> hnsw_fd_;
 };
 
-template <typename T, HnswHierarchy hierarchy>
-std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+template <typename T, HnswHierarchy hierarchy, typename CagraIndexT>
+std::enable_if_t<hierarchy == HnswHierarchy::NONE && is_cagra_hnsw_export_index_v<T, CagraIndexT>,
+                 std::unique_ptr<index<T>>>
+from_cagra(raft::resources const& res,
+           const index_params& params,
+           CagraIndexT const& cagra_index,
+           std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<NONE>");
   std::random_device dev;
@@ -243,12 +261,13 @@ std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> fr
   return std::unique_ptr<index<T>>(hnsw_index);
 }
 
-template <typename T, HnswHierarchy hierarchy>
-std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+template <typename T, HnswHierarchy hierarchy, typename CagraIndexT>
+std::enable_if_t<hierarchy == HnswHierarchy::CPU && is_cagra_hnsw_export_index_v<T, CagraIndexT>,
+                 std::unique_ptr<index<T>>>
+from_cagra(raft::resources const& res,
+           const index_params& params,
+           CagraIndexT const& cagra_index,
+           std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<CPU>");
   auto host_dataset = raft::make_host_matrix<T, int64_t>(0, 0);
@@ -256,6 +275,8 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     host_dataset.data_handle(), host_dataset.extent(0), host_dataset.extent(1));
   if (dataset.has_value()) {
     host_dataset_view = dataset.value();
+  } else if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
+    RAFT_FAIL("hnsw::from_cagra<CPU> requires dataset for host CAGRA index");
   } else {
     // move dataset to host, remove padding
     auto cagra_dataset = cagra_index.dataset();
@@ -688,12 +709,15 @@ void serialize_to_hnswlib_batched(raft::resources const& res,
 
 // Serialize a disk-backed CAGRA index into hnswlib format by reading graph/dataset/label
 // rows directly from the backing files via pread.
-template <typename T, typename IdxT>
+template <typename CagraIndexT>
+  requires is_cagra_hnsw_export_index_v<typename CagraIndexT::value_type, CagraIndexT>
 void serialize_to_hnswlib_from_disk(raft::resources const& res,
                                     std::ostream& os_raw,
                                     const cuvs::neighbors::hnsw::index_params& params,
-                                    const cuvs::neighbors::cagra::index<T, IdxT>& index_)
+                                    CagraIndexT const& index_)
 {
+  using T    = typename CagraIndexT::value_type;
+  using IdxT = typename CagraIndexT::index_type;
   RAFT_EXPECTS(index_.dataset_fd().has_value() && index_.graph_fd().has_value(),
                "Function only implements serialization from disk.");
 
@@ -860,14 +884,19 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 // Serialize an in-memory CAGRA index into hnswlib format on disk, copying graph/dataset
 // rows from the in-memory (device or host) structures batch by batch. This avoids
 // materializing the full HNSW index in host memory.
-template <typename T, typename IdxT>
+template <typename CagraIndexT>
+  requires is_cagra_hnsw_export_index_v<typename CagraIndexT::value_type, CagraIndexT>
 void serialize_to_hnswlib_from_inmem(
   raft::resources const& res,
   std::ostream& os_raw,
   const cuvs::neighbors::hnsw::index_params& params,
-  const cuvs::neighbors::cagra::index<T, IdxT>& index_,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+  CagraIndexT const& index_,
+  std::optional<
+    raft::host_matrix_view<const typename CagraIndexT::value_type, int64_t, raft::row_major>>
+    dataset)
 {
+  using T     = typename CagraIndexT::value_type;
+  using IdxT  = typename CagraIndexT::index_type;
   auto stream = raft::resource::get_cuda_stream(res);
   [[maybe_unused]] auto num_threads =
     params.num_threads == 0 ? cuvs::core::omp::get_max_threads() : params.num_threads;
@@ -882,6 +911,8 @@ void serialize_to_hnswlib_from_inmem(
     device_dataset = false;
     source_dataset = dataset->data_handle();
     source_stride  = dim;
+  } else if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
+    RAFT_FAIL("serialize_to_hnswlib_from_inmem requires dataset for host CAGRA index");
   } else if (auto cagra_dataset = index_.dataset(); cagra_dataset.data_handle() != nullptr) {
     n_rows         = cagra_dataset.extent(0);
     dim            = cagra_dataset.extent(1);
@@ -967,12 +998,13 @@ void serialize_to_hnswlib_from_inmem(
     res, os_raw, params, n_rows, dim, graph_degree_int, index_.metric(), read_batch);
 }
 
-template <typename T, HnswHierarchy hierarchy>
-std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+template <typename T, HnswHierarchy hierarchy, typename CagraIndexT>
+std::enable_if_t<hierarchy == HnswHierarchy::GPU && is_cagra_hnsw_export_index_v<T, CagraIndexT>,
+                 std::unique_ptr<index<T>>>
+from_cagra(raft::resources const& res,
+           const index_params& params,
+           CagraIndexT const& cagra_index,
+           std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
   auto stream = raft::resource::get_cuda_stream(res);
@@ -1004,6 +1036,8 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     device_copy    = false;
     source_dataset = dataset->data_handle();
     source_stride  = dim;
+  } else if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
+    RAFT_FAIL("hnsw::from_cagra<GPU> requires dataset for host CAGRA index");
   } else if (auto cagra_dataset = cagra_index.dataset(); cagra_dataset.data_handle() != nullptr) {
     n_rows         = cagra_dataset.extent(0);
     dim            = cagra_dataset.extent(1);
@@ -1233,13 +1267,20 @@ inline std::pair<size_t, size_t> get_available_memory(
   return std::make_pair(available_host_memory, available_device_memory);
 }
 
-template <typename T>
+template <typename T, typename CagraIndexT>
+  requires is_cagra_hnsw_export_index_v<T, CagraIndexT>
 std::unique_ptr<index<T>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+  CagraIndexT const& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
+  if constexpr (is_host_cagra_hnsw_export_index_v<T, CagraIndexT>) {
+    if (!cagra_index.dataset_fd().has_value() && !dataset.has_value()) {
+      RAFT_FAIL("hnsw::from_cagra requires dataset for host CAGRA index");
+    }
+  }
+
   // special treatment for index on disk
   if (cagra_index.dataset_fd().has_value() && cagra_index.graph_fd().has_value()) {
     // Get directory from graph file descriptor
@@ -1594,13 +1635,20 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
     cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
     cagra_params.graph_build_params     = cagra_ace_params;
   }
-  // Build CAGRA index optionally using ACE
-  auto cagra_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
+
+  // Public HNSW API uses host_matrix_view; CAGRA build expects a padded dataset view.
+  // Host build stores only the graph; vectors are passed separately to from_cagra below.
+  cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_padded_view(
+    dataset, static_cast<uint32_t>(dataset.extent(1)));
+  auto ace_host_index = cuvs::neighbors::cagra::build(res, cagra_params, host_padded_view);
 
   RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
 
-  // Convert CAGRA index to HNSW index
-  return from_cagra<T>(res, params, cagra_index, dataset);
+  return from_cagra<T>(
+    res,
+    params,
+    ace_host_index,
+    ace_host_index.dataset_fd().has_value() ? std::nullopt : std::make_optional(dataset));
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail

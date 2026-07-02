@@ -212,12 +212,6 @@ struct cuvsCagraIndexParams {
   /** Number of Iterations to run if building with NN_DESCENT */
   size_t nn_descent_niter;
   /**
-   * Optional: specify compression parameters if compression is desired.
-   *
-   * NOTE: this is experimental new API, consider it unsafe.
-   */
-  cuvsCagraCompressionParams_t compression;
-  /**
    * Optional: specify graph build params based on build_algo
    * - IVF_PQ: cuvsIvfPqParams_t
    * - ACE: cuvsAceParams_t
@@ -466,13 +460,15 @@ CUVS_EXPORT cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t par
  */
 
 /**
- * @brief Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
+ * @brief Struct holding the CAGRA index storage address and vector element dtype (DLPack-style)
  *
+ * Matches the usual cuVS C index pattern (`addr` + `dtype`). \p addr points at implementation-owned
+ * storage (not always a bare `cagra::index*`); free only via \ref cuvsCagraIndexDestroy. \p dtype
+ * describes index vector elements for queries and template dispatch.
  */
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-
 } cuvsCagraIndex;
 
 typedef cuvsCagraIndex* cuvsCagraIndex_t;

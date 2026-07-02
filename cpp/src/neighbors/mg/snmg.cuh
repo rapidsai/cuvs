@@ -587,7 +587,7 @@ void search(const raft::resources& clique,
         static_cast<const cuvs::neighbors::mg_search_params<ivf_pq::search_params>*>(search_params);
       search_mode      = mg_search_params->search_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
-    } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+    } else if constexpr (std::is_same<AnnIndexType, cagra::device_padded_index<T, IdxT>>::value) {
       const cuvs::neighbors::mg_search_params<cagra::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<cagra::search_params>*>(search_params);
       search_mode      = mg_search_params->search_mode;
@@ -666,7 +666,7 @@ void search(const raft::resources& clique,
         static_cast<const cuvs::neighbors::mg_search_params<ivf_pq::search_params>*>(search_params);
       merge_mode       = mg_search_params->merge_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
-    } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+    } else if constexpr (std::is_same<AnnIndexType, cagra::device_padded_index<T, IdxT>>::value) {
       const cuvs::neighbors::mg_search_params<cagra::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<cagra::search_params>*>(search_params);
       merge_mode       = mg_search_params->merge_mode;

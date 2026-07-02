@@ -12,6 +12,7 @@
 #include <string>
 
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 
 #include <rmm/mr/pool_memory_resource.hpp>
@@ -65,9 +66,13 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   raft::resource::sync_stream(dev_resources);
   auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
     dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
+  // Wrap in a host_padded_dataset_view. ACE graph construction is host-side CPU work and does not
+  // require CUDA row-alignment; construct the view directly to avoid the alignment check.
+  cuvs::neighbors::host_padded_dataset_view<float, int64_t> host_padded_view(
+    dataset_host_view, static_cast<uint32_t>(dataset_host_view.extent(1)));
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(dev_resources, index_params, dataset_host_view);
+  auto ace_host_index = cagra::build(dev_resources, index_params, host_padded_view);
   // In-memory build of ACE provides the index in memory, so we can search it directly using
   // cagra::search
 
@@ -80,7 +85,30 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
   hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
-  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index);
+
+  std::unique_ptr<hnsw::index<float>> hnsw_index;
+  std::unique_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>> padded_owner;
+  if (ace_host_index.dataset_fd().has_value()) {
+    // Disk ACE path: ACE artifacts (dataset, graph, mapping) live on disk. Transfer file
+    // descriptors to a device index so from_cagra can serialize to hnsw_index.bin on disk.
+    cagra::device_padded_index<float, uint32_t> device_index(dev_resources,
+                                                             ace_host_index.metric());
+    device_index.update_dataset(dev_resources, std::move(*ace_host_index.steal_dataset_fd()));
+    if (ace_host_index.graph_fd().has_value()) {
+      device_index.update_graph(dev_resources, std::move(*ace_host_index.steal_graph_fd()));
+    }
+    if (ace_host_index.mapping_fd().has_value()) {
+      device_index.update_mapping(dev_resources, std::move(*ace_host_index.steal_mapping_fd()));
+    }
+    hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, device_index, std::nullopt);
+  } else {
+    // In-memory ACE path: graph is in host memory. Upload the original dataset to device and
+    // attach it before from_cagra builds the HNSW hierarchy in memory.
+    padded_owner = cuvs::neighbors::make_device_padded_dataset(dev_resources, dataset_host_view);
+    auto device_index = cagra::attach_device_dataset_on_host_index(
+      dev_resources, ace_host_index, padded_owner->as_dataset_view());
+    hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, device_index, dataset_host_view);
+  }
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
@@ -116,8 +144,12 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   std::cout << "Deserializing HNSW index from disk for search." << std::endl;
 
   hnsw::index<float>* hnsw_index_raw = nullptr;
-  hnsw::deserialize(
-    dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
+  hnsw::deserialize(dev_resources,
+                    hnsw_params,
+                    hnsw_index_path,
+                    ace_host_index.dim(),
+                    ace_host_index.metric(),
+                    &hnsw_index_raw);
 
   std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
 
