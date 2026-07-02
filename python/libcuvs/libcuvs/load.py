@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -37,9 +37,11 @@ def load_library():
     try:
         # These libraries  must be loaded before libcuvs because libcuvs
         # references their symbols
+        import libkvikio
         import libraft
         import librmm
 
+        libkvikio.load_library()
         librmm.load_library()
         libraft.load_library()
     except ModuleNotFoundError:

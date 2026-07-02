@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
@@ -189,6 +189,7 @@ if(NOT BUILD_CPU_ONLY)
   include(${rapids-cmake-dir}/cpm/cccl.cmake)
   rapids_cpm_cccl()
   include(cmake/thirdparty/get_raft.cmake)
+  include(cmake/thirdparty/get_kvikio.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
   include(${rapids-cmake-dir}/cpm/cuco.cmake)
   rapids_cpm_cuco()
@@ -1463,6 +1464,7 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+            kvikio::kvikio
   )
 
   target_include_directories(
@@ -1539,8 +1541,12 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
-              $<COMPILE_ONLY:cuco::cuco> CUDA::nvJitLink CUDA::nvrtc
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco>
+              CUDA::nvJitLink
+              CUDA::nvrtc
+              $<BUILD_LOCAL_INTERFACE:kvikio::kvikio>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -1600,6 +1606,7 @@ SECTIONS
               $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
               $<COMPILE_ONLY:nvidia::cutlass::cutlass>
               $<COMPILE_ONLY:cuco::cuco>
+              $<BUILD_LOCAL_INTERFACE:kvikio::kvikio>
     )
   endif()
 

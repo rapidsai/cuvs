@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -389,6 +389,13 @@ ConfigureTest(
 ConfigureTest(
   NAME STATS_TEST
   PATH stats/trustworthiness.cu stats/silhouette_score.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME UTIL_TEST
+  PATH util/file_io_test.cpp
   GPUS 1
   PERCENT 100
 )
