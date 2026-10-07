@@ -236,7 +236,7 @@ struct ace_params {
    * reverse-edge merge. Then build the reverse-edge graph globally and merge it into the pruned
    * graph. In disk mode (explicit or automatic), cross-partition incoming edges are buffered
    * to temporary files while building each pruned partition, then merged on the CPU one
-   * destination partition at a time, retaining at most `graph_degree` incoming candidates
+   * destination partition at a time, retaining at most `ceil(graph_degree / 2)` incoming candidates
    * per node in memory.
    * The merge preserves edge-rank priority; ties use reordered source ID in disk mode
    * and are GPU-scheduling-dependent in memory mode. Disabled by default.

@@ -1260,10 +1260,10 @@ void ace_validate_disk_mode_partitions(raft::resources const& res,
   size_t reverse_buffer_bytes  = 0;
   size_t reverse_bytes_per_row = 0;
   if (add_global_reverse_edges) {
-    reverse_buffer_bytes = ace_disk_reverse_edges<IdxT>::buffer_bytes(mem.available_host_memory);
-    reverse_bytes_per_row =
-      graph_degree * sizeof(typename ace_disk_reverse_edges<IdxT>::incoming_edge) +
-      sizeof(uint32_t);
+    reverse_buffer_bytes  = ace_disk_reverse_edges<IdxT>::buffer_bytes(mem.available_host_memory);
+    reverse_bytes_per_row = ace_disk_reverse_edges<IdxT>::incoming_capacity(graph_degree) *
+                              sizeof(typename ace_disk_reverse_edges<IdxT>::incoming_edge) +
+                            sizeof(uint32_t);
     host_workspace_size_total += reverse_buffer_bytes + sub_partition_size * reverse_bytes_per_row;
     host_workspace_size_fixed += reverse_buffer_bytes;
   }
@@ -2028,23 +2028,26 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
       if (disk_reverse_edges.has_value()) {
         // The pruned partial graph is already on the host. Convert only its core rows
         // to disk IDs and collect incoming records before writing or releasing it.
-        std::vector<IdxT> adjusted_graph(core_sub_dataset_size * graph_degree);
+        auto adjusted_graph =
+          raft::make_host_vector<IdxT, int64_t>(core_sub_dataset_size * graph_degree);
         auto const core_offset      = core_partition_offsets(partition_id);
         auto const augmented_offset = augmented_partition_offsets(partition_id);
         for (size_t edge = 0; edge < adjusted_graph.size(); ++edge) {
           auto const local_id = partial_sub_graph->data_handle()[edge];
           RAFT_EXPECTS(size_t(local_id) < sub_dataset_size,
                        "ACE: partial graph contains an invalid neighbor");
-          adjusted_graph[edge] = size_t(local_id) < core_sub_dataset_size
+          adjusted_graph(edge) = size_t(local_id) < core_sub_dataset_size
                                    ? static_cast<IdxT>(core_offset + local_id)
                                    : core_forward_mapping(augmented_backward_mapping(
                                        augmented_offset + local_id - core_sub_dataset_size));
         }
-        disk_reverse_edges->append_partition(partition_id, adjusted_graph);
+        disk_reverse_edges->append_partition(
+          partition_id, std::span<IdxT const>(adjusted_graph.data_handle(), adjusted_graph.size()));
         adjust_end = std::chrono::high_resolution_clock::now();
         auto const graph_offset =
           size_t(core_offset) * graph_degree * sizeof(IdxT) + graph_header_size;
-        cuvs::util::write_large_file(graph_fd, adjusted_graph.data(), graph_bytes, graph_offset);
+        cuvs::util::write_large_file(
+          graph_fd, adjusted_graph.data_handle(), graph_bytes, graph_offset);
         write_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::high_resolution_clock::now() - adjust_end)
                           .count();

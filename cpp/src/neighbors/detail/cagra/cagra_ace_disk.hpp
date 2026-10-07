@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cuvs/util/file_io.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
 
 #include <algorithm>
@@ -15,7 +16,6 @@
 #include <span>
 #include <string>
 #include <type_traits>
-#include <vector>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -61,14 +61,6 @@ class ace_disk_reverse_edges {
     IdxT destination;
     IdxT source;
     uint32_t rank;
-
-    // Avoid the generic device-only detail::swap overload pulled in by CAGRA's top-k code.
-    friend void swap(record& a, record& b) noexcept
-    {
-      std::swap(a.destination, b.destination);
-      std::swap(a.source, b.source);
-      std::swap(a.rank, b.rank);
-    }
   };
 
   struct incoming_edge {
@@ -81,6 +73,9 @@ class ace_disk_reverse_edges {
     }
   };
 
+  // The first floor(degree / 2) graph neighbors are protected during the merge.
+  static uint32_t incoming_capacity(uint32_t degree) { return degree - degree / 2; }
+
   static size_t buffer_bytes(size_t available_host_memory)
   {
     return std::max(sizeof(record), std::min(size_t{8} << 20, available_host_memory / 100));
@@ -90,15 +85,20 @@ class ace_disk_reverse_edges {
                          std::span<IdxT const> offsets,
                          uint32_t degree,
                          size_t buffer_size)
-    : offsets_(offsets.begin(), offsets.end()),
+    : offsets_(raft::make_host_vector<IdxT, int64_t>(offsets.size())),
       degree_(degree),
-      capacity_(std::max(size_t{1}, buffer_size / sizeof(record)))
+      capacity_(std::max(size_t{1}, buffer_size / sizeof(record))),
+      sizes_(raft::make_host_vector<size_t, int64_t>(offsets.empty() ? 0 : offsets.size() - 1)),
+      buffer_(raft::make_host_vector<record, int64_t>(capacity_))
   {
-    RAFT_EXPECTS(offsets_.size() >= 2 && offsets_.front() == 0 &&
-                   std::is_sorted(offsets_.begin(), offsets_.end()) && degree_ > 0,
+    RAFT_EXPECTS(offsets.size() >= 2 && offsets.front() == 0 && degree_ > 0,
                  "ACE: invalid reverse-edge partition layout");
-    sizes_.resize(offsets_.size() - 1);
-    buffer_.reserve(capacity_);
+    for (size_t i = 0; i < offsets.size(); ++i) {
+      RAFT_EXPECTS(i == 0 || offsets[i - 1] <= offsets[i],
+                   "ACE: invalid reverse-edge partition layout");
+      offsets_(i) = offsets[i];
+      if (i + 1 < offsets.size()) { sizes_(i) = 0; }
+    }
     directory_ = build_dir + "/reverse_edges_XXXXXX";
     RAFT_EXPECTS(::mkdtemp(directory_.data()) != nullptr,
                  "ACE: failed to create reverse-edge workspace: %s",
@@ -123,18 +123,20 @@ class ace_disk_reverse_edges {
   // Rows and neighbors both use core-reordered IDs, as in the on-disk graph.
   void append_partition(size_t partition, std::span<IdxT const> graph)
   {
-    auto const first = offsets_.at(partition);
-    auto const last  = offsets_.at(partition + 1);
+    RAFT_EXPECTS(partition < sizes_.size(), "ACE: invalid reverse-edge partition");
+    auto const first = offsets_(partition);
+    auto const last  = offsets_(partition + 1);
     RAFT_EXPECTS(graph.size() == size_t(last - first) * degree_,
                  "ACE: invalid pruned core graph size");
     for (size_t row = 0; row < size_t(last - first); ++row) {
       for (uint32_t rank = 0; rank < degree_; ++rank) {
         auto const destination = graph[row * degree_ + rank];
-        RAFT_EXPECTS(static_cast<uint64_t>(destination) < static_cast<uint64_t>(offsets_.back()),
-                     "ACE: graph contains an invalid neighbor");
+        RAFT_EXPECTS(
+          static_cast<uint64_t>(destination) < static_cast<uint64_t>(offsets_(offsets_.size() - 1)),
+          "ACE: graph contains an invalid neighbor");
         if (destination >= first && destination < last) { continue; }
-        buffer_.push_back({destination, static_cast<IdxT>(first + row), rank});
-        if (buffer_.size() == capacity_) { flush(); }
+        buffer_(buffer_count_++) = {destination, static_cast<IdxT>(first + row), rank};
+        if (buffer_count_ == capacity_) { flush(); }
       }
     }
   }
@@ -142,71 +144,87 @@ class ace_disk_reverse_edges {
   void merge(cuvs::util::file_descriptor const& graph_fd, size_t graph_header_size)
   {
     flush();
-    buffer_.resize(capacity_);
+    auto const candidate_capacity = incoming_capacity(degree_);
     for (size_t partition = 0; partition < sizes_.size(); ++partition) {
-      if (sizes_[partition] == 0) { continue; }
-      auto const first = offsets_[partition];
-      auto const rows  = size_t(offsets_[partition + 1] - first);
+      if (sizes_(partition) == 0) { continue; }
+      auto const first = offsets_(partition);
+      auto const rows  = size_t(offsets_(partition + 1) - first);
 
-      // Keep only the best degree incoming edges per row. Buckets can be arbitrarily
-      // skewed: their size does not determine RAM usage. Max-heaps preserve rank priority
-      // across buffer flushes and source-partition build order. GPU rank ties are
-      // scheduling-dependent; the disk path breaks them deterministically by source ID.
-      std::vector<incoming_edge> incoming(rows * degree_);
-      std::vector<uint32_t> counts(rows, 0);
+      // Keep only enough incoming candidates to fill the replaceable half of each row.
+      // Buckets can be arbitrarily skewed: their size does not determine RAM usage.
+      // Max-heaps preserve rank priority across buffer flushes and source-partition build order.
+      // GPU rank ties are scheduling-dependent; the disk path breaks them by source ID.
+      auto incoming = raft::make_host_vector<incoming_edge, int64_t>(rows * candidate_capacity);
+      auto counts   = raft::make_host_vector<uint32_t, int64_t>(rows);
+      for (size_t row = 0; row < rows; ++row) {
+        counts(row) = 0;
+      }
       cuvs::util::file_descriptor bucket(bucket_path(partition), O_RDONLY);
-      for (size_t offset = 0; offset < sizes_[partition];) {
-        auto const count = std::min(capacity_, sizes_[partition] - offset);
+      for (size_t offset = 0; offset < sizes_(partition);) {
+        auto const count = std::min(capacity_, sizes_(partition) - offset);
         ace_disk_host_io<false>(
-          bucket, buffer_.data(), count * sizeof(record), offset * sizeof(record));
+          bucket, buffer_.data_handle(), count * sizeof(record), offset * sizeof(record));
         for (size_t i = 0; i < count; ++i) {
-          auto const& edge = buffer_[i];
-          RAFT_EXPECTS(
-            edge.destination >= first && edge.destination < offsets_[partition + 1] &&
-              edge.rank < degree_ &&
-              static_cast<uint64_t>(edge.source) < static_cast<uint64_t>(offsets_.back()),
-            "ACE: invalid reverse-edge record");
+          auto const& edge = buffer_(i);
+          RAFT_EXPECTS(edge.destination >= first && edge.destination < offsets_(partition + 1) &&
+                         edge.rank < degree_ &&
+                         static_cast<uint64_t>(edge.source) <
+                           static_cast<uint64_t>(offsets_(offsets_.size() - 1)),
+                       "ACE: invalid reverse-edge record");
           auto const row = size_t(edge.destination - first);
-          auto* heap     = incoming.data() + row * degree_;
-          auto& n        = counts[row];
+          auto* heap     = incoming.data_handle() + row * candidate_capacity;
+          auto& n        = counts(row);
           incoming_edge candidate{edge.source, edge.rank};
-          if (n < degree_) {
-            heap[n++] = candidate;
-            std::push_heap(heap, heap + n);
+          if (n < candidate_capacity) {
+            auto index = n++;
+            while (index > 0) {
+              auto const parent = (index - 1) / 2;
+              if (!(heap[parent] < candidate)) { break; }
+              heap[index] = heap[parent];
+              index       = parent;
+            }
+            heap[index] = candidate;
           } else if (candidate < heap[0]) {
-            std::pop_heap(heap, heap + n);
-            heap[n - 1] = candidate;
-            std::push_heap(heap, heap + n);
+            heap[0] = candidate;
+            sift_down(heap, n);
           }
         }
         offset += count;
       }
 
-      std::vector<IdxT> graph(rows * degree_);
+      auto graph             = raft::make_host_vector<IdxT, int64_t>(rows * degree_);
       auto const file_offset = graph_header_size + size_t(first) * degree_ * sizeof(IdxT);
-      ace_disk_host_io<false>(graph_fd, graph.data(), graph.size() * sizeof(IdxT), file_offset);
+      ace_disk_host_io<false>(
+        graph_fd, graph.data_handle(), graph.size() * sizeof(IdxT), file_offset);
       auto const protected_edges = degree_ / 2;
       for (size_t row = 0; row < rows; ++row) {
-        auto* edges = incoming.data() + row * degree_;
-        auto n      = counts[row];
-        std::sort_heap(edges, edges + n);
-        auto* neighbors = graph.data() + row * degree_;
+        auto* edges     = incoming.data_handle() + row * candidate_capacity;
+        auto n          = counts(row);
+        auto* neighbors = graph.data_handle() + row * degree_;
         // Match ace_merge_partition_reverse_edges: insert in reverse priority order,
         // protect the first half of the pruned row, and move rather than duplicate edges.
         while (n > 0) {
-          auto const source = edges[--n].source;
-          auto* existing    = std::find(neighbors, neighbors + degree_, source);
-          if (existing < neighbors + protected_edges) { continue; }
-          auto* end = existing == neighbors + degree_ ? existing - 1 : existing;
-          std::move_backward(neighbors + protected_edges, end, end + 1);
+          auto const source = edges[0].source;
+          edges[0]          = edges[--n];
+          sift_down(edges, n);
+          uint32_t existing = 0;
+          while (existing < degree_ && neighbors[existing] != source) {
+            ++existing;
+          }
+          if (existing < protected_edges) { continue; }
+          auto const end = existing == degree_ ? degree_ - 1 : existing;
+          for (auto rank = end; rank > protected_edges; --rank) {
+            neighbors[rank] = neighbors[rank - 1];
+          }
           neighbors[protected_edges] = source;
         }
       }
-      ace_disk_host_io<true>(graph_fd, graph.data(), graph.size() * sizeof(IdxT), file_offset);
+      ace_disk_host_io<true>(
+        graph_fd, graph.data_handle(), graph.size() * sizeof(IdxT), file_offset);
       bucket.close();
       std::filesystem::remove(bucket_path(partition));
     }
-    buffer_.clear();
+    buffer_count_ = 0;
   }
 
  private:
@@ -217,35 +235,64 @@ class ace_disk_reverse_edges {
 
   void flush()
   {
-    std::sort(buffer_.begin(), buffer_.end(), [](record const& a, record const& b) {
-      return a.destination < b.destination;
+    // Sort the fixed POD buffer without STL containers or algorithms.
+    ::qsort(buffer_.data_handle(), buffer_count_, sizeof(record), [](void const* a, void const* b) {
+      auto const lhs = static_cast<record const*>(a)->destination;
+      auto const rhs = static_cast<record const*>(b)->destination;
+      return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
     });
     size_t begin = 0;
-    while (begin < buffer_.size()) {
-      auto const partition =
-        size_t(std::upper_bound(offsets_.begin(), offsets_.end(), buffer_[begin].destination) -
-               offsets_.begin() - 1);
-      size_t end = begin + 1;
-      while (end < buffer_.size() && buffer_[end].destination < offsets_[partition + 1]) {
+    while (begin < buffer_count_) {
+      // Upper-bound search also handles empty core partitions (repeated offsets).
+      size_t low  = 0;
+      size_t high = offsets_.size();
+      while (low < high) {
+        auto const middle = low + (high - low) / 2;
+        if (offsets_(middle) <= buffer_(begin).destination) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+      auto const partition = low - 1;
+      size_t end           = begin + 1;
+      while (end < buffer_count_ && buffer_(end).destination < offsets_(partition + 1)) {
         ++end;
       }
       cuvs::util::file_descriptor bucket(
-        bucket_path(partition), sizes_[partition] == 0 ? O_CREAT | O_EXCL | O_WRONLY : O_WRONLY);
+        bucket_path(partition), sizes_(partition) == 0 ? O_CREAT | O_EXCL | O_WRONLY : O_WRONLY);
       ace_disk_host_io<true>(bucket,
-                             buffer_.data() + begin,
+                             buffer_.data_handle() + begin,
                              (end - begin) * sizeof(record),
-                             sizes_[partition] * sizeof(record));
-      sizes_[partition] += end - begin;
+                             sizes_(partition) * sizeof(record));
+      sizes_(partition) += end - begin;
       begin = end;
     }
-    buffer_.clear();
+    buffer_count_ = 0;
   }
 
-  std::vector<IdxT> offsets_;
+  // Restore a max-heap after replacing its root. No allocation occurs per candidate.
+  static void sift_down(incoming_edge* heap, uint32_t count)
+  {
+    if (count == 0) { return; }
+    auto const value = heap[0];
+    uint32_t index   = 0;
+    while (index < count / 2) {
+      auto child = index * 2 + 1;
+      if (child + 1 < count && heap[child] < heap[child + 1]) { ++child; }
+      if (!(value < heap[child])) { break; }
+      heap[index] = heap[child];
+      index       = child;
+    }
+    heap[index] = value;
+  }
+
+  raft::host_vector<IdxT, int64_t> offsets_;
   uint32_t degree_;
   size_t capacity_;
-  std::vector<size_t> sizes_;
-  std::vector<record> buffer_;
+  raft::host_vector<size_t, int64_t> sizes_;
+  raft::host_vector<record, int64_t> buffer_;
+  size_t buffer_count_ = 0;
   std::string directory_;
 };
 
