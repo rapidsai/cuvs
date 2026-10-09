@@ -179,7 +179,7 @@ __device__ __forceinline__ float bbq_row_distance(
   namespace bbq = cuvs::preprocessing::quantize::bbq;
   const uint32_t raw =
     bbq::code_inner_product(quantizer_document, quantizer_query, row_document, row_query);
-  return bbq::bbq_calculate_metric(raw,
+  return bbq::bbq_calculate_metric(static_cast<float>(raw),
                                    bbq::get_dequant_factors(quantizer_document, row_document),
                                    bbq::get_dequant_factors(quantizer_query, row_query),
                                    quantizer_document,

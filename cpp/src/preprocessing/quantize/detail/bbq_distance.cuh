@@ -466,13 +466,14 @@ get_dequant_factors(const quantizer_view<DataT, IdxT>& quantizer, int64_t row)
 }
 
 // Converts one raw BBQ dot product into a final (post-epilogue) float distance, given both
-// operands' precomputed dequant factors. Evaluated exactly once per matrix cell
+// operands' precomputed dequant factors. Evaluated exactly once per matrix cell. `raw` is float so
+// float accumulators (fp8 MMA) pass straight through; integer-accumulating callers cast.
 // dim/centroid_norm_sq/row_norm both come directly from quantizer_document/quantizer_query rather
 // than being passed separately, since every caller reads them the same id-indexed way -- row_norm
 // is only read for CosineExpanded (skipped entirely otherwise).
 template <typename DataT, typename Index_t, typename DistEpilogue_t>
 __device__ __forceinline__ float bbq_calculate_metric(
-  uint32_t raw,
+  float raw,
   const bbq_dequant_factors& doc_factors,
   const bbq_dequant_factors& query_factors,
   const quantizer_view<DataT, int64_t>& quantizer_document,
@@ -485,10 +486,9 @@ __device__ __forceinline__ float bbq_calculate_metric(
   constexpr bool can_postprocess_dist = std::is_same_v<DistEpilogue_t, raft::identity_op>;
   const float dim                     = static_cast<float>(quantizer_document.dim());
 
-  const float centered = dim * doc_factors.lower * query_factors.lower +
-                         query_factors.lower * doc_factors.sum_delta +
-                         doc_factors.lower * query_factors.sum_delta +
-                         doc_factors.delta * query_factors.delta * static_cast<float>(raw);
+  const float centered =
+    dim * doc_factors.lower * query_factors.lower + query_factors.lower * doc_factors.sum_delta +
+    doc_factors.lower * query_factors.sum_delta + doc_factors.delta * query_factors.delta * raw;
   const float corrections = doc_factors.corrections + query_factors.corrections;
   float d;
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
