@@ -195,71 +195,88 @@ run_sanitizer() {
   timeout 300 python "${CI_DIR}/b2_postcheck.py" 2>&1 | tail -5
 }
 
-rapids-logger "Phase 1: ROLE=${ROLE}"
-case "${ROLE}" in
-  0)
-    run_sanitizer memcheck-all 75m --tool memcheck --leak-check no --padding 32 -- "${DIAG_DIR}/pq_all.txt"
-    ;;
-  1)
-    run_sanitizer synccheck-all 50m --tool synccheck -- "${DIAG_DIR}/pq_all.txt"
-    run_sanitizer initcheck-host 30m --tool initcheck -- "${DIAG_DIR}/pq_host_small.txt"
-    ;;
-  2)
-    run_sanitizer racecheck-host 45m --tool racecheck --racecheck-report all -- "${DIAG_DIR}/pq_host_small.txt"
-    run_sanitizer memcheck-recall 30m --tool memcheck --leak-check no --padding 32 -- "${DIAG_DIR}/pq_recall.txt"
-    ;;
-  3)
-    pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
-    HANG_SYNC_EACH=1 run_watched "sync-each-pq" 360 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests/test_product_quantizer.py
-    popd > /dev/null || exit 1
-    timeout 300 python "${CI_DIR}/b2_postcheck.py" 2>&1 | tail -5
-    run_sanitizer memcheck-host 60m --tool memcheck --leak-check no --padding 32 -- "${DIAG_DIR}/pq_host.txt"
-    ;;
-esac
 
-rapids-logger "Phase 2: bisect buckets (PQ subset, then test_cagra.py in the same process)"
-BUCKETS=(none all host dev recall)
-declare -A RUNS HANGS FAILS
-for b in "${BUCKETS[@]}"; do RUNS[$b]=0; HANGS[$b]=0; FAILS[$b]=0; done
-DEADLINE=$(( SCRIPT_START + 225 * 60 ))
-round=0
+# One bucket per GPU (the poison may persist across processes, so buckets are
+# never mixed on one GPU). Sanitizer passes that run PQ cases from other buckets
+# are done after the bisect loop.
+BUCKETS=(host recall dev none)
+BUCKET=${BUCKETS[${ROLE}]}
+
+phase1_pre() {
+  case "${ROLE}" in
+    0)
+      run_sanitizer memcheck-host 60m --tool memcheck --leak-check no --padding 32 -- "${DIAG_DIR}/pq_host.txt"
+      run_sanitizer initcheck-host-small 25m --tool initcheck -- "${DIAG_DIR}/pq_host_small.txt"
+      ;;
+    1)
+      run_sanitizer memcheck-recall 30m --tool memcheck --leak-check no --padding 32 -- "${DIAG_DIR}/pq_recall.txt"
+      ;;
+  esac
+}
+
+phase1_post() {
+  case "${ROLE}" in
+    0)
+      run_sanitizer synccheck-host 30m --tool synccheck -- "${DIAG_DIR}/pq_host.txt"
+      ;;
+    1)
+      run_sanitizer racecheck-host-small 40m --tool racecheck --racecheck-report all -- "${DIAG_DIR}/pq_host_small.txt"
+      ;;
+    2)
+      pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
+      HANG_SYNC_EACH=1 run_watched "sync-each-pq" 360 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests/test_product_quantizer.py
+      popd > /dev/null || exit 1
+      timeout 300 python "${CI_DIR}/b2_postcheck.py" 2>&1 | tail -5
+      run_sanitizer synccheck-all 45m --tool synccheck -- "${DIAG_DIR}/pq_all.txt"
+      ;;
+    3)
+      run_sanitizer memcheck-all 70m --tool memcheck --leak-check no --padding 32 -- "${DIAG_DIR}/pq_all.txt"
+      ;;
+  esac
+}
+
+rapids-logger "Phase 1 (before bisect): ROLE=${ROLE} BUCKET=${BUCKET}"
+phase1_pre
+
+rapids-logger "Phase 2: bucket ${BUCKET} (PQ subset, then test_cagra.py in the same process), repeated"
+case "${BUCKET}" in
+  none) ids=() ;;
+  host) mapfile -t ids < "${DIAG_DIR}/pq_host.txt" ;;
+  dev) mapfile -t ids < "${DIAG_DIR}/pq_dev.txt" ;;
+  recall) mapfile -t ids < "${DIAG_DIR}/pq_recall.txt" ;;
+esac
+PHASE2_END=$(( SCRIPT_START + 165 * 60 ))
 n=0
+RUNS=0
+HANGS=0
+FAILS=0
+HANG_ITERS=""
 SEQ=""
-while (( $(date +%s) < DEADLINE )); do
-  round=$((round + 1))
-  for k in 0 1 2 3 4; do
-    (( $(date +%s) < DEADLINE )) || break
-    b=${BUCKETS[$(( (k + ROLE + round) % 5 ))]}
-    n=$((n + 1))
-    case "${b}" in
-      none) ids=() ;;
-      all) mapfile -t ids < "${DIAG_DIR}/pq_all.txt" ;;
-      host) mapfile -t ids < "${DIAG_DIR}/pq_host.txt" ;;
-      dev) mapfile -t ids < "${DIAG_DIR}/pq_dev.txt" ;;
-      recall) mapfile -t ids < "${DIAG_DIR}/pq_recall.txt" ;;
-    esac
-    rapids-logger "Run ${n} (round ${round}): bucket=${b} (${#ids[@]} PQ tests) then test_cagra.py"
-    pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
-    run_watched "run${n}-${b}" 360 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" "${ids[@]}" tests/test_cagra.py
-    rc=$?
-    popd > /dev/null || exit 1
-    RUNS[$b]=$(( RUNS[$b] + 1 ))
-    if (( rc == 124 )); then
-      HANGS[$b]=$(( HANGS[$b] + 1 ))
-      SEQ="${SEQ} ${b}:HANG"
-    elif (( rc != 0 )); then
-      FAILS[$b]=$(( FAILS[$b] + 1 ))
-      SEQ="${SEQ} ${b}:rc${rc}"
-    else
-      SEQ="${SEQ} ${b}:ok"
-    fi
-    echo "B2-PROGRESS role=${ROLE} seq:${SEQ}"
-  done
+while (( $(date +%s) < PHASE2_END )); do
+  n=$((n + 1))
+  rapids-logger "Iteration ${n}: bucket=${BUCKET} (${#ids[@]} PQ tests) then test_cagra.py"
+  pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
+  run_watched "iter${n}-${BUCKET}" 360 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" "${ids[@]}" tests/test_cagra.py
+  rc=$?
+  popd > /dev/null || exit 1
+  RUNS=$((RUNS + 1))
+  if (( rc == 124 )); then
+    HANGS=$((HANGS + 1))
+    HANG_ITERS="${HANG_ITERS} ${n}"
+    SEQ="${SEQ} ${n}:HANG"
+  elif (( rc != 0 )); then
+    FAILS=$((FAILS + 1))
+    SEQ="${SEQ} ${n}:rc${rc}"
+  else
+    SEQ="${SEQ} ${n}:ok"
+  fi
+  echo "B2-PROGRESS role=${ROLE} bucket=${BUCKET} seq:${SEQ}"
 done
+
+rapids-logger "Phase 1 (after bisect): ROLE=${ROLE}"
+phase1_post
 
 rapids-logger "B2 BISECT SUMMARY (ROLE=${ROLE}, runner ${RUNNER_NAME:-?})"
-for b in "${BUCKETS[@]}"; do
-  echo "B2-SUMMARY bucket=${b} runs=${RUNS[$b]} hangs=${HANGS[$b]} other_failures=${FAILS[$b]}"
-done
+echo "B2-SUMMARY bucket=${BUCKET} runs=${RUNS} hangs=${HANGS} other_failures=${FAILS} hang_iterations:${HANG_ITERS}"
 echo "B2-SEQUENCE ${SEQ}"
 exit 0
