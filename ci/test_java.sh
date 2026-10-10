@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# [DO NOT MERGE] CagraRandomizedIT root-cause sweep across cuVS versions.
+if [ -z "${SKIP_CAGRA_SWEEP:-}" ]; then
+  bash ci/cagra_sweep.sh
+  exit 0
+fi
+
 # Runs cuvs-java's own IT test suite against the classes from a prior amd64 build job,
 # without recompiling (or running jextract) on this host. cuvs-java is always built on
 # amd64; this verifies that the resulting jextract-generated Panama bindings also work

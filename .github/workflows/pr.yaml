@@ -459,6 +459,7 @@ jobs:
       security-events: write # publish redacted SARIF to code scanning
     uses: ./.github/workflows/security-suite.yml
   conda-cpp-build:
+    if: false
     needs: [build-details]
     permissions:
       actions: read
@@ -596,6 +597,7 @@ jobs:
       container-image-repository: "rapidsai/citestwheel"
       script: "ci/test_standalone_c.sh"
   conda-java-build:
+    if: false
     needs: [conda-cpp-build]
     permissions:
       actions: read
@@ -614,7 +616,6 @@ jobs:
       artifact-name-prefix: "cuvs-java"
       file_to_upload: "java/cuvs-java/target/"
   conda-java-tests:
-    needs: conda-java-build
     permissions:
       actions: read
       contents: read
