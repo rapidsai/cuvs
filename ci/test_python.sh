@@ -203,46 +203,54 @@ CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
 BENCH_TESTS_DIR="${PWD}/python/cuvs_bench/cuvs_bench"
 PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240 -o junit_family=xunit2)
 
+# CPU hogs to emulate a CPU-starved runner (noisy neighbors), which widens host-side race windows.
+HOG_PIDS=()
+start_hogs() {
+  local n=$1
+  for _ in $(seq 1 "${n}"); do
+    sh -c 'while :; do :; done' &
+    HOG_PIDS+=($!)
+  done
+}
+stop_hogs() {
+  for p in "${HOG_PIDS[@]}"; do kill "${p}" 2>/dev/null || true; done
+  HOG_PIDS=()
+}
+
 # Total budget for the repeat loop (seconds).
-BUDGET=$(( 200 * 60 ))
+BUDGET=$(( 170 * 60 ))
 LOOP_START=$(date +%s)
 i=0
 while (( $(date +%s) - LOOP_START < BUDGET )); do
   i=$((i + 1))
-  rapids-logger "Iteration ${i} (hangs so far: ${HANGS}:${HANG_LIST})"
+  NHOGS=$(( (i % 3) * 12 ))
+  rapids-logger "Iteration ${i}, ${NHOGS} CPU hogs (hangs so far: ${HANGS}:${HANG_LIST})"
+  start_hogs "${NHOGS}"
+  cat /proc/loadavg
 
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
   if (( i % 2 == 1 )); then
-    # Same command as the regular CI job: the full cuvs suite with coverage.
-    run_watched "iter${i}-cuvs-full" 420 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
-      --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
-      --cov-config=../.coveragerc \
-      --cov=cuvs \
-      --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
-      --cov-report=term \
-      tests
+    run_watched "iter${i}-cuvs-prefix" 600 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+      tests/test_all_neighbors.py tests/test_binary_quantizer.py tests/test_brute_force.py tests/test_cagra.py
   else
     # Host-input product quantizer tests followed by the CAGRA tests in one process.
-    run_watched "iter${i}-pq-cagra" 420 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+    run_watched "iter${i}-pq-cagra" 600 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
       tests/test_product_quantizer.py tests/test_cagra.py
   fi
   grep -c -i "illegal memory access\|illegal address" "${DIAG_DIR}/iter${i}-"*.log 2>/dev/null | sed 's/^/ILLEGAL-ADDRESS count: /' || true
   popd > /dev/null || exit 1
 
   pushd "${BENCH_TESTS_DIR}" > /dev/null || exit 1
-  run_watched "iter${i}-bench" 420 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
-    --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
-    --cov-config=../.coveragerc \
-    --cov=cuvs \
-    --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-bench-coverage.xml" \
-    --cov-report=term \
-    tests
+  run_watched "iter${i}-bench-cli" 600 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+    tests/test_cli.py
   popd > /dev/null || exit 1
+  stop_hogs
 
   if (( HANGS >= 2 )); then
     break
   fi
 done
+stop_hogs
 
 rapids-logger "HANG SUMMARY: ${HANGS} hang(s) in ${i} iteration(s):${HANG_LIST}"
 if (( HANGS > 0 )); then
