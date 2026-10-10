@@ -21,20 +21,21 @@ OUT=$(mktemp -d)
 run_version() {
   local ver=$1 channel=$2
   local env="sweep-${ver//./}"
+  local prefix="${OUT}/env-${env}"
   rapids-logger "cuVS ${ver} from ${channel}"
-  mamba create -y -n "${env}" --override-channels -c "${channel}" -c conda-forge \
+  mamba create -y -p "${prefix}" --override-channels -c "${channel}" -c conda-forge \
     "cuvs=${ver}" "cuda-version=12.9" "python=3.12" "cupy>=13" numpy > "${OUT}/${env}-create.log" 2>&1
   echo "[${ver}] mamba create exit code $?"
   tail -n 15 "${OUT}/${env}-create.log"
-  if ! conda run -n "${env}" python -c "import cupy, cuvs; print('versions', cuvs.__version__, cupy.__version__)"; then
+  if ! "${prefix}/bin/python" -c "import cupy, cuvs; print('versions', cuvs.__version__, cupy.__version__)"; then
     echo "[${ver}] ENV CREATE FAILED"
-    conda list -n "${env}" | grep -E "cuvs|cupy|python " || true
+    conda list -p "${prefix}" | grep -E "cuvs|cupy|python " || true
     return
   fi
-  conda run -n "${env}" python -I ci/cagra_randomized_sweep.py --tag "${ver}" \
+  "${prefix}/bin/python" -I ci/cagra_randomized_sweep.py --tag "${ver}" \
     --minutes "${MINUTES}" --seed "${SEED}" --out "${OUT}/${env}.jsonl" > "${OUT}/${env}.out" 2>&1
   grep -v "\]\[warning\]" "${OUT}/${env}.out" | tail -n 300
-  conda env remove -q -y -n "${env}" > /dev/null 2>&1
+  rm -rf "${prefix}"
 }
 
 run_version 25.06 rapidsai
