@@ -233,7 +233,8 @@ case "${EXP}" in
   rmmmanaged) B3_SHIM=rmm_managed ;;
   sepproc) ;;
   cachewarm) ;;
-  cachecold) export CUDA_CACHE_DISABLE=1 CUPY_CACHE_IN_MEMORY=1 ;;
+  cachenv) export CUDA_CACHE_DISABLE=1 ;;
+  cachecupy) export CUPY_CACHE_IN_MEMORY=1 ;;
   *) echo "unknown experiment ${EXP}"; exit 1 ;;
 esac
 env | grep -E "^(CUDA_|B3_)" || true
@@ -248,13 +249,36 @@ new_files() {
   find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /opt/conda -o -path "${GITHUB_WORKSPACE:-/__w}" -o -path /__w \) -prune \
     -o -newer "${CACHE_MARK}" -type f -print 2>/dev/null | grep -v "${DIAG_DIR}" | head -60
 }
-clear_caches() {
-  echo "---- clearing caches before iteration ${i}:"; new_files | sed 's/^/  removing /'
-  rm -rf ~/.nv ~/.cupy ~/.cache/cuvs ~/.cache/raft "${CUVS_TESTS_DIR}/.pytest_cache" 2>/dev/null
-  new_files | xargs -r rm -f
-  find /tmp /var/tmp -mindepth 1 -maxdepth 1 -newer "${CACHE_MARK}" ! -path "${DIAG_DIR}*" -exec rm -rf {} + 2>/dev/null
-  echo "---- remaining new files:"; new_files
+cache_info() {
+  echo "---- caches ($1):"
+  du -sh ~/.nv ~/.nv/ComputeCache ~/.cupy ~/.cupy/kernel_cache ~/.cache 2>/dev/null
+  python "${CI_DIR}/b3_cache_info.py" ~/.nv/ComputeCache ~/.cupy/kernel_cache 2>&1 | head -80
+  echo "---- other files written outside the workspace since the loop started:"
+  new_files | grep -vE "/\.nv/|/\.cupy/" | head -30
 }
+clear_caches() {
+  case "${EXP}" in
+    cachenv) echo "---- removing ~/.nv before iteration ${i}"; rm -rf ~/.nv ;;
+    cachecupy) echo "---- removing ~/.cupy before iteration ${i}"; rm -rf ~/.cupy ;;
+  esac
+}
+cache_info "before the loop"
+if [[ "${EXP}" == cachewarm ]]; then
+  rapids-logger "Probe: PTX JIT disabled, empty driver cache (which modules need JIT?)"
+  pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
+  timeout -s KILL 1200 env CUDA_DISABLE_PTX_JIT=1 CUDA_CACHE_PATH="${DIAG_DIR}/probe-cache" \
+    python -m pytest -q -p no:cacheprovider -o faulthandler_timeout=240 tests/test_product_quantizer.py tests/test_cagra.py \
+    > "${DIAG_DIR}/probe.log" 2>&1
+  echo "probe rc=$?"
+  tail -5 "${DIAG_DIR}/probe.log"
+  echo "---- distinct error lines:"
+  grep -aoE "(cuda|CUDA|cupy|RAFT|rmm).{0,40}(rror|failure).{0,200}" "${DIAG_DIR}/probe.log" | sed -E 's/0x[0-9a-f]+/0x?/g' | sort | uniq -c | sort -rn | head -20
+  echo "---- first failing tests:"
+  grep -aE "^(FAILED|ERROR) " "${DIAG_DIR}/probe.log" | head -15
+  grep -aE "^(FAILED|ERROR) " "${DIAG_DIR}/probe.log" | sed -E 's/\[.*//' | sort | uniq -c
+  popd > /dev/null || exit 1
+  touch "${CACHE_MARK}"
+fi
 i=0
 pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
 while (( $(date +%s) - LOOP_START < BUDGET )); do
@@ -287,9 +311,9 @@ while (( $(date +%s) - LOOP_START < BUDGET )); do
       fi
       ;;
     cache*)
-      if [[ "${EXP}" == cachecold ]]; then clear_caches; fi
+      clear_caches
       run_watched "iter${i}-pq-cagra" "${STALL}" python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests/test_product_quantizer.py tests/test_cagra.py
-      if (( i <= 2 )); then echo "---- files written since the loop started (after iteration ${i}):"; new_files; du -sh ~/.nv ~/.cupy ~/.cache 2>/dev/null; fi
+      if (( i <= 2 )); then cache_info "after iteration ${i}"; fi
       ;;
     *)
       run_watched "iter${i}-pq-cagra" "${STALL}" python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests/test_product_quantizer.py tests/test_cagra.py
