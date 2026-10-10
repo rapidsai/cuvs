@@ -7,8 +7,6 @@ set -euo pipefail
 # Usage: ci/test_cpp.sh [SHARD NUM_SHARDS]
 # With SHARD and NUM_SHARDS (1 <= SHARD <= NUM_SHARDS), only every NUM_SHARDS-th libcuvs test is
 # run, starting from test number SHARD, so the tests can be split across several CI jobs.
-SHARD=${1:-1}
-NUM_SHARDS=${2:-1}
 
 . /opt/conda/etc/profile.d/conda.sh
 
@@ -52,23 +50,19 @@ nvidia-smi
 # RAPIDS_DATASET_ROOT_DIR is used by test scripts
 RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
 export RAPIDS_DATASET_ROOT_DIR
-./ci/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
 
 EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-# Run Python build utilities tests (once, in the first shard)
-if [[ "${SHARD}" == "1" ]]; then
-  rapids-logger "Run libcuvs Python build utilities tests"
-  pytest cpp/tests/python
-fi
-
-# Run libcuvs gtests from libcuvs-tests package
-rapids-logger "Run libcuvs tests (shard ${SHARD} of ${NUM_SHARDS})"
-pushd "$CONDA_PREFIX"/bin/gtests/libcuvs
-timeout -v --signal=SIGINT --kill-after=60s 100m ctest -j8 --output-on-failure -I "${SHARD},,${NUM_SHARDS}"
-popd
+# [DO NOT MERGE] Only run the NNTest cases from NEIGHBORS_TEST.
+rapids-logger "Run NEIGHBORS_TEST NNTest*"
+nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv
+"$CONDA_PREFIX"/bin/gtests/libcuvs/NEIGHBORS_TEST --gtest_filter='NNTest*:Top1nn*' --gtest_repeat=3 --gtest_brief=0
+rapids-logger "Run CUTILE_SMOKE_TEST"
+"$CONDA_PREFIX"/bin/gtests/libcuvs/CUTILE_SMOKE_TEST
+rapids-logger "Run CLUSTER_TEST (cuTile-backed kmeans)"
+"$CONDA_PREFIX"/bin/gtests/libcuvs/CLUSTER_TEST --gtest_brief=1
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
