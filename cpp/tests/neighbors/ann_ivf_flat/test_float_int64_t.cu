@@ -10,10 +10,13 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/init.cuh>
 #include <raft/matrix/init.cuh>
+#include <raft/random/rng.cuh>
 
+#include <algorithm>
 #include <numeric>
 #include <optional>
 #include <sstream>
+#include <vector>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -46,6 +49,81 @@ TEST(IVFFlatSerialization, StreamRoundTrip)
   EXPECT_EQ(loaded.size(), index.size());
   EXPECT_EQ(loaded.dim(), index.dim());
   EXPECT_EQ(loaded.n_lists(), index.n_lists());
+}
+
+// k-means can leave a cluster empty, which gives it a zero center. With the cosine metric, the
+// coarse search must not produce NaN distances for such lists, or the probed lists are wrong.
+TEST(AnnIVFFlatTest, CosineZeroNormCenters)
+{
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  constexpr int64_t n_rows    = 10000;
+  constexpr int64_t n_queries = 500;
+  constexpr int64_t dim       = 8;
+  constexpr uint32_t n_lists  = 1024;
+  constexpr uint32_t k        = 16;
+
+  auto data    = raft::make_device_matrix<float, int64_t>(handle, n_rows, dim);
+  auto queries = raft::make_device_matrix<float, int64_t>(handle, n_queries, dim);
+  raft::random::RngState rng(1234ULL);
+  raft::random::uniform(handle, rng, data.data_handle(), data.size(), 0.1f, 2.0f);
+  raft::random::uniform(handle, rng, queries.data_handle(), queries.size(), 0.1f, 2.0f);
+
+  index_params params;
+  params.n_lists           = n_lists;
+  params.metric            = cuvs::distance::DistanceType::CosineExpanded;
+  params.add_data_on_build = false;
+  auto idx                 = build(handle, params, raft::make_const_mdspan(data.view()));
+
+  // Zero the centers of every other list, as if k-means had left them empty.
+  std::vector<float> centers_h(idx.centers().size());
+  raft::update_host(centers_h.data(), idx.centers().data_handle(), centers_h.size(), stream);
+  raft::resource::sync_stream(handle);
+  for (uint32_t l = 0; l < n_lists; l += 2) {
+    std::fill_n(centers_h.begin() + l * dim, dim, 0.0f);
+  }
+  raft::update_device(idx.centers().data_handle(), centers_h.data(), centers_h.size(), stream);
+  extend(handle, raft::make_const_mdspan(data.view()), std::nullopt, &idx);
+
+  // Probe exactly as many lists as there are non-zero centers.
+  search_params sparams;
+  sparams.n_probes = n_lists / 2;
+  auto neighbors   = raft::make_device_matrix<int64_t, int64_t>(handle, n_queries, k);
+  auto distances   = raft::make_device_matrix<float, int64_t>(handle, n_queries, k);
+  search(handle,
+         sparams,
+         idx,
+         raft::make_const_mdspan(queries.view()),
+         neighbors.view(),
+         distances.view());
+
+  auto naive_neighbors = raft::make_device_matrix<int64_t, int64_t>(handle, n_queries, k);
+  auto naive_distances = raft::make_device_matrix<float, int64_t>(handle, n_queries, k);
+  cuvs::neighbors::naive_knn<float, float, int64_t>(handle,
+                                                    naive_distances.data_handle(),
+                                                    naive_neighbors.data_handle(),
+                                                    queries.data_handle(),
+                                                    data.data_handle(),
+                                                    n_queries,
+                                                    n_rows,
+                                                    dim,
+                                                    k,
+                                                    params.metric);
+
+  std::vector<int64_t> neighbors_h(n_queries * k), naive_neighbors_h(n_queries * k);
+  std::vector<float> distances_h(n_queries * k), naive_distances_h(n_queries * k);
+  raft::update_host(neighbors_h.data(), neighbors.data_handle(), neighbors_h.size(), stream);
+  raft::update_host(distances_h.data(), distances.data_handle(), distances_h.size(), stream);
+  raft::update_host(
+    naive_neighbors_h.data(), naive_neighbors.data_handle(), naive_neighbors_h.size(), stream);
+  raft::update_host(
+    naive_distances_h.data(), naive_distances.data_handle(), naive_distances_h.size(), stream);
+  raft::resource::sync_stream(handle);
+
+  // Every data row is in a list with a non-zero center, and all of those lists are probed.
+  EXPECT_TRUE(eval_neighbours(
+    naive_neighbors_h, neighbors_h, naive_distances_h, distances_h, n_queries, k, 0.001, 0.99));
 }
 
 TEST(AnnIVFFlatTest, RepeatedExtendCopyPreservesSharedListWithinCapacity)
