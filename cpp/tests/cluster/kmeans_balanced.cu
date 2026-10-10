@@ -10,8 +10,10 @@
 #include <raft/core/handle.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/random/make_blobs.cuh>
+#include <raft/random/rng.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -22,6 +24,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <cstring>
 #include <optional>
 #include <vector>
 
@@ -300,5 +304,89 @@ KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, flo
 KB_TEST((KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>, true>),
         KmeansBalancedTestFI8I32I32_SEP,
         inputsf_i32);
+
+/*
+ * Identical fits must give bitwise-identical centers. With `skewed`, 95% of the rows are packed in
+ * a tiny region and n_lists divides n_rows, so most clusters start (nearly) empty and the balancing
+ * step must find a donor for many receivers.
+ */
+
+template <typename DataT>
+void check_balanced_fit_reproducible(
+  cuvs::cluster::kmeans::balanced_donor_selection donor_selection, bool skewed = false)
+{
+  raft::resources handle;
+  auto stream           = raft::resource::get_cuda_stream(handle);
+  const int64_t n_rows  = 20000;
+  const int64_t n_cols  = 24;
+  const int64_t n_lists = skewed ? 1000 : 200;
+  auto data_f           = raft::make_device_matrix<float, int64_t>(handle, n_rows, n_cols);
+  auto data             = raft::make_device_matrix<DataT, int64_t>(handle, n_rows, n_cols);
+  raft::random::RngState rng(1234ULL);
+  raft::random::uniform(handle, rng, data_f.data_handle(), n_rows * n_cols, -100.0f, 100.0f);
+  if (skewed) {
+    auto packed = raft::make_device_matrix_view<float, int64_t>(
+      data_f.data_handle(), n_rows * 95 / 100, n_cols);
+    raft::linalg::map(
+      handle, packed, raft::mul_const_op<float>{1e-3f}, raft::make_const_mdspan(packed));
+  }
+  raft::linalg::map(
+    handle, data.view(), raft::cast_op<DataT>{}, raft::make_const_mdspan(data_f.view()));
+
+  cuvs::cluster::kmeans::balanced_params params;
+  params.n_iters         = 20;
+  params.donor_selection = donor_selection;
+  if (donor_selection == cuvs::cluster::kmeans::balanced_donor_selection::Random) {
+    // The IVF-PQ codebook settings
+    params.balance_lower_tolerance = 0.25f;
+    params.balance_upper_tolerance = 4.0f;
+    params.centroid_offset         = 0.05f;
+  }
+
+  std::vector<std::vector<float>> results;
+  for (int run = 0; run < 2; run++) {
+    auto centers = raft::make_device_matrix<float, int64_t>(handle, n_lists, n_cols);
+    ASSERT_NO_THROW(cuvs::cluster::kmeans::fit(
+      handle, params, raft::make_const_mdspan(data.view()), centers.view()));
+    std::vector<float> h(centers.size());
+    raft::update_host(h.data(), centers.data_handle(), h.size(), stream);
+    raft::resource::sync_stream(handle);
+    for (auto x : h) {
+      ASSERT_TRUE(std::isfinite(x));
+    }
+    results.push_back(std::move(h));
+  }
+  ASSERT_EQ(0, std::memcmp(results[0].data(), results[1].data(), results[0].size() * sizeof(float)))
+    << "balanced k-means centers differ between identical fits";
+}
+
+TEST(KmeansBalancedReproducible, FloatSizeSorted)
+{
+  check_balanced_fit_reproducible<float>(
+    cuvs::cluster::kmeans::balanced_donor_selection::SizeSorted);
+}
+
+TEST(KmeansBalancedReproducible, FloatRandomDonor)
+{
+  check_balanced_fit_reproducible<float>(cuvs::cluster::kmeans::balanced_donor_selection::Random);
+}
+
+TEST(KmeansBalancedReproducible, Int8SizeSorted)
+{
+  check_balanced_fit_reproducible<int8_t>(
+    cuvs::cluster::kmeans::balanced_donor_selection::SizeSorted);
+}
+
+TEST(KmeansBalancedReproducible, SkewedSizeSorted)
+{
+  check_balanced_fit_reproducible<float>(
+    cuvs::cluster::kmeans::balanced_donor_selection::SizeSorted, true);
+}
+
+TEST(KmeansBalancedReproducible, SkewedRandomDonor)
+{
+  check_balanced_fit_reproducible<float>(cuvs::cluster::kmeans::balanced_donor_selection::Random,
+                                         true);
+}
 
 }  // namespace cuvs

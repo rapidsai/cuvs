@@ -10,7 +10,9 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/init.cuh>
 #include <raft/matrix/init.cuh>
+#include <raft/random/rng.cuh>
 
+#include <cstring>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -26,6 +28,30 @@ TEST_P(AnnIVFFlatTestF_float, AnnIVFFlat)
 }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_float, ::testing::ValuesIn(inputs));
+
+TEST(IVFFlatBuild, Reproducible)
+{
+  raft::resources handle;
+  auto stream          = raft::resource::get_cuda_stream(handle);
+  const int64_t n_rows = 100000;
+  const int64_t dim    = 32;
+  auto dataset         = raft::make_device_matrix<float, int64_t>(handle, n_rows, dim);
+  raft::random::RngState rng(42ULL);
+  raft::random::uniform(handle, rng, dataset.data_handle(), n_rows * dim, -1.0f, 1.0f);
+
+  index_params params;
+  params.n_lists = 500;
+  std::vector<std::vector<float>> centers;
+  for (int run = 0; run < 2; run++) {
+    const auto index = build(handle, params, raft::make_const_mdspan(dataset.view()));
+    std::vector<float> h(index.centers().size());
+    raft::update_host(h.data(), index.centers().data_handle(), h.size(), stream);
+    raft::resource::sync_stream(handle);
+    centers.push_back(std::move(h));
+  }
+  ASSERT_EQ(0, std::memcmp(centers[0].data(), centers[1].data(), centers[0].size() * sizeof(float)))
+    << "IVF-Flat centers differ between identical builds";
+}
 
 TEST(IVFFlatSerialization, StreamRoundTrip)
 {
