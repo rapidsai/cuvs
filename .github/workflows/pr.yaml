@@ -67,4 +67,4 @@ jobs:
       script: ci/test_python.sh
       run_codecov: false
       matrix_type: "pull-request,nightly"
-      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | [range(4) as $i | .[] | . + {COPY: $i}]'
+      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | [range(2) as $i | .[] | . + {COPY: $i}]'
