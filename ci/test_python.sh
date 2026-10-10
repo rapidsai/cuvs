@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+BUCKET=${1:-real-order}
+
 . /opt/conda/etc/profile.d/conda.sh
 
 rapids-logger "Configuring conda strict channel priority"
@@ -239,14 +241,20 @@ LOOP_START=$(date +%s)
 i=0
 while (( $(date +%s) - LOOP_START < BUDGET )); do
   i=$((i + 1))
-  rapids-logger "Iteration ${i} (hangs so far: ${HANGS}:${HANG_LIST})"
+  rapids-logger "Bucket ${BUCKET} iteration ${i} (hangs so far: ${HANGS}:${HANG_LIST})"
   nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader || true
 
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
-  # Host-input product quantizer tests followed by the CAGRA tests in one process.
-  run_watched "iter${i}-pq-cagra" 480 \
-      python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
-      tests/test_product_quantizer.py tests/test_cagra.py
+  case "${BUCKET}" in
+    real-order) FILES=(tests/test_all_neighbors.py tests/test_binary_quantizer.py tests/test_brute_force.py tests/test_cagra.py) ;;
+    all-neighbors) FILES=(tests/test_all_neighbors.py tests/test_cagra.py) ;;
+    bf-bq) FILES=(tests/test_brute_force.py tests/test_binary_quantizer.py tests/test_cagra.py) ;;
+    cagra-only) FILES=(tests/test_cagra.py) ;;
+    pq-cagra) FILES=(tests/test_product_quantizer.py tests/test_cagra.py) ;;
+    *) echo "unknown bucket ${BUCKET}"; exit 1 ;;
+  esac
+  run_watched "iter${i}-${BUCKET}" 480 \
+      python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" "${FILES[@]}"
   popd > /dev/null || exit 1
 
   if (( HANGS >= 2 )); then
@@ -254,7 +262,7 @@ while (( $(date +%s) - LOOP_START < BUDGET )); do
   fi
 done
 
-rapids-logger "HANG SUMMARY: ${HANGS} hang(s) in ${i} iteration(s):${HANG_LIST}"
+rapids-logger "HANG SUMMARY (${BUCKET}): ${HANGS} hang(s) in ${i} iteration(s):${HANG_LIST}"
 if (( HANGS > 0 )); then
   exit 1
 fi

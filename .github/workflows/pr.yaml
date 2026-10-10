@@ -26,10 +26,14 @@ jobs:
       pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@main
+    strategy:
+      fail-fast: false
+      matrix:
+        bucket: [real-order, all-neighbors, bf-bq, cagra-only]
     with:
       build_type: pull-request
-      script: ci/test_python.sh
+      script: "ci/test_python.sh ${{ matrix.bucket }}"
       run_codecov: false
       container-options: "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
       matrix_type: "pull-request,nightly"
-      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | [range(4) as $i | .[] | . + {COPY: $i}]'
+      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2"))'
