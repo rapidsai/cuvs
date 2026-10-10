@@ -79,70 +79,85 @@ descendants() {
   done
 }
 
-dump_one() {
+thread_times() {
   local p=$1
-  echo "================ PID ${p}: $(tr '\0' ' ' < /proc/"${p}"/cmdline 2>/dev/null | cut -c1-300)"
-  grep -E "^(State|Threads|voluntary|nonvoluntary)" /proc/"${p}"/status 2>/dev/null || true
-  echo "---- threads (tid comm state utime stime wchan)"
   for t in /proc/"${p}"/task/*; do
-    tid=$(basename "$t")
     stat=$(cat "$t"/stat 2>/dev/null) || continue
-    # fields after the ')' : state is field 3, utime 14, stime 15
     rest=${stat##*) }
     # shellcheck disable=SC2086
     set -- $rest
-    echo "${tid} $(cat "$t"/comm 2>/dev/null) state=$1 utime=${12} stime=${13} wchan=$(cat "$t"/wchan 2>/dev/null)"
+    echo "$(basename "$t") $(cat "$t"/comm 2>/dev/null) state=$1 utime=${12} stime=${13} wchan=$(cat "$t"/wchan 2>/dev/null) syscall=$(cut -c1-120 < "$t"/syscall 2>/dev/null)"
   done
-  echo "---- kernel stacks"
-  for t in /proc/"${p}"/task/*; do
-    echo "-- $(basename "$t") $(cat "$t"/comm 2>/dev/null)"
-    head -30 "$t"/stack 2>&1
-  done
-  if grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
-    echo "---- py-spy dump --native"
-    timeout 120 "${DBG_BIN}/py-spy" dump --native --pid "${p}" 2>&1 || true
-  fi
-  echo "---- gdb thread apply all bt"
-  timeout 300 "${DBG_BIN}/gdb" -p "${p}" -batch -nx \
-    -ex "set pagination off" -ex "set print thread-events off" \
-    -ex "info threads" -ex "thread apply all bt 40" 2>&1 | grep -v "^\[New LWP" || true
-}
-
-dump_cuda_gdb() {
-  local p=$1
-  if [[ -n "${CUDA_GDB}" ]]; then
-    echo "---- cuda-gdb ${p}"
-    timeout 300 "${CUDA_GDB}" -p "${p}" -batch -nx \
-      -ex "set pagination off" \
-      -ex "info cuda devices" \
-      -ex "info cuda kernels" \
-      -ex "info cuda blocks" \
-      -ex "info cuda warps" \
-      -ex "info cuda threads" \
-      -ex "bt" 2>&1 | head -400 || true
-  fi
 }
 
 dump_diag() {
-  local root=$1
-  local pids
+  local root=$1 log=$2
+  local pids p size0
   pids=$(descendants "${root}")
   echo "########## HANG DIAGNOSTICS $(date -u +%FT%TZ) root=${root} pids: ${pids}"
   ps -eo pid,ppid,stat,wchan:32,etime,time,pcpu,rss,cmd --forest | cut -c1-250 || true
-  echo "---- top threads"
-  for p in ${pids}; do top -b -n 1 -H -p "${p}" 2>/dev/null | head -40 || true; done
-  echo "---- nvidia-smi"
+  cat /proc/loadavg
   nvidia-smi || true
-  nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory,clocks.sm,clocks.mem,power.draw,memory.used,clocks_throttle_reasons.active --format=csv -lms 500 & local smipid=$!
-  sleep 5; kill "${smipid}" 2>/dev/null || true
-  nvidia-smi -q -d PERFORMANCE,CLOCK,ECC,PIDS,ROW_REMAPPER 2>&1 | head -200 || true
-  for p in ${pids}; do dump_one "${p}"; done
-  # cuda-gdb last: attaching may disturb the process
+  nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory,clocks.sm,power.draw,memory.used --format=csv -lms 500 & local smipid=$!
+  sleep 3; kill "${smipid}" 2>/dev/null || true
+  # Passive information first (no ptrace).
   for p in ${pids}; do
-    if grep -qE "python|ANN_BENCH" /proc/"${p}"/cmdline 2>/dev/null; then dump_cuda_gdb "${p}"; fi
+    echo "---- passive thread info ${p} (sample 1)"
+    thread_times "${p}"
+    sleep 2
+    echo "---- passive thread info ${p} (sample 2)"
+    thread_times "${p}"
+    grep -E "^(VmRSS|VmSwap|Threads|voluntary|nonvoluntary)" /proc/"${p}"/status || true
   done
-  echo "---- dmesg tail"
-  dmesg 2>/dev/null | tail -30 || true
+  size0=$(stat -c %s "${log}")
+  # One ptrace-based sample, then check whether the process resumes on its own.
+  for p in ${pids}; do
+    if grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
+      echo "---- py-spy dump --native ${p}"
+      timeout 120 "${DBG_BIN}/py-spy" dump --native --pid "${p}" 2>&1 | head -60 || true
+    fi
+  done
+  sleep 30
+  echo "---- log size before/after the py-spy attach: ${size0} -> $(stat -c %s "${log}")"
+  for p in ${pids}; do
+    if grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
+      echo "---- py-spy dump --native ${p} (30 s later)"
+      timeout 120 "${DBG_BIN}/py-spy" dump --native --pid "${p}" 2>&1 | head -40 || true
+      thread_times "${p}" | head -3
+    fi
+  done
+  # GPU core dump through the user-triggered coredump pipe, then inspect it offline.
+  for p in ${pids}; do
+    pipe="${DIAG_DIR}/corepipe.${p}"
+    if [[ ! -p "${pipe}" ]]; then
+      echo "---- pipes in ${DIAG_DIR}:"; find "${DIAG_DIR}" -maxdepth 1 -type p
+      pipe=$(find "${DIAG_DIR}" -maxdepth 1 -type p -name "corepipe*" | tail -1)
+    fi
+    if [[ -n "${pipe}" && -p "${pipe}" ]]; then
+      echo "---- triggering GPU coredump through ${pipe}"
+      timeout 30 sh -c "echo 1 > '${pipe}'" || echo "pipe write timed out"
+      for _ in $(seq 1 60); do
+        if ! kill -0 "${p}" 2>/dev/null; then break; fi
+        sleep 5
+      done
+      find "${DIAG_DIR}" -maxdepth 1 -name "core*" -exec ls -la {} + || true
+      for core in "${DIAG_DIR}"/core.cuda.*; do
+        [[ -f "${core}" ]] || continue
+        if [[ -n "${CUDA_GDB}" ]]; then
+          timeout 600 "${CUDA_GDB}" -batch -nx \
+            -ex "set pagination off" \
+            -ex "target cudacore ${core}" \
+            -ex "info cuda kernels" \
+            -ex "info cuda blocks" \
+            -ex "info cuda warps" \
+            -ex "bt" \
+            -ex "info cuda lanes" 2>&1 | head -300 || true
+        fi
+      done
+    else
+      echo "---- no coredump pipe ${pipe}"; find "${DIAG_DIR}" -maxdepth 1 | head
+    fi
+  done
   echo "########## END HANG DIAGNOSTICS"
 }
 
@@ -182,7 +197,7 @@ run_watched() {
     HANGS=$((HANGS + 1))
     HANG_LIST="${HANG_LIST} ${name}"
     echo "!!!!! HANG DETECTED in ${name} after $(( $(date +%s) - start ))s (no output for ${stall}s)"
-    dump_diag "${pid}"
+    dump_diag "${pid}" "${log}"
     for p in $(descendants "${pid}"); do kill -9 "${p}" 2>/dev/null || true; done
     wait "${pid}" 2>/dev/null
     rc=124
@@ -200,7 +215,6 @@ run_watched() {
 set +e
 
 CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
-BENCH_TESTS_DIR="${PWD}/python/cuvs_bench/cuvs_bench"
 PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240 -o junit_family=xunit2)
 
 # CPU hogs to emulate a CPU-starved runner (noisy neighbors), which widens host-side race windows.
@@ -217,32 +231,27 @@ stop_hogs() {
   HOG_PIDS=()
 }
 
+# GPU core dumps on demand: writing to the pipe makes the driver dump the GPU state of the process.
+export CUDA_ENABLE_USER_TRIGGERED_COREDUMP=1
+export CUDA_COREDUMP_PIPE="${DIAG_DIR}/corepipe.%p"
+export CUDA_COREDUMP_FILE="${DIAG_DIR}/core.cuda.%p"
+export CUDA_COREDUMP_GENERATION_FLAGS="skip_global_memory,skip_shared_memory,skip_local_memory"
+
 # Total budget for the repeat loop (seconds).
 BUDGET=$(( 170 * 60 ))
 LOOP_START=$(date +%s)
 i=0
 while (( $(date +%s) - LOOP_START < BUDGET )); do
   i=$((i + 1))
-  NHOGS=$(( (i % 3) * 12 ))
+  NHOGS=$(( (i % 2) * 12 ))
   rapids-logger "Iteration ${i}, ${NHOGS} CPU hogs (hangs so far: ${HANGS}:${HANG_LIST})"
   start_hogs "${NHOGS}"
   cat /proc/loadavg
 
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
-  if (( i % 2 == 1 )); then
-    run_watched "iter${i}-cuvs-prefix" 600 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
-      tests/test_all_neighbors.py tests/test_binary_quantizer.py tests/test_brute_force.py tests/test_cagra.py
-  else
-    # Host-input product quantizer tests followed by the CAGRA tests in one process.
-    run_watched "iter${i}-pq-cagra" 600 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+  # Host-input product quantizer tests followed by the CAGRA tests in one process.
+  run_watched "iter${i}-pq-cagra" 480 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
       tests/test_product_quantizer.py tests/test_cagra.py
-  fi
-  grep -c -i "illegal memory access\|illegal address" "${DIAG_DIR}/iter${i}-"*.log 2>/dev/null | sed 's/^/ILLEGAL-ADDRESS count: /' || true
-  popd > /dev/null || exit 1
-
-  pushd "${BENCH_TESTS_DIR}" > /dev/null || exit 1
-  run_watched "iter${i}-bench-cli" 600 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
-    tests/test_cli.py
   popd > /dev/null || exit 1
   stop_hogs
 
