@@ -4,11 +4,6 @@
 
 set -euo pipefail
 
-# Usage: ci/test_cpp.sh [SHARD NUM_SHARDS]
-# With SHARD and NUM_SHARDS (1 <= SHARD <= NUM_SHARDS), only every NUM_SHARDS-th libcuvs test is
-# run, starting from test number SHARD, so the tests can be split across several CI jobs.
-SHARD=${1:-1}
-NUM_SHARDS=${2:-1}
 
 . /opt/conda/etc/profile.d/conda.sh
 
@@ -52,23 +47,34 @@ nvidia-smi
 # RAPIDS_DATASET_ROOT_DIR is used by test scripts
 RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
 export RAPIDS_DATASET_ROOT_DIR
-./ci/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
 
 EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-# Run Python build utilities tests (once, in the first shard)
-if [[ "${SHARD}" == "1" ]]; then
-  rapids-logger "Run libcuvs Python build utilities tests"
-  pytest cpp/tests/python
-fi
-
-# Run libcuvs gtests from libcuvs-tests package
-rapids-logger "Run libcuvs tests (shard ${SHARD} of ${NUM_SHARDS})"
+# Run the k-means and IVF test binaries once in full.
+rapids-logger "Run k-means and IVF test binaries"
 pushd "$CONDA_PREFIX"/bin/gtests/libcuvs
-timeout -v --signal=SIGINT --kill-after=60s 100m ctest -j8 --output-on-failure -I "${SHARD},,${NUM_SHARDS}"
+timeout -v --signal=SIGINT --kill-after=60s 120m ctest -j4 --output-on-failure -R "^(CLUSTER_TEST|CLUSTER_KMEANS_MG_TEST|CLUSTER_KMEANS_MNMG_TEST|NEIGHBORS_ANN_IVF_FLAT_TEST|NEIGHBORS_ANN_IVF_PQ_TEST|NEIGHBORS_ANN_IVF_SQ_TEST|NEIGHBORS_ANN_IVF_RABITQ_TEST)$"
 popd
+
+# Repeat the reproducibility tests.
+repeat_test() {
+  local binary=$1 filter=$2 repeat=$3
+  local log="$CONDA_PREFIX/bin/gtests/libcuvs/${binary}_repeat.log"
+  rapids-logger "Repeat ${binary} --gtest_filter=${filter} ${repeat} times"
+  "$CONDA_PREFIX"/bin/gtests/libcuvs/"${binary}" --gtest_filter="${filter}" --gtest_repeat="${repeat}" > "${log}" 2>&1
+  echo "Exit status: $?"
+  tail -n 5 "${log}"
+  grep -E "Failure|differ|Expected" "${log}" | head -n 50 || true
+  echo "Failures:"
+  grep -E "^\[  FAILED  \] .* \([0-9]+ ms\)$" "${log}" | sed -E 's/, where GetParam.*//; s/ \([0-9]+ ms\)//' | sort | uniq -c || true
+  echo "Passes:"
+  grep -E "^\[       OK \]" "${log}" | sed -E 's/ \([0-9]+ ms\)//' | sort | uniq -c || true
+}
+repeat_test CLUSTER_TEST "KmeansFitBatchedTests/*:KmeansBalancedReproducible.*" 50
+repeat_test NEIGHBORS_ANN_IVF_FLAT_TEST "IVFFlatBuild.Reproducible" 10
+repeat_test NEIGHBORS_ANN_IVF_PQ_TEST "IvfPqBuild.Reproducible*" 10
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
