@@ -756,6 +756,8 @@ void search(const raft::resources& clique,
     } else {
       // Only one rank is available, so process its batches sequentially.
       const int rank = 0;
+// [DO NOT MERGE] Restore the release/26.10 behavior (pre-#2704) to reproduce the flaky abort.
+#pragma omp parallel for
       for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
         int64_t offset                  = batch_idx * n_rows_per_batch;
         int64_t query_offset            = offset * n_cols;
