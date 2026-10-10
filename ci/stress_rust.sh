@@ -6,15 +6,17 @@
 set -uo pipefail
 
 STRESS_MINUTES=${STRESS_MINUTES:-110}
+ENV_NAME=${ENV_NAME:-rust}
+RUST_DIR=${RUST_DIR:-rust}
 
 . /opt/conda/etc/profile.d/conda.sh
 set +u
-conda activate rust
+conda activate "${ENV_NAME}"
 set -u
 
 rapids-logger "Installing gdb and compute-sanitizer"
-rapids-mamba-retry install -y -n rust gdb "cuda-sanitizer-api=${RAPIDS_CUDA_VERSION%.*}" || \
-  rapids-mamba-retry install -y -n rust gdb || true
+rapids-mamba-retry install -y -n "${ENV_NAME}" gdb "cuda-sanitizer-api=${RAPIDS_CUDA_VERSION%.*}" || \
+  rapids-mamba-retry install -y -n "${ENV_NAME}" gdb || true
 which gdb compute-sanitizer || true
 
 nvidia-smi || true
@@ -23,13 +25,15 @@ cat /proc/sys/kernel/core_pattern || true
 ulimit -c unlimited || true
 ulimit -c
 
-cd rust || exit 1
+cd "${RUST_DIR}" || exit 1
 export RUST_BACKTRACE=full
 cargo test -p cuvs --lib --no-run 2>&1 | tee norun.log
 TEST_BIN=$(sed -n 's/.*Executable unittests src\/lib.rs (\(.*\))/\1/p' norun.log | tail -1)
 TEST_BIN=$(realpath "${TEST_BIN}")
 echo "TEST_BIN=${TEST_BIN}"
 "${TEST_BIN}" --list 2>/dev/null | tail -3
+HAVE_STRESS=0
+if "${TEST_BIN}" --list --ignored 2>/dev/null | grep -q "stress_"; then HAVE_STRESS=1; fi
 
 LOGDIR=$(mktemp -d)
 mkdir -p "${LOGDIR}/cores"
@@ -52,7 +56,7 @@ while [ "$(date +%s)" -lt "${deadline}" ]; do
   [ -n "${t}" ] && targs=(--test-threads="${t}")
   mode="native"
   if (( iter % 4 == 0 )); then mode="gdb"; fi
-  if (( iter % 6 == 0 )); then mode="stress"; fi
+  if (( iter % 6 == 0 )) && (( HAVE_STRESS )); then mode="stress"; fi
   key="${mode}-t${t:-default}"
   per_mode_runs[$key]=$(( ${per_mode_runs[$key]:-0} + 1 ))
   log="${LOGDIR}/iter${iter}.log"
