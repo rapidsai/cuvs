@@ -12,13 +12,21 @@ _last_module = None
 _each = os.environ.get("HANG_SYNC_EACH", "0") == "1"
 
 
+def _get_last_error():
+    try:
+        from cuda.bindings import runtime as cudart
+    except ImportError:  # older cuda-python
+        from cuda import cudart
+    return int(cudart.cudaGetLastError()[0])
+
+
 def _sync(where, verbose=True):
     import cupy as cp
 
     t0 = time.time()
     try:
         cp.cuda.runtime.deviceSynchronize()
-        err = cp.cuda.runtime.getLastError()
+        err = _get_last_error()
         dt = time.time() - t0
         if verbose or err != 0 or dt > 2.0:
             print(
