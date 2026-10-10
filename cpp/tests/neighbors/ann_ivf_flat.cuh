@@ -20,7 +20,14 @@
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/util/fast_int_div.cuh>
+#include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_pool.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <iostream>
+#include <limits>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -63,6 +70,230 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       database(0, stream_),
       search_queries(0, stream_)
   {
+  }
+
+  // [CI ONLY] Diagnostics for the flaky recall-0 / duplicate-index failures.
+  void diagnose(const char* where,
+                const cuvs::neighbors::ivf_flat::index<DataT, IdxT>& idx,
+                const std::vector<IdxT>& naive_idx,
+                const std::vector<T>& naive_dist,
+                const std::vector<IdxT>& ivf_idx,
+                const std::vector<T>& ivf_dist,
+                IdxT db_offset)
+  {
+    raft::resource::sync_stream(handle_);
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
+    auto& os           = std::cout;
+    const auto n_lists = idx.n_lists();
+    const auto dim     = idx.dim();
+    const size_t n_db  = ps.num_db_vecs;
+    const size_t k     = ps.k;
+    const size_t nq    = ps.num_queries;
+    os << "[DIAG " << where << "] params " << ps << " n_lists=" << n_lists << " dim=" << dim
+       << " veclen=" << idx.veclen() << " size=" << idx.size()
+       << " adaptive=" << idx.adaptive_centers()
+       << " conservative=" << idx.conservative_memory_allocation() << std::endl;
+
+    // 1. Input data integrity
+    std::vector<DataT> db_h(n_db * ps.dim), q_h(nq * ps.dim);
+    raft::update_host(db_h.data(), database.data(), db_h.size(), stream_);
+    raft::update_host(q_h.data(), search_queries.data(), q_h.size(), stream_);
+    raft::resource::sync_stream(handle_);
+    size_t db_changed = 0, q_changed = 0, db_zero = 0, q_zero = 0;
+    for (size_t i = 0; i < db_h.size(); i++)
+      db_changed += std::memcmp(&db_h[i], &db_host_[i], sizeof(DataT)) != 0;
+    for (size_t i = 0; i < q_h.size(); i++)
+      q_changed += std::memcmp(&q_h[i], &q_host_[i], sizeof(DataT)) != 0;
+    for (size_t i = 0; i < n_db; i++) {
+      bool z = true;
+      for (size_t d = 0; d < size_t(ps.dim); d++)
+        z = z && static_cast<float>(db_h[i * ps.dim + d]) == 0.f;
+      db_zero += z;
+    }
+    for (size_t i = 0; i < nq; i++) {
+      bool z = true;
+      for (size_t d = 0; d < size_t(ps.dim); d++)
+        z = z && static_cast<float>(q_h[i * ps.dim + d]) == 0.f;
+      q_zero += z;
+    }
+    os << "[DIAG " << where << "] database changed elems=" << db_changed
+       << " queries changed elems=" << q_changed << " zero db rows=" << db_zero
+       << " zero query rows=" << q_zero << std::endl;
+
+    // 2. Centers
+    std::vector<float> centers_h(size_t(n_lists) * dim);
+    raft::update_host(centers_h.data(), idx.centers().data_handle(), centers_h.size(), stream_);
+    std::vector<float> cnorm_h;
+    if (idx.center_norms().has_value()) {
+      cnorm_h.resize(n_lists);
+      raft::update_host(cnorm_h.data(), idx.center_norms()->data_handle(), n_lists, stream_);
+    }
+    std::vector<uint32_t> sizes_h(n_lists);
+    raft::update_host(sizes_h.data(), idx.list_sizes().data_handle(), n_lists, stream_);
+    std::vector<IdxT*> inds_ptrs_h(n_lists);
+    raft::update_host(inds_ptrs_h.data(), idx.inds_ptrs().data_handle(), n_lists, stream_);
+    std::vector<DataT*> data_ptrs_h(n_lists);
+    raft::update_host(data_ptrs_h.data(), idx.data_ptrs().data_handle(), n_lists, stream_);
+    raft::resource::sync_stream(handle_);
+    size_t c_nan = 0, c_zero = 0, cn_nan = 0, cn_zero = 0, cn_mismatch = 0;
+    for (uint32_t l = 0; l < n_lists; l++) {
+      bool z = true, nan = false;
+      double nn = 0;
+      for (uint32_t d = 0; d < dim; d++) {
+        float v = centers_h[size_t(l) * dim + d];
+        z       = z && v == 0.f;
+        nan     = nan || !std::isfinite(v);
+        nn += double(v) * v;
+      }
+      c_zero += z;
+      c_nan += nan;
+      if (!cnorm_h.empty()) {
+        cn_nan += !std::isfinite(cnorm_h[l]);
+        cn_zero += cnorm_h[l] == 0.f;
+        double expect =
+          ps.metric == cuvs::distance::DistanceType::CosineExpanded ? std::sqrt(nn) : nn;
+        cn_mismatch += std::abs(expect - cnorm_h[l]) > 1e-3 * std::max(1.0, expect);
+      }
+    }
+    os << "[DIAG " << where << "] centers: non-finite rows=" << c_nan << " zero rows=" << c_zero
+       << " center_norms: present=" << !cnorm_h.empty() << " non-finite=" << cn_nan
+       << " zero=" << cn_zero << " mismatch=" << cn_mismatch << std::endl;
+
+    // 3. Lists
+    size_t sum = 0, empty = 0, max_sz = 0, ptr_mismatch = 0, cap_short = 0;
+    for (uint32_t l = 0; l < n_lists; l++) {
+      sum += sizes_h[l];
+      empty += sizes_h[l] == 0;
+      max_sz    = std::max<size_t>(max_sz, sizes_h[l]);
+      auto& lst = idx.lists()[l];
+      if (lst) {
+        if (lst->indices.data_handle() != inds_ptrs_h[l] ||
+            lst->data.data_handle() != data_ptrs_h[l])
+          ptr_mismatch++;
+        if (lst->indices.size() < sizes_h[l]) cap_short++;
+      } else if (sizes_h[l] > 0) {
+        ptr_mismatch++;
+      }
+    }
+    os << "[DIAG " << where << "] lists: sum sizes=" << sum << " empty=" << empty
+       << " max=" << max_sz << " ptr mismatch=" << ptr_mismatch << " capacity short=" << cap_short
+       << std::endl;
+
+    std::vector<int> seen(n_db, 0);
+    std::vector<int64_t> where_list(n_db, -1);
+    size_t bad_ids = 0, data_mismatch = 0, data_mismatch_lists = 0;
+    for (uint32_t l = 0; l < n_lists; l++) {
+      if (sizes_h[l] == 0 || cap_short) continue;
+      std::vector<IdxT> ids(sizes_h[l]);
+      raft::update_host(ids.data(), inds_ptrs_h[l], sizes_h[l], stream_);
+      size_t padded = raft::round_up_safe<size_t>(sizes_h[l], kIndexGroupSize);
+      std::vector<DataT> ldata(padded * dim);
+      raft::update_host(ldata.data(), data_ptrs_h[l], ldata.size(), stream_);
+      raft::resource::sync_stream(handle_);
+      size_t mism_here = 0;
+      for (uint32_t r = 0; r < sizes_h[l]; r++) {
+        auto id = ids[r];
+        if (id < 0 || size_t(id) >= n_db) {
+          bad_ids++;
+          continue;
+        }
+        seen[id]++;
+        where_list[id] = l;
+        uint32_t vl    = idx.veclen();
+        for (uint32_t d = 0; d < dim; d++) {
+          size_t off = size_t(r / kIndexGroupSize) * kIndexGroupSize * dim +
+                       size_t(d - d % vl) * kIndexGroupSize + size_t(r % kIndexGroupSize) * vl +
+                       d % vl;
+          if (std::memcmp(&ldata[off], &db_h[size_t(id) * dim + d], sizeof(DataT)) != 0) {
+            mism_here++;
+            break;
+          }
+        }
+      }
+      data_mismatch += mism_here;
+      data_mismatch_lists += mism_here > 0;
+    }
+    size_t missing = 0, dup = 0;
+    for (size_t i = 0; i < n_db; i++) {
+      missing += seen[i] == 0;
+      dup += seen[i] > 1;
+    }
+    os << "[DIAG " << where << "] ids: out of range=" << bad_ids << " missing=" << missing
+       << " duplicated=" << dup << " rows whose list data != database=" << data_mismatch << " (in "
+       << data_mismatch_lists << " lists)" << std::endl;
+
+    // 4. Results
+    size_t res_invalid = 0, res_nan = 0, res_max = 0, q_zero_match = 0;
+    for (size_t i = 0; i < nq; i++) {
+      size_t matches = 0;
+      for (size_t j = 0; j < k; j++) {
+        auto id = ivf_idx[i * k + j];
+        auto dd = ivf_dist[i * k + j];
+        res_invalid += id < 0 || size_t(id) >= n_db;
+        res_nan += std::isnan(dd);
+        res_max += dd == std::numeric_limits<T>::max() || dd == std::numeric_limits<T>::lowest() ||
+                   std::isinf(dd);
+        for (size_t jj = 0; jj < k; jj++)
+          if (std::abs(dd - naive_dist[i * k + jj]) <= 0.001 || id == naive_idx[i * k + jj]) {
+            matches++;
+            break;
+          }
+      }
+      q_zero_match += matches == 0;
+    }
+    os << "[DIAG " << where << "] results: invalid ids=" << res_invalid << " NaN dists=" << res_nan
+       << " inf/max dists=" << res_max << " queries with 0 matches=" << q_zero_match << std::endl;
+
+    // 5. Per-query details for the first queries
+    auto qnorm = [&](size_t q) {
+      double s = 0;
+      for (uint32_t d = 0; d < dim; d++) {
+        double v = static_cast<float>(q_h[q * dim + d]);
+        s += v * v;
+      }
+      return std::sqrt(s);
+    };
+    for (size_t q = 0; q < std::min<size_t>(3, nq); q++) {
+      os << "[DIAG " << where << "] query " << q << " = (";
+      for (uint32_t d = 0; d < std::min<uint32_t>(dim, 8); d++)
+        os << static_cast<float>(q_h[q * dim + d]) << (d + 1 < dim ? "," : "");
+      os << ")" << std::endl << "  naive: ";
+      for (size_t j = 0; j < k; j++) {
+        auto id = naive_idx[q * k + j] + db_offset;
+        os << id << ":" << naive_dist[q * k + j] << "[L"
+           << (size_t(id) < n_db ? where_list[id] : -2) << "] ";
+      }
+      os << std::endl << "  ivf:   ";
+      for (size_t j = 0; j < k; j++) {
+        auto id = ivf_idx[q * k + j];
+        os << id << ":" << ivf_dist[q * k + j] << "[L"
+           << (id >= 0 && size_t(id) < n_db ? where_list[id] : -2) << "] ";
+      }
+      os << std::endl;
+      // coarse ranking (host), cosine/inner/L2 approximations
+      std::vector<std::pair<double, uint32_t>> cd(n_lists);
+      double qn = qnorm(q);
+      for (uint32_t l = 0; l < n_lists; l++) {
+        double dot = 0, l2 = 0;
+        for (uint32_t d = 0; d < dim; d++) {
+          double c = centers_h[size_t(l) * dim + d];
+          double x = static_cast<float>(q_h[q * dim + d]);
+          dot += c * x;
+          l2 += (c - x) * (c - x);
+        }
+        double cn = cnorm_h.empty() ? 1.0 : cnorm_h[l];
+        double v  = ps.metric == cuvs::distance::DistanceType::CosineExpanded ? -dot / (qn * cn)
+                    : ps.metric == cuvs::distance::DistanceType::InnerProduct ? -dot
+                                                                              : l2;
+        if (std::isnan(v)) v = 1e30;
+        cd[l] = {v, l};
+      }
+      std::sort(cd.begin(), cd.end());
+      os << "  coarse top-" << ps.nprobe << " (list:dist:size): ";
+      for (size_t j = 0; j < std::min<size_t>(ps.nprobe, n_lists); j++)
+        os << cd[j].second << ":" << cd[j].first << ":" << sizes_h[cd[j].second] << " ";
+      os << std::endl;
+    }
   }
 
   void testIVFFlat()
@@ -203,6 +434,33 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         raft::update_host(
           indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
+
+        {
+          float diag_eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
+          if (!eval_neighbours(indices_naive,
+                               indices_ivfflat,
+                               distances_naive,
+                               distances_ivfflat,
+                               ps.num_queries,
+                               ps.k,
+                               diag_eps,
+                               min_recall)) {
+            diagnose("testIVFFlat/index_loaded",
+                     index_loaded,
+                     indices_naive,
+                     distances_naive,
+                     indices_ivfflat,
+                     distances_ivfflat,
+                     0);
+            diagnose("testIVFFlat/index_2",
+                     index_2,
+                     indices_naive,
+                     distances_naive,
+                     indices_ivfflat,
+                     distances_ivfflat,
+                     0);
+          }
+        }
 
         // Test the centroid invariants
         if (index_2.adaptive_centers()) {
@@ -474,6 +732,85 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         raft::update_host(
           indices_ivfflat.data(), indices_ivfflat_dev.data_handle(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
+
+        float diag_eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
+        if (!eval_neighbours(indices_naive,
+                             indices_ivfflat,
+                             distances_naive,
+                             distances_ivfflat,
+                             ps.num_queries,
+                             ps.k,
+                             diag_eps,
+                             min_recall)) {
+          diagnose("testFilter",
+                   index,
+                   indices_naive,
+                   distances_naive,
+                   indices_ivfflat,
+                   distances_ivfflat,
+                   0);
+          // Repeat the same search on the same index to tell a corrupted index from a transient
+          // search-time error.
+          std::vector<IdxT> idx2(queries_size);
+          std::vector<T> dist2(queries_size);
+          ivf_flat::search(handle_,
+                           search_params,
+                           index,
+                           search_queries_view,
+                           indices_ivfflat_dev.view(),
+                           distances_ivfflat_dev.view(),
+                           bitset_filter_obj);
+          raft::update_host(
+            dist2.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);
+          raft::update_host(idx2.data(), indices_ivfflat_dev.data_handle(), queries_size, stream_);
+          raft::resource::sync_stream(handle_);
+          std::cout << "[DIAG testFilter] re-search with the same filter:" << std::endl;
+          (void)eval_neighbours(indices_naive,
+                                idx2,
+                                distances_naive,
+                                dist2,
+                                ps.num_queries,
+                                ps.k,
+                                diag_eps,
+                                min_recall);
+          // Rebuild the bitset and search again.
+          cuvs::core::bitset<std::uint32_t, IdxT> bitset2(
+            handle_, removed_indices.view(), ps.num_db_vecs);
+          std::vector<uint32_t> bits_h(bitset2.view().n_elements());
+          std::vector<uint32_t> bits_old(removed_indices_bitset.view().n_elements());
+          raft::update_host(bits_h.data(), bitset2.view().data(), bits_h.size(), stream_);
+          raft::update_host(
+            bits_old.data(), removed_indices_bitset.view().data(), bits_old.size(), stream_);
+          raft::resource::sync_stream(handle_);
+          size_t diff_words = 0, zero_bits = 0;
+          for (size_t i = 0; i < bits_h.size(); i++) {
+            diff_words += bits_h[i] != bits_old[i];
+            zero_bits += 32 - __builtin_popcount(bits_old[i]);
+          }
+          std::cout << "[DIAG testFilter] bitset words=" << bits_old.size()
+                    << " differing words vs fresh bitset=" << diff_words
+                    << " zero bits in original=" << zero_bits << std::endl;
+          ivf_flat::search(handle_,
+                           search_params,
+                           index,
+                           search_queries_view,
+                           indices_ivfflat_dev.view(),
+                           distances_ivfflat_dev.view(),
+                           cuvs::neighbors::filtering::bitset_filter(bitset2.view()));
+          raft::update_host(
+            dist2.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);
+          raft::update_host(idx2.data(), indices_ivfflat_dev.data_handle(), queries_size, stream_);
+          raft::resource::sync_stream(handle_);
+          std::cout << "[DIAG testFilter] re-search with a fresh bitset:" << std::endl;
+          (void)eval_neighbours(indices_naive,
+                                idx2,
+                                distances_naive,
+                                dist2,
+                                ps.num_queries,
+                                ps.k,
+                                diag_eps,
+                                min_recall);
+        }
       }
       float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
       ASSERT_TRUE(eval_neighbours(indices_naive,
@@ -505,6 +842,11 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(1), DataT(20));
     }
     raft::resource::sync_stream(handle_);
+    db_host_.resize(ps.num_db_vecs * ps.dim);
+    q_host_.resize(ps.num_queries * ps.dim);
+    raft::update_host(db_host_.data(), database.data(), db_host_.size(), stream_);
+    raft::update_host(q_host_.data(), search_queries.data(), q_host_.size(), stream_);
+    raft::resource::sync_stream(handle_);
   }
 
   void TearDown() override
@@ -520,6 +862,8 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   AnnIvfFlatInputs<IdxT> ps;
   rmm::device_uvector<DataT> database;
   rmm::device_uvector<DataT> search_queries;
+  std::vector<DataT> db_host_;
+  std::vector<DataT> q_host_;
 };
 
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
