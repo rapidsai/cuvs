@@ -88,7 +88,17 @@ def pytest_sessionfinish(session, exitstatus):
     try:
         for line in open("/proc/self/maps"):
             p = line.split()[-1]
-            if any(k in p for k in ("nvrtc", "cudart", "nvJitLink", "cublas")):
+            if any(
+                k in p
+                for k in (
+                    "nvrtc",
+                    "cudart",
+                    "nvJitLink",
+                    "cublas",
+                    "cusolver",
+                    "cusparse",
+                )
+            ):
                 libs.add(os.path.realpath(p))
     except OSError:
         pass
