@@ -24,7 +24,7 @@ rapids-mamba-retry env create --yes -f env.yaml -n test
 
 rapids-logger "Create debugging tools environments"
 rapids-mamba-retry create --yes -n dbg -c conda-forge gdb py-spy || true
-rapids-mamba-retry create --yes -n cudagdb -c conda-forge "cuda-gdb=12.9" "cuda-version=12.9" || true
+rapids-mamba-retry create --yes -n cudagdb -c conda-forge "cuda-gdb=12.9" "cuda-sanitizer-api=12.9" "cuda-version=12.9" || true
 DBG_BIN=/opt/conda/envs/dbg/bin
 CUDA_GDB=$(ls /opt/conda/envs/cudagdb/bin/cuda-gdb 2>/dev/null || true)
 
@@ -215,6 +215,7 @@ run_watched() {
 set +e
 
 CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
+CI_DIR="${PWD}/ci"
 PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240 -o junit_family=xunit2)
 
 # CPU hogs to emulate a CPU-starved runner (noisy neighbors), which widens host-side race windows.
@@ -231,6 +232,24 @@ stop_hogs() {
   HOG_PIDS=()
 }
 
+rapids-logger "compute-sanitizer on the host-input product quantizer tests"
+SANITIZER=$(find /opt/conda/envs/cudagdb -name compute-sanitizer -type f -perm -u+x 2>/dev/null | head -1)
+echo "compute-sanitizer: ${SANITIZER}"
+pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
+python -m pytest --collect-only -q -p no:cacheprovider tests/test_product_quantizer.py 2>/dev/null \
+  | grep -E "test_product_quantizer\[False-.*-64-700\]" | sed "s|^cuvs/||" > "${DIAG_DIR}/pq_host_ids.txt" || true
+head -3 "${DIAG_DIR}/pq_host_ids.txt"
+wc -l "${DIAG_DIR}/pq_host_ids.txt"
+if [[ -n "${SANITIZER}" ]]; then
+  # shellcheck disable=SC2046
+  timeout 45m "${SANITIZER}" --tool memcheck --print-limit 100 --error-exitcode 0 \
+    python -m pytest -q -p no:cacheprovider $(cat "${DIAG_DIR}/pq_host_ids.txt") 2>&1 | tail -150
+  # shellcheck disable=SC2046
+  timeout 30m "${SANITIZER}" --tool initcheck --print-limit 100 --error-exitcode 0 \
+    python -m pytest -q -p no:cacheprovider $(head -8 "${DIAG_DIR}/pq_host_ids.txt") 2>&1 | tail -150
+fi
+popd > /dev/null || exit 1
+
 # GPU core dumps on demand: writing to the pipe makes the driver dump the GPU state of the process.
 export CUDA_ENABLE_USER_TRIGGERED_COREDUMP=1
 export CUDA_COREDUMP_PIPE="${DIAG_DIR}/corepipe.%p"
@@ -238,7 +257,7 @@ export CUDA_COREDUMP_FILE="${DIAG_DIR}/core.cuda.%p"
 export CUDA_COREDUMP_GENERATION_FLAGS="skip_global_memory,skip_shared_memory,skip_local_memory"
 
 # Total budget for the repeat loop (seconds).
-BUDGET=$(( 170 * 60 ))
+BUDGET=$(( 120 * 60 ))
 LOOP_START=$(date +%s)
 i=0
 while (( $(date +%s) - LOOP_START < BUDGET )); do
@@ -250,7 +269,8 @@ while (( $(date +%s) - LOOP_START < BUDGET )); do
 
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
   # Host-input product quantizer tests followed by the CAGRA tests in one process.
-  run_watched "iter${i}-pq-cagra" 480 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+  PYTHONPATH="${CI_DIR}:${PYTHONPATH:-}" run_watched "iter${i}-pq-cagra" 480 \
+      python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" -p hang_sync_plugin \
       tests/test_product_quantizer.py tests/test_cagra.py
   popd > /dev/null || exit 1
   stop_hogs
