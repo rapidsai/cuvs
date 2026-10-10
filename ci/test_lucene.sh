@@ -95,7 +95,36 @@ rapids-logger "Run cuvs-lucene tests against the amd64-built classes"
 # compilation for this run, forcing test to use amd64-compiled jar instead of
 # local code.
 pushd java/cuvs-lucene
-mvn --batch-mode test -Dskip.compile=true
+MVN_TEST=(mvn --batch-mode test -Dskip.compile=true -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false)
+FAILING_SEED=(-Dtests.seed=2A18DA9484B33896 -Dtests.locale=to-Latn-TO -Dtests.timezone=Etc/GMT-1)
+
+rapids-logger "DIAG: replay failing seed 2A18DA9484B33896 (GPU format x3, then Lucene CPU HNSW formats)"
+for rep in 1 2 3; do
+  echo "SEEDRUN gpu rep=${rep}"
+  "${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' "${FAILING_SEED[@]}" 2>&1 | grep -E "DIAG|AssertionError|Tests run:" | head -10 || true
+done
+for fmt in default 32; do
+  echo "SEEDRUN cpuFormat=${fmt}"
+  "${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' "${FAILING_SEED[@]}" -Ddiag.cpuFormat="${fmt}" 2>&1 | grep -E "DIAG|AssertionError|Tests run:" | head -10 || true
+done
+
+rapids-logger "DIAG: recall sweep (GPU format vs Lucene CPU HNSW on the same segments)"
+"${MVN_TEST[@]}" -Dtest='TestDiagRandomizedHNSWRecall' -Ddiag.minutes=40 2>&1 | grep -E "DIAGSWEEP|AssertionError|Exception|Tests run:" || true
+
+rapids-logger "DIAG: TestCuVSRandomizedHNSWVectorSearch with random seeds"
+fails=0
+runs=0
+end=$((SECONDS + 30 * 60))
+while [ "${SECONDS}" -lt "${end}" ]; do
+  runs=$((runs + 1))
+  out=$("${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' 2>&1)
+  echo "${out}" | grep -E "^DIAG" | sed "s/^/LOOP iter=${runs} /" || true
+  if echo "${out}" | grep -q "AssertionError\|BUILD FAILURE"; then
+    fails=$((fails + 1))
+    echo "LOOP iter=${runs} FAILED: $(echo "${out}" | grep -E 'AssertionError|reproduce with' | head -2 | tr '\n' ' ')"
+  fi
+done
+echo "LOOP TestCuVSRandomizedHNSWVectorSearch failures=${fails}/${runs}"
 popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"

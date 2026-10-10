@@ -49,7 +49,12 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
       Logger.getLogger(TestCuVSRandomizedHNSWVectorSearch.class.getName());
 
   static final Codec codec =
-      TestUtil.alwaysKnnVectorsFormat(new Lucene99AcceleratedHNSWVectorsFormat());
+      TestUtil.alwaysKnnVectorsFormat(
+          "default".equals(System.getProperty("diag.cpuFormat"))
+              ? new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat()
+              : "32".equals(System.getProperty("diag.cpuFormat"))
+                  ? new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat(32, 32)
+                  : new Lucene99AcceleratedHNSWVectorsFormat());
   static IndexSearcher searcher;
   static IndexReader reader;
   static Directory directory;
@@ -143,10 +148,88 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
           Level.FINE, "\t" + reader.storedFields().document(hit.doc).get("id") + ": " + hit.score);
     }
 
+    printDiagnostics(queries[0], topK, hits);
+
     for (ScoreDoc hit : hits) {
       int doc = Integer.parseInt(reader.storedFields().document(hit.doc).get("id"));
       assertTrue("Result returned was not in topK*3: " + doc, expected.get(0).contains(doc));
     }
+  }
+
+  private static void printDiagnostics(float[] query, int topK, ScoreDoc[] hits)
+      throws IOException {
+    int n = dataset.length;
+    double[] dist = new double[n];
+    List<Integer> order = new ArrayList<>();
+    for (int j = 0; j < n; j++) {
+      if (!hasVector[j]) continue;
+      double d = 0;
+      for (int x = 0; x < query.length; x++) {
+        double diff = query[x] - dataset[j][x];
+        d += diff * diff;
+      }
+      dist[j] = d;
+      order.add(j);
+    }
+    order.sort((a, b) -> Double.compare(dist[a], dist[b]));
+    int nv = order.size();
+    int[] rank = new int[n];
+    for (int r = 0; r < nv; r++) rank[order.get(r)] = r + 1;
+    List<Integer> segs = new ArrayList<>();
+    for (var ctx : reader.leaves()) {
+      var v = ctx.reader().getFloatVectorValues("vector");
+      segs.add(v == null ? 0 : v.size());
+    }
+    StringBuilder sb = new StringBuilder();
+    int worst = 0;
+    int worstId = -1;
+    String violation = "";
+    for (ScoreDoc hit : hits) {
+      int id = Integer.parseInt(reader.storedFields().document(hit.doc).get("id"));
+      if (id < 0 || id >= n || !hasVector[id]) {
+        violation += " invalid:" + id;
+        continue;
+      }
+      float expectedScore = VectorSimilarityFunction.EUCLIDEAN.compare(query, dataset[id]);
+      if (Math.abs(expectedScore - hit.score) > 1e-4f * expectedScore) {
+        violation += " scoreMismatch:" + id + "(" + hit.score + " vs " + expectedScore + ")";
+      }
+      sb.append(id).append('@').append(rank[id]).append(' ');
+      if (rank[id] > worst) {
+        worst = rank[id];
+        worstId = id;
+      }
+    }
+    int all =
+        searcher.search(new KnnFloatVectorQuery("vector", query, Math.max(nv, 1)), Math.max(nv, 1))
+            .scoreDocs
+            .length;
+    int kth = order.get(Math.min(topK, nv) - 1);
+    int k3 = order.get(Math.min(3 * topK, nv) - 1);
+    System.out.println(
+        String.format(
+            java.util.Locale.ROOT,
+            "DIAG n=%d nv=%d dims=%d topK=%d segs=%s format=%s worstId=%d worstRank=%d window=%d"
+                + " %s d(worst)/d(1st)=%.4f d(worst)/d(k-th)=%.4f d(3k-th)/d(1st)=%.4f"
+                + " d(last)/d(1st)=%.4f reachable=%d/%d%s hits(id@rank)=[%s]",
+            n,
+            nv,
+            dataset[0].length,
+            topK,
+            segs,
+            System.getProperty("diag.cpuFormat", "gpu"),
+            worstId,
+            worst,
+            3 * topK,
+            worst > 3 * topK ? "MISS" : "ok",
+            worstId < 0 ? 0 : Math.sqrt(dist[worstId] / dist[order.get(0)]),
+            worstId < 0 ? 0 : Math.sqrt(dist[worstId] / dist[kth]),
+            Math.sqrt(dist[k3] / dist[order.get(0)]),
+            Math.sqrt(dist[order.get(nv - 1)] / dist[order.get(0)]),
+            all,
+            nv,
+            violation.isEmpty() ? "" : " VIOLATION" + violation,
+            sb.toString().trim()));
   }
 
   private static List<List<Integer>> generateExpectedResults(
