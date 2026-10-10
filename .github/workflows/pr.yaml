@@ -32,4 +32,4 @@ jobs:
       run_codecov: false
       container-options: "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
       matrix_type: "pull-request,nightly"
-      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | [range(4) as $i | .[] | . + {COPY: $i}]'
+      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | [range(1) as $i | .[] | . + {COPY: $i}]'
