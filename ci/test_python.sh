@@ -121,7 +121,7 @@ dump_diag() {
       timeout 120 "${DBG_BIN}/py-spy" dump --native --pid "${p}" 2>&1 | head -60 || true
     fi
   done
-  sleep 30
+  sleep 15
   echo "---- log size before/after the py-spy attach: ${size0} -> $(stat -c %s "${log}")"
   for p in ${pids}; do
     if grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
@@ -178,6 +178,8 @@ print('cagra ok', n.copy_to_host()[0, :3], round(time.time() - t, 2), 's', flush
 HANGS=0
 HANG_LIST=""
 # run_watched <name> <stall_seconds> <cmd...>
+# On a stall: capture diagnostics, attach cuda-gdb (which unsticks the stall), record where the
+# process resumes, and keep watching. Kill only after several stalls in the same process.
 run_watched() {
   local name=$1 stall=$2
   shift 2
@@ -189,7 +191,7 @@ run_watched() {
   local pid=$!
   tail -n +1 -F "${log}" 2>/dev/null &
   local tailpid=$!
-  local last_size=-1 last_change now size hung=0
+  local last_size=-1 last_change now size stalls=0 killed=0
   last_change=$(date +%s)
   while kill -0 "${pid}" 2>/dev/null; do
     sleep 5
@@ -199,44 +201,48 @@ run_watched() {
       last_size=${size}
       last_change=${now}
     elif (( now - last_change > stall )); then
-      hung=1
-      break
+      stalls=$((stalls + 1))
+      HANGS=$((HANGS + 1))
+      HANG_LIST="${HANG_LIST} ${name}#${stalls}"
+      echo "!!!!! HANG DETECTED in ${name} (stall ${stalls}) after $(( now - start ))s (no output for ${stall}s)"
+      dump_diag "${pid}" "${log}"
+      sleep 20
+      echo "---- 20 s after cuda-gdb detach: log size $(stat -c %s "${log}") (was ${size})"
+      for p in $(descendants "${pid}"); do
+        if grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
+          timeout 120 "${DBG_BIN}/py-spy" dump --native --pid "${p}" 2>&1 | grep -E "cuvs|raft|test_|cuda|cub" | head -15 || true
+        fi
+      done
+      nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader || true
+      if (( stalls >= 4 )); then
+        echo "---- ${stalls} stalls in ${name}; killing it"
+        for p in $(descendants "${pid}"); do kill -9 "${p}" 2>/dev/null || true; done
+        killed=1
+        break
+      fi
+      last_change=$(date +%s)
     fi
   done
+  if (( killed )); then
+    for _ in $(seq 1 60); do kill -0 "${pid}" 2>/dev/null || break; sleep 2; done
+  fi
+  wait "${pid}" 2>/dev/null
+  local rc=$?
   sleep 2
   kill "${tailpid}" 2>/dev/null || true
   wait "${tailpid}" 2>/dev/null || true
-  local rc=0
-  if (( hung )); then
-    HANGS=$((HANGS + 1))
-    HANG_LIST="${HANG_LIST} ${name}"
-    echo "!!!!! HANG DETECTED in ${name} after $(( $(date +%s) - start ))s (no output for ${stall}s)"
-    dump_diag "${pid}" "${log}"
-    for p in $(descendants "${pid}"); do kill -9 "${p}" 2>/dev/null || true; done
-    for _ in $(seq 1 60); do kill -0 "${pid}" 2>/dev/null || break; sleep 2; done
-    if kill -0 "${pid}" 2>/dev/null; then
-      echo "---- process ${pid} still alive 120 s after SIGKILL:"
-      thread_times "${pid}" | head -5
-    else
-      wait "${pid}" 2>/dev/null
-    fi
-    rc=124
-    post_kill_probe
-  else
-    wait "${pid}"
-    rc=$?
-  fi
-  echo "<<<<< END ${name}: rc=${rc} elapsed=$(( $(date +%s) - start ))s"
+  if (( stalls > 0 )); then post_kill_probe; fi
+  echo "<<<<< END ${name}: rc=${rc} stalls=${stalls} elapsed=$(( $(date +%s) - start ))s"
   return ${rc}
 }
 
 set +e
 
 CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
-PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240 -o junit_family=xunit2)
+PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=120 -o junit_family=xunit2)
 
 # Total budget for the repeat loop (seconds).
-BUDGET=$(( 120 * 60 ))
+BUDGET=$(( 160 * 60 ))
 LOOP_START=$(date +%s)
 i=0
 while (( $(date +%s) - LOOP_START < BUDGET )); do
@@ -253,13 +259,10 @@ while (( $(date +%s) - LOOP_START < BUDGET )); do
     pq-cagra) FILES=(tests/test_product_quantizer.py tests/test_cagra.py) ;;
     *) echo "unknown bucket ${BUCKET}"; exit 1 ;;
   esac
-  run_watched "iter${i}-${BUCKET}" 480 \
+  run_watched "iter${i}-${BUCKET}" 240 \
       python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" "${FILES[@]}"
   popd > /dev/null || exit 1
 
-  if (( HANGS >= 2 )); then
-    break
-  fi
 done
 
 rapids-logger "HANG SUMMARY (${BUCKET}): ${HANGS} hang(s) in ${i} iteration(s):${HANG_LIST}"
