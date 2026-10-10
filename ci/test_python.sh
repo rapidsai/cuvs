@@ -236,8 +236,8 @@ nsys_summary() {
   ls -la "${rep}"
   local db="${rep%.nsys-rep}.sqlite"
   timeout 900 "${NSYS}" export --type sqlite --force-overwrite true -o "${db}" "${rep}" > /dev/null 2>&1 || echo "export failed"
-  timeout 900 "${NSYS}" stats -q --format csv -r cuda_api_sum,cuda_gpu_kern_sum,cuda_gpu_mem_time_sum,um_sum,um_total_sum,um_cpu_page_faults_sum "${db}" 2>&1 | cut -c1-240 | head -150 || true
-  python "${PWD}/ci/b3_nsys_query.py" "${db}" 2>&1 | head -300 || true
+  timeout 900 "${NSYS}" stats -q --format csv -r cuda_api_sum,cuda_gpu_kern_sum,cuda_gpu_mem_time_sum,um_sum,um_total_sum,um_cpu_page_faults_sum "${db}" 2>&1 | cut -c1-240 | grep -vE "^[0-9.]+,[0-9]+,[0-9]+,[0-9.]+,.*(void |cutlass|cub::)" | head -250 || true
+  python "${CI_DIR}/b3_nsys_query.py" "${db}" 2>&1 | head -300 || true
 }
 
 set +e
