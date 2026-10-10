@@ -53,6 +53,33 @@ import org.junit.Test;
 @SuppressSysoutChecks(bugUrl = "")
 public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
 
+  /** Lucene's CPU HNSW format with the dimension limit raised to the accelerated format's 4096. */
+  public static final class HighDimHnswFormat extends KnnVectorsFormat {
+    private final KnnVectorsFormat delegate;
+
+    public HighDimHnswFormat(KnnVectorsFormat delegate) {
+      super(delegate.getName());
+      this.delegate = delegate;
+    }
+
+    @Override
+    public org.apache.lucene.codecs.KnnVectorsWriter fieldsWriter(
+        org.apache.lucene.index.SegmentWriteState state) throws java.io.IOException {
+      return delegate.fieldsWriter(state);
+    }
+
+    @Override
+    public org.apache.lucene.codecs.KnnVectorsReader fieldsReader(
+        org.apache.lucene.index.SegmentReadState state) throws java.io.IOException {
+      return delegate.fieldsReader(state);
+    }
+
+    @Override
+    public int getMaxDimensions(String fieldName) {
+      return 4096;
+    }
+  }
+
   static final String[] FIELDS = {"gpu", "cpu", "cpu32"};
   static final int[] KS = {1, 2, 3, 5, 8, 13, 21, 34, 55, 64, 89, 128, 200};
   static final int NUM_QUERIES = 10;
@@ -76,6 +103,136 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
     }
   }
 
+  /** Unwraps to the per-field HNSW reader and returns the field's graph, or null. */
+  static org.apache.lucene.util.hnsw.HnswGraph graphOf(
+      org.apache.lucene.index.LeafReader leaf, String field) throws Exception {
+    org.apache.lucene.index.LeafReader r = org.apache.lucene.index.FilterLeafReader.unwrap(leaf);
+    if (!(r instanceof org.apache.lucene.index.CodecReader cr)) return null;
+    Object vr = cr.getVectorReader();
+    for (int i = 0; i < 8 && vr != null; i++) {
+      if (vr instanceof org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader h) {
+        return h.getGraph(field);
+      }
+      if (vr
+          instanceof org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat.FieldsReader pf) {
+        vr = pf.getFieldReader(field);
+        continue;
+      }
+      java.lang.reflect.Field f = null;
+      for (Class<?> c = vr.getClass(); c != null && f == null; c = c.getSuperclass()) {
+        try {
+          f = c.getDeclaredField("delegate");
+        } catch (NoSuchFieldException e) {
+          // keep looking
+        }
+      }
+      if (f == null) return null;
+      f.setAccessible(true);
+      vr = f.get(vr);
+    }
+    return null;
+  }
+
+  /**
+   * For each leaf: vector count, the best global rank present in the leaf, the global ranks the
+   * leaf-only search returns for k, and level-0 graph stats (entry node, degree min/avg/max,
+   * invalid/self/duplicate neighbors, nodes reachable from the entry node).
+   */
+  static String leafReport(IndexReader reader, String field, float[] query, int k, int[] rankById) {
+    StringBuilder sb = new StringBuilder();
+    try {
+      for (LeafReaderContext ctx : reader.leaves()) {
+        FloatVectorValues v = ctx.reader().getFloatVectorValues(field);
+        int nv = v == null ? 0 : v.size();
+        sb.append(" {leaf=").append(ctx.ord).append(" nv=").append(nv);
+        if (nv == 0) {
+          sb.append('}');
+          continue;
+        }
+        StoredFields sf = ctx.reader().storedFields();
+        int best = Integer.MAX_VALUE;
+        for (int ord = 0; ord < nv; ord++) {
+          int id = Integer.parseInt(sf.document(v.ordToDoc(ord)).get("id"));
+          best = Math.min(best, rankById[id]);
+        }
+        IndexSearcher leafSearcher = new IndexSearcher(ctx.reader());
+        ScoreDoc[] hits =
+            leafSearcher.search(new KnnFloatVectorQuery(field, query, k), k).scoreDocs;
+        int[] ranks = new int[hits.length];
+        for (int h = 0; h < hits.length; h++) {
+          ranks[h] = rankById[Integer.parseInt(sf.document(hits[h].doc).get("id"))];
+        }
+        sb.append(" bestRank=").append(best).append(" returned=").append(Arrays.toString(ranks));
+        org.apache.lucene.util.hnsw.HnswGraph g = graphOf(ctx.reader(), field);
+        if (g == null) {
+          sb.append(" graph=?}");
+          continue;
+        }
+        int size = g.size();
+        int minDeg = Integer.MAX_VALUE, maxDeg = 0, invalid = 0, self = 0, dup = 0;
+        long sumDeg = 0;
+        int[][] adj = new int[size][];
+        for (int node = 0; node < size; node++) {
+          g.seek(0, node);
+          List<Integer> nb = new ArrayList<>();
+          Set<Integer> seen = new HashSet<>();
+          for (int n = g.nextNeighbor();
+              n != org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
+              n = g.nextNeighbor()) {
+            if (n < 0 || n >= size) {
+              invalid++;
+              continue;
+            }
+            if (n == node) self++;
+            if (!seen.add(n)) dup++;
+            nb.add(n);
+          }
+          adj[node] = nb.stream().mapToInt(Integer::intValue).toArray();
+          minDeg = Math.min(minDeg, nb.size());
+          maxDeg = Math.max(maxDeg, nb.size());
+          sumDeg += nb.size();
+        }
+        int entry = g.entryNode();
+        boolean[] vis = new boolean[size];
+        java.util.ArrayDeque<Integer> dq = new java.util.ArrayDeque<>();
+        int reach = 0;
+        if (entry >= 0 && entry < size) {
+          dq.add(entry);
+          vis[entry] = true;
+        }
+        while (!dq.isEmpty()) {
+          int x = dq.poll();
+          reach++;
+          for (int y : adj[x]) {
+            if (!vis[y]) {
+              vis[y] = true;
+              dq.add(y);
+            }
+          }
+        }
+        sb.append(
+            String.format(
+                Locale.ROOT,
+                " graph(size=%d levels=%d entry=%d deg=%d/%.1f/%d invalid=%d self=%d dup=%d"
+                    + " reachable=%d entryDeg=%d)}",
+                size,
+                g.numLevels(),
+                entry,
+                minDeg,
+                (double) sumDeg / size,
+                maxDeg,
+                invalid,
+                self,
+                dup,
+                reach,
+                entry >= 0 && entry < size ? adj[entry].length : -1));
+      }
+    } catch (Exception e) {
+      sb.append(" leafReportError=").append(e);
+    }
+    return sb.toString();
+  }
+
   static int dimBucket(int dims) {
     if (dims <= 16) return 0;
     if (dims <= 128) return 1;
@@ -92,8 +249,8 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
     long deadline = System.nanoTime() + (long) (minutes * 60e9);
 
     KnnVectorsFormat gpuFormat = new Lucene99AcceleratedHNSWVectorsFormat();
-    KnnVectorsFormat cpuFormat = new Lucene99HnswVectorsFormat();
-    KnnVectorsFormat cpu32Format = new Lucene99HnswVectorsFormat(32, 32);
+    KnnVectorsFormat cpuFormat = new HighDimHnswFormat(new Lucene99HnswVectorsFormat());
+    KnnVectorsFormat cpu32Format = new HighDimHnswFormat(new Lucene99HnswVectorsFormat(32, 32));
     Codec codec =
         new AssertingCodec() {
           @Override
@@ -312,6 +469,14 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
                           inTopK,
                           expectedCount,
                           Arrays.toString(hitRanks)));
+                  if (f == 0) {
+                    System.out.println(
+                        "DIAGSWEEP MISSLEAVES trial="
+                            + trials
+                            + " k="
+                            + k
+                            + leafReport(reader, field, queries[q], k, rank));
+                  }
                 }
               }
             }

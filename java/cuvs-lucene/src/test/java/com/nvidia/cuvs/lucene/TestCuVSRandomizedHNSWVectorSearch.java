@@ -51,9 +51,11 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
   static final Codec codec =
       TestUtil.alwaysKnnVectorsFormat(
           "default".equals(System.getProperty("diag.cpuFormat"))
-              ? new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat()
+              ? new TestDiagRandomizedHNSWRecall.HighDimHnswFormat(
+                  new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat())
               : "32".equals(System.getProperty("diag.cpuFormat"))
-                  ? new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat(32, 32)
+                  ? new TestDiagRandomizedHNSWRecall.HighDimHnswFormat(
+                      new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat(32, 32))
                   : new Lucene99AcceleratedHNSWVectorsFormat());
   static IndexSearcher searcher;
   static IndexReader reader;
@@ -200,6 +202,12 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
         worstId = id;
       }
     }
+    int[] rankById = new int[n];
+    java.util.Arrays.fill(rankById, -1);
+    for (int r = 0; r < nv; r++) rankById[order.get(r)] = r + 1;
+    System.out.println(
+        "DIAG leaves:"
+            + TestDiagRandomizedHNSWRecall.leafReport(reader, "vector", query, topK, rankById));
     int all =
         searcher.search(new KnnFloatVectorQuery("vector", query, Math.max(nv, 1)), Math.max(nv, 1))
             .scoreDocs
