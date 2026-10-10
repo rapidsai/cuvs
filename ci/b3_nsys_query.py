@@ -69,6 +69,31 @@ if "CUPTI_ACTIVITY_KIND_KERNEL" in T:
             f"  {r['start'] / 1e9:.4f} {(r['end'] - r['start']) / 1e6:9.3f} ms s{r['streamId']} {s(r['demangledName'])[:150]}"
         )
 
+if "CUPTI_ACTIVITY_KIND_MEMCPY" in T:
+    # CUPTI memory kinds: 0 unknown, 1 pageable, 2 pinned, 3 device, 4 array, 5 managed
+    print("== memcpy histogram by (copyKind, srcKind, dstKind)")
+    for r in q(
+        "SELECT copyKind, srcKind, dstKind, count(*) n, sum(bytes) b, sum(end-start) d, max(end-start) mx FROM CUPTI_ACTIVITY_KIND_MEMCPY GROUP BY copyKind, srcKind, dstKind ORDER BY n DESC"
+    ):
+        print(
+            f"  copyKind={r['copyKind']} src={r['srcKind']} dst={r['dstKind']}: n={r['n']} bytes={r['b']} total={r['d'] / 1e6:.1f} ms max={r['mx'] / 1e6:.2f} ms"
+        )
+    print("== pageable-source/destination memcpys per 10 s bucket")
+    for r in q(
+        "SELECT CAST(start/10e9 AS INT) b, count(*) n, sum(end-start) d FROM CUPTI_ACTIVITY_KIND_MEMCPY WHERE srcKind=1 OR dstKind=1 GROUP BY b ORDER BY b"
+    ):
+        print(
+            f"    t={r['b'] * 10:5d}s n={r['n']} total={r['d'] / 1e6:.1f} ms"
+        )
+    print("== API calls by name for memcpy-like calls")
+    if "CUPTI_ACTIVITY_KIND_RUNTIME" in T:
+        for r in q(
+            "SELECT nameId, count(*) n, sum(end-start) d, max(end-start) mx FROM CUPTI_ACTIVITY_KIND_RUNTIME GROUP BY nameId ORDER BY d DESC LIMIT 25"
+        ):
+            print(
+                f"  {s(r['nameId'])}: n={r['n']} total={r['d'] / 1e6:.1f} ms max={r['mx'] / 1e6:.2f} ms"
+            )
+
 for t in ("CUPTI_ACTIVITY_KIND_MEMCPY", "CUPTI_ACTIVITY_KIND_MEMSET"):
     if t in T:
         print(f"== last 15 {t} (start s, dur ms, bytes, kinds)")
