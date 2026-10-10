@@ -263,9 +263,10 @@ case "${EXP}" in
   cachecupy) export CUPY_CACHE_IN_MEMORY=1 ;;
   eager) export CUDA_MODULE_LOADING=EAGER ;;
   pinnvrtc|pincudart) ;;
+  kvikiocompat) export KVIKIO_COMPAT_MODE=ON ;;
   *) echo "unknown experiment ${EXP}"; exit 1 ;;
 esac
-env | grep -E "^(CUDA_|B3_)" || true
+env | grep -E "^(CUDA_|B3_|KVIKIO_|CUPY_)" || true
 
 BUDGET=$(( 115 * 60 ))
 LOOP_START=$(date +%s)

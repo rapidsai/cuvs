@@ -33,4 +33,4 @@ jobs:
       container-options: "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
       matrix_type: "nightly"
       # One experiment per job, selected by the DEPENDENCIES suffix (see ci/test_python.sh).
-      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2" and .LINUX_VER == "ubuntu24.04")) | .[0:1] | [.[] | (. + {DEPENDENCIES: "latest-eager"}), (. + {DEPENDENCIES: "latest-pinnvrtc"}), (. + {DEPENDENCIES: "latest-pincudart"})]'
+      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2" and .LINUX_VER == "ubuntu24.04")) | .[0:1] | [.[] | (. + {DEPENDENCIES: "latest-eager"}), (. + {DEPENDENCIES: "latest-pinnvrtc"}), (. + {DEPENDENCIES: "latest-pincudart"}), (. + {DEPENDENCIES: "latest-kvikiocompat"})]'
