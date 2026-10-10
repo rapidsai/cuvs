@@ -6,6 +6,7 @@
 #pragma once
 
 #include "kmeans_common.cuh"
+#include "kmeans_fixed_point_sums.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
 #include "../../core/nvtx.hpp"
@@ -43,6 +44,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <tuple>
 #include <type_traits>
@@ -211,6 +213,17 @@ auto calc_minibatch_size(const raft::resources& handle,
   return std::make_tuple(minibatch_size, mem_per_row);
 }
 
+/** The dataset as a random-access iterator over MathT values (mapping only if T != MathT). */
+template <typename MathT, typename T, typename MappingOpT>
+auto math_iterator(const T* dataset, MappingOpT mapping_op)
+{
+  if constexpr (std::is_same_v<T, MathT>) {
+    return dataset;
+  } else {
+    return thrust::transform_iterator<MappingOpT, const T*>(dataset, mapping_op);
+  }
+}
+
 /**
  * @brief Given the data and labels, calculate cluster centers and sizes in one sweep.
  *
@@ -236,6 +249,9 @@ auto calc_minibatch_size(const raft::resources& handle,
  *    the weighted average principle.
  * @param[in] mapping_op Mapping operation from T to MathT
  * @param[inout] mr (optional) Memory resource to use for temporary allocations on the device
+ * @param[inout] workspace Scratch buffer, resized as needed (reuse it across calls to avoid
+ *    allocating every time)
+ * @param[inout] accumulator Fixed-point accumulator whose scales were set for `dataset`
  */
 template <typename T,
           typename MathT,
@@ -253,7 +269,9 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             const LabelT* labels,
                             bool reset_counters,
                             MappingOpT mapping_op,
-                            rmm::device_async_resource_ref mr)
+                            rmm::device_async_resource_ref mr,
+                            rmm::device_uvector<char>& workspace,
+                            fixed_point_sums::accumulator<MathT>& accumulator)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -265,8 +283,6 @@ void calc_centers_and_sizes(const raft::resources& handle,
       handle, raft::make_const_mdspan(centersView), clusterSizesView, centersView, raft::mul_op{});
   }
 
-  rmm::device_uvector<char> workspace(0, stream, mr);
-
   // If we reset the counters, we can compute directly the new sizes in cluster_sizes.
   // If we don't reset, we compute in a temporary buffer and add in a separate step.
   rmm::device_uvector<CounterT> temp_cluster_sizes(0, stream, mr);
@@ -276,32 +292,10 @@ void calc_centers_and_sizes(const raft::resources& handle,
     temp_sizes = temp_cluster_sizes.data();
   }
 
-  // Apply mapping only when the data and math types are different.
-  if constexpr (std::is_same_v<T, MathT>) {
-    raft::linalg::reduce_rows_by_key(dataset,
-                                     dim,
-                                     labels,
-                                     nullptr,
-                                     n_rows,
-                                     dim,
-                                     n_clusters,
-                                     centers,
-                                     stream.get(),
-                                     reset_counters);
-  } else {
-    // todo(lsugy): use iterator from KV output of fusedL2NN
-    thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset, mapping_op);
-    raft::linalg::reduce_rows_by_key(mapping_itr,
-                                     dim,
-                                     labels,
-                                     nullptr,
-                                     n_rows,
-                                     dim,
-                                     n_clusters,
-                                     centers,
-                                     stream.get(),
-                                     reset_counters);
-  }
+  // Sum the rows of each cluster exactly (fixed-point), so that identical builds give
+  // bitwise-identical centers. Apply mapping only when the data and math types are different.
+  accumulator.sums_by_label(
+    handle, math_iterator<MathT>(dataset, mapping_op), labels, n_rows, centers, reset_counters);
 
   // Compute weight of each cluster
   cuvs::cluster::kmeans::detail::countLabels(
@@ -321,6 +315,43 @@ void calc_centers_and_sizes(const raft::resources& handle,
                                                              clusterSizesView,
                                                              centersView,
                                                              raft::div_checkzero_op{});
+}
+
+/** Same as above, with a temporary workspace and accumulator. */
+template <typename T,
+          typename MathT,
+          typename IdxT,
+          typename LabelT,
+          typename CounterT,
+          typename MappingOpT>
+void calc_centers_and_sizes(const raft::resources& handle,
+                            MathT* centers,
+                            CounterT* cluster_sizes,
+                            IdxT n_clusters,
+                            IdxT dim,
+                            const T* dataset,
+                            IdxT n_rows,
+                            const LabelT* labels,
+                            bool reset_counters,
+                            MappingOpT mapping_op,
+                            rmm::device_async_resource_ref mr)
+{
+  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle), mr);
+  fixed_point_sums::accumulator<MathT> accumulator(handle, dim, n_clusters, mr);
+  accumulator.set_scale(handle, math_iterator<MathT>(dataset, mapping_op), n_rows);
+  calc_centers_and_sizes(handle,
+                         centers,
+                         cluster_sizes,
+                         n_clusters,
+                         dim,
+                         dataset,
+                         n_rows,
+                         labels,
+                         reset_counters,
+                         mapping_op,
+                         mr,
+                         workspace,
+                         accumulator);
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */
@@ -640,7 +671,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
                                      IdxT average,
                                      MathT centroid_offset,
                                      IdxT seed,
-                                     IdxT* search_count,
+                                     IdxT stride,
                                      IdxT* update_count,
                                      MappingOpT mapping_op)
 {
@@ -652,12 +683,17 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   IdxT i = n_rows;
   IdxT j = raft::laneId();
   if (j == 0) {
+    // The candidate sequence of each receiver is derived from its index (not from a shared atomic
+    // counter), so the donor points do not depend on the order in which the warps run.
+    // `stride >= n_clusters`, so different receivers use different counters (and thus, before
+    // wrapping around, different candidates); `stride` is coprime with `n_rows`, so each receiver
+    // visits every row within `n_rows` attempts and finds a donor whenever one exists.
     IdxT attempt = 0;
     do {
-      auto old = atomicAdd(search_count, IdxT{1});
-      auto candidate =
-        static_cast<IdxT>((static_cast<int64_t>(seed) * static_cast<int64_t>(old + 1)) %
-                          static_cast<int64_t>(n_rows));
+      auto counter = static_cast<int64_t>(attempt) * static_cast<int64_t>(stride) +
+                     static_cast<int64_t>(receiver_cluster);
+      auto candidate = static_cast<IdxT>((static_cast<int64_t>(seed) * (counter + 1)) %
+                                         static_cast<int64_t>(n_rows));
       if (static_cast<IdxT>(cluster_sizes[labels[candidate]]) >= average) { i = candidate; }
       ++attempt;
     } while (i >= n_rows && attempt < n_rows);
@@ -791,6 +827,7 @@ auto adjust_centers(const raft::resources& handle,
                     MathT balance_upper_tolerance,
                     MathT centroid_offset,
                     cuvs::cluster::kmeans::balanced_donor_selection donor_selection,
+                    uint32_t balancing_step,
                     MappingOpT mapping_op,
                     rmm::device_async_resource_ref device_memory) -> bool
 {
@@ -802,7 +839,6 @@ auto adjust_centers(const raft::resources& handle,
                                       601,  659,  733,  809,  863,  941,  1013, 1069, 1151, 1223,
                                       1291, 1373, 1451, 1511, 1583, 1657, 1733, 1811, 1889, 1987,
                                       2053, 2129, 2213, 2287, 2357, 2423, 2531, 2617, 2687, 2741};
-  static IdxT i_primes = 0;
 
   auto average         = static_cast<MathT>(n_rows) / static_cast<MathT>(n_clusters);
   auto lower_threshold = average * balance_lower_tolerance;
@@ -837,10 +873,12 @@ auto adjust_centers(const raft::resources& handle,
   auto n_pairs = static_cast<IdxT>(host_receiver_clusters.size());
   if (n_pairs == 0) { return false; }
 
+  // Rotate the pseudo-random offset with the balancing step (rather than with a process-wide
+  // counter), so that identical builds pick the same donor points.
   IdxT ofst;
+  size_t i_primes = balancing_step;
   do {
-    i_primes = (i_primes + 1) % kPrimes.size();
-    ofst     = kPrimes[i_primes];
+    ofst = kPrimes[i_primes++ % kPrimes.size()];
   } while (n_rows % ofst == 0);
 
   rmm::device_uvector<IdxT> receiver_clusters(n_pairs, stream, device_memory);
@@ -851,8 +889,11 @@ auto adjust_centers(const raft::resources& handle,
   update_count.set_value_to_zero_async(stream);
 
   if (donor_selection == cuvs::cluster::kmeans::balanced_donor_selection::Random) {
-    rmm::device_scalar<IdxT> search_count(stream, device_memory);
-    search_count.set_value_to_zero_async(stream);
+    // The smallest stride >= n_clusters that is coprime with n_rows (see the kernel).
+    auto stride = std::max<IdxT>(n_clusters, 1);
+    while (std::gcd(static_cast<uint64_t>(stride), static_cast<uint64_t>(n_rows)) != 1) {
+      ++stride;
+    }
     const dim3 grid_dim(raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1, 1);
     adjust_centers_random_donor_kernel<kBlockDimY>
       <<<grid_dim, block_dim, 0, stream.get()>>>(centers,
@@ -866,7 +907,7 @@ auto adjust_centers(const raft::resources& handle,
                                                  static_cast<IdxT>(n_rows / n_clusters),
                                                  centroid_offset,
                                                  ofst,
-                                                 search_count.data(),
+                                                 stride,
                                                  update_count.data(),
                                                  mapping_op);
     return update_count.value(stream) > 0;  // NB: rmm scalar performs the sync
@@ -963,6 +1004,11 @@ void balancing_em_iters(const raft::resources& handle,
   RAFT_EXPECTS(params.centroid_offset > 0.0f && params.centroid_offset <= 1.0f,
                "Balanced k-means centroid offset must be in the range (0, 1]");
 
+  // Reused by every M step, so that they are not reallocated on each iteration. The dataset does
+  // not change, so the fixed-point scales are computed once.
+  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle), device_memory);
+  fixed_point_sums::accumulator<MathT> accumulator(handle, dim, n_clusters, device_memory);
+  accumulator.set_scale(handle, math_iterator<MathT>(dataset, mapping_op), n_rows);
   uint32_t balancing_counter = balancing_pullback;
   for (uint32_t iter = 0; iter < n_iters; iter++) {
     // Balancing step - move the centers around to equalize cluster sizes
@@ -979,6 +1025,7 @@ void balancing_em_iters(const raft::resources& handle,
                                    balance_upper_tolerance,
                                    static_cast<MathT>(params.centroid_offset),
                                    params.donor_selection,
+                                   iter,
                                    mapping_op,
                                    device_memory)) {
       if (balancing_counter++ >= balancing_pullback) {
@@ -1025,7 +1072,9 @@ void balancing_em_iters(const raft::resources& handle,
                            cluster_labels,
                            true,
                            mapping_op,
-                           device_memory);
+                           device_memory,
+                           workspace,
+                           accumulator);
   }
 }
 
