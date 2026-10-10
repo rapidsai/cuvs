@@ -7,8 +7,8 @@ set -euo pipefail
 # Usage: ci/test_cpp.sh [SHARD NUM_SHARDS]
 # With SHARD and NUM_SHARDS (1 <= SHARD <= NUM_SHARDS), only every NUM_SHARDS-th libcuvs test is
 # run, starting from test number SHARD, so the tests can be split across several CI jobs.
-SHARD=${1:-1}
-NUM_SHARDS=${2:-1}
+export SHARD=${1:-1}
+export NUM_SHARDS=${2:-1}
 
 . /opt/conda/etc/profile.d/conda.sh
 
@@ -52,23 +52,38 @@ nvidia-smi
 # RAPIDS_DATASET_ROOT_DIR is used by test scripts
 RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
 export RAPIDS_DATASET_ROOT_DIR
-./ci/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
+# (test data download skipped for the MG repro loop)
 
 EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-# Run Python build utilities tests (once, in the first shard)
-if [[ "${SHARD}" == "1" ]]; then
-  rapids-logger "Run libcuvs Python build utilities tests"
-  pytest cpp/tests/python
-fi
-
-# Run libcuvs gtests from libcuvs-tests package
-rapids-logger "Run libcuvs tests (shard ${SHARD} of ${NUM_SHARDS})"
+# [DO NOT MERGE] Reproduce flaky NEIGHBORS_MG_TEST (CAGRA SHARDED/ROUND_ROBIN on a single GPU).
+# Run the affected cases repeatedly in fresh processes for a fixed time budget and count aborts.
+rapids-logger "Repeat NEIGHBORS_MG_TEST AnnMG/5, /8, /14"
+nvidia-smi -L
 pushd "$CONDA_PREFIX"/bin/gtests/libcuvs
-timeout -v --signal=SIGINT --kill-after=60s 100m ctest -j8 --output-on-failure -I "${SHARD},,${NUM_SHARDS}"
+MG_FILTER='AnnMGTest/AnnMGTestF_float.AnnMG/5:AnnMGTest/AnnMGTestF_float.AnnMG/8:AnnMGTest/AnnMGTestF_float.AnnMG/14'
+END=$((SECONDS + 50 * 60))
+N_PROC=0
+N_FAIL=0
+N_OK=0
+while [[ ${SECONDS} -lt ${END} ]]; do
+  N_PROC=$((N_PROC + 1))
+  timeout -v --signal=SIGINT --kill-after=60s 20m ./NEIGHBORS_MG_TEST --gtest_filter="${MG_FILTER}" --gtest_repeat=20 > mg_run.log 2>&1
+  rc=$?
+  ok=$(grep -c 'OK \]' mg_run.log)
+  N_OK=$((N_OK + ok))
+  if [[ ${rc} -ne 0 ]]; then
+    N_FAIL=$((N_FAIL + 1))
+    echo "=== process ${N_PROC} FAILED (rc=${rc}) after ${ok} passing tests; last test started:"
+    grep 'RUN ' mg_run.log | tail -1
+    grep -v -E 'Recall =|^\[ *(RUN|OK) |^Note:|^Repeating|^$' mg_run.log | tail -40
+  fi
+done
 popd
+echo "MG SUMMARY: ${N_FAIL}/${N_PROC} processes failed, ${N_OK} tests passed"
+if [[ ${N_FAIL} -gt 0 ]]; then EXITCODE=1; fi
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
