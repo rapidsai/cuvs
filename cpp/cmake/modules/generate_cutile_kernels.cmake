@@ -34,14 +34,23 @@ function(_cutile_detect)
     return()
   endif()
 
+  # bin2c is installed next to the real nvcc. In conda environments, CUDAToolkit_BIN_DIR is
+  # targets/<arch>/bin, which only contains an nvcc symlink, so also search the symlink target's
+  # directory.
+  set(bin2c_dirs ${CUDAToolkit_BIN_DIR})
+  if(CUDAToolkit_NVCC_EXECUTABLE)
+    get_filename_component(nvcc_real_path "${CUDAToolkit_NVCC_EXECUTABLE}" REALPATH)
+    get_filename_component(nvcc_real_dir "${nvcc_real_path}" DIRECTORY)
+    list(APPEND bin2c_dirs "${nvcc_real_dir}")
+  endif()
   find_program(
     CUVS_CUTILE_BIN2C
     NAMES bin2c
-    PATHS ${CUDAToolkit_BIN_DIR}
+    PATHS ${bin2c_dirs}
     NO_DEFAULT_PATH
   )
   if(NOT CUVS_CUTILE_BIN2C)
-    message(STATUS "cuTile disabled: bin2c not found in ${CUDAToolkit_BIN_DIR}.")
+    message(STATUS "cuTile disabled: bin2c not found in ${bin2c_dirs}.")
     return()
   endif()
 
