@@ -24,7 +24,7 @@ rapids-mamba-retry env create --yes -f env.yaml -n test
 
 rapids-logger "Create debugging tools environments"
 rapids-mamba-retry create --yes -n dbg -c conda-forge gdb py-spy || true
-rapids-mamba-retry create --yes -n cudagdb -c conda-forge "cuda-gdb=12.9" "cuda-sanitizer-api=12.9" "cuda-version=12.9" || true
+rapids-mamba-retry create --yes -n cudagdb -c conda-forge "cuda-gdb=12.9" "cuda-version=12.9" || true
 DBG_BIN=/opt/conda/envs/dbg/bin
 CUDA_GDB=$(ls /opt/conda/envs/cudagdb/bin/cuda-gdb 2>/dev/null || true)
 
@@ -109,6 +109,8 @@ dump_diag() {
     thread_times "${p}"
     grep -E "^(VmRSS|VmSwap|Threads|voluntary|nonvoluntary)" /proc/"${p}"/status || true
   done
+  echo "---- nvidia-smi dmon (power/util/clocks/pcie)"
+  timeout 20 nvidia-smi dmon -s pucvmet -c 5 || true
   size0=$(stat -c %s "${log}")
   # One ptrace-based sample, then check whether the process resumes on its own.
   for p in ${pids}; do
@@ -126,39 +128,49 @@ dump_diag() {
       thread_times "${p}" | head -3
     fi
   done
-  # GPU core dump through the user-triggered coredump pipe, then inspect it offline.
   for p in ${pids}; do
-    pipe="${DIAG_DIR}/corepipe.${p}"
-    if [[ ! -p "${pipe}" ]]; then
-      echo "---- pipes in ${DIAG_DIR}:"; find "${DIAG_DIR}" -maxdepth 1 -type p
-      pipe=$(find "${DIAG_DIR}" -maxdepth 1 -type p -name "corepipe*" | tail -1)
-    fi
-    if [[ -n "${pipe}" && -p "${pipe}" ]]; then
-      echo "---- triggering GPU coredump through ${pipe}"
-      timeout 30 sh -c "echo 1 > '${pipe}'" || echo "pipe write timed out"
-      for _ in $(seq 1 60); do
-        if ! kill -0 "${p}" 2>/dev/null; then break; fi
-        sleep 5
-      done
-      find "${DIAG_DIR}" -maxdepth 1 -name "core*" -exec ls -la {} + || true
-      for core in "${DIAG_DIR}"/core.cuda.*; do
-        [[ -f "${core}" ]] || continue
-        if [[ -n "${CUDA_GDB}" ]]; then
-          timeout 600 "${CUDA_GDB}" -batch -nx \
-            -ex "set pagination off" \
-            -ex "target cudacore ${core}" \
-            -ex "info cuda kernels" \
-            -ex "info cuda blocks" \
-            -ex "info cuda warps" \
-            -ex "bt" \
-            -ex "info cuda lanes" 2>&1 | head -300 || true
-        fi
-      done
-    else
-      echo "---- no coredump pipe ${pipe}"; find "${DIAG_DIR}" -maxdepth 1 | head
+    if [[ -n "${CUDA_GDB}" ]] && grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
+      echo "---- cuda-gdb ${p}"
+      timeout 300 "${CUDA_GDB}" -p "${p}" -batch -nx \
+        -ex "set pagination off" \
+        -ex "info cuda contexts" \
+        -ex "info cuda kernels" \
+        -ex "info cuda blocks" \
+        -ex "bt 30" 2>&1 | grep -vE "^\[(New|Thread) " | head -120 || true
+      echo "---- log size after cuda-gdb: $(stat -c %s "${log}")"
     fi
   done
   echo "########## END HANG DIAGNOSTICS"
+}
+
+# GPU state after the hung process is gone: is the hang per process or per GPU?
+post_kill_probe() {
+  echo "---- nvidia-smi after kill"
+  sleep 5
+  nvidia-smi || true
+  nvidia-smi -q -d UTILIZATION,PERFORMANCE,PIDS,ECC 2>&1 | head -80 || true
+  echo "---- fresh process: alloc/free + small kernel"
+  timeout 120 python -c "
+import time, cupy as cp
+t = time.time()
+a = cp.arange(1 << 20, dtype=cp.float32); s = float(a.sum()); del a
+cp.cuda.runtime.deviceSynchronize()
+print('cupy ok', s, round(time.time() - t, 2), 's', flush=True)
+" 2>&1 | tail -3
+  echo "fresh cupy rc=$?"
+  echo "---- fresh process: CAGRA build (IVF-PQ graph) + search"
+  timeout 300 python -c "
+import time, numpy as np
+from pylibraft.common import device_ndarray
+from cuvs.neighbors import cagra
+t = time.time()
+x = device_ndarray(np.random.random_sample((2048, 32)).astype(np.float32))
+idx = cagra.build(cagra.IndexParams(build_algo='ivf_pq'), x)
+d, n = cagra.search(cagra.SearchParams(), idx, x, 10)
+print('cagra ok', n.copy_to_host()[0, :3], round(time.time() - t, 2), 's', flush=True)
+" 2>&1 | tail -3
+  echo "fresh cagra rc=$?"
+  nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv || true
 }
 
 HANGS=0
@@ -199,11 +211,15 @@ run_watched() {
     echo "!!!!! HANG DETECTED in ${name} after $(( $(date +%s) - start ))s (no output for ${stall}s)"
     dump_diag "${pid}" "${log}"
     for p in $(descendants "${pid}"); do kill -9 "${p}" 2>/dev/null || true; done
-    wait "${pid}" 2>/dev/null
+    for _ in $(seq 1 60); do kill -0 "${pid}" 2>/dev/null || break; sleep 2; done
+    if kill -0 "${pid}" 2>/dev/null; then
+      echo "---- process ${pid} still alive 120 s after SIGKILL:"
+      thread_times "${pid}" | head -5
+    else
+      wait "${pid}" 2>/dev/null
+    fi
     rc=124
-    echo "---- nvidia-smi after kill"
-    sleep 5
-    nvidia-smi || true
+    post_kill_probe
   else
     wait "${pid}"
     rc=$?
@@ -215,46 +231,7 @@ run_watched() {
 set +e
 
 CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
-CI_DIR="${PWD}/ci"
 PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240 -o junit_family=xunit2)
-
-# CPU hogs to emulate a CPU-starved runner (noisy neighbors), which widens host-side race windows.
-HOG_PIDS=()
-start_hogs() {
-  local n=$1
-  for _ in $(seq 1 "${n}"); do
-    sh -c 'while :; do :; done' &
-    HOG_PIDS+=($!)
-  done
-}
-stop_hogs() {
-  for p in "${HOG_PIDS[@]}"; do kill "${p}" 2>/dev/null || true; done
-  HOG_PIDS=()
-}
-
-rapids-logger "compute-sanitizer on the host-input product quantizer tests"
-SANITIZER=$(find /opt/conda/envs/cudagdb -name compute-sanitizer -type f -perm -u+x 2>/dev/null | head -1)
-echo "compute-sanitizer: ${SANITIZER}"
-pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
-python -m pytest --collect-only -q -p no:cacheprovider tests/test_product_quantizer.py 2>/dev/null \
-  | grep -E "test_product_quantizer\[False-.*-64-700\]" | sed "s|^cuvs/||" > "${DIAG_DIR}/pq_host_ids.txt" || true
-head -3 "${DIAG_DIR}/pq_host_ids.txt"
-wc -l "${DIAG_DIR}/pq_host_ids.txt"
-if [[ -n "${SANITIZER}" ]]; then
-  # shellcheck disable=SC2046
-  timeout 45m "${SANITIZER}" --tool memcheck --print-limit 100 --error-exitcode 0 \
-    python -m pytest -q -p no:cacheprovider $(cat "${DIAG_DIR}/pq_host_ids.txt") 2>&1 | tail -150
-  # shellcheck disable=SC2046
-  timeout 30m "${SANITIZER}" --tool initcheck --print-limit 100 --error-exitcode 0 \
-    python -m pytest -q -p no:cacheprovider $(head -8 "${DIAG_DIR}/pq_host_ids.txt") 2>&1 | tail -150
-fi
-popd > /dev/null || exit 1
-
-# GPU core dumps on demand: writing to the pipe makes the driver dump the GPU state of the process.
-export CUDA_ENABLE_USER_TRIGGERED_COREDUMP=1
-export CUDA_COREDUMP_PIPE="${DIAG_DIR}/corepipe.%p"
-export CUDA_COREDUMP_FILE="${DIAG_DIR}/core.cuda.%p"
-export CUDA_COREDUMP_GENERATION_FLAGS="skip_global_memory,skip_shared_memory,skip_local_memory"
 
 # Total budget for the repeat loop (seconds).
 BUDGET=$(( 120 * 60 ))
@@ -262,24 +239,20 @@ LOOP_START=$(date +%s)
 i=0
 while (( $(date +%s) - LOOP_START < BUDGET )); do
   i=$((i + 1))
-  NHOGS=$(( (i % 2) * 12 ))
-  rapids-logger "Iteration ${i}, ${NHOGS} CPU hogs (hangs so far: ${HANGS}:${HANG_LIST})"
-  start_hogs "${NHOGS}"
-  cat /proc/loadavg
+  rapids-logger "Iteration ${i} (hangs so far: ${HANGS}:${HANG_LIST})"
+  nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader || true
 
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
   # Host-input product quantizer tests followed by the CAGRA tests in one process.
-  PYTHONPATH="${CI_DIR}:${PYTHONPATH:-}" run_watched "iter${i}-pq-cagra" 480 \
-      python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" -p hang_sync_plugin \
+  run_watched "iter${i}-pq-cagra" 480 \
+      python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
       tests/test_product_quantizer.py tests/test_cagra.py
   popd > /dev/null || exit 1
-  stop_hogs
 
   if (( HANGS >= 2 )); then
     break
   fi
 done
-stop_hogs
 
 rapids-logger "HANG SUMMARY: ${HANGS} hang(s) in ${i} iteration(s):${HANG_LIST}"
 if (( HANGS > 0 )); then
