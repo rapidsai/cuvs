@@ -232,6 +232,8 @@ case "${EXP}" in
   rmmpool) B3_SHIM=rmm_pool ;;
   rmmmanaged) B3_SHIM=rmm_managed ;;
   sepproc) ;;
+  cachewarm) ;;
+  cachecold) export CUDA_CACHE_DISABLE=1 CUPY_CACHE_IN_MEMORY=1 ;;
   *) echo "unknown experiment ${EXP}"; exit 1 ;;
 esac
 env | grep -E "^(CUDA_|B3_)" || true
@@ -239,6 +241,20 @@ env | grep -E "^(CUDA_|B3_)" || true
 BUDGET=$(( 115 * 60 ))
 LOOP_START=$(date +%s)
 NSYS_REF_DONE=0
+CACHE_MARK="${DIAG_DIR}/cache.mark"
+touch "${CACHE_MARK}"
+# Files written outside the workspace and conda since the loop started (JIT/kernel caches, temp files).
+new_files() {
+  find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /opt/conda -o -path "${GITHUB_WORKSPACE:-/__w}" -o -path /__w \) -prune \
+    -o -newer "${CACHE_MARK}" -type f -print 2>/dev/null | grep -v "${DIAG_DIR}" | head -60
+}
+clear_caches() {
+  echo "---- clearing caches before iteration ${i}:"; new_files | sed 's/^/  removing /'
+  rm -rf ~/.nv ~/.cupy ~/.cache/cuvs ~/.cache/raft "${CUVS_TESTS_DIR}/.pytest_cache" 2>/dev/null
+  new_files | xargs -r rm -f
+  find /tmp /var/tmp -mindepth 1 -maxdepth 1 -newer "${CACHE_MARK}" ! -path "${DIAG_DIR}*" -exec rm -rf {} + 2>/dev/null
+  echo "---- remaining new files:"; new_files
+}
 i=0
 pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
 while (( $(date +%s) - LOOP_START < BUDGET )); do
@@ -269,6 +285,11 @@ while (( $(date +%s) - LOOP_START < BUDGET )); do
       else
         rm -f "${rep}.nsys-rep" "${rep}.sqlite"
       fi
+      ;;
+    cache*)
+      if [[ "${EXP}" == cachecold ]]; then clear_caches; fi
+      run_watched "iter${i}-pq-cagra" "${STALL}" python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests/test_product_quantizer.py tests/test_cagra.py
+      if (( i <= 2 )); then echo "---- files written since the loop started (after iteration ${i}):"; new_files; du -sh ~/.nv ~/.cupy ~/.cache 2>/dev/null; fi
       ;;
     *)
       run_watched "iter${i}-pq-cagra" "${STALL}" python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests/test_product_quantizer.py tests/test_cagra.py
