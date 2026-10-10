@@ -84,3 +84,12 @@ def pytest_sessionfinish(session, exitstatus):
 
     cp.cuda.runtime.deviceSynchronize()
     _KEEP.clear()
+    libs = set()
+    try:
+        for line in open("/proc/self/maps"):
+            p = line.split()[-1]
+            if any(k in p for k in ("nvrtc", "cudart", "nvJitLink", "cublas")):
+                libs.add(os.path.realpath(p))
+    except OSError:
+        pass
+    print(f"\n[b3-shim] loaded CUDA libs: {sorted(libs)}", flush=True)

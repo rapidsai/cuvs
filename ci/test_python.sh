@@ -40,9 +40,35 @@ if [[ "${EXP}" == nsys* ]]; then
   [[ -n "${NSYS}" ]] && "${NSYS}" --version
 fi
 
+if [[ "${EXP}" == pin* ]]; then
+  rapids-logger "Pin experiment ${EXP}: overlay CUDA 12.2 user-space libraries into the test env"
+  rapids-mamba-retry create --yes -n nv122 -c conda-forge "cuda-version=12.2" cuda-nvrtc cuda-cudart || { echo "PIN ENV FAILED"; exit 1; }
+  case "${EXP}" in
+    pinnvrtc) PIN_GLOB="libnvrtc*.so*" ;;
+    pincudart) PIN_GLOB="libcudart.so*" ;;
+  esac
+  # shellcheck disable=SC2086
+  ls -la /opt/conda/envs/test/lib/${PIN_GLOB} || true
+  # shellcheck disable=SC2086
+  for f in /opt/conda/envs/nv122/lib/${PIN_GLOB}; do cp -af "${f}" /opt/conda/envs/test/lib/; done
+  echo "after overlay:"
+  # shellcheck disable=SC2086
+  ls -la /opt/conda/envs/test/lib/${PIN_GLOB}
+fi
+
 set +u
 conda activate test
 set -u
+python - <<'PYEOF' || true
+import os
+import cupy as cp
+import cuvs.neighbors.cagra  # noqa: F401
+cp.arange(1000, dtype=cp.float32).sum().item()  # forces an NVRTC compile
+print("nvrtc version (cupy):", cp.cuda.nvrtc.getVersion())
+print("runtime version (cupy):", cp.cuda.runtime.runtimeGetVersion())
+libs = sorted({os.path.realpath(l.split()[-1]) for l in open("/proc/self/maps") if any(k in l for k in ("nvrtc", "cudart", "nvJitLink"))})
+print("loaded:", libs)
+PYEOF
 
 rapids-print-env
 
@@ -236,6 +262,7 @@ case "${EXP}" in
   cachenv) export CUDA_CACHE_DISABLE=1 ;;
   cachecupy) export CUPY_CACHE_IN_MEMORY=1 ;;
   eager) export CUDA_MODULE_LOADING=EAGER ;;
+  pinnvrtc|pincudart) ;;
   *) echo "unknown experiment ${EXP}"; exit 1 ;;
 esac
 env | grep -E "^(CUDA_|B3_)" || true
