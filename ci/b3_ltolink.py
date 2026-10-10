@@ -51,7 +51,9 @@ lopts = [b"-lto", f"-arch=sm_{arch}".encode()]
 larr = (ctypes.c_char_p * len(lopts))(*lopts)
 rc = jl.nvJitLinkCreate(ctypes.byref(h), len(lopts), larr)
 print("create rc", rc)
-NVJITLINK_INPUT_LTOIR = 5
+NVJITLINK_INPUT_LTOIR = (
+    3  # nvJitLinkInputType: NONE=0, CUBIN=1, PTX=2, LTOIR=3
+)
 rc = jl.nvJitLinkAddData(h, NVJITLINK_INPUT_LTOIR, ltoir, sz, b"frag")
 print("add rc", rc)
 rc = jl.nvJitLinkComplete(h)

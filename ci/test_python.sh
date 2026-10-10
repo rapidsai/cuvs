@@ -267,10 +267,10 @@ cache_info "before the loop"
 rapids-logger "Prelude: does an nvJitLink -lto cubin go through the driver JIT cache?"
 rapids-mamba-retry create --yes -n cutools -c conda-forge cuda-cuobjdump "cuda-version=${RAPIDS_CUDA_VERSION%.*}" > /dev/null 2>&1 || true
 CUOBJDUMP=$(find /opt/conda/envs/cutools -name cuobjdump -type f 2>/dev/null | head -1)
-CUDA_CACHE_PATH="${DIAG_DIR}/lto-cache" python "${CI_DIR}/b3_ltolink.py" "${CONDA_PREFIX}" 90 "${DIAG_DIR}/lto.cubin" 2>&1 | tail -25
+for cc in 90 89; do CUDA_CACHE_PATH="${DIAG_DIR}/lto-cache-${cc}" python "${CI_DIR}/b3_ltolink.py" "${CONDA_PREFIX}" "${cc}" "${DIAG_DIR}/lto-${cc}.cubin" 2>&1 | tail -25; done
 echo "cuobjdump: ${CUOBJDUMP}"
-[[ -n "${CUOBJDUMP}" ]] && "${CUOBJDUMP}" -lelf -lptx "${DIAG_DIR}/lto.cubin" 2>&1 | head -20
-python "${CI_DIR}/b3_cache_info.py" "${DIAG_DIR}/lto-cache" 2>&1 | head -20
+[[ -n "${CUOBJDUMP}" ]] && "${CUOBJDUMP}" -lelf -lptx "${DIAG_DIR}"/lto-*.cubin 2>&1 | head -20
+python "${CI_DIR}/b3_cache_info.py" "${DIAG_DIR}"/lto-cache-* 2>&1 | head -20
 if [[ "${EXP}" == cachewarm ]]; then
   rapids-logger "Probe: PTX JIT disabled, empty driver cache (which modules need JIT?)"
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
