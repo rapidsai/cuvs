@@ -7,8 +7,6 @@ set -euo pipefail
 # Usage: ci/test_cpp.sh [SHARD NUM_SHARDS]
 # With SHARD and NUM_SHARDS (1 <= SHARD <= NUM_SHARDS), only every NUM_SHARDS-th libcuvs test is
 # run, starting from test number SHARD, so the tests can be split across several CI jobs.
-SHARD=${1:-1}
-NUM_SHARDS=${2:-1}
 
 . /opt/conda/etc/profile.d/conda.sh
 
@@ -58,17 +56,13 @@ EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-# Run Python build utilities tests (once, in the first shard)
-if [[ "${SHARD}" == "1" ]]; then
-  rapids-logger "Run libcuvs Python build utilities tests"
-  pytest cpp/tests/python
-fi
-
-# Run libcuvs gtests from libcuvs-tests package
-rapids-logger "Run libcuvs tests (shard ${SHARD} of ${NUM_SHARDS})"
-pushd "$CONDA_PREFIX"/bin/gtests/libcuvs
-timeout -v --signal=SIGINT --kill-after=60s 100m ctest -j8 --output-on-failure -I "${SHARD},,${NUM_SHARDS}"
-popd
+# Reproducer for IVF-RaBitQ search on queries that coincide with a list centroid.
+T="$CONDA_PREFIX"/bin/gtests/libcuvs/NEIGHBORS_ANN_IVF_RABITQ_TEST
+rapids-logger "Run the IVF-RaBitQ exact-match test 20 times"
+timeout -v --signal=SIGINT --kill-after=60s 30m "$T" \
+  --gtest_filter='IvfRabitq/ivf_rabitq_exact_match_test.*' --gtest_repeat=20 --gtest_brief=1
+rapids-logger "Run the full IVF-RaBitQ test 3 times"
+timeout -v --signal=SIGINT --kill-after=60s 60m "$T" --gtest_repeat=3 --gtest_brief=1
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
