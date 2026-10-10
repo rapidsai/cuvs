@@ -31,6 +31,6 @@ jobs:
       script: ci/test_python.sh
       run_codecov: false
       container-options: "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
-      matrix_type: "nightly"
+      matrix_type: "pull-request,nightly"
       # One experiment per job, selected by the DEPENDENCIES suffix (see ci/test_python.sh).
-      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2" and .LINUX_VER == "ubuntu24.04")) | .[0:1] | [.[] | (. + {DEPENDENCIES: "latest-nsys"}), (. + {DEPENDENCIES: "latest-sepproc"}), (. + {DEPENDENCIES: "latest-pinned"}), (. + {DEPENDENCIES: "latest-clb"})]'
+      matrix_filter: '(map(select(.GPU == "h100" and .CUDA_VER == "12.9.2" and .LINUX_VER == "ubuntu24.04")) | .[0:1] | [.[] | (. + {DRIVER: "earliest", DEPENDENCIES: "latest-drv580"}), (. + {DEPENDENCIES: "latest-rmmasync"}), (. + {DEPENDENCIES: "latest-rmmpool"})]) + (map(select(.GPU == "h100" and .CUDA_VER == "12.2.2")) | .[0:1] | [.[] | . + {DRIVER: "latest", DEPENDENCIES: "oldest-drv595"}])'
