@@ -171,7 +171,11 @@ void search_impl(raft::resources const& handle,
       [=] __device__(const uint32_t idx, const float dist) {
         const auto query   = idx / n_lists;
         const auto cluster = idx % n_lists;
-        return dist / (q_norm_ptr[query] * index_center_norm_ptr[cluster]);
+        // k-means leaves a zero center for a list that ends up empty. Cosine distance involving a
+        // zero-norm vector is defined as 1 (similarity 0) instead of NaN, which would corrupt the
+        // selection of the lists to probe.
+        const float denom = q_norm_ptr[query] * index_center_norm_ptr[cluster];
+        return denom > 0.0f ? dist / denom : 0.0f;
       },
       raft::make_const_mdspan(distance_buffer_dev_view));
   }
