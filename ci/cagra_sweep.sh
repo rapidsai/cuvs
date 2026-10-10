@@ -22,10 +22,13 @@ run_version() {
   local ver=$1 channel=$2
   local env="sweep-${ver//./}"
   rapids-logger "cuVS ${ver} from ${channel}"
-  if ! rapids-mamba-retry create -q -y -n "${env}" --override-channels -c "${channel}" -c conda-forge \
-      "cuvs=${ver}" "cuda-version=12.9" "python=3.12" cupy numpy > "${OUT}/${env}-create.log" 2>&1; then
+  mamba create -y -n "${env}" --override-channels -c "${channel}" -c conda-forge \
+    "cuvs=${ver}" "cuda-version=12.9" "python=3.12" "cupy>=13" numpy > "${OUT}/${env}-create.log" 2>&1
+  echo "[${ver}] mamba create exit code $?"
+  tail -n 15 "${OUT}/${env}-create.log"
+  if ! conda run -n "${env}" python -c "import cupy, cuvs; print('versions', cuvs.__version__, cupy.__version__)"; then
     echo "[${ver}] ENV CREATE FAILED"
-    tail -n 30 "${OUT}/${env}-create.log"
+    conda list -n "${env}" | grep -E "cuvs|cupy|python " || true
     return
   fi
   conda run -n "${env}" python -I ci/cagra_randomized_sweep.py --tag "${ver}" \
