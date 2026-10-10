@@ -2,6 +2,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# DO NOT MERGE: candidate-fix check for the H100 CAGRA Python test hang (#2772, #2732, #2783).
+# Uses the packages built in this PR, repeats the PQ + CAGRA reproducer in separate processes,
+# keeps going after a hang (each iteration is a new process), and then runs the full cuvs
+# Python suite once.
+
 set -euo pipefail
 
 . /opt/conda/etc/profile.d/conda.sh
@@ -29,41 +34,95 @@ set +u
 conda activate test
 set -u
 
-RAPIDS_TESTS_DIR=${RAPIDS_TESTS_DIR:-"${PWD}/test-results"}
-RAPIDS_COVERAGE_DIR=${RAPIDS_COVERAGE_DIR:-"${PWD}/coverage-results"}
-mkdir -p "${RAPIDS_TESTS_DIR}" "${RAPIDS_COVERAGE_DIR}"
-
 rapids-print-env
 
-rapids-logger "Check GPU usage"
+rapids-logger "System info"
 nvidia-smi
+nvidia-smi -q | grep -iE "Addressing Mode|Driver Version|Product Name|VBIOS" || true
+hostname || true
+echo "RUNNER_NAME=${RUNNER_NAME:-}"
+conda list | grep -E "^(libcuvs|cuvs) " || true
 
-EXITCODE=0
-trap "EXITCODE=1" ERR
+RAPIDS_TESTS_DIR=${RAPIDS_TESTS_DIR:-"${PWD}/test-results"}
+mkdir -p "${RAPIDS_TESTS_DIR}"
+DIAG_DIR="${PWD}/hang-diag"
+mkdir -p "${DIAG_DIR}"
+
+HANGS=0
+# run_watched <name> <stall_seconds> <cmd...>: run a command, kill it if its output stalls.
+run_watched() {
+  local name=$1 stall=$2
+  shift 2
+  local log="${DIAG_DIR}/${name}.log"
+  local start
+  start=$(date +%s)
+  echo ">>>>> START ${name}: $*"
+  "$@" > "${log}" 2>&1 &
+  local pid=$!
+  local last_size=-1 last_change now size hung=0
+  last_change=$(date +%s)
+  while kill -0 "${pid}" 2>/dev/null; do
+    sleep 5
+    size=$(stat -c %s "${log}" 2>/dev/null || echo 0)
+    now=$(date +%s)
+    if [[ "${size}" != "${last_size}" ]]; then
+      last_size=${size}
+      last_change=${now}
+    elif (( now - last_change > stall )); then
+      hung=1
+      break
+    fi
+  done
+  local rc=0
+  if (( hung )); then
+    HANGS=$((HANGS + 1))
+    HANG_ITERS="${HANG_ITERS:-} ${name}"
+    echo "!!!!! HANG DETECTED in ${name} after $(( $(date +%s) - start ))s (no output for ${stall}s)"
+    tail -n 30 "${log}"
+    nvidia-smi --query-gpu=utilization.gpu,power.draw,memory.used --format=csv || true
+    pkill -9 -P "${pid}" 2>/dev/null || true
+    kill -9 "${pid}" 2>/dev/null || true
+    wait "${pid}" 2>/dev/null
+    rc=124
+  else
+    wait "${pid}"
+    rc=$?
+    tail -n 3 "${log}"
+  fi
+  echo "<<<<< END ${name}: rc=${rc} elapsed=$(( $(date +%s) - start ))s"
+  return ${rc}
+}
+
 set +e
 
-rapids-logger "pytest cuvs"
-pushd python/cuvs/cuvs
-timeout -v --signal=SIGINT --kill-after=60s 40m pytest \
- --cache-clear \
- --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
- --cov-config=../.coveragerc \
- --cov=cuvs \
- --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
- --cov-report=term \
- tests
+CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
+PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240)
 
-rapids-logger "pytest cuvs-bench"
-popd
-pushd python/cuvs_bench/cuvs_bench
-timeout -v --signal=SIGINT --kill-after=60s 40m pytest \
- --cache-clear \
- --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
- --cov-config=../.coveragerc \
- --cov=cuvs \
- --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-bench-coverage.xml" \
- --cov-report=term \
- tests
+N_ITERS=${N_ITERS:-10}
+pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
+i=0
+for i in $(seq 1 "${N_ITERS}"); do
+  rapids-logger "Iteration ${i}/${N_ITERS} (hangs so far: ${HANGS})"
+  run_watched "iter${i}-pq-cagra" 480 \
+    python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+    tests/test_product_quantizer.py tests/test_cagra.py
+  echo "ITERATION_RESULT iter=${i} total_hangs=${HANGS} hang_iters:${HANG_ITERS:-}"
+  du -sh "${HOME}/.nv/ComputeCache" "${HOME}/.cupy/kernel_cache" 2>/dev/null || true
+done
+rapids-logger "REPRO SUMMARY: ${HANGS} hang(s) in ${i} iteration(s)"
 
-rapids-logger "Test script exiting with value: $EXITCODE"
-exit ${EXITCODE}
+rapids-logger "REPRO HANG ITERS:${HANG_ITERS:-}"
+if (( HANGS == 0 )); then
+  rapids-logger "Full cuvs Python suite"
+  run_watched "full-suite" 900 \
+    python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+    --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" tests
+  FULL_RC=$?
+  rapids-logger "FULL SUITE rc=${FULL_RC}"
+fi
+popd > /dev/null || exit 1
+
+if (( HANGS > 0 )); then
+  exit 1
+fi
+exit "${FULL_RC:-0}"
