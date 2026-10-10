@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
@@ -37,21 +37,31 @@ nvidia-smi
 # RAPIDS_DATASET_ROOT_DIR is used by test scripts
 RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
 export RAPIDS_DATASET_ROOT_DIR
-./ci/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
-
 EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-# Run Python build utilities tests
-rapids-logger "Run libcuvs Python build utilities tests"
-pytest cpp/tests/python
-
-# Run libcuvs gtests from libcuvs-tests package
-rapids-logger "Run libcuvs tests"
-pushd "$CONDA_PREFIX"/bin/gtests/libcuvs
-ctest -j8 --output-on-failure
-popd
+# [CI ONLY] Repeat the flaky IVF-Flat int8/uint8 cosine test.
+BIN="$CONDA_PREFIX"/bin/gtests/libcuvs/NEIGHBORS_ANN_IVF_FLAT_TEST
+repeat_test() {
+  local name=$1 filter=$2 repeat=$3
+  local log="${RAPIDS_TESTS_DIR}/${name}.log"
+  rapids-logger "Repeat --gtest_filter=${filter} ${repeat} times"
+  timeout -v --signal=SIGINT --kill-after=60s 150m "${BIN}" --gtest_filter="${filter}" --gtest_repeat="${repeat}" > "${log}" 2>&1
+  echo "Exit status: $?"
+  tail -n 5 "${log}"
+  echo "Failure details:"
+  grep -E -B3 -A6 "Failure$" "${log}" | head -n 400 || true
+  echo "Diagnostics:"
+  grep -E -A0 "DIAG|^  (naive|ivf|coarse)|Recall = 0\.[0-8]|Duplicated" "${log}" | head -n 2000 || true
+  echo "Failures:"
+  grep -E "^\[  FAILED  \] .* \([0-9]+ ms\)$" "${log}" | sed -E 's/, where GetParam.*//; s/ \([0-9]+ ms\)//' | sort | uniq -c || true
+  echo "Passes:"
+  grep -E "^\[       OK \]" "${log}" | sed -E 's/ \([0-9]+ ms\)//' | sort | uniq -c || true
+}
+nvidia-smi -q | grep -E "Driver Version|CUDA Version|Product Name" || true
+repeat_test cosine2 '*AnnIVFFlatTestF_int8.AnnIVFFlat/2:*AnnIVFFlatTestF_uint8.AnnIVFFlat/2' 800
+repeat_test int8_uint8_all '*AnnIVFFlatTestF_int8*:*AnnIVFFlatTestF_uint8*' 4
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
