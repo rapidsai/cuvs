@@ -21,6 +21,7 @@
 #include <raft/core/memory_type.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
@@ -43,7 +44,13 @@
 #include <cub/device/device_select.cuh>
 #include <cub/iterator/arg_index_input_iterator.cuh>
 #include <cuda.h>
+#include <cuda/execution.determinism.h>
+#include <cuda/execution.require.h>
 #include <cuda/iterator>
+#include <cuda/memory_resource>
+#include <cuda/std/execution>
+#include <cuda/std/functional>
+#include <cuda/stream_ref>
 #include <thrust/for_each.h>
 #include <thrust/iterator/transform_iterator.h>
 
@@ -121,6 +128,73 @@ struct WeightedDistanceOp {
     return distance * weights[offset];
   }
 };
+
+/**
+ * @brief A `cuda::mr::resource` that hands out temporary storage from one caller-owned buffer.
+ *
+ * The buffer only grows, and deallocation is a no-op, so repeated calls reuse the same memory
+ * instead of allocating (and possibly synchronizing) every time. Only one allocation may be live
+ * at a time.
+ */
+class workspace_buffer_resource {
+ public:
+  explicit workspace_buffer_resource(rmm::device_uvector<char>& buffer) : buffer_{&buffer} {}
+
+  void* allocate(cuda::stream_ref stream, size_t bytes, size_t alignment)
+  {
+    const size_t needed = bytes + alignment;
+    if (buffer_->size() < needed) { buffer_->resize(needed, stream); }
+    const auto ptr = reinterpret_cast<std::uintptr_t>(buffer_->data());
+    return reinterpret_cast<void*>(raft::alignTo<std::uintptr_t>(ptr, alignment));
+  }
+  void deallocate(cuda::stream_ref, void*, size_t, size_t) noexcept {}
+  void* allocate_sync(size_t bytes, size_t alignment)
+  {
+    return allocate(buffer_->stream(), bytes, alignment);
+  }
+  void deallocate_sync(void*, size_t, size_t) noexcept {}
+  bool operator==(const workspace_buffer_resource& other) const noexcept
+  {
+    return buffer_ == other.buffer_;
+  }
+  bool operator!=(const workspace_buffer_resource& other) const noexcept
+  {
+    return !(*this == other);
+  }
+
+ private:
+  rmm::device_uvector<char>* buffer_;
+};
+
+/**
+ * @brief Device-wide reduction that is bitwise reproducible from run to run.
+ *
+ * Requests `cuda::execution::determinism::run_to_run` explicitly (also cub's current default):
+ * cub combines the partial results in a fixed order on a given GPU, with no atomics. This is
+ * stronger than raft's mapThenSumReduce, which combines block results with atomics.
+ *
+ * `gpu_to_gpu` (an RFA-based sum that is identical across architectures) is not requested: the
+ * inputs of these reductions (distances from GEMM / cuTile TF32 kernels and the centroids derived
+ * from them) already differ between architectures, so a fit cannot be reproducible across GPUs.
+ *
+ * Temporary storage comes from `workspace`, which is resized as needed.
+ */
+template <typename InputIterator, typename OutputT, typename ReductionOpT, typename IndexT>
+void run_to_run_reduce(raft::resources const& handle,
+                       InputIterator input,
+                       IndexT size,
+                       OutputT* output,
+                       ReductionOpT reduction_op,
+                       OutputT init,
+                       rmm::device_uvector<char>& workspace)
+{
+  auto env =
+    cuda::std::execution::env{cuda::stream_ref{raft::resource::get_cuda_stream(handle)},
+                              cuda::execution::require(cuda::execution::determinism::run_to_run),
+                              cuda::std::execution::prop{cuda::mr::get_memory_resource,
+                                                         workspace_buffer_resource{workspace}}};
+  RAFT_CUDA_TRY(cub::DeviceReduce::Reduce(input, output, size, reduction_op, init, env));
+}
 
 template <typename DataT, typename IndexT>
 struct SquaredDiffOp {
@@ -207,17 +281,14 @@ void weightSum(
   DataT wt_sum_h = DataT{0};
 
   if constexpr (raft::is_device_mdspan_v<decltype(weight)>) {
-    // cub::DeviceReduce is run-to-run deterministic, unlike the atomics in mapThenSumReduce.
-    size_t temp_bytes = 0;
-    RAFT_CUDA_TRY(cub::DeviceReduce::Sum(
-      nullptr, temp_bytes, weight.data_handle(), d_wt_sum.data_handle(), n_samples, stream.get()));
-    rmm::device_uvector<char> temp(temp_bytes, stream);
-    RAFT_CUDA_TRY(cub::DeviceReduce::Sum(temp.data(),
-                                         temp_bytes,
-                                         weight.data_handle(),
-                                         d_wt_sum.data_handle(),
-                                         n_samples,
-                                         stream.get()));
+    rmm::device_uvector<char> workspace(0, stream);
+    run_to_run_reduce(handle,
+                      weight.data_handle(),
+                      n_samples,
+                      d_wt_sum.data_handle(),
+                      cuda::std::plus<>{},
+                      DataT{0},
+                      workspace);
     if (check_positive) {
       raft::copy(&wt_sum_h, d_wt_sum.data_handle(), 1, stream);
       raft::resource::sync_stream(handle);
@@ -292,29 +363,9 @@ void computeClusterCost(raft::resources const& handle,
                         MainOpT main_op,
                         ReductionOpT reduction_op)
 {
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle).get();
   cuda::transform_iterator itr(input, main_op);
-
-  size_t temp_storage_bytes = 0;
-  RAFT_CUDA_TRY(cub::DeviceReduce::Reduce(nullptr,
-                                          temp_storage_bytes,
-                                          itr,
-                                          clusterCost.data_handle(),
-                                          size,
-                                          reduction_op,
-                                          OutputT(),
-                                          stream));
-
-  workspace.resize(temp_storage_bytes, stream);
-
-  RAFT_CUDA_TRY(cub::DeviceReduce::Reduce(workspace.data(),
-                                          temp_storage_bytes,
-                                          itr,
-                                          clusterCost.data_handle(),
-                                          size,
-                                          reduction_op,
-                                          OutputT(),
-                                          stream));
+  run_to_run_reduce(
+    handle, itr, size, clusterCost.data_handle(), reduction_op, OutputT(), workspace);
 }
 
 template <typename InputT,
@@ -718,24 +769,26 @@ void finalize_centroids(raft::resources const& handle,
  * @brief Compute the squared norm difference between two centroid sets.
  *
  * Writes sum((old_centroids - new_centroids)^2) into @p sqrd_norm_out.
- * Used for convergence checking. Fully asynchronous — no stream sync.
+ * Used for convergence checking. Fully asynchronous — no stream sync. Temporary storage comes
+ * from @p workspace, which is resized as needed.
  */
 template <typename DataT, typename IndexT>
 void compute_centroid_shift(raft::resources const& handle,
                             raft::device_matrix_view<const DataT, IndexT> old_centroids,
                             raft::device_matrix_view<const DataT, IndexT> new_centroids,
-                            raft::device_scalar_view<DataT> sqrd_norm_out)
+                            raft::device_scalar_view<DataT> sqrd_norm_out,
+                            rmm::device_uvector<char>& workspace)
 {
-  // cub::DeviceReduce is run-to-run deterministic, unlike the atomics in mapThenSumReduce.
-  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
-  computeClusterCost(
+  run_to_run_reduce(
     handle,
-    cuda::counting_iterator<IndexT>(0),
+    cuda::transform_iterator(
+      cuda::counting_iterator<IndexT>(0),
+      SquaredDiffOp<DataT, IndexT>{old_centroids.data_handle(), new_centroids.data_handle()}),
     static_cast<IndexT>(old_centroids.size()),
-    workspace,
-    sqrd_norm_out,
-    SquaredDiffOp<DataT, IndexT>{old_centroids.data_handle(), new_centroids.data_handle()},
-    raft::add_op{});
+    sqrd_norm_out.data_handle(),
+    cuda::std::plus<>{},
+    DataT{0},
+    workspace);
 }
 
 /**
