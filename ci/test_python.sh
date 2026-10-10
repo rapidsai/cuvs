@@ -48,6 +48,23 @@ cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/cpuset.cpus.effective 2>/dev/null || t
 taskset -p $$ || true
 free -g || true
 
+rapids-logger "HMM / pointer attribute probe"
+nvidia-smi -q | grep -iE "Addressing Mode|Driver Version|Product Name" || true
+cat /proc/driver/nvidia/version 2>/dev/null || true
+grep -iE "hmm|ats" /proc/driver/nvidia/params 2>/dev/null || true
+cat /sys/module/nvidia_uvm/parameters/uvm_disable_hmm 2>/dev/null || true
+python - <<'PYEOF' || true
+import numpy as np
+import cupy as cp
+rt = cp.cuda.runtime
+dev = 0
+print("pageableMemoryAccess", rt.deviceGetAttribute(rt.cudaDevAttrPageableMemoryAccess, dev))
+print("concurrentManagedAccess", rt.deviceGetAttribute(rt.cudaDevAttrConcurrentManagedAccess, dev))
+a = np.zeros(1 << 20, dtype=np.float32)
+attr = rt.pointerGetAttributes(a.ctypes.data)
+print("numpy ptr", hex(a.ctypes.data), "type", attr.type, "devicePointer", hex(attr.devicePointer), "hostPointer", hex(attr.hostPointer))
+PYEOF
+
 RAPIDS_TESTS_DIR=${RAPIDS_TESTS_DIR:-"${PWD}/test-results"}
 RAPIDS_COVERAGE_DIR=${RAPIDS_COVERAGE_DIR:-"${PWD}/coverage-results"}
 mkdir -p "${RAPIDS_TESTS_DIR}" "${RAPIDS_COVERAGE_DIR}"
@@ -75,6 +92,11 @@ dump_one() {
     # shellcheck disable=SC2086
     set -- $rest
     echo "${tid} $(cat "$t"/comm 2>/dev/null) state=$1 utime=${12} stime=${13} wchan=$(cat "$t"/wchan 2>/dev/null)"
+  done
+  echo "---- kernel stacks"
+  for t in /proc/"${p}"/task/*; do
+    echo "-- $(basename "$t") $(cat "$t"/comm 2>/dev/null)"
+    head -30 "$t"/stack 2>&1
   done
   if grep -q python /proc/"${p}"/cmdline 2>/dev/null; then
     echo "---- py-spy dump --native"
@@ -189,15 +211,22 @@ while (( $(date +%s) - LOOP_START < BUDGET )); do
   i=$((i + 1))
   rapids-logger "Iteration ${i} (hangs so far: ${HANGS}:${HANG_LIST})"
 
-  # Same commands as the regular CI job: the full cuvs suite with coverage, then cuvs_bench.
   pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
-  run_watched "iter${i}-cuvs-full" 420 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
-    --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
-    --cov-config=../.coveragerc \
-    --cov=cuvs \
-    --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
-    --cov-report=term \
-    tests
+  if (( i % 2 == 1 )); then
+    # Same command as the regular CI job: the full cuvs suite with coverage.
+    run_watched "iter${i}-cuvs-full" 420 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+      --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
+      --cov-config=../.coveragerc \
+      --cov=cuvs \
+      --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
+      --cov-report=term \
+      tests
+  else
+    # Host-input product quantizer tests followed by the CAGRA tests in one process.
+    run_watched "iter${i}-pq-cagra" 420 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" \
+      tests/test_product_quantizer.py tests/test_cagra.py
+  fi
+  grep -c -i "illegal memory access\|illegal address" "${DIAG_DIR}/iter${i}-"*.log 2>/dev/null | sed 's/^/ILLEGAL-ADDRESS count: /' || true
   popd > /dev/null || exit 1
 
   pushd "${BENCH_TESTS_DIR}" > /dev/null || exit 1
