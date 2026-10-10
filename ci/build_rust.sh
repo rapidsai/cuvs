@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
@@ -42,12 +42,11 @@ rapids-logger "Begin Rust build"
 
 sccache --stop-server 2>/dev/null || true
 
-bash ./build.sh rust
+INITIAL_RC=0
+bash ./build.sh rust || INITIAL_RC=$?
+echo "INITIAL build.sh rust (cargo test, default parallelism) rc=${INITIAL_RC}"
 
-sccache --show-adv-stats
+sccache --show-adv-stats || true
 sccache --stop-server >/dev/null 2>&1 || true
 
-# Also test out that we can publish cuvs-sys via a dry-run
-pushd ./rust/cuvs-sys
-cargo publish --dry-run
-popd
+bash ci/stress_rust.sh

@@ -22,6 +22,9 @@ pub mod version;
 #[cfg(test)]
 pub(crate) mod test_utils;
 
+#[cfg(test)]
+mod thread_stress;
+
 pub use dlpack::{AsDlTensor, AsDlTensorMut, DLPackError, DLTensorView, DLTensorViewMut, DType};
 pub use error::LibraryError;
 pub use resources::Resources;
