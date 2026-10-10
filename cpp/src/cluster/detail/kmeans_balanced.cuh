@@ -34,7 +34,6 @@
 #include <raft/util/integer_utils.hpp>
 
 #include <rmm/device_scalar.hpp>
-#include <rmm/mr/managed_memory_resource.hpp>
 #include <rmm/resource_ref.hpp>
 
 #include <thrust/gather.h>
@@ -1177,7 +1176,7 @@ auto build_fine_clusters(const raft::resources& handle,
                          IdxT dim,
                          const T* dataset_mptr,
                          const MathT* dataset_norm_mptr,
-                         const LabelT* labels_mptr,
+                         const LabelT* labels_host,
                          IdxT n_rows,
                          const IdxT* fine_clusters_nums,
                          const IdxT* fine_clusters_csum,
@@ -1187,11 +1186,12 @@ auto build_fine_clusters(const raft::resources& handle,
                          IdxT fine_clusters_nums_max,
                          MathT* cluster_centers,
                          MappingOpT mapping_op,
-                         rmm::device_async_resource_ref managed_memory,
                          rmm::device_async_resource_ref device_memory) -> IdxT
 {
   auto stream = raft::resource::get_cuda_stream(handle);
-  rmm::device_uvector<IdxT> mc_trainset_ids_buf(mesocluster_size_max, stream, managed_memory);
+  // The ids of each mesocluster's rows are selected on the host and copied to the device.
+  std::vector<IdxT> mc_trainset_ids_host(mesocluster_size_max);
+  rmm::device_uvector<IdxT> mc_trainset_ids_buf(mesocluster_size_max, stream, device_memory);
   // for small cluster counts the maximum mesocluster size is proportional to the number of rows, so
   // we use large workspace
   auto large_ws = raft::resource::get_large_workspace_resource_ref(handle);
@@ -1215,7 +1215,7 @@ auto build_fine_clusters(const raft::resources& handle,
   for (IdxT i = 0; i < n_mesoclusters; i++) {
     IdxT k = 0;
     for (IdxT j = 0; j < n_rows && k < mesocluster_size_max; j++) {
-      if (labels_mptr[j] == LabelT(i)) { mc_trainset_ids[k++] = j; }
+      if (labels_host[j] == LabelT(i)) { mc_trainset_ids_host[k++] = j; }
     }
     if (k != static_cast<IdxT>(mesocluster_sizes[i]))
       RAFT_LOG_DEBUG("Incorrect mesocluster size at %d. %zu vs %zu",
@@ -1233,6 +1233,9 @@ auto build_fine_clusters(const raft::resources& handle,
                    "Number of fine clusters must be non-zero for a non-empty mesocluster");
     }
 
+    // The previous iteration ended with a stream sync, so the host buffer can be refilled; the
+    // copy below is synchronized at the end of this iteration before the next refill.
+    raft::copy(mc_trainset_ids, mc_trainset_ids_host.data(), k, stream);
     raft::matrix::gather(dataset_mptr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream.get());
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -1308,8 +1311,6 @@ void build_hierarchical(const raft::resources& handle,
   IdxT n_mesoclusters = std::min(n_clusters, static_cast<IdxT>(std::sqrt(n_clusters) + 0.5));
   RAFT_LOG_DEBUG("build_hierarchical: n_mesoclusters: %u", n_mesoclusters);
 
-  // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
-  rmm::mr::managed_memory_resource managed_memory;
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource_ref(handle);
   auto [max_minibatch_size, mem_per_row]       = calc_minibatch_size<MathT>(
     handle, n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
@@ -1351,8 +1352,8 @@ void build_hierarchical(const raft::resources& handle,
     CounterT;
 
   // build coarse clusters (mesoclusters)
-  rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, managed_memory);
-  rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, managed_memory);
+  rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, device_memory);
+  rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, device_memory);
   {
     rmm::device_uvector<MathT> mesocluster_centers_buf(n_mesoclusters * dim, stream, device_memory);
     build_clusters(handle,
@@ -1369,10 +1370,14 @@ void build_hierarchical(const raft::resources& handle,
                    dataset_norm);
   }
 
-  auto mesocluster_sizes  = mesocluster_sizes_buf.data();
-  auto mesocluster_labels = mesocluster_labels_buf.data();
-
+  // The mesocluster labels and sizes are used on the host to arrange the fine clusters.
+  std::vector<LabelT> mesocluster_labels_host(n_rows);
+  std::vector<CounterT> mesocluster_sizes_host(n_mesoclusters);
+  raft::copy(mesocluster_labels_host.data(), mesocluster_labels_buf.data(), n_rows, stream);
+  raft::copy(mesocluster_sizes_host.data(), mesocluster_sizes_buf.data(), n_mesoclusters, stream);
   raft::resource::sync_stream(handle, stream);
+  auto mesocluster_sizes  = mesocluster_sizes_host.data();
+  auto mesocluster_labels = mesocluster_labels_host.data();
 
   // build fine clusters
   auto [mesocluster_size_max, fine_clusters_nums_max, fine_clusters_nums, fine_clusters_csum] =
@@ -1408,7 +1413,6 @@ void build_hierarchical(const raft::resources& handle,
                                              fine_clusters_nums_max,
                                              cluster_centers,
                                              mapping_op,
-                                             managed_memory,
                                              device_memory);
   RAFT_EXPECTS(n_clusters_done == n_clusters, "Didn't process all clusters.");
 
