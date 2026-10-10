@@ -235,6 +235,7 @@ case "${EXP}" in
   cachewarm) ;;
   cachenv) export CUDA_CACHE_DISABLE=1 ;;
   cachecupy) export CUPY_CACHE_IN_MEMORY=1 ;;
+  eager) export CUDA_MODULE_LOADING=EAGER ;;
   *) echo "unknown experiment ${EXP}"; exit 1 ;;
 esac
 env | grep -E "^(CUDA_|B3_)" || true
