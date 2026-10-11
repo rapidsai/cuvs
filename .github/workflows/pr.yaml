@@ -36,7 +36,7 @@ jobs:
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
       node_type: cpu16
       script: ci/build_cpp.sh
-      matrix_filter: map(select(.ARCH == "amd64" and (.CUDA_VER | startswith("12."))))
+      matrix_filter: map(select((.ARCH == "amd64" and (.CUDA_VER | startswith("12."))) or (.ARCH == "arm64" and (.CUDA_VER | startswith("13.3")))))
   conda-python-build:
     needs: [build-details, conda-cpp-build]
     permissions:
@@ -51,7 +51,7 @@ jobs:
       build_type: pull-request
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
       script: ci/build_python.sh
-      matrix_filter: map(select(.ARCH == "amd64" and (.CUDA_VER | startswith("12.")))) | group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
+      matrix_filter: map(select((.ARCH == "amd64" and (.CUDA_VER | startswith("12."))) or (.ARCH == "arm64" and (.CUDA_VER | startswith("13.3"))))) | group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   conda-python-tests:
     needs: [conda-python-build]
     permissions:
@@ -67,4 +67,4 @@ jobs:
       script: ci/test_python.sh
       run_codecov: false
       matrix_type: "pull-request,nightly"
-      matrix_filter: 'map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | [range(4) as $i | .[] | . + {COPY: $i}]'
+      matrix_filter: '[(map(select(.GPU == "h100" and .CUDA_VER == "12.9.2")) | range(4) as $i | .[] | . + {COPY: $i}), (map(select(.GPU == "gb300")) | .[0:1] | .[])]'

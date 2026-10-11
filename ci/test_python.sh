@@ -70,7 +70,12 @@ cudart.cudaRuntimeGetVersion(ctypes.byref(rt_ver))
 cudart.cudaFree(None)
 val = ctypes.c_int()
 cudart.cudaDeviceGetAttribute(ctypes.byref(val), 88, 0)  # cudaDevAttrPageableMemoryAccess
-print(f"probe cudart={lib[-1] if lib else '?'} runtime={rt_ver.value} pageableMemoryAccess={val.value}")
+hpt = ctypes.c_int()
+cudart.cudaDeviceGetAttribute(ctypes.byref(hpt), 100, 0)  # ...UsesHostPageTables
+print(
+    f"probe cudart={lib[-1] if lib else '?'} runtime={rt_ver.value} "
+    f"pageableMemoryAccess={val.value} pageableMemoryAccessUsesHostPageTables={hpt.value}"
+)
 
 
 def probe(name, ptr):
@@ -144,7 +149,13 @@ set +e
 CUVS_TESTS_DIR="${PWD}/python/cuvs/cuvs"
 PYTEST_ARGS=(-v -p no:cacheprovider -o faulthandler_timeout=240)
 
-N_ITERS=${N_ITERS:-10}
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+if [[ "${GPU_NAME}" == *H100* ]]; then
+  N_ITERS=${N_ITERS:-10}
+else
+  N_ITERS=${N_ITERS:-3}
+fi
+echo "GPU_NAME=${GPU_NAME} N_ITERS=${N_ITERS}"
 pushd "${CUVS_TESTS_DIR}" > /dev/null || exit 1
 i=0
 for i in $(seq 1 "${N_ITERS}"); do
@@ -167,6 +178,14 @@ if (( HANGS == 0 )); then
   rapids-logger "FULL SUITE rc=${FULL_RC}"
 fi
 popd > /dev/null || exit 1
+
+rapids-logger "cuvs_bench tests"
+pushd python/cuvs_bench/cuvs_bench > /dev/null || exit 1
+run_watched "cuvs-bench" 900 python -X faulthandler -m pytest "${PYTEST_ARGS[@]}" tests
+BENCH_RC=$?
+rapids-logger "CUVS_BENCH rc=${BENCH_RC}"
+popd > /dev/null || exit 1
+if (( BENCH_RC != 0 )); then FULL_RC=${BENCH_RC}; fi
 
 if (( HANGS > 0 )); then
   exit 1
