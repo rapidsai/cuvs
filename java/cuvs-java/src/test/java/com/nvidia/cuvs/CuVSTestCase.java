@@ -184,7 +184,7 @@ public abstract class CuVSTestCase {
                 " | #%d id=%d rank=%d ties=%d exact=%.4f got=%.4f pass=%b",
                 j, id, rank, ties, d[id], got, prefilters == null || prefilters[q].get(id)));
       }
-      log.info(sb.toString());
+      System.err.println(sb);
     }
   }
 

@@ -190,8 +190,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
         try {
           compareResults(results, expected, topK, datasetSize, numQueries);
         } catch (AssertionError e) {
-          log.info(
-              "MISMATCH seed={} n={} dim={} q={} k={} prefilter={} kind={}",
+          System.err.printf(
+              "MISMATCH seed=%s n=%d dim=%d q=%d k=%d prefilter=%b kind=%s legacyPrefilter=%b%n",
               com.carrotsearch.randomizedtesting.RandomizedContext.current()
                   .getRunnerSeedAsString(),
               datasetSize,
@@ -199,7 +199,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
               numQueries,
               topK,
               usePrefilter,
-              datasetMemoryKind);
+              datasetMemoryKind,
+              Boolean.getBoolean("cuvs.repro.legacyPrefilter"));
           logMismatchDiagnostics("cagra", results, vectors, queries, prefilters, topK);
           throw e;
         }

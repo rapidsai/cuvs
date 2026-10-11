@@ -4,12 +4,6 @@
 
 set -euo pipefail
 
-# [DO NOT MERGE] CagraRandomizedIT root-cause sweep across cuVS versions.
-if [ -z "${SKIP_CAGRA_SWEEP:-}" ]; then
-  bash ci/cagra_sweep.sh
-  exit 0
-fi
-
 # Runs cuvs-java's own IT test suite against the classes from a prior amd64 build job,
 # without recompiling (or running jextract) on this host. cuvs-java is always built on
 # amd64; this verifies that the resulting jextract-generated Panama bindings also work
@@ -72,9 +66,10 @@ pushd java/cuvs-java
 LOGDIR="$(mktemp -d)"
 run_it() {
   local tag=$1 cls=$2 iters=$3
+  shift 3
   local log="${LOGDIR}/${tag}.log"
   mvn --batch-mode verify -Dskip.compile=true -Dit.test="${cls}" -Dtest=NONE \
-    -Dsurefire.failIfNoSpecifiedTests=false -Dtests.iters="${iters}" > "${log}" 2>&1
+    -Dsurefire.failIfNoSpecifiedTests=false -Dtests.iters="${iters}" "$@" > "${log}" 2>&1
   local rc=$?
   local summary
   summary=$(grep -h "Tests run:.*in com" "${log}" | tail -1)
@@ -82,37 +77,36 @@ run_it() {
   if [ ${rc} -ne 0 ]; then
     EXITCODE=1
     echo "::group::FAILED ${tag}"
-    grep -h -E "Exit Code|terminate called|what\(\)|\[warning\]|tiny dataset|MISMATCH|DIAG|<<< (FAILURE|ERROR)|AssertionError|Exception|seed#" "${log}" | head -200
+    grep -h -E "Exit Code|terminate called|what\(\)|MISMATCH|DIAG|<<< (FAILURE|ERROR)|AssertionError|Exception|seed#" "${log}" | head -200
     echo "::endgroup::"
-  else
-    grep -h "tiny dataset" "${log}"
   fi
 }
 
-rapids-logger "Deterministic reproducer: CAGRA build on a single row"
-run_it single-row CagraSingleRowIT 1
-
-rapids-logger "HnswRandomizedIT loop"
-END=$((SECONDS + 40 * 60))
+rapids-logger "CagraRandomizedIT loop with the pre-#2375 prefilter buffer"
+END=$((SECONDS + 35 * 60))
 N=0
 while [ ${SECONDS} -lt ${END} ]; do
   N=$((N + 1))
-  run_it "hnsw-${N}" HnswRandomizedIT 10
+  run_it "legacy-${N}" CagraRandomizedIT 2 -Dcuvs.repro.legacyPrefilter=true
 done
 
-rapids-logger "CagraRandomizedIT loop"
-END=$((SECONDS + 30 * 60))
+rapids-logger "CagraRandomizedIT loop with the current prefilter buffer"
+END=$((SECONDS + 35 * 60))
 N=0
 while [ ${SECONDS} -lt ${END} ]; do
   N=$((N + 1))
-  run_it "cagra-${N}" CagraRandomizedIT 2
+  run_it "current-${N}" CagraRandomizedIT 2
 done
 
 rapids-logger "Summary"
-grep -h "Tests run:.*in com" "${LOGDIR}"/*.log | sed -E 's/Time elapsed: [0-9.]+ s //' | sort | uniq -c
-grep -l "Exit Code: 134" "${LOGDIR}"/*.log
+for t in legacy current; do
+  echo "${t}: $(cat "${LOGDIR}/${t}"-*.log | grep -c "Tests run:.*in com") test summaries, $(cat "${LOGDIR}/${t}"-*.log | grep -c "MISMATCH") mismatching cases"
+done
 grep -h "MISMATCH" "${LOGDIR}"/*.log
 popd
+
+rapids-logger "Python replay on older cuVS releases"
+SWEEP_VERSIONS="25.02 25.04 25.06" SWEEP_MINUTES=12 bash ci/cagra_sweep.sh
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

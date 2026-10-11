@@ -533,8 +533,12 @@ public class CagraIndexImpl implements CagraIndex {
           } else {
             BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
             long[] filters = concatenatedFilters.toLongArray();
+            // [DO NOT MERGE] -Dcuvs.repro.legacyPrefilter=true restores the buffer sizing from
+            // before #2375, which drops the trailing all-zero words of the filter.
             var prefilterDataMemorySegment =
-                buildMemorySegment(localArena, filters, (prefilterDataLength + 63) / 64);
+                Boolean.getBoolean("cuvs.repro.legacyPrefilter")
+                    ? buildMemorySegment(localArena, filters)
+                    : buildMemorySegment(localArena, filters, (prefilterDataLength + 63) / 64);
 
             long[] prefilterShape = {prefilterLen};
 

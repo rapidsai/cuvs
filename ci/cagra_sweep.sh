@@ -24,7 +24,7 @@ run_version() {
   local prefix="${OUT}/env-${env}"
   rapids-logger "cuVS ${ver} from ${channel}"
   mamba create -y -p "${prefix}" --override-channels -c "${channel}" -c conda-forge \
-    "cuvs=${ver}" "cuda-version=12.9" "python=3.12" "cupy>=13" numpy > "${OUT}/${env}-create.log" 2>&1
+    "cuvs=${ver}" "cuda-version>=12,<13" "python=3.12" "cupy>=13" numpy > "${OUT}/${env}-create.log" 2>&1
   echo "[${ver}] mamba create exit code $?"
   tail -n 15 "${OUT}/${env}-create.log"
   if ! "${prefix}/bin/python" -c "import cupy, cuvs; print('versions', cuvs.__version__, cupy.__version__)"; then
@@ -39,12 +39,12 @@ run_version() {
   rm -rf "${prefix}"
 }
 
-run_version 25.06 rapidsai
-run_version 25.10 rapidsai
-run_version 26.02 rapidsai
-run_version 26.06 rapidsai
-run_version 26.08 rapidsai
-run_version 26.12 rapidsai-nightly
+for v in ${SWEEP_VERSIONS:-25.06 25.10 26.02 26.06 26.08}; do
+  run_version "${v}" rapidsai
+done
+if [ -z "${SWEEP_VERSIONS:-}" ]; then
+  run_version 26.12 rapidsai-nightly
+fi
 
 rapids-logger "Summary"
 grep -h "SUMMARY\|RECALL" "${OUT}"/*.out 2>/dev/null
