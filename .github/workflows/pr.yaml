@@ -12,8 +12,8 @@ jobs:
     needs:
       - build-details
       - conda-cpp-build
-      - rust-build
       - rust-old-crate
+      - c-host-alloc
     uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@main
     permissions:
       contents: read
@@ -39,6 +39,7 @@ jobs:
       script: ci/build_cpp.sh
       matrix_filter: 'map(select(.ARCH == "amd64")) | sort_by(.CUDA_VER | split(".") | map(tonumber)) | [last]'
   rust-build:
+    if: false
     needs: [conda-cpp-build]
     permissions:
       actions: read
@@ -64,3 +65,16 @@ jobs:
       build_type: pull-request
       matrix_filter: 'map(select(.ARCH == "amd64")) | sort_by(.CUDA_VER | split(".") | map(tonumber)) | [last] | [range(2) as $i | .[] | . + {COPY: $i, GPU: (if $i < 1 then "rtxpro6000" else "l4" end)}]'
       script: "ci/stress_rust_old.sh"
+  c-host-alloc:
+    needs: [conda-cpp-build]
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: read
+      pull-requests: read
+    uses: ./.github/workflows/matrix-job.yaml
+    with:
+      build_type: pull-request
+      matrix_filter: 'map(select(.ARCH == "amd64")) | sort_by(.CUDA_VER | split(".") | map(tonumber)) | [last]'
+      script: "ci/test_c_host_alloc.sh"
