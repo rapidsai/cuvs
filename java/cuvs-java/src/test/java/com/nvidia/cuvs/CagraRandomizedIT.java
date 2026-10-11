@@ -28,19 +28,32 @@ import org.slf4j.LoggerFactory;
  * dimensions the nearest neighbors are barely closer than the rest, so a single query can
  * legitimately miss some or all of its exact neighbors. The test therefore checks what must hold
  * for every query (the right number of distinct, valid rows that pass the prefilter, returned in
- * order with their correct distances), and checks recall only as a mean over many queries.
+ * order with their correct distances), and checks recall only as a mean over many queries. Each
+ * case also searches for a copy of one of its rows, which the search should return first.
+ *
+ * <p>This test used to require the first 5 results of every query to be among the exact {@code
+ * 2k + 10} nearest neighbors. That failed now and then for legitimate approximate results (#631),
+ * and it also caught the Java bindings leaking filtered-out rows (#1048, #1468, fixed in #2375),
+ * which the prefilter check here reports directly.
  */
 @RunWith(RandomizedRunner.class)
 public class CagraRandomizedIT extends CuVSTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(CagraRandomizedIT.class);
 
-  // Lower bound for the mean recall@k over the queries of each dataset memory kind, with and
-  // without a prefilter. See testResultsTopKWithRandomValues.
-  private static final double MIN_MEAN_RECALL = 0.8;
+  // Lower bounds for the mean recall@k over the queries of each dataset memory kind, without and
+  // with a prefilter. In CI (RTX PRO 6000, CUDA 13), about 300 runs of this test measured means of
+  // 0.83 (standard deviation 0.022, lowest 0.76) without a prefilter and 0.94 (standard deviation
+  // 0.011, lowest 0.90) with one. The bounds sit 8 and 12 standard deviations below the means, so
+  // they only fail when results are wrong rather than approximate.
+  private static final double MIN_MEAN_RECALL_UNFILTERED = 0.65;
+  private static final double MIN_MEAN_RECALL_FILTERED = 0.8;
+  // Minimum fraction of the searches for a copy of a row that return that row first. All of more
+  // than 100,000 such searches did in CI.
+  private static final double MIN_SELF_MATCH_RATE = 0.99;
   // Returned distances are computed in float on the GPU; allow for the difference in rounding
-  // from the double-precision distances computed here.
-  private static final double DISTANCE_RELATIVE_TOLERANCE = 1e-3;
+  // from the double-precision distances computed here (at most 2.4e-7 in CI).
+  private static final double DISTANCE_RELATIVE_TOLERANCE = 1e-4;
 
   enum TestDatasetMemoryKind {
     HEAP,
@@ -53,12 +66,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
   private final int[][] queryCount = new int[TestDatasetMemoryKind.values().length][2];
 
-  // [DO NOT MERGE] measurement only
-  private double maxRelativeDistanceError;
   private int selfQueries;
-  private int selfFoundFirst;
-  private int selfFoundAnywhere;
-  private int recallQueryLimit = Integer.MAX_VALUE;
+  private int selfMatches;
 
   @Before
   public void setup() {
@@ -74,12 +83,10 @@ public class CagraRandomizedIT extends CuVSTestCase {
       }
     }
 
-    // The mean recall measured in CI over thousands of these test runs (see the PR that
-    // re-enabled this test) stays far above this bound in every group; it guards against
-    // results that are wrong rather than approximate, such as a broken graph or search.
-    System.err.printf(
-        "SELF-MATCH queries=%d first=%d anywhere=%d maxRelDistErr=%.3g%n",
-        selfQueries, selfFoundFirst, selfFoundAnywhere, maxRelativeDistanceError);
+    assertTrue(
+        String.format(
+            "Only %d of %d searches for a row returned it first", selfMatches, selfQueries),
+        selfMatches >= MIN_SELF_MATCH_RATE * selfQueries);
     for (var kind : TestDatasetMemoryKind.values()) {
       for (int filtered = 0; filtered < 2; filtered++) {
         int n = queryCount[kind.ordinal()][filtered];
@@ -87,9 +94,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
           continue;
         }
         double meanRecall = recallSum[kind.ordinal()][filtered] / n;
-        System.err.printf(
-            "RECALL-GROUP kind=%s filtered=%d queries=%d mean=%.5f%n",
-            kind, filtered, n, meanRecall);
+        double minMeanRecall =
+            filtered == 1 ? MIN_MEAN_RECALL_FILTERED : MIN_MEAN_RECALL_UNFILTERED;
         log.info(
             "{} {} prefilter: mean recall@k {} over {} queries",
             kind,
@@ -99,8 +105,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
         assertTrue(
             String.format(
                 "Mean recall@k %f over %d queries (%s, prefilter=%b) is below %f",
-                meanRecall, n, kind, filtered == 1, MIN_MEAN_RECALL),
-            meanRecall >= MIN_MEAN_RECALL);
+                meanRecall, n, kind, filtered == 1, minMeanRecall),
+            meanRecall >= minMeanRecall);
       }
     }
   }
@@ -146,7 +152,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
     float[][] vectors = generateData(random, datasetSize, dimensions);
     float[][] queries = generateData(random, numQueries, dimensions);
-    // [DO NOT MERGE] measurement: one more query that is a copy of a row passing the filter.
+    // One more query is a copy of a row that passes the prefilter, if any does.
     int selfRow = random.nextInt(datasetSize);
     if (prefilter != null && !prefilter.get(selfRow)) {
       int next = prefilter.nextSetBit(selfRow);
@@ -155,9 +161,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     if (selfRow >= 0) {
       queries = Arrays.copyOf(queries, numQueries + 1);
       queries[numQueries] = vectors[selfRow].clone();
-      numQueries++;
     }
-    final int selfQueryRow = selfRow;
 
     String caseDescription =
         String.format(
@@ -217,21 +221,22 @@ public class CagraRandomizedIT extends CuVSTestCase {
           queryBuilder.withPrefilter(prefilter, datasetSize);
         }
         SearchResults results = index.search(queryBuilder.build());
-        recallQueryLimit = selfQueryRow >= 0 ? numQueries - 1 : numQueries;
-        if (selfQueryRow >= 0) {
-          var selfResult = results.getResults().get(numQueries - 1);
+        checkResults(
+            caseDescription,
+            datasetMemoryKind,
+            results,
+            vectors,
+            queries,
+            numQueries,
+            prefilter,
+            topK);
+        if (selfRow >= 0) {
+          var selfResult = results.getResults().get(numQueries);
           selfQueries++;
-          if (!selfResult.isEmpty() && selfResult.keySet().iterator().next() == selfQueryRow) {
-            selfFoundFirst++;
-          }
-          if (selfResult.containsKey(selfQueryRow)) {
-            selfFoundAnywhere++;
-          } else {
-            System.err.printf("SELF-MISS %s row=%d%n", caseDescription, selfQueryRow);
+          if (!selfResult.isEmpty() && selfResult.keySet().iterator().next() == selfRow) {
+            selfMatches++;
           }
         }
-        checkResults(
-            caseDescription, datasetMemoryKind, results, vectors, queries, prefilter, topK);
       } finally {
         index.close();
       }
@@ -262,6 +267,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
       SearchResults results,
       float[][] vectors,
       float[][] queries,
+      int numRandomQueries,
       BitSet prefilter,
       int topK) {
     List<Map<Integer, Float>> resultMaps = results.getResults();
@@ -292,10 +298,6 @@ public class CagraRandomizedIT extends CuVSTestCase {
         assertTrue(where + ": results are not sorted by distance", distance >= previous);
         previous = distance;
         double tolerance = DISTANCE_RELATIVE_TOLERANCE * Math.max(exact[id], 1.0);
-        maxRelativeDistanceError =
-            Math.max(
-                maxRelativeDistanceError,
-                Math.abs(distance - exact[id]) / Math.max(exact[id], 1.0));
         assertTrue(
             where + ": distance " + distance + " of row " + id + " should be " + exact[id],
             Math.abs(distance - exact[id]) <= tolerance);
@@ -304,7 +306,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
           found++;
         }
       }
-      if (expectedCount > 0 && q < recallQueryLimit) {
+      // Recall is measured on the random queries only, not on the copy of a row.
+      if (expectedCount > 0 && q < numRandomQueries) {
         recallSum[datasetMemoryKind.ordinal()][filtered] += (double) found / expectedCount;
         queryCount[datasetMemoryKind.ordinal()][filtered]++;
       }

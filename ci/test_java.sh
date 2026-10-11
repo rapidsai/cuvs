@@ -82,16 +82,13 @@ run_it() {
   fi
 }
 
-rapids-logger "New CagraRandomizedIT with the pre-#2375 prefilter buffer"
-END=$((SECONDS + 15 * 60))
-N=0
-while [ ${SECONDS} -lt ${END} ]; do
-  N=$((N + 1))
-  run_it "legacy-${N}" CagraRandomizedIT 2 -Dcuvs.repro.legacyPrefilter=true
-done
+rapids-logger "Full cuvs-java IT suite"
+mvn --batch-mode verify -Dskip.compile=true > "${LOGDIR}/full.log" 2>&1
+echo "full suite rc=$?"
+grep -h "Tests run:" "${LOGDIR}/full.log" | tail -n 40
 
-rapids-logger "New CagraRandomizedIT"
-END=$((SECONDS + 75 * 60))
+rapids-logger "Final CagraRandomizedIT loop"
+END=$((SECONDS + 100 * 60))
 N=0
 while [ ${SECONDS} -lt ${END} ]; do
   N=$((N + 1))
@@ -99,12 +96,9 @@ while [ ${SECONDS} -lt ${END} ]; do
 done
 
 rapids-logger "Summary"
-for t in legacy current; do
-  echo "${t}: $(cat "${LOGDIR}/${t}"-*.log | grep -c "Tests run:.*in com") test summaries"
-  cat "${LOGDIR}/${t}"-*.log | grep -h "Tests run:.*in com" | sed -E 's/Time elapsed: [0-9.]+ s //' | sort | uniq -c
-  cat "${LOGDIR}/${t}"-*.log | grep -h "AssertionError" | sed -E 's/[0-9]+/N/g' | sort | uniq -c
-done
-grep -h "RECALL-GROUP\|SELF-MATCH\|SELF-MISS" "${LOGDIR}"/current-*.log
+echo "$(cat "${LOGDIR}"/current-*.log | grep -c "Tests run:.*in com") test summaries"
+cat "${LOGDIR}"/current-*.log | grep -h "Tests run:.*in com" | sed -E 's/Time elapsed: [0-9.]+ s //' | sort | uniq -c
+cat "${LOGDIR}"/current-*.log | grep -h "AssertionError" | sed -E 's/[0-9]+/N/g' | sort | uniq -c
 popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"
