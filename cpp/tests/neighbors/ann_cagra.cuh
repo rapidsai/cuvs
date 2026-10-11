@@ -43,6 +43,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -2435,7 +2436,11 @@ class AnnCagraMultiPartitionTest : public ::testing::TestWithParam<AnnCagraMpInp
   {
     database.resize(static_cast<size_t>(ps.n_rows) * ps.dim, stream_);
     search_queries.resize(static_cast<size_t>(ps.n_queries) * ps.dim, stream_);
-    raft::random::RngState r(1234ULL);
+    // [DO NOT MERGE] CUVS_QDIAG_SEED_SWEEP=1 gives every test instance a different dataset seed.
+    static uint64_t seed_counter = 0;
+    uint64_t seed                = 1234ULL;
+    if (std::getenv("CUVS_QDIAG_SEED_SWEEP") != nullptr) { seed = 1234ULL + (++seed_counter); }
+    raft::random::RngState r(seed);
     InitDataset(handle_, database.data(), ps.n_rows, ps.dim, ps.metric, r);
     InitDataset(handle_, search_queries.data(), ps.n_queries, ps.dim, ps.metric, r);
     raft::resource::sync_stream(handle_);
