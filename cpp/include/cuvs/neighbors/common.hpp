@@ -1115,7 +1115,11 @@ template <typename ValueT, typename SrcT>
   if (ptr_attrs.type == cudaMemoryTypeDevice || ptr_attrs.type == cudaMemoryTypeManaged) {
     return const_cast<ValueT*>(src.data_handle());
   }
-  auto* device_ptr = reinterpret_cast<ValueT*>(ptr_attrs.devicePointer);
+  // Pageable host memory may have a non-null `devicePointer` on HMM/ATS systems, but it is not
+  // treated as device-accessible; only registered (pinned) host memory is.
+  auto* device_ptr = ptr_attrs.type == cudaMemoryTypeHost
+                       ? reinterpret_cast<ValueT*>(ptr_attrs.devicePointer)
+                       : nullptr;
   RAFT_EXPECTS(device_ptr != nullptr, "%s", error_msg);
   return device_ptr;
 }

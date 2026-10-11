@@ -60,8 +60,12 @@ struct pointer_residency_count<Type, Types...> {
     auto [on_device, on_host] = pointer_residency_count<Types...>::run(ptrs...);
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-    if (attr.devicePointer || attr.type == cudaMemoryTypeDevice) { ++on_device; }
-    if (attr.hostPointer || attr.type == cudaMemoryTypeUnregistered) { ++on_host; }
+    // Pageable (unregistered) host memory is treated as host-only. On systems with HMM or ATS the
+    // GPU can access pageable memory and `devicePointer` may be non-null for it, but GPU kernels
+    // and memsets on pageable memory go through GPU page faults and must not be used here.
+    const bool pageable = attr.type == cudaMemoryTypeUnregistered;
+    if (attr.type == cudaMemoryTypeDevice || (!pageable && attr.devicePointer)) { ++on_device; }
+    if (pageable || attr.hostPointer) { ++on_host; }
     return std::make_tuple(on_device, on_host);
   }
 };
