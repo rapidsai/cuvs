@@ -27,6 +27,8 @@ project(
   VERSION "${RAPIDS_VERSION}"
   LANGUAGES ${lang_list}
 )
+# [CI ONLY] Newer CCCL warns on <cub/cub.cuh>, which fails this older commit with -Werror.
+add_compile_definitions(CCCL_DISABLE_CUB_UMBRELLA_HEADER_WARNING)
 
 # Find CMake packages provided by installed wheels.
 find_package(Python COMPONENTS Interpreter)
