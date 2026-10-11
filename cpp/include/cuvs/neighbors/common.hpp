@@ -25,6 +25,7 @@
 #include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
 #include <cuvs/core/export.hpp>
+#include <cuvs/util/pointer_attributes.hpp>
 #include <raft/core/detail/macros.hpp>
 
 #include <cuda_fp16.h>
@@ -1115,7 +1116,11 @@ template <typename ValueT, typename SrcT>
   if (ptr_attrs.type == cudaMemoryTypeDevice || ptr_attrs.type == cudaMemoryTypeManaged) {
     return const_cast<ValueT*>(src.data_handle());
   }
-  auto* device_ptr = reinterpret_cast<ValueT*>(ptr_attrs.devicePointer);
+  // Host memory needs a device mapping; pageable memory only counts when the device reads it
+  // through the host page tables (ATS), not through HMM page faults.
+  auto* device_ptr = cuvs::util::detail::is_device_accessible(ptr_attrs)
+                       ? reinterpret_cast<ValueT*>(ptr_attrs.devicePointer)
+                       : nullptr;
   RAFT_EXPECTS(device_ptr != nullptr, "%s", error_msg);
   return device_ptr;
 }
