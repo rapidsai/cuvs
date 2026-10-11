@@ -82,16 +82,16 @@ run_it() {
   fi
 }
 
-rapids-logger "CagraRandomizedIT loop with the pre-#2375 prefilter buffer"
-END=$((SECONDS + 35 * 60))
+rapids-logger "New CagraRandomizedIT with the pre-#2375 prefilter buffer"
+END=$((SECONDS + 15 * 60))
 N=0
 while [ ${SECONDS} -lt ${END} ]; do
   N=$((N + 1))
   run_it "legacy-${N}" CagraRandomizedIT 2 -Dcuvs.repro.legacyPrefilter=true
 done
 
-rapids-logger "CagraRandomizedIT loop with the current prefilter buffer"
-END=$((SECONDS + 35 * 60))
+rapids-logger "New CagraRandomizedIT"
+END=$((SECONDS + 75 * 60))
 N=0
 while [ ${SECONDS} -lt ${END} ]; do
   N=$((N + 1))
@@ -100,13 +100,12 @@ done
 
 rapids-logger "Summary"
 for t in legacy current; do
-  echo "${t}: $(cat "${LOGDIR}/${t}"-*.log | grep -c "Tests run:.*in com") test summaries, $(cat "${LOGDIR}/${t}"-*.log | grep -c "MISMATCH") mismatching cases"
+  echo "${t}: $(cat "${LOGDIR}/${t}"-*.log | grep -c "Tests run:.*in com") test summaries"
+  cat "${LOGDIR}/${t}"-*.log | grep -h "Tests run:.*in com" | sed -E 's/Time elapsed: [0-9.]+ s //' | sort | uniq -c
+  cat "${LOGDIR}/${t}"-*.log | grep -h "AssertionError" | sed -E 's/[0-9]+/N/g' | sort | uniq -c
 done
-grep -h "MISMATCH" "${LOGDIR}"/*.log
+grep -h "RECALL-GROUP\|SELF-MATCH\|SELF-MISS" "${LOGDIR}"/current-*.log
 popd
-
-rapids-logger "Python replay on older cuVS releases"
-SWEEP_VERSIONS="25.02 25.04 25.06" SWEEP_MINUTES=12 bash ci/cagra_sweep.sh
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
