@@ -14,7 +14,7 @@ fi
 nvidia-smi
 conda config --set channel_priority strict
 
-MINUTES=${SWEEP_MINUTES:-11}
+MINUTES=${SWEEP_MINUTES:-13}
 SEED=$(( $(date +%s) % 100000 ))
 OUT=$(mktemp -d)
 
@@ -32,9 +32,10 @@ run_version() {
     conda list -p "${prefix}" | grep -E "cuvs|cupy|python " || true
     return
   fi
-  "${prefix}/bin/python" -I ci/cagra_randomized_sweep.py --tag "${ver}" \
+  timeout -k 60 "$(( MINUTES * 60 + 900 ))" "${prefix}/bin/python" -I ci/cagra_randomized_sweep.py --tag "${ver}" \
     --minutes "${MINUTES}" --seed "${SEED}" --out "${OUT}/${env}.jsonl" > "${OUT}/${env}.out" 2>&1
-  grep -v "\]\[warning\]" "${OUT}/${env}.out" | tail -n 300
+  echo "[${ver}] sweep exit code $?"
+  grep -v "\]\[warning\]" "${OUT}/${env}.out" | tail -n 1500
   rm -rf "${prefix}"
 }
 
@@ -43,9 +44,8 @@ run_version 25.10 rapidsai
 run_version 26.02 rapidsai
 run_version 26.06 rapidsai
 run_version 26.08 rapidsai
-run_version 26.10 rapidsai
 run_version 26.12 rapidsai-nightly
 
 rapids-logger "Summary"
-grep -h "SUMMARY\|ENV CREATE FAILED" "${OUT}"/*.out 2>/dev/null
+grep -h "SUMMARY\|RECALL" "${OUT}"/*.out 2>/dev/null
 exit 0

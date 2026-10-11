@@ -65,7 +65,11 @@ def run_case(rng, mode, case_id, args):
     order = np.argsort(exact, axis=1, kind="stable")
 
     params = cagra.IndexParams(build_algo=args.build_algo)
-    index = cagra.build(params, cp.asarray(data))
+    # Like the Java test, build from host memory or from device memory. Older cuVS releases
+    # keep a non-owning view of an aligned device dataset, so it has to outlive the index.
+    on_host = bool(rng.integers(0, 2))
+    d_data = None if on_host else cp.asarray(data)
+    index = cagra.build(params, data if on_host else d_data)
     sp = cagra.SearchParams()
     kwargs = {}
     if keep is not None:
@@ -82,6 +86,7 @@ def run_case(rng, mode, case_id, args):
     rec = dict(
         id=case_id,
         mode=mode,
+        host=on_host,
         n=n,
         dim=dim,
         nq=nq,
@@ -163,6 +168,7 @@ def run_case(rng, mode, case_id, args):
     rec["recall_min"] = float(np.min(recalls)) if recalls else 1.0
     rec["old_check_fail"] = old_fail_q
     rec["problems"] = problems
+    del index, d_data
     return rec
 
 
@@ -174,11 +180,13 @@ def main():
     ap.add_argument("--edge-fraction", type=float, default=0.3)
     ap.add_argument("--build-algo", default="nn_descent")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--print-below", type=float, default=0.7)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
     end = time.time() + args.minutes * 60
     n_cases = n_old_fail = n_prob = 0
     recall_means = []
+    by_filter = {}
     with open(args.out, "w") as f:
         i = 0
         while time.time() < end:
@@ -201,7 +209,12 @@ def main():
                 continue
             n_cases += 1
             recall_means.append(rec["recall_mean"])
-            if rec["old_check_fail"] or rec["problems"]:
+            by_filter.setdefault(rec["filter"], []).append(rec["recall_mean"])
+            if (
+                rec["old_check_fail"]
+                or rec["problems"]
+                or rec["recall_mean"] < args.print_below
+            ):
                 n_old_fail += bool(rec["old_check_fail"])
                 n_prob += bool(rec["problems"])
                 print(f"[{args.tag}] CASE {json.dumps(rec)}", flush=True)
@@ -214,6 +227,15 @@ def main():
         f"median={np.median(r):.4f} mean={r.mean():.4f}",
         flush=True,
     )
+    for f, vals in sorted(by_filter.items()):
+        v = np.array(vals)
+        print(
+            f"[{args.tag}] RECALL filter={f} cases={len(v)} min={v.min():.4f} "
+            f"p1={np.quantile(v, 0.01):.4f} p5={np.quantile(v, 0.05):.4f} "
+            f"p25={np.quantile(v, 0.25):.4f} median={np.median(v):.4f} "
+            f"mean={v.mean():.4f}",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
