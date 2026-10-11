@@ -43,6 +43,52 @@ hostname || true
 echo "RUNNER_NAME=${RUNNER_NAME:-}"
 conda list | grep -E "^(libcuvs|cuvs) " || true
 
+rapids-logger "Pointer attribute probe (pageable host memory, touched and untouched)"
+python - <<'PYEOF' || true
+import ctypes
+import glob
+import os
+
+lib = sorted(glob.glob(os.path.join(os.environ.get("CONDA_PREFIX", ""), "lib", "libcudart.so.*")))
+cudart = ctypes.CDLL(lib[-1] if lib else "libcudart.so")
+libc = ctypes.CDLL("libc.so.6")
+libc.malloc.restype = ctypes.c_void_p
+libc.malloc.argtypes = [ctypes.c_size_t]
+
+
+class Attr(ctypes.Structure):
+    _fields_ = [
+        ("type", ctypes.c_int),
+        ("device", ctypes.c_int),
+        ("devicePointer", ctypes.c_void_p),
+        ("hostPointer", ctypes.c_void_p),
+    ]
+
+
+rt_ver = ctypes.c_int()
+cudart.cudaRuntimeGetVersion(ctypes.byref(rt_ver))
+cudart.cudaFree(None)
+val = ctypes.c_int()
+cudart.cudaDeviceGetAttribute(ctypes.byref(val), 88, 0)  # cudaDevAttrPageableMemoryAccess
+print(f"probe cudart={lib[-1] if lib else '?'} runtime={rt_ver.value} pageableMemoryAccess={val.value}")
+
+
+def probe(name, ptr):
+    a = Attr()
+    rc = cudart.cudaPointerGetAttributes(ctypes.byref(a), ctypes.c_void_p(ptr))
+    print(
+        f"probe {name}: rc={rc} type={a.type} devicePointer={a.devicePointer} "
+        f"hostPointer={a.hostPointer} ptr={ptr}"
+    )
+
+
+for n in (64, 4096, 1 << 20, 1 << 24):
+    p = libc.malloc(n)
+    probe(f"malloc({n}) untouched", p)
+    ctypes.memset(p, 1, n)
+    probe(f"malloc({n}) touched", p)
+PYEOF
+
 RAPIDS_TESTS_DIR=${RAPIDS_TESTS_DIR:-"${PWD}/test-results"}
 mkdir -p "${RAPIDS_TESTS_DIR}"
 DIAG_DIR="${PWD}/hang-diag"
