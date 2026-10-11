@@ -14,6 +14,8 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_id.hpp>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/init.cuh>
 
@@ -896,13 +898,20 @@ void sort_knn_graph(
   const double time_sort_start = cur_time();
   RAFT_LOG_DEBUG("# Sorting kNN Graph on GPUs ");
 
-  // Only stage the dataset when it is not already device-accessible; a device dataset is read in
-  // place instead of being duplicated into a second full-size device buffer.
+  // A dataset in device memory of the resource's GPU (or in managed memory) is read in place
+  // instead of being duplicated into a second full-size device buffer. Host datasets, and device
+  // allocations owned by another GPU (which the sort kernel cannot read without peer access), are
+  // staged as before.
+  bool stage_dataset = !d_accessor::is_device_accessible;
+  if constexpr (d_accessor::is_device_accessible) {
+    const int dataset_device = raft::get_device_for_address(dataset_ptr);
+    stage_dataset = dataset_device >= 0 && dataset_device != raft::resource::get_device_id(res);
+  }
   using d_dataset_t = decltype(raft::make_device_mdarray<DataT>(
     res, large_tmp_mr, raft::make_extents<int64_t>(dataset_size, dataset_dim)));
   std::optional<d_dataset_t> d_dataset;
   const DataT* d_dataset_ptr = dataset_ptr;
-  if constexpr (!d_accessor::is_device_accessible) {
+  if (stage_dataset) {
     d_dataset.emplace(raft::make_device_mdarray<DataT>(
       res, large_tmp_mr, raft::make_extents<int64_t>(dataset_size, dataset_dim)));
     raft::copy(res, d_dataset->view(), dataset);
