@@ -14,7 +14,6 @@ import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.DEVICE_TO_HOST
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
@@ -468,8 +467,6 @@ public class CagraIndexImpl implements CagraIndex {
         == cagraRequiredRowWidth(logicalColumns, elementSizeBytes(dataset.dataType()));
   }
 
-  private static final BitSet[] EMPTY_PREFILTER_BITSET = new BitSet[0];
-
   /**
    * Invokes the native search_cagra_index via the Panama API for searching a
    * CAGRA index.
@@ -495,9 +492,7 @@ public class CagraIndexImpl implements CagraIndex {
       final long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
       final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
       final boolean hasPreFilter = query.getPrefilter() != null;
-      final BitSet[] prefilters =
-          hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
-      final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
+      final long prefilterDataLength = hasPreFilter ? query.getNumDocs() : 0;
       final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
       final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
@@ -531,8 +526,9 @@ public class CagraIndexImpl implements CagraIndex {
             cuvsFilter.type(prefilter, 0); // NO_FILTER
             cuvsFilter.addr(prefilter, 0);
           } else {
-            BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
-            long[] filters = concatenatedFilters.toLongArray();
+            // CAGRA takes a single filter for all queries. Use its bits as they are: concatenate()
+            // would read a BitSet with no bits set as "no filter" and return excluded rows.
+            long[] filters = query.getPrefilter().get(0, query.getNumDocs()).toLongArray();
             var prefilterDataMemorySegment =
                 buildMemorySegment(localArena, filters, (prefilterDataLength + 63) / 64);
 
