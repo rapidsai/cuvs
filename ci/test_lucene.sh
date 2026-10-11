@@ -95,7 +95,37 @@ rapids-logger "Run cuvs-lucene tests against the amd64-built classes"
 # compilation for this run, forcing test to use amd64-compiled jar instead of
 # local code.
 pushd java/cuvs-lucene
-mvn --batch-mode test -Dskip.compile=true
+MVN_TEST=(mvn --batch-mode test -Dskip.compile=true -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=TestAcceleratedHNSWMultiLayerRoundTrip)
+DIAG_LOG="$(mktemp)"
+
+rapids-logger "DIAG: replay failing seed 73F002E9239F2329 (x5)"
+for rep in 1 2 3 4 5; do
+  "${MVN_TEST[@]}" -Dtests.seed=73F002E9239F2329 -Dtests.locale=gu-IN -Dtests.timezone=Europe/Guernsey 2>&1 \
+    | grep -E "^PDIAG|AssertionError|Tests run:" | sed "s/^/SEEDRUN rep=${rep} /" | tee -a "${DIAG_LOG}" || true
+done
+
+rapids-logger "DIAG: TestAcceleratedHNSWMultiLayerRoundTrip with random seeds"
+runs=0
+end=$((SECONDS + ${DIAG_MINUTES:-45} * 60))
+while [ "${SECONDS}" -lt "${end}" ]; do
+  runs=$((runs + 1))
+  "${MVN_TEST[@]}" -Dtests.iters=100 2>&1 \
+    | grep -E "^PDIAG|AssertionError|reproduce with|Tests run:.*Fail" | sed "s/^/LOOP run=${runs} /" | tee -a "${DIAG_LOG}" || true
+done
+
+rapids-logger "DIAG: summary"
+for fmt in LuceneAcceleratedHNSWBinaryQuantizedVectorsFormat LuceneAcceleratedHNSWScalarQuantizedVectorsFormat Lucene99AcceleratedHNSWVectorsFormat; do
+  total=$(grep -c "PDIAG fmt=${fmt} " "${DIAG_LOG}" || true)
+  reordered=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep -vc "reorderedDocs=0 " || true)
+  oldMiss=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep -c "oldFound=false" || true)
+  oldMissReordered=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep "oldFound=false" | grep -vc "reorderedDocs=0 " || true)
+  newMiss=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep -c "newFound=false" || true)
+  echo "SUMMARY fmt=${fmt} iterations=${total} reordered=${reordered} oldMiss=${oldMiss} oldMissReordered=${oldMissReordered} newMiss=${newMiss}"
+  if [ "${newMiss}" -ne 0 ]; then
+    EXITCODE=1
+  fi
+done
+echo "SUMMARY newOthersGE>0 (BQ): $(grep 'PDIAG fmt=LuceneAcceleratedHNSWBinaryQuantizedVectorsFormat ' "${DIAG_LOG}" | grep -oE 'new\[[^]]*\]' | grep -vc 'othersGE=0 ' || true)"
 popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"
