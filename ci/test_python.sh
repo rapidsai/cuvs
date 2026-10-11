@@ -318,6 +318,8 @@ clear_caches() {
   esac
 }
 cache_info "before the loop"
+rapids-logger "Prelude: cudaPointerGetAttributes on pageable host memory"
+python "${CI_DIR}/b3_ptrattr.py" 2>&1 | tail -30
 rapids-logger "Prelude: does an nvJitLink -lto cubin go through the driver JIT cache?"
 rapids-mamba-retry create --yes -n cutools -c conda-forge cuda-cuobjdump "cuda-version=${RAPIDS_CUDA_VERSION%.*}" > /dev/null 2>&1 || true
 CUOBJDUMP=$(find /opt/conda/envs/cutools -name cuobjdump -type f 2>/dev/null | head -1)

@@ -49,7 +49,12 @@ for line in gdb_out.splitlines():
 
 print("== register values that point into non-library mappings")
 for (val, path), where in sorted(seen.items(), key=lambda kv: kv[0][0]):
-    print(f"  0x{val:x} -> {path}   ({', '.join(where[:4])})")
+    flag = ""
+    if path in ("[heap]", "[anon]"):
+        flag = "  <-- PAGEABLE HOST (heap/anon)"
+    elif "nvidia-uvm" in path:
+        flag = "  <-- MANAGED (nvidia-uvm)"
+    print(f"  0x{val:x} -> {path}{flag}   ({', '.join(where[:4])})")
 print("== /dev/nvidia-uvm and /dev/nvidia* mappings (count by path)")
 counts = {}
 for lo, hi, perm, path in maps:
