@@ -277,7 +277,7 @@ STALL=420
 MAX_HANGS=3
 case "${EXP}" in
   baseline|nsys|drv*) ;;
-  clb) export CUDA_LAUNCH_BLOCKING=1 ;;
+  clb) export CUDA_LAUNCH_BLOCKING=1 B3_PTRPROBE=1 ;;
   pinned) B3_SHIM=pq_pinned ;;
   pqdev) B3_SHIM=pq_device ;;
   rmmasync) B3_SHIM=rmm_async ;;

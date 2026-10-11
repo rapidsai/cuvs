@@ -72,6 +72,17 @@ def pytest_configure(config):
 
 
 def pytest_runtest_teardown(item, nextitem):
+    if (
+        nextitem is None or nextitem.module is not item.module
+    ) and os.environ.get("B3_PTRPROBE"):
+        try:
+            import b3_ptrattr
+
+            b3_ptrattr.round_(
+                f"in-process, after module {item.module.__name__}"
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"[b3-shim] ptrattr probe failed: {e!r}", flush=True)
     if nextitem is None or nextitem.module is not item.module:
         print(
             f"\n[b3-shim] {item.module.__name__}: converted {_COUNTS['converted']} host inputs",

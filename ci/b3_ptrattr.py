@@ -46,29 +46,33 @@ def round_(label):
     return big, small
 
 
-print(
-    "pageableMemoryAccess",
-    rt.deviceGetAttribute(rt.cudaDevAttrPageableMemoryAccess, 0),
-)
-keep = [round_("before any GPU access to host memory")]
+def main():
+    print(
+        "pageableMemoryAccess",
+        rt.deviceGetAttribute(rt.cudaDevAttrPageableMemoryAccess, 0),
+    )
+    keep = [round_("before any GPU access to host memory")]
 
-# (d) the GPU copies from pageable memory, then probe the same array again.
-src = np.arange(1 << 16, dtype=np.float32)
-dst = cp.empty_like(cp.asarray(src[:1]))
-dst = cp.asarray(src)
-probe("(d) np array after cp.asarray (H2D copy)", src.ctypes.data)
+    # (d) the GPU copies from pageable memory, then probe the same array again.
+    src = np.arange(1 << 16, dtype=np.float32)
+    keep.append(cp.asarray(src))
+    probe("(d) np array after cp.asarray (H2D copy)", src.ctypes.data)
 
-# (e) host-input PQ build/transform, as in test_product_quantizer.
-try:
-    from cuvs.preprocessing.quantize import pq
+    # (e) host-input PQ build/transform, as in test_product_quantizer.
+    try:
+        from cuvs.preprocessing.quantize import pq
 
-    x = np.random.random_sample((1000, 64)).astype(np.float32)
-    params = pq.QuantizerParams(pq_bits=8, pq_dim=32)
-    q = pq.build(params, x)
-    pq.transform(q, x)
-    cp.cuda.runtime.deviceSynchronize()
-    probe("(e) PQ host input after pq.build/transform", x.ctypes.data)
-except Exception as e:  # noqa: BLE001
-    print("PQ step failed:", repr(e))
+        x = np.random.random_sample((1000, 64)).astype(np.float32)
+        params = pq.QuantizerParams(pq_bits=8, pq_dim=32)
+        q = pq.build(params, x)
+        pq.transform(q, x)
+        cp.cuda.runtime.deviceSynchronize()
+        probe("(e) PQ host input after pq.build/transform", x.ctypes.data)
+    except Exception as e:  # noqa: BLE001
+        print("PQ step failed:", repr(e))
 
-keep.append(round_("after host-input PQ build"))
+    keep.append(round_("after host-input PQ build"))
+
+
+if __name__ == "__main__":
+    main()
