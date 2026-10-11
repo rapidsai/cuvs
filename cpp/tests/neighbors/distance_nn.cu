@@ -10,6 +10,7 @@
 #include "../../src/distance/unfused_distance_nn.cuh"
 
 #include <cuda/stream>
+#include <cuvs/detail/jit_lto/cutile_compat.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
@@ -118,7 +119,17 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
       workspace_size = m * n * sizeof(AccT);
     }
 
-    if (backend_unavailable) { GTEST_SKIP() << "Requested top_1_nn path is unavailable"; }
+    if (backend_unavailable) {
+      // cuTile cubins are embedded only for specific architectures and are not forward compatible
+      // across minor versions, so cuTile (and FP16 Auto, which has no non-cuTile fallback) is
+      // expected to be unavailable on devices such as GB300 (sm_103) and GB10 (sm_121).
+      const auto& prop = raft::resource::get_device_properties(handle);
+      GTEST_SKIP() << "Requested top_1_nn path is unavailable on compute capability " << prop.major
+                   << "." << prop.minor
+                   << (cuvs::detail::jit_lto::cutile_launch_available_on_current_device()
+                         ? ""
+                         : " (this build has no cuTile cubin for this architecture)");
+    }
 
     // Reset buffer
     if constexpr (std::is_same_v<OutT, raft::KeyValuePair<IdxT, AccT>>) {
