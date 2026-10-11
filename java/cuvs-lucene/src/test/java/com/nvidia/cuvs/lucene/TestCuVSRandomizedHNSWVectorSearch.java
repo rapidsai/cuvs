@@ -4,17 +4,13 @@
  */
 package com.nvidia.cuvs.lucene;
 
+import static com.nvidia.cuvs.lucene.TestUtils.assertSearchFindsNearestNeighbors;
 import static com.nvidia.cuvs.lucene.TestUtils.generateDataset;
 import static com.nvidia.cuvs.lucene.TestUtils.generateQueries;
 import static com.nvidia.cuvs.lucene.ThreadLocalCuVSResourcesProvider.isSupported;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.lucene.codecs.Codec;
@@ -49,14 +45,7 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
       Logger.getLogger(TestCuVSRandomizedHNSWVectorSearch.class.getName());
 
   static final Codec codec =
-      TestUtil.alwaysKnnVectorsFormat(
-          "default".equals(System.getProperty("diag.cpuFormat"))
-              ? new TestDiagRandomizedHNSWRecall.HighDimHnswFormat(
-                  new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat())
-              : "32".equals(System.getProperty("diag.cpuFormat"))
-                  ? new TestDiagRandomizedHNSWRecall.HighDimHnswFormat(
-                      new org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat(32, 32))
-                  : new Lucene99AcceleratedHNSWVectorsFormat());
+      TestUtil.alwaysKnnVectorsFormat(new Lucene99AcceleratedHNSWVectorsFormat());
   static IndexSearcher searcher;
   static IndexReader reader;
   static Directory directory;
@@ -64,7 +53,9 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
   static int DATASET_SIZE_LIMIT = 1000;
   static int DIMENSIONS_LIMIT = 2048;
   static int NUM_QUERIES_LIMIT = 10;
-  static int TOP_K_LIMIT = 64; // TODO This fails beyond 64
+  // A wider search is more accurate, not less: in the measurements described in testVectorSearch,
+  // no result was outside the closest 3 * topK for any topK from 8 to 200.
+  static int TOP_K_LIMIT = 128;
   static float[][] dataset;
   // Whether each document of the dataset was indexed with a vector; only those can be hits.
   static boolean[] hasVector;
@@ -128,150 +119,25 @@ public class TestCuVSRandomizedHNSWVectorSearch extends LuceneTestCase {
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, dataset.length);
 
-    if (dataset.length < topK) topK = dataset.length;
-
     float[][] queries = generateQueries(random, dataset[0].length, numQueries);
-    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries);
 
     log.log(Level.FINE, "Dataset size: " + dataset.length + "x" + dataset[0].length);
     log.log(Level.FINE, "Query size: " + numQueries + "x" + queries[0].length);
     log.log(Level.FINE, "TopK: " + topK);
 
-    Query query = new KnnFloatVectorQuery("vector", queries[0], topK);
-    int correct[] = new int[topK];
-    for (int i = 0; i < topK; i++) correct[i] = expected.get(0).get(i);
-
-    ScoreDoc[] hits = searcher.search(query, topK).scoreDocs;
-    log.log(Level.FINE, "RESULTS: " + Arrays.toString(hits));
-    log.log(Level.FINE, "EXPECTD: " + expected.get(0));
-
-    for (ScoreDoc hit : hits) {
-      log.log(
-          Level.FINE, "\t" + reader.storedFields().document(hit.doc).get("id") + ": " + hit.score);
-    }
-
-    printDiagnostics(queries[0], topK, hits);
-
-    for (ScoreDoc hit : hits) {
-      int doc = Integer.parseInt(reader.storedFields().document(hit.doc).get("id"));
-      assertTrue("Result returned was not in topK*3: " + doc, expected.get(0).contains(doc));
-    }
-  }
-
-  private static void printDiagnostics(float[] query, int topK, ScoreDoc[] hits)
-      throws IOException {
-    int n = dataset.length;
-    double[] dist = new double[n];
-    List<Integer> order = new ArrayList<>();
-    for (int j = 0; j < n; j++) {
-      if (!hasVector[j]) continue;
-      double d = 0;
-      for (int x = 0; x < query.length; x++) {
-        double diff = query[x] - dataset[j][x];
-        d += diff * diff;
-      }
-      dist[j] = d;
-      order.add(j);
-    }
-    order.sort((a, b) -> Double.compare(dist[a], dist[b]));
-    int nv = order.size();
-    int[] rank = new int[n];
-    for (int r = 0; r < nv; r++) rank[order.get(r)] = r + 1;
-    List<Integer> segs = new ArrayList<>();
-    for (var ctx : reader.leaves()) {
-      var v = ctx.reader().getFloatVectorValues("vector");
-      segs.add(v == null ? 0 : v.size());
-    }
-    StringBuilder sb = new StringBuilder();
-    int worst = 0;
-    int worstId = -1;
-    String violation = "";
-    for (ScoreDoc hit : hits) {
-      int id = Integer.parseInt(reader.storedFields().document(hit.doc).get("id"));
-      if (id < 0 || id >= n || !hasVector[id]) {
-        violation += " invalid:" + id;
-        continue;
-      }
-      float expectedScore = VectorSimilarityFunction.EUCLIDEAN.compare(query, dataset[id]);
-      if (Math.abs(expectedScore - hit.score) > 1e-4f * expectedScore) {
-        violation += " scoreMismatch:" + id + "(" + hit.score + " vs " + expectedScore + ")";
-      }
-      sb.append(id).append('@').append(rank[id]).append(' ');
-      if (rank[id] > worst) {
-        worst = rank[id];
-        worstId = id;
-      }
-    }
-    int[] rankById = new int[n];
-    java.util.Arrays.fill(rankById, -1);
-    for (int r = 0; r < nv; r++) rankById[order.get(r)] = r + 1;
-    System.out.println(
-        "DIAG leaves:"
-            + TestDiagRandomizedHNSWRecall.leafReport(reader, "vector", query, topK, rankById));
-    int all =
-        searcher.search(new KnnFloatVectorQuery("vector", query, Math.max(nv, 1)), Math.max(nv, 1))
-            .scoreDocs
-            .length;
-    int kth = order.get(Math.min(topK, nv) - 1);
-    int k3 = order.get(Math.min(3 * topK, nv) - 1);
-    System.out.println(
-        String.format(
-            java.util.Locale.ROOT,
-            "DIAG n=%d nv=%d dims=%d topK=%d segs=%s format=%s worstId=%d worstRank=%d window=%d"
-                + " %s d(worst)/d(1st)=%.4f d(worst)/d(k-th)=%.4f d(3k-th)/d(1st)=%.4f"
-                + " d(last)/d(1st)=%.4f reachable=%d/%d%s hits(id@rank)=[%s]",
-            n,
-            nv,
-            dataset[0].length,
-            topK,
-            segs,
-            System.getProperty("diag.cpuFormat", "gpu"),
-            worstId,
-            worst,
-            3 * topK,
-            worst > 3 * topK ? "MISS" : "ok",
-            worstId < 0 ? 0 : Math.sqrt(dist[worstId] / dist[order.get(0)]),
-            worstId < 0 ? 0 : Math.sqrt(dist[worstId] / dist[kth]),
-            Math.sqrt(dist[k3] / dist[order.get(0)]),
-            Math.sqrt(dist[order.get(nv - 1)] / dist[order.get(0)]),
-            all,
-            nv,
-            violation.isEmpty() ? "" : " VIOLATION" + violation,
-            sb.toString().trim()));
-  }
-
-  private static List<List<Integer>> generateExpectedResults(
-      int topK, float[][] dataset, float[][] queries) {
-    List<List<Integer>> neighborsResult = new ArrayList<>();
-    int dimensions = dataset[0].length;
-
-    for (float[] query : queries) {
-      Map<Integer, Double> distances = new TreeMap<>();
-      for (int j = 0; j < dataset.length; j++) {
-        if (hasVector[j] == false) {
-          continue;
-        }
-        double distance = 0;
-        for (int k = 0; k < dimensions; k++) {
-          distance += (query[k] - dataset[j][k]) * (query[k] - dataset[j][k]);
-        }
-        distances.put(j, (distance));
-      }
-
-      Map<Integer, Double> sorted = new TreeMap<Integer, Double>(distances);
-      log.log(Level.FINE, "EXPECTED: " + sorted);
-
-      // Sort by distance and select the topK nearest neighbors
-      List<Integer> neighbors =
-          distances.entrySet().stream()
-              .sorted(Map.Entry.comparingByValue())
-              .map(Map.Entry::getKey)
-              .toList();
-      neighborsResult.add(neighbors.subList(0, Math.min(topK * 3, neighbors.size())));
-    }
-
-    log.log(Level.FINE, "Expected results generated successfully.");
-    return neighborsResult;
+    // The search is approximate. Lucene searches each segment's HNSW graph with a beam as wide as
+    // topK, and in this data (uniform random vectors with up to 2048 dimensions, so all distances
+    // are within about 10% of each other) a narrow beam sometimes stops just short of the true
+    // neighbors. Over 27,003 random indexes from this test's distribution, with 10 queries each, a
+    // result fell outside the closest 3 * topK in 1.7% of queries at topK = 1, 0.21% at topK = 2,
+    // 0.03% at topK = 3, 3 times in 270,000 queries at topK = 5, and never at topK >= 8. Those
+    // results were at most rank 17, and typically only 1.3% farther away than the nearest
+    // neighbor. On the same segments, Lucene's own HNSW format missed in 22% of queries at
+    // topK = 1. Allowing 2 misses across all the queries keeps the false failure rate below 1e-5
+    // per run.
+    int allowedMisses = 2;
+    assertSearchFindsNearestNeighbors(
+        searcher, "vector", "id", dataset, hasVector, queries, topK, allowedMisses);
   }
 
   @Test

@@ -96,29 +96,28 @@ rapids-logger "Run cuvs-lucene tests against the amd64-built classes"
 # local code.
 pushd java/cuvs-lucene
 MVN_TEST=(mvn --batch-mode test -Dskip.compile=true -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false)
-FAILING_SEED=(-Dtests.seed=2A18DA9484B33896 -Dtests.locale=to-Latn-TO -Dtests.timezone=Etc/GMT-1)
 
-rapids-logger "DIAG: replay failing seed 2A18DA9484B33896 (GPU format x3, then Lucene CPU HNSW formats)"
-for rep in 1 2 3; do
-  echo "SEEDRUN gpu rep=${rep}"
-  "${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' "${FAILING_SEED[@]}" 2>&1 | grep -E "DIAG|AssertionError|Tests run:" | head -10 || true
+rapids-logger "VERIFY: full cuvs-lucene suite with the fix"
+"${MVN_TEST[@]}" 2>&1 | grep -E "Tests run:|FAIL|AssertionError" | tail -60 || true
+
+rapids-logger "VERIFY: replay the failing seeds with the fixed test"
+for seed in 2A18DA9484B33896 E71CA7A60ABC8BD7; do
+  for rep in 1 2 3 4 5; do
+    echo "SEEDRUN seed=${seed} rep=${rep}"
+    "${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' -Dtests.seed="${seed}" 2>&1 | grep -E "AssertionError|Tests run:" | head -3 || true
+  done
 done
-for fmt in default 32; do
-  echo "SEEDRUN cpuFormat=${fmt}"
-  "${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' "${FAILING_SEED[@]}" -Ddiag.cpuFormat="${fmt}" 2>&1 | grep -E "DIAG|AssertionError|Tests run:" | head -10 || true
-done
 
-rapids-logger "DIAG: recall sweep (GPU format vs Lucene CPU HNSW on the same segments)"
-"${MVN_TEST[@]}" -Dtest='TestDiagRandomizedHNSWRecall' -Ddiag.minutes=40 2>&1 | grep -E "DIAGSWEEP|AssertionError|Exception|Tests run:" || true
+rapids-logger "VERIFY: recall sweep with the new check (GPU format vs Lucene CPU HNSW)"
+"${MVN_TEST[@]}" -Dtest='TestDiagRandomizedHNSWRecall' -Ddiag.minutes=25 2>&1 | grep -E "DIAGSWEEP (REPORT|field|NEWCHECKFAIL|VIOLATION|UNREACHABLE)|AssertionError|Exception|Tests run:" || true
 
-rapids-logger "DIAG: TestCuVSRandomizedHNSWVectorSearch with random seeds"
+rapids-logger "VERIFY: fixed TestCuVSRandomizedHNSWVectorSearch with random seeds"
 fails=0
 runs=0
-end=$((SECONDS + 30 * 60))
+end=$((SECONDS + 40 * 60))
 while [ "${SECONDS}" -lt "${end}" ]; do
   runs=$((runs + 1))
   out=$("${MVN_TEST[@]}" -Dtest='TestCuVSRandomizedHNSWVectorSearch' 2>&1)
-  echo "${out}" | grep -E "^DIAG" | sed "s/^/LOOP iter=${runs} /" || true
   if echo "${out}" | grep -q "AssertionError\|BUILD FAILURE"; then
     fails=$((fails + 1))
     echo "LOOP iter=${runs} FAILED: $(echo "${out}" | grep -E 'AssertionError|reproduce with' | head -2 | tr '\n' ' ')"

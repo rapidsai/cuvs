@@ -94,6 +94,9 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
     // Test-equivalent event: query 0, topK uniform in [1, 64] capped at the dataset size.
     long testRuns = 0;
     long testFailures = 0;
+    // New check: all of 1..10 queries, topK uniform in [1, 128], at most 2 hits beyond 3*topK.
+    long newRuns = 0;
+    long newFailures = 0;
     // miss rate (k <= 64) by dimension bucket
     long[] dimQueries = new long[5];
     long[] dimMisses = new long[5];
@@ -321,6 +324,9 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
 
           float[][] queries = TestUtils.generateQueries(random, dims, NUM_QUERIES);
           int testTopK = Math.min(random.nextInt(64) + 1, datasetSize);
+          int newTopK = Math.min(random.nextInt(128) + 1, datasetSize);
+          int newNumQueries = random.nextInt(10) + 1;
+          int[] newMisses = new int[FIELDS.length];
 
           for (int q = 0; q < NUM_QUERIES; q++) {
             // exact distances and ranks among documents with vectors
@@ -370,10 +376,12 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
               List<Integer> ks = new ArrayList<>();
               for (int k : KS) ks.add(k);
               if (q == 0) ks.add(-1); // marker for the test-equivalent topK
+              if (q < newNumQueries) ks.add(-2); // marker for the new check's topK
               for (int ki = 0; ki < ks.size(); ki++) {
                 boolean testEquivalent = ks.get(ki) == -1;
-                int k = testEquivalent ? testTopK : ks.get(ki);
-                if (!testEquivalent && k > numVectors) continue;
+                boolean newCheck = ks.get(ki) == -2;
+                int k = testEquivalent ? testTopK : newCheck ? newTopK : ks.get(ki);
+                if (!testEquivalent && !newCheck && k > numVectors) continue;
                 ScoreDoc[] hits =
                     searcher.search(new KnnFloatVectorQuery(field, queries[q], k), k).scoreDocs;
                 // invariants
@@ -384,6 +392,7 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
                 }
                 Set<Integer> seen = new HashSet<>();
                 int worst = 0;
+                int beyond = 0;
                 int inTopK = 0;
                 float prevScore = Float.POSITIVE_INFINITY;
                 int[] ids = new int[hits.length];
@@ -404,6 +413,7 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
                   if (hits[h].score > prevScore) violation = "unsorted scores at " + h;
                   prevScore = hits[h].score;
                   worst = Math.max(worst, rank[id]);
+                  if (rank[id] > 3 * k) beyond++;
                   if (rank[id] <= k) inTopK++;
                 }
                 if (violation != null) {
@@ -423,6 +433,10 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
                           violation));
                 }
                 boolean miss = worst > 3 * k;
+                if (newCheck) {
+                  newMisses[f] += beyond;
+                  continue;
+                }
                 if (testEquivalent) {
                   st.testRuns++;
                   if (miss) st.testFailures++;
@@ -481,6 +495,27 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
               }
             }
           }
+          for (int f = 0; f < FIELDS.length; f++) {
+            stats[f].newRuns++;
+            if (newMisses[f] > 2) {
+              stats[f].newFailures++;
+            }
+            if (newMisses[f] > 2 && f == 0) {
+              System.out.println(
+                  String.format(
+                      Locale.ROOT,
+                      "DIAGSWEEP NEWCHECKFAIL field=%s trial=%d n=%d nv=%d dims=%d topK=%d"
+                          + " queries=%d misses=%d",
+                      FIELDS[f],
+                      trials,
+                      datasetSize,
+                      numVectors,
+                      dims,
+                      newTopK,
+                      newNumQueries,
+                      newMisses[f]));
+            }
+          }
         } finally {
           reader.close();
         }
@@ -498,12 +533,15 @@ public class TestDiagRandomizedHNSWRecall extends LuceneTestCase {
       sb.append(
           String.format(
               Locale.ROOT,
-              "DIAGSWEEP field=%s violations=%d unreachableTrials=%d testEquivalentFailures=%d/%d;",
+              "DIAGSWEEP field=%s violations=%d unreachableTrials=%d testEquivalentFailures=%d/%d"
+                  + " newCheckFailures=%d/%d;",
               FIELDS[f],
               st.invariantViolations,
               st.unreachableTrials,
               st.testFailures,
-              st.testRuns));
+              st.testRuns,
+              st.newFailures,
+              st.newRuns));
       for (int ki = 0; ki < KS.length; ki++) {
         if (st.queries[ki] == 0) continue;
         sb.append(
