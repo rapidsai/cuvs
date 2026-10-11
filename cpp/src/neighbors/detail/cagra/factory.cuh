@@ -16,6 +16,8 @@
 
 #include <cuvs/neighbors/common.hpp>
 
+#include <mutex>
+
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT,
@@ -147,6 +149,8 @@ struct store {
   raft::cache::
     lru<key, key_hash, std::equal_to<>, dataset_descriptor_host<DataT, IndexT, DistanceT>>
       value{kDefaultSize};
+  /** Serializes lookup-or-insert, so that concurrent searches share a single descriptor. */
+  std::mutex mutex;
 };
 
 }  // namespace descriptor_cache
@@ -170,9 +174,15 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   auto key = descriptor_cache::make_key(params, dataset, metric, dataset_norms);
-  auto& cache =
-    raft::resource::get_custom_resource<descriptor_cache::store<DataT, IndexT, DistanceT>>(res)
-      ->value;
+  auto* store =
+    raft::resource::get_custom_resource<descriptor_cache::store<DataT, IndexT, DistanceT>>(res);
+  auto& cache = store->value;
+  // Hold the lock across the lookup and the insertion. Otherwise threads that miss concurrently
+  // each create a descriptor and the later insertion replaces the earlier one, which may already
+  // be in use by another thread; the last owner then frees it on its own stream while a kernel on
+  // a different stream can still be reading it. Only host-side work happens under the lock (the
+  // device-side initialization is deferred to the first `dev_ptr()` call).
+  std::lock_guard<std::mutex> lock(store->mutex);
   dataset_descriptor_host<DataT, IndexT, DistanceT> desc;
   if (!cache.get(key, &desc)) {
     desc =
