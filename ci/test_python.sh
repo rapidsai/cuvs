@@ -133,7 +133,17 @@ run_watched() {
     nvidia-smi --query-gpu=utilization.gpu,power.draw,memory.used --format=csv || true
     pkill -9 -P "${pid}" 2>/dev/null || true
     kill -9 "${pid}" 2>/dev/null || true
-    wait "${pid}" 2>/dev/null
+    # A process stuck in the driver may not exit on SIGKILL; do not block on it.
+    for _ in $(seq 1 12); do
+      kill -0 "${pid}" 2>/dev/null || break
+      sleep 5
+    done
+    if kill -0 "${pid}" 2>/dev/null; then
+      echo "!!!!! ${name}: pid ${pid} did not exit after SIGKILL; continuing without it"
+      disown "${pid}" 2>/dev/null || true
+    else
+      wait "${pid}" 2>/dev/null
+    fi
     rc=124
   else
     wait "${pid}"
