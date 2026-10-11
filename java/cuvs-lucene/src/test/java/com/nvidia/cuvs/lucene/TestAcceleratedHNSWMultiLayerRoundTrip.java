@@ -111,13 +111,17 @@ public class TestAcceleratedHNSWMultiLayerRoundTrip extends LuceneTestCase {
 
         int queryNode = graph.entryNode();
         assertTrue(nodesByLevel.get(2).contains(queryNode));
+        // Graph nodes are vector ordinals, which equal docIDs in this dense single-segment index.
+        // The randomized merge policy can reorder documents during forceMerge, so the entry node's
+        // vector must be looked up through its stored id rather than by indexing the input array
+        // with the ordinal.
+        int queryId = Integer.parseInt(leaf.storedFields().document(queryNode).get("id"));
         IndexSearcher searcher = new IndexSearcher(reader);
-        var hits = searcher.search(new KnnFloatVectorQuery(FIELD, vectors[queryNode], 10), 10);
+        var hits = searcher.search(new KnnFloatVectorQuery(FIELD, vectors[queryId], 10), 10);
         assertEquals(10, hits.scoreDocs.length);
-        String queryNodeId = Integer.toString(queryNode);
         boolean foundQueryNode = false;
         for (var hit : hits.scoreDocs) {
-          foundQueryNode |= queryNodeId.equals(searcher.storedFields().document(hit.doc).get("id"));
+          foundQueryNode |= hit.doc == queryNode;
         }
         assertTrue("the entry-node vector must be returned for its own query", foundQueryNode);
       }
