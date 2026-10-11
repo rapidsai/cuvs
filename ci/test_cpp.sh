@@ -70,8 +70,12 @@ repeat_test() {
   grep -E "^\[       OK \]" "${log}" | sed -E 's/ \([0-9]+ ms\)//' | sort | uniq -c || true
 }
 nvidia-smi -q | grep -E "Driver Version|CUDA Version|Product Name" || true
+rapids-logger "Zero-norm center regression test WITHOUT the guard (expected to fail)"
+CUVS_CI_DISABLE_ZERO_NORM_GUARD=1 "${BIN}" --gtest_filter='AnnIVFFlatTest.CosineZeroNormCenters' 2>&1 | tail -n 20 || true
+rapids-logger "Zero-norm center regression test WITH the guard"
+"${BIN}" --gtest_filter='AnnIVFFlatTest.CosineZeroNormCenters' --gtest_repeat=20 2>&1 | grep -E "Duplicated|Recall|FAILED|PASSED|OK \]" | sort | uniq -c
 repeat_test cosine2 '*AnnIVFFlatTestF_int8.AnnIVFFlat/2:*AnnIVFFlatTestF_uint8.AnnIVFFlat/2' 800
-repeat_test int8_uint8_all '*AnnIVFFlatTestF_int8*:*AnnIVFFlatTestF_uint8*' 4
+repeat_test full_ivf_flat '*' 1
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

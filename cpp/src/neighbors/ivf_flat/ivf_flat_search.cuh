@@ -26,6 +26,7 @@
 
 #include <rmm/resource_ref.hpp>
 
+#include <cstdlib>
 #include <type_traits>
 
 namespace cuvs::neighbors::ivf_flat::detail {
@@ -165,6 +166,8 @@ void search_impl(raft::resources const& handle,
     auto n_lists                      = index.n_lists();
     const auto* q_norm_ptr            = query_norm_dev.data();
     const auto* index_center_norm_ptr = index.center_norms()->data_handle();
+    // [CI ONLY] Allow disabling the zero-norm guard to compare against the old behavior.
+    const bool no_guard = std::getenv("CUVS_CI_DISABLE_ZERO_NORM_GUARD") != nullptr;
     raft::linalg::map_offset(
       handle,
       distance_buffer_dev_view,
@@ -175,6 +178,7 @@ void search_impl(raft::resources const& handle,
         // zero-norm vector is defined as 1 (similarity 0) instead of NaN, which would corrupt the
         // selection of the lists to probe.
         const float denom = q_norm_ptr[query] * index_center_norm_ptr[cluster];
+        if (no_guard) { return dist / denom; }
         return denom > 0.0f ? dist / denom : 0.0f;
       },
       raft::make_const_mdspan(distance_buffer_dev_view));
