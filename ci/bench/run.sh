@@ -191,6 +191,24 @@ case "${GROUP}" in
       done
     done
     ;;
+  profile2)
+    rapids-logger "Install Nsight Systems"
+    rapids-mamba-retry install --yes -n bench -c conda-forge nsight-systems
+    i=0
+    for cfg in "donor=size" "donor=random distinct=1"; do
+      i=$((i + 1))
+      for v in base pr2804 base pr2804; do
+        rapids-logger "nsys: ${v} balanced 64 calls ${cfg}"
+        # shellcheck disable=SC2086
+        BENCH_EXPECT_LIB="${W}/${v}/lib/libcuvs.so" LD_LIBRARY_PATH="${CONDA_PREFIX}/lib" \
+          nsys profile -t cuda --stats=false -f true -o "${W}/prof_${v}_${i}" \
+          "${W}/bench_${v}" "${v}" balanced n=65536 d=2 k=256 calls=64 iters=25 ${cfg} \
+          reps=1 warmup=0 | grep -E "^(RESULT|ERROR|LIB)" || true
+        nsys stats -r cuda_gpu_kern_sum,cuda_api_sum --format table "${W}/prof_${v}_${i}.nsys-rep" \
+          2>/dev/null | cut -c1-250 | head -n 70 || true
+      done
+    done
+    ;;
   lite)
     micro
     rounds ${R} kmeans n=1000000 d=128 k=100,1000,10000 reps=1

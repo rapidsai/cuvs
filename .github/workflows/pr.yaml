@@ -86,4 +86,4 @@ jobs:
       script: "ci/bench/run.sh"
       matrix_type: nightly
       # DEPENDENCIES selects the workload group of ci/bench/run.sh.
-      matrix_filter: '[{ARCH: "amd64", PY_VER: "3.13", CUDA_VER: "13.3.0", LINUX_VER: "ubuntu26.04", GPU: "h100", DRIVER: "latest", DEPENDENCIES: "profile"}, {ARCH: "amd64", PY_VER: "3.13", CUDA_VER: "13.3.0", LINUX_VER: "ubuntu26.04", GPU: "a100", DRIVER: "latest", DEPENDENCIES: "profile"}]'
+      matrix_filter: '[{ARCH: "amd64", PY_VER: "3.13", CUDA_VER: "13.3.0", LINUX_VER: "ubuntu26.04", GPU: "h100", DRIVER: "latest", DEPENDENCIES: "profile2"}]'
