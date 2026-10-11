@@ -216,7 +216,13 @@ void bench_reduce(int64_t n, int reps)
 int main()
 {
   // Timing (and reproducibility) on k-means fit shapes.
-  for (auto [n, d, k] : std::vector<std::tuple<int64_t, int64_t, int64_t>>{{100000, 128, 10},
+  for (auto [n, d, k] : std::vector<std::tuple<int64_t, int64_t, int64_t>>{{100000, 32, 10},
+                                                                           {100000, 32, 1000},
+                                                                           {100000, 128, 10},
+                                                                           {100000, 128, 100},
+                                                                           {100000, 128, 1000},
+                                                                           {100000, 1024, 10},
+                                                                           {100000, 1024, 100},
                                                                            {1000000, 32, 100},
                                                                            {1000000, 32, 1000},
                                                                            {1000000, 128, 10},

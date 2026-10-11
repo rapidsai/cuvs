@@ -167,6 +167,30 @@ case "${GROUP}" in
     rounds ${R} ivf n=10000000 d=96 index=flat:16384,pq:16384:48 reps=1
     rounds ${R} ivf n=1000000 d=768 index=flat:1024,pq:1024:96
     ;;
+  profile)
+    micro
+    rapids-logger "Balanced k-means, 64 small fits (IVF-PQ codebook-like)"
+    rounds ${R} balanced n=65536 d=2 k=256 calls=64 donor=size iters=25 distinct=1
+    rounds ${R} balanced n=65536 d=2 k=256 calls=64 donor=random iters=25 distinct=1
+    rounds ${R} balanced n=65536 d=2 k=256 calls=64 donor=size iters=25
+    rounds ${R} balanced n=65536 d=2 k=256 calls=64 donor=random iters=25
+    rapids-logger "Install Nsight Systems"
+    rapids-mamba-retry install --yes -n bench -c conda-forge nsight-systems
+    i=0
+    for cfg in "n=100000 d=128 k=100" "n=100000 d=32 k=1000" "n=100000 d=1024 k=10" \
+      "n=1000000 d=128 k=10"; do
+      i=$((i + 1))
+      for v in base pr2801; do
+        rapids-logger "nsys: ${v} kmeans ${cfg}"
+        # shellcheck disable=SC2086
+        BENCH_EXPECT_LIB="${W}/${v}/lib/libcuvs.so" LD_LIBRARY_PATH="${CONDA_PREFIX}/lib" \
+          nsys profile -t cuda --stats=false -f true -o "${W}/prof_${v}_${i}" \
+          "${W}/bench_${v}" "${v}" kmeans ${cfg} reps=3 warmup=1 | grep -E "^(RESULT|ERROR|LIB)" || true
+        nsys stats -r cuda_gpu_kern_sum,cuda_api_sum --format table "${W}/prof_${v}_${i}.nsys-rep" \
+          2>/dev/null | cut -c1-220 | head -n 70 || true
+      done
+    done
+    ;;
   lite)
     micro
     rounds ${R} kmeans n=1000000 d=128 k=100,1000,10000 reps=1

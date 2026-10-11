@@ -406,8 +406,27 @@ void suite_balanced(const Args& a)
                         return T(fmaxf(-127.f, fminf(127.f, rintf(x * 6.f))));
                       });
   }
+  // distinct=1: every call gets its own dataset (like the per-subspace fits of IVF-PQ), instead
+  // of refitting the same data `calls` times.
+  const bool distinct = a.geti("distinct", 0) != 0 && calls > 1;
+  std::optional<raft::device_matrix<T, int64_t>> XS;
+  if (distinct) {
+    XS.emplace(raft::make_device_matrix<T, int64_t>(res, calls * n, d));
+    for (int i = 0; i < calls; i++) {
+      make_data<float>(res, Xf.data_handle(), n, d, 1000, 2.0f, 4321ULL + i);
+      thrust::transform(thrust::cuda::par.on(stream.get()),
+                        Xf.data_handle(),
+                        Xf.data_handle() + n * d,
+                        XS->data_handle() + i * n * d,
+                        [] __device__(float x) {
+                          return std::is_same_v<T, float>
+                                   ? T(x)
+                                   : T(fmaxf(-127.f, fminf(127.f, rintf(x * 6.f))));
+                        });
+    }
+  }
   std::vector<T> hX;
-  if (n * d <= int64_t(1) << 28) { hX = to_host(res, X.data_handle(), n * d); }
+  if (!distinct && n * d <= int64_t(1) << 28) { hX = to_host(res, X.data_handle(), n * d); }
 
   cuvs::cluster::kmeans::balanced_params params;
   params.n_iters = n_iters;
@@ -423,7 +442,10 @@ void suite_balanced(const Args& a)
     for (int r = 0; r < warmup + reps; r++) {
       double ms = time_ms(res, [&] {
         for (int i = 0; i < calls; i++) {
-          cuvs::cluster::kmeans::fit(res, params, raft::make_const_mdspan(X.view()), C.view());
+          auto Xi = distinct ? raft::make_device_matrix_view<const T, int64_t>(
+                                 XS->data_handle() + i * n * d, n, d)
+                             : raft::make_const_mdspan(X.view());
+          cuvs::cluster::kmeans::fit(res, params, Xi, C.view());
         }
       });
       if (r < warmup) { continue; }
@@ -447,7 +469,7 @@ void suite_balanced(const Args& a)
         }
       }
       printf(
-        "RESULT balanced_fit dtype=%s n=%ld d=%ld k=%ld donor=%s n_iters=%d calls=%d | "
+        "RESULT balanced_fit dtype=%s n=%ld d=%ld k=%ld donor=%s n_iters=%d calls=%d%s | "
         "variant=%s ms=%.3f inertia64=%.9g min_size=%ld max_size=%ld hash=%016lx\n",
         dtype,
         n,
@@ -456,6 +478,7 @@ void suite_balanced(const Args& a)
         random ? "random" : "size_sorted",
         n_iters,
         calls,
+        distinct ? " distinct=1" : "",
         g_variant.c_str(),
         ms,
         inert,
