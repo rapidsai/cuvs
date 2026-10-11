@@ -30,7 +30,7 @@ rapids-dependency-file-generator \
   | tee env.yaml
 
 rapids-mamba-retry env create --yes -f env.yaml -n test
-rapids-mamba-retry create --yes -n dbg -c conda-forge py-spy || true
+rapids-mamba-retry create --yes -n dbg -c conda-forge py-spy gdb || true
 DBG_BIN=/opt/conda/envs/dbg/bin
 NSYS=""
 if [[ "${EXP}" == nsys* ]]; then
@@ -170,6 +170,14 @@ gpu_diag() {
   echo "[after] main: $(thread_line /proc/"${p}"/task/"${p}")"
   echo "---- py-spy dump --native (single ptrace sample)"
   timeout 120 "${DBG_BIN}/py-spy" dump --native --pid "${p}" 2>&1 | head -45 || true
+  echo "---- gdb: main-thread frames and registers, matched against /proc/${p}/maps"
+  cp /proc/"${p}"/maps "${DIAG_DIR}/maps.${p}" 2>/dev/null || true
+  grep -cE "nvidia-uvm" "${DIAG_DIR}/maps.${p}" | sed 's/^/nvidia-uvm mappings: /' || true
+  local gdbargs=(-batch -nx -p "${p}" -ex "set pagination off" -ex "thread 1" -ex "bt 30")
+  for n in $(seq 0 22); do gdbargs+=(-ex "frame ${n}" -ex "info registers rdi rsi rdx rcx r8 r9 rbx rbp r12 r13 r14 r15"); done
+  timeout 180 "${DBG_BIN}/gdb" "${gdbargs[@]}" > "${DIAG_DIR}/gdb.${p}" 2>&1
+  grep -E "^#[0-9]+ " "${DIAG_DIR}/gdb.${p}" | cut -c1-200 | head -30
+  python "${CI_DIR}/b3_regs.py" "${DIAG_DIR}/gdb.${p}" "${DIAG_DIR}/maps.${p}" 2>&1 | head -60
   echo "########## END B3 GPU/DRIVER DIAG"
 }
 
