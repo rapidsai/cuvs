@@ -29,8 +29,9 @@ cd "${RUST_DIR}" || exit 1
 export RUST_BACKTRACE=full
 cargo test -p cuvs --lib --no-run 2>&1 | tee norun.log
 TEST_BIN=$(sed -n 's/.*Executable unittests src\/lib.rs (\(.*\))/\1/p' norun.log | tail -1)
-TEST_BIN=$(realpath "${TEST_BIN}")
+TEST_BIN=$(realpath "${TEST_BIN}" 2>/dev/null || true)
 echo "TEST_BIN=${TEST_BIN}"
+if [ ! -x "${TEST_BIN}" ]; then echo "Failed to build the test binary"; exit 1; fi
 "${TEST_BIN}" --list 2>/dev/null | tail -3
 HAVE_STRESS=0
 if "${TEST_BIN}" --list --ignored 2>/dev/null | grep -q "stress_"; then HAVE_STRESS=1; fi
