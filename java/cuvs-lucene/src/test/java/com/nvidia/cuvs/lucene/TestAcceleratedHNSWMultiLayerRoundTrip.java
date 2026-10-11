@@ -111,136 +111,21 @@ public class TestAcceleratedHNSWMultiLayerRoundTrip extends LuceneTestCase {
 
         int queryNode = graph.entryNode();
         assertTrue(nodesByLevel.get(2).contains(queryNode));
+        // Graph nodes are vector ordinals, which equal docIDs in this dense single-segment index.
+        // The randomized merge policy can reorder documents during forceMerge, so the entry node's
+        // vector must be looked up through its stored id rather than by indexing the input array
+        // with the ordinal.
+        int queryId = Integer.parseInt(leaf.storedFields().document(queryNode).get("id"));
         IndexSearcher searcher = new IndexSearcher(reader);
-
-        // DIAG: the graph ordinal (== docID in this single dense leaf) and the insertion id differ
-        // once a merge policy reorders segments during forceMerge.
-        int[] docToId = new int[leaf.maxDoc()];
-        int reorderedDocs = 0;
-        for (int doc = 0; doc < leaf.maxDoc(); doc++) {
-          docToId[doc] = Integer.parseInt(leaf.storedFields().document(doc).get("id"));
-          if (docToId[doc] != doc) {
-            reorderedDocs++;
-          }
+        var hits = searcher.search(new KnnFloatVectorQuery(FIELD, vectors[queryId], 10), 10);
+        assertEquals(10, hits.scoreDocs.length);
+        boolean foundQueryNode = false;
+        for (var hit : hits.scoreDocs) {
+          foundQueryNode |= hit.doc == queryNode;
         }
-        String fmt = format.getClass().getSimpleName();
-        String mp = config.getMergePolicy().getClass().getSimpleName();
-
-        // Original (pre-fix) query: vectors[queryNode] interprets the graph ordinal as an id.
-        var oldHits = searcher.search(new KnnFloatVectorQuery(FIELD, vectors[queryNode], 10), 10);
-        boolean oldFound = false;
-        for (var hit : oldHits.scoreDocs) {
-          oldFound |= docToId[hit.doc] == queryNode;
-        }
-        // Fixed query: the entry node's own stored vector, matched by docID.
-        float[] entryVector = vectors[docToId[queryNode]];
-        var newHits = searcher.search(new KnnFloatVectorQuery(FIELD, entryVector, 10), 10);
-        boolean newFound = false;
-        for (var hit : newHits.scoreDocs) {
-          newFound |= hit.doc == queryNode;
-        }
-        String oldTarget = diagTarget(leaf, vectors[queryNode], docOfId(docToId, queryNode));
-        String newTarget = diagTarget(leaf, entryVector, queryNode);
-        System.out.println(
-            "PDIAG fmt="
-                + fmt
-                + " mp="
-                + mp
-                + " entryOrd="
-                + queryNode
-                + " entryId="
-                + docToId[queryNode]
-                + " reorderedDocs="
-                + reorderedDocs
-                + " oldFound="
-                + oldFound
-                + " newFound="
-                + newFound
-                + " old["
-                + oldTarget
-                + "] new["
-                + newTarget
-                + "]");
-        if (!oldFound || !newFound) {
-          System.out.println("PDIAG-HITS fmt=" + fmt + " old=" + describeHits(oldHits, docToId));
-          System.out.println("PDIAG-HITS fmt=" + fmt + " new=" + describeHits(newHits, docToId));
-        }
-        assertEquals(10, newHits.scoreDocs.length);
-        assertTrue("the entry-node vector must be returned for its own query", newFound);
+        assertTrue("the entry-node vector must be returned for its own query", foundQueryNode);
       }
     }
-  }
-
-  private static int docOfId(int[] docToId, int id) {
-    for (int doc = 0; doc < docToId.length; doc++) {
-      if (docToId[doc] == id) {
-        return doc;
-      }
-    }
-    return -1;
-  }
-
-  private static String describeHits(org.apache.lucene.search.TopDocs hits, int[] docToId) {
-    StringBuilder sb = new StringBuilder();
-    for (var hit : hits.scoreDocs) {
-      sb.append(hit.doc).append("/id").append(docToId[hit.doc]).append(':').append(hit.score);
-      sb.append(' ');
-    }
-    return sb.toString();
-  }
-
-  /**
-   * Scores every doc against {@code query} with the format's own scorer (quantized for BQ/SQ) and
-   * with exact float L2, and reports where {@code targetDoc} ranks.
-   */
-  private static String diagTarget(LeafReader leaf, float[] query, int targetDoc)
-      throws IOException {
-    var values = leaf.getFloatVectorValues(FIELD);
-    var scorer = values.scorer(query);
-    var it = scorer.iterator();
-    float[] scores = new float[leaf.maxDoc()];
-    for (int doc = it.nextDoc(); doc != NO_MORE_DOCS; doc = it.nextDoc()) {
-      scores[doc] = scorer.score();
-    }
-    var exactValues = leaf.getFloatVectorValues(FIELD);
-    var exactIt = exactValues.iterator();
-    float[] exact = new float[leaf.maxDoc()];
-    for (int doc = exactIt.nextDoc(); doc != NO_MORE_DOCS; doc = exactIt.nextDoc()) {
-      exact[doc] = EUCLIDEAN.compare(query, exactValues.vectorValue(exactIt.index()));
-    }
-    float self = scores[targetDoc];
-    int ge = 0;
-    int gt = 0;
-    int exactGe = 0;
-    float best = Float.NEGATIVE_INFINITY;
-    for (int doc = 0; doc < scores.length; doc++) {
-      if (doc != targetDoc && scores[doc] >= self) {
-        ge++;
-      }
-      if (doc != targetDoc && scores[doc] > self) {
-        gt++;
-      }
-      if (doc != targetDoc && exact[doc] >= exact[targetDoc]) {
-        exactGe++;
-      }
-      if (doc != targetDoc) {
-        best = Math.max(best, scores[doc]);
-      }
-    }
-    return "doc="
-        + targetDoc
-        + " selfScore="
-        + self
-        + " bestOther="
-        + best
-        + " othersGE="
-        + ge
-        + " othersGT="
-        + gt
-        + " exactSelf="
-        + exact[targetDoc]
-        + " exactOthersGE="
-        + exactGe;
   }
 
   private KnnVectorsFormat acceleratedOnlyFormat() {

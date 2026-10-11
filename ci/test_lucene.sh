@@ -98,34 +98,31 @@ pushd java/cuvs-lucene
 MVN_TEST=(mvn --batch-mode test -Dskip.compile=true -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=TestAcceleratedHNSWMultiLayerRoundTrip)
 DIAG_LOG="$(mktemp)"
 
-rapids-logger "DIAG: replay failing seed 73F002E9239F2329 (x5)"
+rapids-logger "VERIFY: replay failing seed 73F002E9239F2329 (x5)"
 for rep in 1 2 3 4 5; do
   "${MVN_TEST[@]}" -Dtests.seed=73F002E9239F2329 -Dtests.locale=gu-IN -Dtests.timezone=Europe/Guernsey 2>&1 \
-    | grep -E "^PDIAG|AssertionError|Tests run:" | sed "s/^/SEEDRUN rep=${rep} /" | tee -a "${DIAG_LOG}" || true
+    | grep -E "AssertionError|Tests run:.*in com" | sed "s/^/SEEDRUN rep=${rep} /" | tee -a "${DIAG_LOG}" || true
 done
 
-rapids-logger "DIAG: TestAcceleratedHNSWMultiLayerRoundTrip with random seeds"
+rapids-logger "VERIFY: TestAcceleratedHNSWMultiLayerRoundTrip (fixed) with random seeds"
 runs=0
 end=$((SECONDS + ${DIAG_MINUTES:-45} * 60))
 while [ "${SECONDS}" -lt "${end}" ]; do
   runs=$((runs + 1))
   "${MVN_TEST[@]}" -Dtests.iters=100 2>&1 \
-    | grep -E "^PDIAG|AssertionError|reproduce with|Tests run:.*Fail" | sed "s/^/LOOP run=${runs} /" | tee -a "${DIAG_LOG}" || true
+    | grep -E "AssertionError|reproduce with|Tests run:.*in com|\\[ERROR\\] com\\.nvidia" | sed "s/^/LOOP run=${runs} /" | tee -a "${DIAG_LOG}" || true
 done
 
-rapids-logger "DIAG: summary"
-for fmt in LuceneAcceleratedHNSWBinaryQuantizedVectorsFormat LuceneAcceleratedHNSWScalarQuantizedVectorsFormat Lucene99AcceleratedHNSWVectorsFormat; do
-  total=$(grep -c "PDIAG fmt=${fmt} " "${DIAG_LOG}" || true)
-  reordered=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep -vc "reorderedDocs=0 " || true)
-  oldMiss=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep -c "oldFound=false" || true)
-  oldMissReordered=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep "oldFound=false" | grep -vc "reorderedDocs=0 " || true)
-  newMiss=$(grep "PDIAG fmt=${fmt} " "${DIAG_LOG}" | grep -c "newFound=false" || true)
-  echo "SUMMARY fmt=${fmt} iterations=${total} reordered=${reordered} oldMiss=${oldMiss} oldMissReordered=${oldMissReordered} newMiss=${newMiss}"
-  if [ "${newMiss}" -ne 0 ]; then
-    EXITCODE=1
-  fi
-done
-echo "SUMMARY newOthersGE>0 (BQ): $(grep 'PDIAG fmt=LuceneAcceleratedHNSWBinaryQuantizedVectorsFormat ' "${DIAG_LOG}" | grep -oE 'new\[[^]]*\]' | grep -vc 'othersGE=0 ' || true)"
+rapids-logger "VERIFY: summary"
+read -r tests failures errors < <(grep "^LOOP .*Tests run:.*in com" "${DIAG_LOG}" \
+  | sed -E 's/.*Tests run: ([0-9]+), Failures: ([0-9]+), Errors: ([0-9]+).*/\1 \2 \3/' \
+  | awk '{t += $1; f += $2; e += $3} END {print t + 0, f + 0, e + 0}')
+bqFail=$(grep "^LOOP .*\\[ERROR\\] com\\.nvidia.*BinaryQuantized" "${DIAG_LOG}" | grep -c . || true)
+seedFail=$(grep "^SEEDRUN .*AssertionError" "${DIAG_LOG}" | grep -c . || true)
+echo "SUMMARY mvnRuns=${runs} testsRun=${tests} failures=${failures} errors=${errors} bqFailures=${bqFail} seedReplayAssertionErrors=${seedFail}"
+if [ "${failures:-1}" -ne 0 ] || [ "${errors:-1}" -ne 0 ] || [ "${seedFail}" -ne 0 ]; then
+  EXITCODE=1
+fi
 popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"
