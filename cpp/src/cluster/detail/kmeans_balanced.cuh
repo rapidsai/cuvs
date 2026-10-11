@@ -42,6 +42,7 @@
 #include <thrust/transform.h>
 
 #include <algorithm>
+#include <atomic>
 #include <limits>
 #include <optional>
 #include <tuple>
@@ -802,7 +803,8 @@ auto adjust_centers(const raft::resources& handle,
                                       601,  659,  733,  809,  863,  941,  1013, 1069, 1151, 1223,
                                       1291, 1373, 1451, 1511, 1583, 1657, 1733, 1811, 1889, 1987,
                                       2053, 2129, 2213, 2287, 2357, 2423, 2531, 2617, 2687, 2741};
-  static IdxT i_primes = 0;
+  // Shared by all threads that build balanced k-means concurrently, so it must be atomic.
+  static std::atomic<std::size_t> i_primes{0};
 
   auto average         = static_cast<MathT>(n_rows) / static_cast<MathT>(n_clusters);
   auto lower_threshold = average * balance_lower_tolerance;
@@ -839,8 +841,7 @@ auto adjust_centers(const raft::resources& handle,
 
   IdxT ofst;
   do {
-    i_primes = (i_primes + 1) % kPrimes.size();
-    ofst     = kPrimes[i_primes];
+    ofst = kPrimes[(i_primes.fetch_add(1, std::memory_order_relaxed) + 1) % kPrimes.size()];
   } while (n_rows % ofst == 0);
 
   rmm::device_uvector<IdxT> receiver_clusters(n_pairs, stream, device_memory);
