@@ -220,9 +220,21 @@ run_watched() {
     fi
     for p in $(descendants "${cp}"); do kill -9 "${p}" 2>/dev/null || true; done
     # Give nsys time to write the report after the target dies.
-    for _ in $(seq 1 120); do kill -0 "${pid}" 2>/dev/null || break; sleep 5; done
+    local waits=24
+    [[ -n "${NSYS}" ]] && waits=120
+    for _ in $(seq 1 "${waits}"); do kill -0 "${pid}" 2>/dev/null || break; sleep 5; done
     for p in $(descendants "${pid}"); do kill -9 "${p}" 2>/dev/null || true; done
-    wait "${pid}" 2>/dev/null
+    sleep 5
+    if kill -0 "${pid}" 2>/dev/null; then
+      echo "!!!!! process ${pid} survives SIGKILL after $(( waits * 5 + 5 ))s:"
+      for p in $(descendants "${pid}"); do
+        echo "  ${p} $(grep -E '^State' /proc/"${p}"/status 2>/dev/null) wchan=$(cat /proc/"${p}"/wchan 2>/dev/null)"
+      done
+      nvidia-smi --query-compute-apps=pid,used_memory --format=csv || true
+      disown "${pid}" 2>/dev/null || true
+    else
+      wait "${pid}" 2>/dev/null
+    fi
     rc=124
   else
     wait "${pid}"
