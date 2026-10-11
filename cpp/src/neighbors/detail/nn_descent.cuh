@@ -967,9 +967,17 @@ __launch_bounds__(BLOCK_SIZE)
 
   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
-  wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
+  // c_nn: new x new (phase 1), c_no: new x old (phase 2). Both phases share one pass over the
+  // feature dimension so each new-vector tile is gathered from global memory only once.
+  wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_nn;
+  wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_no;
+  const bool has_old = list_old_size > 0;
   if (metric != cuvs::distance::DistanceType::BitwiseHamming) {
-    wmma::fill_fragment(c_frag, 0.0);
+    wmma::fill_fragment(c_nn, 0.0);
+    wmma::fill_fragment(c_no, 0.0);
+    // s_unique_counter aliases s_ov[0][0]: every thread must have read the list sizes above
+    // before the first tile load below overwrites s_ov.
+    if (has_old) { __syncthreads(); }
 
     for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
       int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
@@ -989,6 +997,21 @@ __launch_bounds__(BLOCK_SIZE)
                    lane_id);
         }
       }
+      if (has_old) {
+#pragma unroll
+        for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
+          int idx = i * num_warps + warp_id;
+          if (idx < list_old_size) {
+            size_t neighbor_id = old_neighbors[idx];
+            size_t idx_in_data = neighbor_id * data_dim;
+            load_vec(s_ov[idx],
+                     data + idx_in_data + step * TILE_COL_WIDTH,
+                     num_load_elems,
+                     TILE_COL_WIDTH,
+                     lane_id);
+          }
+        }
+      }
       __syncthreads();
 
       for (int i = 0; i < TILE_COL_WIDTH / WMMA_K; i++) {
@@ -996,14 +1019,22 @@ __launch_bounds__(BLOCK_SIZE)
           a_frag, s_nv[warp_id_y * WMMA_M] + i * WMMA_K, TILE_COL_WIDTH + APAD);
         wmma::load_matrix_sync(
           b_frag, s_nv[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
-        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-        __syncthreads();
+        wmma::mma_sync(c_nn, a_frag, b_frag, c_nn);
+        if (has_old) {
+          wmma::load_matrix_sync(
+            b_frag, s_ov[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
+          wmma::mma_sync(c_no, a_frag, b_frag, c_no);
+        }
       }
+      // Shared memory is only read inside the k loop; one barrier before the next tile load
+      // overwrites s_nv / s_ov (or s_distances, which aliases s_ov, is written) is enough.
+      __syncthreads();
     }
 
+    // s_ov is dead from here on, so s_distances (which aliases it) can take the new x new block.
     wmma::store_matrix_sync(
       s_distances + warp_id_y * WMMA_M * SKEWED_MAX_NUM_BI_SAMPLES + warp_id_x * WMMA_N,
-      c_frag,
+      c_nn,
       SKEWED_MAX_NUM_BI_SAMPLES,
       wmma::mem_row_major);
   }
@@ -1030,59 +1061,14 @@ __launch_bounds__(BLOCK_SIZE)
     }
   }
 
-  if (!list_old_size) return;
+  if (!has_old) return;
 
   __syncthreads();
 
   if (metric != cuvs::distance::DistanceType::BitwiseHamming) {
-    wmma::fill_fragment(c_frag, 0.0);
-    for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-      int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
-                             ? data_dim - step * TILE_COL_WIDTH
-                             : TILE_COL_WIDTH;
-      if (TILE_COL_WIDTH < data_dim) {
-#pragma unroll
-        for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
-          int idx = i * num_warps + warp_id;
-          if (idx < list_new_size) {
-            size_t neighbor_id = new_neighbors[idx];
-            size_t idx_in_data = neighbor_id * data_dim;
-            load_vec(s_nv[idx],
-                     data + idx_in_data + step * TILE_COL_WIDTH,
-                     num_load_elems,
-                     TILE_COL_WIDTH,
-                     lane_id);
-          }
-        }
-      }
-#pragma unroll
-      for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
-        int idx = i * num_warps + warp_id;
-        if (idx < list_old_size) {
-          size_t neighbor_id = old_neighbors[idx];
-          size_t idx_in_data = neighbor_id * data_dim;
-          load_vec(s_ov[idx],
-                   data + idx_in_data + step * TILE_COL_WIDTH,
-                   num_load_elems,
-                   TILE_COL_WIDTH,
-                   lane_id);
-        }
-      }
-      __syncthreads();
-
-      for (int i = 0; i < TILE_COL_WIDTH / WMMA_K; i++) {
-        wmma::load_matrix_sync(
-          a_frag, s_nv[warp_id_y * WMMA_M] + i * WMMA_K, TILE_COL_WIDTH + APAD);
-        wmma::load_matrix_sync(
-          b_frag, s_ov[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
-        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-        __syncthreads();
-      }
-    }
-
     wmma::store_matrix_sync(
       s_distances + warp_id_y * WMMA_M * SKEWED_MAX_NUM_BI_SAMPLES + warp_id_x * WMMA_N,
-      c_frag,
+      c_no,
       SKEWED_MAX_NUM_BI_SAMPLES,
       wmma::mem_row_major);
     __syncthreads();
