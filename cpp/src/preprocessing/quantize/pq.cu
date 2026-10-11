@@ -5,8 +5,8 @@
 
 #include "./detail/pq.cuh"
 
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
-#include <cuvs/util/pointer_attributes.hpp>
 
 #include <raft/matrix/copy.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -89,7 +89,7 @@ auto train_from_rows(raft::resources const& res,
 {
   cudaPointerAttributes ptr_attrs;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, src_ptr));
-  auto const* device_ptr = cuvs::util::detail::is_device_accessible(ptr_attrs)
+  auto const* device_ptr = cuvs::neighbors::detail::is_device_accessible(ptr_attrs)
                              ? reinterpret_cast<T const*>(ptr_attrs.devicePointer)
                              : nullptr;
   if (device_ptr == nullptr) {

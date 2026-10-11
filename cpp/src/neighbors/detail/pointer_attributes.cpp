@@ -2,7 +2,8 @@
  * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-#pragma once
+
+#include <cuvs/neighbors/common.hpp>
 
 #include <raft/util/cuda_rt_essentials.hpp>
 
@@ -11,13 +12,15 @@
 #include <mutex>
 #include <unordered_map>
 
-namespace cuvs::util::detail {
+namespace cuvs::neighbors::detail {
+
+namespace {
 
 /**
  * Whether `device` reads pageable (unregistered) host memory through the host page tables (ATS,
  * e.g. Grace Hopper / Grace Blackwell). The result is cached per device.
  */
-inline auto pageable_memory_uses_host_page_tables(int device) -> bool
+auto pageable_memory_uses_host_page_tables(int device) -> bool
 {
   static std::mutex mutex;
   static std::unordered_map<int, bool> cache;
@@ -30,17 +33,9 @@ inline auto pageable_memory_uses_host_page_tables(int device) -> bool
   return uses_host_page_tables != 0;
 }
 
-/**
- * Whether memory described by `attr` may be dereferenced in device code on the current device.
- *
- * Device and managed memory are device-accessible, and registered (pinned) host memory is when it
- * is mapped (`devicePointer` is set). Pageable (unregistered) host memory is device-accessible only
- * when the device reads it through the host page tables (ATS). On systems with HMM,
- * `cudaPointerGetAttributes` can also report a non-null `devicePointer` for pageable memory (for
- * example after the first GPU access to pageable memory in the process), but device accesses to it
- * are then serviced through GPU page faults, so it is treated as host-only there.
- */
-inline auto is_device_accessible(const cudaPointerAttributes& attr) -> bool
+}  // namespace
+
+auto is_device_accessible(const cudaPointerAttributes& attr) -> bool
 {
   switch (attr.type) {
     case cudaMemoryTypeDevice:
@@ -55,4 +50,4 @@ inline auto is_device_accessible(const cudaPointerAttributes& attr) -> bool
   }
 }
 
-}  // namespace cuvs::util::detail
+}  // namespace cuvs::neighbors::detail

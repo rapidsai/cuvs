@@ -74,7 +74,7 @@ inline auto is_device_accessible(const void* ptr) -> bool
 {
   cudaPointerAttributes attrs{};
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&attrs, ptr));
-  return cuvs::util::detail::is_device_accessible(attrs);
+  return cuvs::neighbors::detail::is_device_accessible(attrs);
 }
 
 /**
