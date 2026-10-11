@@ -38,6 +38,7 @@
 #include <climits>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <random>
 #include <type_traits>
 
@@ -895,16 +896,25 @@ void sort_knn_graph(
   const double time_sort_start = cur_time();
   RAFT_LOG_DEBUG("# Sorting kNN Graph on GPUs ");
 
-  auto d_dataset = raft::make_device_mdarray<DataT>(
-    res, large_tmp_mr, raft::make_extents<int64_t>(dataset_size, dataset_dim));
-  raft::copy(res, d_dataset.view(), dataset);
+  // Only stage the dataset when it is not already device-accessible; a device dataset is read in
+  // place instead of being duplicated into a second full-size device buffer.
+  using d_dataset_t = decltype(raft::make_device_mdarray<DataT>(
+    res, large_tmp_mr, raft::make_extents<int64_t>(dataset_size, dataset_dim)));
+  std::optional<d_dataset_t> d_dataset;
+  const DataT* d_dataset_ptr = dataset_ptr;
+  if constexpr (!d_accessor::is_device_accessible) {
+    d_dataset.emplace(raft::make_device_mdarray<DataT>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(dataset_size, dataset_dim)));
+    raft::copy(res, d_dataset->view(), dataset);
+    d_dataset_ptr = d_dataset->data_handle();
+  }
 
   raft::copy(res, d_input_graph.view(), knn_graph);
 
   RAFT_LOG_DEBUG(".");
   launch_sort_knn_graph(res,
                         metric,
-                        d_dataset.data_handle(),
+                        d_dataset_ptr,
                         static_cast<uint32_t>(dataset_size),
                         static_cast<uint32_t>(dataset_dim),
                         d_input_graph.data_handle(),
