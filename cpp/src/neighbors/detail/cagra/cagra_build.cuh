@@ -191,10 +191,57 @@ constexpr bool ace_spill_count_fits(uint64_t count)
   return count <= static_cast<uint64_t>(std::numeric_limits<IdxT>::max());
 }
 
-/** Only augmented labeling needs the quadratic centroid-distance matrix. */
-constexpr bool ace_partition_count_supported(size_t n_partitions, double target_alpha)
+/** Match the sample size used for centroid training and margin calibration. */
+inline size_t ace_labeling_sample_count(size_t rows, size_t partitions, double rate = 0.01)
 {
-  return target_alpha == 0.0 || n_partitions <= 8192;
+  const size_t minimum = partitions > rows / 100 ? rows : 100 * partitions;
+  return std::min(rows, std::max(static_cast<size_t>(rows * rate), minimum));
+}
+
+/** Peak explicit device buffers in labeling, excluding the resource workspace. */
+inline size_t ace_labeling_gpu_bytes(
+  size_t rows, size_t dim, size_t partitions, double target_alpha, size_t batch_rows = 32768)
+{
+  const long double samples   = ace_labeling_sample_count(rows, partitions);
+  const long double centroids = partitions;
+  // Sample and centroid matrices survive through assignment. The centroid-pair device
+  // matrix is released before score sampling; assignment uses the admitted batch size.
+  const long double persistent     = (samples + centroids) * dim;
+  const long double centroid_pairs = target_alpha > 0.0 ? centroids * centroids : 0.0L;
+  const long double assignment     = static_cast<long double>(batch_rows) * (dim + centroids);
+  const long double bytes = sizeof(float) * (persistent + std::max(centroid_pairs, assignment));
+  // Saturate impossible requests instead of wrapping the admission estimate.
+  return bytes >= static_cast<long double>(std::numeric_limits<size_t>::max())
+           ? std::numeric_limits<size_t>::max()
+           : static_cast<size_t>(bytes);
+}
+
+/** Choose a labeling batch that fits both budgets; zero means the fixed buffers cannot fit. */
+inline size_t ace_labeling_batch_size(size_t rows,
+                                      size_t dim,
+                                      size_t partitions,
+                                      double target_alpha,
+                                      size_t gpu_budget,
+                                      size_t host_budget)
+{
+  if (rows == 0 || partitions == 0) { return 0; }
+  const long double samples   = ace_labeling_sample_count(rows, partitions);
+  const long double centroids = partitions;
+  const long double pairs     = target_alpha > 0.0 ? centroids * centroids : 0.0L;
+  const long double gpu_fixed = sizeof(float) * (samples + centroids) * dim;
+  // The host retains centroid-pair distances during assignment. Reserve both the final
+  // score vector and thread-local scores during calibration (at most three spills per row).
+  const long double scores =
+    target_alpha > 0.0 ? 2.0L * samples * std::min<size_t>(3, partitions - 1) : 0.0L;
+  const long double host_fixed = sizeof(float) * (samples * dim + pairs + scores);
+  const long double per_row    = sizeof(float) * (static_cast<long double>(dim) + centroids);
+  if (per_row == 0 || gpu_fixed + sizeof(float) * pairs > gpu_budget ||
+      gpu_fixed + per_row > gpu_budget || host_fixed + per_row > host_budget) {
+    return 0;
+  }
+  return static_cast<size_t>(std::min({static_cast<long double>(std::min<size_t>(rows, 32768)),
+                                       std::floor((gpu_budget - gpu_fixed) / per_row),
+                                       std::floor((host_budget - host_fixed) / per_row)}));
 }
 
 /** A sampled quantile with deterministic subsampling of scores tied at the boundary. */
@@ -283,12 +330,13 @@ inline std::vector<float> ace_sample_margin_scores(
   raft::device_matrix_view<const float, int64_t> sample,
   raft::device_matrix_view<const float, int64_t> centroids,
   raft::host_matrix_view<const float, int64_t> centroid_distances,
-  size_t max_spills)
+  size_t max_spills,
+  size_t batch_rows)
 {
   const size_t n_samples    = sample.extent(0);
   const size_t dataset_dim  = sample.extent(1);
   const size_t n_partitions = centroids.extent(0);
-  const size_t chunk_size   = std::min<size_t>(n_samples, 32 * 1024);
+  const size_t chunk_size   = std::min(n_samples, batch_rows);
   auto distances_host       = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);
   auto distances_device = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
   auto stream           = raft::resource::get_cuda_stream(res).get();
@@ -341,8 +389,10 @@ void ace_get_partition_labels(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
   double target_alpha,
+  size_t chunk_size,
   double sampling_rate = 0.01)
 {
+  RAFT_EXPECTS(chunk_size > 0, "ACE labeling batch must contain at least one row");
   size_t dataset_size = dataset.extent(0);
   size_t labels_size  = partition_labels.extent(0);
   size_t labels_dim   = partition_labels.extent(1);
@@ -360,18 +410,13 @@ void ace_get_partition_labels(
                  target_alpha <= static_cast<double>(labels_dim - 1),
                "ACE target_alpha must be finite and in [0, %zu]",
                labels_dim - 1);
-  RAFT_EXPECTS(ace_partition_count_supported(n_partitions, target_alpha),
-               "ACE positive target_alpha currently supports at most 8192 partitions");
   cudaStream_t stream = raft::resource::get_cuda_stream(res).get();
 
   // Sampling vectors from dataset. Uses float conversion on host instead of
   // raft::matrix::sample_rows to minimize GPU memory usage.
   // TODO(julianmi): Switch to sample_rows when https://github.com/nvidia/cuvs/issues/1461 is
   // addressed.
-  size_t n_samples         = dataset_size * sampling_rate;
-  const size_t min_samples = 100 * n_partitions;
-  n_samples                = std::max(n_samples, min_samples);
-  n_samples                = std::min(n_samples, dataset_size);
+  const size_t n_samples = ace_labeling_sample_count(dataset_size, n_partitions, sampling_rate);
   RAFT_LOG_DEBUG("ACE build: partition labeling uses %lu sampled vectors", n_samples);
 
   auto sample_db = raft::make_host_matrix<float, int64_t>(n_samples, dataset_dim);
@@ -396,22 +441,25 @@ void ace_get_partition_labels(
     raft::make_host_matrix<float, int64_t>(centroid_distance_rows, centroid_distance_rows);
   ace_margin_gate margin_gate;
   if (target_alpha > 0.0) {
-    auto centroid_distances_dev =
-      raft::make_device_matrix<float, int64_t>(res, n_partitions, n_partitions);
-    cuvs::distance::pairwise_distance(res,
-                                      raft::make_const_mdspan(centroids_dev.view()),
-                                      raft::make_const_mdspan(centroids_dev.view()),
-                                      centroid_distances_dev.view(),
-                                      cuvs::distance::DistanceType::L2Expanded);
-    raft::copy(
-      res, centroid_distances.view(), raft::make_const_mdspan(centroid_distances_dev.view()));
-    raft::resource::sync_stream(res, stream);
+    {
+      auto centroid_distances_dev =
+        raft::make_device_matrix<float, int64_t>(res, n_partitions, n_partitions);
+      cuvs::distance::pairwise_distance(res,
+                                        raft::make_const_mdspan(centroids_dev.view()),
+                                        raft::make_const_mdspan(centroids_dev.view()),
+                                        centroid_distances_dev.view(),
+                                        cuvs::distance::DistanceType::L2Expanded);
+      raft::copy(
+        res, centroid_distances.view(), raft::make_const_mdspan(centroid_distances_dev.view()));
+      raft::resource::sync_stream(res, stream);
+    }
     margin_gate = ace_target_alpha_threshold(
       ace_sample_margin_scores(res,
                                raft::make_const_mdspan(sample_db_dev.view()),
                                raft::make_const_mdspan(centroids_dev.view()),
                                raft::make_const_mdspan(centroid_distances.view()),
-                               max_spills),
+                               max_spills,
+                               chunk_size),
       n_samples,
       max_spills,
       target_alpha);
@@ -422,7 +470,6 @@ void ace_get_partition_labels(
 
   // Compute distances between dataset and centroid vectors
   // Uses float conversion on host instead of batch_load_iterator to minimize GPU memory usage.
-  const size_t chunk_size = 32 * 1024;
   auto _sub_dataset       = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
   auto _sub_distances     = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);
   auto _sub_dataset_dev   = raft::make_device_matrix<float, int64_t>(res, chunk_size, dataset_dim);
@@ -1182,6 +1229,7 @@ struct ace_memory_requirements {
   size_t total_size;
   size_t available_host_memory;
   size_t available_gpu_memory;
+  size_t labeling_batch_size;
 };
 
 // Amount of host memory that can be used for the build
@@ -1201,6 +1249,38 @@ inline double ace_estimated_vector_expansion_factor(double target_alpha)
   return 1.0 + estimated_spills;
 }
 
+/** Admit labeling before creating artifacts, reserving the concurrent host labels and GPU
+ * workspace. */
+inline size_t ace_check_labeling_memory(raft::resources const& res,
+                                        size_t dataset_size,
+                                        size_t dataset_dim,
+                                        size_t n_partitions,
+                                        double target_alpha,
+                                        size_t index_size,
+                                        ace_memory_requirements const& mem)
+{
+  const size_t workspace        = raft::resource::get_workspace_total_bytes(res);
+  const long double host_budget = usable_cpu_memory_fraction * mem.available_host_memory;
+  const long double host_labels =
+    static_cast<long double>(mem.partition_labels_size) + 2.0L * n_partitions * index_size;
+  const size_t batch = ace_labeling_batch_size(
+    dataset_size,
+    dataset_dim,
+    n_partitions,
+    target_alpha,
+    workspace < mem.available_gpu_memory ? mem.available_gpu_memory - workspace : 0,
+    host_labels < host_budget ? static_cast<size_t>(host_budget - host_labels) : 0);
+  RAFT_EXPECTS(batch > 0,
+               "ACE: memory insufficient for partition labeling (%zu partitions), including "
+               "centroid-pair distances and one batch row: host %.2f GiB, GPU %.2f GiB "
+               "available. Reduce partitions or increase the memory budgets",
+               n_partitions,
+               to_gib(mem.available_host_memory),
+               to_gib(mem.available_gpu_memory));
+  RAFT_LOG_DEBUG("ACE: partition labeling batch size %zu", batch);
+  return batch;
+}
+
 // Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
 bool ace_check_use_disk_mode(raft::resources const& res,
@@ -1212,6 +1292,7 @@ bool ace_check_use_disk_mode(raft::resources const& res,
                              size_t intermediate_degree,
                              size_t graph_degree,
                              double vector_expansion_factor,
+                             double target_alpha,
                              std::optional<double> max_host_memory_gb,
                              std::optional<double> max_gpu_memory_gb,
                              bool guarantee_connectivity,
@@ -1319,6 +1400,14 @@ bool ace_check_use_disk_mode(raft::resources const& res,
   size_t gpu_memory_required =
     std::max(mem.sub_dataset_size, opt_dev_ws_total) + extra_gpu_workspace_size;
 
+  mem.labeling_batch_size = ace_check_labeling_memory(
+    res, dataset_size, dataset_dim, n_partitions, target_alpha, sizeof(IdxT), mem);
+  const size_t labeling_gpu_required =
+    ace_labeling_gpu_bytes(
+      dataset_size, dataset_dim, n_partitions, target_alpha, mem.labeling_batch_size) +
+    extra_gpu_workspace_size;
+  gpu_memory_required = std::max(gpu_memory_required, labeling_gpu_required);
+
   bool gpu_memory_limited = mem.available_gpu_memory < gpu_memory_required;
 
   RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
@@ -1380,6 +1469,7 @@ void ace_validate_disk_mode_partitions(raft::resources const& res,
                                        size_t intermediate_degree,
                                        size_t graph_degree,
                                        double vector_expansion_factor,
+                                       double target_alpha,
                                        bool guarantee_connectivity,
                                        ace_memory_requirements& mem)
 {
@@ -1520,6 +1610,8 @@ void ace_validate_disk_mode_partitions(raft::resources const& res,
       to_gib(new_opt_host_ws),
       to_gib(new_opt_dev_ws + extra_gpu_workspace_size));
   }
+  mem.labeling_batch_size = ace_check_labeling_memory(
+    res, dataset_size, dataset_dim, n_partitions, target_alpha, sizeof(IdxT), mem);
 }
 
 template <typename T, typename IdxT, typename DatasetViewT>
@@ -1632,6 +1724,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                                                           intermediate_degree,
                                                           graph_degree,
                                                           vector_expansion_factor,
+                                                          target_alpha,
                                                           ace_params.max_host_memory_gb,
                                                           ace_params.max_gpu_memory_gb,
                                                           params.guarantee_connectivity,
@@ -1646,6 +1739,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                                                  intermediate_degree,
                                                  graph_degree,
                                                  vector_expansion_factor,
+                                                 target_alpha,
                                                  params.guarantee_connectivity,
                                                  mem);
       ace_validate_partition_count(n_partitions, dataset_size, true);
@@ -1657,9 +1751,6 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                  "ACE target_alpha must be finite and in [0, %zu] for %zu partitions",
                  max_spills,
                  n_partitions);
-
-    RAFT_EXPECTS(ace_partition_count_supported(n_partitions, target_alpha),
-                 "ACE positive target_alpha currently supports at most 8192 partitions");
 
     // Preallocate space for files for better performance and fail early if not enough space.
     cuvs::util::file_descriptor reordered_fd;
@@ -1715,7 +1806,8 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                                       dataset_dim,
                                       partition_labels.view(),
                                       partition_histogram.view(),
-                                      target_alpha);
+                                      target_alpha,
+                                      mem.labeling_batch_size);
 
     ace_check_partition_sizes<IdxT>(dataset_size,
                                     n_partitions,

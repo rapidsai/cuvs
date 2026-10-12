@@ -295,7 +295,7 @@ def test_cagra_ace_tiny_memory_limit_triggers_disk_mode():
             ef_construction=100,
             build_dir=temp_dir,
             use_disk=False,  # Not explicitly requesting disk mode
-            max_host_memory_gb=0.001,  # Tiny limit to force disk mode
+            max_host_memory_gb=0.004,  # Fit labeling buffers but force disk mode
             max_gpu_memory_gb=0.0,  # No GPU memory limit
         )
 
