@@ -109,21 +109,22 @@ public class TestAcceleratedHNSWMultiLayerRoundTrip extends LuceneTestCase {
         assertTrue(nodesByLevel.get(1).containsAll(nodesByLevel.get(2)));
         assertUpperNeighborsStayOnTheirLevel(graph, nodesByLevel);
 
-        int queryNode = graph.entryNode();
-        assertTrue(nodesByLevel.get(2).contains(queryNode));
-        // Graph nodes are vector ordinals, which equal docIDs in this dense single-segment index.
-        // The randomized merge policy can reorder documents during forceMerge, so the entry node's
-        // vector must be looked up through its stored id rather than by indexing the input array
-        // with the ordinal.
-        int queryId = Integer.parseInt(leaf.storedFields().document(queryNode).get("id"));
+        // Nothing fixes the order documents land in after forceMerge: the randomized merge policy
+        // may reorder them, so neither the ordinal nor the docID of a graph node is its insertion
+        // id. Check that every document kept its own vector, then query by the entry node's own.
+        TestUtils.assertVectorsKeepTheirDocuments(leaf, FIELD, vectors);
+
+        int entryOrdinal = graph.entryNode();
+        assertTrue(nodesByLevel.get(2).contains(entryOrdinal));
+        int entryDoc = leaf.getFloatVectorValues(FIELD).ordToDoc(entryOrdinal);
+        int entryId = Integer.parseInt(leaf.storedFields().document(entryDoc).get("id"));
         IndexSearcher searcher = new IndexSearcher(reader);
-        var hits = searcher.search(new KnnFloatVectorQuery(FIELD, vectors[queryId], 10), 10);
+        var hits = searcher.search(new KnnFloatVectorQuery(FIELD, vectors[entryId], 10), 10);
         assertEquals(10, hits.scoreDocs.length);
-        boolean foundQueryNode = false;
-        for (var hit : hits.scoreDocs) {
-          foundQueryNode |= hit.doc == queryNode;
-        }
-        assertTrue("the entry-node vector must be returned for its own query", foundQueryNode);
+        assertEquals(
+            "the entry-node vector must be the closest hit for its own query",
+            entryDoc,
+            hits.scoreDocs[0].doc);
       }
     }
   }
