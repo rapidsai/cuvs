@@ -24,7 +24,9 @@ function(_cutile_fragment_tag_header_files output_var)
 endfunction()
 
 # Probes the toolchain for cuTile support and records the result in the CUVS_CUTILE_* global
-# properties. Missing prerequisites disable cuTile instead of failing configuration.
+# properties. Before CUDA 13.1, which is the first release with tileiras, missing prerequisites
+# disable cuTile. From CUDA 13.1 on they fail configuration, so that a build cannot silently ship
+# without the cuTile kernels.
 function(_cutile_detect)
   set_property(GLOBAL PROPERTY CUVS_CUTILE_ENABLED 0)
 
@@ -32,6 +34,13 @@ function(_cutile_detect)
   if(CUDAToolkit_VERSION VERSION_LESS 13.0)
     message(STATUS "cuTile disabled: requires CUDA 13.0+ (found ${CUDAToolkit_VERSION}).")
     return()
+  endif()
+  if(CUDAToolkit_VERSION VERSION_LESS 13.1)
+    set(missing_level STATUS)
+    set(missing_prefix "cuTile disabled")
+  else()
+    set(missing_level FATAL_ERROR)
+    set(missing_prefix "cuTile is required with CUDA 13.1+ (found ${CUDAToolkit_VERSION})")
   endif()
 
   # bin2c is installed next to the real nvcc. In conda environments, CUDAToolkit_BIN_DIR is
@@ -50,7 +59,7 @@ function(_cutile_detect)
     NO_DEFAULT_PATH
   )
   if(NOT CUVS_CUTILE_BIN2C)
-    message(STATUS "cuTile disabled: bin2c not found in ${bin2c_dirs}.")
+    message(${missing_level} "${missing_prefix}: bin2c not found in ${bin2c_dirs}.")
     return()
   endif()
 
@@ -63,9 +72,10 @@ function(_cutile_detect)
   )
   if(NOT import_result EQUAL 0)
     message(
-      STATUS "cuTile disabled: cuda.tile (cuTile Python) is not importable by ${python}. "
-             "Install cutile-python and cuda-tileiras (conda), or cuda-tile[tileiras] (pip).\n"
-             "Import error: ${import_error}"
+      ${missing_level}
+      "${missing_prefix}: cuda.tile (cuTile Python) is not importable by ${python}. "
+      "Install cutile-python and cuda-tileiras (conda), or cuda-tile[tileiras] (pip).\n"
+      "Import error: ${import_error}"
     )
     return()
   endif()
