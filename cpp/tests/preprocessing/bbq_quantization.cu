@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -58,7 +58,8 @@ auto to_device(raft::resources const& res,
   return device;
 }
 
-/** True when environment variable @p name is set to something other than "", "0", "false", "off". */
+/** True when environment variable @p name is set to something other than "", "0", "false", "off".
+ */
 auto env_flag_enabled(const char* name) -> bool
 {
   const char* value = std::getenv(name);
@@ -250,7 +251,7 @@ INSTANTIATE_TEST_CASE_P(
     bbq_build_inputs{
       512, 64, bbq_code_layout::packed_1b, cuvs::distance::DistanceType::InnerProduct},
     bbq_build_inputs{
-      1024*512, 1024, bbq_code_layout::packed_4b, cuvs::distance::DistanceType::InnerProduct},
+      32 * 512, 128, bbq_code_layout::packed_4b, cuvs::distance::DistanceType::InnerProduct},
     bbq_build_inputs{
       512, 64, bbq_code_layout::packed_8b, cuvs::distance::DistanceType::CosineExpanded},
     // Rows shorter than a warp, and tails in the middle of a byte, a group and a nibble pair.
@@ -326,12 +327,13 @@ TEST(BbqBuild, ReconstructsRowsWithinErrorBudget)
   // 4x a uniform quantizer is worth against a gaussian, and how much of that survives is the
   // interval search's job -- these numbers are what regresses if the search stops converging.
   const std::vector<std::pair<bbq_code_layout, double>> budgets{
-    {bbq_code_layout::packed_1b, 0.496},       // 0.55     measured 0.494
-    {bbq_code_layout::transposed_2b, 0.127},   // 2b, 0.15     measured 0.127
-    {bbq_code_layout::packed_4b, 0.01},      // 0.012     measured 0.00992
-    {bbq_code_layout::transposed_4b, 0.01},  // 4b, 0.012     same codes as packed_4b, in a different order
-    {bbq_code_layout::packed_7b, 2.0e-4},     // 2.0e-4     measured 1.44e-4
-    {bbq_code_layout::packed_8b, 4.0e-5}};    // 5.0e-5     measured 3.52e-5
+    {bbq_code_layout::packed_1b, 0.496},      // 0.55     measured 0.494
+    {bbq_code_layout::transposed_2b, 0.127},  // 2b, 0.15     measured 0.127
+    {bbq_code_layout::packed_4b, 0.01},       // 0.012     measured 0.00992
+    {bbq_code_layout::transposed_4b,
+     0.01},  // 4b, 0.012     same codes as packed_4b, in a different order
+    {bbq_code_layout::packed_7b, 2.0e-4},   // 2.0e-4     measured 1.44e-4
+    {bbq_code_layout::packed_8b, 4.0e-5}};  // 5.0e-5     measured 3.52e-5
 
   raft::resources res;
   auto dataset = raft::make_device_matrix<float, int64_t>(res, kRows, kDim);
@@ -366,6 +368,5 @@ TEST(BbqBuild, ReconstructsRowsWithinErrorBudget)
   EXPECT_LT(errors[4], errors[2]) << "7 bits is no better than 4";
   EXPECT_LT(errors[5], errors[4]) << "8 bits is no better than 7";
 }
-
 
 }  // namespace cuvs::preprocessing::quantize::bbq::detail

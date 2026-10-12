@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -57,7 +57,10 @@ _RAFT_HOST_DEVICE DataT clamp(DataT value, DataT min, DataT max)
 
 /** Java Math.round, which rounds half up rather than half to even. */
 template <typename MathT>
-__device__ __forceinline__ int lucene_round(MathT x) { return static_cast<int>(::floor(x + MathT(0.5))); }
+__device__ __forceinline__ int lucene_round(MathT x)
+{
+  return static_cast<int>(::floor(x + MathT(0.5)));
+}
 
 /** Everything the interval search needs from a row. Warp-uniform on return. */
 struct row_stats {
@@ -70,8 +73,8 @@ struct row_stats {
   float row_norm;
   /** x.c, the additional correction of the non-euclidean metrics. */
   float centroid_dot;
-  double mean;
-  double std;
+  float mean;
+  float std;
 };
 
 template <typename MathT>
@@ -83,10 +86,10 @@ __device__ inline row_stats compute_row_stats(const float* row_ptr,
   constexpr float kInf = std::numeric_limits<float>::infinity();
   float min_value      = kInf;
   float max_value      = -kInf;
-  MathT sum           = MathT(0.0);
-  MathT sum_sq        = MathT(0.0);
-  MathT row_norm      = MathT(0.0);
-  MathT centroid_dot  = MathT(0.0);
+  MathT sum            = MathT(0.0);
+  MathT sum_sq         = MathT(0.0);
+  MathT row_norm       = MathT(0.0);
+  MathT centroid_dot   = MathT(0.0);
   for (uint32_t d = raft::laneId(); d < dim; d += raft::WarpSize) {
     const float x = row_ptr[d];
     const float v = x - centroid[d];
@@ -104,15 +107,15 @@ __device__ inline row_stats compute_row_stats(const float* row_ptr,
   row_norm     = raft::warpReduce(row_norm, raft::add_op{});
   centroid_dot = raft::warpReduce(centroid_dot, raft::add_op{});
 
-  const MathT mean     = sum / dim;
-  const MathT variance = raft::max(sum_sq / dim - mean * mean, MathT(0.0));
+  const MathT mean     = static_cast<MathT>(sum / dim);
+  const MathT variance = raft::max(static_cast<MathT>(sum_sq / dim - mean * mean), MathT(0.0));
   return row_stats{min_value,
                    max_value,
                    static_cast<float>(sum_sq),
                    static_cast<float>(row_norm),
                    static_cast<float>(centroid_dot),
-                   mean,
-                   raft::sqrt(variance)};
+                   static_cast<float>(mean),
+                   static_cast<float>(raft::sqrt(variance))};
 }
 
 /**
@@ -120,29 +123,21 @@ __device__ inline row_stats compute_row_stats(const float* row_ptr,
  * the error along the row itself weighted by `1 - lambda`, which is what keeps the reconstruction's
  * inner product with the original unbiased.
  */
+template <typename MathT>
 __device__ inline float interval_loss(const float* row_ptr,
-                                       const float* centroid,
-                                       uint32_t dim,
-                                       float2 interval,
-                                       int points,
-                                       float norm2,
-                                       float lambda)
+                                      const float* centroid,
+                                      uint32_t dim,
+                                      float2 interval,
+                                      int points,
+                                      float norm2,
+                                      float lambda)
 {
   const float lower    = interval.x;
   const float upper    = interval.y;
-  const float step     = (upper - lower) / (points - 1.0f);
-  const float step_inv = 1.0f / step;
-  float xe             = 0.0f;
-  float e              = 0.0f;
-  /*for (uint32_t d = raft::laneId(); d < dim; d += raft::WarpSize) {
-    const float xi = row_ptr[d] - centroid[d];
-    
-    // Quantize then de-quantize the value.
-    const float xiq = lower + step * lucene_round(
-      static_cast<float>((clamp(xi, lower, upper) - lower)) * step_inv);
-    xe += xi * (xi - xiq);
-    e += (xi - xiq) * (xi - xiq);
-  }   */
+  const MathT step     = static_cast<MathT>((upper - lower) / (points - MathT(1.0f)));
+  const MathT step_inv = MathT(1.0f) / step;
+  MathT xe             = 0.0f;
+  MathT e              = 0.0f;
 
   if (dim % 2 == 0) {
     for (uint32_t d = raft::laneId() * 2; d < dim; d += raft::WarpSize * 2) {
@@ -150,35 +145,38 @@ __device__ inline float interval_loss(const float* row_ptr,
       xi.load(row_ptr, d);
       xi.val.data[0] -= centroid[d];
       xi.val.data[1] -= centroid[d + 1];
-      const float xiq1 = lower + step * lucene_round(
-        static_cast<float>((clamp(xi.val.data[0], lower, upper) - lower)) * step_inv);
-      const float xiq2 = lower + step * lucene_round(
-        static_cast<float>((clamp(xi.val.data[1], lower, upper) - lower)) * step_inv);
-      xe += xi.val.data[0] * (xi.val.data[0] - xiq1)
-        + xi.val.data[1] * (xi.val.data[1] - xiq2);
-      e += (xi.val.data[0] - xiq1) * (xi.val.data[0] - xiq1)
-        + (xi.val.data[1] - xiq2) * (xi.val.data[1] - xiq2);
+      const MathT xiq1 =
+        lower +
+        step * lucene_round(static_cast<MathT>((clamp(xi.val.data[0], lower, upper) - lower)) *
+                            step_inv);
+      const MathT xiq2 =
+        lower +
+        step * lucene_round(static_cast<MathT>((clamp(xi.val.data[1], lower, upper) - lower)) *
+                            step_inv);
+      xe += xi.val.data[0] * (xi.val.data[0] - xiq1) + xi.val.data[1] * (xi.val.data[1] - xiq2);
+      e += (xi.val.data[0] - xiq1) * (xi.val.data[0] - xiq1) +
+           (xi.val.data[1] - xiq2) * (xi.val.data[1] - xiq2);
     }
   } else {
     for (uint32_t d = raft::laneId(); d < dim; d += raft::WarpSize) {
       const float xi = row_ptr[d] - centroid[d];
-      
-      // Quantize then de-quantize the value.
-      const float xiq = lower + step * lucene_round(
-        static_cast<float>((clamp(xi, lower, upper) - lower)) * step_inv);
+      const MathT xiq =
+        lower +
+        step * lucene_round(static_cast<MathT>((clamp(xi, lower, upper) - lower)) * step_inv);
       xe += xi * (xi - xiq);
       e += (xi - xiq) * (xi - xiq);
     }
   }
   xe = raft::warpReduce(xe, raft::add_op{});
   e  = raft::warpReduce(e, raft::add_op{});
-  return (1.0f - lambda) * xe * xe / norm2 + lambda * e;
+  return (MathT(1.0f) - lambda) * xe * xe / norm2 + lambda * e;
 }
 
 /**
  * Coordinate descent on the interval: each step solves the 2x2 normal equations for the endpoints
  * with the code assignments held fixed, and stops as soon as a step stops paying for itself.
  */
+template <typename MathT>
 __device__ inline float2 optimize_intervals(float2 interval,
                                             const float* row_ptr,
                                             const float* centroid,
@@ -188,22 +186,23 @@ __device__ inline float2 optimize_intervals(float2 interval,
                                             float lambda,
                                             int iters)
 {
-  float initial_loss = interval_loss(row_ptr, centroid, dim, interval, points, norm2, lambda);
-  const float scale   = (1.0f - lambda) / norm2;
+  float initial_loss =
+    interval_loss<MathT>(row_ptr, centroid, dim, interval, points, norm2, lambda);
+  const float scale = (1.0f - lambda) / norm2;
   if (!::isfinite(scale)) { return interval; }
   for (int i = 0; i < iters; ++i) {
     const float lower    = interval.x;
     const float upper    = interval.y;
     const float step_inv = (points - 1.0f) / (upper - lower);
-    float daa = 0.0f, dab = 0.0f, dbb = 0.0f, dax = 0.0f, dbx = 0.0f;
+    MathT daa = 0.0f, dab = 0.0f, dbb = 0.0f, dax = 0.0f, dbx = 0.0f;
     auto accumulate = [&](float xi) {
-      const float clamped = (clamp(xi, lower, upper) - lower) * step_inv;
-      const float k = lucene_round<float>(clamped);
-      const float s = k / (points - 1);
-      daa += (1.0f - s) * (1.0f - s);
-      dab += (1.0f - s) * s;
+      const MathT clamped = (clamp(xi, lower, upper) - lower) * step_inv;
+      const MathT k       = lucene_round<MathT>(clamped);
+      const MathT s       = k / (points - 1);
+      daa += (MathT(1.0f) - s) * (MathT(1.0f) - s);
+      dab += (MathT(1.0f) - s) * s;
       dbb += s * s;
-      dax += xi * (1.0f - s);
+      dax += xi * (MathT(1.0f) - s);
       dbx += xi * s;
     };
     if (dim % 4 == 0) {
@@ -211,7 +210,7 @@ __device__ inline float2 optimize_intervals(float2 interval,
         raft::TxN_t<float, 4> xi;
         xi.load(row_ptr, d);
         accumulate(xi.val.data[0] - centroid[d]);
-        accumulate(xi.val.data[1] - centroid[d + 1]);   
+        accumulate(xi.val.data[1] - centroid[d + 1]);
         accumulate(xi.val.data[2] - centroid[d + 2]);
         accumulate(xi.val.data[3] - centroid[d + 3]);
       }
@@ -226,18 +225,19 @@ __device__ inline float2 optimize_intervals(float2 interval,
     dax = raft::warpReduce(dax, raft::add_op{});
     dbx = raft::warpReduce(dbx, raft::add_op{});
 
-    const float m0  = scale * dax * dax + lambda * daa;
-    const float m1  = scale * dax * dbx + lambda * dab;
-    const float m2  = scale * dbx * dbx + lambda * dbb;
-    const float det = m0 * m2 - m1 * m1;
+    const MathT m0  = scale * dax * dax + lambda * daa;
+    const MathT m1  = scale * dax * dbx + lambda * dab;
+    const MathT m2  = scale * dbx * dbx + lambda * dbb;
+    const MathT det = m0 * m2 - m1 * m1;
     if (det == 0) { return interval; }
-    const float2 candidate = {
-      static_cast<float>((m2 * dax - m1 * dbx) / det),
-      static_cast<float>((m0 * dbx - m1 * dax) / det)};
-    if (raft::abs(interval.x - candidate.x) < 1e-8f && raft::abs(interval.y - candidate.y) < 1e-8f) {
+    const float2 candidate = {static_cast<float>((m2 * dax - m1 * dbx) / det),
+                              static_cast<float>((m0 * dbx - m1 * dax) / det)};
+    if (raft::abs(interval.x - candidate.x) < 1e-8f &&
+        raft::abs(interval.y - candidate.y) < 1e-8f) {
       return interval;
     }
-    const float new_loss = interval_loss(row_ptr, centroid, dim, candidate, points, norm2, lambda);
+    const float new_loss =
+      interval_loss<MathT>(row_ptr, centroid, dim, candidate, points, norm2, lambda);
     if (new_loss > initial_loss) { return interval; }
     interval     = candidate;
     initial_loss = new_loss;
@@ -301,7 +301,7 @@ struct quantizer_output {
 };
 
 /** One warp per row: find the row's interval, then quantize and pack the row against it. */
-template <bbq_code_layout Layout>
+template <bbq_code_layout Layout, typename MathT>
 __global__ void quantize_kernel(
   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
   const float* centroid,
@@ -336,12 +336,13 @@ __global__ void quantize_kernel(
   if (row_id >= dataset.extent(0)) { return; }
 
   const auto* row_ptr = &dataset(row_id, 0);
-  const auto stats    = compute_row_stats<float>(row_ptr, centroid, dim, euclidean);
+  const auto stats    = compute_row_stats<MathT>(row_ptr, centroid, dim, euclidean);
   const auto grid     = minimum_mse_grid(bits);
   float2 interval     = {
     clamp(static_cast<float>(grid.x * stats.std + stats.mean), stats.min, stats.max),
     clamp(static_cast<float>(grid.y * stats.std + stats.mean), stats.min, stats.max)};
-  interval = optimize_intervals(interval, row_ptr, centroid, dim, stats.norm2, points, lambda, iters);
+  interval =
+    optimize_intervals<MathT>(interval, row_ptr, centroid, dim, stats.norm2, points, lambda, iters);
 
   const float lower = interval.x;
   const float upper = interval.y;
@@ -386,16 +387,17 @@ void launch_quantize_kernel(raft::resources const& res,
   const size_t centroid_bytes = dataset.extent(1) * sizeof(float);
   const bool stage_centroid =
     centroid_bytes <= raft::resource::get_device_properties(res).sharedMemPerBlock;
-  quantize_kernel<Layout><<<n_blocks,
-                            kQuantizeBlockSize,
-                            stage_centroid ? centroid_bytes : 0,
-                            raft::resource::get_cuda_stream(res).get()>>>(dataset,
-                                                                          centroid,
-                                                                          stage_centroid,
-                                                                          is_euclidean(params.metric),
-                                                                          params.lambda,
-                                                                          params.iters,
-                                                                          out);
+  quantize_kernel<Layout, float>
+    <<<n_blocks,
+       kQuantizeBlockSize,
+       stage_centroid ? centroid_bytes : 0,
+       raft::resource::get_cuda_stream(res).get()>>>(dataset,
+                                                     centroid,
+                                                     stage_centroid,
+                                                     is_euclidean(params.metric),
+                                                     params.lambda,
+                                                     params.iters,
+                                                     out);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
