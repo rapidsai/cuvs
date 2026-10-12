@@ -29,7 +29,7 @@
 #include "scann_quantize.cuh"
 #include "scann_soar.cuh"
 
-namespace cuvs::neighbors::experimental::scann::detail {
+namespace cuvs::neighbors::scann::detail {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 /* @defgroup scann_build_detail scann build
@@ -461,4 +461,4 @@ index<T, IdxT> build(
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::scann::detail
+}  // namespace cuvs::neighbors::scann::detail

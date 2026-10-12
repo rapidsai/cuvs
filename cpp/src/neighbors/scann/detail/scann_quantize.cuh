@@ -14,7 +14,7 @@
 #include "scann_common.cuh"
 using namespace cuvs::neighbors;
 
-namespace cuvs::neighbors::experimental::scann::detail {
+namespace cuvs::neighbors::scann::detail {
 
 /** Fix the internal indexing type to avoid integer underflows/overflows */
 using ix_t = int64_t;
@@ -392,4 +392,4 @@ auto sample_training_residuals(
     raft::make_device_vector_view<const LabelT, int64_t>(trainset_labels.data_handle(), n_samples));
 }
 
-}  // namespace cuvs::neighbors::experimental::scann::detail
+}  // namespace cuvs::neighbors::scann::detail

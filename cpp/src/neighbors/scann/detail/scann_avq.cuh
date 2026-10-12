@@ -32,7 +32,7 @@
 
 #include "scann_common.cuh"
 
-namespace cuvs::neighbors::experimental::scann::detail {
+namespace cuvs::neighbors::scann::detail {
 
 namespace {
 
@@ -635,4 +635,4 @@ void apply_avq(raft::resources const& res,
                         dataset.extent(0));
   raft::resource::sync_stream(res);
 }
-}  // namespace cuvs::neighbors::experimental::scann::detail
+}  // namespace cuvs::neighbors::scann::detail

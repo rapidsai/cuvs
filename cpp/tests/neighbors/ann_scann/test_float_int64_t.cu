@@ -5,7 +5,7 @@
 
 #include "../ann_scann.cuh"
 
-namespace cuvs::neighbors::experimental::scann {
+namespace cuvs::neighbors::scann {
 
 using f32_i64 = scann_test<float, int64_t>;
 
@@ -17,4 +17,4 @@ INSTANTIATE(f32_i64,
             defaults() + small_dims_all_pq_bits() + big_dims_all_pq_bits() + bf16() + bf16_avq() +
               avq() + soar());
 
-}  // namespace cuvs::neighbors::experimental::scann
+}  // namespace cuvs::neighbors::scann

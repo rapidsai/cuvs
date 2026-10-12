@@ -20,13 +20,13 @@
 #include <rmm/mr/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
-namespace cuvs::neighbors::experimental::scann {
+namespace cuvs::neighbors::scann {
 
 struct scann_inputs {
   uint32_t num_db_vecs = 4096;
   uint32_t dim         = 64;
 
-  cuvs::neighbors::experimental::scann::index_params index_params;
+  cuvs::neighbors::scann::index_params index_params;
 
   scann_inputs()
   {
@@ -70,7 +70,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     auto db_view =
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
 
-    return cuvs::neighbors::experimental::scann::build(handle_, ipams, db_view);
+    return cuvs::neighbors::scann::build(handle_, ipams, db_view);
   }
 
   auto build_only_host_input()
@@ -84,7 +84,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     auto db_view = raft::make_host_matrix_view<const DataT, int64_t>(
       h_database.data_handle(), ps.num_db_vecs, ps.dim);
 
-    return cuvs::neighbors::experimental::scann::build(handle_, ipams, db_view);
+    return cuvs::neighbors::scann::build(handle_, ipams, db_view);
   }
 
   auto build_only_host_input_overlap()
@@ -103,7 +103,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     auto db_view = raft::make_host_matrix_view<const DataT, int64_t>(
       h_database.data_handle(), ps.num_db_vecs, ps.dim);
 
-    return cuvs::neighbors::experimental::scann::build(handle_, ipams, db_view);
+    return cuvs::neighbors::scann::build(handle_, ipams, db_view);
   }
 
   template <typename BuildIndex>
@@ -413,4 +413,4 @@ inline auto soar() -> test_cases_t
 #define INSTANTIATE(type, vals) \
   INSTANTIATE_TEST_SUITE_P(ScaNN, type, ::testing::ValuesIn(vals)); /* NOLINT */
 
-}  // namespace cuvs::neighbors::experimental::scann
+}  // namespace cuvs::neighbors::scann
