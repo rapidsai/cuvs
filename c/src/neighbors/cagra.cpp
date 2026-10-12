@@ -630,9 +630,9 @@ static void make_device_padded_dataset_view(raft::resources* res_ptr,
                                             cuvsDataset_t* output_padded_dataset)
 {
   auto dataset = dataset_tensor->dl_tensor;
-  auto* out    = new cuvsDataset{};
+  // Owned until handed out, so a rejected tensor does not leak the handle.
+  auto out     = std::make_unique<cuvsDataset>();
   if (!cuvs::core::is_dlpack_device_compatible(dataset)) {
-    delete out;
     RAFT_FAIL("cuvsDatasetMakePaddedView: dataset must have device-compatible memory");
   }
   using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::layout_stride>;
@@ -645,7 +645,7 @@ static void make_device_padded_dataset_view(raft::resources* res_ptr,
   out->mem_type     = CUVS_DATASET_MEM_TYPE_DEVICE;
   out->layout       = CUVS_DATASET_LAYOUT_PADDED;
   out->is_owning    = false;
-  *output_padded_dataset = out;
+  *output_padded_dataset = out.release();
 }
 
 template <typename T>
@@ -654,9 +654,9 @@ static void make_host_padded_dataset_view(raft::resources*,
                                           cuvsDataset_t* output_padded_dataset)
 {
   auto dataset = dataset_tensor->dl_tensor;
-  auto* out    = new cuvsDataset{};
+  // Owned until handed out, so a rejected tensor does not leak the handle.
+  auto out     = std::make_unique<cuvsDataset>();
   if (!cuvs::core::is_dlpack_host_compatible(dataset)) {
-    delete out;
     RAFT_FAIL("cuvsDatasetMakePaddedView: dataset must have host-compatible memory");
   }
   using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::layout_stride>;
@@ -669,7 +669,7 @@ static void make_host_padded_dataset_view(raft::resources*,
   out->mem_type     = CUVS_DATASET_MEM_TYPE_HOST;
   out->layout       = CUVS_DATASET_LAYOUT_PADDED;
   out->is_owning    = false;
-  *output_padded_dataset = out;
+  *output_padded_dataset = out.release();
 }
 
 template <typename T>
@@ -678,9 +678,9 @@ static void make_device_standard_dataset_view(raft::resources*,
                                               cuvsDataset_t* output_standard_dataset)
 {
   auto dataset = dataset_tensor->dl_tensor;
-  auto* out    = new cuvsDataset{};
+  // Owned until handed out, so a rejected tensor does not leak the handle.
+  auto out     = std::make_unique<cuvsDataset>();
   if (!cuvs::core::is_dlpack_device_compatible(dataset)) {
-    delete out;
     RAFT_FAIL("cuvsDatasetMakeStandardView: dataset must have device-compatible memory");
   }
   using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::layout_stride>;
@@ -693,7 +693,7 @@ static void make_device_standard_dataset_view(raft::resources*,
   out->mem_type     = CUVS_DATASET_MEM_TYPE_DEVICE;
   out->layout       = CUVS_DATASET_LAYOUT_STANDARD;
   out->is_owning    = false;
-  *output_standard_dataset = out;
+  *output_standard_dataset = out.release();
 }
 
 template <typename T>
@@ -702,9 +702,9 @@ static void make_host_standard_dataset_view(raft::resources*,
                                             cuvsDataset_t* output_standard_dataset)
 {
   auto dataset = dataset_tensor->dl_tensor;
-  auto* out    = new cuvsDataset{};
+  // Owned until handed out, so a rejected tensor does not leak the handle.
+  auto out     = std::make_unique<cuvsDataset>();
   if (!cuvs::core::is_dlpack_host_compatible(dataset)) {
-    delete out;
     RAFT_FAIL("cuvsDatasetMakeStandardView: dataset must have host-compatible memory");
   }
   using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::layout_stride>;
@@ -717,7 +717,7 @@ static void make_host_standard_dataset_view(raft::resources*,
   out->mem_type     = CUVS_DATASET_MEM_TYPE_HOST;
   out->layout       = CUVS_DATASET_LAYOUT_STANDARD;
   out->is_owning    = false;
-  *output_standard_dataset = out;
+  *output_standard_dataset = out.release();
 }
 
 template <typename T>
