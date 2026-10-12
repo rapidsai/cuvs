@@ -165,7 +165,17 @@ abstract class CuVSMatrixBaseImpl implements CuVSMatrixInternal {
             valueLayoutFromType(dataType));
       }
     } else if (deviceType == kDLCPU()) {
-      return new CuVSHostMatrixImpl(data, rows, cols, dataType);
+      var strides = DLTensor.strides(dlTensor);
+      if (strides.equals(MemorySegment.NULL)) {
+        return new CuVSHostMatrixImpl(data, rows, cols, dataType);
+      }
+      return new CuVSHostMatrixImpl(
+          data,
+          rows,
+          cols,
+          Math.toIntExact(strides.get(int64_t, 0)),
+          Math.toIntExact(strides.getAtIndex(int64_t, 1)),
+          dataType);
     } else {
       throw new IllegalArgumentException("Unsupported device type: " + deviceType);
     }
