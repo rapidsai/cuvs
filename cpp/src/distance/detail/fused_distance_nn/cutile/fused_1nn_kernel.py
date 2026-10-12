@@ -59,7 +59,7 @@ def make_kernel(
     if occupancy is not None:
         kernel_options["occupancy"] = ct.ByTarget(**{gpu_code: occupancy})
     # CTAs per CGA. Omitted means 1 (no clustering); high-dim tiles set it explicitly.
-    kernel_options["num_ctas"] = ct.ByTarget(**{gpu_code: num_ctas or 1})
+    kernel_options["num_ctas"] = ct.ByTarget(**{gpu_code: num_ctas or None})
 
     @ct.kernel(**kernel_options)
     def fused_1nn_kernel(
