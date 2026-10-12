@@ -657,6 +657,36 @@ TEST_P(LinkageTestF_Int, Result) { EXPECT_TRUE(score == 1.0); }
 
 INSTANTIATE_TEST_CASE_P(LinkageTest, LinkageTestF_Int, ::testing::ValuesIn(linkage_inputsf2));
 
+TEST(LinkageTest, MstOrderUsesOrientedEndpointsAsFinalTieBreakers)
+{
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  std::vector<int> const host_src{3, 1, 2, 0};
+  std::vector<int> const host_dst{1, 3, 0, 2};
+  std::vector<float> const host_weights(4, 1.0f);
+  std::vector<int> const expected_src{0, 2, 1, 3};
+  std::vector<int> const expected_dst{2, 0, 3, 1};
+
+  rmm::device_uvector<int> src(host_src.size(), stream);
+  rmm::device_uvector<int> dst(host_dst.size(), stream);
+  rmm::device_uvector<float> weights(host_weights.size(), stream);
+  raft::copy(src.data(), host_src.data(), host_src.size(), stream);
+  raft::copy(dst.data(), host_dst.data(), host_dst.size(), stream);
+  raft::copy(weights.data(), host_weights.data(), host_weights.size(), stream);
+
+  detail::sort_mst_edges(handle, src.data(), dst.data(), weights.data(), src.size());
+
+  std::vector<int> sorted_src(src.size());
+  std::vector<int> sorted_dst(dst.size());
+  raft::copy(sorted_src.data(), src.data(), src.size(), stream);
+  raft::copy(sorted_dst.data(), dst.data(), dst.size(), stream);
+  raft::resource::sync_stream(handle, stream);
+
+  EXPECT_EQ(sorted_src, expected_src);
+  EXPECT_EQ(sorted_dst, expected_dst);
+}
+
 TEST(LinkageTest, MstOrderAndDendrogramAreRepeatable)
 {
   raft::resources handle;
