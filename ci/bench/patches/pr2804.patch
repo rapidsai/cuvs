@@ -1,0 +1,289 @@
+diff --git a/cpp/src/cluster/detail/kmeans_balanced.cuh b/cpp/src/cluster/detail/kmeans_balanced.cuh
+index bb96c911..881c0bd9 100644
+--- a/cpp/src/cluster/detail/kmeans_balanced.cuh
++++ b/cpp/src/cluster/detail/kmeans_balanced.cuh
+@@ -43,6 +43,7 @@
+ 
+ #include <algorithm>
+ #include <limits>
++#include <numeric>
+ #include <optional>
+ #include <tuple>
+ #include <type_traits>
+@@ -640,7 +641,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
+                                      IdxT average,
+                                      MathT centroid_offset,
+                                      IdxT seed,
+-                                     IdxT* search_count,
++                                     IdxT stride,
+                                      IdxT* update_count,
+                                      MappingOpT mapping_op)
+ {
+@@ -652,12 +653,17 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
+   IdxT i = n_rows;
+   IdxT j = raft::laneId();
+   if (j == 0) {
++    // The candidate sequence of each receiver is derived from its index (not from a shared atomic
++    // counter), so the donor points do not depend on the order in which the warps run.
++    // `stride >= n_clusters`, so different receivers use different counters (and thus, before
++    // wrapping around, different candidates); `stride` is coprime with `n_rows`, so each receiver
++    // visits every row within `n_rows` attempts and finds a donor whenever one exists.
+     IdxT attempt = 0;
+     do {
+-      auto old = atomicAdd(search_count, IdxT{1});
+-      auto candidate =
+-        static_cast<IdxT>((static_cast<int64_t>(seed) * static_cast<int64_t>(old + 1)) %
+-                          static_cast<int64_t>(n_rows));
++      auto counter = static_cast<int64_t>(attempt) * static_cast<int64_t>(stride) +
++                     static_cast<int64_t>(receiver_cluster);
++      auto candidate = static_cast<IdxT>((static_cast<int64_t>(seed) * (counter + 1)) %
++                                         static_cast<int64_t>(n_rows));
+       if (static_cast<IdxT>(cluster_sizes[labels[candidate]]) >= average) { i = candidate; }
+       ++attempt;
+     } while (i >= n_rows && attempt < n_rows);
+@@ -768,6 +774,8 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
+  *                   max_cluster_size > average_size * balance_upper_tolerance
+  *                   balance_upper_tolerance > 1
+  * @param[in] centroid_offset offset from the donor cluster centroid towards a donor point
++ * @param[in] donor_selection how the donor points are chosen (see above)
++ * @param[in] balancing_step index of the current EM iteration; selects the pseudo-random offset
+  * @param[in] mapping_op Mapping operation from T to MathT
+  * @param[inout] device_memory  memory resource to use for temporary allocations
+  *
+@@ -791,6 +799,7 @@ auto adjust_centers(const raft::resources& handle,
+                     MathT balance_upper_tolerance,
+                     MathT centroid_offset,
+                     cuvs::cluster::kmeans::balanced_donor_selection donor_selection,
++                    uint32_t balancing_step,
+                     MappingOpT mapping_op,
+                     rmm::device_async_resource_ref device_memory) -> bool
+ {
+@@ -802,7 +811,6 @@ auto adjust_centers(const raft::resources& handle,
+                                       601,  659,  733,  809,  863,  941,  1013, 1069, 1151, 1223,
+                                       1291, 1373, 1451, 1511, 1583, 1657, 1733, 1811, 1889, 1987,
+                                       2053, 2129, 2213, 2287, 2357, 2423, 2531, 2617, 2687, 2741};
+-  static IdxT i_primes = 0;
+ 
+   auto average         = static_cast<MathT>(n_rows) / static_cast<MathT>(n_clusters);
+   auto lower_threshold = average * balance_lower_tolerance;
+@@ -837,10 +845,12 @@ auto adjust_centers(const raft::resources& handle,
+   auto n_pairs = static_cast<IdxT>(host_receiver_clusters.size());
+   if (n_pairs == 0) { return false; }
+ 
++  // Rotate the pseudo-random offset with the balancing step rather than with a process-wide
++  // counter, so that the donor points do not depend on how many fits ran before in the process.
+   IdxT ofst;
++  size_t i_primes = balancing_step;
+   do {
+-    i_primes = (i_primes + 1) % kPrimes.size();
+-    ofst     = kPrimes[i_primes];
++    ofst = kPrimes[i_primes++ % kPrimes.size()];
+   } while (n_rows % ofst == 0);
+ 
+   rmm::device_uvector<IdxT> receiver_clusters(n_pairs, stream, device_memory);
+@@ -851,8 +861,11 @@ auto adjust_centers(const raft::resources& handle,
+   update_count.set_value_to_zero_async(stream);
+ 
+   if (donor_selection == cuvs::cluster::kmeans::balanced_donor_selection::Random) {
+-    rmm::device_scalar<IdxT> search_count(stream, device_memory);
+-    search_count.set_value_to_zero_async(stream);
++    // The smallest stride >= n_clusters that is coprime with n_rows (see the kernel).
++    auto stride = std::max<IdxT>(n_clusters, 1);
++    while (std::gcd(static_cast<uint64_t>(stride), static_cast<uint64_t>(n_rows)) != 1) {
++      ++stride;
++    }
+     const dim3 grid_dim(raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1, 1);
+     adjust_centers_random_donor_kernel<kBlockDimY>
+       <<<grid_dim, block_dim, 0, stream.get()>>>(centers,
+@@ -866,7 +879,7 @@ auto adjust_centers(const raft::resources& handle,
+                                                  static_cast<IdxT>(n_rows / n_clusters),
+                                                  centroid_offset,
+                                                  ofst,
+-                                                 search_count.data(),
++                                                 stride,
+                                                  update_count.data(),
+                                                  mapping_op);
+     return update_count.value(stream) > 0;  // NB: rmm scalar performs the sync
+@@ -979,6 +992,7 @@ void balancing_em_iters(const raft::resources& handle,
+                                    balance_upper_tolerance,
+                                    static_cast<MathT>(params.centroid_offset),
+                                    params.donor_selection,
++                                   iter,
+                                    mapping_op,
+                                    device_memory)) {
+       if (balancing_counter++ >= balancing_pullback) {
+diff --git a/cpp/src/neighbors/ivf_pq/ivf_pq_build.cuh b/cpp/src/neighbors/ivf_pq/ivf_pq_build.cuh
+index 85024d2d..8f6cdccd 100644
+--- a/cpp/src/neighbors/ivf_pq/ivf_pq_build.cuh
++++ b/cpp/src/neighbors/ivf_pq/ivf_pq_build.cuh
+@@ -58,6 +58,8 @@
+ #include <thrust/extrema.h>
+ #include <thrust/iterator/transform_iterator.h>
+ #include <thrust/scan.h>
++#include <thrust/sequence.h>
++#include <thrust/sort.h>
+ 
+ #include <memory>
+ #include <variant>
+@@ -205,17 +207,6 @@ void flat_compute_residuals(
+                      stream.get());
+ }
+ 
+-template <uint32_t BlockDim, typename IdxT>
+-__launch_bounds__(BlockDim) static __global__ void fill_indices_kernel(IdxT n_rows,
+-                                                                       IdxT* data_indices,
+-                                                                       IdxT* data_offsets,
+-                                                                       const uint32_t* labels)
+-{
+-  const auto i = IdxT(BlockDim) * IdxT(blockIdx.x) + IdxT(threadIdx.x);
+-  if (i >= n_rows) { return; }
+-  data_indices[atomicAdd<IdxT>(data_offsets + labels[i], 1)] = i;
+-}
+-
+ /**
+  * @brief Calculate cluster offsets and arrange data indices into clusters.
+  *
+@@ -249,13 +240,12 @@ auto calculate_offsets_and_indices(IdxT n_rows,
+   stream.sync();
+   RAFT_EXPECTS(cumsum == n_rows, "cluster sizes do not add up.");
+   RAFT_LOG_DEBUG("Max cluster size %d", max_cluster_size);
+-  rmm::device_uvector<IdxT> data_offsets_buf(n_lists, stream);
+-  auto data_offsets = data_offsets_buf.data();
+-  raft::copy(data_offsets, cluster_offsets, n_lists, stream);
+-  constexpr uint32_t n_threads = 128;  // NOLINT
+-  const IdxT n_blocks          = raft::div_rounding_up_unsafe(n_rows, n_threads);
+-  fill_indices_kernel<n_threads>
+-    <<<n_blocks, n_threads, 0, stream.get()>>>(n_rows, data_indices, data_offsets, labels);
++  // Group the row indices by cluster with a stable sort, so that the order of the rows within a
++  // cluster (which decides the per-cluster training subsets) is the same in every build.
++  rmm::device_uvector<uint32_t> sorted_labels(n_rows, stream);
++  raft::copy(sorted_labels.data(), labels, n_rows, stream);
++  thrust::sequence(exec_policy, data_indices, data_indices + n_rows);
++  thrust::stable_sort_by_key(exec_policy, sorted_labels.begin(), sorted_labels.end(), data_indices);
+   return max_cluster_size;
+ }
+ 
+diff --git a/cpp/tests/cluster/kmeans_balanced.cu b/cpp/tests/cluster/kmeans_balanced.cu
+index 3b7988e7..185f400d 100644
+--- a/cpp/tests/cluster/kmeans_balanced.cu
++++ b/cpp/tests/cluster/kmeans_balanced.cu
+@@ -3,6 +3,7 @@
+  * SPDX-License-Identifier: Apache-2.0
+  */
+ 
++#include "../../src/cluster/detail/kmeans_balanced.cuh"
+ #include "../test_utils.h"
+ 
+ #include <cuvs/cluster/kmeans.hpp>
+@@ -12,16 +13,20 @@
+ #include <raft/core/resource/cuda_stream.hpp>
+ #include <raft/linalg/unary_op.cuh>
+ #include <raft/random/make_blobs.cuh>
++#include <raft/random/rng.cuh>
+ #include <raft/stats/adjusted_rand_index.cuh>
+ #include <raft/util/cuda_utils.cuh>
+ #include <raft/util/cudart_utils.hpp>
+ 
+ #include <rmm/device_uvector.hpp>
++#include <rmm/mr/per_device_resource.hpp>
+ 
+ #include <thrust/fill.h>
+ 
+ #include <gtest/gtest.h>
+ 
++#include <cstdint>
++#include <cstring>
+ #include <optional>
+ #include <vector>
+ 
+@@ -301,4 +306,90 @@ KB_TEST((KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>,
+         KmeansBalancedTestFI8I32I32_SEP,
+         inputsf_i32);
+ 
++/*
++ * The balancing step must pick the same donor points for identical inputs: they may depend neither
++ * on the order in which the GPU runs the warps nor on how many fits ran before in the process.
++ * Most rows are packed in a few clusters and many clusters are empty, so that many receivers need a
++ * donor.
++ */
++void check_adjust_centers_reproducible(cuvs::cluster::kmeans::balanced_donor_selection donor)
++{
++  raft::resources handle;
++  auto stream           = raft::resource::get_cuda_stream(handle);
++  const int64_t n_rows  = 10007;
++  const int64_t dim     = 8;
++  const int64_t n_lists = 200;
++  auto dataset          = raft::make_device_matrix<float, int64_t>(handle, n_rows, dim);
++  raft::random::RngState rng(1234ULL);
++  raft::random::uniform(handle, rng, dataset.data_handle(), n_rows * dim, -1.0f, 1.0f);
++  std::vector<float> h_centers(n_lists * dim);
++  for (size_t i = 0; i < h_centers.size(); i++) {
++    h_centers[i] = static_cast<float>(i % 97) / 97.0f;
++  }
++
++  // 95% of the rows in clusters [0, 10), the rest spread over [10, 60); clusters [60, 200) empty.
++  std::vector<uint32_t> h_labels(n_rows);
++  std::vector<uint32_t> h_sizes(n_lists, 0);
++  for (int64_t i = 0; i < n_rows; i++) {
++    h_labels[i] = i < n_rows * 95 / 100 ? i % 10 : 10 + i % 50;
++    h_sizes[h_labels[i]]++;
++  }
++  auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_rows);
++  auto sizes  = raft::make_device_vector<uint32_t, int64_t>(handle, n_lists);
++  raft::update_device(labels.data_handle(), h_labels.data(), n_rows, stream);
++  raft::update_device(sizes.data_handle(), h_sizes.data(), n_lists, stream);
++
++  const bool random     = donor == cuvs::cluster::kmeans::balanced_donor_selection::Random;
++  const float lower_tol = random ? 0.25f : 0.7f;
++  const float upper_tol = random ? 4.0f : 1.5f;
++  const float offset    = random ? 0.05f : 0.2f;
++
++  std::vector<std::vector<float>> results;
++  for (int run = 0; run < 3; run++) {
++    auto centers = raft::make_device_matrix<float, int64_t>(handle, n_lists, dim);
++    raft::update_device(centers.data_handle(), h_centers.data(), h_centers.size(), stream);
++    bool adjusted =
++      cuvs::cluster::kmeans::detail::adjust_centers(handle,
++                                                    centers.data_handle(),
++                                                    n_lists,
++                                                    dim,
++                                                    dataset.data_handle(),
++                                                    n_rows,
++                                                    labels.data_handle(),
++                                                    sizes.data_handle(),
++                                                    lower_tol,
++                                                    upper_tol,
++                                                    offset,
++                                                    donor,
++                                                    /*balancing_step=*/3u,
++                                                    raft::identity_op{},
++                                                    rmm::mr::get_current_device_resource_ref());
++    ASSERT_TRUE(adjusted);
++    std::vector<float> h(centers.size());
++    raft::update_host(h.data(), centers.data_handle(), h.size(), stream);
++    raft::resource::sync_stream(handle);
++    results.push_back(std::move(h));
++  }
++  // Both strategies move (at least) the first 60 empty clusters.
++  for (int64_t c = 60; c < 120; c++) {
++    ASSERT_NE(0, std::memcmp(&results[0][c * dim], &h_centers[c * dim], dim * sizeof(float)))
++      << "cluster " << c << " was not moved";
++  }
++  for (int run = 1; run < 3; run++) {
++    ASSERT_EQ(
++      0, std::memcmp(results[0].data(), results[run].data(), results[0].size() * sizeof(float)))
++      << "adjust_centers moved the centers differently for identical inputs (call " << run << ")";
++  }
++}
++
++TEST(KmeansBalancedAdjustCenters, ReproducibleSizeSorted)
++{
++  check_adjust_centers_reproducible(cuvs::cluster::kmeans::balanced_donor_selection::SizeSorted);
++}
++
++TEST(KmeansBalancedAdjustCenters, ReproducibleRandomDonor)
++{
++  check_adjust_centers_reproducible(cuvs::cluster::kmeans::balanced_donor_selection::Random);
++}
++
+ }  // namespace cuvs
