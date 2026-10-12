@@ -71,6 +71,9 @@ cdef class AceParams:
     target_alpha : float, default = 1.0 (optional)
         Target number of augmented copies per input vector. A value of 0
         disables augmentation; values above 1 allow multi-partition spills.
+        Must be finite and in [0, min(3, N - 1)], where N is the effective
+        partition count after build-time adjustment. Sampling can change the
+        realized spill count.
     """
 
     cdef cuvsHnswAceParams* params

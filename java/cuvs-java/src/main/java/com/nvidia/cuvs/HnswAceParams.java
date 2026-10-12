@@ -206,6 +206,9 @@ public class HnswAceParams {
      *
      * A value of 0 disables augmentation. Values above 1 allow a vector to spill into multiple
      * nearby partitions. The default is {@code 1.0}.
+     * Must be finite and in {@code [0, min(3, N - 1)]}, where {@code N} is the effective
+     * partition count after build-time adjustment.
+     * Sampling can change the realized spill count.
      *
      * @param targetAlpha the target augmentation ratio
      * @return an instance of Builder

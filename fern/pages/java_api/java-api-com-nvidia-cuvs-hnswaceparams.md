@@ -243,6 +243,9 @@ Sets the target number of augmented (spill) copies per input vector.
 
 A value of 0 disables augmentation. Values above 1 allow a vector to spill into multiple
 nearby partitions. The default is `1.0`.
+Must be finite and in `[0, min(3, N - 1)]`, where `N` is the effective
+partition count after build-time adjustment.
+Sampling can change the realized spill count.
 
 **Parameters**
 
@@ -254,7 +257,7 @@ nearby partitions. The default is `1.0`.
 
 an instance of Builder
 
-_Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/HnswAceParams.java:212`_
+_Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/HnswAceParams.java:215`_
 
 ### build
 
@@ -268,6 +271,6 @@ Builds an instance of `HnswAceParams`.
 
 an instance of `HnswAceParams`
 
-_Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/HnswAceParams.java:222`_
+_Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/HnswAceParams.java:225`_
 
 _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/HnswAceParams.java:16`_

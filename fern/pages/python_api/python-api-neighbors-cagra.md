@@ -28,7 +28,7 @@ for each partition independently.
 | `use_disk` | `bool, default = False` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
 | `max_host_memory_gb` | `float, default = 0` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. Useful for testing or when running alongside other memory-intensive processes. |
 | `max_gpu_memory_gb` | `float, default = 0` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. Useful for testing or when running alongside other memory-intensive processes. |
-| `target_alpha` | `float, default = 1.0` | Target number of augmented copies per input vector. A value of 0 disables augmentation; values above 1 allow multi-partition spills. |
+| `target_alpha` | `float, default = 1.0` | Target number of augmented copies per input vector. A value of 0 disables augmentation; values above 1 allow multi-partition spills. Must be finite and in [0, min(3, N - 1)], where N is the effective partition count after build-time adjustment. Sampling can change the realized spill count. |
 
 **Constructor**
 

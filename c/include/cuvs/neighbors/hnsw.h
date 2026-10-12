@@ -93,6 +93,9 @@ struct cuvsHnswAceParams {
   /**
    * Target number of augmented (spill) copies per input vector.
    * A value of 0 disables augmentation. The default is 1.0.
+   * Must be finite and in [0, min(3, N - 1)], where N is the effective partition
+   * count after build-time adjustment.
+   * This is an expected budget; sampling can change the realized spill count.
    */
   double target_alpha;
 };
