@@ -657,34 +657,41 @@ TEST_P(LinkageTestF_Int, Result) { EXPECT_TRUE(score == 1.0); }
 
 INSTANTIATE_TEST_CASE_P(LinkageTest, LinkageTestF_Int, ::testing::ValuesIn(linkage_inputsf2));
 
-TEST(LinkageTest, EqualWeightMstOrderAndDendrogramAreRepeatable)
+TEST(LinkageTest, MstOrderAndDendrogramAreRepeatable)
 {
   raft::resources handle;
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // The same equal-weight tree in deliberately different COO orders.
+  // The same mixed-weight tree in deliberately different COO orders. All edges are stored in
+  // reverse canonical orientation, and the equal-weight bucket has a different canonical order
+  // than its raw (src, dst) order.
   std::vector<std::vector<int>> input_src = {
-    {3, 2, 1, 4, 0}, {1, 4, 3, 0, 2}, {4, 0, 2, 1, 3}, {2, 3, 0, 4, 1}};
+    {3, 2, 4, 5, 1}, {1, 5, 3, 2, 4}, {4, 1, 2, 5, 3}, {2, 4, 5, 1, 3}};
   std::vector<std::vector<int>> input_dst = {
-    {4, 3, 2, 5, 1}, {2, 5, 4, 1, 3}, {5, 1, 3, 2, 4}, {3, 4, 1, 5, 2}};
-  std::vector<int> const expected_src{0, 1, 2, 3, 4};
-  std::vector<int> const expected_dst{1, 2, 3, 4, 5};
-  std::vector<float> const expected_weights(5, 1.0f);
+    {0, 1, 1, 3, 0}, {0, 3, 0, 1, 1}, {1, 0, 1, 3, 0}, {1, 1, 3, 0, 0}};
+  std::vector<std::vector<float>> input_weights = {{1.0f, 1.0f, 2.0f, 0.5f, 1.0f},
+                                                   {1.0f, 0.5f, 1.0f, 1.0f, 2.0f},
+                                                   {2.0f, 1.0f, 1.0f, 0.5f, 1.0f},
+                                                   {1.0f, 2.0f, 0.5f, 1.0f, 1.0f}};
+  std::vector<int> const expected_src{5, 1, 3, 2, 4};
+  std::vector<int> const expected_dst{3, 0, 0, 1, 1};
+  std::vector<float> const expected_weights{0.5f, 1.0f, 1.0f, 1.0f, 2.0f};
 
   std::vector<int> expected_children;
   std::vector<float> expected_distances;
   std::vector<int> expected_sizes;
 
   for (std::size_t run = 0; run < 20; ++run) {
-    auto const& host_src = input_src[run % input_src.size()];
-    auto const& host_dst = input_dst[run % input_dst.size()];
+    auto const& host_src     = input_src[run % input_src.size()];
+    auto const& host_dst     = input_dst[run % input_dst.size()];
+    auto const& host_weights = input_weights[run % input_weights.size()];
 
     rmm::device_uvector<int> src(host_src.size(), stream);
     rmm::device_uvector<int> dst(host_dst.size(), stream);
     rmm::device_uvector<float> weights(host_src.size(), stream);
     raft::copy(src.data(), host_src.data(), host_src.size(), stream);
     raft::copy(dst.data(), host_dst.data(), host_dst.size(), stream);
-    raft::copy(weights.data(), expected_weights.data(), expected_weights.size(), stream);
+    raft::copy(weights.data(), host_weights.data(), host_weights.size(), stream);
 
     detail::sort_mst_edges(handle, src.data(), dst.data(), weights.data(), src.size());
 
