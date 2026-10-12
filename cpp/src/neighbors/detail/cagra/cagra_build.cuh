@@ -191,6 +191,12 @@ constexpr bool ace_spill_count_fits(uint64_t count)
   return count <= static_cast<uint64_t>(std::numeric_limits<IdxT>::max());
 }
 
+/** Only augmented labeling needs the quadratic centroid-distance matrix. */
+constexpr bool ace_partition_count_supported(size_t n_partitions, double target_alpha)
+{
+  return target_alpha == 0.0 || n_partitions <= 8192;
+}
+
 /** A sampled quantile with deterministic subsampling of scores tied at the boundary. */
 struct ace_margin_gate {
   double threshold       = -std::numeric_limits<double>::infinity();
@@ -354,7 +360,8 @@ void ace_get_partition_labels(
                  target_alpha <= static_cast<double>(labels_dim - 1),
                "ACE target_alpha must be finite and in [0, %zu]",
                labels_dim - 1);
-  RAFT_EXPECTS(n_partitions <= 8192, "ACE target_alpha currently supports at most 8192 partitions");
+  RAFT_EXPECTS(ace_partition_count_supported(n_partitions, target_alpha),
+               "ACE positive target_alpha currently supports at most 8192 partitions");
   cudaStream_t stream = raft::resource::get_cuda_stream(res).get();
 
   // Sampling vectors from dataset. Uses float conversion on host instead of
@@ -382,28 +389,33 @@ void ace_get_partition_labels(
   auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
   cuvs::cluster::kmeans::fit(res, kmeans_params, sample_db_dev.view(), centroids_dev.view());
 
-  auto centroid_distances = raft::make_host_matrix<float, int64_t>(n_partitions, n_partitions);
-  auto centroid_distances_dev =
-    raft::make_device_matrix<float, int64_t>(res, n_partitions, n_partitions);
-  cuvs::distance::pairwise_distance(res,
-                                    raft::make_const_mdspan(centroids_dev.view()),
-                                    raft::make_const_mdspan(centroids_dev.view()),
-                                    centroid_distances_dev.view(),
-                                    cuvs::distance::DistanceType::L2Expanded);
-  raft::copy(
-    res, centroid_distances.view(), raft::make_const_mdspan(centroid_distances_dev.view()));
-  raft::resource::sync_stream(res, stream);
-
-  const size_t max_spills = labels_dim - 1;
-  const auto margin_gate  = ace_target_alpha_threshold(
-    ace_sample_margin_scores(res,
-                             raft::make_const_mdspan(sample_db_dev.view()),
-                             raft::make_const_mdspan(centroids_dev.view()),
-                             raft::make_const_mdspan(centroid_distances.view()),
-                             max_spills),
-    n_samples,
-    max_spills,
-    target_alpha);
+  // Core-only builds do not need centroid-pair distances or sampled spill scores.
+  const size_t max_spills             = labels_dim - 1;
+  const size_t centroid_distance_rows = target_alpha > 0.0 ? n_partitions : 0;
+  auto centroid_distances =
+    raft::make_host_matrix<float, int64_t>(centroid_distance_rows, centroid_distance_rows);
+  ace_margin_gate margin_gate;
+  if (target_alpha > 0.0) {
+    auto centroid_distances_dev =
+      raft::make_device_matrix<float, int64_t>(res, n_partitions, n_partitions);
+    cuvs::distance::pairwise_distance(res,
+                                      raft::make_const_mdspan(centroids_dev.view()),
+                                      raft::make_const_mdspan(centroids_dev.view()),
+                                      centroid_distances_dev.view(),
+                                      cuvs::distance::DistanceType::L2Expanded);
+    raft::copy(
+      res, centroid_distances.view(), raft::make_const_mdspan(centroid_distances_dev.view()));
+    raft::resource::sync_stream(res, stream);
+    margin_gate = ace_target_alpha_threshold(
+      ace_sample_margin_scores(res,
+                               raft::make_const_mdspan(sample_db_dev.view()),
+                               raft::make_const_mdspan(centroids_dev.view()),
+                               raft::make_const_mdspan(centroid_distances.view()),
+                               max_spills),
+      n_samples,
+      max_spills,
+      target_alpha);
+  }
   RAFT_LOG_INFO("ACE: target_alpha %.3f -> boundary margin threshold %.6f",
                 target_alpha,
                 margin_gate.threshold);
@@ -455,9 +467,11 @@ void ace_get_partition_labels(
       std::vector<std::pair<float, size_t>> nearest(labels_dim);
 #pragma omp for
       for (size_t i_sub = 0; i_sub < sub_dataset_size; i_sub++) {
-        const size_t output_row = i_base + i_sub;
-        const size_t found      = ace_select_nearest_partitions(
-          &sub_distances(i_sub, 0), n_partitions, labels_dim, nearest.data());
+        const size_t output_row         = i_base + i_sub;
+        const size_t found              = ace_select_nearest_partitions(&sub_distances(i_sub, 0),
+                                                           n_partitions,
+                                                           target_alpha > 0.0 ? labels_dim : 1,
+                                                           nearest.data());
         partition_labels(output_row, 0) = static_cast<IdxT>(nearest[0].second);
 #pragma omp atomic update
         partition_histogram(nearest[0].second, 0) += 1;
@@ -1643,6 +1657,9 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                  "ACE target_alpha must be finite and in [0, %zu] for %zu partitions",
                  max_spills,
                  n_partitions);
+
+    RAFT_EXPECTS(ace_partition_count_supported(n_partitions, target_alpha),
+                 "ACE positive target_alpha currently supports at most 8192 partitions");
 
     // Preallocate space for files for better performance and fail early if not enough space.
     cuvs::util::file_descriptor reordered_fd;
