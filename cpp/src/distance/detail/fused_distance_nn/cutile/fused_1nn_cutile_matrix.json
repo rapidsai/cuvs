@@ -280,10 +280,10 @@
               "tile_k": 32
             }
           ],
-          "gpu_code": "sm_110",
-          "cc_major": 11,
-          "cc_minor": 0,
-          "arch_tag": "cutile_arch_11_0"
+          "gpu_code": "sm_107",
+          "cc_major": 10,
+          "cc_minor": 7,
+          "arch_tag": "cutile_arch_10_7"
         },
         {
           "data_type": "half",
@@ -306,10 +306,10 @@
               "tile_k": 64
             }
           ],
-          "gpu_code": "sm_110",
-          "cc_major": 11,
-          "cc_minor": 0,
-          "arch_tag": "cutile_arch_11_0"
+          "gpu_code": "sm_107",
+          "cc_major": 10,
+          "cc_minor": 7,
+          "arch_tag": "cutile_arch_10_7"
         },
         {
           "data_type": "float",
@@ -422,10 +422,10 @@
               "num_ctas": 4
             }
           ],
-          "gpu_code": "sm_110",
-          "cc_major": 11,
-          "cc_minor": 0,
-          "arch_tag": "cutile_arch_11_0"
+          "gpu_code": "sm_107",
+          "cc_major": 10,
+          "cc_minor": 7,
+          "arch_tag": "cutile_arch_10_7"
         },
         {
           "data_type": "half",
@@ -441,10 +441,10 @@
               "num_ctas": 4
             }
           ],
-          "gpu_code": "sm_110",
-          "cc_major": 11,
-          "cc_minor": 0,
-          "arch_tag": "cutile_arch_11_0"
+          "gpu_code": "sm_107",
+          "cc_major": 10,
+          "cc_minor": 7,
+          "arch_tag": "cutile_arch_10_7"
         }
       ]
     }

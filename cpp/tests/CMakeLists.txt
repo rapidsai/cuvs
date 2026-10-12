@@ -153,7 +153,7 @@ ConfigureTest(
 )
 target_compile_definitions(
   CUTILE_SMOKE_TEST PRIVATE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
-                            CUVS_CUTILE_SM110_ENABLED=${CUVS_CUTILE_SM110_ENABLED}
+                            CUVS_CUTILE_SM107_ENABLED=${CUVS_CUTILE_SM107_ENABLED}
 )
 if(CUVS_CUTILE_ENABLED)
   # These are intentionally library-private implementation symbols. Build the smoke executable with

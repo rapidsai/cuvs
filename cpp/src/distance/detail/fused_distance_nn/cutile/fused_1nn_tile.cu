@@ -43,7 +43,7 @@ bool should_use_high_dim_tile(IdxT n, IdxT k, int cc_major, int cc_minor)
   } else if (cc_major == 10 && cc_minor == 0) {
     k_thresh = 1536;
     n_thresh = 1000;
-  } else if (cc_major == 11 && cc_minor == 0) {
+  } else if (cc_major == 10 && cc_minor == 7) {
     k_thresh = 2048;
     n_thresh = 1000;
   } else if (cc_major == 12 && cc_minor == 0) {
