@@ -1337,10 +1337,10 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         auto offsets =
           cuvs::neighbors::cagra::merged_dataset_offsets(handle_, dataset_views, bitset_filter_obj);
 
-        // Exercise the real concatenate_and_filter_datasets() helper -- it gathers directly from
+        // Exercise the real concatenate_datasets() helper with a filter -- it gathers directly from
         // index0's/index1's own device dataset storage (not from `database`), so this also
         // validates the helper against the `merged_dataset_offsets()` boundaries computed above.
-        auto merged_dataset = cuvs::neighbors::cagra::concatenate_and_filter_datasets<DataT>(
+        auto merged_dataset = cuvs::neighbors::cagra::concatenate_datasets<DataT>(
           handle_, dataset_views, bitset_filter_obj);
         auto merged_view = merged_dataset->as_dataset_view();
         auto merge_idx   = cuvs::neighbors::cagra::merge(

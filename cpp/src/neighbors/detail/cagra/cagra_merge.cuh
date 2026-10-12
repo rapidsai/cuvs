@@ -162,48 +162,41 @@ void copy_datasets_into(raft::resources const& handle,
   }
 }
 
-/** Concatenate `datasets` (unfiltered, in order) into a freshly allocated, CAGRA-padded, owning
- *  device dataset. Convenience helper for building `merge()`'s `merged_dataset` argument in the
- *  unfiltered case; the matching `offsets` are simply each dataset's cumulative `n_rows()`. */
+/** Concatenate `datasets` (in order) into a freshly allocated, CAGRA-padded, owning device
+ *  dataset, optionally retaining only the rows selected by `row_filter`. Convenience helper for
+ *  building `merge()`'s `merged_dataset` argument; call `merged_dataset_offsets()` with the same
+ *  `row_filter` to get the matching `offsets`.
+ *
+ *  When `row_filter` is `none_sample_filter`, all rows are copied. When it is a bitset filter,
+ *  only surviving rows are gathered (peak device memory is the output buffer sized to the
+ *  surviving row count — no unfiltered-sized staging buffer is allocated). */
 template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
-auto concatenate_datasets(raft::resources const& handle, std::vector<DatasetViewT> const& datasets)
+auto concatenate_datasets(raft::resources const& handle,
+                          std::vector<DatasetViewT> const& datasets,
+                          cuvs::neighbors::filtering::base_filter const& row_filter =
+                            cuvs::neighbors::filtering::none_sample_filter{})
   -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
 {
-  auto [dim, stride] = validate_datasets_for_concat(datasets, "cagra::concatenate_datasets");
+  auto [dim, stride]  = validate_datasets_for_concat(datasets, "cagra::concatenate_datasets");
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle).get();
 
-  int64_t total_rows = 0;
-  for (auto const& v : datasets) {
-    total_rows += static_cast<int64_t>(v.n_rows());
+  if (row_filter.get_filter_type() == cuvs::neighbors::filtering::FilterType::None) {
+    int64_t total_rows = 0;
+    for (auto const& v : datasets) {
+      total_rows += static_cast<int64_t>(v.n_rows());
+    }
+    auto out_array = raft::make_device_matrix<T, int64_t>(handle, total_rows, stride);
+    RAFT_CUDA_TRY(cudaMemsetAsync(
+      out_array.data_handle(), 0, static_cast<std::size_t>(out_array.size()) * sizeof(T), stream));
+    copy_datasets_into<T>(handle, datasets, out_array.data_handle(), stride, dim);
+    return std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
+      std::move(out_array), dim);
   }
 
-  auto out_array      = raft::make_device_matrix<T, int64_t>(handle, total_rows, stride);
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle).get();
-  RAFT_CUDA_TRY(cudaMemsetAsync(
-    out_array.data_handle(), 0, static_cast<std::size_t>(out_array.size()) * sizeof(T), stream));
-
-  copy_datasets_into<T>(handle, datasets, out_array.data_handle(), stride, dim);
-
-  return std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(std::move(out_array),
-                                                                              dim);
-}
-
-/** Concatenate `datasets` (in order), retaining only rows selected by `row_filter`, into a
- *  freshly allocated, CAGRA-padded, owning device dataset. Convenience helper for building
- *  `merge()`'s `merged_dataset` argument in the bitset-filtered case; call
- *  `merged_dataset_offsets()` with the same `row_filter` to get the matching `offsets`.
- *
- *  Peak device memory is only the output buffer, sized to the *surviving* row count: each
- *  dataset's surviving rows are gathered directly from device memory, so no unfiltered-sized
- *  staging buffer is ever allocated. */
-template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
-auto concatenate_and_filter_datasets(
-  raft::resources const& handle,
-  std::vector<DatasetViewT> const& datasets,
-  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> const& row_filter)
-  -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
-{
-  auto [dim, stride] =
-    validate_datasets_for_concat(datasets, "cagra::concatenate_and_filter_datasets");
+  RAFT_EXPECTS(row_filter.get_filter_type() == cuvs::neighbors::filtering::FilterType::Bitset,
+               "cagra::concatenate_datasets: only none and bitset filters are supported");
+  auto const& actual_filter =
+    dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(row_filter);
 
   std::vector<int64_t> unfiltered_offsets;
   unfiltered_offsets.reserve(datasets.size() + 1);
@@ -212,14 +205,12 @@ auto concatenate_and_filter_datasets(
     unfiltered_offsets.push_back(unfiltered_offsets.back() + static_cast<int64_t>(v.n_rows()));
   }
   int64_t const unfiltered_rows = unfiltered_offsets.back();
-  int64_t const final_rows      = row_filter.view().count(handle);
-
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle).get();
+  int64_t const final_rows      = actual_filter.view().count(handle);
 
   auto surviving_rows_csr = raft::make_device_csr_matrix<uint32_t, int64_t, int64_t, int64_t>(
     handle, 1, static_cast<std::size_t>(unfiltered_rows));
   surviving_rows_csr.initialize_sparsity(final_rows);
-  row_filter.view().to_csr(handle, surviving_rows_csr);
+  actual_filter.view().to_csr(handle, surviving_rows_csr);
   auto csr_indices = surviving_rows_csr.structure_view().get_indices();
 
   std::vector<int64_t> surviving_rows_host(csr_indices.size());

@@ -571,27 +571,18 @@ std::vector<int64_t> merged_dataset_offsets(
   return cagra::detail::merged_dataset_offsets<DatasetViewT>(handle, datasets, row_filter);
 }
 
-/** @brief Concatenate `datasets` (unfiltered) into a freshly allocated, CAGRA-padded, owning
- * device dataset. Optional convenience helper for `merge()`'s `merged_dataset` argument in the
- * unfiltered case. */
+/** @brief Concatenate `datasets` (in order) into a freshly allocated, CAGRA-padded, owning device
+ * dataset, optionally retaining only the rows selected by `row_filter`. Optional convenience
+ * helper for `merge()`'s `merged_dataset` argument; call `merged_dataset_offsets()` with the same
+ * `row_filter` to get the matching `offsets`. */
 template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
-auto concatenate_datasets(raft::resources const& handle, std::vector<DatasetViewT> const& datasets)
+auto concatenate_datasets(raft::resources const& handle,
+                          std::vector<DatasetViewT> const& datasets,
+                          cuvs::neighbors::filtering::base_filter const& row_filter =
+                            cuvs::neighbors::filtering::none_sample_filter{})
   -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
 {
-  return cagra::detail::concatenate_datasets<T>(handle, datasets);
-}
-
-/** @brief Concatenate `datasets`, retaining only rows selected by `row_filter`, into a freshly
- * allocated, CAGRA-padded, owning device dataset. Optional convenience helper for `merge()`'s
- * `merged_dataset` argument in the bitset-filtered case. */
-template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
-auto concatenate_and_filter_datasets(
-  raft::resources const& handle,
-  std::vector<DatasetViewT> const& datasets,
-  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> const& row_filter)
-  -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
-{
-  return cagra::detail::concatenate_and_filter_datasets<T>(handle, datasets, row_filter);
+  return cagra::detail::concatenate_datasets<T>(handle, datasets, row_filter);
 }
 
 template <typename T, typename IdxT = uint32_t, typename OutputIdxT = uint32_t>
@@ -711,9 +702,6 @@ auto update_dataset(raft::resources const& res,
     cuvs::neighbors::filtering::base_filter const& row_filter);                            \
   template CUVS_EXPORT std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> \
   cuvs::neighbors::cagra::concatenate_datasets<T, DatasetViewT>(                           \
-    raft::resources const& handle, std::vector<DatasetViewT> const& datasets);             \
-  template CUVS_EXPORT std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> \
-  cuvs::neighbors::cagra::concatenate_and_filter_datasets<T, DatasetViewT>(                \
     raft::resources const& handle,                                                         \
     std::vector<DatasetViewT> const& datasets,                                             \
-    cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> const& row_filter);
+    cuvs::neighbors::filtering::base_filter const& row_filter);

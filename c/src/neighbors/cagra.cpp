@@ -1419,6 +1419,7 @@ void _concatenate_datasets(cuvsResources_t res,
                            cuvsDataset_t* datasets,
                            size_t num_datasets,
                            DLDataType dtype,
+                           cuvsFilter filter,
                            cuvsDataset_t* merged_dataset)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -1426,60 +1427,23 @@ void _concatenate_datasets(cuvsResources_t res,
     validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraConcatenateDatasets");
 
   auto compute = [&](auto const& dataset_views) {
-    bind_concatenated_dataset<T>(
-      cuvs::neighbors::cagra::concatenate_datasets<T>(*res_ptr, dataset_views), dtype,
-      merged_dataset);
-  };
-
-  if (layout == CUVS_DATASET_LAYOUT_PADDED) {
-    using ViewT = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
-    std::vector<ViewT> views;
-    views.reserve(num_datasets);
-    for (size_t i = 0; i < num_datasets; ++i) {
-      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    if (filter.type == NO_FILTER) {
+      bind_concatenated_dataset<T>(
+        cuvs::neighbors::cagra::concatenate_datasets<T>(*res_ptr, dataset_views), dtype,
+        merged_dataset);
+    } else {
+      int64_t total_rows = 0;
+      for (auto const& v : dataset_views) { total_rows += static_cast<int64_t>(v.n_rows()); }
+      using filter_mdspan_type = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+      auto removed_tensor      = reinterpret_cast<DLManagedTensor*>(filter.addr);
+      auto removed_indices     = cuvs::core::from_dlpack<filter_mdspan_type>(removed_tensor);
+      cuvs::core::bitset_view<std::uint32_t, int64_t> bitset_view_obj(removed_indices, total_rows);
+      cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> row_filter(bitset_view_obj);
+      bind_concatenated_dataset<T>(
+        cuvs::neighbors::cagra::concatenate_datasets<T>(*res_ptr, dataset_views, row_filter),
+        dtype,
+        merged_dataset);
     }
-    compute(views);
-  } else {
-    using ViewT = cuvs::neighbors::device_standard_dataset_view<T, int64_t>;
-    std::vector<ViewT> views;
-    views.reserve(num_datasets);
-    for (size_t i = 0; i < num_datasets; ++i) {
-      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
-    }
-    compute(views);
-  }
-}
-
-template <typename T>
-void _concatenate_and_filter_datasets(cuvsResources_t res,
-                                      cuvsDataset_t* datasets,
-                                      size_t num_datasets,
-                                      DLDataType dtype,
-                                      cuvsFilter filter,
-                                      cuvsDataset_t* merged_dataset)
-{
-  RAFT_EXPECTS(filter.type == BITSET,
-               "cuvsCagraConcatenateDatasets: only BITSET filters are supported");
-  auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto layout =
-    validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraConcatenateDatasets");
-
-  auto compute = [&](auto const& dataset_views) {
-    // Count total rows so we can size the bitset_view correctly.
-    int64_t total_rows = 0;
-    for (auto const& v : dataset_views) { total_rows += static_cast<int64_t>(v.n_rows()); }
-
-    using filter_mdspan_type = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
-    auto removed_tensor      = reinterpret_cast<DLManagedTensor*>(filter.addr);
-    auto removed_indices     = cuvs::core::from_dlpack<filter_mdspan_type>(removed_tensor);
-    cuvs::core::bitset_view<std::uint32_t, int64_t> bitset_view_obj(removed_indices, total_rows);
-    cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> row_filter(bitset_view_obj);
-
-    bind_concatenated_dataset<T>(
-      cuvs::neighbors::cagra::concatenate_and_filter_datasets<T>(*res_ptr, dataset_views,
-                                                                 row_filter),
-      dtype,
-      merged_dataset);
   };
 
   if (layout == CUVS_DATASET_LAYOUT_PADDED) {
@@ -2606,6 +2570,8 @@ extern "C" cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
                  "All input datasets must be non-null");
     RAFT_EXPECTS(merged_dataset != nullptr, "merged_dataset output pointer must not be null");
 
+    RAFT_EXPECTS(filter.type == NO_FILTER || filter.type == BITSET,
+                 "cuvsCagraConcatenateDatasets: only NO_FILTER and BITSET filters are supported");
     auto dtype = datasets[0]->dtype;
     for (size_t i = 1; i < num_datasets; ++i) {
       RAFT_EXPECTS(datasets[i] != nullptr && datasets[i]->addr != 0,
@@ -2613,36 +2579,16 @@ extern "C" cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
       RAFT_EXPECTS(datasets[i]->dtype.code == dtype.code && datasets[i]->dtype.bits == dtype.bits,
                    "All input datasets must have the same data type");
     }
-    if (filter.type == NO_FILTER) {
-      if (dtype.code == kDLFloat && dtype.bits == 32) {
-        _concatenate_datasets<float>(res, datasets, num_datasets, dtype, merged_dataset);
-      } else if (dtype.code == kDLFloat && dtype.bits == 16) {
-        _concatenate_datasets<half>(res, datasets, num_datasets, dtype, merged_dataset);
-      } else if (dtype.code == kDLInt && dtype.bits == 8) {
-        _concatenate_datasets<int8_t>(res, datasets, num_datasets, dtype, merged_dataset);
-      } else if (dtype.code == kDLUInt && dtype.bits == 8) {
-        _concatenate_datasets<uint8_t>(res, datasets, num_datasets, dtype, merged_dataset);
-      } else {
-        RAFT_FAIL("Unsupported dataset data type: code=%d, bits=%d", dtype.code, dtype.bits);
-      }
+    if (dtype.code == kDLFloat && dtype.bits == 32) {
+      _concatenate_datasets<float>(res, datasets, num_datasets, dtype, filter, merged_dataset);
+    } else if (dtype.code == kDLFloat && dtype.bits == 16) {
+      _concatenate_datasets<half>(res, datasets, num_datasets, dtype, filter, merged_dataset);
+    } else if (dtype.code == kDLInt && dtype.bits == 8) {
+      _concatenate_datasets<int8_t>(res, datasets, num_datasets, dtype, filter, merged_dataset);
+    } else if (dtype.code == kDLUInt && dtype.bits == 8) {
+      _concatenate_datasets<uint8_t>(res, datasets, num_datasets, dtype, filter, merged_dataset);
     } else {
-      RAFT_EXPECTS(filter.type == BITSET,
-                   "cuvsCagraConcatenateDatasets: only NO_FILTER and BITSET filters are supported");
-      if (dtype.code == kDLFloat && dtype.bits == 32) {
-        _concatenate_and_filter_datasets<float>(res, datasets, num_datasets, dtype, filter,
-                                                merged_dataset);
-      } else if (dtype.code == kDLFloat && dtype.bits == 16) {
-        _concatenate_and_filter_datasets<half>(res, datasets, num_datasets, dtype, filter,
-                                               merged_dataset);
-      } else if (dtype.code == kDLInt && dtype.bits == 8) {
-        _concatenate_and_filter_datasets<int8_t>(res, datasets, num_datasets, dtype, filter,
-                                                 merged_dataset);
-      } else if (dtype.code == kDLUInt && dtype.bits == 8) {
-        _concatenate_and_filter_datasets<uint8_t>(res, datasets, num_datasets, dtype, filter,
-                                                  merged_dataset);
-      } else {
-        RAFT_FAIL("Unsupported dataset data type: code=%d, bits=%d", dtype.code, dtype.bits);
-      }
+      RAFT_FAIL("Unsupported dataset data type: code=%d, bits=%d", dtype.code, dtype.bits);
     }
   });
 }
