@@ -178,10 +178,12 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
     raft::resource::get_custom_resource<descriptor_cache::store<DataT, IndexT, DistanceT>>(res);
   auto& cache = store->value;
   // Hold the lock across the lookup and the insertion. Otherwise threads that miss concurrently
-  // each create a descriptor and the later insertion replaces the earlier one, which may already
-  // be in use by another thread; the last owner then frees it on its own stream while a kernel on
-  // a different stream can still be reading it. Only host-side work happens under the lock (the
-  // device-side initialization is deferred to the first `dev_ptr()` call).
+  // each create a descriptor and insert it under the same key (the LRU cache does not deduplicate
+  // keys), so concurrent searches can end up with different descriptors. When the last owner of
+  // one releases it, its device memory is freed with `cudaFreeAsync` on the stream that
+  // initialized it, which is not ordered after a kernel on another thread's stream that can still
+  // be reading it. Only host-side work happens under the lock (the device-side initialization is
+  // deferred to the first `dev_ptr()` call).
   std::lock_guard<std::mutex> lock(store->mutex);
   dataset_descriptor_host<DataT, IndexT, DistanceT> desc;
   if (!cache.get(key, &desc)) {
