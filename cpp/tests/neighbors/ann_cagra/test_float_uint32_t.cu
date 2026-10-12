@@ -168,4 +168,40 @@ TEST(AceBudget, RejectsSpillOffsetOverflow)
   EXPECT_FALSE(ace_spill_count_fits<uint32_t>(1'500'000'000ULL * 3));
 }
 
+TEST(AceBudget, SubsamplesFiniteAndInfiniteQuantileTies)
+{
+  for (const float score : {0.0f, std::numeric_limits<float>::infinity()}) {
+    auto gate = ace_target_alpha_threshold(std::vector<float>(300, score), 100, 3, 0.25);
+    EXPECT_EQ(gate.threshold, score);
+    EXPECT_DOUBLE_EQ(gate.tie_probability, 1.0 / 12.0);
+    size_t accepted = 0;
+    for (size_t row = 0; row < 100'000; ++row) {
+      for (size_t partition = 1; partition <= 3; ++partition) {
+        accepted += gate.accepts(score, row, partition);
+      }
+    }
+    EXPECT_NEAR(static_cast<double>(accepted) / 100'000, 0.25, 0.01);
+  }
+}
+
+TEST(AceBudget, AccountsForScoresBelowThreshold)
+{
+  auto gate = ace_target_alpha_threshold({0, 1, 1, 1, 2, 2}, 2, 3, 1.0);
+  EXPECT_EQ(gate.threshold, 1);
+  EXPECT_DOUBLE_EQ(gate.tie_probability, 1.0 / 3.0);
+  EXPECT_TRUE(gate.accepts(0, 5, 1));
+  EXPECT_FALSE(gate.accepts(2, 5, 1));
+}
+
+TEST(AceBudget, ZeroAndMaximumBudgets)
+{
+  const std::vector<float> scores{0, 1, std::numeric_limits<float>::infinity()};
+  auto zero = ace_target_alpha_threshold(scores, 1, 3, 0.0);
+  auto full = ace_target_alpha_threshold(scores, 1, 3, 3.0);
+  for (const float score : scores) {
+    EXPECT_FALSE(zero.accepts(score, 0, 1));
+    EXPECT_TRUE(full.accepts(score, 0, 1));
+  }
+}
+
 }  // namespace cuvs::neighbors::cagra::detail

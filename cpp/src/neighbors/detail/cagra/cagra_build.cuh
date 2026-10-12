@@ -191,6 +191,51 @@ constexpr bool ace_spill_count_fits(uint64_t count)
   return count <= static_cast<uint64_t>(std::numeric_limits<IdxT>::max());
 }
 
+/** A sampled quantile with deterministic subsampling of scores tied at the boundary. */
+struct ace_margin_gate {
+  double threshold       = -std::numeric_limits<double>::infinity();
+  double tie_probability = 0.0;
+
+  /** Select ties independently of labeling chunk size and OpenMP scheduling. */
+  bool accepts(float margin, size_t row, size_t partition) const
+  {
+    if (margin < threshold) { return true; }
+    if (margin != threshold || tie_probability <= 0.0) { return false; }
+    if (tie_probability >= 1.0) { return true; }
+    // SplitMix64 gives a stable uniform variate for each (row, spill partition).
+    uint64_t key = (static_cast<uint64_t>(row) * 0x9e3779b97f4a7c15ULL) ^ partition;
+    key          = (key ^ (key >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    key          = (key ^ (key >> 27)) * 0x94d049bb133111ebULL;
+    key ^= key >> 31;
+    const double uniform = static_cast<double>(key >> 11) * 0x1.0p-53;
+    return uniform < tie_probability;
+  }
+};
+
+/** Estimate a spill gate, retaining only the required fraction of quantile ties. */
+inline ace_margin_gate ace_target_alpha_threshold(std::vector<float> scores,
+                                                  size_t n_samples,
+                                                  size_t max_spills,
+                                                  double target_alpha)
+{
+  if (scores.empty() || target_alpha <= 0.0) { return {}; }
+  if (target_alpha >= static_cast<double>(max_spills)) {
+    return {std::numeric_limits<double>::infinity(), 1.0};
+  }
+  const size_t keep =
+    std::min(static_cast<size_t>(std::llround(target_alpha * n_samples)), scores.size());
+  if (keep == 0) { return {}; }
+  std::nth_element(scores.begin(), scores.begin() + keep - 1, scores.end());
+  const float threshold = scores[keep - 1];
+  size_t below          = 0;
+  size_t equal          = 0;
+  for (const float score : scores) {
+    below += score < threshold;
+    equal += score == threshold;
+  }
+  return {threshold, static_cast<double>(keep - below) / equal};
+}
+
 // A small per-vector cap bounds worst-case partition imbalance while target_alpha controls the
 // global augmentation budget. The cap is intentionally internal: the spill-cap sweep showed no
 // consistent quality benefit from exposing larger values.
@@ -280,21 +325,6 @@ inline std::vector<float> ace_sample_margin_scores(
   return scores;
 }
 
-inline double ace_target_alpha_threshold(std::vector<float> scores,
-                                         size_t n_samples,
-                                         size_t max_spills,
-                                         double target_alpha)
-{
-  if (scores.empty() || target_alpha <= 0.0) { return -std::numeric_limits<double>::infinity(); }
-  if (target_alpha >= static_cast<double>(max_spills)) {
-    return std::numeric_limits<double>::infinity();
-  }
-  size_t keep = static_cast<size_t>(std::llround(target_alpha * n_samples));
-  keep        = std::clamp<size_t>(keep, 1, scores.size());
-  std::nth_element(scores.begin(), scores.begin() + keep - 1, scores.end());
-  return scores[keep - 1];
-}
-
 // ACE: Get core plus boundary-gated spill partition labels. Only core graph rows are retained;
 // spill vectors enlarge local builds but their graph rows are not merged into the final graph.
 template <typename T, typename IdxT>
@@ -364,8 +394,8 @@ void ace_get_partition_labels(
     res, centroid_distances.view(), raft::make_const_mdspan(centroid_distances_dev.view()));
   raft::resource::sync_stream(res, stream);
 
-  const size_t max_spills       = labels_dim - 1;
-  const double margin_threshold = ace_target_alpha_threshold(
+  const size_t max_spills = labels_dim - 1;
+  const auto margin_gate  = ace_target_alpha_threshold(
     ace_sample_margin_scores(res,
                              raft::make_const_mdspan(sample_db_dev.view()),
                              raft::make_const_mdspan(centroids_dev.view()),
@@ -374,8 +404,9 @@ void ace_get_partition_labels(
     n_samples,
     max_spills,
     target_alpha);
-  RAFT_LOG_INFO(
-    "ACE: target_alpha %.3f -> boundary margin threshold %.6f", target_alpha, margin_threshold);
+  RAFT_LOG_INFO("ACE: target_alpha %.3f -> boundary margin threshold %.6f",
+                target_alpha,
+                margin_gate.threshold);
 
   // Compute distances between dataset and centroid vectors
   // Uses float conversion on host instead of batch_load_iterator to minimize GPU memory usage.
@@ -437,7 +468,7 @@ void ace_get_partition_labels(
             ace_boundary_margin(nearest[0].first,
                                 nearest[rank].first,
                                 centroid_distances(nearest[0].second, nearest[rank].second));
-          if (margin > margin_threshold) { continue; }
+          if (!margin_gate.accepts(margin, output_row, nearest[rank].second)) { continue; }
           partition_labels(output_row, output_slot++) = static_cast<IdxT>(nearest[rank].second);
 #pragma omp atomic update
           partition_histogram(nearest[rank].second, 1) += 1;
