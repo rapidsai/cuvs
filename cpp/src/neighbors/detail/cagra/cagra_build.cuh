@@ -294,12 +294,14 @@ inline ace_margin_gate ace_target_alpha_threshold(std::vector<float> scores,
 // consistent quality benefit from exposing larger values.
 constexpr size_t ace_max_spills_per_vector = 3;
 
+/** Mark an unused spill slot without aliasing a valid partition ID. */
 template <typename IdxT>
 constexpr IdxT ace_invalid_partition()
 {
   return std::numeric_limits<IdxT>::max();
 }
 
+/** Select up to n_keep nearest partitions, ordered by squared distance. */
 inline size_t ace_select_nearest_partitions(const float* distances,
                                             size_t n_partitions,
                                             size_t n_keep,
@@ -318,6 +320,7 @@ inline size_t ace_select_nearest_partitions(const float* distances,
   return filled;
 }
 
+/** Distance to the core/spill bisector; coincident centroids yield an infinite margin. */
 inline float ace_boundary_margin(float core_distance, float spill_distance, float centroid_distance)
 {
   return centroid_distance > 0.0f
@@ -325,6 +328,7 @@ inline float ace_boundary_margin(float core_distance, float spill_distance, floa
            : std::numeric_limits<float>::infinity();
 }
 
+/** Collect candidate spill margins from the centroid-training sample for budget calibration. */
 inline std::vector<float> ace_sample_margin_scores(
   raft::resources const& res,
   raft::device_matrix_view<const float, int64_t> sample,
@@ -379,8 +383,10 @@ inline std::vector<float> ace_sample_margin_scores(
   return scores;
 }
 
-// ACE: Get core plus boundary-gated spill partition labels. Only core graph rows are retained;
-// spill vectors enlarge local builds but their graph rows are not merged into the final graph.
+/**
+ * ACE: Get core plus boundary-gated spill partition labels. Only core graph rows are retained;
+ * spill vectors enlarge local builds but their graph rows are not merged into the final graph.
+ */
 template <typename T, typename IdxT>
 void ace_get_partition_labels(
   raft::resources const& res,
@@ -552,7 +558,9 @@ void ace_get_partition_labels(
   }
 }
 
-// ACE: Check partition sizes for stable KNN graph construction
+/**
+ * ACE: Check partition sizes for stable KNN graph construction
+ */
 template <typename IdxT>
 void ace_check_partition_sizes(
   size_t dataset_size,
@@ -637,8 +645,10 @@ void ace_check_partition_sizes(
   }
 }
 
-// ACE: Create forward/backward mappings between original and reordered vector IDs
-// The in-memory path can be parallelized but the disk path requires ordering.
+/**
+ * ACE: Create forward/backward mappings between original and reordered vector IDs
+ * The in-memory path can be parallelized but the disk path requires ordering.
+ */
 template <typename IdxT>
 void ace_create_forward_and_backward_lists(
   size_t dataset_size,
@@ -876,9 +886,11 @@ void ace_adjust_sub_graph_ids_disk(
   raft::resource::sync_stream(res);
 }
 
-// ACE: Reorder dataset based on partition assignments and store to disk
-// Writes two files: reordered_dataset.npy (core partitions) and augmented_dataset.npy (secondary
-// partitions). Uses buffered writes optimized for NVMe storage.
+/**
+ * ACE: Reorder dataset based on partition assignments and store to disk
+ * Writes two files: reordered_dataset.npy (core partitions) and augmented_dataset.npy (secondary
+ * partitions). Uses buffered writes optimized for NVMe storage.
+ */
 template <typename T, typename IdxT>
 void ace_reorder_and_store_dataset(
   raft::resources const& res,
@@ -1240,6 +1252,7 @@ constexpr double imbalance_factor = 3.0;
 
 constexpr double ace_label_expansion_factor = 1.0 + ace_max_spills_per_vector;
 
+/** Estimate core-plus-spill storage with headroom; this is not an overflow bound. */
 inline double ace_estimated_vector_expansion_factor(double target_alpha)
 {
   // Sampled thresholds closely track target_alpha in the validated sweeps. Keep 10% plus 0.1
@@ -1281,7 +1294,9 @@ inline size_t ace_check_labeling_memory(raft::resources const& res,
   return batch;
 }
 
-// Check if disk mode should be used for ACE based on memory constraints
+/**
+ * Check if disk mode should be used for ACE based on memory constraints
+ */
 template <typename T, typename IdxT>
 bool ace_check_use_disk_mode(raft::resources const& res,
                              bool use_disk,
@@ -1460,7 +1475,9 @@ inline void ace_validate_partition_count(size_t n_partitions,
                  : "ACE: number of partitions cannot exceed dataset size");
 }
 
-// Validate and adjust partitions for disk mode memory requirements
+/**
+ * Validate and adjust partitions for disk mode memory requirements
+ */
 template <typename T, typename IdxT>
 void ace_validate_disk_mode_partitions(raft::resources const& res,
                                        size_t& n_partitions,
@@ -1628,15 +1645,17 @@ auto build_from_host_matrix(raft::resources const& res,
                             DatasetViewT const& dataset)
   -> cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>;
 
-// Build CAGRA index using ACE (Augmented Core Extraction) partitioning
-// ACE enables building indexes for datasets too large to fit in GPU memory by:
-// 1. Partitioning the dataset using balanced k-means into a non-overlapping core and
-// boundary-gated spill partitions
-// 2. Building sub-indexes for each partition independently
-// 3. Concatenating sub-graphs (of core partitions) into a final unified index
-// Supports both in-memory and disk-based modes depending on available host memory.
-// In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
-// The returned index is not usable for search. Use the created files for search instead.
+/**
+ * Build CAGRA index using ACE (Augmented Core Extraction) partitioning
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
+ * 1. Partitioning the dataset using balanced k-means into a non-overlapping core and
+ * boundary-gated spill partitions
+ * 2. Building sub-indexes for each partition independently
+ * 3. Concatenating sub-graphs (of core partitions) into a final unified index
+ * Supports both in-memory and disk-based modes depending on available host memory.
+ * In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
+ * The returned index is not usable for search. Use the created files for search instead.
+ */
 template <typename T, typename IdxT, typename DatasetViewT>
   requires cuvs::neighbors::is_host_dataset_view_v<DatasetViewT>
 auto build_ace(raft::resources const& res, const index_params& params, DatasetViewT const& dataset)

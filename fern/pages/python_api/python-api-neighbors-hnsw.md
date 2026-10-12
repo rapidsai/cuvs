@@ -82,6 +82,8 @@ def max_gpu_memory_gb(self)
 def target_alpha(self)
 ```
 
+Return the expected number of spill copies per input vector.
+
 ## IndexParams
 
 ```python

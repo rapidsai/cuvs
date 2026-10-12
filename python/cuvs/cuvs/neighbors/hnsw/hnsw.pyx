@@ -94,6 +94,7 @@ cdef class AceParams:
                  max_host_memory_gb=0,
                  max_gpu_memory_gb=0,
                  target_alpha=1.0):
+        """Initialize ACE parameters, including the expected spill-copy budget."""
         self.params.npartitions = npartitions
         self._build_dir_bytes = build_dir.encode('utf-8')
         self.params.build_dir = self._build_dir_bytes
@@ -126,6 +127,7 @@ cdef class AceParams:
 
     @property
     def target_alpha(self):
+        """Return the expected number of spill copies per input vector."""
         return self.params.target_alpha
 
 
