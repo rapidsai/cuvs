@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../../../src/neighbors/detail/cagra/cagra_build.cuh"
 #include "../ann_cagra.cuh"
 
 #include <utility>
@@ -154,3 +155,17 @@ TEST(AnnCagraMultiPartition, MixedGraphDegreeRejected)
 }
 
 }  // namespace cuvs::neighbors::cagra
+
+namespace cuvs::neighbors::cagra::detail {
+
+TEST(AceBudget, RejectsSpillOffsetOverflow)
+{
+  constexpr uint64_t limit = std::numeric_limits<uint32_t>::max();
+  EXPECT_TRUE(ace_spill_count_fits<uint32_t>(0));
+  EXPECT_TRUE(ace_spill_count_fits<uint32_t>(limit));
+  EXPECT_FALSE(ace_spill_count_fits<uint32_t>(limit + 1));
+  // Original IDs fit, but three spill copies per row do not.
+  EXPECT_FALSE(ace_spill_count_fits<uint32_t>(1'500'000'000ULL * 3));
+}
+
+}  // namespace cuvs::neighbors::cagra::detail

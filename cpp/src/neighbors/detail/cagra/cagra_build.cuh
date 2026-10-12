@@ -47,6 +47,8 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -180,6 +182,13 @@ void check_graph_degree(size_t& intermediate_degree, size_t& graph_degree, size_
       intermediate_degree);
     graph_degree = intermediate_degree;
   }
+}
+
+/** Check the realized spill count before storing prefix sums or cursors in IdxT. */
+template <typename IdxT>
+constexpr bool ace_spill_count_fits(uint64_t count)
+{
+  return count <= static_cast<uint64_t>(std::numeric_limits<IdxT>::max());
 }
 
 // A small per-vector cap bounds worst-case partition imbalance while target_alpha controls the
@@ -550,6 +559,17 @@ void ace_create_forward_and_backward_lists(
   raft::host_vector_view<IdxT, int64_t, raft::row_major> core_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets)
 {
+  const size_t labels_dim = partition_labels.extent(1);
+  size_t total_augmented  = 0;
+  for (size_t partition = 0; partition < n_partitions; partition++) {
+    total_augmented += partition_histogram(partition, 1);
+  }
+  RAFT_EXPECTS(ace_spill_count_fits<IdxT>(total_augmented),
+               "ACE: realized spill count exceeds the index type's offset capacity; reduce "
+               "target_alpha or dataset size");
+  RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == total_augmented,
+               "augmented_backward_mapping must have one entry per spill copy");
+
   core_partition_offsets(0)      = 0;
   augmented_partition_offsets(0) = 0;
   for (size_t c = 1; c < n_partitions; c++) {
@@ -557,14 +577,6 @@ void ace_create_forward_and_backward_lists(
     augmented_partition_offsets(c) =
       augmented_partition_offsets(c - 1) + partition_histogram(c - 1, 1);
   }
-
-  const size_t labels_dim = partition_labels.extent(1);
-  size_t total_augmented  = 0;
-  for (size_t partition = 0; partition < n_partitions; partition++) {
-    total_augmented += partition_histogram(partition, 1);
-  }
-  RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == total_augmented,
-               "augmented_backward_mapping must have one entry per spill copy");
 
   if (static_cast<size_t>(core_forward_mapping.extent(0)) == 0) {
     // Memory path: both backward mappings
@@ -1675,6 +1687,11 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
     for (size_t partition = 0; partition < n_partitions; partition++) {
       total_augmented_vectors += partition_histogram(partition, 1);
     }
+    // target_alpha is sampled, so its product with dataset_size is not an overflow bound.
+    // Validate the realized count before allocating spill files, mappings, or IdxT offsets.
+    RAFT_EXPECTS(ace_spill_count_fits<IdxT>(total_augmented_vectors),
+                 "ACE: realized spill count exceeds the index type's offset capacity; reduce "
+                 "target_alpha or dataset size");
     RAFT_LOG_INFO("ACE build: realized target_alpha %.3f (requested %.3f, spill_cap=%zu)",
                   static_cast<double>(total_augmented_vectors) / dataset_size,
                   target_alpha,
