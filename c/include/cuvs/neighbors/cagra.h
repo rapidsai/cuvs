@@ -1013,56 +1013,6 @@ CUVS_EXPORT cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  */
 
 /**
- * @brief Compute per-index write offsets for a merged dataset buffer.
- *
- * `cuvsCagraMerge_v2`/`cuvsCagraMergeWithParams_v2` require the caller to have already
- * concatenated every input index's dataset (in `indices` order, applying `filter` if any) into a
- * single buffer and to know each index's starting row within it. For `filter.type == NO_FILTER`,
- * those offsets are just the cumulative sizes of `indices` and this function is not needed. For
- * `BITSET`, the number of surviving rows per index cannot be derived any other way, so call this
- * first.
- *
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] indices Array of input cuvsCagraIndex_t handles that will be passed to merge
- * @param[in] num_indices Number of input indices
- * @param[in] filter Filter that will be passed to merge. Only `NO_FILTER` and `BITSET` supported.
- * @param[out] offsets Caller-allocated array of `num_indices + 1` int64_t. Entry `i` is the row at
- *                     which `indices[i]`'s surviving rows must start in the merged buffer; the
- *                     last entry is the total row count of the merged buffer.
- * @return cuvsError_t
- */
-CUVS_EXPORT cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
-                                                      cuvsCagraIndex_t* indices,
-                                                      size_t num_indices,
-                                                      cuvsFilter filter,
-                                                      int64_t* offsets);
-
-/**
- * @brief Concatenate every input index's dataset (in `indices` order) into a freshly allocated,
- * CAGRA-padded, owning device dataset, optionally retaining only the rows selected by `filter`.
- *
- * This is an optional convenience function for building `cuvsCagraMerge_v2`'s `merged_dataset`
- * argument. Callers that already have their own concatenated buffer are not required to use it.
- * Call `cuvsCagraMergedDatasetOffsets` with the same `filter` to get the matching `offsets`.
- *
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] indices Array of input cuvsCagraIndex_t handles to concatenate, in the order they
- *                    will be passed to `cuvsCagraMerge_v2`
- * @param[in] num_indices Number of input indices
- * @param[in] filter Row filter. Pass `{NO_FILTER, 0}` (or a zero-initialized `cuvsFilter`) to
- *                   concatenate all rows. Pass a `BITSET` filter to retain only the surviving rows.
- * @param[out] merged_dataset Newly allocated owning dataset handle containing the concatenated
- *                            (and optionally filtered) rows in `indices` order. Caller must destroy
- *                            it with `cuvsDatasetDestroy` when done.
- * @return cuvsError_t
- */
-CUVS_EXPORT cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
-                                                     cuvsCagraIndex_t* indices,
-                                                     size_t num_indices,
-                                                     cuvsFilter filter,
-                                                     cuvsDataset_t* merged_dataset);
-
-/**
  * @brief Merge multiple CAGRA indices into a single CAGRA index.
  *
  * The caller is responsible for concatenating every input index's dataset (applying `filter` if

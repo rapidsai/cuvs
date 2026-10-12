@@ -877,7 +877,7 @@ cuvsFilter filter);
 | `queries` | in | `DLManagedTensor*` | DLManagedTensor* queries dataset to search |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* output `k` neighbors for queries |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* output `k` distances for queries |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-core-filter#cuvsfilter) | cuvsFilter input filter that can be used to filter queries and neighbors based on the given bitset. |
 
 **Returns**
 
@@ -916,7 +916,7 @@ The index element type may be float32, float16, int8, or uint8. All partitions m
 | `partition_ids` | out | `DLManagedTensor*` | DLManagedTensor* (device, uint32, [n_queries, k]); which partition each returned neighbor came from |
 | `neighbors` | out | `DLManagedTensor*` | DLManagedTensor* (device, uint32 or int64, [n_queries, k]); ordinal in the corresponding partition's dataset |
 | `distances` | out | `DLManagedTensor*` | DLManagedTensor* (device, float32, [n_queries, k]); post-processed distance for each (query, neighbor) |
-| `filters` | in | [`cuvsFilter*`](/api-reference/c-api-neighbors-common#cuvsfilter) | array of `num_partitions` filters, one per partition (or NULL for a fully unfiltered search). `filters[i]` applies to partition `i`: use \{.type=NO_FILTER, .addr=0\} for no filter on that partition, or \{.type=BITSET, .addr=ptr\} where ptr is a uintptr_t-cast DLManagedTensor* holding that partition's own bitset (one bit per vector in that partition; standard 32-bit packing). |
+| `filters` | in | [`cuvsFilter*`](/api-reference/c-api-core-filter#cuvsfilter) | array of `num_partitions` filters, one per partition (or NULL for a fully unfiltered search). `filters[i]` applies to partition `i`: use \{.type=NO_FILTER, .addr=0\} for no filter on that partition, or \{.type=BITSET, .addr=ptr\} where ptr is a uintptr_t-cast DLManagedTensor* holding that partition's own bitset (one bit per vector in that partition; standard 32-bit packing). |
 
 **Returns**
 
@@ -1090,64 +1090,6 @@ cuvsCagraIndex_t index);
 
 ## CAGRA C-API merge functions
 
-<a id="cuvscagramergeddatasetoffsets"></a>
-### cuvsCagraMergedDatasetOffsets
-
-Compute per-index write offsets for a merged dataset buffer.
-
-```c
-cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
-cuvsCagraIndex_t* indices,
-size_t num_indices,
-cuvsFilter filter,
-int64_t* offsets);
-```
-
-`cuvsCagraMerge_v2`/`cuvsCagraMergeWithParams_v2` require the caller to have already concatenated every input index's dataset (in `indices` order, applying `filter` if any) into a single buffer and to know each index's starting row within it. For `filter.type == NO_FILTER`, those offsets are just the cumulative sizes of `indices` and this function is not needed. For `BITSET`, the number of surviving rows per index cannot be derived any other way, so call this first.
-
-**Parameters**
-
-| Name | Direction | Type | Description |
-| --- | --- | --- | --- |
-| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
-| `indices` | in | [`cuvsCagraIndex_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Array of input cuvsCagraIndex_t handles that will be passed to merge |
-| `num_indices` | in | `size_t` | Number of input indices |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | Filter that will be passed to merge. Only `NO_FILTER` and `BITSET` supported. |
-| `offsets` | out | `int64_t*` | Caller-allocated array of `num_indices + 1` int64_t. Entry `i` is the row at which `indices[i]`'s surviving rows must start in the merged buffer; the last entry is the total row count of the merged buffer. |
-
-**Returns**
-
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
-<a id="cuvscagraconcatenatedatasets"></a>
-### cuvsCagraConcatenateDatasets
-
-Concatenate every input index's dataset (in `indices` order) into a freshly allocated, CAGRA-padded, owning device dataset, optionally retaining only the rows selected by `filter`.
-
-```c
-cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
-cuvsCagraIndex_t* indices,
-size_t num_indices,
-cuvsFilter filter,
-cuvsDataset_t* merged_dataset);
-```
-
-This is an optional convenience function for building `cuvsCagraMerge_v2`'s `merged_dataset` argument. Callers that already have their own concatenated buffer are not required to use it. Call `cuvsCagraMergedDatasetOffsets` with the same `filter` to get the matching `offsets`.
-
-**Parameters**
-
-| Name | Direction | Type | Description |
-| --- | --- | --- | --- |
-| `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
-| `indices` | in | [`cuvsCagraIndex_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Array of input cuvsCagraIndex_t handles to concatenate, in the order they will be passed to `cuvsCagraMerge_v2` |
-| `num_indices` | in | `size_t` | Number of input indices |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | Row filter. Pass `\{NO_FILTER, 0\}` (or a zero-initialized `cuvsFilter`) to concatenate all rows. Pass a `BITSET` filter to retain only the surviving rows. |
-| `merged_dataset` | out | `cuvsDataset_t*` | Newly allocated owning dataset handle containing the concatenated (and optionally filtered) rows in `indices` order. Caller must destroy it with `cuvsDatasetDestroy` when done. |
-
-**Returns**
-
-[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
-
 <a id="cuvscagramerge-v2"></a>
 ### cuvsCagraMerge_v2
 
@@ -1187,7 +1129,7 @@ Example:
 | `params` | in | [`cuvsCagraIndexParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindexparams) | cuvsCagraIndexParams_t parameters for the output index |
 | `indices` | in | [`cuvsCagraIndex_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Array of input cuvsCagraIndex_t handles to merge |
 | `num_indices` | in | `size_t` | Number of input indices |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | Filter, already applied by the caller while building `merged_dataset` |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-core-filter#cuvsfilter) | Filter, already applied by the caller while building `merged_dataset` |
 | `merged_dataset` | in | `cuvsDataset_t` | Caller-owned dataset handle already containing the concatenated (and, if `filter` is set, already-filtered) dataset, with the same layout as the input indices. Keep this dataset alive while using |
 | `offsets` | in | `const int64_t*` | Per-index starting row within `merged_dataset`, as returned by `cuvsCagraMergedDatasetOffsets`. Array of `num_indices + 1` int64_t; the last entry must equal `merged_dataset`'s row count. |
 | `output_index` | out | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Output handle that will store the merged index. Must be initialized using `cuvsCagraIndexCreate` before use. |
@@ -1224,7 +1166,7 @@ See `cuvsCagraMerge_v2` for the full `merged_dataset`/`offsets` contract.
 | `merge_params` | in | [`cuvsCagraMergeParams_t`](/api-reference/c-api-neighbors-cagra#cuvscagramergeparams) | cuvsCagraMergeParams_t parameters controlling the merge algorithm, or NULL to use AUTO defaults |
 | `indices` | in | [`cuvsCagraIndex_t*`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Array of input cuvsCagraIndex_t handles to merge |
 | `num_indices` | in | `size_t` | Number of input indices |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-neighbors-common#cuvsfilter) | Filter, already applied by the caller while building `merged_dataset` |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-core-filter#cuvsfilter) | Filter, already applied by the caller while building `merged_dataset` |
 | `merged_dataset` | in | `cuvsDataset_t` | Caller-owned dataset handle already containing the concatenated (and, if `filter` is set, already-filtered) dataset. Keep this dataset alive while using `output_index`. A host-backed dataset must be updated with `cuvsCagraUpdateDataset` before device search. |
 | `offsets` | in | `const int64_t*` | Per-index starting row within `merged_dataset`, as returned by `cuvsCagraMergedDatasetOffsets`. Array of `num_indices + 1` int64_t. |
 | `output_index` | out | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Output handle initialized with `cuvsCagraIndexCreate` |
