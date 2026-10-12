@@ -24,7 +24,7 @@ struct l2_exp_cutlass_op {
     AccT outVal = aNorm + bNorm - AccT(2.0) * accVal;
 
     // Expanded L2 can be slightly negative due to round-off; clamp to zero.
-    outVal = outVal > AccT{0} ? outVal : AccT{0};
+    outVal = outVal < AccT{0} ? AccT{0} : outVal;
     return sqrt ? raft::sqrt(outVal) : outVal;
   }
 
@@ -94,7 +94,7 @@ struct l2_exp_distance_op {
         AccT val    = regxn[i] + regyn[j] - (AccT)2.0 * accVal;
 
         // Expanded L2 can be slightly negative due to round-off; clamp to zero.
-        acc[i][j] = val > AccT{0} ? val : AccT{0};
+        acc[i][j] = val < AccT{0} ? AccT{0} : val;
       }
     }
     if (sqrt) {
