@@ -150,9 +150,9 @@ def run_ivf_pq_build_search_test(
 )
 def test_ivf_pq(inplace, dtype, metric):
     # One dimension per PQ subspace. With the default pq_dim (8 for 10
-    # columns), the inner-product recall on this data is only about 0.74 and
-    # varies by about 0.01 from build to build, so `recall > 0.7` fails in
-    # roughly 1 of 1000 runs.
+    # columns), the inner-product recall on this data is only about 0.74 with
+    # a standard deviation of about 0.01, so `recall > 0.7` occasionally
+    # failed (0.696 in CI; the lowest of 3200 seeded runs was 0.701).
     run_ivf_pq_build_search_test(
         n_cols=10,
         pq_dim=10,
