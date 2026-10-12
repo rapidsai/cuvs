@@ -530,21 +530,37 @@ pub fn merged_dataset_offsets(
     indices: &[&Index<'_>],
     filter: Option<&Filter<'_, Bitset>>,
 ) -> Result<Vec<i64>> {
-    let mut raw_indices: Vec<ffi::cuvsCagraIndex_t> =
-        indices.iter().map(|index| index.handle.raw()).collect();
-    let mut offsets = vec![0i64; indices.len() + 1];
+    let mut datasets: Vec<ffi::cuvsDataset_t> = Vec::with_capacity(indices.len());
+    for index in indices {
+        let mut ds: ffi::cuvsDataset_t = std::ptr::null_mut();
+        if let Err(e) =
+            check_cuvs(unsafe { ffi::cuvsCagraIndexGetDatasetHandle(index.handle.raw(), &mut ds) })
+        {
+            for d in &datasets {
+                unsafe { ffi::cuvsDatasetDestroy(*d) };
+            }
+            return Err(CagraError::Library(e));
+        }
+        datasets.push(ds);
+    }
 
-    with_filter(filter, |c_filter| {
+    let mut offsets = vec![0i64; indices.len() + 1];
+    let result = with_filter(filter, |c_filter| {
         check_cuvs(unsafe {
             ffi::cuvsCagraMergedDatasetOffsets(
                 res.handle(),
-                raw_indices.as_mut_ptr(),
-                raw_indices.len(),
+                datasets.as_mut_ptr(),
+                datasets.len(),
                 c_filter,
                 offsets.as_mut_ptr(),
             )
         })
-    })?;
+    });
+
+    for d in &datasets {
+        unsafe { ffi::cuvsDatasetDestroy(*d) };
+    }
+    result?;
 
     Ok(offsets)
 }

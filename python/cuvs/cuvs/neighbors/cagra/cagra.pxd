@@ -141,7 +141,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                              int64_t* degree)
     cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index,
                                        DLManagedTensor * graph)
-    cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index,
+    cuvsError_t cuvsCagraIndexGetDatasetAsDLTensor(cuvsCagraIndex_t index,
                                          DLManagedTensor * dataset)
 
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,

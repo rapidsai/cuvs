@@ -1329,14 +1329,19 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         indices.push_back(&index0);
         indices.push_back(&index1);
 
+        std::vector<cuvs::neighbors::device_padded_dataset_view<DataT, int64_t>> dataset_views;
+        for (auto* idx : indices) {
+          dataset_views.push_back(idx->dataset());
+        }
+
         auto offsets =
-          cuvs::neighbors::cagra::merged_dataset_offsets(handle_, indices, bitset_filter_obj);
+          cuvs::neighbors::cagra::merged_dataset_offsets(handle_, dataset_views, bitset_filter_obj);
 
         // Exercise the real concatenate_and_filter_datasets() helper -- it gathers directly from
         // index0's/index1's own device dataset storage (not from `database`), so this also
         // validates the helper against the `merged_dataset_offsets()` boundaries computed above.
-        auto merged_dataset = cuvs::neighbors::cagra::concatenate_and_filter_datasets(
-          handle_, indices, bitset_filter_obj);
+        auto merged_dataset = cuvs::neighbors::cagra::concatenate_and_filter_datasets<DataT>(
+          handle_, dataset_views, bitset_filter_obj);
         auto merged_view = merged_dataset->as_dataset_view();
         auto merge_idx   = cuvs::neighbors::cagra::merge(
           handle_, index_params, indices, merged_view, offsets, bitset_filter_obj);
@@ -1584,7 +1589,11 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
             static_cast<int64_t>(index0.size()) + static_cast<int64_t>(index1.size())};
           // Exercise the real concatenate_datasets() helper -- it gathers directly from index0's
           // and index1's own device dataset storage, in indices_to_merge order.
-          auto merged_dataset = cagra::concatenate_datasets(handle_, indices_to_merge);
+          std::vector<cuvs::neighbors::device_padded_dataset_view<DataT, int64_t>> ds_views;
+          for (auto* idx : indices_to_merge) {
+            ds_views.push_back(idx->dataset());
+          }
+          auto merged_dataset = cagra::concatenate_datasets<DataT>(handle_, ds_views);
           auto merged_view    = merged_dataset->as_dataset_view();
           auto merged_idx =
             ps.physical_merge_params.has_value()

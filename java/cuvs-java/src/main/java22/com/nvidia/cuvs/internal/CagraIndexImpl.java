@@ -1301,21 +1301,29 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined();
         var resourcesAccessor = resources.access()) {
       var cuvsRes = resourcesAccessor.handle();
-      MemorySegment indicesSegment = buildIndicesSegment(localArena, indexes);
+      var datasetHandles = new ArrayList<MemorySegment>(indexes.length);
+      try {
+        MemorySegment datasetsSegment = buildDatasetsSegment(localArena, indexes, datasetHandles);
 
-      SequenceLayout offsetsLayout = MemoryLayout.sequenceLayout(indexes.length + 1, int64_t);
-      MemorySegment offsetsOut = localArena.allocate(offsetsLayout);
+        SequenceLayout offsetsLayout = MemoryLayout.sequenceLayout(indexes.length + 1, int64_t);
+        MemorySegment offsetsOut = localArena.allocate(offsetsLayout);
 
-      try (var nativeFilter = uploadBitsetFilter(cuvsRes, localArena, filter, totalRows(indexes))) {
-        checkCuVSError(
-            cuvsCagraMergedDatasetOffsets(
-                cuvsRes, indicesSegment, indexes.length, nativeFilter.segment, offsetsOut),
-            "cuvsCagraMergedDatasetOffsets");
+        try (var nativeFilter =
+            uploadBitsetFilter(cuvsRes, localArena, filter, totalRows(indexes))) {
+          checkCuVSError(
+              cuvsCagraMergedDatasetOffsets(
+                  cuvsRes, datasetsSegment, indexes.length, nativeFilter.segment, offsetsOut),
+              "cuvsCagraMergedDatasetOffsets");
+        }
+
+        long[] offsets = new long[indexes.length + 1];
+        MemorySegment.copy(offsetsOut, int64_t, 0, offsets, 0, offsets.length);
+        return offsets;
+      } finally {
+        for (MemorySegment ds : datasetHandles) {
+          checkCuVSError(cuvsDatasetDestroy(ds), "cuvsDatasetDestroy");
+        }
       }
-
-      long[] offsets = new long[indexes.length + 1];
-      MemorySegment.copy(offsetsOut, int64_t, 0, offsets, 0, offsets.length);
-      return offsets;
     }
   }
 
@@ -1328,20 +1336,27 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined();
         var resourcesAccessor = resources.access()) {
       var cuvsRes = resourcesAccessor.handle();
-      MemorySegment indicesSegment = buildIndicesSegment(localArena, indexes);
+      var datasetHandles = new ArrayList<MemorySegment>(indexes.length);
+      try {
+        MemorySegment datasetsSegment = buildDatasetsSegment(localArena, indexes, datasetHandles);
 
-      MemorySegment out = localArena.allocate(cuvsDataset_t);
-      MemorySegment noFilter = cuvsFilter.allocate(localArena);
-      cuvsFilter.type(noFilter, 0); // NO_FILTER
-      cuvsFilter.addr(noFilter, 0);
-      checkCuVSError(
-          cuvsCagraConcatenateDatasets(cuvsRes, indicesSegment, indexes.length, noFilter, out),
-          "cuvsCagraConcatenateDatasets");
-      MemorySegment merged = out.get(cuvsDataset_t, 0);
+        MemorySegment out = localArena.allocate(cuvsDataset_t);
+        MemorySegment noFilter = cuvsFilter.allocate(localArena);
+        cuvsFilter.type(noFilter, 0); // NO_FILTER
+        cuvsFilter.addr(noFilter, 0);
+        checkCuVSError(
+            cuvsCagraConcatenateDatasets(cuvsRes, datasetsSegment, indexes.length, noFilter, out),
+            "cuvsCagraConcatenateDatasets");
+        MemorySegment merged = out.get(cuvsDataset_t, 0);
 
-      var result = new CagraIndex.PaddedDataset();
-      result.setDelegate(new DatasetCloseDelegate(merged), merged.address());
-      return result;
+        var result = new CagraIndex.PaddedDataset();
+        result.setDelegate(new DatasetCloseDelegate(merged), merged.address());
+        return result;
+      } finally {
+        for (MemorySegment ds : datasetHandles) {
+          checkCuVSError(cuvsDatasetDestroy(ds), "cuvsDatasetDestroy");
+        }
+      }
     }
   }
 
@@ -1356,20 +1371,28 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined();
         var resourcesAccessor = resources.access()) {
       var cuvsRes = resourcesAccessor.handle();
-      MemorySegment indicesSegment = buildIndicesSegment(localArena, indexes);
+      var datasetHandles = new ArrayList<MemorySegment>(indexes.length);
+      try {
+        MemorySegment datasetsSegment = buildDatasetsSegment(localArena, indexes, datasetHandles);
 
-      MemorySegment out = localArena.allocate(cuvsDataset_t);
-      try (var nativeFilter = uploadBitsetFilter(cuvsRes, localArena, filter, totalRows(indexes))) {
-        checkCuVSError(
-            cuvsCagraConcatenateDatasets(
-                cuvsRes, indicesSegment, indexes.length, nativeFilter.segment, out),
-            "cuvsCagraConcatenateDatasets");
+        MemorySegment out = localArena.allocate(cuvsDataset_t);
+        try (var nativeFilter =
+            uploadBitsetFilter(cuvsRes, localArena, filter, totalRows(indexes))) {
+          checkCuVSError(
+              cuvsCagraConcatenateDatasets(
+                  cuvsRes, datasetsSegment, indexes.length, nativeFilter.segment, out),
+              "cuvsCagraConcatenateDatasets");
+        }
+        MemorySegment merged = out.get(cuvsDataset_t, 0);
+
+        var result = new CagraIndex.PaddedDataset();
+        result.setDelegate(new DatasetCloseDelegate(merged), merged.address());
+        return result;
+      } finally {
+        for (MemorySegment ds : datasetHandles) {
+          checkCuVSError(cuvsDatasetDestroy(ds), "cuvsDatasetDestroy");
+        }
       }
-      MemorySegment merged = out.get(cuvsDataset_t, 0);
-
-      var result = new CagraIndex.PaddedDataset();
-      result.setDelegate(new DatasetCloseDelegate(merged), merged.address());
-      return result;
     }
   }
 
@@ -1384,15 +1407,27 @@ public class CagraIndexImpl implements CagraIndex {
     return resources;
   }
 
-  /** Builds the native {@code cuvsCagraIndex_t[]} array backing several merge-family calls. */
-  private static MemorySegment buildIndicesSegment(Arena arena, CagraIndex[] indexes) {
-    MemorySegment indexesSegment = arena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
+  /**
+   * Gets a non-owning {@code cuvsDataset_t} handle for each index via
+   * {@code cuvsCagraIndexGetCuvsDataset}, stores them in {@code datasetsOut}, and returns a
+   * native array of those handles suitable for passing to {@code cuvsCagraMergedDatasetOffsets}
+   * or {@code cuvsCagraConcatenateDatasets}. The caller is responsible for destroying every handle
+   * in {@code datasetsOut} (via {@code cuvsDatasetDestroy}) when the call is complete.
+   */
+  private static MemorySegment buildDatasetsSegment(
+      Arena arena, CagraIndex[] indexes, List<MemorySegment> datasetsOut) {
+    MemorySegment datasetsSegment = arena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
     for (int i = 0; i < indexes.length; i++) {
       CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
-      indexesSegment.setAtIndex(
-          ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
+      MemorySegment dsSlot = arena.allocate(cuvsDataset_t);
+      checkCuVSError(
+          cuvsCagraIndexGetDatasetHandle(indexImpl.cagraIndexReference.getMemorySegment(), dsSlot),
+          "cuvsCagraIndexGetDatasetHandle");
+      MemorySegment ds = dsSlot.get(cuvsDataset_t, 0);
+      datasetsSegment.setAtIndex(ValueLayout.ADDRESS, i, ds);
+      datasetsOut.add(ds);
     }
-    return indexesSegment;
+    return datasetsSegment;
   }
 
   /** Sum of {@link CagraIndex#size()} across every element of {@code indexes}. */

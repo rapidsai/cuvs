@@ -735,13 +735,14 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-<a id="cuvscagraindexgetdataset"></a>
-### cuvsCagraIndexGetDataset
+<a id="cuvscagraindexgetdatasetasdltensor"></a>
+### cuvsCagraIndexGetDatasetAsDLTensor
 
 Returns a view of the CAGRA dataset
 
 ```c
-cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
+cuvsError_t cuvsCagraIndexGetDatasetAsDLTensor(cuvsCagraIndex_t index,
+DLManagedTensor* dataset);
 ```
 
 This function returns a non-owning view of the CAGRA dataset. The output will be referencing device memory that is directly used in CAGRA, without copying the dataset at all. This means that the output is only valid as long as the CAGRA index is alive, and once cuvsCagraIndexDestroy is called on the cagra index - the returned dataset view will be invalid.
@@ -754,6 +755,31 @@ Note that the DLManagedTensor dataset returned will have an associated 'deleter'
 | --- | --- | --- | --- |
 | `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | CAGRA index |
 | `dataset` | out | `DLManagedTensor*` | the dataset used in cagra |
+
+**Returns**
+
+[`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
+
+<a id="cuvscagraindexgetdatasethandle"></a>
+### cuvsCagraIndexGetDatasetHandle
+
+Return a non-owning cuvsDataset_t handle for the dataset of a built CAGRA index.
+
+```c
+cuvsError_t cuvsCagraIndexGetDatasetHandle(cuvsCagraIndex_t index,
+cuvsDataset_t* dataset);
+```
+
+The returned handle wraps the same device memory the index uses internally; no data is copied. The handle's lifetime is bounded by the index's lifetime — do not use it after `cuvsCagraIndexDestroy`. Destroy the handle with `cuvsDatasetDestroy` when no longer needed.
+
+Only padded and standard device layouts are supported; VPQ, BBQ, and host-backed indices return an error.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `index` | in | [`cuvsCagraIndex_t`](/api-reference/c-api-neighbors-cagra#cuvscagraindex) | Built CAGRA index |
+| `dataset` | out | `cuvsDataset_t*` | Non-owning cuvsDataset_t handle for the index's dataset |
 
 **Returns**
 

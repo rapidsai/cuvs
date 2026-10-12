@@ -368,16 +368,27 @@ func MergedDatasetOffsets(Resources cuvs.Resource, indices []*CagraIndex, allowL
 		defer filterTensor.Close()
 	}
 
-	cIndices := make([]C.cuvsCagraIndex_t, len(indices))
+	cDatasets := make([]C.cuvsDataset_t, len(indices))
 	for i, idx := range indices {
-		cIndices[i] = idx.index
+		err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexGetDatasetHandle(idx.index, &cDatasets[i])))
+		if err != nil {
+			for j := 0; j < i; j++ {
+				C.cuvsDatasetDestroy(cDatasets[j])
+			}
+			return nil, err
+		}
 	}
+	defer func() {
+		for _, ds := range cDatasets {
+			C.cuvsDatasetDestroy(ds)
+		}
+	}()
 
 	cOffsets := make([]C.int64_t, len(indices)+1)
 
 	err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraMergedDatasetOffsets(
 		C.cuvsResources_t(Resources.Resource),
-		&cIndices[0],
+		&cDatasets[0],
 		C.size_t(len(indices)),
 		filter,
 		&cOffsets[0],

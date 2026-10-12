@@ -1239,6 +1239,12 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
 
   cuvsCagraIndex_t index_array[2] = {index_main, index_add};
 
+  cuvsDataset_t ds_main = nullptr;
+  cuvsDataset_t ds_add  = nullptr;
+  ASSERT_EQ(cuvsCagraIndexGetDatasetHandle(index_main, &ds_main), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraIndexGetDatasetHandle(index_add, &ds_add), CUVS_SUCCESS);
+  cuvsDataset_t dataset_array[2] = {ds_main, ds_add};
+
   cuvsFilter no_filter;
   no_filter.type = NO_FILTER;
   no_filter.addr = 0;
@@ -1271,7 +1277,7 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
 
   // --- Unfiltered: cuvsCagraConcatenateDatasets() builds the merged buffer for us. ---
   cuvsDataset_t concatenated_dataset;
-  ASSERT_EQ(cuvsCagraConcatenateDatasets(res, index_array, 2, no_filter, &concatenated_dataset),
+  ASSERT_EQ(cuvsCagraConcatenateDatasets(res, dataset_array, 2, no_filter, &concatenated_dataset),
             CUVS_SUCCESS);
   {
     cuvsDatasetMemType_t mem_type{};
@@ -1343,14 +1349,14 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
 
   int64_t filtered_offsets[3];
   ASSERT_EQ(
-    cuvsCagraMergedDatasetOffsets(res, index_array, 2, bitset_filter, filtered_offsets),
+    cuvsCagraMergedDatasetOffsets(res, dataset_array, 2, bitset_filter, filtered_offsets),
     CUVS_SUCCESS);
   EXPECT_EQ(filtered_offsets[0], 0);
   EXPECT_EQ(filtered_offsets[2], 6);  // 7 rows minus the 1 removed
 
   cuvsDataset_t filtered_dataset;
   ASSERT_EQ(
-    cuvsCagraConcatenateDatasets(res, index_array, 2, bitset_filter, &filtered_dataset),
+    cuvsCagraConcatenateDatasets(res, dataset_array, 2, bitset_filter, &filtered_dataset),
     CUVS_SUCCESS);
 
   cuvsCagraIndex_t index_filtered_merged;
@@ -1391,6 +1397,8 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
   cuvsCagraIndexDestroy(index_merged);
   cuvsCagraIndexDestroy(index_add);
   cuvsCagraIndexDestroy(index_main);
+  cuvsDatasetDestroy(ds_main);
+  cuvsDatasetDestroy(ds_add);
   cuvsDatasetDestroy(filtered_dataset);
   cuvsDatasetDestroy(concatenated_dataset);
   cuvsDatasetDestroy(additional_dataset_view);

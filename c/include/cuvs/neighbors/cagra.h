@@ -595,7 +595,25 @@ CUVS_EXPORT cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int
  * @param[out] dataset the dataset used in cagra
  * @return cuvsError_t
  */
-CUVS_EXPORT cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetDatasetAsDLTensor(cuvsCagraIndex_t index,
+                                                           DLManagedTensor* dataset);
+
+/**
+ * @brief Return a non-owning cuvsDataset_t handle for the dataset of a built CAGRA index.
+ *
+ * The returned handle wraps the same device memory the index uses internally; no data is copied.
+ * The handle's lifetime is bounded by the index's lifetime — do not use it after
+ * `cuvsCagraIndexDestroy`. Destroy the handle with `cuvsDatasetDestroy` when no longer needed.
+ *
+ * Only padded and standard device layouts are supported; VPQ, BBQ, and host-backed indices return
+ * an error.
+ *
+ * @param[in] index Built CAGRA index
+ * @param[out] dataset Non-owning cuvsDataset_t handle for the index's dataset
+ * @return cuvsError_t
+ */
+CUVS_EXPORT cuvsError_t cuvsCagraIndexGetDatasetHandle(cuvsCagraIndex_t index,
+                                                       cuvsDataset_t* dataset);
 
 /**
  * @brief Returns a view of the CAGRA graph

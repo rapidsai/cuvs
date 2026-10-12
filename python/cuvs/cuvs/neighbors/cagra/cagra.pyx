@@ -396,7 +396,7 @@ cdef class Index:
         output = DeviceTensorView()
         cdef cydlpack.DLManagedTensor * tensor = \
             <cydlpack.DLManagedTensor*><size_t>output.get_handle()
-        check_cuvs(cuvsCagraIndexGetDataset(self.index, tensor))
+        check_cuvs(cuvsCagraIndexGetDatasetAsDLTensor(self.index, tensor))
 
         # since we're referencing memory internal to this cagra index in the
         # output view, keep the cagra index alive as long as the output view

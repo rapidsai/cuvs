@@ -3499,49 +3499,37 @@ struct merge_params {
  * `indices[i]`'s surviving rows must start in the merged buffer, and the last entry is the total
  * row count of the merged buffer.
  */
-template <typename T, typename IdxT, cuvs::neighbors::ann_dataset_view DatasetViewT>
-auto merged_dataset_offsets(
-  raft::resources const& res,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices,
-  const cuvs::neighbors::filtering::base_filter& row_filter) -> std::vector<int64_t>;
+template <cuvs::neighbors::ann_dataset_view DatasetViewT>
+auto merged_dataset_offsets(raft::resources const& res,
+                            std::vector<DatasetViewT> const& datasets,
+                            const cuvs::neighbors::filtering::base_filter& row_filter)
+  -> std::vector<int64_t>;
 
-/** @brief Concatenate every input index's dataset (unfiltered, in `indices` order) into a freshly
- * allocated, CAGRA-padded, owning device dataset.
- *
- * This is an optional convenience helper for building `merge()`'s `merged_dataset` argument in
- * the unfiltered case; callers that already have their own concatenated buffer (e.g. built on
- * host, or assembled incrementally) are not required to use it. The matching `offsets` are simply
- * each index's cumulative `.size()`.
+/** @brief Concatenate `datasets` (unfiltered) into a freshly allocated, CAGRA-padded, owning
+ * device dataset. Optional convenience helper for `merge()`'s `merged_dataset` argument.
  *
  * @param[in] res RAFT resources.
- * @param[in] indices CAGRA indices to concatenate, in the order they will be passed to `merge()`.
- * @return An owning, CAGRA-padded device dataset containing every index's rows, concatenated in
- * `indices` order.
+ * @param[in] datasets Dataset views to concatenate, in the order they will appear in the merged
+ *                     index.
+ * @return An owning, CAGRA-padded device dataset containing every dataset's rows concatenated.
  */
-template <typename T, typename IdxT, cuvs::neighbors::ann_dataset_view DatasetViewT>
-auto concatenate_datasets(
-  raft::resources const& res,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices)
+template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
+auto concatenate_datasets(raft::resources const& res, std::vector<DatasetViewT> const& datasets)
   -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>;
 
-/** @brief Concatenate every input index's dataset (in `indices` order), retaining only the rows
- * selected by `row_filter`, into a freshly allocated, CAGRA-padded, owning device dataset.
- *
- * This is an optional convenience helper for building `merge()`'s `merged_dataset` argument in
- * the bitset-filtered case; callers that already have their own filtered, concatenated buffer are
- * not required to use it. Call `merged_dataset_offsets()` with the same `row_filter` to get the
- * matching `offsets`.
+/** @brief Concatenate `datasets`, retaining only rows selected by `row_filter`, into a freshly
+ * allocated, CAGRA-padded, owning device dataset. Optional convenience helper for `merge()`'s
+ * `merged_dataset` argument in the bitset-filtered case.
  *
  * @param[in] res RAFT resources.
- * @param[in] indices CAGRA indices to concatenate, in the order they will be passed to `merge()`.
+ * @param[in] datasets Dataset views to concatenate.
  * @param[in] row_filter Bitset row filter selecting which rows survive into the output.
- * @return An owning, CAGRA-padded device dataset containing every index's surviving rows,
- * concatenated in `indices` order.
+ * @return An owning, CAGRA-padded device dataset containing every dataset's surviving rows.
  */
-template <typename T, typename IdxT, cuvs::neighbors::ann_dataset_view DatasetViewT>
+template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
 auto concatenate_and_filter_datasets(
   raft::resources const& res,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices,
+  std::vector<DatasetViewT> const& datasets,
   cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> const& row_filter)
   -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>;
 

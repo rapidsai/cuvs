@@ -356,6 +356,22 @@ static void with_dataset_view(cuvsDataset_t dataset, Fn&& fn)
   }
 }
 
+/** Dispatch fn over a dense (padded or standard) device cuvsDataset_t.
+ *  PQ and BBQ layouts are not yet supported and trigger RAFT_FAIL. */
+template <typename T, typename Fn>
+static void with_dataset_by_layout(cuvsDataset_t dataset, const char* caller, Fn&& fn)
+{
+  if (dataset->layout == CUVS_DATASET_LAYOUT_PADDED) {
+    with_dataset_view<cuvs::neighbors::device_padded_dataset<T, int64_t>,
+                      cuvs::neighbors::device_padded_dataset_view<T, int64_t>>(dataset, fn);
+  } else if (dataset->layout == CUVS_DATASET_LAYOUT_STANDARD) {
+    with_dataset_view<cuvs::neighbors::device_standard_dataset<T, int64_t>,
+                      cuvs::neighbors::device_standard_dataset_view<T, int64_t>>(dataset, fn);
+  } else {
+    RAFT_FAIL("%s: PQ and BBQ dataset layouts are not yet supported", caller);
+  }
+}
+
 template <typename T>
 void validate_bbq_layouts(cuvs::neighbors::device_bbq_dataset_view<T, int64_t> const& dataset)
 {
@@ -1316,74 +1332,67 @@ void _merge(cuvsResources_t res,
   }
 }
 
+/** Validate that every dataset handle in `datasets` is non-null, device-resident, and shares the
+ *  same layout, which must be padded or standard. Returns that shared layout. */
+static auto validate_datasets_for_concat(cuvsDataset_t* datasets,
+                                         size_t num_datasets,
+                                         const char* err_prefix)
+  -> cuvsDatasetLayout_t
+{
+  RAFT_EXPECTS(datasets != nullptr && num_datasets > 0,
+               "%s: datasets array cannot be null or empty", err_prefix);
+  auto layout = datasets[0]->layout;
+  RAFT_EXPECTS(layout == CUVS_DATASET_LAYOUT_PADDED || layout == CUVS_DATASET_LAYOUT_STANDARD,
+               "%s: only padded and standard device datasets are supported", err_prefix);
+  for (size_t i = 0; i < num_datasets; ++i) {
+    RAFT_EXPECTS(datasets[i] != nullptr && datasets[i]->addr != 0,
+                 "%s: null dataset handle", err_prefix);
+    RAFT_EXPECTS(datasets[i]->layout == layout,
+                 "%s: all datasets must share the same layout", err_prefix);
+    RAFT_EXPECTS(datasets[i]->mem_type == CUVS_DATASET_MEM_TYPE_DEVICE,
+                 "%s: only device datasets are supported", err_prefix);
+  }
+  return layout;
+}
+
 template <typename T>
 void _merged_dataset_offsets(cuvsResources_t res,
-                             cuvsCagraIndex_t* indices,
-                             size_t num_indices,
+                             cuvsDataset_t* datasets,
+                             size_t num_datasets,
                              cuvsFilter filter,
                              int64_t* offsets)
 {
-  auto res_ptr    = reinterpret_cast<raft::resources*>(res);
-  auto* first_box = reinterpret_cast<sg_cagra_c_api_index_box*>(indices[0]->addr);
-  RAFT_EXPECTS(first_box != nullptr, "cuvsCagraMergedDatasetOffsets: null index handle");
-  auto layout = first_box->layout;
-  RAFT_EXPECTS(layout == sg_cagra_c_api_index_box::dataset_layout::device_padded ||
-                 layout == sg_cagra_c_api_index_box::dataset_layout::device_standard,
-               "cuvsCagraMergedDatasetOffsets: host indices are not supported; attach a device "
-               "dataset to each host index first.");
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto layout =
+    validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraMergedDatasetOffsets");
 
-  int64_t merged_row_count = 0;
-  for (size_t i = 0; i < num_indices; ++i) {
-    auto* box = reinterpret_cast<sg_cagra_c_api_index_box*>(indices[i]->addr);
-    RAFT_EXPECTS(box != nullptr, "cuvsCagraMergedDatasetOffsets: null index handle");
-    RAFT_EXPECTS(box->layout == layout,
-                 "cuvsCagraMergedDatasetOffsets: all input indices must share the same dataset "
-                 "layout");
-    with_index_by_layout<T, uint32_t, false>(
-      box,
-      "cuvsCagraMergedDatasetOffsets: null index handle",
-      "cuvsCagraMergedDatasetOffsets: host indices are not supported",
-      [&](auto& idx) { merged_row_count += static_cast<int64_t>(idx.size()); });
-  }
-
-  auto compute = [&](auto const& index_ptrs) {
-    with_row_filter(filter, merged_row_count, [&](auto const& row_filter) {
-      auto result = cuvs::neighbors::cagra::merged_dataset_offsets(*res_ptr, index_ptrs, row_filter);
+  auto compute = [&](auto const& dataset_views) {
+    int64_t total_rows = 0;
+    for (auto const& v : dataset_views) { total_rows += static_cast<int64_t>(v.n_rows()); }
+    with_row_filter(filter, total_rows, [&](auto const& row_filter) {
+      auto result =
+        cuvs::neighbors::cagra::merged_dataset_offsets(*res_ptr, dataset_views, row_filter);
       std::copy(result.begin(), result.end(), offsets);
     });
   };
-  if (layout == sg_cagra_c_api_index_box::dataset_layout::device_padded) {
-    compute(convert_opaque_indices_to_concrete_types<T, cuvs::neighbors::device_padded_dataset_view<T, int64_t>>(
-      indices, num_indices));
-  } else {
-    compute(convert_opaque_indices_to_concrete_types<T, cuvs::neighbors::device_standard_dataset_view<T, int64_t>>(
-      indices, num_indices));
-  }
-}
 
-/** Validate that every index handle in `indices` is non-null and shares the same dataset layout,
- *  which must be a device layout (host indices are not mergeable/concatenable). Returns that
- *  shared layout. */
-static auto validate_indices_for_concat(cuvsCagraIndex_t* indices,
-                                        size_t num_indices,
-                                        const char* err_prefix)
-  -> sg_cagra_c_api_index_box::dataset_layout
-{
-  auto* first_box = reinterpret_cast<sg_cagra_c_api_index_box*>(indices[0]->addr);
-  RAFT_EXPECTS(first_box != nullptr, "%s: null index handle", err_prefix);
-  auto layout = first_box->layout;
-  RAFT_EXPECTS(layout == sg_cagra_c_api_index_box::dataset_layout::device_padded ||
-                 layout == sg_cagra_c_api_index_box::dataset_layout::device_standard,
-               "%s: host indices are not supported; attach a device dataset to each host index "
-               "first.",
-               err_prefix);
-  for (size_t i = 0; i < num_indices; ++i) {
-    auto* box = reinterpret_cast<sg_cagra_c_api_index_box*>(indices[i]->addr);
-    RAFT_EXPECTS(box != nullptr, "%s: null index handle", err_prefix);
-    RAFT_EXPECTS(
-      box->layout == layout, "%s: all input indices must share the same dataset layout", err_prefix);
+  if (layout == CUVS_DATASET_LAYOUT_PADDED) {
+    using ViewT = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
+    std::vector<ViewT> views;
+    views.reserve(num_datasets);
+    for (size_t i = 0; i < num_datasets; ++i) {
+      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    }
+    compute(views);
+  } else {
+    using ViewT = cuvs::neighbors::device_standard_dataset_view<T, int64_t>;
+    std::vector<ViewT> views;
+    views.reserve(num_datasets);
+    for (size_t i = 0; i < num_datasets; ++i) {
+      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    }
+    compute(views);
   }
-  return layout;
 }
 
 /** Bind a freshly built owning `device_padded_dataset<T, int64_t>` to a new `cuvsDataset_t`
@@ -1407,97 +1416,148 @@ static void bind_concatenated_dataset(
 
 template <typename T>
 void _concatenate_datasets(cuvsResources_t res,
-                           cuvsCagraIndex_t* indices,
-                           size_t num_indices,
+                           cuvsDataset_t* datasets,
+                           size_t num_datasets,
                            DLDataType dtype,
                            cuvsDataset_t* merged_dataset)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto layout = validate_indices_for_concat(indices, num_indices, "cuvsCagraConcatenateDatasets");
+  auto layout =
+    validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraConcatenateDatasets");
 
-  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> owner;
-  auto concat = [&](auto const& index_ptrs) {
-    owner = cuvs::neighbors::cagra::concatenate_datasets(*res_ptr, index_ptrs);
+  auto compute = [&](auto const& dataset_views) {
+    bind_concatenated_dataset<T>(
+      cuvs::neighbors::cagra::concatenate_datasets<T>(*res_ptr, dataset_views), dtype,
+      merged_dataset);
   };
-  if (layout == sg_cagra_c_api_index_box::dataset_layout::device_padded) {
-    concat(convert_opaque_indices_to_concrete_types<T, cuvs::neighbors::device_padded_dataset_view<T, int64_t>>(
-      indices, num_indices));
+
+  if (layout == CUVS_DATASET_LAYOUT_PADDED) {
+    using ViewT = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
+    std::vector<ViewT> views;
+    views.reserve(num_datasets);
+    for (size_t i = 0; i < num_datasets; ++i) {
+      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    }
+    compute(views);
   } else {
-    concat(convert_opaque_indices_to_concrete_types<T, cuvs::neighbors::device_standard_dataset_view<T, int64_t>>(
-      indices, num_indices));
+    using ViewT = cuvs::neighbors::device_standard_dataset_view<T, int64_t>;
+    std::vector<ViewT> views;
+    views.reserve(num_datasets);
+    for (size_t i = 0; i < num_datasets; ++i) {
+      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    }
+    compute(views);
   }
-  bind_concatenated_dataset<T>(std::move(owner), dtype, merged_dataset);
 }
 
 template <typename T>
 void _concatenate_and_filter_datasets(cuvsResources_t res,
-                                      cuvsCagraIndex_t* indices,
-                                      size_t num_indices,
+                                      cuvsDataset_t* datasets,
+                                      size_t num_datasets,
                                       DLDataType dtype,
                                       cuvsFilter filter,
                                       cuvsDataset_t* merged_dataset)
 {
   RAFT_EXPECTS(filter.type == BITSET,
-               "cuvsCagraConcatenateDatasets: only NO_FILTER and BITSET filters are supported");
+               "cuvsCagraConcatenateDatasets: only BITSET filters are supported");
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto layout  = validate_indices_for_concat(
-    indices, num_indices, "cuvsCagraConcatenateDatasets");
+  auto layout =
+    validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraConcatenateDatasets");
 
-  int64_t unfiltered_row_count = 0;
-  for (size_t i = 0; i < num_indices; ++i) {
-    auto* box = reinterpret_cast<sg_cagra_c_api_index_box*>(indices[i]->addr);
-    with_index_by_layout<T, uint32_t, false>(
-      box,
-      "cuvsCagraConcatenateDatasets: null index handle",
-      "cuvsCagraConcatenateDatasets: host indices are not supported",
-      [&](auto& idx) { unfiltered_row_count += static_cast<int64_t>(idx.size()); });
-  }
+  auto compute = [&](auto const& dataset_views) {
+    // Count total rows so we can size the bitset_view correctly.
+    int64_t total_rows = 0;
+    for (auto const& v : dataset_views) { total_rows += static_cast<int64_t>(v.n_rows()); }
 
-  // Build the bitset_filter directly (rather than through with_row_filter's generic dispatch,
-  // which would also instantiate the lambda below for none_sample_filter and fail to compile
-  // against concatenate_and_filter_datasets' bitset_filter-only signature) -- filter.type == BITSET
-  // is already validated above.
-  using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
-  auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
-  auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
-  cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(removed_indices,
-                                                                         unfiltered_row_count);
-  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> bitset_row_filter(
-    removed_indices_bitset);
+    using filter_mdspan_type = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+    auto removed_tensor      = reinterpret_cast<DLManagedTensor*>(filter.addr);
+    auto removed_indices     = cuvs::core::from_dlpack<filter_mdspan_type>(removed_tensor);
+    cuvs::core::bitset_view<std::uint32_t, int64_t> bitset_view_obj(removed_indices, total_rows);
+    cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> row_filter(bitset_view_obj);
 
-  std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>> owner;
-  auto concat = [&](auto const& index_ptrs) {
-    owner = cuvs::neighbors::cagra::concatenate_and_filter_datasets(
-      *res_ptr, index_ptrs, bitset_row_filter);
+    bind_concatenated_dataset<T>(
+      cuvs::neighbors::cagra::concatenate_and_filter_datasets<T>(*res_ptr, dataset_views,
+                                                                 row_filter),
+      dtype,
+      merged_dataset);
   };
-  if (layout == sg_cagra_c_api_index_box::dataset_layout::device_padded) {
-    concat(convert_opaque_indices_to_concrete_types<T, cuvs::neighbors::device_padded_dataset_view<T, int64_t>>(
-      indices, num_indices));
+
+  if (layout == CUVS_DATASET_LAYOUT_PADDED) {
+    using ViewT = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
+    std::vector<ViewT> views;
+    views.reserve(num_datasets);
+    for (size_t i = 0; i < num_datasets; ++i) {
+      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    }
+    compute(views);
   } else {
-    concat(convert_opaque_indices_to_concrete_types<T, cuvs::neighbors::device_standard_dataset_view<T, int64_t>>(
-      indices, num_indices));
+    using ViewT = cuvs::neighbors::device_standard_dataset_view<T, int64_t>;
+    std::vector<ViewT> views;
+    views.reserve(num_datasets);
+    for (size_t i = 0; i < num_datasets; ++i) {
+      views.push_back(*reinterpret_cast<ViewT*>(datasets[i]->addr));
+    }
+    compute(views);
   }
-  bind_concatenated_dataset<T>(std::move(owner), dtype, merged_dataset);
 }
 
 template <typename T, typename IdxT>
-void get_dataset_view(cuvsCagraIndex_t index, DLManagedTensor* dataset)
+void get_dataset_dl_tensor_from_index(cuvsCagraIndex_t index, DLManagedTensor* dataset)
 {
   auto* box = reinterpret_cast<sg_cagra_c_api_index_box*>(index->addr);
   with_index_by_layout<T, IdxT, true>(
     box,
-    "cuvsCagraIndexGetDataset: null index handle",
-    "cuvsCagraIndexGetDataset: host indices are allowed",
+    "cuvsCagraIndexGetDatasetAsDLTensor: null index handle",
+    "cuvsCagraIndexGetDatasetAsDLTensor: host indices are allowed",
     [&](auto& idx) {
       using index_dataset_view_t = std::remove_cvref_t<decltype(idx.dataset())>;
       if constexpr (cuvs::neighbors::is_vpq_dataset_view_v<index_dataset_view_t> ||
                     cuvs::neighbors::is_bbq_dataset_view_v<index_dataset_view_t>) {
         RAFT_FAIL(
-          "cuvsCagraIndexGetDataset does not expose quantized datasets as dense DLPack tensors");
+          "cuvsCagraIndexGetDatasetAsDLTensor does not expose quantized datasets as dense DLPack "
+          "tensors");
       } else {
         cuvs::core::to_dlpack(idx.dataset().view(), dataset);
       }
     });
+}
+
+template <typename T>
+static void get_dataset_handle_from_index(cuvsCagraIndex_t index, cuvsDataset_t* dataset_out)
+{
+  auto* box = reinterpret_cast<sg_cagra_c_api_index_box*>(index->addr);
+  RAFT_EXPECTS(box != nullptr, "cuvsCagraIndexGetDatasetHandle: null index handle");
+  bool is_padded = box->layout == sg_cagra_c_api_index_box::dataset_layout::device_padded;
+  RAFT_EXPECTS(is_padded || box->layout == sg_cagra_c_api_index_box::dataset_layout::device_standard,
+               "cuvsCagraIndexGetDatasetHandle: only padded and standard device layouts are "
+               "supported; host, VPQ, and BBQ indices are not supported");
+  if (is_padded) {
+    using IndexT = cuvs::neighbors::cagra::device_padded_index<T, uint32_t>;
+    using ViewT  = cuvs::neighbors::device_padded_dataset_view<T, int64_t>;
+    auto* idx        = reinterpret_cast<IndexT*>(box->index_ptr);
+    auto* view_copy  = new ViewT(idx->dataset());
+    auto* out        = new cuvsDataset{};
+    out->addr        = reinterpret_cast<uintptr_t>(view_copy);
+    out->destroy_addr = &destroy_typed_addr<ViewT>;
+    out->dtype       = index->dtype;
+    out->mem_type    = CUVS_DATASET_MEM_TYPE_DEVICE;
+    out->layout      = CUVS_DATASET_LAYOUT_PADDED;
+    out->is_owning   = false;
+    *dataset_out     = out;
+  } else {
+    using IndexT = cuvs::neighbors::cagra::device_standard_index<T, uint32_t>;
+    using ViewT  = cuvs::neighbors::device_standard_dataset_view<T, int64_t>;
+    auto* idx        = reinterpret_cast<IndexT*>(box->index_ptr);
+    auto* view_copy  = new ViewT(idx->dataset());
+    auto* out        = new cuvsDataset{};
+    out->addr        = reinterpret_cast<uintptr_t>(view_copy);
+    out->destroy_addr = &destroy_typed_addr<ViewT>;
+    out->dtype       = index->dtype;
+    out->mem_type    = CUVS_DATASET_MEM_TYPE_DEVICE;
+    out->layout      = CUVS_DATASET_LAYOUT_STANDARD;
+    out->is_owning   = false;
+    *dataset_out     = out;
+  }
 }
 
 template <typename T, typename IdxT>
@@ -1673,19 +1733,42 @@ extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int6
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset)
+extern "C" cuvsError_t cuvsCagraIndexGetDatasetAsDLTensor(cuvsCagraIndex_t index,
+                                                          DLManagedTensor* dataset)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-      get_dataset_view<float, uint32_t>(index, dataset);
+      get_dataset_dl_tensor_from_index<float, uint32_t>(index, dataset);
     } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
-      get_dataset_view<half, uint32_t>(index, dataset);
+      get_dataset_dl_tensor_from_index<half, uint32_t>(index, dataset);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-      get_dataset_view<int8_t, uint32_t>(index, dataset);
+      get_dataset_dl_tensor_from_index<int8_t, uint32_t>(index, dataset);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-      get_dataset_view<uint8_t, uint32_t>(index, dataset);
+      get_dataset_dl_tensor_from_index<uint8_t, uint32_t>(index, dataset);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexGetDatasetHandle(cuvsCagraIndex_t index,
+                                                      cuvsDataset_t* dataset_out)
+{
+  return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(index != nullptr && index->addr != 0,
+                 "cuvsCagraIndexGetDatasetHandle: index must be built (non-null)");
+    RAFT_EXPECTS(dataset_out != nullptr, "dataset_out must not be null");
+    auto dtype = index->dtype;
+    if (dtype.code == kDLFloat && dtype.bits == 32) {
+      get_dataset_handle_from_index<float>(index, dataset_out);
+    } else if (dtype.code == kDLFloat && dtype.bits == 16) {
+      get_dataset_handle_from_index<half>(index, dataset_out);
+    } else if (dtype.code == kDLInt && dtype.bits == 8) {
+      get_dataset_handle_from_index<int8_t>(index, dataset_out);
+    } else if (dtype.code == kDLUInt && dtype.bits == 8) {
+      get_dataset_handle_from_index<uint8_t>(index, dataset_out);
+    } else {
+      RAFT_FAIL("Unsupported index data type: code=%d, bits=%d", dtype.code, dtype.bits);
     }
   });
 }
@@ -2405,17 +2488,34 @@ extern "C" cuvsError_t cuvsCagraMergeWithParams(cuvsResources_t res,
     return CUVS_ERROR;
   }
 
+  // Step 0: obtain dataset handles for each index.
+  std::vector<cuvsDataset_t> ds_handles(num_indices, nullptr);
+  auto cleanup_ds = [&]() {
+    for (auto ds : ds_handles) {
+      if (ds != nullptr) { cuvsDatasetDestroy(ds); }
+    }
+  };
+  for (size_t i = 0; i < num_indices; ++i) {
+    cuvsError_t get_err = cuvsCagraIndexGetDatasetHandle(indices[i], &ds_handles[i]);
+    if (get_err != CUVS_SUCCESS) {
+      cleanup_ds();
+      return get_err;
+    }
+  }
+
   // Step 1: build the merged dataset internally using the concat helper.
   cuvsDataset_t concat_result = nullptr;
-  cuvsError_t err             = cuvsCagraConcatenateDatasets(res, indices, num_indices, filter, &concat_result);
+  cuvsError_t err = cuvsCagraConcatenateDatasets(res, ds_handles.data(), num_indices, filter, &concat_result);
   if (err != CUVS_SUCCESS) {
+    cleanup_ds();
     if (concat_result != nullptr) { cuvsDatasetDestroy(concat_result); }
     return err;
   }
 
   // Step 2: compute per-index offsets (needed even for NO_FILTER to satisfy v2's contract).
   std::vector<int64_t> offsets_vec(num_indices + 1);
-  err = cuvsCagraMergedDatasetOffsets(res, indices, num_indices, filter, offsets_vec.data());
+  err = cuvsCagraMergedDatasetOffsets(res, ds_handles.data(), num_indices, filter, offsets_vec.data());
+  cleanup_ds();
   if (err != CUVS_SUCCESS) {
     cuvsDatasetDestroy(concat_result);
     return err;
@@ -2460,82 +2560,88 @@ extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
 #pragma GCC diagnostic pop
 
 extern "C" cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
-                                                     cuvsCagraIndex_t* indices,
-                                                     size_t num_indices,
+                                                     cuvsDataset_t* datasets,
+                                                     size_t num_datasets,
                                                      cuvsFilter filter,
                                                      int64_t* offsets)
 {
   return cuvs::core::translate_exceptions([=] {
-    RAFT_EXPECTS(indices != nullptr && num_indices > 0, "indices array cannot be null or empty");
-    RAFT_EXPECTS(indices[0] != nullptr && indices[0]->addr != 0,
-                 "All input indices must be built (non-empty)");
+    RAFT_EXPECTS(datasets != nullptr && num_datasets > 0,
+                 "datasets array cannot be null or empty");
+    RAFT_EXPECTS(datasets[0] != nullptr && datasets[0]->addr != 0,
+                 "All input datasets must be non-null");
     RAFT_EXPECTS(offsets != nullptr, "offsets must not be null");
 
-    auto dtype = (*indices[0]).dtype;
-    for (size_t i = 1; i < num_indices; ++i) {
-      RAFT_EXPECTS(indices[i] != nullptr && indices[i]->addr != 0,
-                   "All input indices must be built (non-empty)");
-      RAFT_EXPECTS((*indices[i]).dtype.code == dtype.code && (*indices[i]).dtype.bits == dtype.bits,
-                   "All input indices must have the same data type");
+    auto dtype = datasets[0]->dtype;
+    for (size_t i = 1; i < num_datasets; ++i) {
+      RAFT_EXPECTS(datasets[i] != nullptr && datasets[i]->addr != 0,
+                   "All input datasets must be non-null");
+      RAFT_EXPECTS(datasets[i]->dtype.code == dtype.code && datasets[i]->dtype.bits == dtype.bits,
+                   "All input datasets must have the same data type");
     }
     if (dtype.code == kDLFloat && dtype.bits == 32) {
-      _merged_dataset_offsets<float>(res, indices, num_indices, filter, offsets);
+      _merged_dataset_offsets<float>(res, datasets, num_datasets, filter, offsets);
     } else if (dtype.code == kDLFloat && dtype.bits == 16) {
-      _merged_dataset_offsets<half>(res, indices, num_indices, filter, offsets);
+      _merged_dataset_offsets<half>(res, datasets, num_datasets, filter, offsets);
     } else if (dtype.code == kDLInt && dtype.bits == 8) {
-      _merged_dataset_offsets<int8_t>(res, indices, num_indices, filter, offsets);
+      _merged_dataset_offsets<int8_t>(res, datasets, num_datasets, filter, offsets);
     } else if (dtype.code == kDLUInt && dtype.bits == 8) {
-      _merged_dataset_offsets<uint8_t>(res, indices, num_indices, filter, offsets);
+      _merged_dataset_offsets<uint8_t>(res, datasets, num_datasets, filter, offsets);
     } else {
-      RAFT_FAIL("Unsupported index data type: code=%d, bits=%d", dtype.code, dtype.bits);
+      RAFT_FAIL("Unsupported dataset data type: code=%d, bits=%d", dtype.code, dtype.bits);
     }
   });
 }
 
 extern "C" cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
-                                                    cuvsCagraIndex_t* indices,
-                                                    size_t num_indices,
+                                                    cuvsDataset_t* datasets,
+                                                    size_t num_datasets,
                                                     cuvsFilter filter,
                                                     cuvsDataset_t* merged_dataset)
 {
   return cuvs::core::translate_exceptions([=] {
-    RAFT_EXPECTS(indices != nullptr && num_indices > 0, "indices array cannot be null or empty");
-    RAFT_EXPECTS(indices[0] != nullptr && indices[0]->addr != 0,
-                 "All input indices must be built (non-empty)");
+    RAFT_EXPECTS(datasets != nullptr && num_datasets > 0,
+                 "datasets array cannot be null or empty");
+    RAFT_EXPECTS(datasets[0] != nullptr && datasets[0]->addr != 0,
+                 "All input datasets must be non-null");
     RAFT_EXPECTS(merged_dataset != nullptr, "merged_dataset output pointer must not be null");
 
-    auto dtype = (*indices[0]).dtype;
-    for (size_t i = 1; i < num_indices; ++i) {
-      RAFT_EXPECTS(indices[i] != nullptr && indices[i]->addr != 0,
-                   "All input indices must be built (non-empty)");
-      RAFT_EXPECTS((*indices[i]).dtype.code == dtype.code && (*indices[i]).dtype.bits == dtype.bits,
-                   "All input indices must have the same data type");
+    auto dtype = datasets[0]->dtype;
+    for (size_t i = 1; i < num_datasets; ++i) {
+      RAFT_EXPECTS(datasets[i] != nullptr && datasets[i]->addr != 0,
+                   "All input datasets must be non-null");
+      RAFT_EXPECTS(datasets[i]->dtype.code == dtype.code && datasets[i]->dtype.bits == dtype.bits,
+                   "All input datasets must have the same data type");
     }
     if (filter.type == NO_FILTER) {
       if (dtype.code == kDLFloat && dtype.bits == 32) {
-        _concatenate_datasets<float>(res, indices, num_indices, dtype, merged_dataset);
+        _concatenate_datasets<float>(res, datasets, num_datasets, dtype, merged_dataset);
       } else if (dtype.code == kDLFloat && dtype.bits == 16) {
-        _concatenate_datasets<half>(res, indices, num_indices, dtype, merged_dataset);
+        _concatenate_datasets<half>(res, datasets, num_datasets, dtype, merged_dataset);
       } else if (dtype.code == kDLInt && dtype.bits == 8) {
-        _concatenate_datasets<int8_t>(res, indices, num_indices, dtype, merged_dataset);
+        _concatenate_datasets<int8_t>(res, datasets, num_datasets, dtype, merged_dataset);
       } else if (dtype.code == kDLUInt && dtype.bits == 8) {
-        _concatenate_datasets<uint8_t>(res, indices, num_indices, dtype, merged_dataset);
+        _concatenate_datasets<uint8_t>(res, datasets, num_datasets, dtype, merged_dataset);
       } else {
-        RAFT_FAIL("Unsupported index data type: code=%d, bits=%d", dtype.code, dtype.bits);
+        RAFT_FAIL("Unsupported dataset data type: code=%d, bits=%d", dtype.code, dtype.bits);
       }
     } else {
       RAFT_EXPECTS(filter.type == BITSET,
                    "cuvsCagraConcatenateDatasets: only NO_FILTER and BITSET filters are supported");
       if (dtype.code == kDLFloat && dtype.bits == 32) {
-        _concatenate_and_filter_datasets<float>(res, indices, num_indices, dtype, filter, merged_dataset);
+        _concatenate_and_filter_datasets<float>(res, datasets, num_datasets, dtype, filter,
+                                                merged_dataset);
       } else if (dtype.code == kDLFloat && dtype.bits == 16) {
-        _concatenate_and_filter_datasets<half>(res, indices, num_indices, dtype, filter, merged_dataset);
+        _concatenate_and_filter_datasets<half>(res, datasets, num_datasets, dtype, filter,
+                                               merged_dataset);
       } else if (dtype.code == kDLInt && dtype.bits == 8) {
-        _concatenate_and_filter_datasets<int8_t>(res, indices, num_indices, dtype, filter, merged_dataset);
+        _concatenate_and_filter_datasets<int8_t>(res, datasets, num_datasets, dtype, filter,
+                                                 merged_dataset);
       } else if (dtype.code == kDLUInt && dtype.bits == 8) {
-        _concatenate_and_filter_datasets<uint8_t>(res, indices, num_indices, dtype, filter, merged_dataset);
+        _concatenate_and_filter_datasets<uint8_t>(res, datasets, num_datasets, dtype, filter,
+                                                  merged_dataset);
       } else {
-        RAFT_FAIL("Unsupported index data type: code=%d, bits=%d", dtype.code, dtype.bits);
+        RAFT_FAIL("Unsupported dataset data type: code=%d, bits=%d", dtype.code, dtype.bits);
       }
     }
   });

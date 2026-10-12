@@ -1679,7 +1679,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     #[must_use]
     #[doc = " @brief Returns a view of the CAGRA dataset\n\n This function returns a non-owning view of the CAGRA dataset.\n The output will be referencing device memory that is directly used\n in CAGRA, without copying the dataset at all. This means that the\n output is only valid as long as the CAGRA index is alive, and once\n cuvsCagraIndexDestroy is called on the cagra index - the returned\n dataset view will be invalid.\n\n Note that the DLManagedTensor dataset returned will have an associated\n 'deleter' function that must be called when the dataset is no longer\n needed. This will free up host memory that stores the shape of the\n dataset view.\n\n @param[in] index CAGRA index\n @param[out] dataset the dataset used in cagra\n @return cuvsError_t"]
-    pub fn cuvsCagraIndexGetDataset(
+    pub fn cuvsCagraIndexGetDatasetAsDLTensor(
         index: cuvsCagraIndex_t,
         dataset: *mut DLManagedTensor,
     ) -> cuvsError_t;
@@ -1810,10 +1810,17 @@ unsafe extern "C" {
 unsafe extern "C" {
     #[must_use]
     #[doc = " @brief Compute per-index write offsets for a merged dataset buffer.\n\n `cuvsCagraMerge`/`cuvsCagraMergeWithParams` require the caller to have already concatenated\n every input index's dataset (in `indices` order, applying `filter` if any) into a single buffer\n and to know each index's starting row within it. For `filter.type == NO_FILTER`, those offsets\n are just the cumulative sizes of `indices` and this function is not needed. For `BITSET`, the\n number of surviving rows per index cannot be derived any other way, so call this first.\n\n @param[in] res cuvsResources_t opaque C handle\n @param[in] indices Array of input cuvsCagraIndex_t handles that will be passed to merge\n @param[in] num_indices Number of input indices\n @param[in] filter Filter that will be passed to merge. Only `NO_FILTER` and `BITSET` supported.\n @param[out] offsets Caller-allocated array of `num_indices + 1` int64_t. Entry `i` is the row at\n                     which `indices[i]`'s surviving rows must start in the merged buffer; the\n                     last entry is the total row count of the merged buffer.\n @return cuvsError_t"]
+    pub fn cuvsCagraIndexGetDatasetHandle(
+        index: cuvsCagraIndex_t,
+        dataset: *mut cuvsDataset_t,
+    ) -> cuvsError_t;
+}
+unsafe extern "C" {
+    #[must_use]
     pub fn cuvsCagraMergedDatasetOffsets(
         res: cuvsResources_t,
-        indices: *mut cuvsCagraIndex_t,
-        num_indices: usize,
+        datasets: *mut cuvsDataset_t,
+        num_datasets: usize,
         filter: cuvsFilter,
         offsets: *mut i64,
     ) -> cuvsError_t;
