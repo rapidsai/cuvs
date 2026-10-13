@@ -241,6 +241,10 @@ ConfigureTest(
   GPUS 1
   PERCENT 100
 )
+# ACE helper tests include cagra_build.cuh and its generated distance declarations.
+target_include_directories(
+  NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST PRIVATE "${CUVS_SOURCE_DIR}/src" "${CUVS_BINARY_DIR}/src"
+)
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_FILTER_UDF_TEST
