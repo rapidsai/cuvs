@@ -20,11 +20,13 @@ import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSMatrix;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.lucene.codecs.CodecUtil;
@@ -65,8 +67,15 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
   private final FlatVectorsReader flatVectorsReader;
   private final FieldInfos fieldInfos;
   private final IntObjectHashMap<FieldEntry> fields;
-  // Loaded eagerly unless this reader was opened for a merge; see getCuVSIndices().
-  private volatile IntObjectHashMap<GPUIndex> cuvsIndices;
+  // Loaded eagerly, or null if this reader was opened for a merge; see getCuVSIndex().
+  private final IntObjectHashMap<GPUIndex> cuvsIndices;
+  // Private, so that code outside this class cannot take the lock held across a GPU load.
+  private final Object lazyLoadLock = new Object();
+  // The indexes a merge-opened reader has loaded so far, by field number. Only added to while
+  // holding lazyLoadLock, but read without it, so that a search on a loaded field never waits for
+  // the load of another.
+  private final Map<Integer, GPUIndex> lazyIndices = new ConcurrentHashMap<>();
+  // Guarded by lazyLoadLock.
   private boolean closed;
   private final IndexInput cuvsIndexInput;
   private final FilterBitsetCache filterBitsetCache;
@@ -137,11 +146,9 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
        * through openCagraIndexForMerge instead. This reduces device memory usage by approximately
        * 50% during merges. IndexWriter pools the reader it opens for a merge, though, and hands it
        * (or a clone sharing this core) to near-real-time readers opened while the merge runs, so
-       * such a reader can still be searched; it then loads its indexes on first use.
+       * such a reader can still be searched; it then loads the index of each field on first use.
        */
-      if (!state.context.context().equals(Context.MERGE)) {
-        cuvsIndices = loadCuVSIndices();
-      }
+      cuvsIndices = state.context.context().equals(Context.MERGE) ? null : loadCuVSIndices();
       success = true;
     } finally {
       if (success == false) {
@@ -315,10 +322,10 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
   /**
    * Deserializes the CAGRA index of a single field onto the GPU, bypassing the {@link GPUIndex}
    * cache. This is how {@link CuVS2510GPUVectorsWriter} obtains the inputs for the cuVS merge API:
-   * a reader opened with {@link Context#MERGE} has no cached indexes at all, and a cached index
-   * belongs to the {@link com.nvidia.cuvs.CuVSResources} of whichever thread opened the reader,
-   * while the merge API requires every input to share one resources instance - the merging
-   * thread's.
+   * a reader opened with {@link Context#MERGE} caches no indexes until it is first searched, and
+   * a cached index belongs to the {@link com.nvidia.cuvs.CuVSResources} of whichever thread opened
+   * the reader (or first searched it, for a merge-opened reader), while the merge API requires
+   * every input to share one resources instance - the merging thread's.
    *
    * <p>The returned index is owned by the caller and must be closed by it.
    *
@@ -369,27 +376,42 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
   }
 
   /**
-   * Returns the GPU indexes of this segment, loading them first if this reader was opened for a
-   * merge and has not been searched yet.
+   * Returns the GPU index of one field, loading it first if this reader was opened for a merge and
+   * the field has not been searched yet. Only that field's index is loaded, so searching one field
+   * does not put the others on the GPU.
    *
-   * @return the map of {@link GPUIndex} objects, keyed by field number
+   * @param fieldNumber the field number
+   * @return the {@link GPUIndex}, or {@code null} if this segment has none for the field
    * @throws IOException I/O exception
    */
-  private IntObjectHashMap<GPUIndex> getCuVSIndices() throws IOException {
-    var indices = cuvsIndices;
-    if (indices == null) {
-      synchronized (this) {
-        if (closed) {
-          throw new AlreadyClosedException("this reader is closed");
-        }
-        indices = cuvsIndices;
-        if (indices == null) {
-          indices = loadCuVSIndices();
-          cuvsIndices = indices;
-        }
-      }
+  private GPUIndex getCuVSIndex(int fieldNumber) throws IOException {
+    if (cuvsIndices != null) {
+      return cuvsIndices.get(fieldNumber);
     }
-    return indices;
+    var index = lazyIndices.get(fieldNumber);
+    if (index != null) {
+      return index;
+    }
+    synchronized (lazyLoadLock) {
+      if (closed) {
+        throw new AlreadyClosedException("this reader is closed");
+      }
+      index = lazyIndices.get(fieldNumber);
+      var fieldEntry = fields.get(fieldNumber);
+      if (index == null && fieldEntry != null) {
+        index = loadCuVSIndex(fieldEntry);
+        lazyIndices.put(fieldNumber, index);
+      }
+      return index;
+    }
+  }
+
+  /**
+   * Returns the number of indexes a merge-opened reader has loaded so far. Package-private so that
+   * tests can check that loading is per field.
+   */
+  int lazilyLoadedIndexCount() {
+    return lazyIndices.size();
   }
 
   /**
@@ -420,7 +442,8 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
         }
       }
     } catch (Throwable t) {
-      Utils.handleThrowable(t);
+      // The caller never sees a partially loaded GPUIndex, so release what was loaded here.
+      Utils.handleThrowable(Utils.closeAll(t, cagraIndex, bruteForceIndex));
     }
     return new GPUIndex(cagraIndex, bruteForceIndex);
   }
@@ -430,18 +453,25 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
    */
   @Override
   public void close() throws IOException {
-    final IntObjectHashMap<GPUIndex> indices;
-    synchronized (this) {
+    synchronized (lazyLoadLock) {
       closed = true;
-      indices = cuvsIndices;
     }
-    var closeableStream = Stream.of(flatVectorsReader, cuvsIndexInput);
-    IOUtils.close(closeableStream::iterator);
-    if (indices != null) {
-      var indexClosableStream = stream(indices.values().iterator()).map(cursor -> cursor.value);
-      IOUtils.close(indexClosableStream::iterator);
+    // No index is loaded once closed is set, so lazyIndices is complete from here on. Close
+    // everything even if one of them fails, and always release this thread's cuVS resources.
+    List<AutoCloseable> closeables = new ArrayList<>();
+    closeables.add(flatVectorsReader);
+    closeables.add(cuvsIndexInput);
+    if (cuvsIndices != null) {
+      for (var cursor : cuvsIndices.values()) {
+        closeables.add(cursor.value);
+      }
     }
-    closeCuVSResourcesInstance();
+    closeables.addAll(lazyIndices.values());
+    closeables.add(() -> closeCuVSResourcesInstance());
+    Throwable failure = Utils.closeAll(null, closeables.toArray(new AutoCloseable[0]));
+    if (failure != null) {
+      Utils.handleThrowable(failure);
+    }
   }
 
   static <T> Stream<T> stream(Iterator<T> iterator) {
@@ -502,12 +532,6 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
       return;
     }
 
-    var fieldNumber = fieldInfos.fieldInfo(field).number;
-    GPUIndex cuvsIndex = getCuVSIndices().get(fieldNumber);
-    if (cuvsIndex == null) {
-      throw new IllegalStateException("Index not found for field:" + field);
-    }
-
     final FloatVectorValues rawValues = flatVectorsReader.getFloatVectorValues(field);
     final Bits acceptedOrds = rawValues.getAcceptOrds(acceptDocs);
     BitSet[] mask = null;
@@ -541,6 +565,13 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
       // the
       // vector count, leaving the trailing ordinals outside the filter and thus default-accepted.
       maskLength = acceptedOrds.length();
+    }
+
+    // Only now, so that a segment where nothing can match never loads its index onto the GPU.
+    var fieldNumber = fieldInfos.fieldInfo(field).number;
+    GPUIndex cuvsIndex = getCuVSIndex(fieldNumber);
+    if (cuvsIndex == null) {
+      throw new IllegalStateException("Index not found for field:" + field);
     }
 
     try {
@@ -731,6 +762,10 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
    * Returns the {@link CagraIndex} for the given field, or {@code null} if this segment has none
    * (e.g., when the field is missing or the segment only holds a brute force index).
    *
+   * <p>If this reader was opened for a merge and has not been searched on this field yet, this
+   * loads the field's index onto the GPU first. The index is owned by this reader, which closes it,
+   * so callers must not close it.
+   *
    * @param field the vector field name
    * @return the CAGRA index, or {@code null}
    * @throws IOException I/O exception
@@ -738,7 +773,7 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
   public CagraIndex getCagraIndexForField(String field) throws IOException {
     FieldInfo info = fieldInfos.fieldInfo(field);
     if (info == null) return null;
-    GPUIndex gpuIndex = getCuVSIndices().get(info.number);
+    GPUIndex gpuIndex = getCuVSIndex(info.number);
     if (gpuIndex == null) return null;
     return gpuIndex.getCagraIndex();
   }
@@ -760,8 +795,7 @@ public class CuVS2510GPUVectorsReader extends KnnVectorsReader {
   /**
    * Gets the map of {@link GPUIndex} objects.
    *
-   * @return the map of GPU index objects, or {@code null} if this reader was opened for a merge and
-   *     has not been searched yet
+   * @return the map of GPU index objects, or {@code null} if this reader was opened for a merge
    */
   public IntObjectHashMap<GPUIndex> getCuvsIndexes() {
     return cuvsIndices;

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.KnnFloatVectorField;
@@ -20,9 +21,11 @@ import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.CodecReader;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FilterLeafReader;
 import org.apache.lucene.index.FilterMergePolicy;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.MergeTrigger;
 import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.SegmentCommitInfo;
@@ -110,6 +113,19 @@ public class TestSearchSegmentsOpenedForMerge extends LuceneTestCase {
     }
   }
 
+  /** Sums the indexes the segments' vectors readers have loaded lazily, over both fields. */
+  private static int lazilyLoadedIndexCount(DirectoryReader reader) {
+    int count = 0;
+    for (LeafReaderContext ctx : reader.leaves()) {
+      CodecReader codecReader = (CodecReader) FilterLeafReader.unwrap(ctx.reader());
+      var perField = (PerFieldKnnVectorsFormat.FieldsReader) codecReader.getVectorReader();
+      // Both fields use the same format, so they share one reader.
+      count +=
+          ((CuVS2510GPUVectorsReader) perField.getFieldReader("vector")).lazilyLoadedIndexCount();
+    }
+    return count;
+  }
+
   @Test
   public void testSearchNRTReaderDuringMerge() throws Exception {
     BlockingMergePolicy mergePolicy = new BlockingMergePolicy();
@@ -135,6 +151,8 @@ public class TestSearchSegmentsOpenedForMerge extends LuceneTestCase {
           doc.add(new StringField("id", Integer.toString(id), Field.Store.YES));
           doc.add(
               new KnnFloatVectorField("vector", vectors[id], VectorSimilarityFunction.EUCLIDEAN));
+          doc.add(
+              new KnnFloatVectorField("vector2", vectors[id], VectorSimilarityFunction.EUCLIDEAN));
           writer.addDocument(doc);
         }
         writer.commit();
@@ -160,9 +178,28 @@ public class TestSearchSegmentsOpenedForMerge extends LuceneTestCase {
             TopDocs hits = searcher.search(query, topK);
             assertEquals(query.toString(), topK, hits.scoreDocs.length);
           }
+          // Searching one field loaded that field's index only.
+          assertEquals(NUM_SEGMENTS, lazilyLoadedIndexCount(reader));
+
+          TopDocs hits =
+              searcher.search(
+                  new GPUKnnFloatVectorQuery("vector2", target, topK, null, topK, 1), topK);
+          assertEquals(topK, hits.scoreDocs.length);
+          assertEquals(2 * NUM_SEGMENTS, lazilyLoadedIndexCount(reader));
         }
       } finally {
         mergePolicy.releaseMerge.countDown();
+      }
+
+      // The merge finishes with the searched readers still pooled, and its result is searchable.
+      writer.forceMerge(1);
+      try (DirectoryReader reader = DirectoryReader.open(writer)) {
+        assertEquals(1, reader.leaves().size());
+        for (String field : List.of("vector", "vector2")) {
+          TopDocs hits =
+              new IndexSearcher(reader).search(new KnnFloatVectorQuery(field, vectors[0], 10), 10);
+          assertEquals(10, hits.scoreDocs.length);
+        }
       }
     }
   }
