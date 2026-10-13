@@ -1235,7 +1235,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         // No device dataset is attached, so cuVS refuses to merge these.
         for (int attempt = 0; attempt < 5; attempt++) {
           assertThrows(
-              Throwable.class, () -> CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams));
+              Throwable.class,
+              () -> CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams));
         }
 
         // The failures left the inputs alone: they still report their rows, and a merge that is
@@ -1250,7 +1251,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           index1.updateDataset(padded1);
           index2.updateDataset(padded2);
 
-          try (CagraIndex mergedIndex = CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams)) {
+          try (CagraIndex mergedIndex =
+              CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams)) {
             assertEquals("The merged index holds every row of both inputs", 6, mergedIndex.size());
 
             try (var queryVectors = CuVSMatrix.ofArray(new float[][] {{0.0f, 0.0f}})) {
