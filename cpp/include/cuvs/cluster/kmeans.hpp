@@ -248,8 +248,10 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * Multiple batches are double-buffered when an auxiliary stream is available.
  * Without a stream pool, the fit uses one input buffer and remains correct but
  * serialized. One auxiliary stream is sufficient to overlap transfer and compute.
- * Pinned host memory is crucial for OOC performance: ordinary pageable or
- * unregistered `mmap`-backed input degrades throughput rapidly.
+ * Pageable and unregistered `mmap`-backed input is read through
+ * one batch-sized pinned host staging buffer per device buffer. The complete input is
+ * never registered or copied into pinned memory. Already pinned input is transferred directly.
+ * Overlap depends on the host reader supplying batches fast enough for the GPU.
  *
  * A pool memory resource is optional but recommended, especially for repeated
  * fits. Configure both pools before `fit` and before first using the handle's
@@ -1722,9 +1724,11 @@ void cluster_cost(
  * `device_buffer_samples` is ignored and each local partition is processed in full.
  * Host partitions spanning multiple batches are double-buffered when an auxiliary stream
  * is available. Each rank needs one auxiliary stream for transfer/compute overlap;
- * otherwise execution uses one input buffer and is correct but serialized. Pinned host memory is
- * crucial: pageable or unregistered `mmap`-backed input degrades throughput rapidly. A per-device
- * memory pool is also recommended.
+ * otherwise execution uses one input buffer and is correct but serialized. Pageable and
+ * unregistered `mmap`-backed partitions use bounded pinned host staging buffers;
+ * already pinned partitions are transferred directly. Overlap depends on the
+ * host reader supplying batches fast enough for the GPU. A per-device memory pool is also
+ * recommended.
  * With `raft::device_resources_snmg`, configure these before `fit` with
  * `handle.set_stream_pool(1)` and `handle.set_memory_pool(percent)`; both calls
  * apply the setting to every device managed by the handle. With independently
