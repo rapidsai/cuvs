@@ -93,6 +93,8 @@ Writes the meta information for the index. Deprecated: it records an M that can 
 than the maxConn of a CPU writer merging the segment, which makes that merge fail on Lucene
 10.4 and later. Use the overload that also takes maxConn.
 
+**Deprecated:** use the overload that also takes maxConn
+
 **Parameters**
 
 | Name | Description |
@@ -169,6 +171,8 @@ _Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/AcceleratedHNSWU
 Writes an empty meta information for the field. Deprecated: it records M = 0; use the
 overload that also takes maxConn.
 
+**Deprecated:** use the overload that also takes maxConn
+
 **Parameters**
 
 | Name | Description |
@@ -235,7 +239,7 @@ _Source: `java/cuvs-lucene/src/main/java/com/nvidia/cuvs/lucene/AcceleratedHNSWU
 public static List<byte[]> quantizeFloatVectorsToScalar(List<float[]> floatVectors)
 ```
 
-Scalar quantization.
+Scalar quantization to unsigned 7-bit values stored in Java bytes.
 
 **Parameters**
 
