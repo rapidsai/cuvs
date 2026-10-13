@@ -226,7 +226,7 @@ ConfigureTest(
 )
 
 ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
+  NAME NEIGHBORS_ANN_CAGRA_BUGS_TEST
   PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
        neighbors/ann_cagra/bug_multi_cta_crash.cu
        neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
@@ -296,7 +296,8 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_NN_DESCENT_TEST
-  PATH neighbors/ann_nn_descent/test_float_uint32_t.cu
+  PATH neighbors/ann_nn_descent/test_convergence.cu
+       neighbors/ann_nn_descent/test_float_uint32_t.cu
        neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
        neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
        neighbors/ann_nn_descent/test_bbq_uint32_t.cu
