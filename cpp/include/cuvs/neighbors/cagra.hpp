@@ -4912,23 +4912,6 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(
   bool device_resident_graphs = false);
 
 /**
- * Calculate the device memory footprint of a VPQ-compressed (CAGRA-Q) dataset.
- *
- * The footprint is the sum of the VQ codebook, the PQ codebook and the encoded rows. Parameters
- * left at 0 are resolved with the same heuristics that `vpq_build` applies.
- *
- * @param[in] uncompressed_dataset_shape shape of the uncompressed dataset
- * @param[in] params VPQ compression parameters
- * @param[in] codebook_element_size size in bytes of a codebook element (2 for the f16 codebooks
- *            used by CAGRA-Q)
- *
- * @return compressed dataset size in bytes
- */
-size_t vpq_dataset_size(raft::matrix_extent<int64_t> uncompressed_dataset_shape,
-                        cuvs::neighbors::vpq_params params,
-                        size_t codebook_element_size = 2);
-
-/**
  * Calculate memory usage of CAGRA build.
  *
  * @param[in] res raft resource

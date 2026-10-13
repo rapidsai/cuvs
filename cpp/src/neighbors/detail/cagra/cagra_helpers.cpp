@@ -6,7 +6,6 @@
 #include "cagra_helpers.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -113,37 +112,6 @@ std::tuple<size_t, size_t, size_t, size_t> optimize_workspace_size(size_t n_rows
   size_t total_dev_fixed  = std::max(prune_dev_fixed, combine_dev_fixed);
 
   return std::make_tuple(total_host, total_dev, total_host_fixed, total_dev_fixed);
-}
-
-size_t vpq_dataset_size(raft::matrix_extent<int64_t> uncompressed_dataset_shape,
-                        cuvs::neighbors::vpq_params params,
-                        size_t codebook_element_size)
-{
-  const size_t n_rows = uncompressed_dataset_shape.extent(0);
-  const size_t dim    = uncompressed_dataset_shape.extent(1);
-
-  // Mirror detail::fill_missing_params_heuristics for the fields that affect the footprint.
-  const size_t pq_bits = params.pq_bits == 0 ? 8 : params.pq_bits;
-  const size_t pq_dim =
-    params.pq_dim == 0 ? raft::div_rounding_up_safe(dim, size_t{4}) : params.pq_dim;
-  const size_t vq_n_centers =
-    params.vq_n_centers == 0
-      ? raft::round_up_safe<size_t>(static_cast<size_t>(std::sqrt(static_cast<double>(n_rows))), 8)
-      : params.vq_n_centers;
-
-  const size_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
-  const size_t pq_n_centers = size_t{1} << pq_bits;
-
-  // Every encoded row starts with its inlined VQ label (vpq_build always requests inline labels)
-  // and is followed by the bit-packed PQ codes.
-  using label_type            = uint32_t;
-  constexpr size_t kLabelBits = 8 * sizeof(label_type);
-  const size_t encoded_row_length =
-    sizeof(label_type) * (1 + raft::div_rounding_up_safe(pq_dim * pq_bits, kLabelBits));
-
-  return vq_n_centers * dim * codebook_element_size       // vq_code_book
-         + pq_n_centers * pq_len * codebook_element_size  // pq_code_book
-         + n_rows * encoded_row_length;                   // encoded rows
 }
 
 namespace {

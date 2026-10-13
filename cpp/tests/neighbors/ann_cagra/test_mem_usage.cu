@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../../../src/neighbors/detail/cagra/cagra_helpers.hpp"
 #include "../cagra_padded_build_helpers.cuh"
 
 #include <cuvs/neighbors/cagra.hpp>
