@@ -4217,7 +4217,7 @@ def parse_enum_values(signature: str) -> list[dict[str, str]]:
         return []
     # Strip comments before splitting to avoid a comma inside one
     body = re.sub(
-        r"/\*.*?\*/|//.*", "", body_match.group("body"), flags=re.DOTALL
+        r"/\*.*?\*/|//[^\n]*", "", body_match.group("body"), flags=re.DOTALL
     )
     values: list[dict[str, str]] = []
     for raw_value in split_top_level(body, ","):
