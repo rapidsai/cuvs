@@ -151,7 +151,10 @@ ConfigureTest(
   GPUS 1
   PERCENT 100
 )
-target_compile_definitions(CUTILE_SMOKE_TEST PRIVATE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED})
+target_compile_definitions(
+  CUTILE_SMOKE_TEST PRIVATE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
+                            CUVS_CUTILE_SM107_ENABLED=${CUVS_CUTILE_SM107_ENABLED}
+)
 if(CUVS_CUTILE_ENABLED)
   # These are intentionally library-private implementation symbols. Build the smoke executable with
   # the generated fragment registrations and planner implementation so it can exercise them without
@@ -223,13 +226,14 @@ ConfigureTest(
 )
 
 ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
+  NAME NEIGHBORS_ANN_CAGRA_BUGS_TEST
   PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
        neighbors/ann_cagra/bug_multi_cta_crash.cu
        neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
        neighbors/ann_cagra/bug_iterative_cagra_build.cu
        neighbors/ann_cagra/bug_issue_93_reproducer.cu
        neighbors/ann_cagra/bug_issue_2523_hashmap_bitlen.cu
+       neighbors/ann_cagra/bug_nan_queries_multi_kernel.cu
   GPUS 1
   PERCENT 100
 )
@@ -292,7 +296,8 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_NN_DESCENT_TEST
-  PATH neighbors/ann_nn_descent/test_float_uint32_t.cu
+  PATH neighbors/ann_nn_descent/test_convergence.cu
+       neighbors/ann_nn_descent/test_float_uint32_t.cu
        neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
        neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
        neighbors/ann_nn_descent/test_bbq_uint32_t.cu
@@ -305,7 +310,7 @@ ConfigureTest(
   PATH neighbors/ann_vamana/test_float_uint32_t.cu neighbors/ann_vamana/test_int8_t_uint32_t.cu
        neighbors/ann_vamana/test_uint8_t_uint32_t.cu neighbors/ann_vamana/test_half_uint32_t.cu
   GPUS 1
-  PERCENT 100
+  PERCENT 10
   FETCH_CODEBOOKS
 )
 
