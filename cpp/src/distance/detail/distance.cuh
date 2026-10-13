@@ -27,7 +27,10 @@ namespace distance {
 namespace detail {
 
 template <typename OutT, typename AccT, typename FinOpT, typename IdxT>
-RAFT_KERNEL set_self_distances(OutT* out, IdxT diagonal_size, IdxT leading_dimension, FinOpT fin_op)
+RAFT_KERNEL set_self_distances_kernel(OutT* out,
+                                      IdxT diagonal_size,
+                                      IdxT leading_dimension,
+                                      FinOpT fin_op)
 {
   IdxT idx = static_cast<IdxT>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (idx < diagonal_size) { out[std::size_t(idx) * leading_dimension + idx] = fin_op(AccT{0}, 0); }
@@ -613,7 +616,7 @@ void distance_impl_l2_expanded(  // NOTE: different name
     raft::launch_kernel(stream,
                         grid_size,
                         block_size,
-                        set_self_distances<OutT, AccT, FinOpT, IdxT>,
+                        set_self_distances_kernel<OutT, AccT, FinOpT, IdxT>,
                         out,
                         diagonal_size,
                         leading_dimension,
