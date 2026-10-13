@@ -1326,7 +1326,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
 
   constexpr int QUERY_ROW_BYTES = 128;
   constexpr int BBQ_PAD         = alignof(uint32_t);
-  // The document buffer is normally only the A operand (two rows broadcast across a warp), so it
+  // The document buffer is normally only the A operand (one row broadcast across a warp), so it
   // needs no bank-conflict pad. Under SelfJoin it doubles as the B operand in phase 1 (32
   // consecutive columns at one byte offset), so it needs the same skew the query buffer gets.
   constexpr int DOC_PAD = SelfJoin ? BBQ_PAD : 0;
@@ -1343,7 +1343,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
   // Document-side (row axis) dequant factors, indexed by list position -- shared by both phases
   // below since rows are always the `new_neighbors`/document side in both, so this is staged once
   // and never restaged. At a given accumulation step, up to MAX_NUM_BI_SAMPLES threads share the
-  // same row0 (see the pair_idx assignment below), so caching avoids up to 64x redundant scattered
+  // same row (see the pair_idx assignment below), so caching avoids up to 64x redundant scattered
   // global reads
   __shared__ bbq_dequant_factors s_document_factors[MAX_NUM_BI_SAMPLES];
 
@@ -1418,9 +1418,8 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
   constexpr int query_plane_tile_u32 = query_plane_tile / 4;
   const int n_tiles                  = raft::ceildiv(plane_bytes, plane_tile);
 
-  // with NUM_SAMPLES=32, BLOCK_SIZE=256, pairs_per_thread = 32 * 64 / 512 = 4
-  constexpr int num_row_pairs    = MAX_NUM_BI_SAMPLES / 2;
-  constexpr int num_pairs        = num_row_pairs * MAX_NUM_BI_SAMPLES;
+  // One (row, col) cell per pair: pairs_per_thread = 64 * 64 / 512 = 8.
+  constexpr int num_pairs        = MAX_NUM_BI_SAMPLES * MAX_NUM_BI_SAMPLES;
   constexpr int pairs_per_thread = (num_pairs + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
   // Every thread's column is invariant across its pairs_per_thread iterations, so fetch it once
@@ -1431,8 +1430,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
     my_col_factors = get_dequant_factors(dataset_query, new_neighbors[my_col]);
   }
 
-  uint32_t acc0[pairs_per_thread] = {};
-  uint32_t acc1[pairs_per_thread] = {};
+  uint32_t acc[pairs_per_thread] = {};
   for (int step = 0; step < n_tiles; ++step) {
     const bool last_tile   = (step == n_tiles - 1);
     const int num_load     = last_tile ? plane_bytes - step * plane_tile : plane_tile;
@@ -1474,9 +1472,9 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
     for (int k = 0; k < pairs_per_thread; ++k) {
       const int pair_idx = tx + k * BLOCK_SIZE;
       if (pair_idx >= num_pairs) continue;
-      const int row0 = (pair_idx / MAX_NUM_BI_SAMPLES) * 2;
-      const int col  = pair_idx % MAX_NUM_BI_SAMPLES;
-      if (col >= new_size) continue;
+      const int row = pair_idx / MAX_NUM_BI_SAMPLES;
+      const int col = pair_idx % MAX_NUM_BI_SAMPLES;
+      if (row >= new_size || col >= new_size) continue;
       // Phase 1 B operand: s_doc_vec under SelfJoin (see the staging note above).
       const uint8_t* row_b;
       if constexpr (SelfJoin) {
@@ -1484,13 +1482,8 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
       } else {
         row_b = s_query_vec[col];
       }
-      cuvs::preprocessing::quantize::bbq::bbq_code_inner_product_2x1<DocumentLayout,
-                                                                     QueryLayout,
-                                                                     document_planes,
-                                                                     query_planes,
-                                                                     doc_row_bytes,
-                                                                     QUERY_ROW_BYTES>(
-        s_doc_vec[row0], s_doc_vec[row0 + 1], row_b, acc0[k], acc1[k]);
+      acc[k] += cuvs::preprocessing::quantize::bbq::code_inner_product(
+        s_doc_vec[row], DocumentLayout, row_b, QueryLayout, doc_row_bytes);
     }
     __syncthreads();
   }
@@ -1498,40 +1491,22 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
   for (int k = 0; k < pairs_per_thread; ++k) {
     const int pair_idx = tx + k * BLOCK_SIZE;
     if (pair_idx >= num_pairs) continue;
-    const int row0 = (pair_idx / MAX_NUM_BI_SAMPLES) * 2;
-    const int col  = pair_idx % MAX_NUM_BI_SAMPLES;
-    if (col >= new_size) continue;
-    const int distance0    = row0 * SKEWED_MAX_NUM_BI_SAMPLES + col;
-    const Index_t query_id = new_neighbors[col];
-    // row0 (unlike row0 + 1 below) isn't otherwise bounded by new_size -- gate it explicitly so a
-    // stale/garbage new_neighbors[row0] past the real list never reaches a dataset_document lookup
-    // (row_norm, for CosineExpanded); the cell is provably never read downstream either way, since
-    // the min-search loops below only visit idx_in_list < new_size.
-    if (row0 < new_size) {
-      const Index_t doc_id0  = new_neighbors[row0];
-      s_distances[distance0] = bbq_calculate_metric(static_cast<float>(acc0[k]),
-                                                    s_document_factors[row0],
-                                                    my_col_factors,
-                                                    dataset_document,
-                                                    dataset_query,
-                                                    metric,
-                                                    dist_epilogue,
-                                                    doc_id0,
-                                                    query_id);
-    }
-    if (row0 + 1 < new_size) {
-      const Index_t doc_id1 = new_neighbors[row0 + 1];
-      s_distances[distance0 + SKEWED_MAX_NUM_BI_SAMPLES] =
-        bbq_calculate_metric(static_cast<float>(acc1[k]),
-                             s_document_factors[row0 + 1],
-                             my_col_factors,
-                             dataset_document,
-                             dataset_query,
-                             metric,
-                             dist_epilogue,
-                             doc_id1,
-                             query_id);
-    }
+    const int row = pair_idx / MAX_NUM_BI_SAMPLES;
+    const int col = pair_idx % MAX_NUM_BI_SAMPLES;
+    // Gating row keeps a stale new_neighbors[row] past the real list from reaching a
+    // dataset_document lookup (row_norm, for CosineExpanded); the min-search loops below only
+    // visit idx_in_list < new_size, so the cell is never read either way.
+    if (row >= new_size || col >= new_size) continue;
+    s_distances[row * SKEWED_MAX_NUM_BI_SAMPLES + col] =
+      bbq_calculate_metric(static_cast<float>(acc[k]),
+                           s_document_factors[row],
+                           my_col_factors,
+                           dataset_document,
+                           dataset_query,
+                           metric,
+                           dist_epilogue,
+                           new_neighbors[row],
+                           new_neighbors[col]);
   }
   __syncthreads();
 
@@ -1562,8 +1537,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
     my_old_col_factors = get_dequant_factors(dataset_query, old_neighbors[my_old_col]);
   }
 
-  uint32_t acc0_old[pairs_per_thread] = {};
-  uint32_t acc1_old[pairs_per_thread] = {};
+  uint32_t acc_old[pairs_per_thread] = {};
   for (int step = 0; step < n_tiles; ++step) {
     const bool last_tile   = (step == n_tiles - 1);
     const int num_load     = last_tile ? plane_bytes - step * plane_tile : plane_tile;
@@ -1599,16 +1573,11 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
     for (int k = 0; k < pairs_per_thread; ++k) {
       const int pair_idx = tx + k * BLOCK_SIZE;
       if (pair_idx >= num_pairs) continue;
-      const int row0 = (pair_idx / MAX_NUM_BI_SAMPLES) * 2;
-      const int col  = pair_idx % MAX_NUM_BI_SAMPLES;
-      if (col >= old_size) continue;
-      cuvs::preprocessing::quantize::bbq::bbq_code_inner_product_2x1<DocumentLayout,
-                                                                     QueryLayout,
-                                                                     document_planes,
-                                                                     query_planes,
-                                                                     doc_row_bytes,
-                                                                     QUERY_ROW_BYTES>(
-        s_doc_vec[row0], s_doc_vec[row0 + 1], s_query_vec[col], acc0_old[k], acc1_old[k]);
+      const int row = pair_idx / MAX_NUM_BI_SAMPLES;
+      const int col = pair_idx % MAX_NUM_BI_SAMPLES;
+      if (row >= new_size || col >= old_size) continue;
+      acc_old[k] += cuvs::preprocessing::quantize::bbq::code_inner_product(
+        s_doc_vec[row], DocumentLayout, s_query_vec[col], QueryLayout, doc_row_bytes);
     }
     __syncthreads();
   }
@@ -1616,38 +1585,19 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
   for (int k = 0; k < pairs_per_thread; ++k) {
     const int pair_idx = tx + k * BLOCK_SIZE;
     if (pair_idx >= num_pairs) continue;
-    const int row0 = (pair_idx / MAX_NUM_BI_SAMPLES) * 2;
-    const int col  = pair_idx % MAX_NUM_BI_SAMPLES;
-    if (col >= old_size) continue;
-    const int distance0    = row0 * SKEWED_MAX_NUM_BI_SAMPLES + col;
-    const Index_t query_id = old_neighbors[col];
-    // See the identical row0 < new_size gate in phase 1 above -- same reasoning (row0 isn't
-    // otherwise bounded, and this cell is never read downstream either way).
-    if (row0 < new_size) {
-      const Index_t doc_id0  = new_neighbors[row0];
-      s_distances[distance0] = bbq_calculate_metric(static_cast<float>(acc0_old[k]),
-                                                    s_document_factors[row0],
-                                                    my_old_col_factors,
-                                                    dataset_document,
-                                                    dataset_query,
-                                                    metric,
-                                                    dist_epilogue,
-                                                    doc_id0,
-                                                    query_id);
-    }
-    if (row0 + 1 < new_size) {
-      const Index_t doc_id1 = new_neighbors[row0 + 1];
-      s_distances[distance0 + SKEWED_MAX_NUM_BI_SAMPLES] =
-        bbq_calculate_metric(static_cast<float>(acc1_old[k]),
-                             s_document_factors[row0 + 1],
-                             my_old_col_factors,
-                             dataset_document,
-                             dataset_query,
-                             metric,
-                             dist_epilogue,
-                             doc_id1,
-                             query_id);
-    }
+    const int row = pair_idx / MAX_NUM_BI_SAMPLES;
+    const int col = pair_idx % MAX_NUM_BI_SAMPLES;
+    if (row >= new_size || col >= old_size) continue;
+    s_distances[row * SKEWED_MAX_NUM_BI_SAMPLES + col] =
+      bbq_calculate_metric(static_cast<float>(acc_old[k]),
+                           s_document_factors[row],
+                           my_old_col_factors,
+                           dataset_document,
+                           dataset_query,
+                           metric,
+                           dist_epilogue,
+                           new_neighbors[row],
+                           old_neighbors[col]);
   }
   __syncthreads();
 
