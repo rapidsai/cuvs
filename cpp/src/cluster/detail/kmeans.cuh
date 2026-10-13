@@ -348,12 +348,11 @@ void kmeans_fit(
   raft::resources const& handle,
   const cuvs::cluster::kmeans::params& pams,
   raft::mdspan<const InputT, raft::matrix_extent<IndexT>, raft::row_major, Accessor> X,
-  std::optional<raft::mdspan<
-    const MathT,
-    raft::vector_extent<IndexT>,
-    raft::layout_right,
-    raft::host_device_accessor<cuda::std::default_accessor<const MathT>, Accessor::mem_type>>>
-    sample_weight,
+  std::optional<raft::mdspan<const MathT,
+                             raft::vector_extent<IndexT>,
+                             raft::layout_right,
+                             raft::host_device_accessor<cuda::std::default_accessor<const MathT>,
+                                                        Accessor::mem_type>>> sample_weight,
   raft::device_matrix_view<MathT, IndexT> centroids,
   raft::host_scalar_view<MathT> inertia,
   raft::host_scalar_view<IndexT> n_iter,
@@ -688,12 +687,11 @@ void kmeans_fit(
   raft::resources const& handle,
   const cuvs::cluster::kmeans::params& pams,
   raft::mdspan<const InputT, raft::matrix_extent<IndexT>, raft::row_major, Accessor> X,
-  std::optional<raft::mdspan<
-    const MathT,
-    raft::vector_extent<IndexT>,
-    raft::layout_right,
-    raft::host_device_accessor<cuda::std::default_accessor<const MathT>, Accessor::mem_type>>>
-    sample_weight,
+  std::optional<raft::mdspan<const MathT,
+                             raft::vector_extent<IndexT>,
+                             raft::layout_right,
+                             raft::host_device_accessor<cuda::std::default_accessor<const MathT>,
+                                                        Accessor::mem_type>>> sample_weight,
   raft::device_matrix_view<MathT, IndexT> centroids,
   raft::host_scalar_view<MathT> inertia,
   raft::host_scalar_view<IndexT> n_iter,
@@ -757,10 +755,11 @@ void kmeans_fit(
       if (sample_weight.has_value()) { bytes_per_row += staging_slots * sizeof(MathT); }
     }
 
-    device_buffer_samples = resolve_kmeans_batch_rows(static_cast<IndexT>(n_samples),
-                                                      device_buffer_samples,
-                                                      raft::resource::get_workspace_free_bytes(handle),
-                                                      bytes_per_row);
+    device_buffer_samples =
+      resolve_kmeans_batch_rows(static_cast<IndexT>(n_samples),
+                                device_buffer_samples,
+                                raft::resource::get_workspace_free_bytes(handle),
+                                bytes_per_row);
   }
 
   const MathT* weight_ptr =
@@ -902,7 +901,7 @@ void kmeans_fit(
   auto L2NormBatch          = raft::make_device_vector<MathT, IndexT>(handle, l2_norm_size);
   auto Tf32NormBatch        = raft::make_device_vector<MathT, IndexT>(
     handle, kmeans_may_require_tf32_norms_v<MathT> ? l2_norm_size : IndexT{0});
-  auto batch_weights_buf    = raft::make_device_vector<MathT, IndexT>(handle, device_buffer_samples);
+  auto batch_weights_buf = raft::make_device_vector<MathT, IndexT>(handle, device_buffer_samples);
   rmm::device_uvector<MathT> L2NormBuf_OR_DistBuf(0, stream);
   rmm::device_uvector<MathT> mapped_data_buf(
     same_type
@@ -1126,9 +1125,9 @@ void kmeans_fit(
           cur_batch_weights(static_cast<IndexT>(data_batch.offset()), wt_data, cur_batch_size);
 
         const bool batch_uses_tf32 =
-          full_norms ? device_uses_tf32
-                     : assignment_uses_tf32(
-                         batch_data, cur_batch_size, centroids_const.data_handle());
+          full_norms
+            ? device_uses_tf32
+            : assignment_uses_tf32(batch_data, cur_batch_size, centroids_const.data_handle());
         if constexpr (!full_norms) {
           if (need_compute_norms) {
             compute_batch_norms(batch_data, cur_batch_size, batch_uses_tf32);
@@ -1144,8 +1143,7 @@ void kmeans_fit(
           full_norms ? static_cast<IndexT>(data_batch.offset()) : IndexT{0};
         auto l2_const_view = raft::make_device_vector_view<const MathT, IndexT>(
           L2NormBatch.data_handle() + l2_norm_offset, cur_batch_size);
-        std::optional<raft::device_vector_view<const MathT, IndexT>> tf32_const_view =
-          std::nullopt;
+        std::optional<raft::device_vector_view<const MathT, IndexT>> tf32_const_view = std::nullopt;
         if constexpr (kmeans_may_require_tf32_norms_v<MathT>) {
           if (batch_uses_tf32) {
             tf32_const_view = raft::make_device_vector_view<const MathT, IndexT>(

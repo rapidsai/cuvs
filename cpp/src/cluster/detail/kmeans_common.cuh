@@ -65,9 +65,7 @@ namespace cuvs::cluster::kmeans::detail {
 constexpr auto kmeans_workspace_budget(std::size_t free_bytes) -> std::size_t
 {
   constexpr std::size_t max_workspace_bytes = std::size_t{1} << 29;
-  if (free_bytes >= max_workspace_bytes + max_workspace_bytes / 4) {
-    return max_workspace_bytes;
-  }
+  if (free_bytes >= max_workspace_bytes + max_workspace_bytes / 4) { return max_workspace_bytes; }
   return free_bytes * 4 / 5;
 }
 

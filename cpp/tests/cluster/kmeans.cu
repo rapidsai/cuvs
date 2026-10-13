@@ -748,13 +748,11 @@ std::vector<ByteT> make_byte_fit_input()
   // Interleave the two well-separated clusters so every outer batch exercises both signs/ranges.
   // There are 11 rows, so a four-row device buffer also exercises a three-row final batch.
   if constexpr (std::is_same_v<ByteT, int8_t>) {
-    return {-120, -110, -100, 72,  80,  88,  -112, -104, -96, 80,  88,
-            96,   -104, -98,  -88, 88,  96,  104,  -96,  -90, -80, 96,
-            104,  112,  -88,  -82, -72, 104, 112,  120,  112, 120, 127};
+    return {-120, -110, -100, 72,  80, 88,  -112, -104, -96, 80,  88,  96,  -104, -98, -88, 88, 96,
+            104,  -96,  -90,  -80, 96, 104, 112,  -88,  -82, -72, 104, 112, 120,  112, 120, 127};
   } else {
-    return {8,   16,  24, 200, 208, 216, 16,  24,  32,  208, 216,
-            224, 24,  32, 40,  216, 224, 232, 32,  40,  48,  224,
-            232, 240, 40, 48,  56,  232, 240, 248, 240, 248, 255};
+    return {8,   16, 24, 200, 208, 216, 16,  24, 32, 208, 216, 224, 24,  32,  40,  216, 224,
+            232, 32, 40, 48,  224, 232, 240, 40, 48, 56,  232, 240, 248, 240, 248, 255};
   }
 }
 
@@ -1002,8 +1000,8 @@ TEST(KmeansBatchSizingTest, ResolvesAutomaticAndExplicitSizes)
 
   EXPECT_EQ(resolve_kmeans_batch_rows(n_rows, int64_t{0}, 250 * bytes_per_row, bytes_per_row), 192);
   EXPECT_EQ(resolve_kmeans_batch_rows(n_rows, int64_t{0}, 63 * bytes_per_row, bytes_per_row), 1);
-  EXPECT_EQ(
-    resolve_kmeans_batch_rows(int64_t{50}, int64_t{0}, 1000 * bytes_per_row, bytes_per_row), 50);
+  EXPECT_EQ(resolve_kmeans_batch_rows(int64_t{50}, int64_t{0}, 1000 * bytes_per_row, bytes_per_row),
+            50);
   EXPECT_EQ(resolve_kmeans_batch_rows(n_rows, int64_t{0}, 1, std::size_t{0}), n_rows);
   EXPECT_EQ(resolve_kmeans_batch_rows(int64_t{0}, int64_t{0}, 1, bytes_per_row), 0);
   EXPECT_EQ(resolve_kmeans_batch_rows(n_rows, int64_t{37}, 0, bytes_per_row), 37);
