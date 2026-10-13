@@ -30,8 +30,8 @@ endfunction()
 function(_cutile_detect)
   set_property(GLOBAL PROPERTY CUVS_CUTILE_ENABLED 0)
 
-  # CMake 4.0 does not provide CUDA::bin2c. Use the vendored upstream module, which also supports
-  # conda's nvcc symlink layout, for this toolchain probe.
+  # CMake 4.0's FindCUDAToolkit does not define the CUDA::bin2c imported target. The compatibility
+  # module backports it and supports conda's nvcc symlink layout using native toolkit discovery.
   list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../thirdparty/cmake")
   find_package(CUDAToolkit REQUIRED)
   if(CUDAToolkit_VERSION VERSION_LESS 13.0)
