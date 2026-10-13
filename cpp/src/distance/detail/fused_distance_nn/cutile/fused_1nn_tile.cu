@@ -58,19 +58,6 @@ bool should_use_high_dim_tile(IdxT n, IdxT k, int cc_major, int cc_minor)
   return static_cast<int64_t>(k) >= k_thresh && static_cast<int64_t>(n) >= n_thresh;
 }
 
-template <typename DataT>
-bool is_cutile_enabled_for_arch(int cc_major, int cc_minor)
-{
-#if CUDART_VERSION >= 13040
-  return true;
-#else
-  if (cc_major == 8) { return false; }
-  if (cc_major == 10 && cc_minor == 7) { return false; }
-  if (cc_major == 9 && cc_minor == 0 && std::is_same_v<DataT, float>) { return false; }
-  return true;
-#endif
-}
-
 bool is_16_byte_aligned(const void* ptr)
 {
   return ptr == nullptr || reinterpret_cast<std::uintptr_t>(ptr) % 16 == 0;
@@ -323,9 +310,6 @@ bool is_fused_1nn_tile_available(
 
   cuvs::detail::jit_lto::CutileRuntimeCapabilities capabilities{};
   if (!cuvs::detail::jit_lto::query_current_cutile_runtime_capabilities(capabilities)) {
-    return false;
-  }
-  if (!is_cutile_enabled_for_arch<DataT>(capabilities.cc_major, capabilities.cc_minor)) {
     return false;
   }
 
