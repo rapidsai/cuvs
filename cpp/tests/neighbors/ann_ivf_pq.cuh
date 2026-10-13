@@ -918,8 +918,10 @@ inline auto small_dims_per_cluster() -> test_cases_t
     if (y.dim < 4) {
       // With only one or two PQ subspaces, use fewer IVF lists so each has enough
       // training rows for its 256-centroid codebook.
-      y.index_params.n_lists   = 4;
-      y.search_params.n_probes = 4;
+      y.index_params.n_lists = 4;
+      // Probe at least the default fraction of lists (20/32) without requiring an
+      // exhaustive search, which would also raise the derived recall threshold.
+      y.search_params.n_probes = 3;
     }
     return y;
   });
