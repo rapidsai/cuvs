@@ -1683,17 +1683,6 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
   }
 }
 
-// Selects fp8 (e4m3) mma.sync instead of u8 wmma for the BBQ local join below. fp8 mma.sync
-// needs sm_89+, so lower archs keep the wmma path even when this is set.
-#ifndef CUVS_NND_BBQ_FP8_MMA
-#define CUVS_NND_BBQ_FP8_MMA 0
-#endif
-#if CUVS_NND_BBQ_FP8_MMA && defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 890)
-#define CUVS_NND_BBQ_USE_FP8_MMA 1
-#else
-#define CUVS_NND_BBQ_USE_FP8_MMA 0
-#endif
-
 // int4 tensor-core BBQ local join, covering both the symmetric (one quantizer, self-join) and
 // asymmetric (two quantizers) cases. Modeled on local_join_kernel_wmma: a warp-level i4 MMA (see
 // promoted_i4_warp_mma.cuh) replaces the popc/dp4a inner product; the accumulator lives in
@@ -1705,7 +1694,16 @@ template <bbq_code_layout DocumentLayout,
           typename Index_t,
           typename ID_t = InternalID_t<Index_t>,
           typename DistEpilogue_t>
-RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
+RAFT_KERNEL
+#ifdef __CUDA_ARCH__
+// Same minBlocksPerMultiprocessor = 4 arches as local_join_kernel_wmma
+#if (__CUDA_ARCH__) == 700 || (__CUDA_ARCH__) == 800 || (__CUDA_ARCH__) == 900 || \
+  (__CUDA_ARCH__) == 1000
+__launch_bounds__(BLOCK_SIZE, 4)
+#else
+__launch_bounds__(BLOCK_SIZE)
+#endif
+#endif
   local_join_kernel_bbq_wmma(const Index_t* graph_new,
                              const Index_t* rev_graph_new,
                              const int2* sizes_new,
@@ -1736,7 +1734,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
   constexpr int MMA_PAD       = 16;
   // Strides are in bytes, though the data is packed 4b.
   constexpr int ROW_STRIDE = BBQ_ROW_BYTES + MMA_PAD;
-#if CUVS_NND_BBQ_USE_FP8_MMA
+#if __CUDA_ARCH__ >= 1030
   using warp_mma = i4_warp_mma_fp8<WARP_TILE, ROW_STRIDE>;
 #else
   using warp_mma = i4_warp_mma_u8<WARP_TILE, ROW_STRIDE>;
@@ -1848,11 +1846,12 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
 
     // col = i % MAX_NUM_BI_SAMPLES is invariant across a thread's own iterations
     // (BLOCK_SIZE is a multiple of MAX_NUM_BI_SAMPLES), so this thread's column factors are
-    // fetched once and reused below
+    // fetched once and reused below. In a self-join they are the staged document factors.
     const int my_col = tx % MAX_NUM_BI_SAMPLES;
     bbq_dequant_factors my_col_factors{};
     if (my_col < col_size) {
-      my_col_factors = get_dequant_factors(dataset_query, col_neighbors[my_col]);
+      my_col_factors = alias_col ? s_document_factors[my_col]
+                                 : get_dequant_factors(dataset_query, col_neighbors[my_col]);
     }
 
     // Cell (row, col) is read (as raw_t, via raw_view) and written (as the final float) at the
