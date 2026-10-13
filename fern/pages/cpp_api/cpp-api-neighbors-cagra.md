@@ -706,7 +706,7 @@ The returned index accepts float queries and stores a non-owning copy of `datase
 
 `cuvs::neighbors::cagra::device_pq_index<float, uint32_t, half>`
 
-built `index&lt;float, uint32_t, device_vpq_dataset_view&lt;half, int64_t&gt;&gt;`
+built `index<float, uint32_t, device_vpq_dataset_view<half, int64_t>>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -731,7 +731,7 @@ cuvs::neighbors::device_padded_dataset_view<float, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_padded_index<float, uint32_t>`
 
-built `device_padded_index&lt;float, uint32_t&gt;`
+built `device_padded_index<float, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -756,7 +756,7 @@ cuvs::neighbors::device_standard_dataset_view<float, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_standard_index<float, uint32_t>`
 
-built `device_standard_index&lt;float, uint32_t&gt;`
+built `device_standard_index<float, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -781,7 +781,7 @@ cuvs::neighbors::host_padded_dataset_view<float, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_padded_index<float, uint32_t>`
 
-built `host_padded_index&lt;float, uint32_t&gt;`
+built `host_padded_index<float, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -806,7 +806,7 @@ cuvs::neighbors::host_standard_dataset_view<float, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_standard_index<float, uint32_t>`
 
-built `host_standard_index&lt;float, uint32_t&gt;`
+built `host_standard_index<float, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -831,7 +831,7 @@ cuvs::neighbors::device_padded_dataset_view<half, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_padded_index<half, uint32_t>`
 
-built `device_padded_index&lt;half, uint32_t&gt;`
+built `device_padded_index<half, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -856,7 +856,7 @@ cuvs::neighbors::device_standard_dataset_view<half, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_standard_index<half, uint32_t>`
 
-built `device_standard_index&lt;half, uint32_t&gt;`
+built `device_standard_index<half, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -881,7 +881,7 @@ cuvs::neighbors::host_padded_dataset_view<half, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_padded_index<half, uint32_t>`
 
-built `host_padded_index&lt;half, uint32_t&gt;`
+built `host_padded_index<half, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -906,7 +906,7 @@ cuvs::neighbors::host_standard_dataset_view<half, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_standard_index<half, uint32_t>`
 
-built `host_standard_index&lt;half, uint32_t&gt;`
+built `host_standard_index<half, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -931,7 +931,7 @@ cuvs::neighbors::device_padded_dataset_view<int8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_padded_index<int8_t, uint32_t>`
 
-built `device_padded_index&lt;int8_t, uint32_t&gt;`
+built `device_padded_index<int8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -956,7 +956,7 @@ cuvs::neighbors::device_standard_dataset_view<int8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_standard_index<int8_t, uint32_t>`
 
-built `device_standard_index&lt;int8_t, uint32_t&gt;`
+built `device_standard_index<int8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -981,7 +981,7 @@ cuvs::neighbors::host_padded_dataset_view<int8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_padded_index<int8_t, uint32_t>`
 
-built `host_padded_index&lt;int8_t, uint32_t&gt;`
+built `host_padded_index<int8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -1006,7 +1006,7 @@ cuvs::neighbors::host_standard_dataset_view<int8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_standard_index<int8_t, uint32_t>`
 
-built `host_standard_index&lt;int8_t, uint32_t&gt;`
+built `host_standard_index<int8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -1031,7 +1031,7 @@ cuvs::neighbors::device_padded_dataset_view<uint8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_padded_index<uint8_t, uint32_t>`
 
-built `device_padded_index&lt;uint8_t, uint32_t&gt;`
+built `device_padded_index<uint8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -1056,7 +1056,7 @@ cuvs::neighbors::device_standard_dataset_view<uint8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::device_standard_index<uint8_t, uint32_t>`
 
-built `device_standard_index&lt;uint8_t, uint32_t&gt;`
+built `device_standard_index<uint8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -1081,7 +1081,7 @@ cuvs::neighbors::host_padded_dataset_view<uint8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_padded_index<uint8_t, uint32_t>`
 
-built `host_padded_index&lt;uint8_t, uint32_t&gt;`
+built `host_padded_index<uint8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -1106,7 +1106,7 @@ cuvs::neighbors::host_standard_dataset_view<uint8_t, int64_t> const& dataset)
 
 `cuvs::neighbors::cagra::host_standard_index<uint8_t, uint32_t>`
 
-built `host_standard_index&lt;uint8_t, uint32_t&gt;`
+built `host_standard_index<uint8_t, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
@@ -1135,7 +1135,7 @@ The returned index cannot be searched: CAGRA has no BBQ search kernels. Call the
 
 `cuvs::neighbors::cagra::device_bbq_index<float, uint32_t>`
 
-built `device_bbq_index&lt;float, uint32_t&gt;`
+built `device_bbq_index<float, uint32_t>`
 
 **Additional overload:** `neighbors::cagra::build`
 
