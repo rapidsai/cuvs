@@ -608,7 +608,7 @@ void distance_impl_l2_expanded(  // NOTE: different name
 
   // When both inputs are the same matrix, diagonal entries compare each row with itself.
   // Set those known self-distances to zero.
-  if (x == y && m > 0 && n > 0) {
+  if (x == y && m > 0 && n > 0 && (is_row_major || m == n)) {
     constexpr uint32_t block_size = 256;
     IdxT diagonal_size            = std::min(m, n);
     IdxT leading_dimension        = is_row_major ? n : m;
