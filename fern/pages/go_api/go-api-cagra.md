@@ -368,7 +368,7 @@ by MergedDatasetOffsets (or the trivial cumulative sizes, if allowList is nil)
 * `allowList` - Row filter already applied by the caller while building mergedDataset, or nil
 * `index` - Output CagraIndex, must be created with CreateIndex before use
 
-_Source: `go/cagra/cagra.go:421`_
+_Source: `go/cagra/cagra.go:439`_
 
 ### MergeIndexWithParams
 
@@ -380,7 +380,7 @@ MergeIndexWithParams merges multiple CAGRA indices into output, using
 explicit mergeParams to control the merge algorithm. See MergeIndex for the
 remaining arguments.
 
-_Source: `go/cagra/cagra.go:428`_
+_Source: `go/cagra/cagra.go:446`_
 
 ### MergedDatasetOffsets
 
@@ -388,17 +388,7 @@ _Source: `go/cagra/cagra.go:428`_
 func MergedDatasetOffsets(Resources cuvs.Resource, indices []*CagraIndex, allowList []uint32) ([]int64, error)
 ```
 
-MergedDatasetOffsets computes, for each input index (in order), the row at
-which its (post-filter) rows must start within a caller-built merged dataset
-buffer, for use with MergeIndex/MergeIndexWithParams. The returned slice has
-len(indices)+1 entries; the last entry is the total merged row count.
-
-For an unfiltered merge (allowList == nil) this is just the cumulative sum
-of each index's row count, and calling this function is unnecessary. For a
-filtered merge, this must be called to determine how many rows survive the
-filter for each index.
-
-_Source: `go/cagra/cagra.go:358`_
+_Source: `go/cagra/cagra.go:372`_
 
 ### SearchIndex
 
@@ -417,7 +407,7 @@ Perform a Approximate Nearest Neighbors search on the Index
 * `distances` - Tensor in device memory that receives the distances of the nearest neighbors
 * `allowList` - List of indices to allow in the search, if nil, no filtering is applied
 
-_Source: `go/cagra/cagra.go:512`_
+_Source: `go/cagra/cagra.go:534`_
 
 ### UpdateDataset
 
@@ -440,7 +430,7 @@ func (index *CagraIndex) Close() error
 
 Destroys the Cagra Index
 
-_Source: `go/cagra/cagra.go:494`_
+_Source: `go/cagra/cagra.go:516`_
 
 ### ExtendParams.Close
 

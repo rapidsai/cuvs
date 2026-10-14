@@ -578,8 +578,7 @@ std::vector<int64_t> merged_dataset_offsets(
 template <typename T, cuvs::neighbors::ann_dataset_view DatasetViewT>
 auto concatenate_datasets(raft::resources const& handle,
                           std::vector<DatasetViewT> const& datasets,
-                          cuvs::neighbors::filtering::base_filter const& row_filter =
-                            cuvs::neighbors::filtering::none_sample_filter{})
+                          cuvs::neighbors::filtering::base_filter const& row_filter)
   -> std::unique_ptr<cuvs::neighbors::device_padded_dataset<T, int64_t>>
 {
   return cagra::detail::concatenate_datasets<T>(handle, datasets, row_filter);
