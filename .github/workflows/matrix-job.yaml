@@ -75,7 +75,7 @@ permissions:
 
 jobs:
   compute-matrix:
-    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@db1cddb6cdf80d1836de64085bb653bea4571867
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@cbf3d64a73fd7b44ee70cebdb50c175b495f6b29
     with:
       build_type: ${{ inputs.build_type }}
       matrix_name: conda-cpp-build
@@ -86,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.compute-matrix.outputs.matrix) }}
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@db1cddb6cdf80d1836de64085bb653bea4571867
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cbf3d64a73fd7b44ee70cebdb50c175b495f6b29
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
