@@ -18,7 +18,6 @@
 
 #include <cstdint>
 #include <iostream>
-#include <memory>
 #include <utility>
 #include <variant>
 
@@ -30,8 +29,8 @@ void print_dataset(const char* name, const DatasetT& dataset)
 }
 
 /**
- * A transformation that takes its input by value and hands back the result. Written this way, it
- * can skip the second buffer whenever the caller passes its only copy of the dataset:
+ * A transformation that takes its input by value and hands back the result. A dataset owns its data
+ * uniquely, so the caller has to move it in and the transform is free to write over its own input:
  * `d = normalize(res, std::move(d))` allocates only the column statistics.
  */
 template <typename T, typename IdxT>
@@ -50,17 +49,10 @@ auto normalize(const raft::resources& res, cuvs::device_contiguous_dataset<T, Id
     return var > T{0} ? (x - mean) / raft::sqrt(var) : T{0};
   };
 
-  if (data.is_data_unique()) {
-    // No other copy can observe the buffer, so the transform may write over its own input.
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
-      res, in, mean_view, var_view, data.data_view(), standardize);
-    return data;
-  }
-  cuvs::device_contiguous_dataset<T, IdxT> out{
-    raft::make_device_matrix<T, int64_t>(res, in.extent(0), in.extent(1))};
+  // Nobody else can observe the buffer, so the transform writes over its own input.
   raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
-    res, in, mean_view, var_view, out.data_view(), standardize);
-  return out;
+    res, in, mean_view, var_view, data.data_view(), standardize);
+  return data;
 }
 
 /* The dictionary slot is free for the datasets that have no dictionary. */
@@ -71,8 +63,26 @@ static_assert(
   std::same_as<cuvs::device_csr_dataset<float, uint32_t>::dictionary_type, std::monostate>);
 static_assert(std::same_as<cuvs::empty_dataset<float, uint32_t>::dictionary_type, std::monostate>);
 static_assert(sizeof(cuvs::device_contiguous_dataset<float, uint32_t>) ==
-              sizeof(std::shared_ptr<void>));
+              sizeof(typename cuvs::device_contiguous_dataset<float, uint32_t>::data_type));
 static_assert(cuvs::device_vpq_dataset<float, uint32_t, float>::is_compressed);
+/* Ownership is unique, so an owning dataset moves rather than copies, while its view is a handle.
+ */
+static_assert(!std::is_copy_constructible_v<cuvs::device_contiguous_dataset<float, uint32_t>>);
+static_assert(std::is_copy_constructible_v<
+              typename cuvs::device_contiguous_dataset<float, uint32_t>::view_type>);
+/* The read-only flavor of the view is the same type with a const element type, in which the two
+ * data views coincide. A mutable view decays into it, but not the other way round.
+ */
+static_assert(
+  std::same_as<
+    typename cuvs::device_contiguous_dataset<float, uint32_t>::const_view_type::data_view_type,
+    typename cuvs::device_contiguous_dataset<float, uint32_t>::const_data_view_type>);
+static_assert(
+  std::convertible_to<typename cuvs::device_contiguous_dataset<float, uint32_t>::view_type,
+                      typename cuvs::device_contiguous_dataset<float, uint32_t>::const_view_type>);
+static_assert(
+  !std::convertible_to<typename cuvs::device_contiguous_dataset<float, uint32_t>::const_view_type,
+                       typename cuvs::device_contiguous_dataset<float, uint32_t>::view_type>);
 
 int main()
 {
@@ -101,18 +111,33 @@ int main()
     raft::make_device_matrix<float, int64_t>(res, n_rows, dim)};
   print_dataset("device contiguous", device_dataset);
 
-  // Moving the dataset in leaves `normalize` as its only owner, so the data is scaled in-place.
+  // The dataset has to be moved into `normalize`, which therefore scales the data in-place.
   raft::linalg::map_offset(res, device_dataset.data_view(), raft::cast_op<float>{});
   const auto* original_data = device_dataset.data_const_view().data_handle();
   device_dataset            = normalize(res, std::move(device_dataset));
   std::cout << "  reused the input buffer: " << std::boolalpha
             << (device_dataset.data_const_view().data_handle() == original_data) << '\n';
 
-  // Passing a copy keeps a second owner alive, so the same call has to allocate its output.
-  auto shared_dataset = device_dataset;
-  auto rescaled       = normalize(res, shared_dataset);
-  std::cout << "  reused the input buffer: "
-            << (rescaled.data_const_view().data_handle() == original_data) << '\n';
+  // A view is the non-owning counterpart of a dataset: it answers the same questions, but the data
+  // stays with the dataset it was taken from.
+  typename cuvs::device_contiguous_dataset<float, uint32_t>::view_type device_view =
+    device_dataset.view();
+  print_dataset("device contiguous (view)", device_view);
+  // The view hands out a read-only mdspan over the same buffer; rebuilding one by hand would mean
+  // spelling out the const accessor.
+  std::cout << "  views the same buffer: "
+            << (device_view.data_const_view().data_handle() == original_data) << '\n';
+
+  // The constness of the dataset picks the flavor of the view: a const dataset hands out the
+  // read-only one, whose data view is already an mdspan of `const float`.
+  const auto& const_dataset = device_dataset;
+  typename cuvs::device_contiguous_dataset<float, uint32_t>::const_view_type const_view =
+    const_dataset.view();
+  print_dataset("device contiguous (const view)", const_view);
+  // ... and a mutable view decays into that same type on its own.
+  const_view = device_view;
+  std::cout << "  views the same buffer: "
+            << (const_view.data_view().data_handle() == original_data) << '\n';
 
   // The same dataset over a padded layout: the spec, not the dataset, selects the layout.
   using padded_dataset_type = cuvs::device_padded_dataset<float, uint32_t>;
@@ -154,10 +179,10 @@ int main()
     // A single codebook shared by all the subspaces; `pq_dim` of them would be per-subspace.
     raft::make_device_mdarray<float, int64_t>(
       res, raft::make_extents<int64_t>(1, pq_n_centers, pq_len))};
-  auto dictionary = std::make_shared<const vpq_dictionary_type>(std::move(codebooks));
 
   vpq_dataset_type vpq_dataset{
-    raft::make_device_matrix<uint8_t, int64_t>(res, n_rows, encoded_row_length), dictionary};
+    raft::make_device_matrix<uint8_t, int64_t>(res, n_rows, encoded_row_length),
+    std::move(codebooks)};
   print_dataset("device vpq", vpq_dataset);
   auto books = vpq_dataset.dictionary_view();
   std::cout << "  vq_n_centers = " << books.vq_n_centers() << ", pq_bits = " << books.pq_bits()
@@ -166,19 +191,21 @@ int main()
   // The data slot is a plain dense matrix of bytes, hence the shared spec.
   std::cout << "  encoded row length = " << vpq_dataset.data_view().extent(1) << '\n';
 
-  // A dictionary is immutable, so another dataset may be encoded against the very same codebooks.
-  vpq_dataset_type shared_vpq_dataset{
-    raft::make_device_matrix<uint8_t, int64_t>(res, n_rows * 2, encoded_row_length),
-    vpq_dataset.share_dictionary()};
-  print_dataset("device vpq (shared dictionary)", shared_vpq_dataset);
+  // The view of a compressed dataset carries the dictionary along, so it can still tell the
+  // dimension that the encoded rows alone do not reveal.
+  auto vpq_view = vpq_dataset.view();
+  print_dataset("device vpq (view)", vpq_view);
+  std::cout << "  views the same codebook: "
+            << (vpq_view.dictionary_view().vq_code_book.data_handle() ==
+                books.vq_code_book.data_handle())
+            << '\n';
 
   // Scalar quantization keeps one code per component, so the dimension is still a property of the
   // data and the dictionary is only the interval to dequantize into.
   using sq_dataset_type    = cuvs::device_sq_dataset<float, uint32_t, float>;
   using sq_dictionary_type = typename sq_dataset_type::dictionary_type;
-  sq_dataset_type sq_dataset{
-    raft::make_device_matrix<int8_t, int64_t>(res, n_rows, dim),
-    std::make_shared<const sq_dictionary_type>(sq_dictionary_type{-1.0F, 1.0F})};
+  sq_dataset_type sq_dataset{raft::make_device_matrix<int8_t, int64_t>(res, n_rows, dim),
+                             sq_dictionary_type{-1.0F, 1.0F}};
   print_dataset("device sq", sq_dataset);
   std::cout << "  range = [" << sq_dataset.dictionary_view().min_ << ", "
             << sq_dataset.dictionary_view().max_ << "]\n";
