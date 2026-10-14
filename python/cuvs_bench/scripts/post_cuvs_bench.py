@@ -6,17 +6,17 @@ This script parses the result tree written by `python -m cuvs_bench.run` and
 converts it to the BenchmarkSubmission format for the Lambda API.
 
 Usage:
-    python scripts/post_csv_results_cuvs_bench.py /path/to/dataset/result \
-        --sku-name on-prem-rtx-pro-6000-blackwell \
-        --storage-configuration-name local-nvme-ann-fbin \
+    python scripts/post_cuvs_bench.py /path/to/dataset/result \
+        --sku-name <registered-sku> \
+        --storage-configuration-name <registered-storage-config> \
         --cache-state warm \
         --cuvs-version 25.10.00 \
         --commit-hash abc1234
 
     # Check the payload without sending it
-    python scripts/post_csv_results_cuvs_bench.py /path/to/dataset/result \
-        --sku-name on-prem-rtx-pro-6000-blackwell \
-        --storage-configuration-name local-nvme-ann-fbin \
+    python scripts/post_cuvs_bench.py /path/to/dataset/result \
+        --sku-name <registered-sku> \
+        --storage-configuration-name <registered-storage-config> \
         --cache-state warm --dry-run
 
 Environment variables:
@@ -120,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sku-name",
         required=True,
-        help="Compute hardware SKU name (e.g., 'on-prem-rtx-pro-6000-blackwell')",
+        help="Compute hardware SKU name registered with the API",
     )
     parser.add_argument(
         "--storage-configuration-name",

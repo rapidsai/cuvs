@@ -6,10 +6,10 @@
 #
 # Required env:
 #   BENCHMARK_API_KEY  Sourced from ~/.config/benchmark/env if not already set.
+#   SKU_NAME                    Hardware SKU registered with the API.
+#   STORAGE_CONFIGURATION_NAME  Storage configuration registered with the API.
 #
 # Optional env (with defaults shown):
-#   SKU_NAME                    on-prem-rtx-pro-6000-blackwell
-#   STORAGE_CONFIGURATION_NAME  local-nvme-ann-fbin
 #   CACHE_STATE                 warm
 #   SEARCH_MODE                 latency
 #   ENGINE_NAME                 cuvs-bench
@@ -37,10 +37,10 @@ Usage:
 
 Required env:
   BENCHMARK_API_KEY            Sourced from ~/.config/benchmark/env if unset.
+  SKU_NAME                     Hardware SKU registered with the API.
+  STORAGE_CONFIGURATION_NAME   Storage configuration registered with the API.
 
 Optional env (with defaults):
-  SKU_NAME                     on-prem-rtx-pro-6000-blackwell
-  STORAGE_CONFIGURATION_NAME   local-nvme-ann-fbin
   CACHE_STATE                  warm
   SEARCH_MODE                  latency
   ENGINE_NAME                  cuvs-bench
@@ -84,8 +84,8 @@ if [ ! -f "$post_script" ]; then
     exit 2
 fi
 
-sku_name="${SKU_NAME:-on-prem-rtx-pro-6000-blackwell}"
-storage_name="${STORAGE_CONFIGURATION_NAME:-local-nvme-ann-fbin}"
+sku_name="${SKU_NAME:?Set SKU_NAME to the hardware SKU registered with the API}"
+storage_name="${STORAGE_CONFIGURATION_NAME:?Set STORAGE_CONFIGURATION_NAME to the storage configuration registered with the API}"
 cache_state="${CACHE_STATE:-warm}"
 search_mode="${SEARCH_MODE:-latency}"
 engine_name="${ENGINE_NAME:-cuvs-bench}"
