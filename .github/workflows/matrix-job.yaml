@@ -86,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.compute-matrix.outputs.matrix) }}
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@f127659d02df896f7ded35eafa08530c362bc694
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@5fcd6608e19e3d8d91690b7d76a48a57b22d44a6
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
