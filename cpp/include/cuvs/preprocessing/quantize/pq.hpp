@@ -290,7 +290,7 @@ namespace detail {
  * // `padded` is a `device_padded_dataset_view<float, int64_t>` over the source rows.
  * cuvs::neighbors::vpq_params vpq_params{};
  * auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset(res, vpq_params, padded);
- * auto idx = cuvs::neighbors::cagra::build(res, cagra_params, vpq.as_dataset_view());
+ * auto idx = cuvs::neighbors::cagra::build(res, cagra_params, vpq.view());
  * @endcode
  */
 template <typename SrcT>

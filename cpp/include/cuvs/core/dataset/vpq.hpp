@@ -31,17 +31,16 @@ namespace CUVS_EXPORT cuvs {
  */
 template <typename MathT, typename BookPolicy, typename CodePolicy>
 struct vpq_spec {
-  /* The encoded rows are stored like the rows of any other dense dataset; only how a row is read
-  and where the dimension comes from are specific to the compression.
-  */
+  // The encoded rows are stored like the rows of any other dense dataset; only how a row is read
+  // and where the dimension comes from are specific to the compression.
   template <typename IdxT>
   using storage_spec =
     typename mdarray_spec<raft::layout_c_contiguous, CodePolicy>::template apply<uint8_t, IdxT>;
 
-  /* The type the codebooks are stored in; the rows themselves are always packed codes. */
+  // The type the codebooks are stored in; the rows themselves are always packed codes.
   using math_type = MathT;
 
-  /* [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one. */
+  // [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one.
   using book_type =
     raft::mdarray<math_type, raft::matrix_extent<uint32_t>, raft::layout_c_contiguous, BookPolicy>;
 
@@ -50,15 +49,14 @@ struct vpq_spec {
     book_type pq_code_book;
   };
 
-  /* The views of the codebooks, writable or read-only alike. */
+  // The views of the codebooks, writable or read-only alike.
   template <typename BookViewT>
   struct dictionary_view_of {
     BookViewT vq_code_book;
     BookViewT pq_code_book;
 
-    /* NOTE: the dimension of the dataset is a property of the VQ codebook: the encoded rows tell
-    only how many bytes it took to compress a vector, which the padding makes ambiguous.
-    */
+    // NOTE: the dimension of the dataset is a property of the VQ codebook: the encoded rows tell
+    // only how many bytes it took to compress a vector, which the padding makes ambiguous.
     [[nodiscard]] auto dim() const noexcept -> uint32_t { return vq_code_book.extent(1); }
     [[nodiscard]] auto vq_n_centers() const noexcept -> uint32_t { return vq_code_book.extent(0); }
     [[nodiscard]] auto pq_n_centers() const noexcept -> uint32_t { return pq_code_book.extent(0); }
@@ -77,22 +75,20 @@ struct vpq_spec {
 
   template <typename T, typename IdxT>
   struct apply : storage_spec<IdxT> {
-    /* The dataset stores codes, but it still represents vectors of `T`. */
+    // The dataset stores codes, but it still represents vectors of `T`.
     using value_type = std::remove_cv_t<T>;
     using code_type  = uint8_t;
-    /* NOTE: re-exported rather than declared here, so that they do not belong to one instantiation
-    of `apply`; qualified lookup into `apply` does not reach the enclosing spec on its own.
-    */
+    // NOTE: re-exported rather than declared here, so that they do not belong to one instantiation
+    // of `apply`; qualified lookup into `apply` does not reach the enclosing spec on its own.
     using math_type                  = vpq_spec::math_type;
     using book_type                  = vpq_spec::book_type;
     using dictionary_type            = vpq_spec::dictionary_type;
     using dictionary_view_type       = vpq_spec::dictionary_view_type;
     using const_dictionary_view_type = vpq_spec::const_dictionary_view_type;
 
-    /* NOTE: the data accessors are inherited; only `get_dim` differs from a dense dataset. Like the
-    inherited ones, it reads the dictionary in either form: the codebooks an owning dataset holds,
-    or the views a `dataset_view` holds.
-    */
+    // NOTE: the data accessors are inherited; only `get_dim` differs from a dense dataset. Like the
+    // inherited ones, it reads the dictionary in either form: the codebooks an owning dataset
+    // holds, or the views a `dataset_view` holds.
     [[nodiscard]] static auto get_dim(const auto&, const auto& dict) noexcept -> uint32_t
     {
       return static_cast<uint32_t>(dict.vq_code_book.extent(1));
@@ -113,7 +109,7 @@ struct vpq_spec {
       return {raft::make_const_mdspan(dict.vq_code_book),
               raft::make_const_mdspan(dict.pq_code_book)};
     }
-    /* The length of an encoded row in bytes, including the inlined VQ label. */
+    // The length of an encoded row in bytes, including the inlined VQ label.
     [[nodiscard]] static auto get_encoded_row_length(const auto& data) noexcept -> uint32_t
     {
       return static_cast<uint32_t>(data.extent(1));

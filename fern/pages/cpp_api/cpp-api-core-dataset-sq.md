@@ -17,15 +17,5 @@ dictionary is only the range the codes are mapped back onto and the dimension is
 
 ```cpp
 template <typename MathT, typename CodePolicy>
-struct sq_spec {
-  /* One code per component, so the codes are laid out exactly like a dense dataset. */ template <typename IdxT> using storage_spec;
-  /* Nothing to allocate: the whole dictionary is the interval the codes are dequantized into. The members are named as in cuvs::preprocessing::quantize::scalar::quantizer. */ struct dictionary_type;
-};
+struct sq_spec;
 ```
-
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `storage_spec` | [`/* One code per component, so the codes are laid out exactly like a dense dataset. */ template <typename IdxT> using`](/api-reference/cpp-api-core-dataset-type#dataset) |  |
-| `dictionary_type` | [`/* Nothing to allocate: the whole dictionary is the interval the codes are dequantized into. The members are named as in cuvs::preprocessing::quantize::scalar::quantizer. */ struct`](/api-reference/cpp-api-preprocessing-quantize-scalar#preprocessing-quantize-scalar-quantizer) |  |

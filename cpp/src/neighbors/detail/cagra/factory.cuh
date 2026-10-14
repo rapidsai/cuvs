@@ -102,7 +102,7 @@ auto make_key(const cagra::search_params& params,
              reinterpret_cast<uint64_t>(dataset_norms),
              uint64_t(dataset.n_rows()),
              dataset.dim(),
-             uint32_t(dataset.stride()),
+             uint32_t(dataset.data_const_view().stride(0)),
              uint32_t(params.team_size),
              uint32_t(metric),
              uint32_t(params.smem_dtype)};

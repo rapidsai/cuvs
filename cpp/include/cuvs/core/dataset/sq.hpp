@@ -25,16 +25,15 @@ namespace CUVS_EXPORT cuvs {
  */
 template <typename MathT, typename CodePolicy>
 struct sq_spec {
-  /* One code per component, so the codes are laid out exactly like a dense dataset. */
+  // One code per component, so the codes are laid out exactly like a dense dataset.
   template <typename IdxT>
   using storage_spec =
     typename mdarray_spec<raft::layout_c_contiguous, CodePolicy>::template apply<int8_t, IdxT>;
 
   using math_type = MathT;
 
-  /* Nothing to allocate: the whole dictionary is the interval the codes are dequantized into.
-  The members are named as in cuvs::preprocessing::quantize::scalar::quantizer.
-  */
+  // Nothing to allocate: the whole dictionary is the interval the codes are dequantized into.
+  // The members are named as in cuvs::preprocessing::quantize::scalar::quantizer.
   struct dictionary_type {
     math_type min_;
     math_type max_;
@@ -43,27 +42,24 @@ struct sq_spec {
 
   template <typename T, typename IdxT>
   struct apply : storage_spec<IdxT> {
-    /* The dataset stores codes, but it still represents vectors of `T`. */
+    // The dataset stores codes, but it still represents vectors of `T`.
     using value_type = std::remove_cv_t<T>;
     using code_type  = int8_t;
-    /* NOTE: re-exported rather than declared here, so that they do not belong to one instantiation
-    of `apply`; qualified lookup into `apply` does not reach the enclosing spec on its own.
-    */
+    // NOTE: re-exported rather than declared here, so that they do not belong to one instantiation
+    // of `apply`; qualified lookup into `apply` does not reach the enclosing spec on its own.
     using math_type            = sq_spec::math_type;
     using dictionary_type      = sq_spec::dictionary_type;
     using dictionary_view_type = sq_spec::dictionary_view_type;
 
-    /* NOTE: every accessor is inherited; the dimension is still one code per component, so even
-    `get_dim` is the dense one.
-    */
+    // NOTE: every accessor is inherited; the dimension is still one code per component, so even
+    // `get_dim` is the dense one.
     [[nodiscard]] static auto get_dictionary_view(const dictionary_type& dict) noexcept
       -> dictionary_view_type
     {
       return dict;
     }
-    /* NOTE: the dictionary is its own view here, read-only or not, so one overload serves both the
-    owning dataset and the view.
-    */
+    // NOTE: the dictionary is its own view here, read-only or not, so one overload serves both the
+    // owning dataset and the view.
     [[nodiscard]] static auto get_dictionary_const_view(const dictionary_type& dict) noexcept
       -> dictionary_view_type
     {

@@ -36,17 +36,15 @@ concept compressed_dataset_spec = requires { typename SpecT::dictionary_type; };
 template <typename T, typename IdxT, typename SpecT>
 struct dataset_view {
   using spec_type = typename SpecT::template apply<T, IdxT>;
-  /* The read-only flavor, in which each view type collapses onto its const counterpart. */
+  // The read-only flavor, in which each view type collapses onto its const counterpart.
   static constexpr bool is_const_view = std::is_const_v<T>;
 
   using value_type = typename spec_type::value_type;
   using index_type = typename spec_type::index_type;
-  /**
-    What one element of the data slot is
-      - for compressed datasets it is the raw data element type; often is uint8_t but may be
-        a larger type to enforce better alignment.
-      - for uncompressed datasets it is the value type of the dataset.
-   */
+  // What one element of the data slot is
+  //   - for compressed datasets it is the raw data element type; often is uint8_t but may be
+  //     a larger type to enforce better alignment.
+  //   - for uncompressed datasets it is the value type of the dataset.
   using code_type = typename decltype([] {
     if constexpr (requires { typename spec_type::code_type; }) {
       return std::type_identity<typename spec_type::code_type>{};
@@ -60,10 +58,8 @@ struct dataset_view {
   using data_view_type =
     std::conditional_t<is_const_view, const_data_view_type, typename spec_type::data_view_type>;
 
-  /**
-    Optional slot that contains everything to give meaning to the encoded data;
-    `std::monostate` for an uncompressed dataset.
-   */
+  // Optional slot that contains everything to give meaning to the encoded data;
+  // `std::monostate` for an uncompressed dataset.
   using dictionary_type = typename decltype([] {
     if constexpr (requires { typename spec_type::dictionary_type; }) {
       return std::type_identity<typename spec_type::dictionary_type>{};
@@ -95,7 +91,7 @@ struct dataset_view {
 
   static constexpr bool is_compressed = compressed_dataset_spec<spec_type>;
 
-  /* An empty view, like a default-constructed mdspan: no rows, no data. */
+  /** An empty view, like a default-constructed mdspan: no rows, no data. */
   dataset_view() noexcept = default;
 
   explicit dataset_view(data_view_type data_view)
@@ -110,15 +106,16 @@ struct dataset_view {
   {
   }
 
-  /* A mutable view decays to a read-only one, the way an mdspan does.
-
-  NOTE: a constructor template, because in the mutable flavor the parameter would spell the very
-  same type; a non-template would be a copy constructor there, and declaring one - even a
-  constrained-away one - suppresses the implicitly declared copy constructor.
-
-  NOTE: the dictionary is assigned in the body rather than in the init-list, because the accessor it
-  comes from is constrained on `is_compressed`.
-  */
+  /**
+   * @brief A mutable view decays to a read-only one, the way an mdspan does.
+   *
+   * NOTE: a constructor template, because in the mutable flavor the parameter would spell the very
+   * same type; a non-template would be a copy constructor there, and declaring one - even a
+   * constrained-away one - suppresses the implicitly declared copy constructor.
+   *
+   * NOTE: the dictionary is assigned in the body rather than in the init-list, because the
+   * accessor it comes from is constrained on `is_compressed`.
+   */
   template <typename OtherT>
     requires(is_const_view && std::same_as<OtherT, std::remove_const_t<T>>)
   dataset_view(const dataset_view<OtherT, IdxT, SpecT>& other) noexcept
@@ -127,33 +124,41 @@ struct dataset_view {
     if constexpr (is_compressed) { dictionary_view_ = other.const_dictionary_view(); }
   }
 
+  /**
+   * @brief The number of rows in the dataset.
+   *
+   * @return The number of rows.
+   */
   [[nodiscard]] auto n_rows() const noexcept -> index_type
   {
     return spec_type::get_n_rows(data_view_);
   }
-  // NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone
+  /**
+   * @brief The dimension of the vectors in the dataset.
+   *
+   * NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone.
+   *
+   * @return The dimension.
+   */
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
     return spec_type::get_dim(data_view_, dictionary_view_);
   }
-  /* The distance between the starts of two rows, in elements; defined if the spec has strided rows.
+
+  /**
+   * @brief A non-owning view of the data, such as mdspan.
+   *
+   * @return A view of the data.
    */
-  [[nodiscard]] auto stride() const noexcept -> uint32_t
-    requires requires(const data_view_type& d) { spec_type::get_stride(d); }
-  {
-    return spec_type::get_stride(data_view_);
-  }
-
-  /*
-   @return A non-owning view of the data, such as mdspan.
-  */
   [[nodiscard]] auto data_view() const noexcept -> data_view_type { return data_view_; }
-  /*
-   NOTE: giving up write access is not a plain cast for most view types - a mutable mdspan, for
-   one, has to be rebuilt over a const accessor - hence the spec does the conversion.
-
-   @return A read-only view of the data.
-  */
+  /**
+   * @brief A read-only view of the data.
+   *
+   * NOTE: giving up write access is not a plain cast for most view types - a mutable mdspan, for
+   * one, has to be rebuilt over a const accessor - hence the spec does the conversion.
+   *
+   * @return A read-only view of the data.
+   */
   [[nodiscard]] auto data_const_view() const noexcept -> const_data_view_type
   {
     if constexpr (is_const_view) {
@@ -163,17 +168,21 @@ struct dataset_view {
     }
   }
 
-  /*
-   @return A non-owning view of the dictionary, such as the two codebooks of a VPQ dataset.
-  */
+  /**
+   * @brief A non-owning view of the dictionary, such as the two codebooks of a VPQ dataset.
+   *
+   * @return A view of the dictionary.
+   */
   [[nodiscard]] auto dictionary_view() const noexcept -> dictionary_view_type
     requires(is_compressed)
   {
     return dictionary_view_;
   }
-  /*
-   @return A read-only view of the dictionary.
-  */
+  /**
+   * @brief A read-only view of the dictionary.
+   *
+   * @return A read-only view of the dictionary.
+   */
   [[nodiscard]] auto const_dictionary_view() const noexcept -> const_dictionary_view_type
     requires(is_compressed)
   {

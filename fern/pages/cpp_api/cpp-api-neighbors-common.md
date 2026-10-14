@@ -89,28 +89,6 @@ struct dataset_view_kind_of {
 | --- | --- | --- |
 | `value` | `static constexpr dataset_view_kind` |  |
 
-<a id="neighbors-dataset-view-kind-of"></a>
-### neighbors::dataset_view_kind_of
-
-The migrated kinds are told apart by their spec, for a dataset as well as for its view.
-
-```cpp
-template <template <typename, typename, typename> class DatasetT,
-typename DataT,
-typename IdxT,
-typename ContainerPolicy>
-struct dataset_view_kind_of<
-DatasetT<DataT, IdxT, mdarray_spec<padded_layout<DataT>, ContainerPolicy>>> {
-  static constexpr dataset_view_kind value;
-};
-```
-
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `value` | `static constexpr dataset_view_kind` |  |
-
 <a id="neighbors-dataset-view-is-device-accessible"></a>
 ### neighbors::dataset_view_is_device_accessible
 

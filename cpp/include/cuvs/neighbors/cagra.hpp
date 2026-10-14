@@ -348,10 +348,10 @@ struct index_params : cuvs::neighbors::index_params {
    *   cagra::index_params index_params;
    *   // Build graph only — caller attaches dataset later.
    *   index_params.attach_dataset_on_build = false;
-   *   auto index = cagra::build(res, index_params, dataset->as_dataset_view());
+   *   auto index = cagra::build(res, index_params, dataset->view());
    *   // ASSERT(index.size() == 0);  // no dataset yet
    *   // Attach with a view (storage owned by `dataset`).
-   *   index = cagra::update_dataset(res, std::move(index), dataset->as_dataset_view());
+   *   index = cagra::update_dataset(res, std::move(index), dataset->view());
    *   cagra::search(res, search_params, index, queries, neighbors, distances);
    * @endcode
    */
@@ -618,7 +618,7 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
    * the index uses the dataset; the index does not take ownership of the buffer.
    * @code{.cpp}
    *   auto padded_owner = cuvs::neighbors::make_device_padded_dataset(res, dataset_mdspan);
-   *   auto view         = padded_owner->as_dataset_view();
+   *   auto view         = padded_owner->view();
    *   cuvs::neighbors::cagra::device_padded_index<float> idx(res, metric, view,
    *                                                       raft::make_const_mdspan(graph));
    *   // `padded_owner` must outlive `idx` (do not let it go out of scope while `idx` is used).
@@ -1278,7 +1278,7 @@ auto build(raft::resources const& res,
  *   using namespace cuvs::neighbors;
  *   // Build `extended` = old || new on device, padded for CAGRA.
  *   auto extended = make_device_padded_dataset(res, concatenated_view);
- *   auto extended_view = extended->as_dataset_view();
+ *   auto extended_view = extended->view();
  *
  *   cagra::extend_params params;
  *   int64_t new_start_row = static_cast<int64_t>(index.size());

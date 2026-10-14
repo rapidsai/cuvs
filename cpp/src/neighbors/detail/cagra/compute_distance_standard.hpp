@@ -41,7 +41,7 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
                  dataset.data_const_view().data_handle(),
                  IndexT(dataset.n_rows()),
                  dataset.dim(),
-                 dataset.stride(),
+                 dataset.data_const_view().stride(0),
                  dataset_norms);
   }
 

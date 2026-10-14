@@ -182,7 +182,7 @@ TEST_P(CagraQBuildTest, BuildsAndSearchesAFreshlyCompressedDataset)
   ASSERT_EQ(compressed.const_dictionary_view().pq_len(),
             static_cast<uint32_t>(params_.dim / params_.pq_dim));
 
-  auto idx = cagra::build(res_, iterative_params(), compressed.as_dataset_view());
+  auto idx = cagra::build(res_, iterative_params(), std::as_const(compressed).view());
   ASSERT_EQ(idx.size(), params_.n_rows);
   ASSERT_EQ(idx.dim(), params_.dim);
   ASSERT_EQ(idx.graph_degree(), 32u);
@@ -203,7 +203,7 @@ TEST_P(CagraQBuildTest, PromotesUnsetGraphBuildParamsToIterative)
   params.graph_degree = 32;
   ASSERT_TRUE(std::holds_alternative<std::monostate>(params.graph_build_params));
 
-  auto idx = cagra::build(res_, params, compressed.as_dataset_view());
+  auto idx = cagra::build(res_, params, std::as_const(compressed).view());
   EXPECT_EQ(idx.size(), params_.n_rows);
 }
 
@@ -227,7 +227,7 @@ class CagraQSerializeTest : public CagraQCompressedTestBase {
 TEST_F(CagraQSerializeTest, RoundTripsGraphAndReattachesDataset)
 {
   auto compressed = compress(res_, dataset(), pq_dim);
-  auto idx        = cagra::build(res_, iterative_params(), compressed.as_dataset_view());
+  auto idx        = cagra::build(res_, iterative_params(), std::as_const(compressed).view());
   auto before     = neighbor_ids(res_, idx, queries(500));
 
   std::stringstream stored;
@@ -240,7 +240,7 @@ TEST_F(CagraQSerializeTest, RoundTripsGraphAndReattachesDataset)
   ASSERT_EQ(restored.graph_degree(), idx.graph_degree());
   EXPECT_EQ(restored.metric(), idx.metric());
 
-  restored = cagra::update_dataset(res_, std::move(restored), compressed.as_dataset_view());
+  restored = cagra::update_dataset(res_, std::move(restored), std::as_const(compressed).view());
   EXPECT_EQ(neighbor_ids(res_, restored, queries(500)), before);
 }
 
@@ -259,7 +259,7 @@ TEST_F(CagraQContractTest, RejectsNonIterativeGraphBuilder)
   auto params     = iterative_params();
   params.graph_build_params =
     graph_build_params::nn_descent_params(params.intermediate_graph_degree);
-  EXPECT_THROW(cagra::build(res_, params, compressed.as_dataset_view()), raft::exception);
+  EXPECT_THROW(cagra::build(res_, params, std::as_const(compressed).view()), raft::exception);
 }
 
 TEST_F(CagraQContractTest, RejectsMetricOtherThanL2Expanded)
@@ -267,14 +267,14 @@ TEST_F(CagraQContractTest, RejectsMetricOtherThanL2Expanded)
   auto compressed = compress(res_, dataset(), 32);
   auto params     = iterative_params();
   params.metric   = cuvs::distance::DistanceType::InnerProduct;
-  EXPECT_THROW(cagra::build(res_, params, compressed.as_dataset_view()), raft::exception);
+  EXPECT_THROW(cagra::build(res_, params, std::as_const(compressed).view()), raft::exception);
 }
 
 TEST_F(CagraQContractTest, RejectsPqBitsOtherThan8)
 {
   auto compressed = compress(res_, dataset(), 32, /* pq_bits */ 6);
   ASSERT_EQ(compressed.const_dictionary_view().pq_bits(), 6u);
-  EXPECT_THROW(cagra::build(res_, iterative_params(), compressed.as_dataset_view()),
+  EXPECT_THROW(cagra::build(res_, iterative_params(), std::as_const(compressed).view()),
                raft::exception);
 }
 
@@ -282,7 +282,7 @@ TEST_F(CagraQContractTest, RejectsPqLenOutsideSupportedSet)
 {
   auto compressed = compress(res_, dataset(), /* pq_dim */ 4);  // pq_len = 64 / 4 = 16
   ASSERT_EQ(compressed.const_dictionary_view().pq_len(), 16u);
-  EXPECT_THROW(cagra::build(res_, iterative_params(), compressed.as_dataset_view()),
+  EXPECT_THROW(cagra::build(res_, iterative_params(), std::as_const(compressed).view()),
                raft::exception);
 }
 
@@ -297,7 +297,8 @@ TEST_F(CagraQContractTest, RejectsEmptyDataset)
   vpq_dataset_t empty{std::move(codes), {std::move(vq_code_book), std::move(pq_code_book)}};
   ASSERT_EQ(empty.n_rows(), 0);
 
-  EXPECT_THROW(cagra::build(res_, iterative_params(), empty.as_dataset_view()), raft::exception);
+  EXPECT_THROW(cagra::build(res_, iterative_params(), std::as_const(empty).view()),
+               raft::exception);
 }
 
 }  // namespace cuvs::neighbors::cagra

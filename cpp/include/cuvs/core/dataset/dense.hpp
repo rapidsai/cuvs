@@ -25,11 +25,10 @@ template <typename LayoutPolicy, typename ContainerPolicy>
 struct mdarray_spec {
   template <typename T, typename IdxT>
   struct apply {
-    /* NOTE: index type != extents type
-    The index type can vary depending on the use case; we often may want to store indices in 32-bit
-    slots to save memory on large datasets. The extents are always fixed to 64-bit signed integers
-    to simplify the conversion and avoid integer overflow issues.
-    */
+    // NOTE: index type != extents type
+    // The index type can vary depending on the use case; we often may want to store indices in
+    // 32-bit slots to save memory on large datasets. The extents are always fixed to 64-bit signed
+    // integers to simplify the conversion and avoid integer overflow issues.
     using value_type = std::remove_cv_t<T>;
     using index_type = std::remove_cv_t<IdxT>;
     using data_type =
@@ -47,18 +46,16 @@ struct mdarray_spec {
     {
       return data.view();
     }
-    /* A mutable mdspan does not decay to a read-only one on its own; it has to be rebuilt over an
-    accessor of `const T`.
-    */
+    // A mutable mdspan does not decay to a read-only one on its own; it has to be rebuilt over an
+    // accessor of `const T`.
     [[nodiscard]] static auto get_data_const_view(data_view_type data) noexcept
       -> const_data_view_type
     {
       return raft::make_const_mdspan(data);
     }
-    /* NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
-    or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
-    whatever the dataset puts in that slot instead.
-    */
+    // NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
+    // or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
+    // whatever the dataset puts in that slot instead.
     [[nodiscard]] static auto get_n_rows(const auto& data) noexcept -> index_type
     {
       return static_cast<index_type>(data.extent(0));
@@ -66,10 +63,6 @@ struct mdarray_spec {
     [[nodiscard]] static auto get_dim(const auto& data, const auto&) noexcept -> uint32_t
     {
       return static_cast<uint32_t>(data.extent(1));
-    }
-    [[nodiscard]] static auto get_stride(const auto& data) noexcept -> uint32_t
-    {
-      return static_cast<uint32_t>(data.stride(0));
     }
   };
 };

@@ -179,13 +179,13 @@ static void merge_indices_for_layout(
       cuvs::neighbors::cagra::detail::merged_dataset_size<T, uint32_t, DatasetViewT>(
         *res_ptr, index_ptrs, row_filter);
     auto const dim    = static_cast<uint32_t>(index_ptrs.front()->dim());
-    auto const stride = static_cast<int64_t>(index_ptrs.front()->dataset().stride());
+    auto const stride = static_cast<int64_t>(index_ptrs.front()->dataset().data_const_view().stride(0));
 
     try {
       using owner_t = cuvs::neighbors::owning_dataset_for_view_t<DatasetViewT>;
       auto owner    = std::make_unique<owner_t>(
         cuvs::neighbors::detail::make_dense_array<owner_t>(*res_ptr, final_row_count, dim, stride));
-      auto view     = owner->as_dataset_view();
+      auto view     = std::as_const(*owner).view();
       auto merged_idx =
         cuvs::neighbors::cagra::merge(
           *res_ptr, params_cpp, index_ptrs, view, merge_params, row_filter);
@@ -229,7 +229,7 @@ static void merge_indices_for_layout(
       raft::copy_matrix(matrix.data_handle() + row_offset * static_cast<std::size_t>(stride),
                         static_cast<std::size_t>(stride),
                         input.data_const_view().data_handle(),
-                        static_cast<std::size_t>(input.stride()),
+                        static_cast<std::size_t>(input.data_const_view().stride(0)),
                         static_cast<std::size_t>(dim),
                         static_cast<std::size_t>(input.n_rows()),
                         stream);
@@ -238,7 +238,7 @@ static void merge_indices_for_layout(
     raft::resource::sync_stream(*res_ptr);
 
     auto owner      = std::make_unique<host_owner_t>(std::move(matrix));
-    auto view       = owner->as_dataset_view();
+    auto view       = std::as_const(*owner).view();
     auto merged_idx = cuvs::neighbors::cagra::build(*res_ptr, params_cpp, view);
     auto* holder =
       new cuvs_cagra_c_api_index_lifetime_holder<T, host_view_t>{std::move(merged_idx)};
@@ -403,7 +403,7 @@ static void with_dataset_view(cuvsDataset_t dataset, Fn&& fn)
   RAFT_EXPECTS(dataset->addr != 0, "null dataset storage");
   if (dataset->is_owning) {
     auto* owner = reinterpret_cast<OwnerT*>(dataset->addr);
-    auto view   = owner->as_dataset_view();
+    auto view   = std::as_const(*owner).view();
     fn(view);
   } else {
     fn(*reinterpret_cast<ViewT*>(dataset->addr));

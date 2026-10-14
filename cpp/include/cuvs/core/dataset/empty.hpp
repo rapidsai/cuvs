@@ -26,9 +26,8 @@ struct empty_spec {
   struct apply {
     using data_type      = empty_dataset_rep;
     using data_view_type = empty_dataset_rep;
-    /* NOTE: not `const empty_dataset_rep`: a read-only view holds this as a member, and a const
-    member would delete its assignment operator.
-    */
+    // NOTE: not `const empty_dataset_rep`: a read-only view holds this as a member, and a const
+    // member would delete its assignment operator.
     using const_data_view_type = empty_dataset_rep;
     using value_type           = std::remove_cv_t<T>;
     using index_type           = std::remove_cv_t<IdxT>;
@@ -37,18 +36,16 @@ struct empty_spec {
     {
       return data;
     }
-    /* NOTE: the view of an empty dataset is the storage itself, so one overload serves both the
-    owning dataset and the view.
-    */
+    // NOTE: the view of an empty dataset is the storage itself, so one overload serves both the
+    // owning dataset and the view.
     [[nodiscard]] static auto get_data_const_view(const data_type& data) noexcept
       -> const_data_view_type
     {
       return data;
     }
-    /* NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
-    or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
-    whatever the dataset puts in that slot instead.
-    */
+    // NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
+    // or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
+    // whatever the dataset puts in that slot instead.
     [[nodiscard]] static auto get_n_rows(const auto&) noexcept -> index_type { return 0; }
     [[nodiscard]] static auto get_dim(const auto& data, const auto&) noexcept -> uint32_t
     {

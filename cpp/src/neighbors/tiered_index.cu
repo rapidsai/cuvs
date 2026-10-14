@@ -245,8 +245,7 @@ void search(raft::resources const& res,
   auto vectors = raft::make_device_matrix_view<const float, int64_t>(
     storage->dataset.data(), index.size(), static_cast<int64_t>(storage->dim));
   auto padded_dataset = cuvs::neighbors::make_device_padded_dataset(res, vectors);
-  auto padded_index =
-    convert_standard_to_padded_index(res, index, padded_dataset->as_dataset_view());
+  auto padded_index   = convert_standard_to_padded_index(res, index, padded_dataset->view());
   padded_index.state->search(
     res, search_params, cagra::search, queries, neighbors, distances, sample_filter);
 }

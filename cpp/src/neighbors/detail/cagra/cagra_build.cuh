@@ -1623,7 +1623,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                 }
                 sub_dataset_padded =
                   cuvs::neighbors::make_device_padded_dataset(res, sub_dataset_view);
-                return sub_dataset_padded->as_dataset_view();
+                return sub_dataset_padded->view();
               }();
               auto direct_index =
                 ::cuvs::neighbors::cagra::detail::build_from_device_matrix<T, IdxT>(
@@ -2482,12 +2482,13 @@ auto iterative_build_graph(raft::resources const& res,
     vpq_dataset      = dataset;
   } else {
     auto const required_stride = cuvs::neighbors::cagra_required_row_width<T>(dataset.dim());
-    RAFT_EXPECTS(dataset.stride() == required_stride,
+    auto const stride          = static_cast<uint32_t>(dataset.data_const_view().stride(0));
+    RAFT_EXPECTS(stride == required_stride,
                  "iterative CAGRA build requires a CAGRA-aligned device dataset "
                  "(stride %u, required %u). Pass a device_padded_dataset_view, or a "
                  "device_standard_dataset_view whose row width already matches "
                  "cagra_required_row_width.",
-                 dataset.stride(),
+                 stride,
                  required_stride);
     dev_dataset      = cuvs::neighbors::dense_row_major_view(dataset);
     logical_dim      = dataset.dim();

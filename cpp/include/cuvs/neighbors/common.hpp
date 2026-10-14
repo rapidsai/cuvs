@@ -249,7 +249,7 @@ struct dataset<empty_dataset_container, void, IdxT, Accessor>
   using owning_storage_type = typename container_type::template owning_storage<IdxT, Accessor>;
   using owning_storage_type::owning_storage_type;
 
-  [[nodiscard]] auto as_dataset_view() const noexcept
+  [[nodiscard]] auto view() const noexcept
     -> dataset_view<empty_dataset_container,
                     void,
                     IdxT,
@@ -382,7 +382,7 @@ struct dataset_view_kind_of<dataset_view<empty_dataset_container, void, IdxT, Ac
   static constexpr dataset_view_kind value = dataset_view_kind::empty;
 };
 
-/** The migrated kinds are told apart by their spec, for a dataset as well as for its view. */
+// The migrated kinds are told apart by their spec, for a dataset as well as for its view.
 template <template <typename, typename, typename> class DatasetT,
           typename DataT,
           typename IdxT,
@@ -648,8 +648,12 @@ template <typename ViewT>
                                           uint32_t stride) -> ViewT
 {
   using data_view_type = typename ViewT::data_view_type;
-  return ViewT{data_view_type{
-    ptr, make_dense_mapping<typename data_view_type::mapping_type>(rows, dim, stride)}};
+  auto mapping = make_dense_mapping<typename data_view_type::mapping_type>(rows, dim, stride);
+  RAFT_EXPECTS(rows == 0 || static_cast<uint32_t>(mapping.stride(0)) == stride,
+               "make_dense_view: the row stride %u does not match the stride %u of the layout",
+               stride,
+               static_cast<uint32_t>(mapping.stride(0)));
+  return ViewT{data_view_type{ptr, mapping}};
 }
 
 }  // namespace detail

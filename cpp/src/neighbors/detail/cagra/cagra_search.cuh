@@ -104,12 +104,12 @@ void search_main_core(
   if (cuvs::neighbors::matrix_row_width_matches_cagra_required(queries)) {
     auto v           = cuvs::neighbors::make_device_padded_dataset_view(res, queries);
     queries_buf      = v.data_const_view().data_handle();
-    query_row_stride = v.stride();
+    query_row_stride = v.data_const_view().stride(0);
   } else {
     queries_padded_own = cuvs::neighbors::make_device_padded_dataset(res, queries);
-    auto v             = queries_padded_own->as_dataset_view();
+    auto v             = queries_padded_own->view();
     queries_buf        = v.data_const_view().data_handle();
-    query_row_stride   = v.stride();
+    query_row_stride   = v.data_const_view().stride(0);
   }
   const bool can_batch_n_queries = (query_row_stride == query_logical_dim);
 
@@ -269,7 +269,7 @@ void search_main(raft::resources const& res,
       query_logical_dim,
       sample_filter);
   } else if constexpr (cuvs::neighbors::is_device_standard_dataset_view_v<DatasetViewT>) {
-    auto const stride = index.dataset().stride();
+    auto const stride = index.dataset().data_const_view().stride(0);
     RAFT_EXPECTS(
       cuvs::neighbors::cagra_required_row_width<T>(stride) == stride,
       "CAGRA search requires each dataset row to have the CAGRA-aligned stride. Create a padded "

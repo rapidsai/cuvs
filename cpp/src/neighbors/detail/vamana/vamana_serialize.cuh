@@ -173,7 +173,7 @@ void serialize_sector_aligned(
   raft::copy_matrix(h_data.data_handle(),
                     ndims,
                     dataset.data_const_view().data_handle(),
-                    dataset.stride(),
+                    dataset.data_const_view().stride(0),
                     ndims,
                     npts,
                     raft::resource::get_cuda_stream(res));

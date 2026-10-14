@@ -218,7 +218,7 @@ void expect_dataset_order(raft::resources const& res,
   // honouring that stride rather than as one contiguous block.
   auto host   = raft::make_host_matrix<T, int64_t>(res, expected.extent(0), expected.extent(1));
   auto stream = raft::resource::get_cuda_stream(res);
-  int64_t const row_stride = static_cast<int64_t>(view.stride());
+  int64_t const row_stride = static_cast<int64_t>(view.data_const_view().stride(0));
   int64_t const dim        = static_cast<int64_t>(view.dim());
   for (int64_t row = 0; row < view.n_rows(); ++row) {
     raft::copy(host.data_handle() + row * dim,
@@ -241,7 +241,7 @@ void expect_zero_padding(raft::resources const& res,
   auto view            = merged.dataset();
   int64_t const rows   = view.n_rows();
   int64_t const dim    = static_cast<int64_t>(view.dim());
-  int64_t const stride = static_cast<int64_t>(view.stride());
+  int64_t const stride = static_cast<int64_t>(view.data_const_view().stride(0));
   std::vector<T> host(static_cast<std::size_t>(rows * stride));
   auto stream = raft::resource::get_cuda_stream(res);
   raft::copy(host.data(), view.data_const_view().data_handle(), host.size(), stream);

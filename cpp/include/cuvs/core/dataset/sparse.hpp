@@ -43,13 +43,13 @@ struct sparse_spec {
       typename SparseLayoutT::
         template matrix_type<value_type, index_type, false, raft::host_container_policy>>;
     using data_view_type = typename data_type::view_type;
-    /* NOTE: raft's sparse hierarchy provides no read-only view yet (see the TODO in
-    raft/core/sparse_types.hpp); until then, even reading the structure requires a mutable matrix.
-
-    Consequently a read-only `dataset_view<const T, ...>` over a sparse spec is read-only in name
-    only: the two view types coincide, so writing through it still compiles. That resolves itself
-    once raft grows a const sparse view.
-    */
+    // NOTE: raft's sparse hierarchy provides no read-only view yet (see the TODO in
+    // raft/core/sparse_types.hpp); until then, even reading the structure requires a mutable
+    // matrix.
+    //
+    // Consequently a read-only `dataset_view<const T, ...>` over a sparse spec is read-only in name
+    // only: the two view types coincide, so writing through it still compiles. That resolves itself
+    // once raft grows a const sparse view.
     using const_data_view_type = data_view_type;
 
     [[nodiscard]] static auto get_data_view(data_type& data) noexcept -> data_view_type
@@ -62,23 +62,21 @@ struct sparse_spec {
     {
       return const_cast<data_type&>(data).view();
     }
-    /* NOTE: there is no read-only view to convert to (see above), so the view passes through. */
+    // NOTE: there is no read-only view to convert to (see above), so the view passes through.
     [[nodiscard]] static auto get_data_const_view(data_view_type data) noexcept
       -> const_data_view_type
     {
       return data;
     }
-    /* NOTE: raft's sparse hierarchy exposes the structure through a mutable accessor only, so
-    reading the shape of either the owning matrix or its view takes a cast.
-    */
+    // NOTE: raft's sparse hierarchy exposes the structure through a mutable accessor only, so
+    // reading the shape of either the owning matrix or its view takes a cast.
     [[nodiscard]] static auto get_structure_view(const auto& data) noexcept
     {
       return const_cast<std::remove_cvref_t<decltype(data)>&>(data).structure_view();
     }
-    /* NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
-    or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
-    whatever the dataset puts in that slot instead.
-    */
+    // NOTE: the shape accessors take the data in either form - the storage an owning dataset holds,
+    // or the view a `dataset_view` holds. A plain spec defines no dictionary either, so it ignores
+    // whatever the dataset puts in that slot instead.
     [[nodiscard]] static auto get_n_rows(const auto& data) noexcept -> index_type
     {
       return static_cast<index_type>(get_structure_view(data).get_n_rows());

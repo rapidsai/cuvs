@@ -20,9 +20,8 @@ namespace CUVS_EXPORT cuvs {
  */
 template <typename T, typename IdxT, typename SpecT>
 struct dataset {
-  /* NOTE: element type for an owning dataset cannot be const;
-     the constness of the dataset itself selects the flavor of the view it hands out.
-  */
+  // NOTE: element type for an owning dataset cannot be const,
+  // the constness of the dataset itself selects the flavor of the view it hands out.
   static_assert(!std::is_const_v<T>, "Element type for an owning dataset must not be const.");
 
   using view_type       = dataset_view<T, IdxT, SpecT>;
@@ -59,9 +58,11 @@ struct dataset {
   {
   }
 
-  /*
-   @return A non-owning view of the whole dataset, data and dictionary alike.
-  */
+  /**
+   * @brief A non-owning view of the whole dataset, data and dictionary alike.
+   *
+   * @return A mutable view of the dataset.
+   */
   [[nodiscard]] auto view() noexcept -> view_type
   {
     if constexpr (is_compressed) {
@@ -70,9 +71,11 @@ struct dataset {
       return view_type{data_view()};
     }
   }
-  /*
-   @return A read-only view of the whole dataset; the constness of the dataset selects this flavor.
-  */
+  /**
+   * @brief A read-only view of the whole dataset; the constness of the dataset selects this flavor.
+   *
+   * @return A read-only view of the dataset.
+   */
   [[nodiscard]] auto view() const noexcept -> const_view_type
   {
     if constexpr (is_compressed) {
@@ -82,46 +85,57 @@ struct dataset {
     }
   }
 
-  /* The former name of the read-only `view()`, kept so that the existing callers keep working. */
-  [[nodiscard]] auto as_dataset_view() const noexcept -> const_view_type { return view(); }
-
+  /**
+   * @brief The number of rows in the dataset.
+   *
+   * @return The number of rows.
+   */
   [[nodiscard]] auto n_rows() const noexcept -> index_type { return spec_type::get_n_rows(data_); }
+  /**
+   * @brief The dimension of the vectors in the dataset.
+   *
+   * @return The dimension.
+   */
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
     // NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone
     return spec_type::get_dim(data_, dictionary_);
   }
-  /* The distance between the starts of two rows, in elements; defined if the spec has strided rows.
-   */
-  [[nodiscard]] auto stride() const noexcept -> uint32_t
-    requires requires(const data_type& d) { spec_type::get_stride(d); }
-  {
-    return spec_type::get_stride(data_);
-  }
 
-  /*
-   @return A non-owning view of the data, such as mdspan.
-  */
+  /**
+   * @brief A non-owning view of the data, such as mdspan.
+   *
+   * @return A mutable view of the data.
+   */
   [[nodiscard]] auto data_view() noexcept -> data_view_type
   {
     return spec_type::get_data_view(data_);
   }
+  /**
+   * @brief A read-only view of the data.
+   *
+   * @return A read-only view of the data.
+   */
   [[nodiscard]] auto data_const_view() const noexcept -> const_data_view_type
   {
     return spec_type::get_data_const_view(data_);
   }
 
-  /*
-   @return A non-owning view of the dictionary, such as the two codebooks of a VPQ dataset.
-  */
+  /**
+   * @brief A non-owning view of the dictionary, such as the two codebooks of a VPQ dataset.
+   *
+   * @return A mutable view of the dictionary.
+   */
   [[nodiscard]] auto dictionary_view() noexcept -> dictionary_view_type
     requires(is_compressed)
   {
     return spec_type::get_dictionary_view(dictionary_);
   }
-  /*
-   @return A read-only view of the dictionary.
-  */
+  /**
+   * @brief A read-only view of the dictionary.
+   *
+   * @return A read-only view of the dictionary.
+   */
   [[nodiscard]] auto const_dictionary_view() const noexcept -> const_dictionary_view_type
     requires(is_compressed)
   {

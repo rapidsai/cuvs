@@ -19,21 +19,5 @@ the two codebooks form the dictionary, while the data slot keeps the encoded row
 
 ```cpp
 template <typename MathT, typename BookPolicy, typename CodePolicy>
-struct vpq_spec {
-  /* The encoded rows are stored like the rows of any other dense dataset;
-  only how a row is read and where the dimension comes from are specific to the compression. */ template <typename IdxT> using storage_spec;
-  /* The type the codebooks are stored in;
-  the rows themselves are always packed codes. */ using math_type;
-  /* [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one. */ using book_type;
-};
+struct vpq_spec;
 ```
-
-**Fields**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `dataset` | `/* The encoded rows are stored like the rows of any other dense` |  |
-| `storage_spec` | `only how a row is read and where the dimension comes from are specific to the compression. */ template <typename IdxT> using` |  |
-| `in` | `/* The type the codebooks are stored` |  |
-| `math_type` | `the rows themselves are always packed codes. */ using` |  |
-| `book_type` | `/* [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one. */ using` |  |

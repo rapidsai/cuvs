@@ -419,7 +419,7 @@ void cuvs_cagra<T, IdxT>::compress_dataset(const T* dataset, size_t nrow)
   vpq_dataset_ = std::make_shared<cuvs::neighbors::device_vpq_dataset<half, int64_t>>(
     cuvs::preprocessing::quantize::pq::make_vpq_dataset(handle_, *index_params_.compression, src));
   vpq_index_ = std::make_shared<cuvs::neighbors::cagra::device_pq_index<T, IdxT, half>>(
-    handle_, parse_metric_type(metric_), vpq_dataset_->as_dataset_view(), index_->graph());
+    handle_, parse_metric_type(metric_), vpq_dataset_->view(), index_->graph());
 
   // Search runs on the compressed rows and the graph, so release the dense copy of the dataset.
   auto empty_dv = cuvs::neighbors::detail::make_empty_dataset_view<
