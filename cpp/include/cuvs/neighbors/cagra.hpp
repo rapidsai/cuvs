@@ -291,11 +291,9 @@ enum class hnsw_heuristic_type : uint32_t {
   SAME_GRAPH_FOOTPRINT = 1
 };
 
-/**
- * Sentinel marking an invalid / absent neighbor in a CAGRA graph. Variable-degree
- * graphs (see index_params::variable_graph_degree_fraction) pad unused neighbor
- * slots with this value, and consumers should treat it as "end of neighbor list".
- */
+// Sentinel marking an invalid / absent neighbor in a CAGRA graph. Variable-degree
+// graphs (see index_params::variable_graph_degree_fraction) pad unused neighbor
+// slots with this value, and consumers should treat it as "end of neighbor list".
 template <typename IdxT>
 inline constexpr IdxT kInvalidNeighbor = IdxT(-1);
 

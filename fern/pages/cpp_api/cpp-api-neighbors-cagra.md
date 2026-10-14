@@ -100,28 +100,6 @@ enum class hnsw_heuristic_type : uint32_t {
 | `SIMILAR_SEARCH_PERFORMANCE` | `0` |
 | `SAME_GRAPH_FOOTPRINT` | `1` |
 
-<a id="neighbors-cagra-idxt"></a>
-### neighbors::cagra::IdxT
-
-Sentinel marking an invalid / absent neighbor in a CAGRA graph. Variable-degree
-
-```cpp
-template <typename IdxT>
-inline constexpr IdxT kInvalidNeighbor = IdxT(-1);
-```
-
-graphs (see index_params::variable_graph_degree_fraction) pad unused neighbor slots with this value, and consumers should treat it as "end of neighbor list".
-
-**Parameters**
-
-| Name | Direction | Type | Description |
-| --- | --- | --- | --- |
-| `arg1` |  | `-1` |  |
-
-**Returns**
-
-`inline constexpr IdxT kInvalidNeighbor =`
-
 <a id="neighbors-cagra-index-params-graph-build-heuristic"></a>
 ### neighbors::cagra::index_params::graph_build_heuristic
 
