@@ -2380,6 +2380,14 @@ extern "C" cuvsError_t cuvsCagraMergeWithParams_v2(cuvsResources_t res,
     RAFT_EXPECTS(merged_dataset != nullptr, "Merged dataset handle must not be null");
     RAFT_EXPECTS(merged_dataset->addr != 0,
                  "merged_dataset must already contain the caller-concatenated dataset");
+    RAFT_EXPECTS(merged_dataset->dtype.code == dtype.code &&
+                   merged_dataset->dtype.bits == dtype.bits,
+                 "cuvsCagraMerge: merged_dataset dtype (code=%d, bits=%d) does not match the "
+                 "input indices dtype (code=%d, bits=%d)",
+                 merged_dataset->dtype.code,
+                 (int)merged_dataset->dtype.bits,
+                 dtype.code,
+                 (int)dtype.bits);
     RAFT_EXPECTS(offsets != nullptr, "offsets must not be null");
     auto offsets_vec = std::vector<int64_t>(offsets, offsets + num_indices + 1);
     output_index->dtype = dtype;  // output index type matches inputs

@@ -679,9 +679,9 @@ auto update_dataset(raft::resources const& res,
 
 #define CUVS_INST_CAGRA_MERGE(T, IdxT, DatasetViewT)                                       \
   template CUVS_EXPORT std::vector<int64_t>                                                \
-  cuvs::neighbors::cagra::merged_dataset_offsets<T, IdxT, DatasetViewT>(                   \
+  cuvs::neighbors::cagra::merged_dataset_offsets<DatasetViewT>(                            \
     raft::resources const& handle,                                                         \
-    std::vector<cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>*> const& indices,     \
+    std::vector<DatasetViewT> const& datasets,                                             \
     cuvs::neighbors::filtering::base_filter const& row_filter);                            \
   template CUVS_EXPORT cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT>                \
   cuvs::neighbors::cagra::merge<T, IdxT, DatasetViewT>(                                    \
