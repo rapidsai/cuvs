@@ -1,13 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <gtest/gtest.h>
 
 #include "../ann_scann.cuh"
-
-#include <raft/matrix/init.cuh>
 
 namespace cuvs::neighbors::scann {
 

@@ -80,7 +80,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
 
     raft::random::RngState r(1234ULL);
 
-    if constexpr (std::is_same<DataT, float>{}) {
+    if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
       raft::random::uniform(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
     } else {
