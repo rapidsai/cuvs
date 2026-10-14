@@ -17,6 +17,7 @@ NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only ind
 
 ```c
 enum cuvsHnswHierarchy {
+  NONE = 0,
   CPU = 1,
   GPU = 2
 };
@@ -26,6 +27,7 @@ enum cuvsHnswHierarchy {
 
 | Name | Value |
 | --- | --- |
+| `NONE` | `0` |
 | `CPU` | `1` |
 | `GPU` | `2` |
 
@@ -55,7 +57,7 @@ struct cuvsHnswAceParams {
 | Name | Type | Description |
 | --- | --- | --- |
 | `npartitions` | `size_t` | Number of partitions for ACE partitioned build.<br /><br />When set to 0 (default), the number of partitions is automatically derived based on available host and GPU memory to maximize partition size while ensuring the build fits in memory.<br /><br />Small values might improve recall but potentially degrade performance and increase memory usage. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).<br /><br />If the specified number of partitions results in partitions that exceed available memory, the value will be automatically increased to fit memory constraints and a warning will be issued. |
-| `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in memory. |
+| `build_dir` | `const char*` | Directory to store ACE build artifacts (e.g., KNN graph, optimized graph). Used when `use_disk` is true or when the graph does not fit in memory. The directory may already exist, but ACE's named artifacts and `hnsw_index.bin` must not already exist. Simultaneous builds must use different directories. On failure, ACE removes only its uncommitted CAGRA artifacts; a completed CAGRA stage is retained if creating the HNSW index fails. |
 | `use_disk` | `bool` | Whether to use disk-based storage for ACE build. When true, enables disk-based operations for memory-efficient graph construction. |
 | `max_host_memory_gb` | `double` | Maximum host memory to use for ACE build in GiB. When set to 0 (default), uses available host memory. Useful for testing or when running alongside other memory-intensive processes. |
 | `max_gpu_memory_gb` | `double` | Maximum GPU memory to use for ACE build in GiB. When set to 0 (default), uses available GPU memory. Useful for testing or when running alongside other memory-intensive processes. |
@@ -259,7 +261,7 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
 
 Convert a CAGRA Index to an HNSW index. NOTE: When hierarchy is:
 
-1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 
 ```c
@@ -296,8 +298,7 @@ DLManagedTensor* dataset,
 cuvsHnswIndex_t index);
 ```
 
-The graph is built on the GPU and converted to an HNSW index that can be searched on the CPU.
-The graph build algorithm is selected automatically unless explicit ACE parameters are provided.
+The graph is built on the GPU and converted to an HNSW index that can be searched on the CPU. The graph build algorithm is selected automatically unless explicit ACE parameters are provided.
 
 NOTE: This function requires CUDA to be available at runtime.
 
