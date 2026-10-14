@@ -36,7 +36,7 @@ permissions: {}
 
 jobs:
   build-details:
-    uses: rapidsai/shared-workflows/.github/workflows/compute-build-details.yaml@e034a0d95b94775477395838bb7ee1163642291f
+    uses: rapidsai/shared-workflows/.github/workflows/compute-build-details.yaml@f127659d02df896f7ded35eafa08530c362bc694
   cpp-build:
     needs: [build-details]
     permissions:
@@ -45,8 +45,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@f127659d02df896f7ded35eafa08530c362bc694
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -168,8 +167,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@f127659d02df896f7ded35eafa08530c362bc694
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -244,8 +242,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@f127659d02df896f7ded35eafa08530c362bc694
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -287,8 +284,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@f127659d02df896f7ded35eafa08530c362bc694
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
