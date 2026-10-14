@@ -14,8 +14,18 @@ _Source header: `cuvs/neighbors/ivf_pq.hpp`_
 A type for specifying how PQ codebooks are created.
 
 ```cpp
-enum class codebook_gen;
+enum class codebook_gen {
+  PER_SUBSPACE = 0,
+  PER_CLUSTER = 1
+};
 ```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `PER_SUBSPACE` | `0` |
+| `PER_CLUSTER` | `1` |
 
 <a id="neighbors-ivf-pq-list-layout"></a>
 ### neighbors::ivf_pq::list_layout
@@ -23,8 +33,18 @@ enum class codebook_gen;
 A type for specifying the memory layout of PQ codes in IVF lists.
 
 ```cpp
-enum class list_layout;
+enum class list_layout {
+  FLAT = 0,
+  INTERLEAVED = 1
+};
 ```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `FLAT` | `0` |
+| `INTERLEAVED` | `1` |
 
 <a id="neighbors-ivf-pq-index-params-from-dataset"></a>
 ### neighbors::ivf_pq::index_params::from_dataset
