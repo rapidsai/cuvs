@@ -20,6 +20,7 @@ template <typename T, typename IdxT, typename SpecT>
 struct dataset_view {
   /* The read-only flavor, in which each view type collapses onto its const counterpart. */ static constexpr bool is_const_view;
   static constexpr bool is_compressed;
+  /* The distance between the starts of two rows, in elements;
 };
 ```
 
@@ -29,6 +30,7 @@ struct dataset_view {
 | --- | --- | --- |
 | `is_const_view` | `/* The read-only flavor, in which each view type collapses onto its const counterpart. */ static constexpr bool` |  |
 | `is_compressed` | `static constexpr bool` |  |
+| `elements` | `/* The distance between the starts of two rows, in` |  |
 
 <a id="dataset-view-code-type"></a>
 ### dataset_view::code_type

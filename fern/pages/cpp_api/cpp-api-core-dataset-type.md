@@ -22,6 +22,7 @@ struct dataset {
   /* NOTE: element type for an owning dataset cannot be const;
   static constexpr bool is_compressed;
   /* @return A read-only view of the whole dataset;
+  /* The distance between the starts of two rows, in elements;
 };
 ```
 
@@ -33,6 +34,7 @@ struct dataset {
 | `const` | [`/* NOTE: element type for an owning dataset cannot be`](/api-reference/cpp-api-core-dataset-type#dataset) |  |
 | `is_compressed` | `static constexpr bool` |  |
 | `dataset` | `/* @return A read-only view of the whole` |  |
+| `elements` | `/* The distance between the starts of two rows, in` |  |
 
 <a id="dictionary-type"></a>
 ### dictionary_type

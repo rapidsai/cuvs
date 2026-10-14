@@ -82,11 +82,21 @@ struct dataset {
     }
   }
 
+  /* The former name of the read-only `view()`, kept so that the existing callers keep working. */
+  [[nodiscard]] auto as_dataset_view() const noexcept -> const_view_type { return view(); }
+
   [[nodiscard]] auto n_rows() const noexcept -> index_type { return spec_type::get_n_rows(data_); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
     // NOTE: a compressed dataset may not be able to tell its dimension from the encoded data alone
     return spec_type::get_dim(data_, dictionary_);
+  }
+  /* The distance between the starts of two rows, in elements; defined if the spec has strided rows.
+   */
+  [[nodiscard]] auto stride() const noexcept -> uint32_t
+    requires requires(const data_type& d) { spec_type::get_stride(d); }
+  {
+    return spec_type::get_stride(data_);
   }
 
   /*
@@ -104,7 +114,7 @@ struct dataset {
   /*
    @return A non-owning view of the dictionary, such as the two codebooks of a VPQ dataset.
   */
-  [[nodiscard]] auto dictionary_view() const noexcept -> dictionary_view_type
+  [[nodiscard]] auto dictionary_view() noexcept -> dictionary_view_type
     requires(is_compressed)
   {
     return spec_type::get_dictionary_view(dictionary_);

@@ -312,7 +312,7 @@ void write_hnswlib_rows_host(
                  "CAGRA dataset rows (%zu) do not match index size (%zu)",
                  static_cast<size_t>(dataset_view.n_rows()),
                  n_rows);
-    dataset_data      = dataset_view.view().data_handle();
+    dataset_data      = dataset_view.data_const_view().data_handle();
     dataset_stride    = dataset_view.stride();
     dataset_is_device = is_device_cagra_hnsw_serialize_index_v<T, IdxT, CagraIndexT>;
   }
@@ -450,7 +450,7 @@ void write_hnswlib_rows_device(raft::resources const& res,
       output.data_handle(),
       row_size,
       graph.data_handle(),
-      dataset.view().data_handle(),
+      dataset.data_const_view().data_handle(),
       first_row,
       rows,
       graph_degree,

@@ -41,48 +41,28 @@ struct vpq_spec {
   /* The type the codebooks are stored in; the rows themselves are always packed codes. */
   using math_type = MathT;
 
-  /* [vq_n_centers, dim] */
-  using vq_book_type =
-    raft::mdarray<math_type, raft::matrix_extent<int64_t>, raft::layout_c_contiguous, BookPolicy>;
-  /* [n_books, pq_n_centers, pq_len], where `n_books` is 1 for a codebook shared by all the
-  subspaces, or `pq_dim` for one codebook per subspace. A row-major 3d array with `n_books == 1`
-  is bit-identical to the flat 2d codebook of the current implementation.
-  */
-  using pq_book_type =
-    raft::mdarray<math_type, raft::extent_3d<int64_t>, raft::layout_c_contiguous, BookPolicy>;
+  /* [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one. */
+  using book_type =
+    raft::mdarray<math_type, raft::matrix_extent<uint32_t>, raft::layout_c_contiguous, BookPolicy>;
 
   struct dictionary_type {
-    vq_book_type vq_code_book;
-    pq_book_type pq_code_book;
+    book_type vq_code_book;
+    book_type pq_code_book;
   };
 
-  struct dictionary_view_type {
-    typename vq_book_type::const_view_type vq_code_book;
-    typename pq_book_type::const_view_type pq_code_book;
+  /* The views of the codebooks, writable or read-only alike. */
+  template <typename BookViewT>
+  struct dictionary_view_of {
+    BookViewT vq_code_book;
+    BookViewT pq_code_book;
 
     /* NOTE: the dimension of the dataset is a property of the VQ codebook: the encoded rows tell
     only how many bytes it took to compress a vector, which the padding makes ambiguous.
     */
-    [[nodiscard]] auto dim() const noexcept -> uint32_t
-    {
-      return static_cast<uint32_t>(vq_code_book.extent(1));
-    }
-    [[nodiscard]] auto vq_n_centers() const noexcept -> uint32_t
-    {
-      return static_cast<uint32_t>(vq_code_book.extent(0));
-    }
-    [[nodiscard]] auto n_books() const noexcept -> uint32_t
-    {
-      return static_cast<uint32_t>(pq_code_book.extent(0));
-    }
-    [[nodiscard]] auto pq_n_centers() const noexcept -> uint32_t
-    {
-      return static_cast<uint32_t>(pq_code_book.extent(1));
-    }
-    [[nodiscard]] auto pq_len() const noexcept -> uint32_t
-    {
-      return static_cast<uint32_t>(pq_code_book.extent(2));
-    }
+    [[nodiscard]] auto dim() const noexcept -> uint32_t { return vq_code_book.extent(1); }
+    [[nodiscard]] auto vq_n_centers() const noexcept -> uint32_t { return vq_code_book.extent(0); }
+    [[nodiscard]] auto pq_n_centers() const noexcept -> uint32_t { return pq_code_book.extent(0); }
+    [[nodiscard]] auto pq_len() const noexcept -> uint32_t { return pq_code_book.extent(1); }
     [[nodiscard]] auto pq_bits() const noexcept -> uint32_t
     {
       return static_cast<uint32_t>(std::countr_zero(pq_n_centers()));
@@ -91,9 +71,9 @@ struct vpq_spec {
     {
       return raft::div_rounding_up_safe(dim(), pq_len());
     }
-    /* Whether every subspace has a codebook of its own, as opposed to sharing a single one. */
-    [[nodiscard]] auto per_subspace() const noexcept -> bool { return n_books() > 1; }
   };
+  using dictionary_view_type       = dictionary_view_of<typename book_type::view_type>;
+  using const_dictionary_view_type = dictionary_view_of<typename book_type::const_view_type>;
 
   template <typename T, typename IdxT>
   struct apply : storage_spec<IdxT> {
@@ -103,11 +83,11 @@ struct vpq_spec {
     /* NOTE: re-exported rather than declared here, so that they do not belong to one instantiation
     of `apply`; qualified lookup into `apply` does not reach the enclosing spec on its own.
     */
-    using math_type            = vpq_spec::math_type;
-    using vq_book_type         = vpq_spec::vq_book_type;
-    using pq_book_type         = vpq_spec::pq_book_type;
-    using dictionary_type      = vpq_spec::dictionary_type;
-    using dictionary_view_type = vpq_spec::dictionary_view_type;
+    using math_type                  = vpq_spec::math_type;
+    using book_type                  = vpq_spec::book_type;
+    using dictionary_type            = vpq_spec::dictionary_type;
+    using dictionary_view_type       = vpq_spec::dictionary_view_type;
+    using const_dictionary_view_type = vpq_spec::const_dictionary_view_type;
 
     /* NOTE: the data accessors are inherited; only `get_dim` differs from a dense dataset. Like the
     inherited ones, it reads the dictionary in either form: the codebooks an owning dataset holds,
@@ -117,23 +97,21 @@ struct vpq_spec {
     {
       return static_cast<uint32_t>(dict.vq_code_book.extent(1));
     }
-    [[nodiscard]] static auto get_dictionary_view(const dictionary_type& dict) noexcept
+    [[nodiscard]] static auto get_dictionary_view(dictionary_type& dict) noexcept
       -> dictionary_view_type
     {
       return {dict.vq_code_book.view(), dict.pq_code_book.view()};
     }
-    /* NOTE: a codebook view is read-only to begin with, so the spec declares no separate const view
-    and these overloads exist only to spell the conversion out of either form.
-    */
     [[nodiscard]] static auto get_dictionary_const_view(const dictionary_type& dict) noexcept
-      -> dictionary_view_type
+      -> const_dictionary_view_type
     {
-      return get_dictionary_view(dict);
+      return {dict.vq_code_book.view(), dict.pq_code_book.view()};
     }
     [[nodiscard]] static auto get_dictionary_const_view(dictionary_view_type dict) noexcept
-      -> dictionary_view_type
+      -> const_dictionary_view_type
     {
-      return dict;
+      return {raft::make_const_mdspan(dict.vq_code_book),
+              raft::make_const_mdspan(dict.pq_code_book)};
     }
     /* The length of an encoded row in bytes, including the inlined VQ label. */
     [[nodiscard]] static auto get_encoded_row_length(const auto& data) noexcept -> uint32_t

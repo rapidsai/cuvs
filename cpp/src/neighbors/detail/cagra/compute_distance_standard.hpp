@@ -38,7 +38,7 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
                    const DistanceT* dataset_norms = nullptr) -> host_type
   {
     return init_(params,
-                 dataset.view().data_handle(),
+                 dataset.data_const_view().data_handle(),
                  IndexT(dataset.n_rows()),
                  dataset.dim(),
                  dataset.stride(),

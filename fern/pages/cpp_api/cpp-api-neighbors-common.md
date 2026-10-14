@@ -71,15 +71,6 @@ template <typename ContainerType, typename DataT, typename IdxT, typename Access
 struct dataset;
 ```
 
-<a id="math-type"></a>
-### math_type
-
-Floating-point type used for VQ/PQ codebooks (rows are still uint8 codes).
-
-```cpp
-using math_type = MathT;
-```
-
 <a id="neighbors-dataset-view-kind-of"></a>
 ### neighbors::dataset_view_kind_of
 
@@ -98,6 +89,28 @@ struct dataset_view_kind_of {
 | --- | --- | --- |
 | `value` | `static constexpr dataset_view_kind` |  |
 
+<a id="neighbors-dataset-view-kind-of"></a>
+### neighbors::dataset_view_kind_of
+
+The migrated kinds are told apart by their spec, for a dataset as well as for its view.
+
+```cpp
+template <template <typename, typename, typename> class DatasetT,
+typename DataT,
+typename IdxT,
+typename ContainerPolicy>
+struct dataset_view_kind_of<
+DatasetT<DataT, IdxT, mdarray_spec<padded_layout<DataT>, ContainerPolicy>>> {
+  static constexpr dataset_view_kind value;
+};
+```
+
+**Fields**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `value` | `static constexpr dataset_view_kind` |  |
+
 <a id="neighbors-dataset-view-is-device-accessible"></a>
 ### neighbors::dataset_view_is_device_accessible
 
@@ -106,38 +119,6 @@ True when the dataset view accessor is device-accessible.
 ```cpp
 template <typename V>
 struct dataset_view_is_device_accessible;
-```
-
-<a id="neighbors-with-accessor"></a>
-### neighbors::with_accessor
-
-Generic accessor retargeting while preserving the dataset tag/layout and value/index types:
-
-`dataset<Tag, DataT, IdxT, OldAccessor>      -> dataset<Tag, DataT, IdxT, NewAccessor>` `dataset_view<Tag, DataT, IdxT, OldAccessor> -> dataset_view<Tag, DataT, IdxT, NewAccessor>`
-
-```cpp
-template <typename DatasetLikeT, typename NewAccessor>
-struct with_accessor;
-```
-
-<a id="neighbors-to-device-accessor"></a>
-### neighbors::to_device_accessor
-
-Map any host accessor to its device counterpart (same payload policy).
-
-```cpp
-template <typename Accessor>
-struct to_device_accessor;
-```
-
-<a id="neighbors-device-counterpart"></a>
-### neighbors::device_counterpart
-
-Maps a host dataset view type to its device-resident counterpart.
-
-```cpp
-template <typename HostViewT>
-struct device_counterpart;
 ```
 
 <a id="neighbors-cagra-view-element-type"></a>

@@ -24,8 +24,7 @@ struct vpq_spec {
   only how a row is read and where the dimension comes from are specific to the compression. */ template <typename IdxT> using storage_spec;
   /* The type the codebooks are stored in;
   the rows themselves are always packed codes. */ using math_type;
-  /* [vq_n_centers, dim] */ using vq_book_type;
-  /* [n_books, pq_n_centers, pq_len], where `n_books` is 1 for a codebook shared by all the subspaces, or `pq_dim` for one codebook per subspace. A row-major 3d array with ` n_books;
+  /* [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one. */ using book_type;
 };
 ```
 
@@ -37,5 +36,4 @@ struct vpq_spec {
 | `storage_spec` | `only how a row is read and where the dimension comes from are specific to the compression. */ template <typename IdxT> using` |  |
 | `in` | `/* The type the codebooks are stored` |  |
 | `math_type` | `the rows themselves are always packed codes. */ using` |  |
-| `vq_book_type` | `/* [vq_n_centers, dim] */ using` |  |
-| `n_books` | `/* [n_books, pq_n_centers, pq_len], where \`n_books\` is 1 for a codebook shared by all the subspaces, or \`pq_dim\` for one codebook per subspace. A row-major 3d array with \`` |  |
+| `book_type` | `/* [vq_n_centers, dim] for the VQ codebook, [pq_n_centers, pq_len] for the PQ one. */ using` |  |

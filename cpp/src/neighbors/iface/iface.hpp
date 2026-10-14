@@ -104,8 +104,12 @@ void build(const raft::resources& handle,
       auto host_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
         index_dataset.data_handle(), index_dataset.extent(0), index_dataset.extent(1));
       if constexpr (std::is_same<AnnIndexType, cagra::device_padded_index<T, IdxT>>::value) {
-        cuvs::neighbors::host_padded_dataset_view<T, int64_t> host_padded(
-          host_view, static_cast<uint32_t>(host_view.extent(1)));
+        auto host_padded = cuvs::neighbors::detail::make_dense_view<
+          cuvs::neighbors::host_padded_dataset_view<T, int64_t>>(
+          host_view.data_handle(),
+          host_view.extent(0),
+          static_cast<uint32_t>(host_view.extent(1)),
+          static_cast<uint32_t>(host_view.extent(1)));
         auto host_idx   = cuvs::neighbors::cagra::build(handle, cagra_params, host_padded);
         auto padded_r   = cuvs::neighbors::make_device_padded_dataset(handle, index_dataset);
         auto device_idx = cuvs::neighbors::cagra::update_dataset(

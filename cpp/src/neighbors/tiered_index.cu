@@ -59,7 +59,7 @@ auto build(raft::resources const& res,
   -> tiered_index::index<cagra::device_padded_index<float, uint32_t>>
 {
   auto state = detail::build<cagra::device_padded_index<float, uint32_t>>(
-    res, params, cagra_build_for_tiered_padded, dataset.view());
+    res, params, cagra_build_for_tiered_padded, cuvs::neighbors::dense_row_major_view(dataset));
   return cuvs::neighbors::tiered_index::index<cagra::device_padded_index<float, uint32_t>>(state);
 }
 
@@ -92,12 +92,13 @@ auto convert_standard_to_padded_index(
   next_state->ann_index.reset();
 
   if (idx.state->ann_index) {
-    auto padded_mds = padded_dataset.view();
-    auto ann_rows   = static_cast<int64_t>(idx.state->ann_rows());
-    auto ann_mds    = raft::make_device_matrix_view<const float, int64_t>(
-      padded_mds.data_handle(), ann_rows, static_cast<int64_t>(padded_mds.extent(1)));
-    auto ann_padded_view =
-      cuvs::neighbors::device_padded_dataset_view<float, int64_t>(ann_mds, padded_dataset.dim());
+    auto padded_mds      = padded_dataset.data_const_view();
+    auto ann_padded_view = cuvs::neighbors::detail::make_dense_view<
+      cuvs::neighbors::device_padded_dataset_view<float, int64_t>>(
+      padded_mds.data_handle(),
+      static_cast<int64_t>(idx.state->ann_rows()),
+      padded_dataset.dim(),
+      padded_mds.stride(0));
     auto ann_padded_idx = cuvs::neighbors::cagra::convert_standard_to_padded_index(
       res, *idx.state->ann_index, ann_padded_view);
     next_state->ann_index =

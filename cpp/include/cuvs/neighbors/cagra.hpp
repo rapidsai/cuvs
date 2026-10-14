@@ -592,7 +592,7 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
-      dataset_{},
+      dataset_{cuvs::neighbors::detail::make_empty_dataset_view<DatasetViewT>()},
       dataset_norms_(std::nullopt)
   {
   }
@@ -793,24 +793,9 @@ struct CUVS_EXPORT index : cuvs::neighbors::index {
     // Re-open the file descriptor in read-only mode for subsequent operations
     dataset_fd_.emplace(std::move(fd));
 
-    if constexpr (cuvs::neighbors::is_device_padded_dataset_view_v<DatasetViewT>) {
-      auto v = raft::make_device_matrix_view<const T, int64_t>(
-        static_cast<const T*>(nullptr), int64_t{0}, dim_);
-      dataset_ = DatasetViewT(v, dim_);
-    } else if constexpr (cuvs::neighbors::is_device_standard_dataset_view_v<DatasetViewT>) {
-      auto v = raft::make_device_matrix_view<const T, int64_t>(
-        static_cast<const T*>(nullptr), int64_t{0}, dim_);
-      dataset_ = DatasetViewT(v);
-    } else if constexpr (cuvs::neighbors::is_host_padded_dataset_view_v<DatasetViewT>) {
-      auto v = raft::make_host_matrix_view<const T, int64_t>(
-        static_cast<const T*>(nullptr), int64_t{0}, dim_);
-      dataset_ = DatasetViewT(v, dim_);
-    } else if constexpr (cuvs::neighbors::is_host_standard_dataset_view_v<DatasetViewT>) {
-      auto v = raft::make_host_matrix_view<const T, int64_t>(
-        static_cast<const T*>(nullptr), int64_t{0}, dim_);
-      dataset_ = DatasetViewT(v);
-    } else if constexpr (cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
-      dataset_ = DatasetViewT{dim_};
+    if constexpr (cuvs::neighbors::is_dense_row_major_dataset_view_v<DatasetViewT> ||
+                  cuvs::neighbors::is_empty_dataset_view_v<DatasetViewT>) {
+      dataset_ = cuvs::neighbors::detail::make_empty_dataset_view<DatasetViewT>(dim_);
     } else {
       RAFT_FAIL("update_dataset(fd): unsupported DatasetViewT for disk-backed dataset");
     }

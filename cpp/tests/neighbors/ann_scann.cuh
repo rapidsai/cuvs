@@ -188,7 +188,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     cuvs::preprocessing::quantize::pq::quantizer<float> quantizer{
       pq_params,
       cuvs::neighbors::device_vpq_dataset<float, int64_t>{
-        std::move(vq_codebook), std::move(pq_codebook_copy), std::move(empty_data)}};
+        std::move(empty_data), {std::move(vq_codebook), std::move(pq_codebook_copy)}}};
 
     auto quantized_residuals_device =
       raft::make_device_matrix<uint8_t, IdxT>(handle_, ps.num_db_vecs, num_subspaces);

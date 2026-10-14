@@ -123,7 +123,7 @@ cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> merge_rebuild(
                unsigned(merged_dataset.stride()),
                long(stride));
 
-  auto output_const_view = merged_dataset.view();
+  auto output_const_view = merged_dataset.data_const_view();
   auto output_view       = raft::make_device_matrix_view<T, int64_t>(
     const_cast<T*>(output_const_view.data_handle()), final_rows, stride);
 
@@ -134,7 +134,7 @@ cuvs::neighbors::cagra::index<T, IdxT, DatasetViewT> merge_rebuild(
       std::size_t n_rows = 0;
       auto const& v      = index->dataset();
       if constexpr (cuvs::neighbors::is_dense_row_major_dataset_view_v<std::decay_t<decltype(v)>>) {
-        src_ptr = v.view().data_handle();
+        src_ptr = v.data_const_view().data_handle();
         n_rows  = static_cast<std::size_t>(v.n_rows());
       } else {
         RAFT_FAIL("cagra::merge: unexpected dataset type while copying rows");
@@ -384,7 +384,7 @@ void copy_input_datasets(
     auto const& source = indices[i]->dataset();
     raft::copy_matrix(destination + offsets[i] * destination_stride,
                       static_cast<std::size_t>(destination_stride),
-                      source.view().data_handle(),
+                      source.data_const_view().data_handle(),
                       static_cast<std::size_t>(source.stride()),
                       static_cast<std::size_t>(dim),
                       static_cast<std::size_t>(source.n_rows()),
@@ -411,7 +411,7 @@ auto merge_fastener(raft::resources const& handle,
                unsigned(merged_dataset.dim()),
                long(preflight.dim));
 
-  auto const output_const_view = merged_dataset.view();
+  auto const output_const_view = merged_dataset.data_const_view();
   auto* destination            = const_cast<T*>(output_const_view.data_handle());
   {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> scope("cagra::merge/consolidate");

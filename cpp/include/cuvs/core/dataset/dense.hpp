@@ -67,14 +67,25 @@ struct mdarray_spec {
     {
       return static_cast<uint32_t>(data.extent(1));
     }
+    [[nodiscard]] static auto get_stride(const auto& data) noexcept -> uint32_t
+    {
+      return static_cast<uint32_t>(data.stride(0));
+    }
   };
 };
+
+/**
+ * Row-major rows padded to 16 bytes, the alignment the CAGRA kernels require. A padded matrix keeps
+ * the logical dimension as its second extent; the row stride follows from the layout.
+ */
+template <typename T>
+using padded_layout = raft::layout_right_padded_impl<16 / sizeof(T)>;
 
 template <typename T, typename IdxT, typename ContainerPolicy>
 using contiguous_dataset =
   dataset<T, IdxT, mdarray_spec<raft::layout_c_contiguous, ContainerPolicy>>;
 template <typename T, typename IdxT, typename ContainerPolicy>
-using padded_dataset = dataset<T, IdxT, mdarray_spec<raft::layout_left_padded<T>, ContainerPolicy>>;
+using padded_dataset = dataset<T, IdxT, mdarray_spec<padded_layout<T>, ContainerPolicy>>;
 template <typename T, typename IdxT>
 using device_contiguous_dataset =
   contiguous_dataset<T, IdxT, raft::device_accessor<raft::device_container_policy<T>>>;

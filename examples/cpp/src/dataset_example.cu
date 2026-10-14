@@ -179,10 +179,8 @@ int main()
   int64_t encoded_row_length = sizeof(uint32_t) + dim / pq_len;
 
   vpq_dictionary_type codebooks{
-    raft::make_device_matrix<float, int64_t>(res, vq_n_centers, dim),
-    // A single codebook shared by all the subspaces; `pq_dim` of them would be per-subspace.
-    raft::make_device_mdarray<float, int64_t>(
-      res, raft::make_extents<int64_t>(1, pq_n_centers, pq_len))};
+    raft::make_device_matrix<float, uint32_t>(res, vq_n_centers, dim),
+    raft::make_device_matrix<float, uint32_t>(res, pq_n_centers, pq_len)};
 
   vpq_dataset_type vpq_dataset{
     raft::make_device_matrix<uint8_t, int64_t>(res, n_rows, encoded_row_length),
@@ -190,8 +188,7 @@ int main()
   print_dataset("device vpq", vpq_dataset);
   auto books = vpq_dataset.dictionary_view();
   std::cout << "  vq_n_centers = " << books.vq_n_centers() << ", pq_bits = " << books.pq_bits()
-            << ", pq_dim = " << books.pq_dim() << ", per_subspace = " << books.per_subspace()
-            << '\n';
+            << ", pq_dim = " << books.pq_dim() << '\n';
   // The data slot is a plain dense matrix of bytes, hence the shared spec.
   std::cout << "  encoded row length = " << vpq_dataset.data_view().extent(1) << '\n';
 

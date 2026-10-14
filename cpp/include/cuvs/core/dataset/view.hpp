@@ -95,6 +95,9 @@ struct dataset_view {
 
   static constexpr bool is_compressed = compressed_dataset_spec<spec_type>;
 
+  /* An empty view, like a default-constructed mdspan: no rows, no data. */
+  dataset_view() noexcept = default;
+
   explicit dataset_view(data_view_type data_view)
     requires(!is_compressed)
     : data_view_{data_view}
@@ -132,6 +135,13 @@ struct dataset_view {
   [[nodiscard]] auto dim() const noexcept -> uint32_t
   {
     return spec_type::get_dim(data_view_, dictionary_view_);
+  }
+  /* The distance between the starts of two rows, in elements; defined if the spec has strided rows.
+   */
+  [[nodiscard]] auto stride() const noexcept -> uint32_t
+    requires requires(const data_view_type& d) { spec_type::get_stride(d); }
+  {
+    return spec_type::get_stride(data_view_);
   }
 
   /*
