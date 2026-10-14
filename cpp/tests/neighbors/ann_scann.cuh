@@ -158,7 +158,11 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     check_code_validity(index, num_subspaces, num_pq_clusters);
     // Reconstruction is validated for the single-level layout. Two-level indexes
     // store residuals relative to coarse/fine centers and are covered separately.
-    if (ps.index_params.n_coarse_clusters == 0) { check_reconstruction(index, num_subspaces); }
+    // The reconstruction check compares against a float ground-truth dataset, so it
+    // is only run for the float data type.
+    if constexpr (std::is_same_v<DataT, float>) {
+      if (ps.index_params.n_coarse_clusters == 0) { check_reconstruction(index, num_subspaces); }
+    }
 
     // Serialization is exercised on the already-built index so we get coverage
     // across the whole parameter matrix without paying for an extra build.
