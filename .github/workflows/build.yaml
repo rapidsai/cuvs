@@ -192,7 +192,6 @@ jobs:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       MAVEN_DEPLOY_TOKEN: ${{ secrets.MAVEN_DEPLOY_TOKEN }}
-      DOCS_DISPATCH_APP_PRIVATE_KEY: ${{ secrets.DOCS_DISPATCH_APP_PRIVATE_KEY }}
     with:
       artifact-name: cuvs-java_maven_repo
       source-git-sha: ${{ inputs.sha || github.sha }}
@@ -201,7 +200,7 @@ jobs:
       docs-project: cuvs-java
   lucene-publish:
     # The Lucene release depends on the matching published Java coordinate.
-    # A failed Java docs dispatch must not prevent publishing Lucene itself.
+    # Documentation is dispatched separately from release-tracking.
     if: ${{ !cancelled() && needs.java-publish.outputs.deployment-state == 'PUBLISHED' }}
     needs: [java-maven-gather, java-publish]
     permissions:
@@ -212,7 +211,6 @@ jobs:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       MAVEN_DEPLOY_TOKEN: ${{ secrets.MAVEN_DEPLOY_TOKEN }}
-      DOCS_DISPATCH_APP_PRIVATE_KEY: ${{ secrets.DOCS_DISPATCH_APP_PRIVATE_KEY }}
     with:
       artifact-name: cuvs-lucene_maven_repo
       source-git-sha: ${{ inputs.sha || github.sha }}

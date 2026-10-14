@@ -22,8 +22,9 @@ directories fail gathering before publication.
 
 Both modules use the shared Maven publisher with automatic publication enabled.
 Lucene waits for the Java publisher's `PUBLISHED` output, so its dependency is
-released first. Java docs dispatch failure does not prevent Lucene publication.
-Each published module dispatches its registered docs project to `rapidsai/docs`.
+released first. Each published module emits a completed-publication receipt.
+The standalone dispatcher in release-tracking starts the registered docs project
+in `rapidsai/docs`; docs failures do not prevent Lucene publication.
 Branch and nightly builds keep their existing build behavior; these newly added
 publication jobs run on release tags.
 
@@ -35,10 +36,10 @@ coordinates. The common staging profile defaults to `com.nvidia.cuvs`; set
 `MAVEN_STAGING_PROFILE_ID` to the actual verified parent namespace if different,
 for example `com.nvidia`. Confirm the namespace and account access during rollout.
 
-Configure `DOCS_DISPATCH_APP_ID` and `DOCS_DISPATCH_APP_PRIVATE_KEY` as described
-in the shared publisher's documentation. Deploy the `cuvs-java` and `cuvs-lucene`
-docs registrations and the shared workflow output contract before enabling this
-caller on the 26.12 release branch. Only one system should publish these
+App credentials remain in release-tracking's existing `release-dispatch`
+environment. Deploy the standalone docs dispatcher, `cuvs-java` and `cuvs-lucene`
+docs registrations, and the shared workflow receipt/output contract before
+enabling this caller on the release branch. Only one system should publish these
 coordinates for a release; retire the legacy manual publishing path at cutover.
 
 The local checks exercise Maven assembly and docs configuration without compiling
