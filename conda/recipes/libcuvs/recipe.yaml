@@ -200,6 +200,8 @@ outputs:
         - libcusparse-dev
         - libnvjitlink-dev
       run:
+        - rapids-logger =0.3
+        - libgomp
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - libraft-headers =${{ minor_version }}
