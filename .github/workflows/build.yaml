@@ -185,7 +185,21 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    if: ${{ inputs.build_type != 'release-candidate' }}
+    if: >-
+      ${{ inputs.build_type != 'release-candidate'
+      && github.event.inputs.build_type != 'release-candidate'
+      && !startsWith(github.ref, 'refs/heads/release-test-')
+      && !startsWith(github.ref_name, 'release-test-')
+      && !startsWith(github.head_ref, 'release-test-')
+      && !startsWith(github.head_ref, 'refs/heads/release-test-')
+      && !startsWith(inputs.branch, 'release-test-')
+      && !startsWith(inputs.branch, 'refs/heads/release-test-')
+      && github.ref != 'agent/release-catalog-canary'
+      && github.ref != 'refs/heads/agent/release-catalog-canary'
+      && github.head_ref != 'agent/release-catalog-canary'
+      && github.head_ref != 'refs/heads/agent/release-catalog-canary'
+      && inputs.branch != 'agent/release-catalog-canary'
+      && inputs.branch != 'refs/heads/agent/release-catalog-canary' }}
     uses: rapidsai/shared-workflows/.github/workflows/conda-upload-packages.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
@@ -194,7 +208,21 @@ jobs:
       sha: ${{ inputs.sha }}
       skip_upload_pkgs: libcuvs-template
   rust-publish:
-    if: ${{ inputs.build_type != 'release-candidate' }}
+    if: >-
+      ${{ inputs.build_type != 'release-candidate'
+      && github.event.inputs.build_type != 'release-candidate'
+      && !startsWith(github.ref, 'refs/heads/release-test-')
+      && !startsWith(github.ref_name, 'release-test-')
+      && !startsWith(github.head_ref, 'release-test-')
+      && !startsWith(github.head_ref, 'refs/heads/release-test-')
+      && !startsWith(inputs.branch, 'release-test-')
+      && !startsWith(inputs.branch, 'refs/heads/release-test-')
+      && github.ref != 'agent/release-catalog-canary'
+      && github.ref != 'refs/heads/agent/release-catalog-canary'
+      && github.head_ref != 'agent/release-catalog-canary'
+      && github.head_ref != 'refs/heads/agent/release-catalog-canary'
+      && inputs.branch != 'agent/release-catalog-canary'
+      && inputs.branch != 'refs/heads/agent/release-catalog-canary' }}
     needs: [rust-build, upload-conda]
     permissions:
       contents: read
@@ -252,7 +280,21 @@ jobs:
       package-name: libcuvs
       package-type: cpp
   wheel-publish-libcuvs:
-    if: ${{ inputs.build_type != 'release-candidate' }}
+    if: >-
+      ${{ inputs.build_type != 'release-candidate'
+      && github.event.inputs.build_type != 'release-candidate'
+      && !startsWith(github.ref, 'refs/heads/release-test-')
+      && !startsWith(github.ref_name, 'release-test-')
+      && !startsWith(github.head_ref, 'release-test-')
+      && !startsWith(github.head_ref, 'refs/heads/release-test-')
+      && !startsWith(inputs.branch, 'release-test-')
+      && !startsWith(inputs.branch, 'refs/heads/release-test-')
+      && github.ref != 'agent/release-catalog-canary'
+      && github.ref != 'refs/heads/agent/release-catalog-canary'
+      && github.head_ref != 'agent/release-catalog-canary'
+      && github.head_ref != 'refs/heads/agent/release-catalog-canary'
+      && inputs.branch != 'agent/release-catalog-canary'
+      && inputs.branch != 'refs/heads/agent/release-catalog-canary' }}
     needs: wheel-build-libcuvs
     permissions:
       actions: read
@@ -291,7 +333,21 @@ jobs:
       # Build a wheel for each CUDA x ARCH x minimum supported Python version
       matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   wheel-publish-cuvs:
-    if: ${{ inputs.build_type != 'release-candidate' }}
+    if: >-
+      ${{ inputs.build_type != 'release-candidate'
+      && github.event.inputs.build_type != 'release-candidate'
+      && !startsWith(github.ref, 'refs/heads/release-test-')
+      && !startsWith(github.ref_name, 'release-test-')
+      && !startsWith(github.head_ref, 'release-test-')
+      && !startsWith(github.head_ref, 'refs/heads/release-test-')
+      && !startsWith(inputs.branch, 'release-test-')
+      && !startsWith(inputs.branch, 'refs/heads/release-test-')
+      && github.ref != 'agent/release-catalog-canary'
+      && github.ref != 'refs/heads/agent/release-catalog-canary'
+      && github.head_ref != 'agent/release-catalog-canary'
+      && github.head_ref != 'refs/heads/agent/release-catalog-canary'
+      && inputs.branch != 'agent/release-catalog-canary'
+      && inputs.branch != 'refs/heads/agent/release-catalog-canary' }}
     needs: wheel-build-cuvs
     permissions:
       actions: read
@@ -311,7 +367,21 @@ jobs:
       publish-wheel-search-key: cuvs_wheel_python_cuvs
   devcontainers:
     name: Build devcontainers
-    if: ${{ inputs.build_type != 'release-candidate' }}
+    if: >-
+      ${{ inputs.build_type != 'release-candidate'
+      && github.event.inputs.build_type != 'release-candidate'
+      && !startsWith(github.ref, 'refs/heads/release-test-')
+      && !startsWith(github.ref_name, 'release-test-')
+      && !startsWith(github.head_ref, 'release-test-')
+      && !startsWith(github.head_ref, 'refs/heads/release-test-')
+      && !startsWith(inputs.branch, 'release-test-')
+      && !startsWith(inputs.branch, 'refs/heads/release-test-')
+      && github.ref != 'agent/release-catalog-canary'
+      && github.ref != 'refs/heads/agent/release-catalog-canary'
+      && github.head_ref != 'agent/release-catalog-canary'
+      && github.head_ref != 'refs/heads/agent/release-catalog-canary'
+      && inputs.branch != 'agent/release-catalog-canary'
+      && inputs.branch != 'refs/heads/agent/release-catalog-canary' }}
     secrets: inherit  # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/build-devcontainers.yaml@main
     permissions:
