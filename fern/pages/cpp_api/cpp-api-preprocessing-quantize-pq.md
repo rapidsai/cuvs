@@ -143,7 +143,7 @@ struct is_vpq_spec;
 <a id="preprocessing-quantize-pq-is-vpq-dataset"></a>
 ### preprocessing::quantize::pq::is_vpq_dataset
 
-True for an owning `dataset&lt;...&gt;` of the VPQ kind.
+True for an owning `dataset<...>` of the VPQ kind.
 
 ```cpp
 template <typename DatasetT>

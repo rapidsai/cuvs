@@ -461,8 +461,18 @@ SizeT> {
 ### neighbors::distribution_mode
 
 ```cpp
-enum distribution_mode;
+enum distribution_mode {
+  REPLICATED,
+  SHARDED
+};
 ```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `REPLICATED` | `` |
+| `SHARDED` | `` |
 
 <a id="neighbors-mg-index-params"></a>
 ### neighbors::mg_index_params

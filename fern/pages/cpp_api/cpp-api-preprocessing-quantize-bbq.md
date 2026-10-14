@@ -179,7 +179,7 @@ struct is_bbq_spec;
 <a id="preprocessing-quantize-bbq-is-bbq-dataset"></a>
 ### preprocessing::quantize::bbq::is_bbq_dataset
 
-True for an owning `dataset&lt;...&gt;` of the BBQ kind.
+True for an owning `dataset<...>` of the BBQ kind.
 
 ```cpp
 template <typename DatasetT>

@@ -35,7 +35,7 @@ struct dataset;
 <a id="core-is-padded-dataset"></a>
 ### core::is_padded_dataset
 
-Owning-side kind traits (true for both `dataset&lt;...&gt;` and `dataset_view&lt;...&gt;` of that kind).
+Owning-side kind traits (true for both `dataset<...>` and `dataset_view<...>` of that kind).
 
 ```cpp
 template <typename DatasetT>
@@ -45,7 +45,7 @@ struct is_padded_dataset;
 <a id="core-is-dataset-view"></a>
 ### core::is_dataset_view
 
-True for any `dataset_view&lt;...&gt;` specialization. Evaluates to `false` (never a hard error) for
+True for any `dataset_view<...>` specialization. Evaluates to `false` (never a hard error) for
 
 everything else, e.g. a plain mdspan passed to a deprecated `build(matrix_view)` overload.
 
@@ -57,7 +57,7 @@ struct is_dataset_view;
 <a id="core-dataset-view-has-spec"></a>
 ### core::dataset_view_has_spec
 
-True when `V` is a `dataset_view` whose spec satisfies the predicate `SpecPred&lt;SpecT&gt;::value`.
+True when `V` is a `dataset_view` whose spec satisfies the predicate `SpecPred<SpecT>::value`.
 
 This is how a kind that lives outside this header classifies its own views.
 
@@ -81,7 +81,7 @@ struct dataset_view_is_device_accessible;
 
 Generic accessor retargeting while preserving the spec kind and value/index types:
 
-`dataset&lt;T, IdxT, SpecT&lt;..., OldAccessor&gt;&gt;      -&gt; dataset&lt;T, IdxT, SpecT&lt;..., NewAccessor&gt;&gt;` `dataset_view&lt;T, IdxT, SpecT&lt;..., OldAccessor&gt;&gt; -&gt; dataset_view&lt;T, IdxT, SpecT&lt;..., NewAccessor&gt;&gt;` Every spec provides `rebind_accessor&lt;NewAccessor&gt;` for this, so this header does not need to know about any particular kind.
+`dataset<T, IdxT, SpecT<..., OldAccessor>>      -> dataset<T, IdxT, SpecT<..., NewAccessor>>` `dataset_view<T, IdxT, SpecT<..., OldAccessor>> -> dataset_view<T, IdxT, SpecT<..., NewAccessor>>` Every spec provides `rebind_accessor<NewAccessor>` for this, so this header does not need to know about any particular kind.
 
 ```cpp
 template <typename DatasetLikeT, typename NewAccessor>
