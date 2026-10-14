@@ -121,7 +121,7 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       node_type: cpu8
-      matrix_filter: ${{ inputs.build_type == 'release-candidate' && '.' || 'map(select(.ARCH == "amd64"))' }}
+      matrix_filter: ${{ inputs.build_type == 'release-candidate' && 'group_by([.ARCH, (.CUDA_VER | split(".") | .[0])]) | map(min_by(.PY_VER | split(".") | map(tonumber)))' || 'map(select(.ARCH == "amd64"))' }}
       script: "ci/build_java.sh"
       artifact-name-prefix: ${{ inputs.build_type == 'release-candidate' && format('cuvs-java-{0}', matrix.ARCH) || 'cuvs-java' }}
       file_to_upload: "java/cuvs-java/target/"
@@ -149,7 +149,7 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       node_type: cpu8
-      matrix_filter: ${{ inputs.build_type == 'release-candidate' && '.' || 'map(select(.ARCH == "amd64"))' }}
+      matrix_filter: ${{ inputs.build_type == 'release-candidate' && 'group_by([.ARCH, (.CUDA_VER | split(".") | .[0])]) | map(min_by(.PY_VER | split(".") | map(tonumber)))' || 'map(select(.ARCH == "amd64"))' }}
       script: "ci/build_lucene.sh"
       artifact-name-prefix: ${{ inputs.build_type == 'release-candidate' && format('cuvs-lucene-{0}', matrix.ARCH) || 'cuvs-lucene' }}
       file_to_upload: "java/cuvs-lucene/target/"
