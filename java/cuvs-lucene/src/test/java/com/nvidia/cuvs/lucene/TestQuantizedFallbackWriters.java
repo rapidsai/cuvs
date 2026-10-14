@@ -73,8 +73,29 @@ public class TestQuantizedFallbackWriters extends LuceneTestCase {
   }
 
   private void checkWritesAndReads(Codec codec) throws Exception {
-    Random random = new Random(random().nextLong());
+    float[][] vectors = randomVectors(new Random(random().nextLong()));
+    try (Directory dir = newDirectory()) {
+      int fallbacks = writeIndex(dir, codec, vectors);
+      assertTrue(codec.getName() + " did not fall back to the CPU", fallbacks > 0);
+      assertVectorsFindThemselves(dir, codec, vectors);
+    }
+  }
+
+  private static float[][] randomVectors(Random random) {
     float[][] vectors = new float[NUM_DOCS][DIMENSIONS];
+    for (float[] vector : vectors) {
+      for (int d = 0; d < DIMENSIONS; d++) {
+        vector[d] = random.nextFloat();
+      }
+    }
+    return vectors;
+  }
+
+  /**
+   * Indexes one document per vector, with its position as the stored "id", and returns how many
+   * times the codec logged that it fell back to the CPU.
+   */
+  private static int writeIndex(Directory dir, Codec codec, float[][] vectors) throws Exception {
     AtomicInteger fallbacks = new AtomicInteger();
     Handler countFallbacks =
         new Handler() {
@@ -93,47 +114,51 @@ public class TestQuantizedFallbackWriters extends LuceneTestCase {
         };
     Logger logger = Logger.getLogger("com.nvidia.cuvs.lucene");
     logger.addHandler(countFallbacks);
-    try (Directory dir = newDirectory()) {
-      // Flushes and merges on this thread, where cuVS is unavailable.
-      IndexWriterConfig config =
-          new IndexWriterConfig()
-              .setCodec(codec)
-              .setUseCompoundFile(false)
-              .setMergeScheduler(new SerialMergeScheduler());
-      try (IndexWriter writer = new IndexWriter(dir, config)) {
-        for (int i = 0; i < NUM_DOCS; i++) {
-          for (int d = 0; d < DIMENSIONS; d++) {
-            vectors[i][d] = random.nextFloat();
-          }
-          Document doc = new Document();
-          doc.add(new StoredField("id", i));
-          doc.add(new KnnFloatVectorField("vector", vectors[i], EUCLIDEAN));
-          writer.addDocument(doc);
-        }
-      }
-      assertTrue(codec.getName() + " did not fall back to the CPU", fallbacks.get() > 0);
-      try (DirectoryReader reader = DirectoryReader.open(dir)) {
-        assertEquals(codec.getName(), NUM_DOCS, reader.numDocs());
-        IndexSearcher searcher = new IndexSearcher(reader);
-        int found = 0;
-        for (int i = 0; i < NUM_DOCS; i++) {
-          ScoreDoc[] hits =
-              searcher.search(new KnnFloatVectorQuery("vector", vectors[i], TOP_K), TOP_K)
-                  .scoreDocs;
-          for (ScoreDoc hit : hits) {
-            if (searcher.storedFields().document(hit.doc).getField("id").numericValue().intValue()
-                == i) {
-              found++;
-              break;
-            }
-          }
-        }
-        assertTrue(
-            codec.getName() + ": only " + found + " of " + NUM_DOCS + " vectors found themselves",
-            found >= NUM_DOCS * 0.9);
+    // Flushes and merges on this thread, where cuVS is unavailable.
+    IndexWriterConfig config =
+        new IndexWriterConfig()
+            .setCodec(codec)
+            .setUseCompoundFile(false)
+            .setMergeScheduler(new SerialMergeScheduler());
+    try (IndexWriter writer = new IndexWriter(dir, config)) {
+      for (int i = 0; i < vectors.length; i++) {
+        Document doc = new Document();
+        doc.add(new StoredField("id", i));
+        doc.add(new KnnFloatVectorField("vector", vectors[i], EUCLIDEAN));
+        writer.addDocument(doc);
       }
     } finally {
       logger.removeHandler(countFallbacks);
+    }
+    return fallbacks.get();
+  }
+
+  /** Checks that at least 90% of the vectors are among their own top-k search results. */
+  private static void assertVectorsFindThemselves(Directory dir, Codec codec, float[][] vectors)
+      throws Exception {
+    try (DirectoryReader reader = DirectoryReader.open(dir)) {
+      assertEquals(codec.getName(), vectors.length, reader.numDocs());
+      IndexSearcher searcher = new IndexSearcher(reader);
+      int found = 0;
+      for (int i = 0; i < vectors.length; i++) {
+        ScoreDoc[] hits =
+            searcher.search(new KnnFloatVectorQuery("vector", vectors[i], TOP_K), TOP_K).scoreDocs;
+        for (ScoreDoc hit : hits) {
+          if (searcher.storedFields().document(hit.doc).getField("id").numericValue().intValue()
+              == i) {
+            found++;
+            break;
+          }
+        }
+      }
+      assertTrue(
+          codec.getName()
+              + ": only "
+              + found
+              + " of "
+              + vectors.length
+              + " vectors found themselves",
+          found >= vectors.length * 0.9);
     }
   }
 }
