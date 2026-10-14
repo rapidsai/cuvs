@@ -56,6 +56,22 @@ jobs:
       sha: ${{ inputs.sha }}
 
   rocky8-clib-standalone-build:
+    if: >-
+      ${{ inputs.build_type != 'release-candidate'
+      && github.event.inputs.build_type != 'release-candidate'
+      && !startsWith(github.ref, 'refs/heads/release-test-')
+      && !startsWith(github.ref, 'release-test-')
+      && !startsWith(github.ref_name, 'release-test-')
+      && !startsWith(github.head_ref, 'release-test-')
+      && !startsWith(github.head_ref, 'refs/heads/release-test-')
+      && !startsWith(inputs.branch, 'release-test-')
+      && !startsWith(inputs.branch, 'refs/heads/release-test-')
+      && github.ref != 'agent/release-catalog-canary'
+      && github.ref != 'refs/heads/agent/release-catalog-canary'
+      && github.head_ref != 'agent/release-catalog-canary'
+      && github.head_ref != 'refs/heads/agent/release-catalog-canary'
+      && inputs.branch != 'agent/release-catalog-canary'
+      && inputs.branch != 'refs/heads/agent/release-catalog-canary' }}
     permissions:
       actions: read
       contents: read
