@@ -15,8 +15,12 @@ rapids-logger "Configuring conda strict channel priority"
 conda config --set channel_priority strict
 
 rapids-logger "Downloading artifacts from previous jobs"
-CPP_CHANNEL=$(rapids-download-from-github "$(rapids-artifact-name conda_cpp libcuvs cuvs --cuda "$RAPIDS_CUDA_VERSION")")
-CUVS_JAVA_DIR=$(rapids-download-from-github "${CUVS_JAVA_ARTIFACT}")
+if [[ "${RAPIDS_RELEASE_CANDIDATE:-false}" == "true" ]]; then
+  CPP_CHANNEL="${RAPIDS_CANDIDATE_CONDA_CHANNEL:?candidate train must provide the cuVS Conda dependency channel}"
+else
+  CPP_CHANNEL=$(rapids-download-from-github "$(rapids-artifact-name conda_cpp libcuvs cuvs --cuda "$RAPIDS_CUDA_VERSION")")
+  CUVS_JAVA_DIR=$(rapids-download-from-github "${CUVS_JAVA_ARTIFACT}")
+fi
 
 rapids-logger "Generate Java testing dependencies"
 
@@ -42,7 +46,8 @@ rapids-print-env
 # and the environment's lib directory has to be on LD_LIBRARY_PATH.
 export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-rapids-logger "Install the cuvs-java artifact into the local Maven repository"
+if [[ "${RAPIDS_RELEASE_CANDIDATE:-false}" != "true" ]]; then
+  rapids-logger "Install the cuvs-java artifact into the local Maven repository"
 
 # cuvs-lucene resolves cuvs-java from the local Maven repository. Rather than rebuilding the Java
 # bindings here, install the jar built by the Java job. Its pom.xml travels with the artifact and
@@ -66,6 +71,16 @@ fi
 pushd java/cuvs-lucene
 mvn --batch-mode install:install-file -Dfile="${CUVS_JAVA_JARS[0]}" -DpomFile="${CUVS_JAVA_POM}"
 popd
+else
+  CUVS_JAVA_VERSION="$(jq -er '.unit_package_versions["maven:cuvs-java"] // .package_versions.maven' \
+    <<<"${RAPIDS_RELEASE_CANDIDATE_UNIT_VERSIONS:-}")"
+  CUVS_JAVA_REPOSITORY="${MAVEN_LOCAL_REPO:?candidate resolver must configure the private Maven repository}/com/nvidia/cuvs/cuvs-java/${CUVS_JAVA_VERSION}"
+  if [[ ! -f "${CUVS_JAVA_REPOSITORY}/cuvs-java-${CUVS_JAVA_VERSION}.jar" \
+    || ! -f "${CUVS_JAVA_REPOSITORY}/cuvs-java-${CUVS_JAVA_VERSION}.pom" ]]; then
+    echo "verified cuvs-java Maven package is missing from ${CUVS_JAVA_REPOSITORY}" >&2
+    exit 1
+  fi
+fi
 
 EXITCODE=0
 trap "EXITCODE=1" ERR
@@ -77,6 +92,10 @@ RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 export RAPIDS_CUDA_MAJOR
 
 bash ./build.sh lucene "${EXTRA_BUILD_ARGS[@]}"
+
+if [[ "${RAPIDS_RELEASE_CANDIDATE:-false}" == "true" ]] && ! ci/package_candidate_maven.sh cuvs-lucene; then
+  exit 1
+fi
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

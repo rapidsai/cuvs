@@ -41,6 +41,30 @@ on:
         description: "If set, 'file_to_upload' is uploaded as '{prefix}-cuda{CUDA_VER}'."
         type: string
         default: ""
+      candidate-dependency-family:
+        description: "Release-candidate dependency family produced by this matrix job."
+        type: string
+        default: ""
+      candidate-unit-id:
+        description: "Exact release-candidate unit ID produced by this matrix job."
+        type: string
+        default: ""
+      candidate-prepare-conda-channel:
+        description: "Resolve the candidate dependency closure into a private Conda channel."
+        type: boolean
+        default: false
+      candidate-skip-github-artifact-upload:
+        description: "Skip duplicate GitHub artifact upload when the candidate is stored privately."
+        type: boolean
+        default: false
+      candidate-artifact-name:
+        description: "Safe, matrix-unique release-candidate catalog source name."
+        type: string
+        default: ""
+      release-catalog-config:
+        description: "Release-candidate catalog output configuration."
+        type: string
+        default: ""
 
 permissions:
   actions: read
@@ -51,7 +75,7 @@ permissions:
 
 jobs:
   compute-matrix:
-    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type }}
       matrix_name: conda-cpp-build
@@ -62,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.compute-matrix.outputs.matrix) }}
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -74,3 +98,10 @@ jobs:
       script: ${{ inputs.script }}
       file_to_upload: ${{ inputs.file_to_upload }}
       artifact-name: ${{ inputs.artifact-name-prefix != '' && format('{0}-cuda{1}', inputs.artifact-name-prefix, matrix.CUDA_VER) || 'result' }}
+      candidate-dependency-family: ${{ inputs.candidate-dependency-family }}
+      candidate-unit-id: ${{ inputs.candidate-unit-id }}
+      candidate-prepare-conda-channel: ${{ inputs.candidate-prepare-conda-channel }}
+      candidate-skip-github-artifact-upload: ${{ inputs.candidate-skip-github-artifact-upload }}
+      candidate-artifact-name: ${{ inputs.candidate-artifact-name }}
+      candidate-cuda-version: ${{ matrix.CUDA_VER }}
+      release-catalog-config: ${{ inputs.release-catalog-config }}

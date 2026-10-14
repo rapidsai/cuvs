@@ -20,7 +20,11 @@ rapids-logger "Configuring conda strict channel priority"
 conda config --set channel_priority strict
 
 rapids-logger "Downloading artifacts from previous jobs"
-CPP_CHANNEL=$(rapids-download-from-github "$(rapids-artifact-name conda_cpp libcuvs cuvs --cuda "$RAPIDS_CUDA_VERSION")")
+if [[ "${RAPIDS_RELEASE_CANDIDATE:-false}" == "true" ]]; then
+  CPP_CHANNEL="${RAPIDS_CANDIDATE_CONDA_CHANNEL:?candidate train must provide the cuVS Conda dependency channel}"
+else
+  CPP_CHANNEL=$(rapids-download-from-github "$(rapids-artifact-name conda_cpp libcuvs cuvs --cuda "$RAPIDS_CUDA_VERSION")")
+fi
 
 rapids-logger "Generate Java testing dependencies"
 
@@ -51,6 +55,10 @@ RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 export RAPIDS_CUDA_MAJOR
 
 bash ./build.sh java "${EXTRA_BUILD_ARGS[@]}"
+
+if [[ "${RAPIDS_RELEASE_CANDIDATE:-false}" == "true" ]] && ! ci/package_candidate_maven.sh cuvs-java; then
+  exit 1
+fi
 
 sccache --show-adv-stats
 sccache --stop-server >/dev/null 2>&1 || true

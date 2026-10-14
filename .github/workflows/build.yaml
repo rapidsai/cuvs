@@ -24,7 +24,7 @@ on:
         required: true
         type: string
       build_type:
-        description: "build_type: one of [branch, nightly, pull-request]"
+        description: "build_type: one of [branch, nightly, pull-request, release-candidate]"
         type: string
         default: nightly
 
@@ -36,7 +36,7 @@ permissions: {}
 
 jobs:
   build-details:
-    uses: rapidsai/shared-workflows/.github/workflows/compute-build-details.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/compute-build-details.yaml@e034a0d95b94775477395838bb7ee1163642291f
   cpp-build:
     needs: [build-details]
     permissions:
@@ -46,7 +46,7 @@ jobs:
       packages: read
       pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -122,10 +122,16 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       node_type: cpu8
-      matrix_filter: map(select(.ARCH == "amd64"))
+      matrix_filter: ${{ inputs.build_type == 'release-candidate' && '.' || 'map(select(.ARCH == "amd64"))' }}
       script: "ci/build_java.sh"
-      artifact-name-prefix: "cuvs-java"
+      artifact-name-prefix: ${{ inputs.build_type == 'release-candidate' && format('cuvs-java-{0}', matrix.ARCH) || 'cuvs-java' }}
       file_to_upload: "java/cuvs-java/target/"
+      candidate-dependency-family: maven
+      candidate-unit-id: maven:cuvs-java
+      candidate-prepare-conda-channel: true
+      candidate-skip-github-artifact-upload: true
+      candidate-artifact-name: ${{ inputs.build_type == 'release-candidate' && format('cuvs-java-{0}-cuda{1}', matrix.ARCH, fromJSON(matrix.CUDA_VER)) || '' }}
+      release-catalog-config: '{"release_catalog_key":"maven:cuvs-java","artifact_directory":".release-candidate-artifacts/maven","artifacts":[{"path":"cuvs-java.tar.gz","package_identity_file":"cuvs-java.identity.json"}]}'
   lucene-build:
     # Depends on the Java job for the cuvs-java artifact that cuvs-lucene builds against.
     needs: java-build
@@ -144,10 +150,16 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       node_type: cpu8
-      matrix_filter: map(select(.ARCH == "amd64"))
+      matrix_filter: ${{ inputs.build_type == 'release-candidate' && '.' || 'map(select(.ARCH == "amd64"))' }}
       script: "ci/build_lucene.sh"
-      artifact-name-prefix: "cuvs-lucene"
+      artifact-name-prefix: ${{ inputs.build_type == 'release-candidate' && format('cuvs-lucene-{0}', matrix.ARCH) || 'cuvs-lucene' }}
       file_to_upload: "java/cuvs-lucene/target/"
+      candidate-dependency-family: maven
+      candidate-unit-id: maven:cuvs-lucene
+      candidate-prepare-conda-channel: true
+      candidate-skip-github-artifact-upload: true
+      candidate-artifact-name: ${{ inputs.build_type == 'release-candidate' && format('cuvs-lucene-{0}-cuda{1}', matrix.ARCH, fromJSON(matrix.CUDA_VER)) || '' }}
+      release-catalog-config: '{"release_catalog_key":"maven:cuvs-lucene","artifact_directory":".release-candidate-artifacts/maven","artifacts":[{"path":"cuvs-lucene.tar.gz","package_identity_file":"cuvs-lucene.identity.json"}]}'
   python-build:
     needs: [build-details, cpp-build]
     permissions:
@@ -157,7 +169,7 @@ jobs:
       packages: read
       pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -175,7 +187,8 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/conda-upload-packages.yaml@main
+    if: ${{ inputs.build_type != 'release-candidate' }}
+    uses: rapidsai/shared-workflows/.github/workflows/conda-upload-packages.yaml@e034a0d95b94775477395838bb7ee1163642291f
     secrets:
       CONDA_RAPIDSAI_NIGHTLY_TOKEN: ${{ secrets.CONDA_RAPIDSAI_NIGHTLY_TOKEN }}
       CONDA_RAPIDSAI_TOKEN: ${{ secrets.CONDA_RAPIDSAI_TOKEN }}
@@ -186,6 +199,7 @@ jobs:
       sha: ${{ inputs.sha }}
       skip_upload_pkgs: libcuvs-template
   rust-publish:
+    if: ${{ inputs.build_type != 'release-candidate' }}
     needs: [rust-build, upload-conda]
     permissions:
       contents: read
@@ -195,13 +209,13 @@ jobs:
   docs-build-matrix:
     permissions:
       contents: read
-    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       matrix_name: docs-build
   docs-build:
     needs: [docs-build-matrix]
-    if: github.ref_type == 'branch'
+    if: ${{ github.ref_type == 'branch' && inputs.build_type != 'release-candidate' }}
     permissions:
       actions: read
       contents: read
@@ -209,7 +223,7 @@ jobs:
       packages: read
       pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@e034a0d95b94775477395838bb7ee1163642291f
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.docs-build-matrix.outputs.matrix) }}
@@ -231,7 +245,7 @@ jobs:
       packages: read
       pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -245,6 +259,7 @@ jobs:
       package-name: libcuvs
       package-type: cpp
   wheel-publish-libcuvs:
+    if: ${{ inputs.build_type != 'release-candidate' }}
     needs: wheel-build-libcuvs
     permissions:
       actions: read
@@ -252,7 +267,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@e034a0d95b94775477395838bb7ee1163642291f
     secrets:
       CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN: ${{ secrets.CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN }}
       RAPIDSAI_PYPI_TOKEN: ${{ secrets.RAPIDSAI_PYPI_TOKEN }}
@@ -273,7 +288,7 @@ jobs:
       packages: read
       pull-requests: read
     secrets: inherit # zizmor: ignore[secrets-inherit]
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@e034a0d95b94775477395838bb7ee1163642291f
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -287,6 +302,7 @@ jobs:
       # Build a wheel for each CUDA x ARCH x minimum supported Python version
       matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   wheel-publish-cuvs:
+    if: ${{ inputs.build_type != 'release-candidate' }}
     needs: wheel-build-cuvs
     permissions:
       actions: read
@@ -294,7 +310,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@e034a0d95b94775477395838bb7ee1163642291f
     secrets:
       CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN: ${{ secrets.CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN }}
       RAPIDSAI_PYPI_TOKEN: ${{ secrets.RAPIDSAI_PYPI_TOKEN }}
@@ -308,6 +324,7 @@ jobs:
       publish-wheel-search-key: cuvs_wheel_python_cuvs
   devcontainers:
     name: Build devcontainers
+    if: ${{ inputs.build_type != 'release-candidate' }}
     secrets: inherit  # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/build-devcontainers.yaml@main
     permissions:
