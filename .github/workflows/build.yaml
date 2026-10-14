@@ -187,9 +187,6 @@ jobs:
       pull-requests: read
     if: ${{ inputs.build_type != 'release-candidate' }}
     uses: rapidsai/shared-workflows/.github/workflows/conda-upload-packages.yaml@e034a0d95b94775477395838bb7ee1163642291f
-    secrets:
-      CONDA_RAPIDSAI_NIGHTLY_TOKEN: ${{ secrets.CONDA_RAPIDSAI_NIGHTLY_TOKEN }}
-      CONDA_RAPIDSAI_TOKEN: ${{ secrets.CONDA_RAPIDSAI_TOKEN }}
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -220,7 +217,6 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    secrets: inherit # zizmor: ignore[secrets-inherit]
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@e034a0d95b94775477395838bb7ee1163642291f
     strategy:
       fail-fast: false
@@ -265,9 +261,6 @@ jobs:
       packages: read
       pull-requests: read
     uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@e034a0d95b94775477395838bb7ee1163642291f
-    secrets:
-      CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN: ${{ secrets.CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN }}
-      RAPIDSAI_PYPI_TOKEN: ${{ secrets.RAPIDSAI_PYPI_TOKEN }}
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -307,9 +300,7 @@ jobs:
       packages: read
       pull-requests: read
     uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@e034a0d95b94775477395838bb7ee1163642291f
-    secrets:
-      CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN: ${{ secrets.CONDA_RAPIDSAI_WHEELS_NIGHTLY_TOKEN }}
-      RAPIDSAI_PYPI_TOKEN: ${{ secrets.RAPIDSAI_PYPI_TOKEN }}
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
