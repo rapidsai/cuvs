@@ -4,6 +4,10 @@
  */
 
 #include <cuvs/core/dataset.hpp>
+#include <cuvs/core/dataset/dense.hpp>
+#include <cuvs/core/dataset/sparse.hpp>
+#include <cuvs/core/dataset/sq.hpp>
+#include <cuvs/core/dataset/vpq.hpp>
 
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_csr_matrix.hpp>
