@@ -75,7 +75,7 @@ permissions:
 
 jobs:
   compute-matrix:
-    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@f127659d02df896f7ded35eafa08530c362bc694
+    uses: rapidsai/shared-workflows/.github/workflows/compute-matrix.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
     with:
       build_type: ${{ inputs.build_type }}
       matrix_name: conda-cpp-build
@@ -86,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.compute-matrix.outputs.matrix) }}
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@f21ce227be8bfb9351989684f3fc5809b9cd703d
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -102,6 +102,6 @@ jobs:
       candidate-unit-id: ${{ inputs.candidate-unit-id }}
       candidate-prepare-conda-channel: ${{ inputs.candidate-prepare-conda-channel }}
       candidate-skip-github-artifact-upload: ${{ inputs.candidate-skip-github-artifact-upload }}
-      candidate-artifact-name: ${{ inputs.candidate-artifact-name }}
+      candidate-artifact-name: ${{ inputs.candidate-artifact-name != '' && format('{0}-{1}-cuda{2}', inputs.candidate-artifact-name, matrix.ARCH, matrix.CUDA_VER) || '' }}
       candidate-cuda-version: ${{ matrix.CUDA_VER }}
       release-catalog-config: ${{ inputs.release-catalog-config }}

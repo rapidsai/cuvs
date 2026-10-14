@@ -36,7 +36,7 @@ permissions: {}
 
 jobs:
   build-details:
-    uses: rapidsai/shared-workflows/.github/workflows/compute-build-details.yaml@f127659d02df896f7ded35eafa08530c362bc694
+    uses: rapidsai/shared-workflows/.github/workflows/compute-build-details.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
   cpp-build:
     needs: [build-details]
     permissions:
@@ -45,7 +45,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@f21ce227be8bfb9351989684f3fc5809b9cd703d
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -123,13 +123,13 @@ jobs:
       node_type: cpu8
       matrix_filter: ${{ inputs.build_type == 'release-candidate' && 'group_by([.ARCH, (.CUDA_VER | split(".") | .[0])]) | map(min_by(.PY_VER | split(".") | map(tonumber)))' || 'map(select(.ARCH == "amd64"))' }}
       script: "ci/build_java.sh"
-      artifact-name-prefix: ${{ inputs.build_type == 'release-candidate' && format('cuvs-java-{0}', matrix.ARCH) || 'cuvs-java' }}
+      artifact-name-prefix: cuvs-java
       file_to_upload: "java/cuvs-java/target/"
       candidate-dependency-family: maven
       candidate-unit-id: maven:cuvs-java
       candidate-prepare-conda-channel: true
       candidate-skip-github-artifact-upload: true
-      candidate-artifact-name: ${{ inputs.build_type == 'release-candidate' && format('cuvs-java-{0}-cuda{1}', matrix.ARCH, fromJSON(matrix.CUDA_VER)) || '' }}
+      candidate-artifact-name: ${{ inputs.build_type == 'release-candidate' && 'cuvs-java' || '' }}
       release-catalog-config: '{"release_catalog_key":"maven:cuvs-java","artifact_directory":".release-candidate-artifacts/maven","artifacts":[{"path":"cuvs-java.tar.gz","package_identity_file":"cuvs-java.identity.json"}]}'
   lucene-build:
     # Depends on the Java job for the cuvs-java artifact that cuvs-lucene builds against.
@@ -151,13 +151,13 @@ jobs:
       node_type: cpu8
       matrix_filter: ${{ inputs.build_type == 'release-candidate' && 'group_by([.ARCH, (.CUDA_VER | split(".") | .[0])]) | map(min_by(.PY_VER | split(".") | map(tonumber)))' || 'map(select(.ARCH == "amd64"))' }}
       script: "ci/build_lucene.sh"
-      artifact-name-prefix: ${{ inputs.build_type == 'release-candidate' && format('cuvs-lucene-{0}', matrix.ARCH) || 'cuvs-lucene' }}
+      artifact-name-prefix: cuvs-lucene
       file_to_upload: "java/cuvs-lucene/target/"
       candidate-dependency-family: maven
       candidate-unit-id: maven:cuvs-lucene
       candidate-prepare-conda-channel: true
       candidate-skip-github-artifact-upload: true
-      candidate-artifact-name: ${{ inputs.build_type == 'release-candidate' && format('cuvs-lucene-{0}-cuda{1}', matrix.ARCH, fromJSON(matrix.CUDA_VER)) || '' }}
+      candidate-artifact-name: ${{ inputs.build_type == 'release-candidate' && 'cuvs-lucene' || '' }}
       release-catalog-config: '{"release_catalog_key":"maven:cuvs-lucene","artifact_directory":".release-candidate-artifacts/maven","artifacts":[{"path":"cuvs-lucene.tar.gz","package_identity_file":"cuvs-lucene.identity.json"}]}'
   python-build:
     needs: [build-details, cpp-build]
@@ -167,7 +167,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@f21ce227be8bfb9351989684f3fc5809b9cd703d
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -238,7 +238,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@f21ce227be8bfb9351989684f3fc5809b9cd703d
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
@@ -277,7 +277,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@f21ce227be8bfb9351989684f3fc5809b9cd703d
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@9ac257258ee48137e797fc3e122f992f9ab17b9c
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       build-datetime: ${{ needs.build-details.outputs.build-datetime }}
