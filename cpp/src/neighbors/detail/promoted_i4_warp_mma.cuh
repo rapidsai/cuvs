@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <raft/util/cuda_dev_essentials.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 #include <mma.h>
 
@@ -129,30 +129,23 @@ struct i4_warp_mma_u8 {
 
 // fp8 mma.sync needs sm_89+.
 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 890)
-// Expands the eight 4-bit codes packed in w to e4m3 bytes of the same value (0..15 are exact in
-// e4m3): lo gets the codes in w's low 16 bits, hi the codes in its high 16 bits. prmt tables hold
-// only 8 bytes, so 0..7 and 8..15 use separate tables; a selector with bit 3 set yields the
-// selected byte's sign, 0 here, which zeroes the lanes the other table owns. prmt reads only the
-// selector's low 16 bits, hence the shift for hi.
-__device__ __forceinline__ void nibbles_to_e4m3(uint32_t w, uint32_t& lo, uint32_t& hi)
-{
-  constexpr uint32_t k0_3   = 0x44403800u;
-  constexpr uint32_t k4_7   = 0x4e4c4a48u;
-  constexpr uint32_t k8_11  = 0x53525150u;
-  constexpr uint32_t k12_15 = 0x57565554u;
-  auto lookup               = [](uint32_t sel) {
-    uint32_t below_8, from_8;
-    asm("prmt.b32 %0, %1, %2, %3;" : "=r"(below_8) : "r"(k0_3), "r"(k4_7), "r"(sel));
-    asm("prmt.b32 %0, %1, %2, %3;" : "=r"(from_8) : "r"(k8_11), "r"(k12_15), "r"(sel ^ 0x8888u));
-    return below_8 | from_8;
-  };
-  lo = lookup(w);
-  hi = lookup(w >> 16);
-}
+// A 4-bit code c (0..15) masked into its own byte and read as e4m3 is c / kE4m3CodeScale:
+//   c    byte   e4m3 value
+//   0    0x00   0
+//   1    0x01   1 / 512
+//   ...
+//   15   0x0F   15 / 512
+// so splitting a packed word into its low and high nibbles, one code per byte, is the whole
+// expansion to e4m3, and every product carries 1 / kE4m3CodeScale^2, removed in store().
+// Codes 1..7 are e4m3 subnormals (exponent bits 0000). Hardware that flushed subnormal MMA inputs
+// to zero would silently drop them; we accept that risk because e4m3 defines these values as part
+// of its (already small) range and the fp8 MMA paths honor them. nvcc's -ftz does not apply: it
+// covers f32 arithmetic, and every f32 value here is a normal number.
+constexpr int kE4m3CodeScale = 512;
 
 // c += a * b over one m16n8k32 tile. The tensor core's fp8 accumulator keeps far fewer bits than
-// f32, so chaining c through it drops low bits of the integer sums. Each MMA starts from zero
-// instead -- one tile's sum fits exactly -- and the running sum is kept with ordinary f32 adds.
+// f32, so chaining c through it drops low bits of the sums. Each MMA starts from zero instead --
+// one tile's sum fits exactly -- and the running sum is kept with ordinary f32 adds.
 __device__ __forceinline__ void mma_e4m3_m16n8k32(float (&c)[4],
                                                   const uint32_t (&a)[4],
                                                   const uint32_t (&b)[2])
@@ -188,7 +181,7 @@ struct i4_warp_mma_fp8 {
 
   // m16n8k32 fragment coordinates: `group` is the A row (and +8) and the B column this lane holds;
   // `quad` picks its 4-byte slice of the k-step. A and B read the same slice, and expanding it to
-  // (low 16 bits -> k 0..15, high -> k 16..31) the same way keeps their k orders aligned.
+  // (low nibbles -> k 0..15, high nibbles -> k 16..31) the same way keeps their k orders aligned.
   // Kept rolled for the same register reason as the u8 path.
   template <int RowBytes>
   __device__ __forceinline__ void accumulate(const uint8_t (*a)[RowStride],
@@ -196,9 +189,10 @@ struct i4_warp_mma_fp8 {
                                              int row0,
                                              int col0)
   {
-    const int lane  = threadIdx.x % raft::warp_size();
-    const int group = lane / 4;
-    const int quad  = lane % 4;
+    constexpr uint32_t kLowNibbles = 0x0f0f0f0fu;
+    const int lane                 = threadIdx.x % raft::warp_size();
+    const int group                = lane / 4;
+    const int quad                 = lane % 4;
 #pragma unroll 1
     for (int kk = 0; kk < RowBytes / KSTEP_BYTES; ++kk) {
       const int byte0 = kk * KSTEP_BYTES + quad * 4;
@@ -208,13 +202,16 @@ struct i4_warp_mma_fp8 {
         const int row     = row0 + msub * MMA_M + group;
         const uint32_t r0 = *reinterpret_cast<const uint32_t*>(a[row] + byte0);
         const uint32_t r8 = *reinterpret_cast<const uint32_t*>(a[row + 8] + byte0);
-        nibbles_to_e4m3(r0, a_frag[msub][0], a_frag[msub][2]);
-        nibbles_to_e4m3(r8, a_frag[msub][1], a_frag[msub][3]);
+        a_frag[msub][0]   = r0 & kLowNibbles;
+        a_frag[msub][2]   = (r0 >> 4) & kLowNibbles;
+        a_frag[msub][1]   = r8 & kLowNibbles;
+        a_frag[msub][3]   = (r8 >> 4) & kLowNibbles;
       }
       for (int nsub = 0; nsub < SUB_N; ++nsub) {
         const uint32_t w =
           *reinterpret_cast<const uint32_t*>(b[col0 + nsub * MMA_N + group] + byte0);
-        nibbles_to_e4m3(w, b_frag[nsub][0], b_frag[nsub][1]);
+        b_frag[nsub][0] = w & kLowNibbles;
+        b_frag[nsub][1] = (w >> 4) & kLowNibbles;
       }
       for (int msub = 0; msub < SUB_M; ++msub) {
         for (int nsub = 0; nsub < SUB_N; ++nsub) {
@@ -224,21 +221,23 @@ struct i4_warp_mma_fp8 {
     }
   }
 
-  // Lane (group, quad) holds columns quad*2, +1 of rows group and group+8.
+  // Lane (group, quad) holds columns quad*2, +1 of rows group and group+8. Runs once, after every
+  // K chunk is accumulated, so this is where the codes' 1 / kE4m3CodeScale^2 comes off.
   template <int Stride>
   __device__ __forceinline__ void store(raw_t* dst, int row0, int col0) const
   {
     static_assert(Stride % 2 == 0, "float2 stores need even row strides");
-    const int lane  = threadIdx.x % raft::warp_size();
-    const int group = lane / 4;
-    const int quad  = lane % 4;
+    constexpr float code_scale_sq = kE4m3CodeScale * kE4m3CodeScale;
+    const int lane                = threadIdx.x % raft::warp_size();
+    const int group               = lane / 4;
+    const int quad                = lane % 4;
     for (int msub = 0; msub < SUB_M; ++msub) {
       for (int nsub = 0; nsub < SUB_N; ++nsub) {
         for (int h = 0; h < 2; ++h) {
           const int row = row0 + msub * MMA_M + group + h * 8;
           const int col = col0 + nsub * MMA_N + quad * 2;
-          *reinterpret_cast<float2*>(dst + row * Stride + col) =
-            make_float2(c[msub][nsub][h * 2], c[msub][nsub][h * 2 + 1]);
+          *reinterpret_cast<float2*>(dst + row * Stride + col) = make_float2(
+            c[msub][nsub][h * 2] * code_scale_sq, c[msub][nsub][h * 2 + 1] * code_scale_sq);
         }
       }
     }
