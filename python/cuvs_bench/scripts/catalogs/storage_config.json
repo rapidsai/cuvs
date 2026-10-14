@@ -1,0 +1,8 @@
+{
+  "storage_configuration_name": "local-nvme-ann-fbin",
+  "storage_system": "nvme",
+  "file_format": "fbin",
+  "file_format_notes": "cuvs-bench binary vector format: base.fbin, query.fbin, groundtruth.neighbors.ibin",
+  "is_gds_enabled": false,
+  "path": "/raid/jnke/conference_implementation/benchmark-DB/datasets"
+}

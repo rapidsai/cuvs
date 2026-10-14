@@ -1,0 +1,12 @@
+{
+  "sku_name": "on-prem-rtx-pro-6000-blackwell",
+  "provider": "on-prem",
+  "hourly_cost_usd": 0,
+  "processor_model": "Intel(R) Xeon(R) 6960P",
+  "processor_arch": "x86_64",
+  "core_count": 288,
+  "socket_count": 2,
+  "host_ram_size": 2434612563968,
+  "gpu_model": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "gpu_count_per_unit": 7
+}
