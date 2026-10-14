@@ -36,14 +36,14 @@ import org.junit.Test;
  * Verifies the HNSW {@code M} recorded in a segment's metadata, for every segment an
  * accelerated-HNSW writer can produce.
  *
- * <p>{@code M} has two lower bounds. It bounds what the reader accepts: Lucene sizes its arc buffer
- * as {@code M * 2} and asserts that every stored adjacency row fits, so {@code M} must cover {@code
- * ceil(cagraGraphDegree / 2)} of the graph actually built. An {@code M} taken from the configured
- * graph degree can understate the graph, because cuVS is free to build a degree other than the one
- * requested -- and under the HEURISTIC strategy it derives the degree from maxConn and ignores the
- * configured graph degree outright.
+ * <p>The recorded {@code M} must equal maxConn, and the graph must fit within it. Lucene's reader
+ * sizes its arc buffer as {@code M * 2} and asserts that every stored adjacency row fits, and a CPU
+ * merge holds at most {@code 2 * maxConn} neighbors per node. The writers keep the graph within
+ * that: under HEURISTIC, cuVS derives the degree from maxConn, ignoring the configured graph degree
+ * outright, and CUSTOM rejects a degree above {@code 2 * maxConn}. An {@code M} taken from the
+ * configured graph degree would therefore be wrong.
  *
- * <p>{@code M} must also not fall below maxConn. On Lucene 10.4+ a CPU merge sizes the merged
+ * <p>{@code M} must not fall below maxConn either. On Lucene 10.4+ a CPU merge sizes the merged
  * graph's neighbor arrays from the {@code M} of its largest source segment but fills them up to
  * {@code 2 * maxConn}. cuVS truncates the CAGRA graph degree to {@code dataset_size - 1} for small
  * datasets, so the graph alone would give a 20-vector segment {@code M = 10} with maxConn 16, and a
@@ -60,8 +60,8 @@ public class TestSegmentMaxConnConsistency extends LuceneTestCase {
   private static final int MAX_CONN = 16;
 
   /**
-   * Every segment -- including a degenerate single-vector one -- must record an M that covers both
-   * its own widest adjacency row and maxConn.
+   * Every segment -- including a degenerate single-vector one -- must record M = maxConn and keep
+   * every adjacency row within 2 * maxConn.
    */
   @Test
   public void testRecordedMCoversEachSegmentsGraphAndMaxConn() throws Exception {
@@ -100,28 +100,18 @@ public class TestSegmentMaxConnConsistency extends LuceneTestCase {
           int recordedM = graph.maxConn();
           int widestRow = widestAdjacencyRow(graph);
 
-          assertEquals(
-              "segment of "
-                  + size
-                  + " vectors recorded M="
-                  + recordedM
-                  + " but its widest adjacency row holds "
-                  + widestRow
-                  + " arcs and maxConn is "
-                  + MAX_CONN,
-              Math.max(MAX_CONN, Math.ceilDiv(widestRow, 2)),
-              recordedM);
+          assertEquals("segment of " + size + " vectors recorded M", MAX_CONN, recordedM);
 
-          // The reader sizes its arc buffer as M*2 and asserts every arc count fits, so an M that
-          // understates the graph corrupts reads regardless of where it came from.
+          // Checked against maxConn, not the recorded M: a CPU merge holds at most 2 * maxConn
+          // neighbors per node, however large an M the segment records.
           assertTrue(
               "segment of "
                   + size
-                  + " vectors has "
+                  + " vectors has a row of "
                   + widestRow
-                  + " arcs but only M*2="
-                  + (recordedM * 2),
-              widestRow <= recordedM * 2);
+                  + " arcs, more than 2 * maxConn = "
+                  + (2 * MAX_CONN),
+              widestRow <= 2 * MAX_CONN);
         }
       }
     }
