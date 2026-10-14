@@ -421,13 +421,13 @@ namespace experimental {
 namespace scann {
 
 using index_params [[deprecated(
-  "Use cuvs::neighbors::scann::index_params")]] = cuvs::neighbors::scann::index_params;
+  "Use cuvs::neighbors::scann::index_params instead")]] = cuvs::neighbors::scann::index_params;
 
 template <typename T, typename IdxT>
-using index [[deprecated("Use cuvs::neighbors::scann::index")]] =
+using index [[deprecated("Use cuvs::neighbors::scann::index instead")]] =
   cuvs::neighbors::scann::index<T, IdxT>;
 
-[[deprecated("Use cuvs::neighbors::scann::build")]] inline auto build(
+[[deprecated("Use cuvs::neighbors::scann::build instead")]] inline auto build(
   raft::resources const& handle,
   const cuvs::neighbors::scann::index_params& params,
   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
@@ -436,7 +436,7 @@ using index [[deprecated("Use cuvs::neighbors::scann::index")]] =
   return cuvs::neighbors::scann::build(handle, params, dataset);
 }
 
-[[deprecated("Use cuvs::neighbors::scann::build")]] inline auto build(
+[[deprecated("Use cuvs::neighbors::scann::build instead")]] inline auto build(
   raft::resources const& handle,
   const cuvs::neighbors::scann::index_params& params,
   raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
@@ -445,7 +445,7 @@ using index [[deprecated("Use cuvs::neighbors::scann::index")]] =
   return cuvs::neighbors::scann::build(handle, params, dataset);
 }
 
-[[deprecated("Use cuvs::neighbors::scann::serialize")]] inline void serialize(
+[[deprecated("Use cuvs::neighbors::scann::serialize instead")]] inline void serialize(
   raft::resources const& handle,
   const std::string& file_prefix,
   const cuvs::neighbors::scann::index<float, int64_t>& index)

@@ -11,16 +11,44 @@
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <cstdlib>
 #include <cuda/stream>
+#include <filesystem>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <rmm/cuda_stream_pool.hpp>
 #include <rmm/mr/managed_memory_resource.hpp>
+#include <string>
 #include <thrust/sequence.h>
+#include <unistd.h>
+#include <vector>
 
 namespace cuvs::neighbors::scann {
+
+/**
+ * Helper that creates a unique temporary directory for serialized ScaNN assets.
+ * The directory (and everything in it) is removed when the object is destroyed.
+ */
+struct tmp_index_dir {
+  std::string dirname = (std::filesystem::temp_directory_path() /
+                         ("cuvs_scann_" + std::to_string(getpid()) + "_" +
+                          std::to_string(counter++) + "_" + std::to_string(std::rand())))
+                          .string();
+
+  tmp_index_dir() { std::filesystem::create_directories(dirname); }
+
+  ~tmp_index_dir()
+  {
+    std::error_code error;
+    std::filesystem::remove_all(dirname, error);
+  }
+
+ private:
+  static inline std::atomic<uint64_t> counter = 0;
+};
 
 struct scann_inputs {
   uint32_t num_db_vecs = 4096;
@@ -128,7 +156,35 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
 
     ASSERT_EQ(index.bf16_dataset().size(), expected_bf16_size);
     check_code_validity(index, num_subspaces, num_pq_clusters);
-    check_reconstruction(index, num_subspaces);
+    // Reconstruction is validated for the single-level layout. Two-level indexes
+    // store residuals relative to coarse/fine centers and are covered separately.
+    if (ps.index_params.n_coarse_clusters == 0) { check_reconstruction(index, num_subspaces); }
+
+    // Serialization is exercised on the already-built index so we get coverage
+    // across the whole parameter matrix without paying for an extra build.
+    check_serialize(index);
+  }
+
+  void check_serialize(const index<DataT, IdxT>& idx)
+  {
+    tmp_index_dir dir;
+    cuvs::neighbors::scann::serialize(handle_, dir.dirname, idx);
+
+    std::vector<std::string> expected_files = {"cuvs_metadata.bin",
+                                               "centers.npy",
+                                               "datapoint_to_token.npy",
+                                               "pq_codebook.npy",
+                                               "hashed_dataset.npy",
+                                               "hashed_dataset_soar.npy"};
+    if (ps.index_params.reordering_bf16) { expected_files.push_back("bf16_dataset.npy"); }
+    if (ps.index_params.n_coarse_clusters > 0) {
+      expected_files.push_back("coarse_centers.npy");
+      expected_files.push_back("coarse_labels.npy");
+    }
+
+    for (const auto& file : expected_files) {
+      EXPECT_TRUE(std::filesystem::file_size(std::filesystem::path(dir.dirname) / file) > 0u);
+    }
   }
 
   void check_code_validity(const index<DataT, IdxT>& idx, int num_subspaces, int num_pq_clusters)
@@ -386,6 +442,16 @@ inline auto soar() -> test_cases_t
 {
   scann_inputs ts;
   ts.index_params.soar_lambda = 1.5;
+
+  return {ts};
+}
+
+inline auto two_level() -> test_cases_t
+{
+  scann_inputs ts;
+  // Enable the two-level (coarse + fine) partitioning path so the coarse
+  // serialization assets are exercised. n_coarse_clusters must stay < n_leaves.
+  ts.index_params.n_coarse_clusters = 4;
 
   return {ts};
 }
