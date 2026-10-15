@@ -741,9 +741,10 @@ std::unique_ptr<index<int8_t>> from_cagra(
 /**
  * @brief Construct an hnswlib index from a host-built CAGRA index.
  * Requires `dataset` for in-memory indices — host builds do not store vectors in the index.
- * This also applies to `GRAPH_ONLY`, which requires a GPU hierarchy. Supply vectors in original
- * row order with matching row count and logical dimensions. Serialize the returned temporary
- * graph artifact before destroying the handle.
+ * `GRAPH_ONLY` requires a GPU hierarchy and explicit `dataset` vectors for both in-memory and
+ * disk-backed indices. Supply vectors in original row order with matching row count and logical
+ * dimensions. For in-memory conversion, serialize the returned temporary graph artifact before
+ * destroying the handle.
  *
  * `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()`
  * mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
@@ -785,9 +786,10 @@ std::unique_ptr<index<int8_t>> from_cagra(
 /**
  * @brief Construct an hnswlib index from a host-built CAGRA index (standard dataset layout).
  * Requires `dataset` for in-memory indices — host builds do not store vectors in the index.
- * This also applies to `GRAPH_ONLY`, which requires a GPU hierarchy. Supply vectors in original
- * row order with matching row count and logical dimensions. Serialize the returned temporary
- * graph artifact before destroying the handle.
+ * `GRAPH_ONLY` requires a GPU hierarchy and explicit `dataset` vectors for both in-memory and
+ * disk-backed indices. Supply vectors in original row order with matching row count and logical
+ * dimensions. For in-memory conversion, serialize the returned temporary graph artifact before
+ * destroying the handle.
  *
  * `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()`
  * mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.

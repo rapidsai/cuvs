@@ -522,7 +522,7 @@ Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existin
 
 **Additional overload:** `neighbors::hnsw::from_cagra`
 
-Construct an hnswlib index from a host-built CAGRA index. Requires `dataset` for in-memory indices — host builds do not store vectors in the index. This also applies to `GRAPH_ONLY`, which requires a GPU hierarchy. Supply vectors in original row order with matching row count and logical dimensions. Serialize the returned temporary graph artifact before destroying the handle.
+Construct an hnswlib index from a host-built CAGRA index. Requires `dataset` for in-memory indices — host builds do not store vectors in the index. `GRAPH_ONLY` requires a GPU hierarchy and explicit `dataset` vectors for both in-memory and disk-backed indices. Supply vectors in original row order with matching row count and logical dimensions. For in-memory conversion, serialize the returned temporary graph artifact before destroying the handle.
 
 ```cpp
 std::unique_ptr<index<float>> from_cagra(
@@ -552,7 +552,7 @@ Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existin
 
 **Additional overload:** `neighbors::hnsw::from_cagra`
 
-Construct an hnswlib index from a host-built CAGRA index (standard dataset layout). Requires `dataset` for in-memory indices — host builds do not store vectors in the index. This also applies to `GRAPH_ONLY`, which requires a GPU hierarchy. Supply vectors in original row order with matching row count and logical dimensions. Serialize the returned temporary graph artifact before destroying the handle.
+Construct an hnswlib index from a host-built CAGRA index (standard dataset layout). Requires `dataset` for in-memory indices — host builds do not store vectors in the index. `GRAPH_ONLY` requires a GPU hierarchy and explicit `dataset` vectors for both in-memory and disk-backed indices. Supply vectors in original row order with matching row count and logical dimensions. For in-memory conversion, serialize the returned temporary graph artifact before destroying the handle.
 
 ```cpp
 std::unique_ptr<index<float>> from_cagra(
