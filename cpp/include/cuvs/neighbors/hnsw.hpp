@@ -1198,9 +1198,11 @@ void search(raft::resources const& res,
  * library.
  * When `output_format` is `GRAPH_ONLY`, the saved artifact stores the graph only.
  * Load it with the two-filename `deserialize` overload and a local dataset in original row order.
- * Serialize to a filename outside the handle's temporary directory to preserve the artifact
- * beyond the handle's lifetime. Serializing to its current `file_path()` does not transfer
- * ownership.
+ * For an in-memory CAGRA source, conversion creates an internal temporary directory that is
+ * deleted when the returned index is destroyed. Serialize outside that directory to keep the
+ * graph file. Serializing to the index's current `file_path()` does not transfer ownership.
+ * A caller-supplied `ace_params.build_dir` used for disk-backed ACE is not an owned temporary
+ * directory: destroying the index does not remove that directory or its graph file.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the serialized HNSW output
@@ -1232,9 +1234,11 @@ void serialize(raft::resources const& res, const std::string& filename, const in
  * library.
  * When `output_format` is `GRAPH_ONLY`, the saved artifact stores the graph only.
  * Load it with the two-filename `deserialize` overload and a local dataset in original row order.
- * Serialize to a filename outside the handle's temporary directory to preserve the artifact
- * beyond the handle's lifetime. Serializing to its current `file_path()` does not transfer
- * ownership.
+ * For an in-memory CAGRA source, conversion creates an internal temporary directory that is
+ * deleted when the returned index is destroyed. Serialize outside that directory to keep the
+ * graph file. Serializing to the index's current `file_path()` does not transfer ownership.
+ * A caller-supplied `ace_params.build_dir` used for disk-backed ACE is not an owned temporary
+ * directory: destroying the index does not remove that directory or its graph file.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the serialized HNSW output
@@ -1266,9 +1270,11 @@ void serialize(raft::resources const& res, const std::string& filename, const in
  * library.
  * When `output_format` is `GRAPH_ONLY`, the saved artifact stores the graph only.
  * Load it with the two-filename `deserialize` overload and a local dataset in original row order.
- * Serialize to a filename outside the handle's temporary directory to preserve the artifact
- * beyond the handle's lifetime. Serializing to its current `file_path()` does not transfer
- * ownership.
+ * For an in-memory CAGRA source, conversion creates an internal temporary directory that is
+ * deleted when the returned index is destroyed. Serialize outside that directory to keep the
+ * graph file. Serializing to the index's current `file_path()` does not transfer ownership.
+ * A caller-supplied `ace_params.build_dir` used for disk-backed ACE is not an owned temporary
+ * directory: destroying the index does not remove that directory or its graph file.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the serialized HNSW output
@@ -1300,9 +1306,11 @@ void serialize(raft::resources const& res, const std::string& filename, const in
  * library.
  * When `output_format` is `GRAPH_ONLY`, the saved artifact stores the graph only.
  * Load it with the two-filename `deserialize` overload and a local dataset in original row order.
- * Serialize to a filename outside the handle's temporary directory to preserve the artifact
- * beyond the handle's lifetime. Serializing to its current `file_path()` does not transfer
- * ownership.
+ * For an in-memory CAGRA source, conversion creates an internal temporary directory that is
+ * deleted when the returned index is destroyed. Serialize outside that directory to keep the
+ * graph file. Serializing to the index's current `file_path()` does not transfer ownership.
+ * A caller-supplied `ace_params.build_dir` used for disk-backed ACE is not an owned temporary
+ * directory: destroying the index does not remove that directory or its graph file.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the serialized HNSW output
