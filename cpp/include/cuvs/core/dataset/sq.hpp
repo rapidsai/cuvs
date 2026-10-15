@@ -8,6 +8,7 @@
 #include <cuvs/core/dataset/dense.hpp>
 #include <cuvs/core/dataset/type.hpp>
 #include <cuvs/core/export.hpp>
+#include <cuvs/preprocessing/quantize/scalar.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -32,12 +33,9 @@ struct sq_spec {
 
   using math_type = MathT;
 
-  // Nothing to allocate: the whole dictionary is the interval the codes are dequantized into.
-  // The members are named as in cuvs::preprocessing::quantize::scalar::quantizer.
-  struct dictionary_type {
-    math_type min_;
-    math_type max_;
-  };
+  // Nothing to allocate: the whole dictionary is the interval the codes are dequantized into,
+  // which is exactly what the scalar quantizer holds.
+  using dictionary_type      = cuvs::preprocessing::quantize::scalar::quantizer<math_type>;
   using dictionary_view_type = dictionary_type;
 
   template <typename T, typename IdxT>
