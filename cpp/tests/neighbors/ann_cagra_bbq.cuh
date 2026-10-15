@@ -119,8 +119,8 @@ class AnnCagraBbqTest : public ::testing::TestWithParam<AnnCagraBbqInputs> {
 
   /** Top-k neighbors @p index returns for the test queries. */
   template <typename IndexT>
-  auto search_neighbors(IndexT const& index,
-                        cagra::search_params search_params = {}) -> std::vector<uint32_t>
+  auto search_neighbors(IndexT const& index, cagra::search_params search_params = {})
+    -> std::vector<uint32_t>
   {
     size_t queries_size = static_cast<size_t>(ps.n_queries) * ps.k;
     rmm::device_uvector<float> distances_dev(queries_size, stream_);
