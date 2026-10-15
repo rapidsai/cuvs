@@ -509,6 +509,12 @@ dependencies:
               - cuda-toolkit[cublas,curand,cusolver,cusparse,nvrtc]==12.*
               - nvidia-nvjitlink-cu12>=12.9,<13
           - matrix:
+              cuda: "13.4"
+              use_cuda_wheels: "true"
+            packages:
+              - cuda-toolkit[cublas,curand,cusolver,cusparse,nvrtc]==13.*
+              - nvidia-nvjitlink>=13.4,<14
+          - matrix:
               cuda: "13.*"
               use_cuda_wheels: "true"
             packages:

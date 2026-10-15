@@ -5,6 +5,8 @@
 set -euo pipefail
 
 source rapids-init-pip
+# EXPERIMENTAL: build against CUDA 13.4 (see ci/use_cuda_13_4.sh)
+source ci/use_cuda_13_4.sh
 
 package_name="libcuvs"
 package_dir="python/libcuvs"
