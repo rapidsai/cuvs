@@ -3,9 +3,52 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "../../../src/neighbors/detail/hnsw_layered_gather.hpp"
 #include "../ann_hnsw_ace.cuh"
 
 namespace cuvs::neighbors::hnsw {
+
+TEST(HnswLayeredGather, PreservesSelectedBytesWithAndWithoutPadding)
+{
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+  const std::vector<size_t> row_ids{4, 1, 4, 0};
+  constexpr size_t source_rows = 5;
+  // Cover nonaligned vectors with one-, two-, and four-byte scalar representations.
+  for (const size_t row_bytes : {size_t{17}, size_t{34}, size_t{68}}) {
+    for (const size_t padding : {size_t{0}, size_t{12}}) {
+      const size_t stride = row_bytes + padding;
+      std::vector<uint8_t> source(source_rows * stride, 0xff);
+      for (size_t row = 0; row < source_rows; ++row) {
+        for (size_t col = 0; col < row_bytes; ++col) {
+          source[row * stride + col] = static_cast<uint8_t>(row * row_bytes + col);
+        }
+      }
+      rmm::device_uvector<uint8_t> device_source(source.size(), stream);
+      raft::copy(device_source.data(), source.data(), source.size(), stream);
+      std::vector<uint8_t> actual(row_ids.size() * row_bytes);
+      detail::gather_layered_hnsw_vectors(handle,
+                                          device_source.data(),
+                                          stride,
+                                          row_bytes,
+                                          row_ids.data(),
+                                          row_ids.size(),
+                                          actual.data());
+      std::vector<uint8_t> expected;
+      for (const auto row : row_ids) {
+        expected.insert(
+          expected.end(), source.begin() + row * stride, source.begin() + row * stride + row_bytes);
+      }
+      EXPECT_EQ(actual, expected) << "row_bytes=" << row_bytes << " padding=" << padding;
+    }
+  }
+}
+
+TEST(HnswLayeredGather, EmptySelectionDoesNotAccessStorage)
+{
+  raft::resources handle;
+  EXPECT_NO_THROW(detail::gather_layered_hnsw_vectors(handle, nullptr, 0, 0, nullptr, 0, nullptr));
+}
 
 TEST(CagraAceWorkspace, FailurePreservesCallerDirectory)
 {

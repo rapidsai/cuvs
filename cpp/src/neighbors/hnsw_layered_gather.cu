@@ -7,23 +7,25 @@
 #include <algorithm>
 #include <raft/core/error.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/matrix/gather.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
 
 namespace cuvs::neighbors::hnsw::detail {
 namespace {
-__global__ void gather_rows(const uint8_t* source,
-                            size_t stride,
-                            size_t row_bytes,
-                            const size_t* row_ids,
-                            size_t bytes,
-                            uint8_t* output)
-{
-  for (size_t i = blockIdx.x * size_t(blockDim.x) + threadIdx.x; i < bytes;
-       i += size_t(blockDim.x) * gridDim.x) {
-    output[i] = source[size_t(row_ids[i / row_bytes]) * stride + i % row_bytes];
+// Present padded rows as a compact byte matrix to RAFT's iterator-based gather.
+struct strided_source_byte {
+  const uint8_t* source;
+  size_t stride;
+  size_t row_bytes;
+
+  __host__ __device__ uint8_t operator()(size_t offset) const
+  {
+    return source[(offset / row_bytes) * stride + offset % row_bytes];
   }
-}
+};
 }  // namespace
 
 void gather_layered_hnsw_vectors(raft::resources const& res,
@@ -36,7 +38,12 @@ void gather_layered_hnsw_vectors(raft::resources const& res,
 {
   if (rows == 0) { return; }
   RAFT_EXPECTS(row_bytes > 0 && source_stride_bytes >= row_bytes, "Invalid vector row stride");
-  cudaStream_t stream = raft::resource::get_cuda_stream(res).get();
+  cudaStream_t stream     = raft::resource::get_cuda_stream(res).get();
+  const auto source_bytes = thrust::make_transform_iterator(
+    thrust::make_counting_iterator<size_t>(0),
+    strided_source_byte{static_cast<const uint8_t*>(source), source_stride_bytes, row_bytes});
+  // The source has at least enough rows to include every requested row ID.
+  const auto source_rows = *std::max_element(host_row_ids, host_row_ids + rows) + size_t{1};
   const auto batch_rows =
     std::min(rows, std::max<size_t>(1, (64 * 1024 * 1024) / (row_bytes + sizeof(size_t))));
   rmm::device_uvector<size_t> row_ids(batch_rows, stream);
@@ -48,13 +55,8 @@ void gather_layered_hnsw_vectors(raft::resources const& res,
                                   count * sizeof(size_t),
                                   cudaMemcpyHostToDevice,
                                   stream));
-    gather_rows<<<std::min<size_t>(65535, (count * row_bytes + 255) / 256), 256, 0, stream>>>(
-      static_cast<const uint8_t*>(source),
-      source_stride_bytes,
-      row_bytes,
-      row_ids.data(),
-      count * row_bytes,
-      values.data());
+    raft::matrix::gather(
+      source_bytes, row_bytes, source_rows, row_ids.data(), count, values.data(), stream);
     RAFT_CUDA_TRY(cudaGetLastError());
     RAFT_CUDA_TRY(cudaMemcpyAsync(static_cast<uint8_t*>(host_output) + start * row_bytes,
                                   values.data(),

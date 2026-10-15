@@ -351,7 +351,7 @@ if(BUILD_CAGRA_HNSWLIB)
 
   ConfigureTest(
     NAME NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST
-    PATH neighbors/ann_hnsw_ace/test_float_uint32_t.cu
+    PATH neighbors/ann_hnsw_ace/test_float_uint32_t.cu ../src/neighbors/hnsw_layered_gather.cu
     GPUS 1
     PERCENT 100
   )
