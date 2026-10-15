@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "detail/bbq_quantizer.cuh"
 #include <cuvs/preprocessing/quantize/bbq.hpp>
 #include <optional>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
-#include "detail/bbq_quantizer.cuh"
 
 namespace CUVS_EXPORT cuvs {
 
@@ -46,11 +46,19 @@ void resolve_dequant_factors(
 }
 }  // namespace helpers
 
-quantizer<float, int64_t> build(raft::resources const& res,
-                                const params params,
-                                raft::device_matrix_view<const float, int64_t> dataset)
+quantizer<float> build(raft::resources const& res,
+                       raft::device_matrix_view<const float, int64_t> dataset)
 {
-  return detail::build(res, params, dataset);
+  return detail::build(res, dataset);
+}
+
+cuvs::neighbors::device_bbq_dataset<float, int64_t> transform(
+  raft::resources const& res,
+  const params params,
+  quantizer_view<float> quantizer,
+  raft::device_matrix_view<const float, int64_t> dataset)
+{
+  return detail::transform(res, params, quantizer, dataset);
 }
 
 }  // namespace preprocessing::quantize::bbq

@@ -16,6 +16,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/norm.cuh>
 #include <raft/stats/mean.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -23,7 +24,6 @@
 
 #include <cstdint>
 #include <limits>
-#include <vector>
 
 namespace cuvs::preprocessing::quantize::bbq::detail {
 
@@ -289,7 +289,7 @@ __device__ inline void write_code_group(uint8_t* code_row,
   }
 }
 
-/** The per-row arrays to fill a `quantizer`, as raw pointers. */
+/** The per-row arrays to fill a `bbq_dataset_owning_storage`, as raw pointers. */
 struct quantizer_output {
   uint8_t* codes;
   uint32_t code_row_length;
@@ -403,11 +403,12 @@ void launch_quantize_kernel(raft::resources const& res,
 
 inline void quantize_rows(raft::resources const& res,
                           const cuvs::preprocessing::quantize::bbq::params& params,
+                          bbq_code_layout layout,
                           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
                           const float* centroid,
                           quantizer_output out)
 {
-  switch (params.layout) {
+  switch (layout) {
     case bbq_code_layout::packed_1b:
       return launch_quantize_kernel<bbq_code_layout::packed_1b>(
         res, params, dataset, centroid, out);
@@ -427,68 +428,94 @@ inline void quantize_rows(raft::resources const& res,
       return launch_quantize_kernel<bbq_code_layout::packed_8b>(
         res, params, dataset, centroid, out);
   }
-  RAFT_FAIL("Unknown BBQ code layout %d", static_cast<int>(params.layout));
+  RAFT_FAIL("Unknown BBQ code layout %d", static_cast<int>(layout));
 }
 
 /**
- * Quantizes @p dataset against a single centroid shared by every row, as Lucene and
- * Elasticsearch do, and returns the codes together with the per-row corrections search needs.
+ * Computes the single centroid shared by every row, as Lucene and Elasticsearch do.
  */
 inline auto build(raft::resources const& res,
-                  const cuvs::preprocessing::quantize::bbq::params& params,
                   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> quantizer<float, int64_t>
+  -> quantizer<float>
 {
-  using DataT = float;
+  using DataT       = float;
+  const auto n_rows = dataset.extent(0);
+  const auto dim    = dataset.extent(1);
+  RAFT_EXPECTS(n_rows > 0 && dim > 0, "BBQ build needs a non-empty dataset");
+
+  quantizer<DataT> quant{res, static_cast<uint32_t>(dim)};
+  raft::stats::mean(res, dataset, quant.centroid.view());
+  auto centroid_norm_sq = raft::make_device_vector<float, int64_t>(res, 1);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    res,
+    raft::make_device_matrix_view<const DataT, int64_t>(quant.centroid.data_handle(), 1, dim),
+    centroid_norm_sq.view());
+  const auto stream = raft::resource::get_cuda_stream(res).get();
+  raft::copy(&quant.centroid_norm_sq, centroid_norm_sq.data_handle(), 1, stream);
+  raft::resource::sync_stream(res);
+  return quant;
+}
+
+/**
+ * Quantizes @p dataset against the centroid of @p quant in the document layout, and again in the
+ * query layout when it differs, and returns the codes together with the per-row corrections search
+ * needs.
+ */
+inline auto transform(raft::resources const& res,
+                      const cuvs::preprocessing::quantize::bbq::params& params,
+                      quantizer_view<float> quant,
+                      raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::device_bbq_dataset<float, int64_t>
+{
   constexpr int64_t kMaxQuantizeRows =
     kQuantizeBlockSize * int64_t{std::numeric_limits<int32_t>::max()} / raft::WarpSize;
   const auto n_rows = dataset.extent(0);
   const auto dim    = dataset.extent(1);
-  RAFT_EXPECTS(n_rows > 0 && dim > 0, "BBQ build needs a non-empty dataset");
-  RAFT_EXPECTS(dataset.extent(0) <= kMaxQuantizeRows,
-               "BBQ build: at most %lld rows are supported, got %lld",
+  RAFT_EXPECTS(n_rows > 0 && dim > 0, "BBQ transform needs a non-empty dataset");
+  RAFT_EXPECTS(dim == static_cast<int64_t>(quant.dim()),
+               "BBQ transform: the dataset has %lld dimensions, the quantizer %u",
+               static_cast<long long>(dim),
+               quant.dim());
+  RAFT_EXPECTS(n_rows <= kMaxQuantizeRows,
+               "BBQ transform: at most %lld rows are supported, got %lld",
                static_cast<long long>(kMaxQuantizeRows),
-               static_cast<long long>(dataset.extent(0)));
+               static_cast<long long>(n_rows));
 
-  quantizer<DataT, int64_t> q{
-    res, n_rows, static_cast<uint32_t>(dim), params.layout, params.metric};
-  raft::stats::mean(res, dataset, q.centroid.view());
+  const auto stream = raft::resource::get_cuda_stream(res).get();
+  quantizer<float> dataset_quantizer{res, quant.dim()};
+  raft::copy(
+    dataset_quantizer.centroid.data_handle(), quant.centroid.data_handle(), quant.dim(), stream);
+  dataset_quantizer.centroid_norm_sq = quant.centroid_norm_sq;
+  cuvs::neighbors::device_bbq_dataset<float, int64_t> encoded{std::move(dataset_quantizer)};
 
-  auto stream = raft::resource::get_cuda_stream(res).get();
-  // Every layout but packed_4b writes each of its row's bytes; that one leaves the trailing byte
-  // of an odd-dimension row alone.
-  RAFT_CUDA_TRY(cudaMemsetAsync(q.codes.data_handle(), 0, q.codes.size(), stream));
-  quantize_rows(res,
-                params,
-                dataset,
-                q.centroid.data_handle(),
-                quantizer_output{q.codes.data_handle(),
-                                 q.encoded_row_length(),
-                                 q.lower_intervals.data_handle(),
-                                 q.upper_intervals.data_handle(),
-                                 q.additional_corrections.data_handle(),
-                                 q.quantized_component_sums.data_handle(),
-                                 q.row_norm.data_handle()});
-  helpers::resolve_dequant_factors(res,
-                                   q.dequant_delta.view(),
-                                   q.dequant_sum_delta.view(),
-                                   raft::make_const_mdspan(q.lower_intervals.view()),
-                                   raft::make_const_mdspan(q.upper_intervals.view()),
-                                   raft::make_const_mdspan(q.quantized_component_sums.view()),
-                                   params.layout);
-
-  std::vector<DataT> centroid_host(dim);
-  raft::copy(centroid_host.data(), q.centroid.data_handle(), dim, stream);
-  raft::resource::sync_stream(res);
-  float centroid_norm_sq = 0.0f;
-  for (const float c : centroid_host) {
-    centroid_norm_sq += c * c;
-  }
-  q.centroid_norm_sq = centroid_norm_sq;
-  return q;
+  auto encode = [&](bbq_code_layout layout) {
+    bbq_dataset_owning_storage<float, int64_t> storage{
+      res, encoded.quantizer.view(), n_rows, layout, params.metric};
+    RAFT_CUDA_TRY(cudaMemsetAsync(storage.codes.data_handle(), 0, storage.codes.size(), stream));
+    quantize_rows(res,
+                  params,
+                  layout,
+                  dataset,
+                  encoded.quantizer.centroid.data_handle(),
+                  quantizer_output{storage.codes.data_handle(),
+                                   storage.encoded_row_length(),
+                                   storage.lower_intervals.data_handle(),
+                                   storage.upper_intervals.data_handle(),
+                                   storage.additional_corrections.data_handle(),
+                                   storage.quantized_component_sums.data_handle(),
+                                   storage.row_norm.data_handle()});
+    helpers::resolve_dequant_factors(
+      res,
+      storage.dequant_delta.view(),
+      storage.dequant_sum_delta.view(),
+      raft::make_const_mdspan(storage.lower_intervals.view()),
+      raft::make_const_mdspan(storage.upper_intervals.view()),
+      raft::make_const_mdspan(storage.quantized_component_sums.view()),
+      layout);
+    encoded.add_storage(std::move(storage));
+  };
+  encode(params.doc_layout);
+  if (params.query_layout != params.doc_layout) { encode(params.query_layout); }
+  return encoded;
 }
-/*
- transform(raft::resources const& res,
-  const quantizer<float>& quant,
-  raft::host_matrix_view<const float, int64_t> dataset)*/
 }  // namespace cuvs::preprocessing::quantize::bbq::detail
