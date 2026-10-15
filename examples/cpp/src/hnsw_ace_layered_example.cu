@@ -11,7 +11,10 @@
 // It emits one graph artifact, hnsw_index.cuvs. The dataset remains separate and does not
 // need to be transferred to the search server, which typically has the dataset locally.
 //
-// Run with an optional backend (regular by default) and output directory.
+// Run with an optional graph build method (regular by default) and output directory.
+//   regular: default hnsw::build selection; uses ordinary CAGRA when memory permits.
+//   ace: explicitly select ACE with disk mode disabled.
+//   disk-ace: explicitly select ACE with disk mode enabled in the output directory.
 // For example: ./hnsw_ace_layered_example regular /tmp/my_hnsw_graph
 // Use a fresh output directory for each disk-ace run.
 //
@@ -92,7 +95,7 @@ auto quantize_dataset(raft::device_resources const& dev_resources,
   return dataset_i8;
 }
 
-auto make_hnsw_params(const std::string& backend, const std::string& build_dir)
+auto make_hnsw_params(const std::string& build_method, const std::string& build_dir)
   -> cuvs::neighbors::hnsw::index_params
 {
   using namespace cuvs::neighbors;
@@ -104,10 +107,10 @@ auto make_hnsw_params(const std::string& backend, const std::string& build_dir)
   hnsw_params.M               = 32;
   hnsw_params.ef_construction = 120;
 
-  if (backend != "regular") {
+  if (build_method != "regular") {
     auto ace_params                = hnsw::graph_build_params::ace_params();
     ace_params.npartitions         = 4;
-    ace_params.use_disk            = backend == "disk-ace";
+    ace_params.use_disk            = build_method == "disk-ace";
     ace_params.build_dir           = build_dir;
     hnsw_params.graph_build_params = ace_params;
   }
@@ -124,7 +127,7 @@ auto hnsw_build(raft::device_resources const& dev_resources,
   using namespace cuvs::neighbors;
 
   auto hnsw_index = hnsw::build(dev_resources, hnsw_params, dataset);
-  // In-memory backends own a temporary artifact. Persist it before the handle is destroyed.
+  // In-memory build methods own a temporary artifact. Persist it before the handle is destroyed.
   hnsw::serialize(dev_resources, artifact_path, *hnsw_index);
   std::cout << "  hnsw_build: layered artifact saved to " << artifact_path << std::endl;
   return artifact_path;
@@ -192,13 +195,14 @@ void hnsw_search(raft::device_resources const& dev_resources,
 
 int main(int argc, char** argv)
 {
-  const std::string backend   = argc > 1 ? argv[1] : "regular";
-  const std::string build_dir = argc > 2 ? argv[2] : "/tmp/hnsw_ace_layered";
-  if (argc > 3 || (backend != "regular" && backend != "ace" && backend != "disk-ace")) {
+  const std::string build_method = argc > 1 ? argv[1] : "regular";
+  const std::string build_dir    = argc > 2 ? argv[2] : "/tmp/hnsw_ace_layered";
+  if (argc > 3 ||
+      (build_method != "regular" && build_method != "ace" && build_method != "disk-ace")) {
     std::cerr << "Usage: " << argv[0] << " [regular|ace|disk-ace] [output-directory]" << std::endl;
     return 1;
   }
-  std::cout << "Graph build backend: " << backend << std::endl;
+  std::cout << "Graph build method: " << build_method << std::endl;
   raft::device_resources dev_resources;
 
   rmm::mr::pool_memory_resource pool_mr(rmm::mr::get_current_device_resource_ref(),
@@ -242,7 +246,7 @@ int main(int argc, char** argv)
   auto dataset_i8_view = raft::make_host_matrix_view<const int8_t, int64_t, raft::row_major>(
     dataset_i8.data_handle(), n_samples, n_dim);
   auto dataset_path = write_local_dataset(dataset_host_view, build_dir + "/dataset.npy");
-  auto hnsw_params  = make_hnsw_params(backend, build_dir);
+  auto hnsw_params  = make_hnsw_params(build_method, build_dir);
 
   std::cout << "[stage 2] Build graph-only HNSW artifact from int8 data" << std::endl;
   auto artifact_path = hnsw_build<int8_t>(
@@ -255,7 +259,7 @@ int main(int argc, char** argv)
   hnsw_search<float>(dev_resources, *hnsw_index, queries_host_view);
 #else
   auto dataset_path = write_local_dataset(dataset_host_view, build_dir + "/dataset.npy");
-  auto hnsw_params  = make_hnsw_params(backend, build_dir);
+  auto hnsw_params  = make_hnsw_params(build_method, build_dir);
 
   std::cout << "[stage 2] Build layered HNSW index" << std::endl;
   auto artifact_path = hnsw_build<float>(
