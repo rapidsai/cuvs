@@ -510,7 +510,7 @@ struct cuvsHnswMaterializeParams {
 | Name | Type | Description |
 | --- | --- | --- |
 | `dataset_path` | `const char*` | Local dataset path holding the original-ID-ordered vectors used to build the artifact.<br /><br />Supported formats match layered deserialization: `.npy` and ANN benchmark `*.bin` files with a `[uint32 rows, uint32 cols]` header (`.fbin`, `.f16bin`, `.u8bin`, `.i8bin`). |
-| `max_host_memory_gb` | `double` | Upper bound on host memory (in GiB) used for the base-topology reorder buffer.<br /><br />When `&lt;= 0`, the whole base topology is reordered in a single in-memory pass (no temporary files). When set, the base topology is reordered through bucketed temporary files so that peak host memory stays close to this budget. |
+| `max_host_memory_gb` | `double` | Upper bound on host memory (in GiB) used for the base-topology reorder buffer.<br /><br />When `<= 0`, the whole base topology is reordered in a single in-memory pass (no temporary files). When set, the base topology is reordered through bucketed temporary files so that peak host memory stays close to this budget. |
 | `num_threads` | `int` | Number of host threads to use. When `0`, the maximum number of threads is used. |
 
 <a id="cuvshnswmaterializeparamscreate"></a>

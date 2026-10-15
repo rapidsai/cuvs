@@ -37,7 +37,7 @@ public double getMaxHostMemoryGb()
 ```
 
 Gets the upper bound on host memory (in GiB) used for the base-topology
-reorder buffer. When `&lt;= 0`, the whole base topology is reordered in a
+reorder buffer. When `<= 0`, the whole base topology is reordered in a
 single in-memory pass.
 
 **Returns**
@@ -104,7 +104,7 @@ public Builder withMaxHostMemoryGb(double maxHostMemoryGb)
 Sets the upper bound on host memory (in GiB) used for the base-topology
 reorder buffer.
 
-When `&lt;= 0` (default), the whole base topology is reordered in a single
+When `<= 0` (default), the whole base topology is reordered in a single
 in-memory pass (no temporary files). When set, the base topology is reordered
 through bucketed temporary files so that peak host memory stays close to this
 budget.
