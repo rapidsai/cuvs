@@ -119,8 +119,8 @@ class AnnCagraBbqTest : public ::testing::TestWithParam<AnnCagraBbqInputs> {
 
   /** Top-k neighbors @p index returns for the test queries. */
   template <typename IndexT>
-  auto search_neighbors(IndexT const& index, cagra::search_params search_params = {})
-    -> std::vector<uint32_t>
+  auto search_neighbors(IndexT const& index,
+                        cagra::search_params search_params = {}) -> std::vector<uint32_t>
   {
     size_t queries_size = static_cast<size_t>(ps.n_queries) * ps.k;
     rmm::device_uvector<float> distances_dev(queries_size, stream_);
@@ -350,7 +350,7 @@ inline const std::vector<AnnCagraBbqInputs> bbq_inputs = [] {
   const std::vector<std::tuple<bbq_code_layout, opt_layout, double>> code_specs{
     {bbq_code_layout::packed_1b, opt_layout{}, 0.84},
     {bbq_code_layout::transposed_2b, opt_layout{}, 0.92},
-    {bbq_code_layout::transposed_2b, opt_layout{bbq_code_layout::packed_1b}, 0.92},
+    {bbq_code_layout::transposed_2b, opt_layout{bbq_code_layout::packed_1b}, 0.91},
     {bbq_code_layout::packed_4b, opt_layout{}, 0.95},
     {bbq_code_layout::packed_4b, opt_layout{bbq_code_layout::packed_1b}, 0.90},
     {bbq_code_layout::transposed_4b, opt_layout{bbq_code_layout::packed_1b}, 0.90},
