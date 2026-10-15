@@ -55,6 +55,7 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
                         source.adaptive_centers(),
                         source.conservative_memory_allocation(),
                         source.dim());
+  if (source.binary_index()) { target.set_logical_dim(source.logical_dim()); }
 
   // Copy the independent parts
   raft::copy(res, target.list_sizes(), source.list_sizes());

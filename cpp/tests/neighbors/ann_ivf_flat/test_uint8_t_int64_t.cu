@@ -118,6 +118,85 @@ TEST(BinaryIvfFlatRegression, ExhaustiveScalarAndVectorizedScan)
   }
 }
 
+TEST(BinaryIvfFlatRegression, BitmapDatasetNonByteAligned)
+{
+  raft::resources handle;
+  auto stream                   = raft::resource::get_cuda_stream(handle);
+  constexpr int64_t logical_dim = 13;
+  constexpr int64_t n_rows      = 4;
+  std::vector<uint32_t> words((n_rows * logical_dim + 31) / 32);
+  auto set_bit = [](std::vector<uint32_t>& storage, int64_t bit) {
+    storage[bit / 32] |= uint32_t{1} << (bit % 32);
+  };
+  set_bit(words, logical_dim);
+  set_bit(words, 2 * logical_dim + 12);
+  set_bit(words, 3 * logical_dim);
+  set_bit(words, 3 * logical_dim + 12);
+
+  raft::core::bitset<uint32_t, int64_t> data(handle, n_rows * logical_dim, false);
+  raft::update_device(data.data(), words.data(), words.size(), stream);
+  auto dataset = cuvs::make_device_bitmap_dataset_view(data, n_rows, logical_dim);
+
+  index_params params;
+  params.metric                   = cuvs::distance::DistanceType::BitwiseHamming;
+  params.n_lists                  = 1;
+  params.kmeans_n_iters           = 3;
+  params.kmeans_trainset_fraction = 1.0;
+  auto idx                        = build(handle, params, dataset);
+  EXPECT_EQ(idx.dim(), 2);
+  EXPECT_EQ(idx.logical_dim(), logical_dim);
+
+  std::vector<uint32_t> more_words((logical_dim + 31) / 32);
+  for (int64_t bit = 0; bit < logical_dim; ++bit) {
+    set_bit(more_words, bit);
+  }
+  raft::core::bitset<uint32_t, int64_t> more(handle, logical_dim, false);
+  raft::update_device(more.data(), more_words.data(), more_words.size(), stream);
+  auto more_dataset = cuvs::make_device_bitmap_dataset_view(more, int64_t{1}, logical_dim);
+  auto ids          = raft::make_device_vector<int64_t, int64_t>(handle, 1);
+  const int64_t id  = n_rows;
+  raft::update_device(ids.data_handle(), &id, 1, stream);
+  const std::optional<raft::device_vector_view<const int64_t, int64_t>> ids_view =
+    raft::make_const_mdspan(ids.view());
+  auto extended = extend(handle, more_dataset, ids_view, idx);
+  EXPECT_EQ(extended.size(), n_rows + 1);
+  EXPECT_EQ(extended.logical_dim(), logical_dim);
+
+  std::stringstream bytes;
+  serialize(handle, bytes, extended);
+  index<uint8_t, int64_t> restored(handle);
+  deserialize(handle, bytes, &restored);
+  EXPECT_EQ(restored.logical_dim(), logical_dim);
+
+  constexpr int64_t n_queries = 2;
+  std::vector<uint32_t> query_words((n_queries * logical_dim + 31) / 32);
+  for (int64_t bit = 0; bit < logical_dim; ++bit) {
+    set_bit(query_words, logical_dim + bit);
+  }
+  raft::core::bitset<uint32_t, int64_t> queries(handle, n_queries * logical_dim, false);
+  raft::update_device(queries.data(), query_words.data(), query_words.size(), stream);
+  auto query_dataset = cuvs::make_device_bitmap_dataset_view(queries, n_queries, logical_dim);
+  auto neighbors     = raft::make_device_matrix<int64_t, int64_t>(handle, n_queries, n_rows + 1);
+  auto distances     = raft::make_device_matrix<float, int64_t>(handle, n_queries, n_rows + 1);
+  search_params search_params;
+  search_params.n_probes = 1;
+  search(handle, search_params, restored, query_dataset, neighbors.view(), distances.view());
+
+  std::vector<int64_t> neighbors_host(neighbors.size());
+  std::vector<float> distances_host(distances.size());
+  raft::update_host(neighbors_host.data(), neighbors.data_handle(), neighbors_host.size(), stream);
+  raft::update_host(distances_host.data(), distances.data_handle(), distances_host.size(), stream);
+  raft::resource::sync_stream(handle);
+  const std::vector<int> weights{0, 1, 1, 2, 13};
+  for (int64_t query = 0; query < n_queries; ++query) {
+    for (int64_t rank = 0; rank < n_rows + 1; ++rank) {
+      auto neighbor = neighbors_host[query * (n_rows + 1) + rank];
+      auto expected = query == 0 ? weights[neighbor] : logical_dim - weights[neighbor];
+      EXPECT_EQ(distances_host[query * (n_rows + 1) + rank], expected);
+    }
+  }
+}
+
 TEST(BinaryIvfFlatRegression, AdaptiveCountsSurviveCloneAndSerialization)
 {
   raft::resources handle;
@@ -279,11 +358,11 @@ TEST(BinaryIvfFlatRegression, LegacySerializationCompatibility)
     serialize(handle, serialized, idx);
     char dtype[4];
     serialized.read(dtype, 4);
-    EXPECT_EQ(raft::deserialize_scalar<int>(handle, serialized), 6);
-    for (int version : {4, 5}) {
+    EXPECT_EQ(raft::deserialize_scalar<int>(handle, serialized), 7);
+    for (int version : {4, 5, 6}) {
       // Version 4 and the original binary version 5 stored padded list lengths and IDs.
       // Upstream's nonbinary version 5 stores the actual list length with padded vector data.
-      const uint32_t stored_size = version == 4 || idx.binary_index() ? 32 : 4;
+      const uint32_t stored_size = version == 4 || (version == 5 && idx.binary_index()) ? 32 : 4;
       std::stringstream legacy;
       legacy.write(dtype, 4);
       raft::serialize_scalar(handle, legacy, version);

@@ -23,12 +23,13 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Serialization version
-// Version 6 combines packed binary centers and exact adaptive counts with the
-// unpadded list lengths introduced in version 5. Versions 4 and 5 remain readable;
+// Version 7 stores the logical bit dimension of binary datasets. Version 6 combines packed binary
+// centers and exact adaptive counts with the unpadded list lengths introduced in version 5.
+// Versions 4, 5, and 6 remain readable;
 // version 4 binary indexes omitted their centers and cannot be recovered.
 // TODO(hcho3) Implement next-gen serializer for IVF that allows for expansion in a backward
 //             compatible fashion.
-constexpr int serialization_version = 6;
+constexpr int serialization_version = 7;
 
 /**
  * Save the index to file.
@@ -53,6 +54,7 @@ void serialize(raft::resources const& handle, Output& os, const index<T, IdxT>& 
   serialize_scalar(handle, os, serialization_version);
   serialize_scalar(handle, os, index_.size());
   serialize_scalar(handle, os, index_.dim());
+  serialize_scalar(handle, os, index_.logical_dim());
   serialize_scalar(handle, os, index_.n_lists());
   serialize_scalar(handle, os, index_.metric());
   serialize_scalar(handle, os, index_.adaptive_centers());
@@ -118,11 +120,12 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
                "ivf_flat::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
-  if (ver != serialization_version && ver != 5 && ver != 4) {
+  if (ver != serialization_version && ver != 6 && ver != 5 && ver != 4) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
   auto n_rows           = raft::deserialize_scalar<IdxT>(handle, is);
   auto dim              = raft::deserialize_scalar<std::uint32_t>(handle, is);
+  auto logical_dim      = ver >= 7 ? raft::deserialize_scalar<std::uint32_t>(handle, is) : 0;
   auto n_lists          = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto metric           = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
   bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
@@ -146,6 +149,7 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
   RAFT_EXPECTS(ver >= 5 || metric != cuvs::distance::DistanceType::BitwiseHamming,
                "ivf_flat::deserialize: version 4 binary indexes did not store their centers");
   index<T, IdxT> index_ = index<T, IdxT>(handle, metric, n_lists, adaptive_centers, cma, dim);
+  if (index_.binary_index() && ver >= 7) { index_.set_logical_dim(logical_dim); }
 
   if (index_.binary_index()) {
     cuvs::util::detail::deserialize_mdspan(handle, input, index_.binary_centers());

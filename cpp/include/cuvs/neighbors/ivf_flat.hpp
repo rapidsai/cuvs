@@ -5,12 +5,15 @@
 
 #pragma once
 
-#include <cstdint>
+#include <cuvs/core/dataset/bitmap.hpp>
 #include <cuvs/core/export.hpp>
 #include <cuvs/neighbors/common.hpp>
+
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/util/integer_utils.hpp>
+
+#include <cstdint>
 #include <sstream>
 #include <string>
 
@@ -272,6 +275,16 @@ struct index : cuvs::neighbors::index {
    */
   uint32_t dim() const noexcept;
 
+  /** Logical dimensionality in bits for a binary index, or `dim()` for other indexes. */
+  uint32_t logical_dim() const noexcept;
+
+  /**
+   * Set the logical dimensionality of a byte-packed binary index.
+   *
+   * This is intended for dataset adapters that preserve dimensions not divisible by eight.
+   */
+  void set_logical_dim(uint32_t dim);
+
   /** Number of clusters/inverted lists. */
   uint32_t n_lists() const noexcept;
   raft::device_vector_view<T*, uint32_t> data_ptrs() noexcept;
@@ -314,6 +327,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<uint32_t, int64_t, raft::row_major> binary_center_counts_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
   bool binary_index_;
+  uint32_t logical_dim_;
 
   // Computed members
   raft::device_vector<T*, uint32_t> data_ptrs_;
@@ -583,6 +597,18 @@ void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx);
+
+/**
+ * @brief Build a BitwiseHamming index from a tightly packed bitmap dataset.
+ *
+ * Rows are repacked to byte boundaries at the API boundary; unused bits in the final byte are
+ * cleared.
+ */
+template <typename BitmapT>
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
+           cuvs::device_bitmap_dataset_view<BitmapT, int64_t> dataset)
+  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1149,6 +1175,21 @@ void extend(raft::resources const& handle,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
 
+/** Build a new index by extending a binary index with a tightly packed bitmap dataset. */
+template <typename BitmapT>
+auto extend(raft::resources const& handle,
+            cuvs::device_bitmap_dataset_view<BitmapT, int64_t> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
+  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+
+/** Extend a binary index in-place with a tightly packed bitmap dataset. */
+template <typename BitmapT>
+void extend(raft::resources const& handle,
+            cuvs::device_bitmap_dataset_view<BitmapT, int64_t> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
+
 /**
  * @brief Build a new index containing the data of the original plus new extra vectors.
  *
@@ -1631,6 +1672,17 @@ void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/** Search a binary index using a tightly packed bitmap query dataset. */
+template <typename BitmapT>
+void search(raft::resources const& handle,
+            const cuvs::neighbors::ivf_flat::search_params& params,
+            const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index,
+            cuvs::device_bitmap_dataset_view<BitmapT, int64_t> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =

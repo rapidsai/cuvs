@@ -66,6 +66,7 @@ index<T, IdxT>::index(raft::resources const& res,
         : raft::make_device_matrix<uint32_t, int64_t>(res, 0, 0)),
     center_norms_(std::nullopt),
     binary_index_(metric == cuvs::distance::DistanceType::BitwiseHamming),
+    logical_dim_(binary_index_ ? expanded_binary_dim(dim) : dim),
     data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
@@ -204,6 +205,21 @@ uint32_t index<T, IdxT>::dim() const noexcept
   } else {
     return centers_.extent(1);
   }
+}
+
+template <typename T, typename IdxT>
+uint32_t index<T, IdxT>::logical_dim() const noexcept
+{
+  return logical_dim_;
+}
+
+template <typename T, typename IdxT>
+void index<T, IdxT>::set_logical_dim(uint32_t dim)
+{
+  RAFT_EXPECTS(binary_index_, "logical bit dimensionality is only configurable for binary indexes");
+  RAFT_EXPECTS((dim == 0 && this->dim() == 0) || (dim > 0 && ((dim - 1) / 8 + 1) == this->dim()),
+               "logical bit dimensionality must match the packed byte dimensionality");
+  logical_dim_ = dim;
 }
 
 template <typename T, typename IdxT>

@@ -315,6 +315,40 @@ uint32_t dim() const noexcept;
 
 `uint32_t`
 
+<a id="neighbors-ivf-flat-index-logical-dim"></a>
+### neighbors::ivf_flat::index::logical_dim
+
+Logical dimensionality in bits for a binary index, or `dim()` for other indexes.
+
+```cpp
+uint32_t logical_dim() const noexcept;
+```
+
+**Returns**
+
+`uint32_t`
+
+<a id="neighbors-ivf-flat-index-set-logical-dim"></a>
+### neighbors::ivf_flat::index::set_logical_dim
+
+Set the logical dimensionality of a byte-packed binary index.
+
+```cpp
+void set_logical_dim(uint32_t dim);
+```
+
+This is intended for dataset adapters that preserve dimensions not divisible by eight.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `dim` |  | `uint32_t` |  |
+
+**Returns**
+
+`void`
+
 <a id="neighbors-ivf-flat-index-n-lists"></a>
 ### neighbors::ivf_flat::index::n_lists
 
@@ -652,6 +686,32 @@ Usage example:
 **Returns**
 
 `void`
+
+**Additional overload:** `neighbors::ivf_flat::build`
+
+Build a BitwiseHamming index from a tightly packed bitmap dataset.
+
+```cpp
+template <typename BitmapT>
+auto build(raft::resources const& handle,
+const cuvs::neighbors::ivf_flat::index_params& index_params,
+cuvs::device_bitmap_dataset_view<BitmapT, int64_t> dataset)
+-> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+```
+
+Rows are repacked to byte boundaries at the API boundary; unused bits in the final byte are cleared.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `index_params` |  | `const cuvs::neighbors::ivf_flat::index_params&` |  |
+| `dataset` |  | [`cuvs::device_bitmap_dataset_view<BitmapT, int64_t>`](/api-reference/cpp-api-core-dataset-bitmap#device-bitmap-dataset-view) |  |
+
+**Returns**
+
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index)
 
 **Additional overload:** `neighbors::ivf_flat::build`
 
@@ -1157,6 +1217,57 @@ Usage example:
 | `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `neighbors::ivf_flat::extend`
+
+Build a new index by extending a binary index with a tightly packed bitmap dataset.
+
+```cpp
+template <typename BitmapT>
+auto extend(raft::resources const& handle,
+cuvs::device_bitmap_dataset_view<BitmapT, int64_t> new_vectors,
+std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
+-> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `new_vectors` |  | [`cuvs::device_bitmap_dataset_view<BitmapT, int64_t>`](/api-reference/cpp-api-core-dataset-bitmap#device-bitmap-dataset-view) |  |
+| `new_indices` |  | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` |  |
+| `idx` |  | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) |  |
+
+**Returns**
+
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index)
+
+**Additional overload:** `neighbors::ivf_flat::extend`
+
+Extend a binary index in-place with a tightly packed bitmap dataset.
+
+```cpp
+template <typename BitmapT>
+void extend(raft::resources const& handle,
+cuvs::device_bitmap_dataset_view<BitmapT, int64_t> new_vectors,
+std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `new_vectors` |  | [`cuvs::device_bitmap_dataset_view<BitmapT, int64_t>`](/api-reference/cpp-api-core-dataset-bitmap#device-bitmap-dataset-view) |  |
+| `new_indices` |  | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` |  |
+| `idx` |  | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) |  |
 
 **Returns**
 
