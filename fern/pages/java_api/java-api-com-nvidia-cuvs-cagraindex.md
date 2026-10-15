@@ -693,10 +693,10 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:510`_
 @Deprecated(since = "26.12", forRemoval = true) Builder from(InputStream inputStream)
 ```
 
-**Deprecated.** Use `#fromSerialized(InputStream)`.
-
 Sets an instance of InputStream typically used when index deserialization is
 needed. Unlike `#fromSerialized(InputStream)`, `#build()` closes it.
+
+**Deprecated:** Use `#fromSerialized(InputStream)`.
 
 **Parameters**
 
@@ -716,12 +716,12 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:522`_
 @Deprecated(since = "26.12", forRemoval = true) Builder from(InputStream inputStream, DeserializeDataset outDataset)
 ```
 
-**Deprecated.** Use `#fromSerialized(InputStream)` and `FromSerializedBuilder#withOutputDataset(DeserializeDataset)`.
-
 Sets an input stream and an empty caller-owned output handle for explicit dataset
 deserialization. The concrete output type must match the dataset layout stored in the
 serialized index. Keep `outDataset` alive while the built index is in use. Unlike
 `#fromSerialized(InputStream)`, `#build()` closes `inputStream`.
+
+**Deprecated:** Use `#fromSerialized(InputStream)` and `FromSerializedBuilder#withOutputDataset(DeserializeDataset)`.
 
 **Parameters**
 
@@ -742,10 +742,10 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:537`_
 @Deprecated(since = "26.12", forRemoval = true) Builder from(CuVSMatrix graph)
 ```
 
-**Deprecated.** Use `#fromGraph(CagraIndexParams.CuvsDistanceType, CuVSMatrix, CuVSMatrix)`, which takes the metric directly.
-
 Sets a CAGRA graph instance to re-create an index from a
 previously built graph.
+
+**Deprecated:** Use `#fromGraph(CagraIndexParams.CuvsDistanceType, CuVSMatrix, CuVSMatrix)`, which takes the metric directly.
 
 _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:547`_
 
@@ -755,9 +755,9 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:547`_
 @Deprecated(since = "26.12", forRemoval = true) Builder withDataset(float[][] vectors)
 ```
 
-**Deprecated.** Use `#fromDataset(float[][])`.
-
 Sets the dataset vectors for building the `CagraIndex`.
+
+**Deprecated:** Use `#fromDataset(float[][])`.
 
 **Parameters**
 
@@ -777,14 +777,14 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:557`_
 @Deprecated(since = "26.12", forRemoval = true) Builder withDataset(CuVSMatrix dataset)
 ```
 
-**Deprecated.** Use `#fromDataset(CuVSMatrix)`. To create an index from a graph or from BBQ quantizers, pass the dataset to `#fromGraph(CagraIndexParams.CuvsDistanceType, CuVSMatrix, CuVSMatrix)` or `FromBbqBuilder#withDenseDataset(CuVSMatrix)`.
-
 Sets the dataset for building the `CagraIndex`.
 
 The caller retains ownership until a build that uses this dataset returns successfully.
 The returned index then owns the dataset, and the caller must leave it open until the index
 is closed. If the build fails or uses another configured input source, ownership remains
 with the caller.
+
+**Deprecated:** Use `#fromDataset(CuVSMatrix)`. To create an index from a graph or from BBQ quantizers, pass the dataset to `#fromGraph(CagraIndexParams.CuvsDistanceType, CuVSMatrix, CuVSMatrix)` or `FromBbqBuilder#withDenseDataset(CuVSMatrix)`.
 
 **Parameters**
 
@@ -804,8 +804,6 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:574`_
 @Deprecated(since = "26.12", forRemoval = true) Builder withBbqDataset(BbqQuantizer... quantizers)
 ```
 
-**Deprecated.** Use `#fromBbq(BbqQuantizer)` or `#fromBbq(BbqQuantizer, BbqQuantizer)`.
-
 Builds the graph from one or two encoded BBQ representations. An optional dense dataset
 supplied with `#withDataset(CuVSMatrix)` is attached before search; otherwise call
 `CagraIndex#updateDataset(PaddedDatasetView)` or
@@ -816,6 +814,8 @@ stay open for as long as the index is in use. A dense dataset passed to
 `#withDataset(CuVSMatrix)` is owned by the index, as it is for a non-BBQ build, and is
 closed with it.
 
+**Deprecated:** Use `#fromBbq(BbqQuantizer)` or `#fromBbq(BbqQuantizer, BbqQuantizer)`.
+
 _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:591`_
 
 ### withIndexParams
@@ -824,10 +824,10 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:591`_
 @Deprecated(since = "26.12", forRemoval = true) Builder withIndexParams(CagraIndexParams cagraIndexParameters)
 ```
 
-**Deprecated.** Use `FromDatasetBuilder#withIndexParams(CagraIndexParams)` or `FromBbqBuilder#withIndexParams(CagraIndexParams)`. An index created from a graph takes its metric as an argument of `#fromGraph(CagraIndexParams.CuvsDistanceType, CuVSMatrix, CuVSMatrix)`.
-
 Registers an instance of configured `CagraIndexParams` with this
 Builder.
+
+**Deprecated:** Use `FromDatasetBuilder#withIndexParams(CagraIndexParams)` or `FromBbqBuilder#withIndexParams(CagraIndexParams)`. An index created from a graph takes its metric as an argument of `#fromGraph(CagraIndexParams.CuvsDistanceType, CuVSMatrix, CuVSMatrix)`.
 
 **Parameters**
 
@@ -847,14 +847,14 @@ _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/CagraIndex.java:605`_
 @Deprecated(since = "26.12", forRemoval = true) CagraIndex build() throws Throwable
 ```
 
-**Deprecated.** Call `build()` on the builder returned by one of the `from*` methods.
-
 Builds and returns an instance of CagraIndex. With a dataset alone, `#withIndexParams`
 is optional, and without it the index is built with the defaults of
 `CagraIndexParams.Builder`. With BBQ quantizers it is optional too, and without it the
 index is built with those defaults and the quantizers' metric. With a graph it is required,
 because the index takes its metric from it. With a stream to load it is not allowed,
 because the loaded index has its own.
+
+**Deprecated:** Call `build()` on the builder returned by one of the `from*` methods.
 
 **Returns**
 

@@ -932,6 +932,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       log.trace("Building first index...");
       CagraIndex index1 =
           CagraIndex.newBuilder(resources)
@@ -957,7 +963,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         index2.updateDataset(padded2);
 
         log.trace("Merging indexes...");
-        CagraIndex mergedIndex = CagraIndex.merge(new CagraIndex[] {index1, index2});
+        CagraIndex mergedIndex = CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams);
         log.trace("Merge completed successfully");
 
         // Pin SINGLE_CTA; AUTO may pick MULTI_CTA, which drops neighbors on this tiny dataset.
@@ -1053,6 +1059,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       CagraIndex index1 =
           CagraIndex.newBuilder(resources)
               .fromDataset(vector1)
@@ -1077,7 +1089,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         assertEquals("Input index sizes", 3, index2.size());
 
         try (CagraIndex mergedIndex =
-            CagraIndex.merge(new CagraIndex[] {index1, index2}, null, rowFilter)) {
+            CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams, rowFilter)) {
           assertEquals(
               "The merged index should hold one row per set bit",
               rowFilter.cardinality(),
@@ -1202,6 +1214,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       try (CagraIndex index1 =
               CagraIndex.newBuilder(resources)
                   .fromDataset(vector1)
@@ -1216,7 +1234,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         // No device dataset is attached, so cuVS refuses to merge these.
         for (int attempt = 0; attempt < 5; attempt++) {
           assertThrows(
-              Throwable.class, () -> CagraIndex.merge(new CagraIndex[] {index1, index2}, null));
+              Throwable.class,
+              () -> CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams));
         }
 
         // The failures left the inputs alone: they still report their rows, and a merge that is
@@ -1231,7 +1250,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           index1.updateDataset(padded1);
           index2.updateDataset(padded2);
 
-          try (CagraIndex mergedIndex = CagraIndex.merge(new CagraIndex[] {index1, index2}, null)) {
+          try (CagraIndex mergedIndex =
+              CagraIndex.merge(new CagraIndex[] {index1, index2}, mergeParams)) {
             assertEquals("The merged index holds every row of both inputs", 6, mergedIndex.size());
 
             try (var queryVectors = CuVSMatrix.ofArray(new float[][] {{0.0f, 0.0f}})) {
