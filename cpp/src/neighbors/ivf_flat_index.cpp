@@ -7,7 +7,6 @@
 #include <cuvs/core/export.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <limits>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cudart_utils.hpp>
@@ -15,11 +14,15 @@
 
 namespace cuvs::neighbors::ivf_flat {
 namespace {
-uint32_t expanded_binary_dim(uint32_t dim)
+uint32_t storage_dim(cuvs::distance::DistanceType metric, uint32_t dim)
 {
-  RAFT_EXPECTS(dim <= std::numeric_limits<uint32_t>::max() / 8,
-               "binary dimensionality is too large for expanded center statistics");
-  return dim * 8;
+  return metric == cuvs::distance::DistanceType::BitwiseHamming && dim > 0 ? (dim - 1) / 8 + 1
+                                                                           : dim;
+}
+
+int64_t expanded_binary_dim(uint32_t dim)
+{
+  return int64_t{dim} * 8;
 }
 }  // namespace
 
@@ -48,7 +51,7 @@ index<T, IdxT>::index(raft::resources const& res,
                       bool conservative_memory_allocation,
                       uint32_t dim)
   : cuvs::neighbors::index(),
-    veclen_(calculate_veclen(dim)),
+    veclen_(calculate_veclen(storage_dim(metric, dim))),
     metric_(metric),
     adaptive_centers_(adaptive_centers),
     conservative_memory_allocation_{conservative_memory_allocation},
@@ -59,14 +62,16 @@ index<T, IdxT>::index(raft::resources const& res,
                : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
     binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
                       ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
-                      : raft::make_device_matrix<uint8_t, int64_t>(res, n_lists, dim)),
+                      : raft::make_device_matrix<uint8_t, int64_t>(
+                          res, n_lists, storage_dim(metric, dim))),
     binary_center_counts_(
       metric == cuvs::distance::DistanceType::BitwiseHamming && adaptive_centers
-        ? raft::make_device_matrix<uint32_t, int64_t>(res, n_lists, expanded_binary_dim(dim))
+        ? raft::make_device_matrix<uint32_t, int64_t>(
+            res, n_lists, expanded_binary_dim(storage_dim(metric, dim)))
         : raft::make_device_matrix<uint32_t, int64_t>(res, 0, 0)),
     center_norms_(std::nullopt),
     binary_index_(metric == cuvs::distance::DistanceType::BitwiseHamming),
-    logical_dim_(binary_index_ ? expanded_binary_dim(dim) : dim),
+    dim_(dim),
     data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
@@ -200,26 +205,17 @@ IdxT index<T, IdxT>::size() const noexcept
 template <typename T, typename IdxT>
 uint32_t index<T, IdxT>::dim() const noexcept
 {
+  return dim_;
+}
+
+template <typename T, typename IdxT>
+uint32_t index<T, IdxT>::storage_dim() const noexcept
+{
   if (binary_index_) {
     return binary_centers_.extent(1);
   } else {
     return centers_.extent(1);
   }
-}
-
-template <typename T, typename IdxT>
-uint32_t index<T, IdxT>::logical_dim() const noexcept
-{
-  return logical_dim_;
-}
-
-template <typename T, typename IdxT>
-void index<T, IdxT>::set_logical_dim(uint32_t dim)
-{
-  RAFT_EXPECTS(binary_index_, "logical bit dimensionality is only configurable for binary indexes");
-  RAFT_EXPECTS((dim == 0 && this->dim() == 0) || (dim > 0 && ((dim - 1) / 8 + 1) == this->dim()),
-               "logical bit dimensionality must match the packed byte dimensionality");
-  logical_dim_ = dim;
 }
 
 template <typename T, typename IdxT>
@@ -289,7 +285,8 @@ template <typename T, typename IdxT>
 void index<T, IdxT>::check_consistency()
 {
   auto n_lists = lists_.size();
-  RAFT_EXPECTS(dim() % veclen_ == 0, "dimensionality is not a multiple of the veclen");
+  RAFT_EXPECTS(storage_dim() % veclen_ == 0,
+               "storage dimensionality is not a multiple of the veclen");
   RAFT_EXPECTS(list_sizes_.extent(0) == n_lists, "inconsistent list size");
   RAFT_EXPECTS(data_ptrs_.extent(0) == n_lists, "inconsistent list size");
   RAFT_EXPECTS(inds_ptrs_.extent(0) == n_lists, "inconsistent list size");
@@ -297,7 +294,8 @@ void index<T, IdxT>::check_consistency()
     RAFT_EXPECTS(binary_centers_.extent(0) == list_sizes_.extent(0),
                  "inconsistent number of lists (clusters)");
     RAFT_EXPECTS(!adaptive_centers_ || (binary_center_counts_.extent(0) == int64_t(n_lists) &&
-                                        binary_center_counts_.extent(1) == int64_t(dim()) * 8),
+                                        binary_center_counts_.extent(1) ==
+                                          int64_t(storage_dim()) * 8),
                  "inconsistent binary center counts");
   } else {
     RAFT_EXPECTS(                                       //

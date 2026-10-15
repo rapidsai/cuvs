@@ -19,6 +19,7 @@
 #include <raft/core/serialize.hpp>
 
 #include <fstream>
+#include <limits>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
@@ -54,7 +55,6 @@ void serialize(raft::resources const& handle, Output& os, const index<T, IdxT>& 
   serialize_scalar(handle, os, serialization_version);
   serialize_scalar(handle, os, index_.size());
   serialize_scalar(handle, os, index_.dim());
-  serialize_scalar(handle, os, index_.logical_dim());
   serialize_scalar(handle, os, index_.n_lists());
   serialize_scalar(handle, os, index_.metric());
   serialize_scalar(handle, os, index_.adaptive_centers());
@@ -80,7 +80,7 @@ void serialize(raft::resources const& handle, Output& os, const index<T, IdxT>& 
   raft::resource::sync_stream(handle);
   cuvs::util::detail::serialize_mdspan(handle, os, sizes_host.view());
 
-  list_spec<uint32_t, T, IdxT> list_store_spec{index_.dim(), true};
+  list_spec<uint32_t, T, IdxT> list_store_spec{index_.storage_dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::serialize_list(handle, os, index_.lists()[label], list_store_spec, sizes_host(label));
   }
@@ -124,8 +124,7 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
   auto n_rows           = raft::deserialize_scalar<IdxT>(handle, is);
-  auto dim              = raft::deserialize_scalar<std::uint32_t>(handle, is);
-  auto logical_dim      = ver >= 7 ? raft::deserialize_scalar<std::uint32_t>(handle, is) : 0;
+  auto serialized_dim   = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto n_lists          = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto metric           = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
   bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
@@ -138,8 +137,22 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
                "ivf_flat::deserialize: n_lists=%u exceeds maximum %u",
                n_lists,
                cuvs::util::kMaxIvfNLists);
+
+  auto dim         = serialized_dim;
+  auto storage_dim = serialized_dim;
+  if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+    if (ver < 7) {
+      RAFT_EXPECTS(serialized_dim <= std::numeric_limits<uint32_t>::max() / 8,
+                   "ivf_flat::deserialize: binary dimensionality is too large");
+      dim *= 8;
+    } else {
+      storage_dim = dim > 0 ? (dim - 1) / 8 + 1 : 0;
+    }
+  }
   RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(
-                 static_cast<std::size_t>(n_lists), static_cast<std::size_t>(dim), sizeof(T)),
+                 static_cast<std::size_t>(n_lists),
+                 static_cast<std::size_t>(storage_dim),
+                 sizeof(T)),
                "ivf_flat::deserialize: integer overflow in n_lists*dim*sizeof(T) "
                "(n_lists=%u, dim=%u)",
                n_lists,
@@ -149,7 +162,6 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
   RAFT_EXPECTS(ver >= 5 || metric != cuvs::distance::DistanceType::BitwiseHamming,
                "ivf_flat::deserialize: version 4 binary indexes did not store their centers");
   index<T, IdxT> index_ = index<T, IdxT>(handle, metric, n_lists, adaptive_centers, cma, dim);
-  if (index_.binary_index() && ver >= 7) { index_.set_logical_dim(logical_dim); }
 
   if (index_.binary_index()) {
     cuvs::util::detail::deserialize_mdspan(handle, input, index_.binary_centers());
@@ -171,8 +183,8 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
   }
   cuvs::util::detail::deserialize_mdspan(handle, input, index_.list_sizes());
 
-  list_spec<uint32_t, T, IdxT> list_device_spec{index_.dim(), cma};
-  list_spec<uint32_t, T, IdxT> list_store_spec{index_.dim(), true};
+  list_spec<uint32_t, T, IdxT> list_device_spec{index_.storage_dim(), cma};
+  list_spec<uint32_t, T, IdxT> list_store_spec{index_.storage_dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::deserialize_list(handle, input, index_.lists()[label], list_store_spec, list_device_spec);
   }

@@ -54,7 +54,8 @@ TEST(BinaryIvfFlatRegression, ExhaustiveScalarAndVectorizedScan)
     params.kmeans_n_iters           = 3;
     params.kmeans_trainset_fraction = 1.0;
     auto idx = build(handle, params, raft::make_const_mdspan(data_dev.view()));
-    ASSERT_EQ(idx.dim(), dim);
+    ASSERT_EQ(idx.dim(), dim * 8);
+    ASSERT_EQ(idx.storage_dim(), dim);
     ASSERT_EQ(idx.size(), n_rows);
     ASSERT_TRUE(idx.binary_index());
     ASSERT_EQ(idx.centers().size(), 0);
@@ -143,8 +144,8 @@ TEST(BinaryIvfFlatRegression, BitmapDatasetNonByteAligned)
   params.kmeans_n_iters           = 3;
   params.kmeans_trainset_fraction = 1.0;
   auto idx                        = build(handle, params, dataset);
-  EXPECT_EQ(idx.dim(), 2);
-  EXPECT_EQ(idx.logical_dim(), logical_dim);
+  EXPECT_EQ(idx.dim(), logical_dim);
+  EXPECT_EQ(idx.storage_dim(), 2);
 
   std::vector<uint32_t> more_words((logical_dim + 31) / 32);
   for (int64_t bit = 0; bit < logical_dim; ++bit) {
@@ -160,13 +161,13 @@ TEST(BinaryIvfFlatRegression, BitmapDatasetNonByteAligned)
     raft::make_const_mdspan(ids.view());
   auto extended = extend(handle, more_dataset, ids_view, idx);
   EXPECT_EQ(extended.size(), n_rows + 1);
-  EXPECT_EQ(extended.logical_dim(), logical_dim);
+  EXPECT_EQ(extended.dim(), logical_dim);
 
   std::stringstream bytes;
   serialize(handle, bytes, extended);
   index<uint8_t, int64_t> restored(handle);
   deserialize(handle, bytes, &restored);
-  EXPECT_EQ(restored.logical_dim(), logical_dim);
+  EXPECT_EQ(restored.dim(), logical_dim);
 
   constexpr int64_t n_queries = 2;
   std::vector<uint32_t> query_words((n_queries * logical_dim + 31) / 32);
@@ -254,9 +255,6 @@ TEST(BinaryIvfFlatRegression, RejectNonByteInputTypes)
   EXPECT_THROW((index<float, int64_t>(handle, params, 16)), raft::logic_error);
   EXPECT_THROW((index<int8_t, int64_t>(handle, params, 16)), raft::logic_error);
   EXPECT_THROW((index<half, int64_t>(handle, params, 16)), raft::logic_error);
-  params.adaptive_centers = true;
-  EXPECT_THROW((index<uint8_t, int64_t>(handle, params, std::numeric_limits<uint32_t>::max())),
-               raft::logic_error);
 }
 
 TEST(BinaryIvfFlatRegression, AdaptiveHostBatchesWithCopyStream)
@@ -367,7 +365,7 @@ TEST(BinaryIvfFlatRegression, LegacySerializationCompatibility)
       legacy.write(dtype, 4);
       raft::serialize_scalar(handle, legacy, version);
       raft::serialize_scalar(handle, legacy, idx.size());
-      raft::serialize_scalar(handle, legacy, idx.dim());
+      raft::serialize_scalar(handle, legacy, idx.storage_dim());
       raft::serialize_scalar(handle, legacy, idx.n_lists());
       raft::serialize_scalar(handle, legacy, idx.metric());
       raft::serialize_scalar(handle, legacy, idx.adaptive_centers());

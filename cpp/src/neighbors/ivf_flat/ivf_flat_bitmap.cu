@@ -19,8 +19,7 @@
 namespace cuvs::neighbors::ivf_flat {
 namespace detail {
 
-template <typename BitmapT>
-__global__ void repack_bitmap_kernel(raft::core::bitmap_view<const BitmapT, int64_t> input,
+__global__ void repack_bitmap_kernel(raft::core::bitmap_view<const uint32_t, int64_t> input,
                                      uint8_t* output,
                                      int64_t output_size,
                                      int64_t encoded_dim)
@@ -41,9 +40,8 @@ __global__ void repack_bitmap_kernel(raft::core::bitmap_view<const BitmapT, int6
   }
 }
 
-template <typename BitmapT>
 auto repack_bitmap(raft::resources const& handle,
-                   cuvs::device_bitmap_dataset_view<BitmapT, int64_t> dataset)
+                   cuvs::device_bitmap_dataset_view<int64_t> dataset)
   -> raft::device_matrix<uint8_t, int64_t, raft::row_major>
 {
   auto input       = dataset.data_const_view();
@@ -67,41 +65,38 @@ auto repack_bitmap(raft::resources const& handle,
     repack_bitmap_kernel<<<n_blocks,
                            threads_per_block,
                            0,
-                           raft::resource::get_cuda_stream(handle).value()>>>(
+                           raft::resource::get_cuda_stream(handle).get()>>>(
       input, output.data_handle(), output_size, encoded_dim);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
   return output;
 }
 
-template <typename BitmapT>
 void check_compatible(const index<uint8_t, int64_t>& idx,
-                      cuvs::device_bitmap_dataset_view<BitmapT, int64_t> dataset)
+                      cuvs::device_bitmap_dataset_view<int64_t> dataset)
 {
   RAFT_EXPECTS(idx.binary_index(), "Bitmap datasets require a BitwiseHamming index.");
-  RAFT_EXPECTS(dataset.data_const_view().get_n_cols() == idx.logical_dim(),
+  RAFT_EXPECTS(dataset.data_const_view().get_n_cols() == idx.dim(),
                "Bitmap dataset dimension must match the index logical dimension.");
 }
 
 }  // namespace detail
 
-template <typename BitmapT>
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_flat::index_params& index_params,
-           cuvs::device_bitmap_dataset_view<BitmapT, int64_t> dataset)
+           cuvs::device_bitmap_dataset_view<int64_t> dataset)
   -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>
 {
   RAFT_EXPECTS(index_params.metric == cuvs::distance::DistanceType::BitwiseHamming,
                "Bitmap datasets require the BitwiseHamming metric.");
   auto packed = detail::repack_bitmap(handle, dataset);
   auto idx    = build(handle, index_params, raft::make_const_mdspan(packed.view()));
-  idx.set_logical_dim(dataset.dim());
+  detail::index_access::set_dim(idx, dataset.dim());
   return idx;
 }
 
-template <typename BitmapT>
 auto extend(raft::resources const& handle,
-            cuvs::device_bitmap_dataset_view<BitmapT, int64_t> new_vectors,
+            cuvs::device_bitmap_dataset_view<int64_t> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
   -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>
@@ -111,9 +106,8 @@ auto extend(raft::resources const& handle,
   return extend(handle, raft::make_const_mdspan(packed.view()), new_indices, idx);
 }
 
-template <typename BitmapT>
 void extend(raft::resources const& handle,
-            cuvs::device_bitmap_dataset_view<BitmapT, int64_t> new_vectors,
+            cuvs::device_bitmap_dataset_view<int64_t> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx)
 {
@@ -123,11 +117,10 @@ void extend(raft::resources const& handle,
   extend(handle, raft::make_const_mdspan(packed.view()), new_indices, idx);
 }
 
-template <typename BitmapT>
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index,
-            cuvs::device_bitmap_dataset_view<BitmapT, int64_t> queries,
+            cuvs::device_bitmap_dataset_view<int64_t> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter)
@@ -142,49 +135,5 @@ void search(raft::resources const& handle,
          distances,
          sample_filter);
 }
-
-template auto build<uint32_t>(raft::resources const&,
-                              const cuvs::neighbors::ivf_flat::index_params&,
-                              cuvs::device_bitmap_dataset_view<uint32_t, int64_t>)
-  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
-template auto build<uint64_t>(raft::resources const&,
-                              const cuvs::neighbors::ivf_flat::index_params&,
-                              cuvs::device_bitmap_dataset_view<uint64_t, int64_t>)
-  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
-
-template auto extend<uint32_t>(raft::resources const&,
-                               cuvs::device_bitmap_dataset_view<uint32_t, int64_t>,
-                               std::optional<raft::device_vector_view<const int64_t, int64_t>>,
-                               const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&)
-  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
-template auto extend<uint64_t>(raft::resources const&,
-                               cuvs::device_bitmap_dataset_view<uint64_t, int64_t>,
-                               std::optional<raft::device_vector_view<const int64_t, int64_t>>,
-                               const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&)
-  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
-
-template void extend<uint32_t>(raft::resources const&,
-                               cuvs::device_bitmap_dataset_view<uint32_t, int64_t>,
-                               std::optional<raft::device_vector_view<const int64_t, int64_t>>,
-                               cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*);
-template void extend<uint64_t>(raft::resources const&,
-                               cuvs::device_bitmap_dataset_view<uint64_t, int64_t>,
-                               std::optional<raft::device_vector_view<const int64_t, int64_t>>,
-                               cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*);
-
-template void search<uint32_t>(raft::resources const&,
-                               const cuvs::neighbors::ivf_flat::search_params&,
-                               const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&,
-                               cuvs::device_bitmap_dataset_view<uint32_t, int64_t>,
-                               raft::device_matrix_view<int64_t, int64_t, raft::row_major>,
-                               raft::device_matrix_view<float, int64_t, raft::row_major>,
-                               const cuvs::neighbors::filtering::base_filter&);
-template void search<uint64_t>(raft::resources const&,
-                               const cuvs::neighbors::ivf_flat::search_params&,
-                               const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&,
-                               cuvs::device_bitmap_dataset_view<uint64_t, int64_t>,
-                               raft::device_matrix_view<int64_t, int64_t, raft::row_major>,
-                               raft::device_matrix_view<float, int64_t, raft::row_major>,
-                               const cuvs::neighbors::filtering::base_filter&);
 
 }  // namespace cuvs::neighbors::ivf_flat

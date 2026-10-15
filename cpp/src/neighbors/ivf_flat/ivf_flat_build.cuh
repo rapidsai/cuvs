@@ -39,6 +39,7 @@
 #include <raft/util/pow2_utils.cuh>
 
 #include <cstdint>
+#include <limits>
 
 namespace cuvs::neighbors::ivf_flat {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
@@ -55,7 +56,6 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
                         source.adaptive_centers(),
                         source.conservative_memory_allocation(),
                         source.dim());
-  if (source.binary_index()) { target.set_logical_dim(source.logical_dim()); }
 
   // Copy the independent parts
   raft::copy(res, target.list_sizes(), source.list_sizes());
@@ -193,8 +193,8 @@ void extend(raft::resources const& handle,
 
   auto stream  = raft::resource::get_cuda_stream(handle);
   auto n_lists = index->n_lists();
-  auto dim     = index->dim();
-  list_spec<uint32_t, T, IdxT> list_device_spec{index->dim(),
+  auto dim     = index->storage_dim();
+  list_spec<uint32_t, T, IdxT> list_device_spec{index->storage_dim(),
                                                 index->conservative_memory_allocation()};
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::extend(%zu, %u)", size_t(n_rows), dim);
@@ -228,7 +228,7 @@ void extend(raft::resources const& handle,
     utils::make_batch_load_iterator<T>(handle,
                                        new_vectors,
                                        n_rows,
-                                       IdxT{index->dim()},
+                                       IdxT{index->storage_dim()},
                                        max_batch_size,
                                        copy_stream,
                                        raft::resource::get_workspace_resource_ref(handle),
@@ -237,7 +237,8 @@ void extend(raft::resources const& handle,
 
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
-      raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
+      raft::make_device_matrix_view<const T, IdxT>(
+        batch.data(), batch.size(), index->storage_dim());
     auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
     if (index->binary_index()) {
@@ -341,7 +342,8 @@ void extend(raft::resources const& handle,
       vec_batches.prefetch_next_batch();
       for (const auto& batch : vec_batches) {
         auto batch_data_view =
-          raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
+          raft::make_device_matrix_view<const T, IdxT>(
+            batch.data(), batch.size(), index->storage_dim());
         auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
           new_labels.data_handle() + batch.offset(), batch.size());
         cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
@@ -411,7 +413,8 @@ void extend(raft::resources const& handle,
   size_t d_report_offset    = n_rows * 5 / 100;
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
-      raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
+      raft::make_device_matrix_view<const T, IdxT>(
+        batch.data(), batch.size(), index->storage_dim());
     // Kernel to insert the new vectors
     const dim3 block_dim(256);
     const dim3 grid_dim(raft::ceildiv<IdxT>(batch.size(), block_dim.x));
@@ -512,7 +515,13 @@ inline auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
                "Cosine metric requires more than one dim");
-  index<T, IdxT> index(handle, params, dim);
+  auto logical_dim = dim;
+  if (params.metric == cuvs::distance::DistanceType::BitwiseHamming) {
+    RAFT_EXPECTS(dim <= std::numeric_limits<uint32_t>::max() / 8,
+                 "binary dimensionality is too large");
+    logical_dim *= 8;
+  }
+  index<T, IdxT> index(handle, params, logical_dim);
 
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
@@ -527,17 +536,20 @@ inline auto build(raft::resources const& handle,
     auto n_rows_train = n_rows / trainset_ratio;
 
     rmm::device_uvector<T> trainset(
-      n_rows_train * index.dim(), stream, raft::resource::get_large_workspace_resource_ref(handle));
+      n_rows_train * index.storage_dim(),
+      stream,
+      raft::resource::get_large_workspace_resource_ref(handle));
     // TODO: a proper sampling
     raft::copy_matrix(trainset.data(),
-                      index.dim(),
+                      index.storage_dim(),
                       dataset,
-                      index.dim() * trainset_ratio,
-                      index.dim(),
+                      index.storage_dim() * trainset_ratio,
+                      index.storage_dim(),
                       n_rows_train,
                       stream);
     auto trainset_const_view =
-      raft::make_device_matrix_view<const T, IdxT>(trainset.data(), n_rows_train, index.dim());
+      raft::make_device_matrix_view<const T, IdxT>(
+        trainset.data(), n_rows_train, index.storage_dim());
 
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
@@ -547,11 +559,11 @@ inline auto build(raft::resources const& handle,
     if constexpr (std::is_same_v<T, uint8_t>) {
       if (index.binary_index()) {
         rmm::device_uvector<float> decoded_centers(
-          size_t(index.n_lists()) * index.dim() * 8,
+          size_t(index.n_lists()) * index.storage_dim() * 8,
           stream,
           raft::resource::get_workspace_resource_ref(handle));
         auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(
-          decoded_centers.data(), index.n_lists(), IdxT(index.dim()) * 8);
+          decoded_centers.data(), index.n_lists(), IdxT(index.storage_dim()) * 8);
 
         cuvs::cluster::kmeans_balanced::fit(
           handle, kmeans_params, trainset_const_view, decoded_centers_view, raft::identity_op{});
@@ -562,13 +574,13 @@ inline auto build(raft::resources const& handle,
           handle, temp_quantizer, decoded_centers_view, index.binary_centers());
       } else {
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
-          index.centers().data_handle(), index.n_lists(), index.dim());
+          index.centers().data_handle(), index.n_lists(), index.storage_dim());
         cuvs::cluster::kmeans_balanced::fit(
           handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
       }
     } else {
       auto centers_view = raft::make_device_matrix_view<float, IdxT>(
-        index.centers().data_handle(), index.n_lists(), index.dim());
+        index.centers().data_handle(), index.n_lists(), index.storage_dim());
       cuvs::cluster::kmeans_balanced::fit(
         handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
     }
@@ -627,7 +639,7 @@ inline void fill_refinement_index(raft::resources const& handle,
 
   // Allocate new memory
   auto& lists = refinement_index->lists();
-  list_spec<uint32_t, T, IdxT> list_device_spec{refinement_index->dim(), false};
+  list_spec<uint32_t, T, IdxT> list_device_spec{refinement_index->storage_dim(), false};
   for (uint32_t label = 0; label < n_lists; label++) {
     ivf::resize_list(handle, lists[label], list_device_spec, n_candidates, uint32_t(0));
   }
@@ -646,7 +658,7 @@ inline void fill_refinement_index(raft::resources const& handle,
                                                refinement_index->inds_ptrs().data_handle(),
                                                list_sizes_ptr,
                                                n_queries * n_candidates,
-                                               refinement_index->dim(),
+                                               refinement_index->storage_dim(),
                                                refinement_index->veclen());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
@@ -699,7 +711,7 @@ auto extend(raft::resources const& handle,
             std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
             const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index) -> index<T, IdxT>
 {
-  ASSERT(new_vectors.extent(1) == orig_index.dim(),
+  ASSERT(new_vectors.extent(1) == orig_index.storage_dim(),
          "new_vectors should have the same dimension as the index");
 
   IdxT n_rows = new_vectors.extent(0);
@@ -721,7 +733,7 @@ auto extend(raft::resources const& handle,
             std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,
             const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index) -> index<T, IdxT>
 {
-  ASSERT(new_vectors.extent(1) == orig_index.dim(),
+  ASSERT(new_vectors.extent(1) == orig_index.storage_dim(),
          "new_vectors should have the same dimension as the index");
 
   IdxT n_rows = new_vectors.extent(0);
@@ -743,7 +755,7 @@ void extend(raft::resources const& handle,
             std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
             index<T, IdxT>* index)
 {
-  ASSERT(new_vectors.extent(1) == index->dim(),
+  ASSERT(new_vectors.extent(1) == index->storage_dim(),
          "new_vectors should have the same dimension as the index");
 
   IdxT n_rows = new_vectors.extent(0);
@@ -765,7 +777,7 @@ void extend(raft::resources const& handle,
             std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,
             index<T, IdxT>* index)
 {
-  ASSERT(new_vectors.extent(1) == index->dim(),
+  ASSERT(new_vectors.extent(1) == index->storage_dim(),
          "new_vectors should have the same dimension as the index");
 
   IdxT n_rows = new_vectors.extent(0);
