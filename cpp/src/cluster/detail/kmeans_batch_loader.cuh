@@ -230,8 +230,8 @@ class kmeans_batch_loader<DataT, IndexT, false> {
   {
     // Drain both streams before events and staging buffers are destroyed, including on exceptions.
     if (!batches_.empty()) {
-      RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(raft::resource::get_cuda_stream(*res_).get()));
-      RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(copy_stream_.get()));
+      raft::resource::sync_stream(*res_);
+      raft::resource::sync_stream(*res_, copy_stream_);
     }
     for (auto event : events_) {
       if (event != nullptr) { RAFT_CUDA_TRY_NO_THROW(cudaEventDestroy(event)); }
