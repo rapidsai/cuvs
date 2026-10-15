@@ -49,9 +49,14 @@ enum class HnswHierarchy { NONE, CPU, GPU };
  * disk-backed ACE all support this format. Load a graph-only artifact with the two-filename
  * `deserialize` overload and a separate dataset in original row order before searching.
  *
- * In-memory builds return a file-backed handle that owns a temporary artifact. Call `serialize`
- * before destroying that handle to preserve the artifact. Disk-backed ACE artifacts remain in
- * the caller's build directory after the handle is destroyed.
+ * With `GRAPH_ONLY`, `build` and `from_cagra` construct the hierarchy and write the graph-only
+ * file before returning. The returned index refers to that file; it is not yet searchable.
+ * For an in-memory CAGRA source, the index owns a temporary directory that is deleted when the
+ * index is destroyed. Use `serialize` to save the graph outside that directory. Disk-backed ACE
+ * output remains in the caller's build directory after the index is destroyed.
+ *
+ * For a complete build, save, load, and search example, see
+ * [hnsw_ace_layered_example.cu](https://github.com/NVIDIA/cuvs/blob/main/examples/cpp/src/hnsw_ace_layered_example.cu).
  */
 enum class HnswOutputFormat {
   HNSWLIB,
@@ -252,11 +257,6 @@ struct extend_params {
  * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
  * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
  *
- * `GRAPH_ONLY` supports regular CAGRA, in-memory ACE, and disk-backed ACE with a GPU hierarchy.
- * The returned handle references a graph artifact. Save it with `serialize`, then load it with
- * the two-filename `deserialize` overload and an original-order dataset before searching.
- * Temporary artifacts from in-memory builds are removed when the handle is destroyed.
- *
  * NOTE: This function requires CUDA headers to be available at compile time.
  *
  * @param[in] res raft resources
@@ -314,11 +314,6 @@ std::unique_ptr<index<float>> build(
  * tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index
  * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
  * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
- *
- * `GRAPH_ONLY` supports regular CAGRA, in-memory ACE, and disk-backed ACE with a GPU hierarchy.
- * The returned handle references a graph artifact. Save it with `serialize`, then load it with
- * the two-filename `deserialize` overload and an original-order dataset before searching.
- * Temporary artifacts from in-memory builds are removed when the handle is destroyed.
  *
  * NOTE: This function requires CUDA headers to be available at compile time.
  *
@@ -378,11 +373,6 @@ std::unique_ptr<index<half>> build(
  * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
  * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
  *
- * `GRAPH_ONLY` supports regular CAGRA, in-memory ACE, and disk-backed ACE with a GPU hierarchy.
- * The returned handle references a graph artifact. Save it with `serialize`, then load it with
- * the two-filename `deserialize` overload and an original-order dataset before searching.
- * Temporary artifacts from in-memory builds are removed when the handle is destroyed.
- *
  * NOTE: This function requires CUDA headers to be available at compile time.
  *
  * @param[in] res raft resources
@@ -440,11 +430,6 @@ std::unique_ptr<index<uint8_t>> build(
  * tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index
  * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
  * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
- *
- * `GRAPH_ONLY` supports regular CAGRA, in-memory ACE, and disk-backed ACE with a GPU hierarchy.
- * The returned handle references a graph artifact. Save it with `serialize`, then load it with
- * the two-filename `deserialize` overload and an original-order dataset before searching.
- * Temporary artifacts from in-memory builds are removed when the handle is destroyed.
  *
  * NOTE: This function requires CUDA headers to be available at compile time.
  *
