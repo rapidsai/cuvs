@@ -2630,7 +2630,18 @@ void search(raft::resources const& res,
   }
 }
 
-// Reconstruct the graph-only artifact from a loaded index without retaining its source file.
+/**
+ * @brief Serialize the existing graph topology of a deserialized in-memory GRAPH_ONLY index.
+ *
+ * Deserialization loads the graph and vectors into memory and closes its input files. The
+ * returned index retains no source graph path or file descriptor. This function writes the
+ * in-memory levels and links, so it still works after the original graph file has been removed.
+ * It does not rebuild the hierarchy or write the attached vectors.
+ *
+ * @param[in] idx A deserialized GRAPH_ONLY index with an in-memory hnswlib graph.
+ * @param[in] filename Destination graph-only file. An existing destination is replaced after
+ * the new graph has been written to a sibling temporary file.
+ */
 template <typename T>
 void serialize_loaded_layered_hnsw(const index_impl<T>& idx, const std::string& filename)
 {
