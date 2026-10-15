@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../../src/neighbors/detail/cagra/cagra_build.cuh"
+#include "../../../src/neighbors/detail/cagra/cagra_ace.cuh"
 #include "../ann_cagra.cuh"
 
 #include <utility>

@@ -113,7 +113,7 @@ struct dataset_view_is_device_accessible;
 
 Generic accessor retargeting while preserving the dataset tag/layout and value/index types:
 
-`dataset&lt;Tag, DataT, IdxT, OldAccessor&gt;      -&gt; dataset&lt;Tag, DataT, IdxT, NewAccessor&gt;` `dataset_view&lt;Tag, DataT, IdxT, OldAccessor&gt; -&gt; dataset_view&lt;Tag, DataT, IdxT, NewAccessor&gt;`
+`dataset<Tag, DataT, IdxT, OldAccessor>      -> dataset<Tag, DataT, IdxT, NewAccessor>` `dataset_view<Tag, DataT, IdxT, OldAccessor> -> dataset_view<Tag, DataT, IdxT, NewAccessor>`
 
 ```cpp
 template <typename DatasetLikeT, typename NewAccessor>
@@ -552,8 +552,18 @@ struct udf_filter : public base_filter {
 ### neighbors::distribution_mode
 
 ```cpp
-enum distribution_mode;
+enum distribution_mode {
+  REPLICATED,
+  SHARDED
+};
 ```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `REPLICATED` | `` |
+| `SHARDED` | `` |
 
 <a id="neighbors-mg-index-params"></a>
 ### neighbors::mg_index_params

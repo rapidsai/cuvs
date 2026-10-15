@@ -151,7 +151,10 @@ ConfigureTest(
   GPUS 1
   PERCENT 100
 )
-target_compile_definitions(CUTILE_SMOKE_TEST PRIVATE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED})
+target_compile_definitions(
+  CUTILE_SMOKE_TEST PRIVATE CUVS_CUTILE_ENABLED=${CUVS_CUTILE_ENABLED}
+                            CUVS_CUTILE_SM107_ENABLED=${CUVS_CUTILE_SM107_ENABLED}
+)
 if(CUVS_CUTILE_ENABLED)
   # These are intentionally library-private implementation symbols. Build the smoke executable with
   # the generated fragment registrations and planner implementation so it can exercise them without
@@ -238,13 +241,9 @@ ConfigureTest(
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST
   PATH neighbors/ann_cagra/test_float_uint32_t.cu neighbors/ann_cagra/test_iterative_cagra_q.cu
-  ADDITIONAL_DEP cuco::cuco kvikio::kvikio
+  ADDITIONAL_DEP kvikio::kvikio
   GPUS 1
   PERCENT 100
-)
-# ACE helper tests include cagra_build.cuh and its generated distance declarations.
-target_include_directories(
-  NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST PRIVATE "${CUVS_SOURCE_DIR}/src" "${CUVS_BINARY_DIR}/src"
 )
 
 ConfigureTest(
