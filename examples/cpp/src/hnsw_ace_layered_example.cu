@@ -8,8 +8,9 @@
 // as well. Thus, the index needs to be transferred to a search server with enough memory.
 //
 // HnswOutputFormat::GRAPH_ONLY builds a GPU hierarchy as a graph-only HNSW artifact on disk.
-// It emits one graph artifact, hnsw_index.cuvs. The dataset remains separate and does not
-// need to be transferred to the search server, which typically has the dataset locally.
+// The build creates hnsw_index.cuvs; this example serializes a persistent copy to saved_graph.cuvs.
+// Transfer saved_graph.cuvs to the search server. The dataset remains separate and does not
+// need to be transferred when the search server already has it locally.
 //
 // Run with an optional graph build method (regular by default) and output directory.
 //   regular: default hnsw::build selection; uses ordinary CAGRA when memory permits.
@@ -27,7 +28,7 @@
 //
 // Layered-on-disk layout:
 //
-//   index_dir/hnsw_index.cuvs
+//   index_dir/saved_graph.cuvs
 //     fixed header + layer descriptors
 //     levels: uint8 [N], max HNSW level for each original row id
 //     base nodes + base links: uint32 node ids with hnswlib-ready link rows
