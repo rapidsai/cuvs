@@ -1219,7 +1219,8 @@ auto build_and_serialize_layered_hnsw(
   using IdxT = typename CagraIndexT::index_type;
   static_assert(is_cagra_hnsw_export_index_v<T, CagraIndexT>,
                 "Layered HNSW serialization expects a CAGRA index type");
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("hnsw::serialize_layered");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "hnsw::build_and_serialize_layered_hnsw");
   const auto total_start_time = std::chrono::steady_clock::now();
 
   const bool disk_graph   = index_.graph_fd().has_value();
