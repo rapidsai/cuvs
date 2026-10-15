@@ -348,7 +348,7 @@ Usage example:
 
 Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
 
-1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 3. `GPU`: The hierarchy is constructed on the GPU. When `output_format` is `GRAPH_ONLY`, the GPU-built hierarchy is stored as graph links only. Reload it with the two-filename `deserialize` overload so vectors can be reconstructed from the local dataset in original row order. In-memory conversion returns a handle owning a temporary artifact. Call `serialize` before destroying the handle to preserve it.
 
@@ -384,7 +384,7 @@ Usage example:
 
 Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
 
-1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 3. `GPU`: The hierarchy is constructed on the GPU. When `output_format` is `GRAPH_ONLY`, the GPU-built hierarchy is stored as graph links only. Reload it with the two-filename `deserialize` overload so vectors can be reconstructed from the local dataset in original row order. In-memory conversion returns a handle owning a temporary artifact. Call `serialize` before destroying the handle to preserve it.
 
@@ -420,7 +420,7 @@ Usage example:
 
 Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
 
-1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 3. `GPU`: The hierarchy is constructed on the GPU. When `output_format` is `GRAPH_ONLY`, the GPU-built hierarchy is stored as graph links only. Reload it with the two-filename `deserialize` overload so vectors can be reconstructed from the local dataset in original row order. In-memory conversion returns a handle owning a temporary artifact. Call `serialize` before destroying the handle to preserve it.
 
@@ -456,7 +456,7 @@ Usage example:
 
 Construct an hnswlib index from a CAGRA index NOTE: When `hnsw::index_params.hierarchy` is:
 
-1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/&lt;random_number&gt;.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
+1. `NONE`: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not compatible with the original hnswlib.
 2. `CPU`: The returned index is mutable and can be extended with additional vectors. The serialized index is also compatible with the original hnswlib library.
 3. `GPU`: The hierarchy is constructed on the GPU. When `output_format` is `GRAPH_ONLY`, the GPU-built hierarchy is stored as graph links only. Reload it with the two-filename `deserialize` overload so vectors can be reconstructed from the local dataset in original row order. In-memory conversion returns a handle owning a temporary artifact. Call `serialize` before destroying the handle to preserve it.
 
