@@ -164,7 +164,7 @@ CUVS_EXPORT cuvsError_t cuvsDatasetGetDtype(cuvsDataset_t dataset, DLDataType* d
  *                     last entry is the total row count of the merged buffer.
  * @return cuvsError_t
  */
-CUVS_EXPORT cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsMergedDatasetOffsets(cuvsResources_t res,
                                                       cuvsDataset_t* datasets,
                                                       size_t num_datasets,
                                                       cuvsFilter filter,
@@ -176,7 +176,7 @@ CUVS_EXPORT cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
  *
  * This is an optional convenience function for building `cuvsCagraMerge_v2`'s `merged_dataset`
  * argument. Callers that already have their own concatenated buffer are not required to use it.
- * Call `cuvsCagraMergedDatasetOffsets` with the same `filter` to get the matching `offsets`.
+ * Call `cuvsMergedDatasetOffsets` with the same `filter` to get the matching `offsets`.
  *
  * Use `cuvsCagraIndexGetCuvsDataset` to obtain a `cuvsDataset_t` handle from each CAGRA index
  * before calling this function.
@@ -192,7 +192,7 @@ CUVS_EXPORT cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
  *                            destroy it with `cuvsDatasetDestroy` when done.
  * @return cuvsError_t
  */
-CUVS_EXPORT cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
+CUVS_EXPORT cuvsError_t cuvsConcatenateDatasets(cuvsResources_t res,
                                                      cuvsDataset_t* datasets,
                                                      size_t num_datasets,
                                                      cuvsFilter filter,

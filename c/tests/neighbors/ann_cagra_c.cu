@@ -1275,9 +1275,9 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
   cuvsCagraSearchParamsCreate(&search_params);
   (*search_params).itopk_size = 1;
 
-  // --- Unfiltered: cuvsCagraConcatenateDatasets() builds the merged buffer for us. ---
+  // --- Unfiltered: cuvsConcatenateDatasets() builds the merged buffer for us. ---
   cuvsDataset_t concatenated_dataset;
-  ASSERT_EQ(cuvsCagraConcatenateDatasets(res, dataset_array, 2, no_filter, &concatenated_dataset),
+  ASSERT_EQ(cuvsConcatenateDatasets(res, dataset_array, 2, no_filter, &concatenated_dataset),
             CUVS_SUCCESS);
   {
     cuvsDatasetMemType_t mem_type{};
@@ -1323,7 +1323,7 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
     EXPECT_NEAR(distance_host, 0.0f, 1e-6);
   }
 
-  // --- Filtered: cuvsCagraConcatenateDatasets() + cuvsCagraMergedDatasetOffsets()
+  // --- Filtered: cuvsConcatenateDatasets() + cuvsMergedDatasetOffsets()
   // together build the merged buffer and its offsets, dropping global row 6 (the query's own
   // exact match) so the merged index must fall back to a different nearest neighbor. ---
   rmm::device_uvector<uint32_t> removed_d(1, stream);
@@ -1349,14 +1349,14 @@ TEST(CagraC, ConcatenateDatasetsMergeSearch)
 
   int64_t filtered_offsets[3];
   ASSERT_EQ(
-    cuvsCagraMergedDatasetOffsets(res, dataset_array, 2, bitset_filter, filtered_offsets),
+    cuvsMergedDatasetOffsets(res, dataset_array, 2, bitset_filter, filtered_offsets),
     CUVS_SUCCESS);
   EXPECT_EQ(filtered_offsets[0], 0);
   EXPECT_EQ(filtered_offsets[2], 6);  // 7 rows minus the 1 removed
 
   cuvsDataset_t filtered_dataset;
   ASSERT_EQ(
-    cuvsCagraConcatenateDatasets(res, dataset_array, 2, bitset_filter, &filtered_dataset),
+    cuvsConcatenateDatasets(res, dataset_array, 2, bitset_filter, &filtered_dataset),
     CUVS_SUCCESS);
 
   cuvsCagraIndex_t index_filtered_merged;

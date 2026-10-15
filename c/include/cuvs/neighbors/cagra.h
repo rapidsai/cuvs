@@ -1035,7 +1035,7 @@ CUVS_EXPORT cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  *
  * The caller is responsible for concatenating every input index's dataset (applying `filter` if
  * any) into a single `merged_dataset` buffer before calling this, and for computing `offsets`
- * (see `cuvsCagraMergedDatasetOffsets`). This function only builds/merges the graph and rebinds
+ * (see `cuvsMergedDatasetOffsets`). This function only builds/merges the graph and rebinds
  * the output index to `merged_dataset` -- it never allocates or copies dataset rows itself. This
  * mirrors the `cuvsCagraExtend` contract.
  *
@@ -1099,7 +1099,7 @@ CUVS_EXPORT cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  *                           \p output_index. A host-backed dataset must be updated with
  *                           `cuvsCagraUpdateDataset` before device search.
  * @param[in] offsets Per-index starting row within `merged_dataset`, as returned by
- *                    `cuvsCagraMergedDatasetOffsets`. Array of `num_indices + 1` int64_t; the last
+ *                    `cuvsMergedDatasetOffsets`. Array of `num_indices + 1` int64_t; the last
  *                    entry must equal `merged_dataset`'s row count.
  * @param[out] output_index Output handle that will store the merged index.
  *                          Must be initialized using `cuvsCagraIndexCreate` before use.
@@ -1130,7 +1130,7 @@ CUVS_EXPORT cuvsError_t cuvsCagraMerge_v2(cuvsResources_t res,
  *                           while using `output_index`. A host-backed dataset must be updated with
  *                           `cuvsCagraUpdateDataset` before device search.
  * @param[in] offsets Per-index starting row within `merged_dataset`, as returned by
- *                    `cuvsCagraMergedDatasetOffsets`. Array of `num_indices + 1` int64_t.
+ *                    `cuvsMergedDatasetOffsets`. Array of `num_indices + 1` int64_t.
  * @param[out] output_index Output handle initialized with `cuvsCagraIndexCreate`
  */
 CUVS_EXPORT cuvsError_t cuvsCagraMergeWithParams_v2(cuvsResources_t res,

@@ -1364,7 +1364,7 @@ void _merged_dataset_offsets(cuvsResources_t res,
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto layout =
-    validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraMergedDatasetOffsets");
+    validate_datasets_for_concat(datasets, num_datasets, "cuvsMergedDatasetOffsets");
 
   auto compute = [&](auto const& dataset_views) {
     int64_t total_rows = 0;
@@ -1424,7 +1424,7 @@ void _concatenate_datasets(cuvsResources_t res,
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto layout =
-    validate_datasets_for_concat(datasets, num_datasets, "cuvsCagraConcatenateDatasets");
+    validate_datasets_for_concat(datasets, num_datasets, "cuvsConcatenateDatasets");
 
   auto compute = [&](auto const& dataset_views) {
     if (filter.type == NO_FILTER) {
@@ -2477,7 +2477,7 @@ extern "C" cuvsError_t cuvsCagraMergeWithParams(cuvsResources_t res,
 
   // Step 1: build the merged dataset internally using the concat helper.
   cuvsDataset_t concat_result = nullptr;
-  cuvsError_t err = cuvsCagraConcatenateDatasets(res, ds_handles.data(), num_indices, filter, &concat_result);
+  cuvsError_t err = cuvsConcatenateDatasets(res, ds_handles.data(), num_indices, filter, &concat_result);
   if (err != CUVS_SUCCESS) {
     cleanup_ds();
     if (concat_result != nullptr) { cuvsDatasetDestroy(concat_result); }
@@ -2486,7 +2486,7 @@ extern "C" cuvsError_t cuvsCagraMergeWithParams(cuvsResources_t res,
 
   // Step 2: compute per-index offsets (needed even for NO_FILTER to satisfy v2's contract).
   std::vector<int64_t> offsets_vec(num_indices + 1);
-  err = cuvsCagraMergedDatasetOffsets(res, ds_handles.data(), num_indices, filter, offsets_vec.data());
+  err = cuvsMergedDatasetOffsets(res, ds_handles.data(), num_indices, filter, offsets_vec.data());
   cleanup_ds();
   if (err != CUVS_SUCCESS) {
     cuvsDatasetDestroy(concat_result);
@@ -2531,7 +2531,7 @@ extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
 }
 #pragma GCC diagnostic pop
 
-extern "C" cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
+extern "C" cuvsError_t cuvsMergedDatasetOffsets(cuvsResources_t res,
                                                      cuvsDataset_t* datasets,
                                                      size_t num_datasets,
                                                      cuvsFilter filter,
@@ -2565,7 +2565,7 @@ extern "C" cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
+extern "C" cuvsError_t cuvsConcatenateDatasets(cuvsResources_t res,
                                                     cuvsDataset_t* datasets,
                                                     size_t num_datasets,
                                                     cuvsFilter filter,
@@ -2579,7 +2579,7 @@ extern "C" cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
     RAFT_EXPECTS(merged_dataset != nullptr, "merged_dataset output pointer must not be null");
 
     RAFT_EXPECTS(filter.type == NO_FILTER || filter.type == BITSET,
-                 "cuvsCagraConcatenateDatasets: only NO_FILTER and BITSET filters are supported");
+                 "cuvsConcatenateDatasets: only NO_FILTER and BITSET filters are supported");
     auto dtype = datasets[0]->dtype;
     for (size_t i = 1; i < num_datasets; ++i) {
       RAFT_EXPECTS(datasets[i] != nullptr && datasets[i]->addr != 0,

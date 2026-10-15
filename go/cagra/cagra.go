@@ -404,7 +404,7 @@ func MergedDatasetOffsets(Resources cuvs.Resource, indices []*CagraIndex, allowL
 
 	cOffsets := make([]C.int64_t, len(indices)+1)
 
-	err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraMergedDatasetOffsets(
+	err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsMergedDatasetOffsets(
 		C.cuvsResources_t(Resources.Resource),
 		&cDatasets[0],
 		C.size_t(len(indices)),

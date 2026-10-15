@@ -1311,9 +1311,9 @@ public class CagraIndexImpl implements CagraIndex {
         try (var nativeFilter =
             uploadBitsetFilter(cuvsRes, localArena, filter, totalRows(indexes))) {
           checkCuVSError(
-              cuvsCagraMergedDatasetOffsets(
+              cuvsMergedDatasetOffsets(
                   cuvsRes, datasetsSegment, indexes.length, nativeFilter.segment, offsetsOut),
-              "cuvsCagraMergedDatasetOffsets");
+              "cuvsMergedDatasetOffsets");
         }
 
         long[] offsets = new long[indexes.length + 1];
@@ -1345,8 +1345,8 @@ public class CagraIndexImpl implements CagraIndex {
         cuvsFilter.type(noFilter, 0); // NO_FILTER
         cuvsFilter.addr(noFilter, 0);
         checkCuVSError(
-            cuvsCagraConcatenateDatasets(cuvsRes, datasetsSegment, indexes.length, noFilter, out),
-            "cuvsCagraConcatenateDatasets");
+            cuvsConcatenateDatasets(cuvsRes, datasetsSegment, indexes.length, noFilter, out),
+            "cuvsConcatenateDatasets");
         MemorySegment merged = out.get(cuvsDataset_t, 0);
 
         var result = new CagraIndex.PaddedDataset();
@@ -1379,9 +1379,9 @@ public class CagraIndexImpl implements CagraIndex {
         try (var nativeFilter =
             uploadBitsetFilter(cuvsRes, localArena, filter, totalRows(indexes))) {
           checkCuVSError(
-              cuvsCagraConcatenateDatasets(
+              cuvsConcatenateDatasets(
                   cuvsRes, datasetsSegment, indexes.length, nativeFilter.segment, out),
-              "cuvsCagraConcatenateDatasets");
+              "cuvsConcatenateDatasets");
         }
         MemorySegment merged = out.get(cuvsDataset_t, 0);
 
@@ -1410,8 +1410,8 @@ public class CagraIndexImpl implements CagraIndex {
   /**
    * Gets a non-owning {@code cuvsDataset_t} handle for each index via
    * {@code cuvsCagraIndexGetCuvsDataset}, stores them in {@code datasetsOut}, and returns a
-   * native array of those handles suitable for passing to {@code cuvsCagraMergedDatasetOffsets}
-   * or {@code cuvsCagraConcatenateDatasets}. The caller is responsible for destroying every handle
+   * native array of those handles suitable for passing to {@code cuvsMergedDatasetOffsets}
+   * or {@code cuvsConcatenateDatasets}. The caller is responsible for destroying every handle
    * in {@code datasetsOut} (via {@code cuvsDatasetDestroy}) when the call is complete.
    */
   private static MemorySegment buildDatasetsSegment(

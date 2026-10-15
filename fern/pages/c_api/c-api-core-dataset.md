@@ -88,13 +88,13 @@ typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
 
 ## Dataset concatenation helpers
 
-<a id="cuvscagramergeddatasetoffsets"></a>
-### cuvsCagraMergedDatasetOffsets
+<a id="cuvsmergeddatasetoffsets"></a>
+### cuvsMergedDatasetOffsets
 
 Compute per-dataset write offsets for a merged dataset buffer.
 
 ```c
-cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
+cuvsError_t cuvsMergedDatasetOffsets(cuvsResources_t res,
 cuvsDataset_t* datasets,
 size_t num_datasets,
 cuvsFilter filter,
@@ -119,20 +119,20 @@ Use `cuvsCagraIndexGetCuvsDataset` to obtain a `cuvsDataset_t` handle from each 
 
 [`cuvsError_t`](/api-reference/c-api-core-c-api#cuvserror-t)
 
-<a id="cuvscagraconcatenatedatasets"></a>
-### cuvsCagraConcatenateDatasets
+<a id="cuvsconcatenatedatasets"></a>
+### cuvsConcatenateDatasets
 
 Concatenate every input dataset (in `datasets` order) into a freshly allocated, CAGRA-padded, owning device dataset, optionally retaining only the rows selected by `filter`.
 
 ```c
-cuvsError_t cuvsCagraConcatenateDatasets(cuvsResources_t res,
+cuvsError_t cuvsConcatenateDatasets(cuvsResources_t res,
 cuvsDataset_t* datasets,
 size_t num_datasets,
 cuvsFilter filter,
 cuvsDataset_t* merged_dataset);
 ```
 
-This is an optional convenience function for building `cuvsCagraMerge_v2`'s `merged_dataset` argument. Callers that already have their own concatenated buffer are not required to use it. Call `cuvsCagraMergedDatasetOffsets` with the same `filter` to get the matching `offsets`.
+This is an optional convenience function for building `cuvsCagraMerge_v2`'s `merged_dataset` argument. Callers that already have their own concatenated buffer are not required to use it. Call `cuvsMergedDatasetOffsets` with the same `filter` to get the matching `offsets`.
 
 Use `cuvsCagraIndexGetCuvsDataset` to obtain a `cuvsDataset_t` handle from each CAGRA index before calling this function.
 

@@ -1635,12 +1635,14 @@ TEST(CagraMergeFastener, InnerProductOrderingDiffersFromL2)
                                        device_dataset.data_handle(),
                                        static_cast<uint32_t>(device_dataset.extent(0)),
                                        static_cast<uint32_t>(device_dataset.extent(1)),
+                                       static_cast<uint32_t>(device_dataset.extent(1)),
                                        l2.data_handle(),
                                        static_cast<uint32_t>(l2.extent(1)));
   detail::graph::launch_sort_knn_graph(res,
                                        cuvs::distance::DistanceType::InnerProduct,
                                        device_dataset.data_handle(),
                                        static_cast<uint32_t>(device_dataset.extent(0)),
+                                       static_cast<uint32_t>(device_dataset.extent(1)),
                                        static_cast<uint32_t>(device_dataset.extent(1)),
                                        ip.data_handle(),
                                        static_cast<uint32_t>(ip.extent(1)));
@@ -1722,6 +1724,7 @@ TEST(CagraMergeFastener, AppendSortAndDedupHandleOffsetsAndPadding)
                                        cuvs::distance::DistanceType::L2Expanded,
                                        combined.data_handle(),
                                        static_cast<uint32_t>(combined.extent(0)),
+                                       static_cast<uint32_t>(combined.extent(1)),
                                        static_cast<uint32_t>(combined.extent(1)),
                                        appended.data_handle(),
                                        static_cast<uint32_t>(appended.extent(1)));
