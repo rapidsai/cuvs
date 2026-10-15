@@ -221,7 +221,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params)
     cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params)
 
-    cuvsError_t cuvsCagraMergedDatasetOffsets(cuvsResources_t res,
+    cuvsError_t cuvsMergedDatasetOffsets(cuvsResources_t res,
                                               cuvsCagraIndex_t* indices,
                                               size_t num_indices,
                                               cuvsFilter filter,

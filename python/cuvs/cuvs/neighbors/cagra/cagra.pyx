@@ -1320,7 +1320,7 @@ def merged_dataset_offsets(indices, filter=None, resources=None):
 
     try:
         with cuda_interruptible():
-            check_cuvs(cuvsCagraMergedDatasetOffsets(
+            check_cuvs(cuvsMergedDatasetOffsets(
                 res,
                 c_indices,
                 num_indices,
