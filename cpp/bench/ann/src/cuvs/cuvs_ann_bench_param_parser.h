@@ -87,10 +87,6 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("ratio")) {
     param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
   }
-  if (conf.contains("max_train_points_per_centroid")) {
-    param.max_train_points_per_centroid = conf.at("max_train_points_per_centroid");
-  }
-  if (conf.contains("sampling_seed")) { param.sampling_seed = conf.at("sampling_seed"); }
 }
 
 template <typename T, typename IdxT>
