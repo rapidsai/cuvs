@@ -8,6 +8,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/pinned_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -24,7 +25,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
-#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -215,10 +215,8 @@ class kmeans_batch_loader<DataT, IndexT, false> {
       // Only a batch-sized host allocation per device slot. Already pinned/registered inputs
       // retain the original direct H2D path without staging memory.
       for (int slot = 0; slot < num_slots(); ++slot) {
-        void* ptr = nullptr;
-        RAFT_CUDA_TRY(
-          cudaHostAlloc(&ptr, max_batch_elements * sizeof(DataT), cudaHostAllocPortable));
-        host_buffers_[slot].reset(static_cast<DataT*>(ptr));
+        host_buffers_[slot].emplace(
+          raft::make_pinned_vector<DataT, std::size_t>(res, max_batch_elements));
       }
     }
   }
@@ -382,21 +380,14 @@ class kmeans_batch_loader<DataT, IndexT, false> {
       } else {
         host_reusable_[slot] = make_event();
       }
-      std::memcpy(host_buffers_[slot].get(), source, elements * sizeof(DataT));
-      source = host_buffers_[slot].get();
+      std::memcpy(host_buffers_[slot]->data_handle(), source, elements * sizeof(DataT));
+      source = host_buffers_[slot]->data_handle();
     }
     // Pinned H2D submission returns without waiting for the device-slot reuse event. Direct
     // pageable cudaMemcpyAsync may block here and prevent the next batch's compute being queued.
     raft::copy(buffer_ptrs_[slot], source, elements, copy_stream_);
     if (pageable) { RAFT_CUDA_TRY(cudaEventRecord(host_reusable_[slot], copy_stream_.get())); }
   }
-
-  struct pinned_deleter {
-    void operator()(DataT* ptr) const noexcept
-    {
-      if (ptr != nullptr) { RAFT_CUDA_TRY_NO_THROW(cudaFreeHost(ptr)); }
-    }
-  };
 
   static bool is_pageable(DataT const* ptr)
   {
@@ -427,7 +418,7 @@ class kmeans_batch_loader<DataT, IndexT, false> {
   cudaEvent_t reusable_[2] = {nullptr, nullptr};
   std::vector<cudaEvent_t> events_;
   std::vector<bool> pageable_partitions_;
-  std::unique_ptr<DataT, pinned_deleter> host_buffers_[2];
+  std::optional<raft::pinned_vector<DataT, std::size_t>> host_buffers_[2];
   // Separate from ready_: mixed pinned partitions can reuse ready_ without using host_buffers_.
   cudaEvent_t host_reusable_[2] = {nullptr, nullptr};
 };

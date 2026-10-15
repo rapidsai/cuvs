@@ -148,16 +148,22 @@ struct params : base_params {
    * Only used by the batched (host-data) code path and ignored by
    * device-data overloads.
    *
+   * Default: 0. For a single host input matrix, this creates one full-dataset input
+   * buffer on the GPU, even when an auxiliary stream is configured. To stream that
+   * matrix in smaller batches, set a positive value less than n_samples.
+   *
    * Inputs spanning multiple batches are double-buffered when the handle has an auxiliary
-   * stream, and use one buffer otherwise. Budget about
+   * stream, and use one buffer otherwise. No auxiliary stream pool is configured by
+   * default, so transfers and compute are serialized. Configure a pool with at least
+   * one auxiliary stream to enable transfer/compute overlap. Budget about
    * `device_buffer_samples * n_features * sizeof(value_type)` bytes per input buffer,
    * plus algorithm workspaces. Sample weights require the same number of additional buffers
-   * with `device_buffer_samples * sizeof(value_type)` bytes each.
+   * with `device_buffer_samples * sizeof(value_type)` bytes each. In these estimates,
+   * substitute n_samples for device_buffer_samples when it is 0.
    *
    * In multi-GPU mode this is a per-rank batch size: each rank processes up
    * to this many local samples per batch, clamped to that rank's local sample
    * count. This is ignored by device-data overloads.
-   * Default: 0 (process all data at once).
    */
   int64_t device_buffer_samples = 0;
 };
