@@ -13,6 +13,8 @@
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan.hpp>
 
+#include <cuda/std/mdspan>
+
 #include <cstdint>
 #include <type_traits>
 
@@ -72,7 +74,7 @@ struct mdarray_spec {
  * the logical dimension as its second extent; the row stride follows from the layout.
  */
 template <typename T>
-using padded_layout = raft::layout_right_padded_impl<16 / sizeof(T)>;
+using padded_layout = cuda::std::layout_right_padded<16 / sizeof(T)>;
 
 template <typename T, typename IdxT, typename ContainerPolicy>
 using contiguous_dataset =
