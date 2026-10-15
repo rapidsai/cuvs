@@ -471,6 +471,8 @@ outputs:
             - libboost-devel =1.87
             - mkl-devel =2023
       run:
+        - if: aarch64
+          then: libopenblas
         - librmm =${{ minor_version }}
         - rapids-logger =0.3
         - libgomp
@@ -484,7 +486,9 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl
         - if: linux64
-          then: mkl =2023
+          then:
+            - mkl =2023
+            - llvm-openmp
       ignore_run_exports:
         by_name:
           - cuda-cudart

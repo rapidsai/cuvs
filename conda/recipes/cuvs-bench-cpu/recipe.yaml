@@ -91,6 +91,9 @@ requirements:
         - libboost-devel=1.87
         - mkl-devel=2023
   run:
+    - if: aarch64
+      then: libopenblas
+    - libgomp
     - click
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
@@ -105,6 +108,7 @@ requirements:
     - if: linux64
       then:
         - mkl =2023
+        - llvm-openmp
   ignore_run_exports:
     by_name:
       - glog
