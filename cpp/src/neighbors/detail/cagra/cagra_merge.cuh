@@ -29,6 +29,7 @@
 #include <rmm/resource_ref.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <limits>
 #include <memory>
 #include <new>
@@ -42,9 +43,9 @@ namespace cuvs::neighbors::cagra::detail {
  *  `i` is the row at which caller-concatenated data for `datasets[i]` must start. For
  *  `row_filter = none_sample_filter`, offsets are just the cumulative sizes of `datasets` --
  *  callers can compute those directly and do not need this function. For a bitset `row_filter`,
- *  the per-dataset surviving row counts are not derivable from public APIs alone, so this function
- *  walks the filter's sorted surviving-row list (via `bitset_view::to_csr`) and locates each
- *  dataset's boundary in it. */
+ *  the per-dataset surviving row counts are found by copying the filter's bitset words to host
+ *  and counting set bits in each dataset's row range — O(total_rows/32) host memory vs O(surviving)
+ *  for CSR materialization. */
 template <cuvs::neighbors::ann_dataset_view DatasetViewT>
 std::vector<int64_t> merged_dataset_offsets(
   raft::resources const& handle,
@@ -66,27 +67,33 @@ std::vector<int64_t> merged_dataset_offsets(
 
   auto const& actual_filter =
     dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(row_filter);
-  int64_t const final_rows = actual_filter.view().count(handle);
+  auto const bv = actual_filter.view();
 
-  auto surviving_rows = raft::make_device_csr_matrix<uint32_t, int64_t, int64_t, int64_t>(
-    handle, 1, static_cast<std::size_t>(offsets.back()));
-  surviving_rows.initialize_sparsity(final_rows);
-  actual_filter.view().to_csr(handle, surviving_rows);
-  auto const csr_indices = surviving_rows.structure_view().get_indices();
-
-  std::vector<int64_t> surviving_rows_host(csr_indices.size());
-  raft::copy(surviving_rows_host.data(),
-             csr_indices.data(),
-             csr_indices.size(),
-             raft::resource::get_cuda_stream(handle));
+  // Copy bitset words to host — O(total_rows/32) bytes vs O(surviving_rows*4) for CSR.
+  auto const n_words = static_cast<int64_t>(bv.n_elements());
+  std::vector<uint32_t> words_h(static_cast<std::size_t>(n_words));
+  raft::copy(words_h.data(), bv.data(), n_words, raft::resource::get_cuda_stream(handle));
   raft::resource::sync_stream(handle);
+
+  // Build cumulative popcount prefix: prefix[i] = set bits in words [0, i).
+  std::vector<int64_t> prefix(static_cast<std::size_t>(n_words + 1), int64_t{0});
+  for (int64_t w = 0; w < n_words; ++w) {
+    prefix[w + 1] = prefix[w] + std::popcount(words_h[w]);
+  }
+
+  // For bit position b, count set bits in [0, b) using the prefix array plus a partial-word mask.
+  auto count_before = [&](int64_t b) -> int64_t {
+    int64_t w = b / 32;
+    int64_t r = b % 32;
+    int64_t c = prefix[w];
+    if (r > 0) { c += std::popcount(words_h[w] & ((uint32_t{1} << r) - 1)); }
+    return c;
+  };
 
   std::vector<int64_t> filtered_offsets;
   filtered_offsets.reserve(offsets.size());
   for (int64_t boundary : offsets) {
-    filtered_offsets.push_back(static_cast<int64_t>(
-      std::lower_bound(surviving_rows_host.begin(), surviving_rows_host.end(), boundary) -
-      surviving_rows_host.begin()));
+    filtered_offsets.push_back(count_before(boundary));
   }
   return filtered_offsets;
 }
@@ -197,6 +204,7 @@ auto concatenate_datasets(raft::resources const& handle,
                "cagra::concatenate_datasets: only none and bitset filters are supported");
   auto const& actual_filter =
     dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(row_filter);
+  auto const bv = actual_filter.view();
 
   std::vector<int64_t> unfiltered_offsets;
   unfiltered_offsets.reserve(datasets.size() + 1);
@@ -204,25 +212,33 @@ auto concatenate_datasets(raft::resources const& handle,
   for (auto const& v : datasets) {
     unfiltered_offsets.push_back(unfiltered_offsets.back() + static_cast<int64_t>(v.n_rows()));
   }
-  int64_t const unfiltered_rows = unfiltered_offsets.back();
-  int64_t const final_rows      = actual_filter.view().count(handle);
 
-  auto surviving_rows_csr = raft::make_device_csr_matrix<uint32_t, int64_t, int64_t, int64_t>(
-    handle, 1, static_cast<std::size_t>(unfiltered_rows));
-  surviving_rows_csr.initialize_sparsity(final_rows);
-  actual_filter.view().to_csr(handle, surviving_rows_csr);
-  auto csr_indices = surviving_rows_csr.structure_view().get_indices();
-
-  std::vector<int64_t> surviving_rows_host(csr_indices.size());
-  raft::copy(surviving_rows_host.data(), csr_indices.data(), csr_indices.size(), stream);
+  // Copy bitset words to host — O(total_rows/32) bytes, avoiding a device CSR allocation.
+  auto const n_words = static_cast<int64_t>(bv.n_elements());
+  std::vector<uint32_t> words_h(static_cast<std::size_t>(n_words));
+  raft::copy(words_h.data(), bv.data(), n_words, stream);
   raft::resource::sync_stream(handle);
+
+  // Build cumulative popcount prefix: prefix[i] = set bits in words [0, i).
+  std::vector<int64_t> prefix(static_cast<std::size_t>(n_words + 1), int64_t{0});
+  for (int64_t w = 0; w < n_words; ++w) {
+    prefix[w + 1] = prefix[w] + std::popcount(words_h[w]);
+  }
+
+  auto count_before = [&](int64_t b) -> int64_t {
+    int64_t w = b / 32;
+    int64_t r = b % 32;
+    int64_t c = prefix[w];
+    if (r > 0) { c += std::popcount(words_h[w] & ((uint32_t{1} << r) - 1)); }
+    return c;
+  };
+
+  int64_t const final_rows = count_before(unfiltered_offsets.back());
 
   std::vector<int64_t> offsets;
   offsets.reserve(unfiltered_offsets.size());
-  for (int64_t boundary : unfiltered_offsets) {
-    offsets.push_back(static_cast<int64_t>(
-      std::lower_bound(surviving_rows_host.begin(), surviving_rows_host.end(), boundary) -
-      surviving_rows_host.begin()));
+  for (int64_t b : unfiltered_offsets) {
+    offsets.push_back(count_before(b));
   }
 
   auto out_array = raft::make_device_matrix<T, int64_t>(handle, final_rows, stride);
@@ -233,11 +249,23 @@ auto concatenate_datasets(raft::resources const& handle,
     int64_t const n_i = offsets[i + 1] - offsets[i];
     if (n_i == 0) { continue; }
 
-    std::vector<int64_t> local_ids_host(surviving_rows_host.begin() + offsets[i],
-                                        surviving_rows_host.begin() + offsets[i + 1]);
-    int64_t const base = unfiltered_offsets[i];
-    for (auto& id : local_ids_host) {
-      id -= base;
+    int64_t const ds_base = unfiltered_offsets[i];
+    int64_t const ds_end  = unfiltered_offsets[i + 1];
+
+    // Scan bitset words in [ds_base, ds_end) bit range to collect local row IDs.
+    std::vector<int64_t> local_ids_host;
+    local_ids_host.reserve(static_cast<std::size_t>(n_i));
+    int64_t const wstart = ds_base / 32;
+    int64_t const wend   = (ds_end + 31) / 32;
+    for (int64_t w = wstart; w < wend; ++w) {
+      uint32_t word = words_h[w];
+      if (w == wstart && (ds_base % 32) != 0) { word &= ~((uint32_t{1} << (ds_base % 32)) - 1); }
+      if ((w + 1) * 32 > ds_end) { word &= (uint32_t{1} << (ds_end - w * 32)) - 1; }
+      while (word) {
+        int const bit_off = std::countr_zero(word);
+        local_ids_host.push_back(w * 32 + bit_off - ds_base);
+        word &= word - 1;
+      }
     }
 
     auto local_ids = raft::make_device_vector<int64_t, int64_t>(handle, n_i);
