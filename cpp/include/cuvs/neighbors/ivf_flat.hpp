@@ -39,10 +39,11 @@ struct index_params : cuvs::neighbors::index_params {
    * which is no longer representative of the original training set.
    *
    * The alternative behavior (adaptive_centers = true) is to update the cluster centers when new
-   * data is added. For BitwiseHamming, centers are packed bitwise majorities of the data in each
-   * cluster, with ties resolved to zero. For other metrics, centers are floating-point means of
-   * the data in each cluster. Cluster assignments and centers depend on the order of adding new
-   * data, so the centers drift with the changing distribution of the newly added data.
+   * data is added. In adaptive mode, centers are floating-point means of the data in each cluster,
+   * except for BitwiseHamming metric, where each cluster center is a packed binary vector formed
+   * by taking the majority value at each bit position across the cluster's binary-quantized
+   * vectors, with ties resolved to 0. Cluster assignments and centers depend on the order of
+   * adding new data, so the centers drift with the changing distribution of the newly added data.
    */
   bool adaptive_centers = false;
   /**
