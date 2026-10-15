@@ -15,7 +15,9 @@
 
 #include <cuda/std/mdspan>
 
+#include <cstddef>
 #include <cstdint>
+#include <numeric>
 #include <type_traits>
 
 namespace CUVS_EXPORT cuvs {
@@ -74,7 +76,7 @@ struct mdarray_spec {
  * the logical dimension as its second extent; the row stride follows from the layout.
  */
 template <typename T>
-using padded_layout = cuda::std::layout_right_padded<16 / sizeof(T)>;
+using padded_layout = cuda::std::layout_right_padded<16 / std::gcd(std::size_t{16}, sizeof(T))>;
 
 template <typename T, typename IdxT, typename ContainerPolicy>
 using contiguous_dataset =
