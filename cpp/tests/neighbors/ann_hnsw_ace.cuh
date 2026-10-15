@@ -33,16 +33,21 @@
 
 namespace cuvs::neighbors::hnsw {
 
+// Input construction paths for the GRAPH_ONLY build/load/search tests.
+// Standard datasets use contiguous logical rows; padded datasets may have a larger physical
+// row stride. Attached cases obtain vectors from the device CAGRA index. Explicit cases build
+// without an attached dataset and pass original-order host vectors to from_cagra instead.
+// Host-built CAGRA indexes always require those explicit host vectors during conversion.
 enum class LayeredSource {
-  disk_ace,
-  regular,
-  inmem_ace,
-  device_standard_attached,
-  device_standard_explicit,
-  device_padded_attached,
-  device_padded_explicit,
-  host_standard,
-  host_padded
+  disk_ace,                  // hnsw::build with explicit ACE parameters and disk mode enabled.
+  regular,                   // Default hnsw::build; small inputs exercise ordinary CAGRA.
+  inmem_ace,                 // hnsw::build with explicit ACE parameters and disk mode disabled.
+  device_standard_attached,  // Device-built CAGRA, standard rows, attached device vectors.
+  device_standard_explicit,  // Device-built CAGRA, standard rows, explicit host vectors.
+  device_padded_attached,    // Device-built CAGRA, padded rows, attached device vectors.
+  device_padded_explicit,    // Device-built CAGRA, padded rows, explicit host vectors.
+  host_standard,             // Host-built CAGRA, standard input rows, explicit host vectors.
+  host_padded                // Host-built CAGRA, padded input rows, explicit host vectors.
 };
 
 struct AnnHnswAceInputs {
