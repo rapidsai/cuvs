@@ -1185,8 +1185,31 @@ void write_layered_base_links_from_inmem(raft::resources const& res,
   }
 }
 
+/**
+ * @brief Construct an HNSW hierarchy from CAGRA and write a GRAPH_ONLY file.
+ *
+ * Reuse the CAGRA graph as the base layer, assign random HNSW levels, gather the vectors of
+ * promoted nodes, and build the upper-layer graphs. Write levels and adjacency lists in the
+ * layered format without vectors. Disk-backed ACE row IDs are mapped back to original dataset
+ * rows; in-memory CAGRA row IDs already refer to that original order.
+ *
+ * This is a construction operation, unlike serialize_loaded_layered_hnsw, which writes an
+ * existing in-memory hierarchy. Vectors are required to build upper layers even though the
+ * output does not contain them.
+ *
+ * @param[in] res Resources for graph construction and device transfers.
+ * @param[in] params HNSW construction parameters; the hierarchy must be GPU.
+ * @param[in] index_ In-memory CAGRA graph or disk-backed ACE graph with its row mapping.
+ * Composite source-index mappings are not supported.
+ * @param[in] dataset Optional original-order host vectors. Required for disk-backed ACE and
+ * indexes without an attached device dataset; otherwise the attached device vectors are used.
+ * @param[in] artifact_file Output graph file in an existing directory. Publication fails if
+ * this path already exists, preserving the existing file.
+ * @return Path of the completed graph-only file. Load it with a separate original-order
+ * dataset using the two-filename deserialize overload before searching.
+ */
 template <typename T, typename CagraIndexT>
-auto serialize_to_layered_hnswlib(
+auto build_and_serialize_layered_hnsw(
   raft::resources const& res,
   const cuvs::neighbors::hnsw::index_params& params,
   const CagraIndexT& index_,
@@ -2396,7 +2419,7 @@ std::unique_ptr<index<T>> from_cagra(
       directory     = std::make_unique<owned_hnsw_directory>();
       artifact_path = directory->path() / "hnsw_index.cuvs";
     }
-    serialize_to_layered_hnswlib<T>(res, params, cagra_index, dataset, artifact_path);
+    build_and_serialize_layered_hnsw<T>(res, params, cagra_index, dataset, artifact_path);
     hnsw_index->set_file_descriptor(cuvs::util::file_descriptor(artifact_path.string(), O_RDONLY));
     hnsw_index->set_artifact_directory(std::move(directory));
     return hnsw_index;
