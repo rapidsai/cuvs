@@ -2785,9 +2785,9 @@ void serialize(raft::resources const& res, const std::string& filename, const in
     return;
   }
 
-  // Check if this is a disk-based index (created from disk-backed CAGRA)
+  // Check whether the index is backed by an existing artifact file.
   if (idx_impl && idx_impl->file_descriptor().has_value()) {
-    // For disk-based indexes, copy the existing file to the new location
+    // Copy the existing artifact, including temporary output from in-memory builds.
     std::string source_path = idx_impl->file_path();
     RAFT_EXPECTS(!source_path.empty(), "Disk-based index has invalid file path");
     RAFT_EXPECTS(std::filesystem::exists(source_path),
