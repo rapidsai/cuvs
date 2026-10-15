@@ -70,8 +70,7 @@ struct device_bitmap_dataset_view {
 template <typename IdxT>
 [[nodiscard]] auto make_device_bitmap_dataset_view(const raft::core::bitset<uint32_t, IdxT>& bitset,
                                                    IdxT n_rows,
-                                                   IdxT dim)
-  -> device_bitmap_dataset_view<IdxT>
+                                                   IdxT dim) -> device_bitmap_dataset_view<IdxT>
 {
   RAFT_EXPECTS(n_rows >= 0 && dim >= 0, "Bitmap dataset extents must be non-negative.");
   RAFT_EXPECTS(bitset.size() == n_rows * dim, "Bitmap storage size must equal n_rows * dim.");
@@ -84,8 +83,8 @@ template <typename IdxT>
  * @param bitmap Existing bitmap view.
  */
 template <typename IdxT>
-[[nodiscard]] auto make_device_bitmap_dataset_view(
-  raft::core::bitmap_view<uint32_t, IdxT> bitmap) -> device_bitmap_dataset_view<IdxT>
+[[nodiscard]] auto make_device_bitmap_dataset_view(raft::core::bitmap_view<uint32_t, IdxT> bitmap)
+  -> device_bitmap_dataset_view<IdxT>
 {
   return {bitmap.data(), bitmap.get_n_rows(), bitmap.get_n_cols()};
 }

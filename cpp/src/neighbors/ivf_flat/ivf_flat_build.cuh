@@ -236,9 +236,8 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
 
   for (const auto& batch : vec_batches) {
-    auto batch_data_view =
-      raft::make_device_matrix_view<const T, IdxT>(
-        batch.data(), batch.size(), index->storage_dim());
+    auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
+      batch.data(), batch.size(), index->storage_dim());
     auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
     if (index->binary_index()) {
@@ -341,9 +340,8 @@ void extend(raft::resources const& handle,
       vec_batches.reset();
       vec_batches.prefetch_next_batch();
       for (const auto& batch : vec_batches) {
-        auto batch_data_view =
-          raft::make_device_matrix_view<const T, IdxT>(
-            batch.data(), batch.size(), index->storage_dim());
+        auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
+          batch.data(), batch.size(), index->storage_dim());
         auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
           new_labels.data_handle() + batch.offset(), batch.size());
         cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
@@ -412,9 +410,8 @@ void extend(raft::resources const& handle,
   size_t next_report_offset = 0;
   size_t d_report_offset    = n_rows * 5 / 100;
   for (const auto& batch : vec_batches) {
-    auto batch_data_view =
-      raft::make_device_matrix_view<const T, IdxT>(
-        batch.data(), batch.size(), index->storage_dim());
+    auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
+      batch.data(), batch.size(), index->storage_dim());
     // Kernel to insert the new vectors
     const dim3 block_dim(256);
     const dim3 grid_dim(raft::ceildiv<IdxT>(batch.size(), block_dim.x));
@@ -535,10 +532,9 @@ inline auto build(raft::resources const& handle,
       1, n_rows / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
     auto n_rows_train = n_rows / trainset_ratio;
 
-    rmm::device_uvector<T> trainset(
-      n_rows_train * index.storage_dim(),
-      stream,
-      raft::resource::get_large_workspace_resource_ref(handle));
+    rmm::device_uvector<T> trainset(n_rows_train * index.storage_dim(),
+                                    stream,
+                                    raft::resource::get_large_workspace_resource_ref(handle));
     // TODO: a proper sampling
     raft::copy_matrix(trainset.data(),
                       index.storage_dim(),
@@ -547,9 +543,8 @@ inline auto build(raft::resources const& handle,
                       index.storage_dim(),
                       n_rows_train,
                       stream);
-    auto trainset_const_view =
-      raft::make_device_matrix_view<const T, IdxT>(
-        trainset.data(), n_rows_train, index.storage_dim());
+    auto trainset_const_view = raft::make_device_matrix_view<const T, IdxT>(
+      trainset.data(), n_rows_train, index.storage_dim());
 
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;

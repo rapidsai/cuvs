@@ -40,8 +40,7 @@ __global__ void repack_bitmap_kernel(raft::core::bitmap_view<const uint32_t, int
   }
 }
 
-auto repack_bitmap(raft::resources const& handle,
-                   cuvs::device_bitmap_dataset_view<int64_t> dataset)
+auto repack_bitmap(raft::resources const& handle, cuvs::device_bitmap_dataset_view<int64_t> dataset)
   -> raft::device_matrix<uint8_t, int64_t, raft::row_major>
 {
   auto input       = dataset.data_const_view();

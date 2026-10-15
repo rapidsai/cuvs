@@ -350,9 +350,9 @@ struct index_access {
   static void set_dim(index<T, IdxT>& idx, uint32_t dim)
   {
     RAFT_EXPECTS(idx.binary_index_, "logical bit dimensionality is only used by binary indexes");
-    RAFT_EXPECTS((dim == 0 && idx.storage_dim() == 0) ||
-                   (dim > 0 && ((dim - 1) / 8 + 1) == idx.storage_dim()),
-                 "logical bit dimensionality must match the storage dimensionality");
+    RAFT_EXPECTS(
+      (dim == 0 && idx.storage_dim() == 0) || (dim > 0 && ((dim - 1) / 8 + 1) == idx.storage_dim()),
+      "logical bit dimensionality must match the storage dimensionality");
     idx.dim_ = dim;
   }
 };

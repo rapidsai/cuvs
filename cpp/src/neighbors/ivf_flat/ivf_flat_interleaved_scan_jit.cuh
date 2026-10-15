@@ -182,8 +182,7 @@ void launch_kernel(const index<T, IdxT>& index,
 
   const int max_query_smem  = 16384;
   uint32_t query_smem_elems = std::min<int>(
-    max_query_smem / sizeof(T),
-    raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.storage_dim()));
+    max_query_smem / sizeof(T), raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.storage_dim()));
   size_t smem_size = query_smem_elems * sizeof(T);
 
   if constexpr (Capacity > 0) {

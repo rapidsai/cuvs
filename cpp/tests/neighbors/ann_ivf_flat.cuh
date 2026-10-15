@@ -356,15 +356,14 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto flat_codes =
           raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.storage_dim());
 
-        raft::matrix::gather(
-          handle_,
-          raft::make_device_matrix_view<const DataT, uint32_t>(
-            (const DataT*)database.data(),
-            static_cast<uint32_t>(ps.num_db_vecs),
-            idx.storage_dim()),
-          raft::make_device_vector_view<const IdxT, uint32_t>((const IdxT*)list_inds.data_handle(),
-                                                              list_size),
-          flat_codes.view());
+        raft::matrix::gather(handle_,
+                             raft::make_device_matrix_view<const DataT, uint32_t>(
+                               (const DataT*)database.data(),
+                               static_cast<uint32_t>(ps.num_db_vecs),
+                               idx.storage_dim()),
+                             raft::make_device_vector_view<const IdxT, uint32_t>(
+                               (const IdxT*)list_inds.data_handle(), list_size),
+                             flat_codes.view());
 
         helpers::codepacker::pack(
           handle_, make_const_mdspan(flat_codes.view()), idx.veclen(), 0, list_data.view());

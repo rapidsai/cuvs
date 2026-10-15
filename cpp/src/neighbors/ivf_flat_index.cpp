@@ -20,10 +20,7 @@ uint32_t storage_dim(cuvs::distance::DistanceType metric, uint32_t dim)
                                                                            : dim;
 }
 
-int64_t expanded_binary_dim(uint32_t dim)
-{
-  return int64_t{dim} * 8;
-}
+int64_t expanded_binary_dim(uint32_t dim) { return int64_t{dim} * 8; }
 }  // namespace
 
 template <typename T, typename IdxT>
@@ -60,15 +57,14 @@ index<T, IdxT>::index(raft::resources const& res,
     centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
                ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)
                : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
-    binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
-                      ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
-                      : raft::make_device_matrix<uint8_t, int64_t>(
-                          res, n_lists, storage_dim(metric, dim))),
-    binary_center_counts_(
-      metric == cuvs::distance::DistanceType::BitwiseHamming && adaptive_centers
-        ? raft::make_device_matrix<uint32_t, int64_t>(
-            res, n_lists, expanded_binary_dim(storage_dim(metric, dim)))
-        : raft::make_device_matrix<uint32_t, int64_t>(res, 0, 0)),
+    binary_centers_(
+      metric != cuvs::distance::DistanceType::BitwiseHamming
+        ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
+        : raft::make_device_matrix<uint8_t, int64_t>(res, n_lists, storage_dim(metric, dim))),
+    binary_center_counts_(metric == cuvs::distance::DistanceType::BitwiseHamming && adaptive_centers
+                            ? raft::make_device_matrix<uint32_t, int64_t>(
+                                res, n_lists, expanded_binary_dim(storage_dim(metric, dim)))
+                            : raft::make_device_matrix<uint32_t, int64_t>(res, 0, 0)),
     center_norms_(std::nullopt),
     binary_index_(metric == cuvs::distance::DistanceType::BitwiseHamming),
     dim_(dim),
@@ -293,10 +289,10 @@ void index<T, IdxT>::check_consistency()
   if (binary_index_) {
     RAFT_EXPECTS(binary_centers_.extent(0) == list_sizes_.extent(0),
                  "inconsistent number of lists (clusters)");
-    RAFT_EXPECTS(!adaptive_centers_ || (binary_center_counts_.extent(0) == int64_t(n_lists) &&
-                                        binary_center_counts_.extent(1) ==
-                                          int64_t(storage_dim()) * 8),
-                 "inconsistent binary center counts");
+    RAFT_EXPECTS(
+      !adaptive_centers_ || (binary_center_counts_.extent(0) == int64_t(n_lists) &&
+                             binary_center_counts_.extent(1) == int64_t(storage_dim()) * 8),
+      "inconsistent binary center counts");
   } else {
     RAFT_EXPECTS(                                       //
       (centers_.extent(0) == list_sizes_.extent(0)) &&  //

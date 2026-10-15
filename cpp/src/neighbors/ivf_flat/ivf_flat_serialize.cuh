@@ -149,14 +149,13 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
       storage_dim = dim > 0 ? (dim - 1) / 8 + 1 : 0;
     }
   }
-  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(
-                 static_cast<std::size_t>(n_lists),
-                 static_cast<std::size_t>(storage_dim),
-                 sizeof(T)),
-               "ivf_flat::deserialize: integer overflow in n_lists*dim*sizeof(T) "
-               "(n_lists=%u, dim=%u)",
-               n_lists,
-               dim);
+  RAFT_EXPECTS(
+    cuvs::util::is_mul_no_overflow(
+      static_cast<std::size_t>(n_lists), static_cast<std::size_t>(storage_dim), sizeof(T)),
+    "ivf_flat::deserialize: integer overflow in n_lists*dim*sizeof(T) "
+    "(n_lists=%u, dim=%u)",
+    n_lists,
+    dim);
 
   // Version 4 never stored packed centers, so its binary indexes cannot be recovered.
   RAFT_EXPECTS(ver >= 5 || metric != cuvs::distance::DistanceType::BitwiseHamming,
