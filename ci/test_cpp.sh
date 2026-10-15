@@ -43,7 +43,7 @@ if [[ "${CUDA_CACHE_PATH}" != /* ]]; then
 fi
 export CUDA_CACHE_PATH
 mkdir -p "${CUDA_CACHE_PATH}"
-rapids-logger "CUDA JIT cache ${CUDA_CACHE_PATH}: $(find "${CUDA_CACHE_PATH}" -type f | wc -l) files before the tests"
+echo "CUDA JIT cache ${CUDA_CACHE_PATH}: $(find "${CUDA_CACHE_PATH}" -type f | wc -l) files before the tests"
 
 rapids-print-env
 
@@ -72,7 +72,7 @@ timeout -v --signal=SIGINT --kill-after=60s 100m ctest -j8 --output-on-failure -
 popd
 
 # Every kernel that was not in the restored cache and had to be linked adds files.
-rapids-logger "CUDA JIT cache ${CUDA_CACHE_PATH}: $(find "${CUDA_CACHE_PATH}" -type f | wc -l) files ($(du -sh "${CUDA_CACHE_PATH}" | cut -f1)) after the tests"
+echo "CUDA JIT cache ${CUDA_CACHE_PATH}: $(find "${CUDA_CACHE_PATH}" -type f | wc -l) files ($(du -sh "${CUDA_CACHE_PATH}" | cut -f1)) after the tests"
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
