@@ -75,8 +75,11 @@ struct mdarray_spec {
  * Row-major rows padded to 16 bytes, the alignment the CAGRA kernels require. A padded matrix keeps
  * the logical dimension as its second extent; the row stride follows from the layout.
  */
+// NOTE: `std::gcd`'s arguments must not be spelled as a braced initializer (`std::size_t{16}`):
+// nvcc and gcc mangle that unevaluated expression differently, which makes .cu and .cpp
+// translation units disagree on the symbol names of everything holding a padded dataset.
 template <typename T>
-using padded_layout = cuda::std::layout_right_padded<16 / std::gcd(std::size_t{16}, sizeof(T))>;
+using padded_layout = cuda::std::layout_right_padded<16 / std::gcd<int, int>(16, sizeof(T))>;
 
 template <typename T, typename IdxT, typename ContainerPolicy>
 using contiguous_dataset =
