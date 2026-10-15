@@ -10,7 +10,6 @@ context:
   datetime_string: '${{ env.get("RAPIDS_DATETIME_STRING") }}'
   head_rev: '${{ git.head_rev(".")[:8] }}'
   linux64: ${{ linux and x86_64 }}
-  ucxx_version: ${{ env.get("UCXX_PACKAGE_DEPENDENCY") }}
 
 recipe:
   name: libcuvs-split
@@ -329,7 +328,7 @@ outputs:
         - libcusolver-dev
         - libcusparse-dev
       run:
-        - libucxx ${{ ucxx_version }}
+        - libucxx
         - ucx
         - libgomp
         - librmm =${{ minor_version }}
