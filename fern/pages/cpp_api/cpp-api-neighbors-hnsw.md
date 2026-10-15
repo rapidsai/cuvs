@@ -363,7 +363,7 @@ std::nullopt);
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 Usage example:
 
@@ -399,7 +399,7 @@ std::nullopt);
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 Usage example:
 
@@ -435,7 +435,7 @@ std::nullopt);
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 Usage example:
 
@@ -471,7 +471,7 @@ std::nullopt);
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 Usage example:
 
@@ -505,7 +505,7 @@ When the index has an attached device dataset view, `dataset` may be omitted. Ot
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 **Parameters**
 
@@ -535,7 +535,7 @@ std::nullopt);
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 **Parameters**
 
@@ -565,7 +565,7 @@ std::nullopt);
 
 `GRAPH_ONLY` conversion does not support composite CAGRA indexes with `source_indices()` mappings. Disk-backed ACE's internal row mapping is supported and restored to original row IDs.
 
-Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the CAGRA graph and fails if that file already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
+Disk-backed `GRAPH_ONLY` conversion creates `hnsw_index.cuvs` beside the existing CAGRA graph, in the directory selected by `ace_params.build_dir` when that graph was built. `from_cagra` derives this path from the CAGRA graph file; it does not select a new build directory. Conversion fails if `hnsw_index.cuvs` already exists. Before repeating conversion, move the previous artifact elsewhere or use a fresh graph directory.
 
 **Parameters**
 
