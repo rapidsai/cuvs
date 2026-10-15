@@ -574,13 +574,12 @@ auto merge_fastener(raft::resources const& handle,
 
   {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> scope("cagra::merge/append/sort");
-    // Padding is zeroed above, so passing the padded width as the dimension is exact for the
-    // L2Expanded metric that preflight restricts Fastener to.
     cagra::detail::graph::launch_sort_knn_graph(handle,
                                                 params.metric,
                                                 dataset_view.data_handle(),
-                                                static_cast<uint32_t>(dataset_view.extent(0)),
-                                                static_cast<uint32_t>(dataset_view.extent(1)),
+                                                static_cast<uint32_t>(preflight.rows),
+                                                static_cast<uint32_t>(preflight.dim),
+                                                static_cast<uint32_t>(stride),
                                                 merged_graph.data_handle(),
                                                 static_cast<uint32_t>(merged_graph.extent(1)));
     merged_graph = merge_scaffold::cap_sorted_graph(
