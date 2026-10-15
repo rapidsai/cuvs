@@ -203,7 +203,8 @@ public class LuceneAcceleratedHNSWScalarQuantizedVectorsWriter extends KnnVector
               dataset,
               acceleratedHNSWParams.getHnswLayers(),
               params,
-              QuantizationType.SCALAR);
+              QuantizationType.SCALAR,
+              acceleratedHNSWParams.getMaxConn());
 
       long vectorIndexOffset = hnswVectorIndex.getFilePointer();
       int[][] graphLevelNodeOffsets = writeGraph(hnswGraph, hnswVectorIndex);
@@ -216,7 +217,8 @@ public class LuceneAcceleratedHNSWScalarQuantizedVectorsWriter extends KnnVector
           vectorIndexLength,
           size,
           hnswGraph,
-          graphLevelNodeOffsets);
+          graphLevelNodeOffsets,
+          acceleratedHNSWParams.getMaxConn());
     } catch (Throwable t) {
       throw Utils.handleThrowable(t);
     }
@@ -225,7 +227,7 @@ public class LuceneAcceleratedHNSWScalarQuantizedVectorsWriter extends KnnVector
   /** Writes the empty or one-vector representation, if {@code size} is trivial. */
   private boolean writeTrivialField(FieldInfo fieldInfo, int size) throws IOException {
     if (size == 0) {
-      writeEmpty(fieldInfo, hnswMeta);
+      writeEmpty(fieldInfo, hnswMeta, acceleratedHNSWParams.getMaxConn());
       return true;
     }
     if (size == 1) {
@@ -311,7 +313,8 @@ public class LuceneAcceleratedHNSWScalarQuantizedVectorsWriter extends KnnVector
           vectorIndexLength,
           size,
           hnswGraph,
-          graphLevelNodeOffsets);
+          graphLevelNodeOffsets,
+          acceleratedHNSWParams.getMaxConn());
 
     } catch (Throwable t) {
       Utils.handleThrowable(t);

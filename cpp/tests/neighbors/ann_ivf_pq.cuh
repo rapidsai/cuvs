@@ -915,6 +915,14 @@ inline auto small_dims_per_cluster() -> test_cases_t
   return map<ivf_pq_inputs>(small_dims(), [](const ivf_pq_inputs& x) {
     ivf_pq_inputs y(x);
     y.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
+    if (y.dim < 4) {
+      // With only one or two PQ subspaces, use fewer IVF lists so each has enough
+      // training rows for its 256-centroid codebook.
+      y.index_params.n_lists = 4;
+      // Probe at least the default fraction of lists (20/32) without requiring an
+      // exhaustive search, which would also raise the derived recall threshold.
+      y.search_params.n_probes = 3;
+    }
     return y;
   });
 }
