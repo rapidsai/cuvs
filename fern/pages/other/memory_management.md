@@ -8,7 +8,7 @@ The most common choice is to configure a device memory pool before creating NVID
 
 [C resources API](/api-reference/c-api-core-c-api#cuvsrmmpoolmemoryresourceenable) | [Java provider API](/api-reference/java-api-com-nvidia-cuvs-spi-cuvsprovider#enablermmpooledmemory) | [Go memory API](/api-reference/go-api-cuvs#newcuvspoolmemory)
 
-C, Java, Go, and Rust configure RMM through NVIDIA cuVS wrappers over the C API. C++ and Python applications usually use RMM directly because RMM is part of the RAPIDS stack used by RAFT and NVIDIA cuVS.
+C, Java, Go, and Rust configure RMM through NVIDIA cuVS wrappers over the C API. C++ and Python applications usually use RMM directly because RMM is the memory layer used by RAFT and NVIDIA cuVS.
 
 ### Setting a device pool
 
