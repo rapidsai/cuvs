@@ -89,7 +89,7 @@ void search_impl(raft::resources const& handle,
   if constexpr (std::is_same_v<T, float>) {
     float_query_size = 0;
   } else {
-    float_query_size = index.binary_index() ? 0 : size_t(n_queries) * index.storage_dim();
+    float_query_size = index.binary_index() ? 0 : size_t(n_queries) * index.dim();
   }
   rmm::device_uvector<float> converted_queries_dev(float_query_size, stream, search_mr);
   float* converted_queries_ptr = converted_queries_dev.data();
@@ -108,7 +108,7 @@ void search_impl(raft::resources const& handle,
   if (index.binary_index()) {
     if constexpr (std::is_same_v<T, uint8_t>) {
       cuvs::distance::detail::ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT> distance_op{
-        static_cast<IdxT>(index.storage_dim())};
+        static_cast<IdxT>(index.dim())};
 
       rmm::device_uvector<uint32_t> uint32_distances(
         size_t(n_queries) * index.n_lists(), stream, search_mr);
@@ -121,7 +121,7 @@ void search_impl(raft::resources const& handle,
                                                        IdxT>(distance_op,
                                                              static_cast<IdxT>(n_queries),
                                                              static_cast<IdxT>(index.n_lists()),
-                                                             static_cast<IdxT>(index.storage_dim()),
+                                                             static_cast<IdxT>(index.dim()),
                                                              queries,
                                                              index.binary_centers().data_handle(),
                                                              nullptr,
@@ -154,9 +154,7 @@ void search_impl(raft::resources const& handle,
         raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
           handle,
           raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
-            converted_queries_ptr,
-            static_cast<IdxT>(n_queries),
-            static_cast<IdxT>(index.storage_dim())),
+            converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
           raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
                                                      static_cast<IdxT>(n_queries)));
         utils::outer_add(query_norm_dev.data(),
@@ -166,7 +164,7 @@ void search_impl(raft::resources const& handle,
                          distance_buffer_dev.data(),
                          stream);
         RAFT_LOG_TRACE_VEC(index.center_norms()->data_handle(),
-                           std::min<uint32_t>(20, index.storage_dim()));
+                           std::min<uint32_t>(20, index.dim()));
         RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
         break;
       }
@@ -174,9 +172,7 @@ void search_impl(raft::resources const& handle,
         raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
           handle,
           raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
-            converted_queries_ptr,
-            static_cast<IdxT>(n_queries),
-            static_cast<IdxT>(index.storage_dim())),
+            converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
           raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
                                                      static_cast<IdxT>(n_queries)),
           raft::sqrt_op{});
@@ -195,12 +191,12 @@ void search_impl(raft::resources const& handle,
                        false,
                        index.n_lists(),
                        n_queries,
-                       index.storage_dim(),
+                       index.dim(),
                        &alpha,
                        index.centers().data_handle(),
-                       index.storage_dim(),
+                       index.dim(),
                        converted_queries_ptr,
-                       index.storage_dim(),
+                       index.dim(),
                        &beta,
                        distance_buffer_dev.data(),
                        index.n_lists(),
@@ -393,7 +389,7 @@ inline void search_with_filtering(raft::resources const& handle,
 
   uint64_t ws_size_per_query =
     4ull * (2ull * n_probes + (index.binary_index() ? 2ull : 1ull) * index.n_lists() +
-            (index.binary_index() ? 0ull : index.storage_dim()) + 1) +
+            (index.binary_index() ? 0ull : index.dim()) + 1) +
     (manage_local_topk ? ((sizeof(IdxT) + 4) * n_probes * k)
                        : (4ull * (max_samples + n_probes + 1)));
 
@@ -408,7 +404,7 @@ inline void search_with_filtering(raft::resources const& handle,
       index,
       effective_metric,
       params,
-      queries + offset_q * index.storage_dim(),
+      queries + offset_q * index.dim(),
       queries_batch,
       offset_q,
       k,
@@ -438,7 +434,7 @@ void search_with_filtering(raft::resources const& handle,
   RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1),
                "Number of columns in output neighbors and distances matrices must be equal");
 
-  RAFT_EXPECTS(queries.extent(1) == index.storage_dim(),
+  RAFT_EXPECTS(queries.extent(1) == index.dim(),
                "Number of query dimensions should equal number of dimensions in the index.");
 
   auto effective_metric =

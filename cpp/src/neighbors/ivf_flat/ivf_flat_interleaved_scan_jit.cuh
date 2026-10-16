@@ -182,7 +182,7 @@ void launch_kernel(const index<T, IdxT>& index,
 
   const int max_query_smem  = 16384;
   uint32_t query_smem_elems = std::min<int>(
-    max_query_smem / sizeof(T), raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.storage_dim()));
+    max_query_smem / sizeof(T), raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
   size_t smem_size = query_smem_elems * sizeof(T);
 
   if constexpr (Capacity > 0) {
@@ -232,7 +232,7 @@ void launch_kernel(const index<T, IdxT>& index,
       k,
       max_samples,
       chunk_indices,
-      index.storage_dim(),
+      index.dim(),
       // sample_filter,
       inds_ptrs,
       bitset_ptr.value_or(nullptr),
@@ -240,7 +240,7 @@ void launch_kernel(const index<T, IdxT>& index,
       original_nbits.value_or(0),
       neighbors,
       distances);
-    queries += grid_dim_y * index.storage_dim();
+    queries += grid_dim_y * index.dim();
     if constexpr (Capacity > 0) {
       neighbors += grid_dim_y * grid_dim_x * k;
       distances += grid_dim_y * grid_dim_x * k;

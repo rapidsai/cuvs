@@ -1486,7 +1486,6 @@ if(NOT BUILD_CPU_ONLY)
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
-    src/neighbors/ivf_flat/ivf_flat_bitmap.cu
     ${ivf_flat_build_extend_inst_files}
     ${ivf_flat_search_inst_files}
     src/neighbors/ivf_flat/ivf_flat_helpers.cu

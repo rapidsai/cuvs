@@ -19,18 +19,16 @@
 #include <raft/core/serialize.hpp>
 
 #include <fstream>
-#include <limits>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Serialization version
-// Version 7 stores the logical bit dimension of binary datasets. Version 6 combines packed binary
-// centers and exact adaptive counts with the unpadded list lengths introduced in version 5.
-// Versions 4, 5, and 6 remain readable;
+// Version 6 combines packed binary centers and exact adaptive counts with the
+// unpadded list lengths introduced in version 5. Versions 4 and 5 remain readable;
 // version 4 binary indexes omitted their centers and cannot be recovered.
 // TODO(hcho3) Implement next-gen serializer for IVF that allows for expansion in a backward
 //             compatible fashion.
-constexpr int serialization_version = 7;
+constexpr int serialization_version = 6;
 
 /**
  * Save the index to file.
@@ -80,7 +78,7 @@ void serialize(raft::resources const& handle, Output& os, const index<T, IdxT>& 
   raft::resource::sync_stream(handle);
   cuvs::util::detail::serialize_mdspan(handle, os, sizes_host.view());
 
-  list_spec<uint32_t, T, IdxT> list_store_spec{index_.storage_dim(), true};
+  list_spec<uint32_t, T, IdxT> list_store_spec{index_.dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::serialize_list(handle, os, index_.lists()[label], list_store_spec, sizes_host(label));
   }
@@ -120,11 +118,11 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
                "ivf_flat::deserialize: serialized dtype prefix does not match requested type");
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
-  if (ver != serialization_version && ver != 6 && ver != 5 && ver != 4) {
+  if (ver != serialization_version && ver != 5 && ver != 4) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
   auto n_rows           = raft::deserialize_scalar<IdxT>(handle, is);
-  auto serialized_dim   = raft::deserialize_scalar<std::uint32_t>(handle, is);
+  auto dim              = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto n_lists          = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto metric           = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
   bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
@@ -137,25 +135,12 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
                "ivf_flat::deserialize: n_lists=%u exceeds maximum %u",
                n_lists,
                cuvs::util::kMaxIvfNLists);
-
-  auto dim         = serialized_dim;
-  auto storage_dim = serialized_dim;
-  if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
-    if (ver < 7) {
-      RAFT_EXPECTS(serialized_dim <= std::numeric_limits<uint32_t>::max() / 8,
-                   "ivf_flat::deserialize: binary dimensionality is too large");
-      dim *= 8;
-    } else {
-      storage_dim = dim > 0 ? (dim - 1) / 8 + 1 : 0;
-    }
-  }
-  RAFT_EXPECTS(
-    cuvs::util::is_mul_no_overflow(
-      static_cast<std::size_t>(n_lists), static_cast<std::size_t>(storage_dim), sizeof(T)),
-    "ivf_flat::deserialize: integer overflow in n_lists*dim*sizeof(T) "
-    "(n_lists=%u, dim=%u)",
-    n_lists,
-    dim);
+  RAFT_EXPECTS(cuvs::util::is_mul_no_overflow(
+                 static_cast<std::size_t>(n_lists), static_cast<std::size_t>(dim), sizeof(T)),
+               "ivf_flat::deserialize: integer overflow in n_lists*dim*sizeof(T) "
+               "(n_lists=%u, dim=%u)",
+               n_lists,
+               dim);
 
   // Version 4 never stored packed centers, so its binary indexes cannot be recovered.
   RAFT_EXPECTS(ver >= 5 || metric != cuvs::distance::DistanceType::BitwiseHamming,
@@ -182,8 +167,8 @@ auto deserialize_impl(raft::resources const& handle, Input& input) -> index<T, I
   }
   cuvs::util::detail::deserialize_mdspan(handle, input, index_.list_sizes());
 
-  list_spec<uint32_t, T, IdxT> list_device_spec{index_.storage_dim(), cma};
-  list_spec<uint32_t, T, IdxT> list_store_spec{index_.storage_dim(), true};
+  list_spec<uint32_t, T, IdxT> list_device_spec{index_.dim(), cma};
+  list_spec<uint32_t, T, IdxT> list_store_spec{index_.dim(), true};
   for (uint32_t label = 0; label < index_.n_lists(); label++) {
     ivf::deserialize_list(handle, input, index_.lists()[label], list_store_spec, list_device_spec);
   }

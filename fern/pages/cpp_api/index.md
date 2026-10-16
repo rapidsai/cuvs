@@ -11,7 +11,6 @@ These pages are generated from the documented public headers in the cuVS source 
 
 ## Common
 
-- [Bitmap](/api-reference/cpp-api-core-dataset-bitmap)
 - [Bloom Filter](/api-reference/cpp-api-core-bloom-filter)
 - [Common Types](/api-reference/cpp-api-common-types)
 - [Roaring Allowlist](/api-reference/cpp-api-core-roaring-allowlist)
