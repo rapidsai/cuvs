@@ -8,10 +8,10 @@ NVIDIA cuVS is a GPU-accelerated library for vector search on the GPU. Vector se
 
 [cuvs_reference]: https://docs.nvidia.com/cuvs
 
-- [Example Notebooks](https://github.com/nvidia/cuvs/tree/HEAD/notebooks): Example notebooks
-- [Code Examples](https://github.com/nvidia/cuvs/tree/HEAD/examples): Self-contained code examples
-- [GitHub repository](https://github.com/nvidia/cuvs): Download the NVIDIA cuVS source code.
-- [Issue tracker](https://github.com/nvidia/cuvs/issues): Report issues or request features.
+- [Example Notebooks](https://github.com/NVIDIA/cuvs/tree/HEAD/notebooks): Example notebooks
+- [Code Examples](https://github.com/NVIDIA/cuvs/tree/HEAD/examples): Self-contained code examples
+- [GitHub repository](https://github.com/NVIDIA/cuvs): Download the NVIDIA cuVS source code.
+- [Issue tracker](https://github.com/NVIDIA/cuvs/issues): Report issues or request features.
 
 ## What is NVIDIA cuVS?
 

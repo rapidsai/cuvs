@@ -31,7 +31,7 @@ class CagraIterativeBuildBugTest : public ::testing::Test {
   {
     cagra::index_params index_params;
     // The bug manifests when graph_degree is equal to intermediate_graph_degree
-    // see issue https://github.com/nvidia/cuvs/issues/1818
+    // see issue https://github.com/NVIDIA/cuvs/issues/1818
     index_params.graph_degree              = 16;
     index_params.intermediate_graph_degree = 16;
 
