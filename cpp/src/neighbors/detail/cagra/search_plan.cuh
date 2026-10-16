@@ -226,7 +226,7 @@ struct search_plan_impl : public search_plan_impl_base {
         // both more width and depth
         _max_iterations = minimum_depth + raft::ceildiv(mc_itopk_size - minimum_depth, num_ctas);
         // Compensate for the difficult case of large topk
-        _max_iterations += raft::ceildiv(static_cast<size_t>(topk), mc_itopk_size) - 1;
+        _max_iterations += raft::ceildiv(static_cast<size_t>(topk), mc_itopk_size);
       } else {
         _max_iterations = itopk_size / search_width;
       }
