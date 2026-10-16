@@ -3400,13 +3400,26 @@ inline void materialize_hnswlib_upper_region(const cuvs::util::file_descriptor& 
     return;
   }
 
+  auto make_offsets = [&](size_t id_begin, size_t id_end) {
+    std::vector<size_t> offsets(id_end - id_begin + 1, 0);
+    for (size_t id = id_begin; id < id_end; ++id) {
+      offsets[id - id_begin + 1] = offsets[id - id_begin] + levels_u8[id];
+    }
+    return offsets;
+  };
+  auto emit_packed = [&](size_t id_begin, size_t id_end, const std::vector<char>& packed) {
+    size_t cursor = 0;
+    for (size_t id = id_begin; id < id_end; ++id) {
+      const size_t level = levels_u8[id];
+      append_element(level, level > 0 ? packed.data() + cursor * urow : nullptr);
+      cursor += level;
+    }
+  };
+
   const size_t fits_budget = metadata.upper_links_bytes + (n_rows + 1) * sizeof(size_t);
   if (fits_budget <= budget_bytes) {
     // Pack all upper rows in original-ID order, then stream them out.
-    std::vector<size_t> packed_start(n_rows + 1, 0);
-    for (size_t i = 0; i < n_rows; ++i) {
-      packed_start[i + 1] = packed_start[i] + static_cast<size_t>(levels_u8[i]);
-    }
+    const auto packed_start = make_offsets(0, n_rows);
     RAFT_EXPECTS(packed_start[n_rows] == metadata.upper_nodes_count,
                  "Layered HNSW upper rows (%zu) do not match upper_nodes_count (%zu)",
                  packed_start[n_rows],
@@ -3420,12 +3433,7 @@ inline void materialize_hnswlib_upper_region(const cuvs::util::file_descriptor& 
                                   const size_t dst_row = packed_start[id] + (level - 1);
                                   std::memcpy(packed.data() + dst_row * urow, link_row, urow);
                                 });
-    size_t cursor = 0;
-    for (size_t id = 0; id < n_rows; ++id) {
-      const size_t level = static_cast<size_t>(levels_u8[id]);
-      append_element(level, level > 0 ? packed.data() + cursor * urow : nullptr);
-      cursor += level;
-    }
+    emit_packed(0, n_rows, packed);
     flush_out();
     RAFT_LOG_INFO("hnswlib materialize: upper region written (single-pass) in %ld ms (%.2f GiB)",
                   elapsed_ms_since(upper_start_time),
@@ -3466,14 +3474,10 @@ inline void materialize_hnswlib_upper_region(const cuvs::util::file_descriptor& 
 
   std::vector<char> chunk;
   for (size_t b = 0; b < num_buckets; ++b) {
-    const size_t id_begin = b * rows_per_bucket;
-    const size_t id_end   = std::min(n_rows, id_begin + rows_per_bucket);
-    const size_t rib      = id_end - id_begin;
-    std::vector<size_t> local_start(rib + 1, 0);
-    for (size_t i = 0; i < rib; ++i) {
-      local_start[i + 1] = local_start[i] + static_cast<size_t>(levels_u8[id_begin + i]);
-    }
-    std::vector<char> packed(local_start[rib] * urow);
+    const size_t id_begin  = b * rows_per_bucket;
+    const size_t id_end    = std::min(n_rows, id_begin + rows_per_bucket);
+    const auto local_start = make_offsets(id_begin, id_end);
+    std::vector<char> packed(local_start.back() * urow);
     spiller.replay(b, chunk, [&](const char* r) {
       uint32_t id32 = 0;
       uint32_t lv32 = 0;
@@ -3483,12 +3487,7 @@ inline void materialize_hnswlib_upper_region(const cuvs::util::file_descriptor& 
       const size_t dst_row = local_start[local] + (static_cast<size_t>(lv32) - 1);
       std::memcpy(packed.data() + dst_row * urow, r + 2 * sizeof(uint32_t), urow);
     });
-    size_t cursor = 0;
-    for (size_t i = 0; i < rib; ++i) {
-      const size_t level = static_cast<size_t>(levels_u8[id_begin + i]);
-      append_element(level, level > 0 ? packed.data() + cursor * urow : nullptr);
-      cursor += level;
-    }
+    emit_packed(id_begin, id_end, packed);
   }
   flush_out();
   RAFT_LOG_INFO("hnswlib materialize: upper region written (%zu buckets) in %ld ms (%.2f GiB)",
