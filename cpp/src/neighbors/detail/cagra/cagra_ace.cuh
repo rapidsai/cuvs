@@ -177,24 +177,6 @@ inline size_t ace_labeling_sample_count(size_t rows, size_t partitions, double r
   return std::min(rows, std::max(static_cast<size_t>(rows * rate), minimum));
 }
 
-/** Peak explicit device buffers in labeling, excluding the resource workspace. */
-inline size_t ace_labeling_gpu_bytes(
-  size_t rows, size_t dim, size_t partitions, double target_alpha, size_t batch_rows = 32768)
-{
-  const long double samples   = ace_labeling_sample_count(rows, partitions);
-  const long double centroids = partitions;
-  // Sample and centroid matrices survive through assignment. The centroid-pair device
-  // matrix is released before score sampling; assignment uses the admitted batch size.
-  const long double persistent     = (samples + centroids) * dim;
-  const long double centroid_pairs = target_alpha > 0.0 ? centroids * centroids : 0.0L;
-  const long double assignment     = static_cast<long double>(batch_rows) * (dim + centroids);
-  const long double bytes = sizeof(float) * (persistent + std::max(centroid_pairs, assignment));
-  // Saturate impossible requests instead of wrapping the admission estimate.
-  return bytes >= static_cast<long double>(std::numeric_limits<size_t>::max())
-           ? std::numeric_limits<size_t>::max()
-           : static_cast<size_t>(bytes);
-}
-
 /** Choose a labeling batch that fits both budgets; zero means the fixed buffers cannot fit. */
 inline size_t ace_labeling_batch_size(size_t rows,
                                       size_t dim,
@@ -208,10 +190,10 @@ inline size_t ace_labeling_batch_size(size_t rows,
   const long double centroids = partitions;
   const long double pairs     = target_alpha > 0.0 ? centroids * centroids : 0.0L;
   const long double gpu_fixed = sizeof(float) * (samples + centroids) * dim;
-  // The host retains centroid-pair distances during assignment. Reserve both the final
-  // score vector and thread-local scores during calibration (at most three spills per row).
+  // The host retains centroid-pair distances during assignment and one score per candidate
+  // spill during calibration (at most three spills per row).
   const long double scores =
-    target_alpha > 0.0 ? 2.0L * samples * std::min<size_t>(3, partitions - 1) : 0.0L;
+    target_alpha > 0.0 ? samples * std::min<size_t>(3, partitions - 1) : 0.0L;
   const long double host_fixed = sizeof(float) * (samples * dim + pairs + scores);
   const long double per_row    = sizeof(float) * (static_cast<long double>(dim) + centroids);
   if (per_row == 0 || gpu_fixed + sizeof(float) * pairs > gpu_budget ||
@@ -324,8 +306,8 @@ inline std::vector<float> ace_sample_margin_scores(
   auto distances_device = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
   auto stream           = raft::resource::get_cuda_stream(res).get();
 
-  std::vector<float> scores;
-  scores.reserve(n_samples * max_spills);
+  // Every sample has max_spills candidates; disjoint slots avoid per-thread buffers and locking.
+  std::vector<float> scores(n_samples * max_spills);
   for (size_t base = 0; base < n_samples; base += chunk_size) {
     const size_t rows = std::min(chunk_size, n_samples - base);
     auto sample_chunk = raft::make_device_matrix_view<const float, int64_t>(
@@ -341,22 +323,18 @@ inline std::vector<float> ace_sample_margin_scores(
 
 #pragma omp parallel
     {
-      std::vector<float> local_scores;
-      local_scores.reserve(rows * max_spills / omp_get_num_threads() + max_spills);
       std::vector<std::pair<float, size_t>> nearest(1 + max_spills);
 #pragma omp for
       for (size_t row = 0; row < rows; row++) {
         const size_t found = ace_select_nearest_partitions(
           &distances_chunk_host(row, 0), n_partitions, 1 + max_spills, nearest.data());
         for (size_t spill = 1; spill < found; spill++) {
-          local_scores.push_back(
+          scores[(base + row) * max_spills + spill - 1] =
             ace_boundary_margin(nearest[0].first,
                                 nearest[spill].first,
-                                centroid_distances(nearest[0].second, nearest[spill].second)));
+                                centroid_distances(nearest[0].second, nearest[spill].second));
         }
       }
-#pragma omp critical
-      scores.insert(scores.end(), local_scores.begin(), local_scores.end());
     }
   }
   return scores;
@@ -537,9 +515,7 @@ void ace_get_partition_labels(
   }
 }
 
-/**
- * ACE: Check partition sizes for stable KNN graph construction
- */
+// Check partition sizes for stable KNN graph construction
 template <typename IdxT>
 void ace_check_partition_sizes(
   size_t dataset_size,
@@ -577,9 +553,8 @@ void ace_check_partition_sizes(
 
   double avg_core_vectors      = static_cast<double>(total_core_vectors) / n_partitions;
   double avg_augmented_vectors = static_cast<double>(total_augmented_vectors) / n_partitions;
-  double avg_total_vectors =
+  double expected_avg_vectors =
     static_cast<double>(total_core_vectors + total_augmented_vectors) / n_partitions;
-  double expected_avg_vectors = avg_total_vectors;
 
   RAFT_LOG_INFO("ACE: Core vectors        - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
                 total_core_vectors,
@@ -623,10 +598,8 @@ void ace_check_partition_sizes(
   }
 }
 
-/**
- * ACE: Create forward/backward mappings between original and reordered vector IDs
- * The in-memory path can be parallelized but the disk path requires ordering.
- */
+// Create forward/backward mappings between original and reordered vector IDs
+// The in-memory path can be parallelized but the disk path requires ordering.
 template <typename IdxT>
 void ace_create_forward_and_backward_lists(
   size_t dataset_size,
@@ -864,11 +837,9 @@ void ace_adjust_sub_graph_ids_disk(
   raft::resource::sync_stream(res);
 }
 
-/**
- * ACE: Reorder dataset based on partition assignments and store to disk
- * Writes two files: reordered_dataset.npy (core partitions) and augmented_dataset.npy (secondary
- * partitions). Uses buffered writes optimized for NVMe storage.
- */
+// Reorder dataset based on partition assignments and store to disk
+// Writes two files: reordered_dataset.npy (core partitions) and augmented_dataset.npy (secondary
+// partitions). Uses buffered writes optimized for NVMe storage.
 template <typename T, typename IdxT>
 void ace_reorder_and_store_dataset(
   raft::host_matrix_view<const T, int64_t, row_major> dataset,
@@ -1308,9 +1279,7 @@ inline size_t ace_check_labeling_memory(raft::resources const& res,
   return batch;
 }
 
-/**
- * Check if disk mode should be used for ACE based on memory constraints
- */
+// Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
 bool ace_check_use_disk_mode(raft::resources const& res,
                              bool use_disk,
@@ -1400,11 +1369,6 @@ bool ace_check_use_disk_mode(raft::resources const& res,
 
   mem.labeling_batch_size = ace_check_labeling_memory(
     res, dataset_size, dataset_dim, n_partitions, target_alpha, sizeof(IdxT), mem);
-  const size_t labeling_gpu_required =
-    ace_labeling_gpu_bytes(
-      dataset_size, dataset_dim, n_partitions, target_alpha, mem.labeling_batch_size) +
-    extra_gpu_workspace_size;
-  gpu_memory_required = std::max(gpu_memory_required, labeling_gpu_required);
 
   bool gpu_memory_limited = mem.available_gpu_memory < gpu_memory_required;
 
@@ -1458,9 +1422,7 @@ inline void ace_validate_partition_count(size_t n_partitions,
                  : "ACE: number of partitions cannot exceed dataset size");
 }
 
-/**
- * Validate and adjust partitions for disk mode memory requirements
- */
+// Validate and adjust partitions for disk mode memory requirements
 template <typename T, typename IdxT>
 void ace_validate_disk_mode_partitions(raft::resources const& res,
                                        size_t& n_partitions,

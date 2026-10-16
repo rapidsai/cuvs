@@ -204,29 +204,16 @@ TEST(AceBudget, ZeroAndMaximumBudgets)
   }
 }
 
-TEST(AceBudget, LabelingMemoryIncludesConcurrentBuffers)
-{
-  constexpr size_t rows       = 1'000'000;
-  constexpr size_t partitions = 8192;
-  constexpr size_t dim        = 128;
-  constexpr size_t expected =
-    sizeof(float) * ((819'200ULL + partitions) * dim + 32768ULL * (dim + partitions));
-  EXPECT_EQ(ace_labeling_gpu_bytes(rows, dim, partitions, 1.0), expected);
-  EXPECT_GT(expected, 1ULL << 30);
-  EXPECT_GT(ace_labeling_gpu_bytes(rows, dim, partitions * 2, 0.0),
-            ace_labeling_gpu_bytes(rows, dim, partitions, 0.0));
-  EXPECT_EQ(ace_labeling_sample_count(1000, 20), 1000);
-}
-
 TEST(AceBudget, LabelingBatchRespectsHostAndGpuBudgetsAbove8192Partitions)
 {
   constexpr size_t rows = 2'000'000, partitions = 16384, dim = 128;
   constexpr size_t samples    = 1'638'400;
   constexpr size_t gpu_fixed  = sizeof(float) * (samples + partitions) * dim;
   constexpr size_t pairs      = sizeof(float) * partitions * partitions;
-  constexpr size_t host_fixed = sizeof(float) * (samples * dim + 6 * samples) + pairs;
+  constexpr size_t host_fixed = sizeof(float) * (samples * dim + 3 * samples) + pairs;
   constexpr size_t per_row    = sizeof(float) * (dim + partitions);
   constexpr size_t ample      = 8ULL << 30;
+  EXPECT_EQ(ace_labeling_sample_count(1000, 20), 1000);
   EXPECT_EQ(ace_labeling_batch_size(rows, dim, partitions, 1.0, ample, ample), 32768);
   // This GPU budget fits the pair matrix but only 20000 assignment rows.
   EXPECT_EQ(ace_labeling_batch_size(rows, dim, partitions, 1.0, gpu_fixed + 20000 * per_row, ample),
@@ -236,17 +223,14 @@ TEST(AceBudget, LabelingBatchRespectsHostAndGpuBudgetsAbove8192Partitions)
   EXPECT_EQ(ace_labeling_batch_size(rows, dim, partitions, 1.0, ample, host_fixed + per_row - 1),
             0);
   EXPECT_EQ(ace_labeling_batch_size(rows, dim, partitions, 1.0, gpu_fixed + pairs - 1, ample), 0);
-  EXPECT_EQ(ace_labeling_gpu_bytes(rows, dim, partitions, 1.0, 20000), gpu_fixed + 20000 * per_row);
   // Core-only builds need no pair matrix or score vectors.
   EXPECT_GT(ace_labeling_batch_size(rows, dim, partitions, 0.0, gpu_fixed + pairs - 1, ample), 0);
   EXPECT_EQ(ace_labeling_batch_size(10, dim, 2, 1.0, ample, ample), 10);
   EXPECT_EQ(ace_labeling_batch_size(rows, dim, partitions, 1.0, 0, ample), 0);
 }
 
-TEST(AceBudget, LabelingMemorySaturatesInsteadOfWrapping)
+TEST(AceBudget, LabelingMemoryRejectsImpossibleDimensions)
 {
-  EXPECT_EQ(ace_labeling_gpu_bytes(1'000'000, std::numeric_limits<size_t>::max(), 8192, 1.0),
-            std::numeric_limits<size_t>::max());
   EXPECT_EQ(ace_labeling_batch_size(1'000'000,
                                     std::numeric_limits<size_t>::max(),
                                     16384,
