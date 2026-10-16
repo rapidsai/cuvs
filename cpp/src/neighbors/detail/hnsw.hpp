@@ -792,6 +792,21 @@ inline auto metric_name(cuvs::distance::DistanceType metric) -> const char*
   }
 }
 
+inline auto make_layered_hnsw_descriptors(const layered_hnsw_file_metadata& metadata)
+  -> std::vector<layered_hnsw_layer_descriptor>
+{
+  std::vector<layered_hnsw_layer_descriptor> layer_descriptors(metadata.layers.size());
+  for (size_t i = 0; i < metadata.layers.size(); ++i) {
+    const auto& layer    = metadata.layers[i];
+    layer_descriptors[i] = {static_cast<uint64_t>(layer.level),
+                            static_cast<uint64_t>(layer.row_count),
+                            static_cast<uint64_t>(layer.degree),
+                            static_cast<uint64_t>(layer.node_offset),
+                            static_cast<uint64_t>(layer.link_offset)};
+  }
+  return layer_descriptors;
+}
+
 template <typename T>
 auto make_layered_hnsw_header(const layered_hnsw_file_metadata& metadata,
                               cuvs::distance::DistanceType metric) -> layered_hnsw_file_header
@@ -1300,16 +1315,8 @@ auto build_and_serialize_layered_hnsw(
   metadata.upper_nodes_bytes = metadata.upper_nodes_count * sizeof(IdxT);
   metadata.upper_links_bytes = next_upper_link_offset * metadata.upper_link_row_bytes;
 
-  const auto header = make_layered_hnsw_header<T>(metadata, index_.metric());
-  std::vector<layered_hnsw_layer_descriptor> layer_descriptors(metadata.layers.size());
-  for (size_t i = 0; i < metadata.layers.size(); ++i) {
-    const auto& layer    = metadata.layers[i];
-    layer_descriptors[i] = {static_cast<uint64_t>(layer.level),
-                            static_cast<uint64_t>(layer.row_count),
-                            static_cast<uint64_t>(layer.degree),
-                            static_cast<uint64_t>(layer.node_offset),
-                            static_cast<uint64_t>(layer.link_offset)};
-  }
+  const auto header             = make_layered_hnsw_header<T>(metadata, index_.metric());
+  const auto layer_descriptors  = make_layered_hnsw_descriptors(metadata);
   const auto descriptors_offset = sizeof(layered_hnsw_file_header);
   const auto descriptors_bytes  = layer_descriptors.size() * sizeof(layered_hnsw_layer_descriptor);
 
@@ -2695,7 +2702,6 @@ void serialize_loaded_layered_hnsw(const index_impl<T>& idx, const std::string& 
     metadata.base_degree = std::max(
       metadata.base_degree, static_cast<size_t>(graph->getListCount(graph->get_linklist0(row))));
   }
-  std::vector<layered_hnsw_layer_descriptor> descriptors;
   for (int level = 1; level <= metadata.maxlevel; ++level) {
     const auto count  = static_cast<size_t>(std::count_if(
       levels.begin(), levels.end(), [level](uint8_t value) { return value >= level; }));
@@ -2705,17 +2711,13 @@ void serialize_loaded_layered_hnsw(const index_impl<T>& idx, const std::string& 
                                degree,
                                metadata.upper_nodes_count,
                                metadata.upper_nodes_count});
-    descriptors.push_back({static_cast<uint64_t>(level),
-                           count,
-                           degree,
-                           metadata.upper_nodes_count,
-                           metadata.upper_nodes_count});
     metadata.upper_nodes_count += count;
   }
   metadata.upper_nodes_bytes     = metadata.upper_nodes_count * sizeof(uint32_t);
   metadata.upper_links_bytes     = metadata.upper_nodes_count * metadata.upper_link_row_bytes;
   auto header                    = make_layered_hnsw_header<T>(metadata, idx.metric());
   header.construction_dtype      = static_cast<uint32_t>(idx.construction_dtype());
+  const auto descriptors         = make_layered_hnsw_descriptors(metadata);
   const size_t descriptors_bytes = descriptors.size() * sizeof(layered_hnsw_layer_descriptor);
   const size_t levels_offset = align_up(sizeof(header) + descriptors_bytes, layered_hnsw_alignment);
   const size_t base_nodes_offset  = levels_offset + metadata.levels_bytes;
