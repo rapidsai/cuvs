@@ -44,7 +44,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <utility>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
@@ -91,15 +90,9 @@ std::string write_local_dataset(raft::host_matrix_view<const T, int64_t> dataset
   return path;
 }
 
-template <typename T>
-struct quantized_pair {
-  raft::host_matrix<T, int64_t> dataset;
-  raft::host_matrix<T, int64_t> queries;
-};
-
-quantized_pair<int8_t> quantize_dataset(raft::device_resources const& dev_resources,
-                                        raft::host_matrix_view<const float, int64_t> dataset_float,
-                                        raft::host_matrix_view<const float, int64_t> queries_float)
+auto quantize_dataset(raft::device_resources const& dev_resources,
+                      raft::host_matrix_view<const float, int64_t> dataset_float)
+  -> raft::host_matrix<int8_t, int64_t>
 {
   std::cout << "  quantize_dataset: training scalar quantizer (float -> int8)" << std::endl;
   cuvs::preprocessing::quantize::scalar::params qp;
@@ -110,12 +103,7 @@ quantized_pair<int8_t> quantize_dataset(raft::device_resources const& dev_resour
   cuvs::preprocessing::quantize::scalar::transform(
     dev_resources, quantizer, dataset_float, dataset_i8.view());
 
-  auto queries_i8 =
-    raft::make_host_matrix<int8_t, int64_t>(queries_float.extent(0), queries_float.extent(1));
-  cuvs::preprocessing::quantize::scalar::transform(
-    dev_resources, quantizer, queries_float, queries_i8.view());
-
-  return {std::move(dataset_i8), std::move(queries_i8)};
+  return dataset_i8;
 }
 
 auto make_hnsw_ace_params(const std::string& build_dir) -> cuvs::neighbors::hnsw::index_params
@@ -161,7 +149,6 @@ auto hnsw_build(raft::device_resources const& dev_resources,
 
 // Materialize the layered artifact into a standard hnswlib index file on disk and time the
 // disk-to-disk materialization. Returns the path to the native hnswlib index file.
-template <typename T>
 auto hnsw_materialize(raft::device_resources const& dev_resources,
                       const cuvs::neighbors::hnsw::index_params& hnsw_params,
                       const std::string& artifact_path,
@@ -303,41 +290,24 @@ int main()
 
   std::filesystem::create_directories(kBuildDir);
 
-#if HNSW_ACE_LAYERED_USE_QUANTIZATION
-  auto q               = quantize_dataset(dev_resources, dataset_host_view, queries_host_view);
-  auto dataset_i8_view = raft::make_host_matrix_view<const int8_t, int64_t, raft::row_major>(
-    q.dataset.data_handle(), n_samples, n_dim);
   auto dataset_path =
     write_local_dataset(dataset_host_view, std::string{kBuildDir} + "/dataset.npy");
-  auto hnsw_params = make_hnsw_ace_params(kBuildDir);
-
+  auto hnsw_params                    = make_hnsw_ace_params(kBuildDir);
   const std::string native_index_path = std::string{kBuildDir} + "/hnsw_native.bin";
 
+#if HNSW_ACE_LAYERED_USE_QUANTIZATION
+  auto dataset_i8      = quantize_dataset(dev_resources, dataset_host_view);
+  auto dataset_i8_view = raft::make_host_matrix_view<const int8_t, int64_t, raft::row_major>(
+    dataset_i8.data_handle(), n_samples, n_dim);
   std::cout << "[stage 2] Build layered HNSW index with ACE" << std::endl;
   auto artifact_path = hnsw_build<int8_t>(dev_resources, hnsw_params, dataset_i8_view);
-
-  std::cout << "[stage 3] Materialize layered HNSW -> native hnswlib index" << std::endl;
-  hnsw_materialize<float>(
-    dev_resources, hnsw_params, artifact_path, dataset_path, n_dim, native_index_path);
-
-  std::cout << "[stage 4] Read materialized hnswlib index into memory" << std::endl;
-  auto hnsw_index =
-    hnsw_load_native<float>(dev_resources, native_index_path, hnsw_params.metric, n_dim);
-
-  std::cout << "[stage 5] Search HNSW index" << std::endl;
-  hnsw_search<float>(dev_resources, *hnsw_index, queries_host_view);
 #else
-  auto dataset_path =
-    write_local_dataset(dataset_host_view, std::string{kBuildDir} + "/dataset.npy");
-  auto hnsw_params = make_hnsw_ace_params(kBuildDir);
-
-  const std::string native_index_path = std::string{kBuildDir} + "/hnsw_native.bin";
-
   std::cout << "[stage 2] Build layered HNSW index with ACE" << std::endl;
   auto artifact_path = hnsw_build<float>(dev_resources, hnsw_params, dataset_host_view);
+#endif
 
   std::cout << "[stage 3] Materialize layered HNSW -> native hnswlib index" << std::endl;
-  hnsw_materialize<float>(
+  hnsw_materialize(
     dev_resources, hnsw_params, artifact_path, dataset_path, n_dim, native_index_path);
 
   std::cout << "[stage 4] Read materialized hnswlib index into memory" << std::endl;
@@ -346,7 +316,6 @@ int main()
 
   std::cout << "[stage 5] Search HNSW index" << std::endl;
   hnsw_search<float>(dev_resources, *hnsw_index, queries_host_view);
-#endif
 
   return 0;
 }
