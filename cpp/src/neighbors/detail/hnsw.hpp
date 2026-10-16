@@ -2595,8 +2595,7 @@ struct layered_artifact_view {
 // Enforces every structural invariant (magic, version, dtype, metric, dim, layer count, section
 // sizes, file length, and the levels max-level) BEFORE the caller allocates buffers sized from
 // these fields, so a corrupt/truncated/crafted header cannot drive an out-of-bounds read or write.
-template <typename T>
-auto read_and_validate_layered_artifact(
+inline auto read_and_validate_layered_artifact(
   const cuvs::util::file_descriptor& artifact_fd,
   const std::string& artifact_path,
   std::optional<int> expected_dim                             = std::nullopt,
@@ -2730,15 +2729,15 @@ auto deserialize_layered_hnswlib(raft::resources const& res,
   const auto total_start_time    = std::chrono::steady_clock::now();
   const auto metadata_start_time = std::chrono::steady_clock::now();
   cuvs::util::file_descriptor artifact_fd(artifact_path, O_RDONLY);
-  auto view                     = read_and_validate_layered_artifact<T>(artifact_fd, artifact_path);
-  auto& metadata                = view.metadata;
-  const auto dim                = static_cast<int>(metadata.dim);
-  const auto metric             = view.metric;
-  const auto artifact_size      = view.artifact_size;
-  const auto base_nodes_offset  = view.base_nodes_offset;
-  const auto base_links_offset  = view.base_links_offset;
-  const auto upper_nodes_offset = view.upper_nodes_offset;
-  const auto upper_links_offset = view.upper_links_offset;
+  auto view                      = read_and_validate_layered_artifact(artifact_fd, artifact_path);
+  auto& metadata                 = view.metadata;
+  const auto dim                 = static_cast<int>(metadata.dim);
+  const auto metric              = view.metric;
+  const auto artifact_size       = view.artifact_size;
+  const auto base_nodes_offset   = view.base_nodes_offset;
+  const auto base_links_offset   = view.base_links_offset;
+  const auto upper_nodes_offset  = view.upper_nodes_offset;
+  const auto upper_links_offset  = view.upper_links_offset;
   const auto metadata_elapsed_ms = elapsed_ms_since(metadata_start_time);
 
   RAFT_EXPECTS(!dataset_path.empty(), "Layered HNSW deserialization requires a dataset filename");
@@ -3055,29 +3054,22 @@ inline void validate_materialize_bucket_count(size_t num_buckets)
 // all disk access sequential.
 struct id_record_spiller {
   std::filesystem::path dir;
-  size_t rows_per_bucket;
   size_t num_buckets;
   size_t record_bytes;
   size_t buffer_cap;
   std::vector<cuvs::util::file_descriptor> fds;
   std::vector<size_t> offsets;
   std::vector<std::vector<char>> buffers;
-  // One mutex per bucket so distinct buckets can be appended concurrently (add() is called from
-  // parallel scatter threads); same-bucket appends serialize on their own mutex.
-  std::vector<std::mutex> bucket_mutexes;
 
   id_record_spiller(std::filesystem::path dir_,
                     size_t num_buckets_,
-                    size_t rows_per_bucket_,
                     size_t record_bytes_,
                     size_t total_buffer_budget)
     : dir(std::move(dir_)),
-      rows_per_bucket(rows_per_bucket_),
       num_buckets(num_buckets_),
       record_bytes(record_bytes_),
       offsets(num_buckets_, 0),
-      buffers(num_buckets_),
-      bucket_mutexes(num_buckets_)
+      buffers(num_buckets_)
   {
     std::filesystem::create_directories(dir);
     fds.reserve(num_buckets);
@@ -3116,7 +3108,6 @@ struct id_record_spiller {
 
   void add(size_t bucket, const void* record)
   {
-    std::lock_guard<std::mutex> guard(bucket_mutexes[bucket]);
     auto& buf = buffers[bucket];
     if (buf.size() + record_bytes > buffer_cap) { flush(bucket); }
     const auto* p = reinterpret_cast<const char*>(record);
@@ -3152,12 +3143,10 @@ struct id_record_spiller {
 };
 
 // Streams the base topology (base_nodes + base_links) in artifact (ACE) order, invoking
-// `cb(original_id, link_row_ptr)` for each row. When `parallel_threads > 1` the callback is invoked
-// concurrently and must be thread-safe for distinct IDs.
+// `cb(original_id, link_row_ptr)` sequentially for each row.
 template <typename IdxT, class F>
 void scatter_layered_base_links(const cuvs::util::file_descriptor& artifact_fd,
                                 const hnswlib_materialize_layout& layout,
-                                int parallel_threads,
                                 F&& cb)
 {
   const size_t n_rows = layout.n_rows;
@@ -3173,28 +3162,11 @@ void scatter_layered_base_links(const cuvs::util::file_descriptor& artifact_fd,
                                 layout.base_nodes_offset + s * sizeof(IdxT));
     cuvs::util::read_large_file(
       artifact_fd, link_buf.data(), cur * row, layout.base_links_offset + s * row);
-    bool invalid = false;
-    if (parallel_threads > 1) {
-#pragma omp parallel for num_threads(parallel_threads) reduction(|| : invalid)
-      for (int64_t k = 0; k < static_cast<int64_t>(cur); ++k) {
-        const size_t id = static_cast<size_t>(node_buf[k]);
-        if (id >= n_rows) {
-          invalid = true;
-          continue;
-        }
-        cb(id, link_buf.data() + static_cast<size_t>(k) * row);
-      }
-    } else {
-      for (size_t k = 0; k < cur; ++k) {
-        const size_t id = static_cast<size_t>(node_buf[k]);
-        if (id >= n_rows) {
-          invalid = true;
-          break;
-        }
-        cb(id, link_buf.data() + k * row);
-      }
+    for (size_t k = 0; k < cur; ++k) {
+      const size_t id = static_cast<size_t>(node_buf[k]);
+      RAFT_EXPECTS(id < n_rows, "Invalid base-layer node id in layered HNSW artifact");
+      cb(id, link_buf.data() + k * row);
     }
-    RAFT_EXPECTS(!invalid, "Invalid base-layer node id in layered HNSW artifact");
   }
 }
 
@@ -3313,7 +3285,7 @@ void materialize_hnswlib_base_region(const cuvs::util::file_descriptor& artifact
   // Single in-memory pass when the whole base topology fits the budget (no temporary files).
   if (budget_bytes >= metadata.base_links_bytes) {
     std::vector<char> ordered_base(metadata.base_links_bytes);
-    scatter_layered_base_links<IdxT>(artifact_fd, layout, 1, [&](size_t id, const char* link_row) {
+    scatter_layered_base_links<IdxT>(artifact_fd, layout, [&](size_t id, const char* link_row) {
       std::memcpy(ordered_base.data() + id * row, link_row, row);
       seen[id] = 1;
     });
@@ -3345,13 +3317,9 @@ void materialize_hnswlib_base_region(const cuvs::util::file_descriptor& artifact
     rows_per_bucket,
     to_gib(budget_bytes));
 
-  id_record_spiller spiller(
-    tmp_dir / "base", num_buckets, rows_per_bucket, record_bytes, budget_bytes / 2);
-  // The spiller's per-bucket mutexes make add() safe under the parallel scatter; each thread stages
-  // the record in its own (thread_local) buffer before the routed append.
-  scatter_layered_base_links<IdxT>(artifact_fd, layout, 1, [&](size_t id, const char* link_row) {
-    thread_local std::vector<char> rec;
-    rec.resize(record_bytes);
+  id_record_spiller spiller(tmp_dir / "base", num_buckets, record_bytes, budget_bytes / 2);
+  std::vector<char> rec(record_bytes);
+  scatter_layered_base_links<IdxT>(artifact_fd, layout, [&](size_t id, const char* link_row) {
     const IdxT id32 = static_cast<IdxT>(id);
     std::memcpy(rec.data(), &id32, sizeof(IdxT));
     std::memcpy(rec.data() + sizeof(IdxT), link_row, row);
@@ -3480,8 +3448,7 @@ inline void materialize_hnswlib_upper_region(const cuvs::util::file_descriptor& 
                 rows_per_bucket);
 
   const size_t record_bytes = 2 * sizeof(uint32_t) + urow;  // [id][level][row]
-  id_record_spiller spiller(
-    tmp_dir / "upper", num_buckets, rows_per_bucket, record_bytes, budget_half);
+  id_record_spiller spiller(tmp_dir / "upper", num_buckets, record_bytes, budget_half);
   std::vector<char> rec(record_bytes);
   scatter_layered_upper_links(artifact_fd,
                               layout,
@@ -3548,8 +3515,7 @@ void materialize_layered_to_hnswlib_on_disk(raft::resources const& res,
   // ---- Phase 0: read and validate the artifact header, descriptors and levels ----
   // Shared with the in-memory deserialize path so the format/offset arithmetic and every
   // size-invariant check live in one place; this also bounds the buffer allocations below.
-  auto view =
-    read_and_validate_layered_artifact<T>(artifact_fd, layered_artifact_path, dim, metric);
+  auto view = read_and_validate_layered_artifact(artifact_fd, layered_artifact_path, dim, metric);
   auto& metadata                = view.metadata;
   auto& levels_u8               = view.levels;
   const auto base_nodes_offset  = view.base_nodes_offset;
