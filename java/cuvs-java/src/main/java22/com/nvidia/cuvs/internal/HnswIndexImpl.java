@@ -327,8 +327,8 @@ public class HnswIndexImpl implements HnswIndex {
           paramsSeg, materializeParams.getMaxHostMemoryGb());
       cuvsHnswMaterializeParams.num_threads(paramsSeg, materializeParams.getNumThreads());
 
-      MemorySegment artifactSeg = buildMemorySegment(localArena, layeredArtifactPath);
-      MemorySegment outputSeg = buildMemorySegment(localArena, outputPath);
+      MemorySegment artifactSeg = localArena.allocateFrom(layeredArtifactPath);
+      MemorySegment outputSeg = localArena.allocateFrom(outputPath);
 
       try (var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
