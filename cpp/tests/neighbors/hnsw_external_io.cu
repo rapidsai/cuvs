@@ -72,12 +72,9 @@ TEST(HnswExternalPlan, BigannByteLedger)
   input.force_disk             = true;
   input.hierarchy              = true;
 
-  auto plan = cagra::detail::make_ace_external_plan(input);
-  auto materialized_host =
-    cagra::detail::estimate_materialized_cagra_ace_host_bytes(input, plan.partitions);
+  auto plan            = cagra::detail::make_ace_external_plan(input);
   constexpr double gib = static_cast<double>(uint64_t{1} << 30);
   EXPECT_TRUE(plan.use_disk);
-  EXPECT_GT(materialized_host, input.rows * input.graph_degree * sizeof(uint32_t));
   EXPECT_NEAR((plan.bytes.source_scan + plan.bytes.centroid_sample) / gib, 120.4, 0.2);
   EXPECT_NEAR((plan.bytes.stage_write + plan.bytes.stage_read) / gib, 506.6, 0.2);
   EXPECT_NEAR(plan.bytes.base_output / gib, 309.2, 0.2);
@@ -218,7 +215,7 @@ TEST(HnswExternalPlan, ReservesMinimumBuffersBeforeChoosingPartitions)
   EXPECT_LE(host_tight.host_peak_bytes, host_tight.host_budget_bytes);
 }
 
-TEST(HnswExternalPlan, SampleAndAssignmentRangesAreBoundedAndMonotonic)
+TEST(HnswExternalPlan, SampleRangesAreBoundedAndMonotonic)
 {
   auto sample = cagra::detail::make_external_sample_ranges(10'003, 1'001);
   ASSERT_LE(sample.size(), 16);
@@ -232,15 +229,6 @@ TEST(HnswExternalPlan, SampleAndAssignmentRangesAreBoundedAndMonotonic)
     previous_end = range.start + range.count;
   }
   EXPECT_EQ(sampled, 1'001);
-
-  auto scan        = cagra::detail::make_external_monotonic_ranges(10'003, 257);
-  uint64_t scanned = 0;
-  for (const auto& range : scan) {
-    EXPECT_EQ(range.start, scanned);
-    EXPECT_GT(range.count, 0);
-    scanned += range.count;
-  }
-  EXPECT_EQ(scanned, 10'003);
 
   auto single = cagra::detail::make_external_sample_ranges(100, 1);
   ASSERT_EQ(single.size(), 1);

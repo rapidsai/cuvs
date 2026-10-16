@@ -77,20 +77,6 @@ inline std::vector<external_row_range> make_external_sample_ranges(uint64_t rows
   return ranges;
 }
 
-inline std::vector<external_row_range> make_external_monotonic_ranges(uint64_t rows,
-                                                                      uint64_t chunk_rows)
-{
-  RAFT_EXPECTS(rows > 0 && chunk_rows > 0, "invalid external HNSW monotonic range request");
-  std::vector<external_row_range> ranges;
-  ranges.reserve(static_cast<size_t>(external_div_rounding_up(rows, chunk_rows)));
-  for (uint64_t start = 0; start < rows;) {
-    uint64_t count = std::min(chunk_rows, rows - start);
-    ranges.push_back({start, count});
-    start = external_checked_add(start, count, "external monotonic range");
-  }
-  return ranges;
-}
-
 struct ace_external_plan_input {
   uint64_t rows                    = 0;
   uint64_t dim                     = 0;
@@ -165,39 +151,6 @@ struct ace_external_plan {
   uint64_t device_per_occurrence        = 0;
   ace_external_byte_ledger bytes;
 };
-
-inline uint64_t estimate_materialized_cagra_ace_host_bytes(const ace_external_plan_input& in,
-                                                           uint64_t partitions)
-{
-  RAFT_EXPECTS(partitions > 0, "CAGRA-ACE host estimate requires at least one partition");
-  const uint64_t vector_bytes =
-    external_checked_mul(in.dim, in.element_size, "CAGRA-ACE vector row");
-  const uint64_t mapping_bytes = external_checked_mul(
-    in.rows,
-    external_checked_mul(4, in.index_size, "CAGRA-ACE labels and mappings row"),
-    "CAGRA-ACE labels and mappings");
-  const uint64_t full_graph_bytes = external_checked_mul(
-    in.rows,
-    external_checked_mul(in.graph_degree, in.index_size, "CAGRA-ACE final graph row"),
-    "CAGRA-ACE final graph");
-  const uint64_t max_occurrences = external_checked_mul(
-    6, external_div_rounding_up(in.rows, partitions), "CAGRA-ACE skewed partition rows");
-  const uint64_t partition_graph_bytes = external_checked_mul(
-    external_checked_add(in.intermediate_degree, in.graph_degree, "CAGRA-ACE combined degree"),
-    in.index_size,
-    "CAGRA-ACE partition graph row");
-  const uint64_t partition_bytes = external_checked_mul(
-    max_occurrences,
-    external_checked_add(
-      external_checked_add(vector_bytes, partition_graph_bytes, "CAGRA-ACE partition row"),
-      in.optimize_host_per_row,
-      "CAGRA-ACE partition row with optimization"),
-    "CAGRA-ACE maximum partition");
-  uint64_t total =
-    external_checked_add(mapping_bytes, full_graph_bytes, "CAGRA-ACE materialized graph");
-  total = external_checked_add(total, in.optimize_host_fixed, "CAGRA-ACE fixed workspace");
-  return external_checked_add(total, partition_bytes, "CAGRA-ACE materialized host bytes");
-}
 
 inline ace_external_byte_ledger make_external_byte_ledger(const ace_external_plan_input& in,
                                                           uint64_t centroid_sample_rows)
