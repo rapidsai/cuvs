@@ -174,6 +174,14 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_rabitq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_rabitq::build(handle, index_params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -198,6 +206,14 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_rabitq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_rabitq::build(handle, index_params, dataset);
+```
 
 **Parameters**
 
@@ -255,6 +271,17 @@ const std::string& filename,
 cuvs::neighbors::ivf_rabitq::index<int64_t>& index);
 ```
 
+```cpp
+#include <raft/core/resources.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = ivf_rabitq::build(...);`
+cuvs::neighbors::ivf_rabitq::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -276,6 +303,20 @@ Load index from file.
 void deserialize(raft::resources const& handle,
 const std::string& filename,
 cuvs::neighbors::ivf_rabitq::index<int64_t>* index);
+```
+
+```cpp
+#include <raft/core/resources.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+using IdxT = int64_t; // type of the index
+// create an empty index
+ivf_rabitq::index<IdxT> index(handle);
+
+cuvs::neighbors::ivf_rabitq::deserialize(handle, filename, &index);
 ```
 
 **Parameters**

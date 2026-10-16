@@ -271,6 +271,30 @@ cuvsCagraIndex_t cagra_index,
 cuvsHnswIndex_t hnsw_index);
 ```
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/hnsw.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// create a CAGRA index with `cuvsCagraBuild`
+
+// Convert the CAGRA index to an HNSW index
+cuvsHnswIndex_t hnsw_index;
+cuvsHnswIndexCreate(&hnsw_index);
+cuvsHnswIndexParams_t hnsw_params;
+cuvsHnswIndexParamsCreate(&hnsw_params);
+cuvsHnswFromCagra(res, hnsw_params, cagra_index, hnsw_index);
+
+// de-allocate `hnsw_params`, `hnsw_index` and `res`
+cuvsError_t hnsw_params_destroy_status = cuvsHnswIndexParamsDestroy(hnsw_params);
+cuvsError_t hnsw_index_destroy_status = cuvsHnswIndexDestroy(hnsw_index);
+cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -302,6 +326,37 @@ The graph is built on the GPU and converted to an HNSW index that can be searche
 
 NOTE: This function requires CUDA to be available at runtime.
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/hnsw.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsResourcesCreate(&res);
+
+// Create index parameters
+cuvsHnswIndexParams_t params;
+cuvsHnswIndexParamsCreate(&params);
+params->hierarchy = GPU;
+params->M = 32;
+params->ef_construction = 120;
+
+// Create HNSW index
+cuvsHnswIndex_t hnsw_index;
+cuvsHnswIndexCreate(&hnsw_index);
+
+// Assume dataset is a populated DLManagedTensor with host data
+DLManagedTensor dataset;
+
+// Build the index
+cuvsHnswBuild(res, params, &dataset, hnsw_index);
+
+// Clean up
+cuvsHnswIndexParamsDestroy(params);
+cuvsHnswIndexDestroy(hnsw_index);
+cuvsResourcesDestroy(res);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -327,6 +382,37 @@ cuvsError_t cuvsHnswExtend(cuvsResources_t res,
 cuvsHnswExtendParams_t params,
 DLManagedTensor* additional_dataset,
 cuvsHnswIndex_t index);
+```
+
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/hnsw.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// create an index with `cuvsCagraBuild`
+
+// Convert the CAGRA index to an HNSW index
+cuvsHnswIndex_t hnsw_index;
+cuvsHnswIndexCreate(&hnsw_index);
+cuvsHnswIndexParams_t hnsw_params;
+cuvsHnswIndexParamsCreate(&hnsw_params);
+cuvsHnswFromCagra(res, hnsw_params, cagra_index, hnsw_index);
+
+// Extend the HNSW index with additional vectors
+DLManagedTensor additional_dataset;
+cuvsHnswExtendParams_t extend_params;
+cuvsHnswExtendParamsCreate(&extend_params);
+cuvsHnswExtend(res, extend_params, additional_dataset, hnsw_index);
+
+// de-allocate `hnsw_params`, `hnsw_index`, `extend_params` and `res`
+cuvsError_t hnsw_params_destroy_status = cuvsHnswIndexParamsDestroy(hnsw_params);
+cuvsError_t hnsw_index_destroy_status = cuvsHnswIndexDestroy(hnsw_index);
+cuvsError_t extend_params_destroy_status = cuvsHnswExtendParamsDestroy(extend_params);
+cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
 ```
 
 **Parameters**
@@ -421,6 +507,32 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances);
 ```
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/hnsw.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// Assume a populated `DLManagedTensor` type here
+DLManagedTensor dataset;
+DLManagedTensor queries;
+DLManagedTensor neighbors;
+
+// Create default search params
+cuvsHnswSearchParams_t params;
+cuvsError_t params_create_status = cuvsHnswSearchParamsCreate(&params);
+
+// Search the `index` built using `cuvsHnswFromCagra`
+cuvsError_t search_status = cuvsHnswSearch(res, params, index, &queries, &neighbors,
+&distances);
+
+// de-allocate `params` and `res`
+cuvsError_t params_destroy_status = cuvsHnswSearchParamsDestroy(params);
+cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -445,6 +557,33 @@ Serialize a CAGRA index to a file as an hnswlib index NOTE: When hierarchy is `N
 
 ```c
 cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHnswIndex_t index);
+```
+
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/hnsw.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// create an index with `cuvsCagraBuild`
+
+// Convert the CAGRA index to an HNSW index
+cuvsHnswIndex_t hnsw_index;
+cuvsHnswIndexCreate(&hnsw_index);
+cuvsHnswIndexParams_t hnsw_params;
+cuvsHnswIndexParamsCreate(&hnsw_params);
+cuvsHnswFromCagra(res, hnsw_params, cagra_index, hnsw_index);
+
+// Serialize the HNSW index
+cuvsHnswSerialize(res, "/path/to/index", hnsw_index);
+
+// de-allocate `hnsw_params`, `hnsw_index` and `res`
+cuvsError_t hnsw_params_destroy_status = cuvsHnswIndexParamsDestroy(hnsw_params);
+cuvsError_t hnsw_index_destroy_status = cuvsHnswIndexDestroy(hnsw_index);
+cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
 ```
 
 **Parameters**
@@ -474,6 +613,29 @@ cuvsHnswIndex_t index);
 ```
 
 NOTE: When hierarchy is `NONE`, the loaded hnswlib index is immutable, and only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib. Experimental, both the API and the serialization format are subject to change.
+
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/hnsw.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// create an index with `cuvsCagraBuild`
+cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
+
+// Load the serialized CAGRA index from file as an hnswlib index
+// The index should have the same dtype as the one used to build CAGRA the index
+cuvsHnswIndex_t hnsw_index;
+cuvsHnswIndexCreate(&hnsw_index);
+cuvsHnsWIndexParams_t hnsw_params;
+cuvsHnswIndexParamsCreate(&hnsw_params);
+hnsw_params->hierarchy = NONE;
+hnsw_index->dtype = index->dtype;
+cuvsHnswDeserialize(res, hnsw_params, "/path/to/index", dim, metric hnsw_index);
+```
 
 **Parameters**
 

@@ -114,6 +114,32 @@ Runs ``params.n_init`` random restarts (unless `warm_start` is true) and keeps t
 
 When `warm_start` is true the incoming ``weights`` / ``means`` / ``covariances`` are used as the single initialization and ``params.n_init`` is ignored.
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/gmm.hpp>
+  ...
+  raft::resources handle;
+  cuvs::cluster::gmm::params params;
+  params.n_components = 3;
+
+  int64_t K = params.n_components, d = X.extent(1);
+  auto weights = raft::make_device_vector<float, int64_t>(handle, K);
+  auto means   = raft::make_device_matrix<float, int64_t>(handle, K, d);
+  auto covs    = raft::make_device_vector<float, int64_t>(handle, K * d * d);
+  auto pchol   = raft::make_device_vector<float, int64_t>(handle, K * d * d);
+  auto precs   = raft::make_device_vector<float, int64_t>(handle, K * d * d);
+  auto labels  = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+  float lower_bound;
+  int n_iter;
+  bool converged;
+
+  cuvs::cluster::gmm::fit(handle, params, X, weights.view(), means.view(),
+                          covs.view(), pchol.view(), precs.view(), labels.view(),
+                          raft::make_host_scalar_view(&lower_bound),
+                          raft::make_host_scalar_view(&n_iter),
+                          raft::make_host_scalar_view(&converged));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |

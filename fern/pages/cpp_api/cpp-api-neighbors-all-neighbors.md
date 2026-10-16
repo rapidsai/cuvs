@@ -62,6 +62,15 @@ float alpha                                                                     
 
 Usage example:
 
+```cpp
+ using namespace cuvs::neighbors;
+ // use default index parameters
+ all_neighbors::all_neighbors_params params;
+ auto indices = raft::make_device_matrix<int64_t, int64_t>(handle, n_row, k);
+ auto distances = raft::make_device_matrix<float, int64_t>(handle, n_row, k);
+ all_neighbors::build(res, params, dataset, indices.view(), distances.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -95,6 +104,15 @@ float alpha                                                                     
 
 Usage example:
 
+```cpp
+ using namespace cuvs::neighbors;
+ all_neighbors::all_neighbors_params params;
+ params.n_clusters = 4;
+ auto indices   = raft::make_host_matrix<int64_t, int64_t>(n_row, k);
+ auto distances = raft::make_host_matrix<float, int64_t>(n_row, k);
+ all_neighbors::build(res, params, dataset, indices.view(), distances.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -127,6 +145,15 @@ float alpha                                                                     
 ```
 
 Usage example:
+
+```cpp
+ using namespace cuvs::neighbors;
+ // use default index parameters
+ all_neighbors::all_neighbors_params params;
+ auto indices = raft::make_device_matrix<int64_t, int64_t>(handle, n_row, k);
+ auto distances = raft::make_device_matrix<float, int64_t>(handle, n_row, k);
+ all_neighbors::build(res, params, dataset, indices.view(), distances.view());
+```
 
 **Parameters**
 

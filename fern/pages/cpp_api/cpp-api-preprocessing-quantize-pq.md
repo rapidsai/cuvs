@@ -120,6 +120,14 @@ The use of a pool memory resource is recommended for more consistent training pe
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+// Set the workspace memory resource to a pool with 2 GiB upper limit.
+raft::resource::set_workspace_to_pool_resource(handle, 2 * 1024 * 1024 * 1024ull);
+cuvs::preprocessing::quantize::pq::params params;
+auto quantizer = cuvs::preprocessing::quantize::pq::build(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -166,6 +174,18 @@ std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::null
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::pq::params params;
+auto quantizer = cuvs::preprocessing::quantize::pq::build(handle, params, dataset);
+auto quantized_dim = get_quantized_dim(quantizer.params_quantizer);
+auto quantized_dataset =
+  raft::make_device_matrix<uint8_t, int64_t>(handle, samples, quantized_dim);
+cuvs::preprocessing::quantize::pq::transform(handle, quantizer, dataset,
+  quantized_dataset.view());
+
+```
 
 **Parameters**
 
@@ -270,6 +290,16 @@ SrcT const& src)
 Accepts either a row-major mdspan with `value_type`, `extent`, `stride`, and `data_handle` (same pattern as `cuvs::neighbors::make_device_padded_dataset`), or any cuVS dense dataset / dataset view exposing `view`, `dim` and `stride`, in which case the logical `dim()` is quantized and the row padding is skipped. The rows may be device-accessible or host-resident. Device-accessible rows (device, managed or pinned) with tight row-major storage (logical stride equals dimension) are passed through to training as they are; a wider row pitch triggers a contiguous dense copy first. Host-resident rows are subsampled for training and encoded in bounded batches, so the dense dataset is never staged on the device in full; they must be tightly packed. Empty sources are rejected. The element type must be `float`, `half`, `int8_t` or `uint8_t`.
 
 Typical **CAGRA-Q** usage: compress the source rows, then build the graph directly from the VPQ dataset (the metric must be `L2Expanded`). Keep the `device_vpq_dataset` alive because the index holds a non-owning view of it.
+
+```cpp
+#include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/preprocessing/quantize/pq.hpp>
+
+// `padded` is a `device_padded_dataset_view<float, int64_t>` over the source rows.
+cuvs::neighbors::vpq_params vpq_params{};
+auto vpq = cuvs::preprocessing::quantize::pq::make_vpq_dataset(res, vpq_params, padded);
+auto idx = cuvs::neighbors::cagra::build(res, cagra_params, vpq.as_dataset_view());
+```
 
 **Parameters**
 

@@ -98,6 +98,12 @@ raft::device_matrix_view<const double, int64_t> dataset);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -121,6 +127,12 @@ raft::host_matrix_view<const double, int64_t> dataset);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+```
 
 **Parameters**
 
@@ -148,6 +160,17 @@ raft::device_matrix_view<uint8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(handle, samples,
+features);
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+raft::make_const_mdspan(dataset.view()));
+cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -174,6 +197,17 @@ raft::host_matrix_view<uint8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle, samples,
+features);
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+raft::make_const_mdspan(dataset.view()));
+cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -199,6 +233,12 @@ raft::device_matrix_view<const float, int64_t> dataset);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -222,6 +262,12 @@ raft::host_matrix_view<const float, int64_t> dataset);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+```
 
 **Parameters**
 
@@ -247,6 +293,19 @@ raft::device_matrix_view<uint8_t, int64_t> out);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+raft::device_matrix<float, uint64_t> dataset = read_dataset(filename);
+int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
+auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(
+   handle, dataset.extent(0), quantized_dim);
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+raft::make_const_mdspan(dataset.view()));
+cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
+```
 
 **Parameters**
 
@@ -274,6 +333,19 @@ raft::host_matrix_view<uint8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+raft::host_matrix<float, uint64_t> dataset = read_dataset(filename);
+int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
+auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(
+   handle, params, dataset.extent(0), quantized_dim);
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+raft::make_const_mdspan(dataset.view()));
+cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -299,6 +371,12 @@ raft::device_matrix_view<const half, int64_t> dataset);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -322,6 +400,12 @@ raft::host_matrix_view<const half, int64_t> dataset);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+```
 
 **Parameters**
 
@@ -348,6 +432,19 @@ raft::device_matrix_view<uint8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+raft::device_matrix<half, uint64_t> dataset = read_dataset(filename);
+int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
+auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(
+   handle, params, dataset.extent(0), quantized_dim);
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+raft::make_const_mdspan(dataset.view()));
+cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -373,6 +470,19 @@ raft::host_matrix_view<uint8_t, int64_t> out);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::binary::params params;
+raft::host_matrix<half, uint64_t> dataset = read_dataset(filename);
+int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
+auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(
+   handle, params, dataset.extent(0), quantized_dim);
+auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+raft::make_const_mdspan(dataset.view()));
+cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
+```
 
 **Parameters**
 

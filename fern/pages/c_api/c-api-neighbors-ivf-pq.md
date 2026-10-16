@@ -568,6 +568,34 @@ DLManagedTensor* dataset,
 cuvsIvfPqIndex_t index);
 ```
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/ivf_pq.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// Assume a populated `DLManagedTensor` type here
+DLManagedTensor dataset;
+
+// Create default index params
+cuvsIvfPqIndexParams_t index_params;
+cuvsError_t params_create_status = cuvsIvfPqIndexParamsCreate(&index_params);
+
+// Create IVF-PQ index
+cuvsIvfPqIndex_t index;
+cuvsError_t index_create_status = cuvsIvfPqIndexCreate(&index);
+
+// Build the IVF-PQ Index
+cuvsError_t build_status = cuvsIvfPqBuild(res, index_params, &dataset, index);
+
+// de-allocate `index_params`, `index` and `res`
+cuvsError_t params_destroy_status = cuvsIvfPqIndexParamsDestroy(index_params);
+cuvsError_t index_destroy_status = cuvsIvfPqIndexDestroy(index);
+cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -642,6 +670,32 @@ DLManagedTensor* neighbors,
 DLManagedTensor* distances);
 ```
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/ivf_pq.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// Assume a populated `DLManagedTensor` type here
+DLManagedTensor dataset;
+DLManagedTensor queries;
+DLManagedTensor neighbors;
+
+// Create default search params
+cuvsIvfPqSearchParams_t search_params;
+cuvsError_t params_create_status = cuvsIvfPqSearchParamsCreate(&search_params);
+
+// Search the `index` built using `cuvsIvfPqBuild`
+cuvsError_t search_status = cuvsIvfPqSearch(res, search_params, index, &queries, &neighbors,
+&distances);
+
+// de-allocate `search_params` and `res`
+cuvsError_t params_destroy_status = cuvsIvfPqSearchParamsDestroy(search_params);
+cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -669,6 +723,17 @@ cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res, const char* filename, cuvsIv
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <cuvs/neighbors/ivf_pq.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// create an index with `cuvsIvfPqBuild`
+cuvsIvfPqSerialize(res, "/path/to/index", index, true);
+```
 
 **Parameters**
 

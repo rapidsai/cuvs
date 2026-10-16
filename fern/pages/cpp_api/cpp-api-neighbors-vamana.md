@@ -344,6 +344,16 @@ The following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters;
+  vamana::index_params index_params;
+  // create and fill index from a [N, D] dataset;
+  auto index = vamana::build(res, index_params, dataset);
+  // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+search) vamana::serialize(res, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -374,6 +384,16 @@ The following distance metrics are supported:
 - L2
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters;
+  vamana::index_params index_params;
+  // create and fill index from a [N, D] dataset;
+  auto index = vamana::build(res, index_params, dataset);
+  // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+search) vamana::serialize(res, filename, index);
+```
 
 **Parameters**
 
@@ -406,6 +426,16 @@ The following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters;
+  vamana::index_params index_params;
+  // create and fill index from a [N, D] dataset;
+  auto index = vamana::build(res, index_params, dataset);
+  // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+search) vamana::serialize(res, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -436,6 +466,16 @@ The following distance metrics are supported:
 - L2
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters;
+  vamana::index_params index_params;
+  // create and fill index from a [N, D] dataset;
+  auto index = vamana::build(res, index_params, dataset);
+  // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+search) vamana::serialize(res, filename, index);
+```
 
 **Parameters**
 
@@ -468,6 +508,16 @@ The following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters;
+  vamana::index_params index_params;
+  // create and fill index from a [N, D] dataset;
+  auto index = vamana::build(res, index_params, dataset);
+  // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+search) vamana::serialize(res, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -499,6 +549,16 @@ The following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters;
+  vamana::index_params index_params;
+  // create and fill index from a [N, D] dataset;
+  auto index = vamana::build(res, index_params, dataset);
+  // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+search) vamana::serialize(res, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -528,6 +588,18 @@ bool sector_aligned  = false);
 
 Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/neighbors/vamana.hpp>
+
+  raft::resources handle;
+
+  // create a string with a filepath
+  std::string file_prefix("/path/to/index/prefix");
+  // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+  cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -555,6 +627,18 @@ bool sector_aligned  = false);
 ```
 
 Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/neighbors/vamana.hpp>
+
+  raft::resources handle;
+
+  // create a string with a filepath
+  std::string file_prefix("/path/to/index/prefix");
+  // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+  cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+```
 
 **Parameters**
 
@@ -584,6 +668,18 @@ bool sector_aligned  = false);
 
 Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/neighbors/vamana.hpp>
+
+  raft::resources handle;
+
+  // create a string with a filepath
+  std::string file_prefix("/path/to/index/prefix");
+  // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+  cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -611,6 +707,17 @@ auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)
 ```
 
 Expects pq pivots file at "$\{codebook_prefix\}_pq_pivots.bin" and rotation matrix file at "$\{codebook_prefix\}_pq_pivots.bin_rotation_matrix.bin".
+
+```cpp
+  #include <cuvs/neighbors/vamana.hpp>
+
+  // create a string with a filepath
+  std::string codebook_prefix("/path/to/index/prefix");
+  // define dimension of vectors in dataset
+  int dim = 64;
+  // construct codebook parameters from input codebook files
+  auto codebooks = cuvs::neighbors::vamana::deserialize_codebooks(codebook_prefix, dim);
+```
 
 **Parameters**
 

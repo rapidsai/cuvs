@@ -138,6 +138,14 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_sq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_sq::build(handle, index_params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -162,6 +170,14 @@ raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_sq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_sq::build(handle, index_params, dataset);
+```
 
 **Parameters**
 
@@ -188,6 +204,14 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_sq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_sq::build(handle, index_params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -212,6 +236,14 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_sq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_sq::build(handle, index_params, dataset);
+```
 
 **Parameters**
 
@@ -241,6 +273,17 @@ cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_sq::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_sq::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+  ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -266,6 +309,17 @@ cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_sq::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_sq::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+  ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+```
 
 **Parameters**
 
@@ -293,6 +347,17 @@ cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_sq::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_sq::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+  ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -318,6 +383,17 @@ cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_sq::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_sq::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+  ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+```
 
 **Parameters**
 
@@ -347,6 +423,18 @@ const cuvs::neighbors::ivf_sq::index<uint8_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_sq.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = ivf_sq::build(...);`
+cuvs::neighbors::ivf_sq::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -371,6 +459,18 @@ cuvs::neighbors::ivf_sq::index<uint8_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_sq.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an empty index with `ivf_sq::index<uint8_t> index(handle);`
+cuvs::neighbors::ivf_sq::deserialize(handle, filename, &index);
+```
 
 **Parameters**
 

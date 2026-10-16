@@ -145,6 +145,14 @@ Returns default CAGRA `index_params` with `graph_build_params` selected by `grap
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+  auto cagra_params = cagra::index_params::from_dataset(dataset.extents());
+  auto cagra_index = cagra::build(res, cagra_params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -177,6 +185,15 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce exactly the same recalls and QPS for the same parameter `ef`. The graphs are different internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve may be shifted along the curve right or left. See the heuristics descriptions for more details.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+  auto cagra_params = cagra::index_params::from_hnsw_params(dataset.extents(), M, efc);
+  auto cagra_index = cagra::build(res, cagra_params, dataset);
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+```
 
 **Parameters**
 
@@ -488,6 +505,22 @@ Stores a shallow copy of the dataset view. The index stores a **non-owning** vie
 Example — **non-owning** `make_device_padded_dataset_view` (wraps an existing device matrix; that matrix must outlive the index):
 
 Example — **owning** `make_device_padded_dataset` returns owning storage (`std::unique_ptr`). You must **keep that object alive** (e.g. hold the `unique_ptr` in a variable or member) for as long as the index uses the dataset; the index does not take ownership of the buffer.
+
+```cpp
+  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset = ...;
+  auto view = cuvs::neighbors::make_device_padded_dataset_view(res, dataset);
+  auto graph = raft::make_device_matrix_view<const uint32_t, int64_t>(...);
+  cuvs::neighbors::cagra::device_padded_index<float> idx(res, metric, view,
+                                                      raft::make_const_mdspan(graph));
+```
+
+```cpp
+  auto padded_owner = cuvs::neighbors::make_device_padded_dataset(res, dataset_mdspan);
+  auto view         = padded_owner->as_dataset_view();
+  cuvs::neighbors::cagra::device_padded_index<float> idx(res, metric, view,
+                                                      raft::make_const_mdspan(graph));
+  // `padded_owner` must outlive `idx` (do not let it go out of scope while `idx` is used).
+```
 
 **Parameters**
 
@@ -1228,6 +1261,17 @@ Note: `extend` does not concatenate datasets. The caller owns the final dataset 
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // Build `extended` = old || new on device, padded for CAGRA.
+  auto extended = make_device_padded_dataset(res, concatenated_view);
+  auto extended_view = extended->as_dataset_view();
+
+  cagra::extend_params params;
+  int64_t new_start_row = static_cast<int64_t>(index.size());
+  cagra::extend(res, params, extended_view, new_start_row, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1361,6 +1405,18 @@ bool include_dataset = true);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1389,6 +1445,19 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>* out_dat
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+
+cuvs::neighbors::cagra::device_padded_index<float> index;
+cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1414,6 +1483,18 @@ bool include_dataset = true);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, os, index);
+```
 
 **Parameters**
 
@@ -1442,6 +1523,18 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<float, int64_t>>* out_dat
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+cuvs::neighbors::cagra::device_padded_index<float> index;
+cuvs::neighbors::cagra::deserialize(handle, is, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1467,6 +1560,18 @@ bool include_dataset = true);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, filename, index);
+```
 
 **Parameters**
 
@@ -1494,6 +1599,19 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<half, int64_t>>* out_data
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+
+cuvs::neighbors::cagra::device_padded_index<half> index;
+cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+```
 
 **Parameters**
 
@@ -1521,6 +1639,18 @@ bool include_dataset = true);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1548,6 +1678,18 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<half, int64_t>>* out_data
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+cuvs::neighbors::cagra::device_padded_index<half> index;
+cuvs::neighbors::cagra::deserialize(handle, is, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1573,6 +1715,18 @@ bool include_dataset = true);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, filename, index);
+```
 
 **Parameters**
 
@@ -1600,6 +1754,19 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<int8_t, int64_t>>* out_da
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+
+cuvs::neighbors::cagra::device_padded_index<int8_t> index;
+cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+```
 
 **Parameters**
 
@@ -1627,6 +1794,18 @@ bool include_dataset = true);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1654,6 +1833,18 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<int8_t, int64_t>>* out_da
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+cuvs::neighbors::cagra::device_padded_index<int8_t> index;
+cuvs::neighbors::cagra::deserialize(handle, is, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1679,6 +1870,18 @@ bool include_dataset = true);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, filename, index);
+```
 
 **Parameters**
 
@@ -1707,6 +1910,19 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<uint8_t, int64_t>>* out_d
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+
+cuvs::neighbors::cagra::device_padded_index<uint8_t> index;
+cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1732,6 +1948,18 @@ bool include_dataset = true);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize(handle, os, index);
+```
 
 **Parameters**
 
@@ -1759,6 +1987,18 @@ std::unique_ptr<cuvs::neighbors::device_padded_dataset<uint8_t, int64_t>>* out_d
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+cuvs::neighbors::cagra::device_padded_index<uint8_t> index;
+cuvs::neighbors::cagra::deserialize(handle, is, &index);
+```
 
 **Parameters**
 
@@ -2327,6 +2567,18 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2357,6 +2609,18 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2387,6 +2651,18 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2417,6 +2693,18 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2447,6 +2735,18 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2476,6 +2776,18 @@ std::nullopt);
 NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+```
 
 **Parameters**
 
@@ -2507,6 +2819,18 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2536,6 +2860,18 @@ std::nullopt);
 NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+```
 
 **Parameters**
 

@@ -49,6 +49,30 @@ raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
 raft::device_vector_view<int, int> labels);
 ```
 
+```cpp
+#include <cuvs/cluster/spectral.hpp>
+#include <cuvs/preprocessing/spectral_embedding.hpp>
+
+raft::resources handle;
+
+// Create connectivity graph from data
+auto graph = raft::make_device_coo_matrix<float>(handle, n_samples, n_samples);
+cuvs::preprocessing::spectral_embedding::params embed_params;
+embed_params.n_neighbors = 15;
+cuvs::preprocessing::spectral_embedding::helpers::create_connectivity_graph(
+    handle, embed_params, X.view(), graph);
+
+// Configure and run spectral clustering
+cuvs::cluster::spectral::params params;
+params.n_clusters = 5;
+params.n_components = 5;
+params.n_neighbors = 15;
+params.n_init = 10;
+
+auto labels = raft::make_device_vector<int>(handle, n_samples);
+cuvs::cluster::spectral::fit_predict(handle, params, graph.view(), labels.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -71,6 +95,30 @@ void fit_predict(raft::resources const& handle,
 params config,
 raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
 raft::device_vector_view<int, int> labels);
+```
+
+```cpp
+#include <cuvs/cluster/spectral.hpp>
+#include <cuvs/preprocessing/spectral_embedding.hpp>
+
+raft::resources handle;
+
+// Create connectivity graph from data
+auto graph = raft::make_device_coo_matrix<double>(handle, n_samples, n_samples);
+cuvs::preprocessing::spectral_embedding::params embed_params;
+embed_params.n_neighbors = 15;
+cuvs::preprocessing::spectral_embedding::helpers::create_connectivity_graph(
+    handle, embed_params, X_double.view(), graph);
+
+// Configure and run spectral clustering
+cuvs::cluster::spectral::params params;
+params.n_clusters = 5;
+params.n_components = 5;
+params.n_neighbors = 15;
+params.n_init = 10;
+
+auto labels = raft::make_device_vector<int>(handle, n_samples);
+cuvs::cluster::spectral::fit_predict(handle, params, graph.view(), labels.view());
 ```
 
 **Parameters**
@@ -98,6 +146,22 @@ raft::device_vector_view<int, int> labels);
 ```
 
 This overload automatically constructs the connectivity graph from the input dataset using k-nearest neighbors.
+
+```cpp
+#include <cuvs/cluster/spectral.hpp>
+
+raft::resources handle;
+
+// Configure spectral clustering
+cuvs::cluster::spectral::params params;
+params.n_clusters = 5;
+params.n_components = 5;
+params.n_neighbors = 15;
+params.n_init = 10;
+
+auto labels = raft::make_device_vector<int>(handle, n_samples);
+cuvs::cluster::spectral::fit_predict(handle, params, X.view(), labels.view());
+```
 
 **Parameters**
 

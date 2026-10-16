@@ -331,6 +331,14 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -362,6 +370,15 @@ NB: Currently, the following distance metrics are supported:
 - CosineExpanded
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -396,6 +413,14 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -427,6 +452,15 @@ NB: Currently, the following distance metrics are supported:
 - CosineExpanded
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -461,6 +495,14 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -492,6 +534,15 @@ NB: Currently, the following distance metrics are supported:
 - CosineExpanded
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -526,6 +577,14 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -557,6 +616,15 @@ NB: Currently, the following distance metrics are supported:
 - CosineExpanded
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -593,6 +661,17 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -626,6 +705,18 @@ NB: Currently, the following distance metrics are supported:
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -662,6 +753,17 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -695,6 +797,18 @@ NB: Currently, the following distance metrics are supported:
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -731,6 +845,17 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -764,6 +889,18 @@ NB: Currently, the following distance metrics are supported:
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
 
 **Parameters**
 
@@ -800,6 +937,17 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_flat::build(handle, dataset, index_params);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -834,6 +982,18 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // create and fill the index from a [N, D] dataset
+  ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+  ivf_flat::build(handle, dataset, index_params, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -866,6 +1026,18 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -891,6 +1063,18 @@ cuvs::neighbors::ivf_flat::index<float, int64_t>* idx);
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -921,6 +1105,18 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -946,6 +1142,18 @@ cuvs::neighbors::ivf_flat::index<half, int64_t>* idx);
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -976,6 +1184,18 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1003,6 +1223,18 @@ cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* idx);
 Usage example:
 
 If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`.
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -1033,6 +1265,18 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1058,6 +1302,18 @@ cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // fill the index with the data
+  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -1090,6 +1346,21 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1117,6 +1388,21 @@ cuvs::neighbors::ivf_flat::index<float, int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -1149,6 +1435,21 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1176,6 +1477,21 @@ cuvs::neighbors::ivf_flat::index<half, int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -1208,6 +1524,21 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1235,6 +1566,21 @@ cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -1267,6 +1613,21 @@ Implementation note: The new data is clustered according to existing kmeans clus
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1294,6 +1655,21 @@ cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  ivf_flat::index_params index_params;
+  index_params.add_data_on_build = false;      // don't populate index on build
+  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+  // train the index from a [N, D] dataset
+  auto index_empty = ivf_flat::build(handle, index_params, dataset);
+  // optional: create a stream pool with at least one stream to enable kernel and copy
+  // overlapping
+  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+  // fill the index with the data
+  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+  ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+```
 
 **Parameters**
 
@@ -1323,6 +1699,18 @@ const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1348,6 +1736,20 @@ cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+using T    = float; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1371,6 +1773,18 @@ const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, os, index);
+```
 
 **Parameters**
 
@@ -1396,6 +1810,20 @@ cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+using T    = float; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1420,6 +1848,18 @@ const cuvs::neighbors::ivf_flat::index<half, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1443,6 +1883,20 @@ cuvs::neighbors::ivf_flat::index<half, int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+using T    = half; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
+```
 
 **Parameters**
 
@@ -1468,6 +1922,18 @@ const cuvs::neighbors::ivf_flat::index<half, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1491,6 +1957,20 @@ cuvs::neighbors::ivf_flat::index<half, int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+using T    = half; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
+```
 
 **Parameters**
 
@@ -1516,6 +1996,18 @@ const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1539,6 +2031,20 @@ cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+using T    = float; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
+```
 
 **Parameters**
 
@@ -1564,6 +2070,18 @@ const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1587,6 +2105,20 @@ cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+using T    = float; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
+```
 
 **Parameters**
 
@@ -1612,6 +2144,18 @@ const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1635,6 +2179,20 @@ cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create a string with a filepath
+std::string filename("/path/to/index");
+using T    = float; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
+```
 
 **Parameters**
 
@@ -1660,6 +2218,18 @@ const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
 Experimental, both the API and the serialization format are subject to change.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an output stream
+std::ostream os(std::cout.rdbuf());
+// create an index with `auto index = ivf_flat::build(...);`
+cuvs::neighbors::ivf_flat::serialize(handle, os, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1683,6 +2253,20 @@ cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
+
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+raft::resources handle;
+
+// create an input stream
+std::istream is(std::cin.rdbuf());
+using T    = float; // data element type
+using IdxT = int64_t; // type of the index
+// create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
+cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
+```
 
 **Parameters**
 
@@ -1717,6 +2301,16 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ve
 
 Usage example:
 
+```cpp
+  auto list_data  = index.lists()[label]->data.view();
+  // allocate the buffer for the input codes
+  auto codes = raft::make_device_matrix<float>(res, n_vec, index.dim());
+  ... prepare n_vecs to pack into the list in codes ...
+  // write codes into the list starting from the 42nd position
+  ivf_flat::helpers::codepacker::pack(
+      res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1748,6 +2342,16 @@ raft::row_major> list_data);
 NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
 
 Usage example:
+
+```cpp
+  auto list_data  = index.lists()[label]->data.view();
+  // allocate the buffer for the input codes
+  auto codes = raft::make_device_matrix<half>(res, n_vec, index.dim());
+  ... prepare n_vecs to pack into the list in codes ...
+  // write codes into the list starting from the 42nd position
+  ivf_flat::helpers::codepacker::pack(
+      res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
+```
 
 **Parameters**
 
@@ -1781,6 +2385,16 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ve
 
 Usage example:
 
+```cpp
+  auto list_data  = index.lists()[label]->data.view();
+  // allocate the buffer for the input codes
+  auto codes = raft::make_device_matrix<int8_t>(res, n_vec, index.dim());
+  ... prepare n_vecs to pack into the list in codes ...
+  // write codes into the list starting from the 42nd position
+  ivf_flat::helpers::codepacker::pack(
+      res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1813,6 +2427,16 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ve
 
 Usage example:
 
+```cpp
+  auto list_data  = index.lists()[label]->data.view();
+  // allocate the buffer for the input codes
+  auto codes = raft::make_device_matrix<uint8_t>(res, n_vec, index.dim());
+  ... prepare n_vecs to pack into the list in codes ...
+  // write codes into the list starting from the 42nd position
+  ivf_flat::helpers::codepacker::pack(
+      res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1844,6 +2468,16 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> codes);
 
 Usage example:
 
+```cpp
+  auto list_data = index.lists()[label]->data.view();
+  // allocate the buffer for the output
+  uint32_t n_take = 4;
+  auto codes = raft::make_device_matrix<float>(res, n_take, index.dim());
+  uint32_t offset = 0;
+  // unpack n_take elements from the list
+  ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1873,6 +2507,16 @@ raft::device_matrix_view<half, uint32_t, raft::row_major> codes);
 ```
 
 Usage example:
+
+```cpp
+  auto list_data = index.lists()[label]->data.view();
+  // allocate the buffer for the output
+  uint32_t n_take = 4;
+  auto codes = raft::make_device_matrix<half>(res, n_take, index.dim());
+  uint32_t offset = 0;
+  // unpack n_take elements from the list
+  ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+```
 
 **Parameters**
 
@@ -1904,6 +2548,16 @@ raft::device_matrix_view<int8_t, uint32_t, raft::row_major> codes);
 
 Usage example:
 
+```cpp
+  auto list_data = index.lists()[label]->data.view();
+  // allocate the buffer for the output
+  uint32_t n_take = 4;
+  auto codes = raft::make_device_matrix<int8_t>(res, n_take, index.dim());
+  uint32_t offset = 0;
+  // unpack n_take elements from the list
+  ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1933,6 +2587,16 @@ raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 ```
 
 Usage example:
+
+```cpp
+  auto list_data = index.lists()[label]->data.view();
+  // allocate the buffer for the output
+  uint32_t n_take = 4;
+  auto codes = raft::make_device_matrix<uint8_t>(res, n_take, index.dim());
+  uint32_t offset = 0;
+  // unpack n_take elements from the list
+  ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+```
 
 **Parameters**
 
@@ -2156,6 +2820,17 @@ void reset_index(const raft::resources& res, index<float, int64_t>* index);
 
 Usage example:
 
+```cpp
+  raft::resources res;
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<float, int64_t> index(res, index_params, D);
+  // reset the index's state and list sizes
+  ivf_flat::helpers::reset_index(res, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2176,6 +2851,17 @@ void reset_index(const raft::resources& res, index<half, int64_t>* index);
 ```
 
 Usage example:
+
+```cpp
+  raft::resources res;
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<half, int64_t> index(res, index_params, D);
+  // reset the index's state and list sizes
+  ivf_flat::helpers::reset_index(res, &index);
+```
 
 **Parameters**
 
@@ -2198,6 +2884,17 @@ void reset_index(const raft::resources& res, index<int8_t, int64_t>* index);
 
 Usage example:
 
+```cpp
+  raft::resources res;
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<int8_t, int64_t> index(res, index_params, D);
+  // reset the index's state and list sizes
+  ivf_flat::helpers::reset_index(res, &index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2218,6 +2915,17 @@ void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index);
 ```
 
 Usage example:
+
+```cpp
+  raft::resources res;
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+  // reset the index's state and list sizes
+  ivf_flat::helpers::reset_index(res, &index);
+```
 
 **Parameters**
 
@@ -2241,6 +2949,24 @@ void recompute_internal_state(const raft::resources& res, index<float, int64_t>*
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+  ivf_flat::helpers::reset_index(res, &index);
+  // resize the first IVF list to hold 5 records
+  auto spec = list_spec<uint32_t, float, int64_t>{
+    index.dim(), index.conservative_memory_allocation()};
+  uint32_t new_size = 5;
+  ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
+  raft::update_device(index.list_sizes(), &new_size, 1, stream);
+  // recompute the internal state of the index
+  ivf_flat::helpers::recompute_internal_state(res, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2261,6 +2987,24 @@ void recompute_internal_state(const raft::resources& res, index<half, int64_t>* 
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+  ivf_flat::helpers::reset_index(res, &index);
+  // resize the first IVF list to hold 5 records
+  auto spec = list_spec<uint32_t, half, int64_t>{
+    index.dim(), index.conservative_memory_allocation()};
+  uint32_t new_size = 5;
+  ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
+  raft::update_device(index.list_sizes(), &new_size, 1, stream);
+  // recompute the internal state of the index
+  ivf_flat::helpers::recompute_internal_state(res, index);
+```
 
 **Parameters**
 
@@ -2283,6 +3027,24 @@ void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+  ivf_flat::helpers::reset_index(res, &index);
+  // resize the first IVF list to hold 5 records
+  auto spec = list_spec<uint32_t, int8_t, int64_t>{
+    index.dim(), index.conservative_memory_allocation()};
+  uint32_t new_size = 5;
+  ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
+  raft::update_device(index.list_sizes(), &new_size, 1, stream);
+  // recompute the internal state of the index
+  ivf_flat::helpers::recompute_internal_state(res, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2303,6 +3065,24 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
 ```
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  // use default index parameters
+  ivf_flat::index_params index_params;
+  // initialize an empty index
+  ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+  ivf_flat::helpers::reset_index(res, &index);
+  // resize the first IVF list to hold 5 records
+  auto spec = list_spec<uint32_t, uint8_t, int64_t>{
+    index.dim(), index.conservative_memory_allocation()};
+  uint32_t new_size = 5;
+  ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
+  raft::update_device(index.list_sizes(), &new_size, 1, stream);
+  // recompute the internal state of the index
+  ivf_flat::helpers::recompute_internal_state(res, index);
+```
 
 **Parameters**
 

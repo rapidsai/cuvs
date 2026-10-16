@@ -24,6 +24,22 @@ float metric_arg);
 
 Usage example:
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/distance/pairwise_distance.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+
+// Assume a populated `DLManagedTensor` type here
+DLManagedTensor x;
+DLManagedTensor y;
+DLManagedTensor dist;
+
+cuvsPairwiseDistance(res, &x, &y, &dist, L2SqrtUnexpanded, 2.0);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |

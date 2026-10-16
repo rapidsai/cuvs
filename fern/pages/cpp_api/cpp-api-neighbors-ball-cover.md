@@ -51,6 +51,20 @@ void build(raft::resources const& handle, index<int64_t, float>& index);
 
 Usage example:
 
+```cpp
+
+ #include <raft/core/resources.hpp>
+ #include <cuvs/neighbors/ball_cover.hpp>
+ #include <cuvs/distance/distance.hpp>
+ using namespace cuvs::neighbors;
+
+ raft::resources handle;
+ ...
+ auto metric = cuvs::distance::DistanceType::L2Expanded;
+ ball_cover::index index(handle, X, metric);
+ ball_cover::build_index(handle, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |

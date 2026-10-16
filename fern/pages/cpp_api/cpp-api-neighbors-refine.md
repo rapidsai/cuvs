@@ -29,6 +29,22 @@ The k nearest neighbors and distances are returned.
 
 Example usage
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -64,6 +80,22 @@ Refinement is an operation that follows an approximate NN search. The approximat
 The k nearest neighbors and distances are returned.
 
 Example usage
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
 
 **Parameters**
 
@@ -101,6 +133,22 @@ The k nearest neighbors and distances are returned.
 
 Example usage
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -136,6 +184,22 @@ Refinement is an operation that follows an approximate NN search. The approximat
 The k nearest neighbors and distances are returned.
 
 Example usage
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
 
 **Parameters**
 
@@ -173,6 +237,22 @@ The k nearest neighbors and distances are returned.
 
 Example usage
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -208,6 +288,22 @@ Refinement is an operation that follows an approximate NN search. The approximat
 The k nearest neighbors and distances are returned.
 
 Example usage
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
 
 **Parameters**
 
@@ -245,6 +341,22 @@ The k nearest neighbors and distances are returned.
 
 Example usage
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -280,6 +392,22 @@ Refinement is an operation that follows an approximate NN search. The approximat
 The k nearest neighbors and distances are returned.
 
 Example usage
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
 
 **Parameters**
 
@@ -317,6 +445,22 @@ The k nearest neighbors and distances are returned.
 
 Example usage
 
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -352,6 +496,22 @@ Refinement is an operation that follows an approximate NN search. The approximat
 The k nearest neighbors and distances are returned.
 
 Example usage
+
+```cpp
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  ivf_pq::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = ivf_pq::build(handle, index_params, dataset);
+  // use default search parameters
+  ivf_pq::search_params search_params;
+  // search m = 4 * k nearest neighbours for each of the N queries
+  ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
+                 out_dists_tmp);
+  // refine it to the k nearest one
+  refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
+          index.metric());
+```
 
 **Parameters**
 

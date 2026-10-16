@@ -60,6 +60,12 @@ raft::device_matrix_view<const double, int64_t> dataset);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -83,6 +89,12 @@ raft::host_matrix_view<const double, int64_t> dataset);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
+```
 
 **Parameters**
 
@@ -110,6 +122,15 @@ raft::device_matrix_view<int8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train<double, int8_t>(handle, params,
+dataset); auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples,
+features); cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -135,6 +156,15 @@ raft::host_matrix_view<int8_t, int64_t> out);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train<double, int8_t>(handle, params,
+dataset); auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view());
+```
 
 **Parameters**
 
@@ -165,6 +195,15 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 Usage example:
 
+```cpp
+auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view()); auto dataset_revert = raft::make_device_matrix<double,
+int64_t>(handle, samples, features);
+cuvs::preprocessing::quantize::scalar::inverse_transform(handle, quantizer,
+dataset_revert.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -193,6 +232,14 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 Usage example:
 
+```cpp
+auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view()); auto dataset_revert = raft::make_host_matrix<double, int64_t>(samples,
+features); cuvs::preprocessing::quantize::scalar::inverse_transform(handle, quantizer,
+dataset_revert.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -218,6 +265,12 @@ raft::device_matrix_view<const float, int64_t> dataset);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -241,6 +294,12 @@ raft::host_matrix_view<const float, int64_t> dataset);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
+```
 
 **Parameters**
 
@@ -267,6 +326,15 @@ raft::device_matrix_view<int8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train<float, int8_t>(handle, params,
+dataset); auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples,
+features); cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -292,6 +360,15 @@ raft::host_matrix_view<int8_t, int64_t> out);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train<float, int8_t>(handle, params,
+dataset); auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view());
+```
 
 **Parameters**
 
@@ -321,6 +398,14 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 Usage example:
 
+```cpp
+auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view()); auto dataset_revert = raft::make_device_matrix<float, int64_t>(handle,
+samples, features); cuvs::preprocessing::quantize::scalar::inverse_transform(handle, quantizer,
+dataset_revert.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -349,6 +434,14 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 Usage example:
 
+```cpp
+auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view()); auto dataset_revert = raft::make_host_matrix<float, int64_t>(samples,
+features); cuvs::preprocessing::quantize::scalar::inverse_transform(handle, quantizer,
+dataset_revert.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -374,6 +467,12 @@ raft::device_matrix_view<const half, int64_t> dataset);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -397,6 +496,12 @@ raft::host_matrix_view<const half, int64_t> dataset);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
+```
 
 **Parameters**
 
@@ -423,6 +528,15 @@ raft::device_matrix_view<int8_t, int64_t> out);
 
 Usage example:
 
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train<half, int8_t>(handle, params,
+dataset); auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples,
+features); cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -448,6 +562,15 @@ raft::host_matrix_view<int8_t, int64_t> out);
 ```
 
 Usage example:
+
+```cpp
+raft::handle_t handle;
+cuvs::preprocessing::quantize::scalar::params params;
+auto quantizer = cuvs::preprocessing::quantize::scalar::train<half, int8_t>(handle, params,
+dataset); auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view());
+```
 
 **Parameters**
 
@@ -477,6 +600,14 @@ Note that depending on the chosen data types train dataset the conversion is not
 
 Usage example:
 
+```cpp
+auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view()); auto dataset_revert = raft::make_device_matrix<half, int64_t>(handle,
+samples, features); cuvs::preprocessing::quantize::scalar::inverse_transform(handle, quantizer,
+dataset_revert.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -504,6 +635,14 @@ raft::host_matrix_view<half, int64_t> out);
 Note that depending on the chosen data types train dataset the conversion is not lossless.
 
 Usage example:
+
+```cpp
+auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+cuvs::preprocessing::quantize::scalar::transform(handle, quantizer, dataset,
+quantized_dataset.view()); auto dataset_revert = raft::make_host_matrix<half, int64_t>(samples,
+features); cuvs::preprocessing::quantize::scalar::inverse_transform(handle, quantizer,
+dataset_revert.view());
+```
 
 **Parameters**
 

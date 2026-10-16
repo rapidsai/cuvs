@@ -97,6 +97,15 @@ The reference HNSW index and the corresponding from-CAGRA generated HNSW index w
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+  auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+  auto cagra_params = to_cagra_params(dataset.extents(), M, efc);
+  auto cagra_index = cagra::build(res, cagra_params, dataset);
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -230,6 +239,40 @@ NOTE: This function requires CUDA headers to be available at compile time.
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+
+  // Create index parameters with ACE configuration
+  hnsw::index_params params;
+  params.metric = cuvs::distance::DistanceType::L2Expanded;
+  params.hierarchy = hnsw::HnswHierarchy::GPU;
+  params.M = 32;
+  params.ef_construction = 120;
+
+  // Configure GPU graph building parameters
+  auto ace_params = hnsw::graph_build_params::ace_params();
+  ace_params.npartitions = 4;
+  ace_params.use_disk = true;
+  ace_params.build_dir = "/tmp/hnsw_ace_build";
+  params.graph_build_params = ace_params;
+
+  // Build the index
+  auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+  // ... fill dataset ...
+  auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+
+  // Search the index
+  hnsw::search_params search_params;
+  search_params.ef = 200;
+  auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+  hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+
+  // Serialize the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -260,6 +303,40 @@ The HNSW index construction parameters `M` and `ef_construction` are the main pa
 NOTE: This function requires CUDA headers to be available at compile time.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+
+  // Create index parameters with ACE configuration
+  hnsw::index_params params;
+  params.metric = cuvs::distance::DistanceType::L2Expanded;
+  params.hierarchy = hnsw::HnswHierarchy::GPU;
+  params.M = 32;
+  params.ef_construction = 120;
+
+  // Configure GPU graph building parameters
+  auto ace_params = hnsw::graph_build_params::ace_params();
+  ace_params.npartitions = 4;
+  ace_params.use_disk = true;
+  ace_params.build_dir = "/tmp/hnsw_ace_build";
+  params.graph_build_params = ace_params;
+
+  // Build the index
+  auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+  // ... fill dataset ...
+  auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+
+  // Search the index
+  hnsw::search_params search_params;
+  search_params.ef = 200;
+  auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+  hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+
+  // Serialize the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
 
 **Parameters**
 
@@ -292,6 +369,40 @@ NOTE: This function requires CUDA headers to be available at compile time.
 
 Usage example:
 
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+
+  // Create index parameters with ACE configuration
+  hnsw::index_params params;
+  params.metric = cuvs::distance::DistanceType::L2Expanded;
+  params.hierarchy = hnsw::HnswHierarchy::GPU;
+  params.M = 32;
+  params.ef_construction = 120;
+
+  // Configure GPU graph building parameters
+  auto ace_params = hnsw::graph_build_params::ace_params();
+  ace_params.npartitions = 4;
+  ace_params.use_disk = true;
+  ace_params.build_dir = "/tmp/hnsw_ace_build";
+  params.graph_build_params = ace_params;
+
+  // Build the index
+  auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+  // ... fill dataset ...
+  auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+
+  // Search the index
+  hnsw::search_params search_params;
+  search_params.ef = 200;
+  auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+  hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+
+  // Serialize the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -322,6 +433,40 @@ The HNSW index construction parameters `M` and `ef_construction` are the main pa
 NOTE: This function requires CUDA headers to be available at compile time.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  raft::resources res;
+
+  // Create index parameters with ACE configuration
+  hnsw::index_params params;
+  params.metric = cuvs::distance::DistanceType::L2Expanded;
+  params.hierarchy = hnsw::HnswHierarchy::GPU;
+  params.M = 32;
+  params.ef_construction = 120;
+
+  // Configure GPU graph building parameters
+  auto ace_params = hnsw::graph_build_params::ace_params();
+  ace_params.npartitions = 4;
+  ace_params.use_disk = true;
+  ace_params.build_dir = "/tmp/hnsw_ace_build";
+  params.graph_build_params = ace_params;
+
+  // Build the index
+  auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+  // ... fill dataset ...
+  auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+
+  // Search the index
+  hnsw::search_params search_params;
+  search_params.ef = 200;
+  auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+  hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+
+  // Serialize the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
 
 **Parameters**
 
@@ -357,6 +502,19 @@ std::nullopt);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -388,6 +546,19 @@ std::nullopt);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+```
 
 **Parameters**
 
@@ -421,6 +592,19 @@ std::nullopt);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -452,6 +636,19 @@ std::nullopt);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+```
 
 **Parameters**
 
@@ -562,6 +759,24 @@ index<float>& idx);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Extend the HNSW index with additional vectors
+  auto additional_dataset = raft::make_host_matrix<float>(res, add_size, index->dim());
+  hnsw::extend_params extend_params;
+  hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -587,6 +802,24 @@ index<half>& idx);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Extend the HNSW index with additional vectors
+  auto additional_dataset = raft::make_host_matrix<half>(res, add_size, index->dim());
+  hnsw::extend_params extend_params;
+  hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+```
 
 **Parameters**
 
@@ -614,6 +847,24 @@ index<uint8_t>& idx);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Extend the HNSW index with additional vectors
+  auto additional_dataset = raft::make_host_matrix<uint8_t>(res, add_size, index->dim());
+  hnsw::extend_params extend_params;
+  hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -639,6 +890,24 @@ index<int8_t>& idx);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Extend the HNSW index with additional vectors
+  auto additional_dataset = raft::make_host_matrix<int8_t>(res, add_size, index->dim());
+  hnsw::extend_params extend_params;
+  hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+```
 
 **Parameters**
 
@@ -692,6 +961,28 @@ raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Search K nearest neighbors as an hnswlib index
+  // using host threads for concurrency
+  hnsw::search_params search_params;
+  search_params.ef = 50 // ef >= K;
+  search_params.num_threads = 10;
+  auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float>(res, n_queries, k);
+  hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -721,6 +1012,28 @@ raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Search K nearest neighbors as an hnswlib index
+  // using host threads for concurrency
+  hnsw::search_params search_params;
+  search_params.ef = 50 // ef >= K;
+  search_params.num_threads = 10;
+  auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float>(res, n_queries, k);
+  hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
+```
 
 **Parameters**
 
@@ -752,6 +1065,28 @@ raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Search K nearest neighbors as an hnswlib index
+  // using host threads for concurrency
+  hnsw::search_params search_params;
+  search_params.ef = 50 // ef >= K;
+  search_params.num_threads = 10;
+  auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float>(res, n_queries, k);
+  hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -782,6 +1117,28 @@ raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+
+  // Search K nearest neighbors as an hnswlib index
+  // using host threads for concurrency
+  hnsw::search_params search_params;
+  search_params.ef = 50 // ef >= K;
+  search_params.num_threads = 10;
+  auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
+  auto distances = raft::make_host_matrix<float>(res, n_queries, k);
+  hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -810,6 +1167,21 @@ void serialize(raft::resources const& res, const std::string& filename, const in
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+  // Save the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -831,6 +1203,21 @@ void serialize(raft::resources const& res, const std::string& filename, const in
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+  // Save the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
 
 **Parameters**
 
@@ -854,6 +1241,21 @@ void serialize(raft::resources const& res, const std::string& filename, const in
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+  // Save the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -875,6 +1277,21 @@ void serialize(raft::resources const& res, const std::string& filename, const in
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+  hnsw::index_params hnsw_params;
+  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+  // Save the index
+  hnsw::serialize(res, "index.bin", *hnsw_index);
+```
 
 **Parameters**
 
@@ -903,6 +1320,28 @@ index<float>** index);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+ hnsw::index_params hnsw_params;
+ auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ // save HNSW index to a file
+ hnsw::serialize(res, "index.bin", *hnsw_index);
+ // Deserialize the HNSW index
+ hnsw::index<float>* loaded_hnsw_index = nullptr;
+ hnsw::deserialize(
+   res, hnsw_params, "index.bin", index->dim(), index->metric(), &loaded_hnsw_index);
+
+  // Delete index after use
+  delete loaded_hnsw_index;
+```
 
 **Parameters**
 
@@ -934,6 +1373,28 @@ index<half>** index);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+ hnsw::index_params hnsw_params;
+ auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ // save HNSW index to a file
+ hnsw::serialize(res, "index.bin", *hnsw_index);
+ // Deserialize the HNSW index
+ hnsw::index<half>* loaded_hnsw_index = nullptr;
+ hnsw::deserialize(
+   res, hnsw_params, "index.bin", index->dim(), index->metric(), &loaded_hnsw_index);
+
+  // Delete index after use
+  delete loaded_hnsw_index;
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -963,6 +1424,28 @@ index<uint8_t>** index);
 ```
 
 Usage example:
+
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+ hnsw::index_params hnsw_params;
+ auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ // save HNSW index to a file
+ hnsw::serialize(res, "index.bin", *hnsw_index);
+ // Deserialize the HNSW index
+ hnsw::index<uint8_t>* loaded_hnsw_index = nullptr;
+ hnsw::deserialize(
+   res, hnsw_params, "index.bin", index->dim(), index->metric(), &loaded_hnsw_index);
+
+  // Delete index after use
+  delete loaded_hnsw_index;
+```
 
 **Parameters**
 
@@ -994,6 +1477,28 @@ index<int8_t>** index);
 
 Usage example:
 
+```cpp
+  // Build a CAGRA index
+  using namespace cuvs::neighbors;
+  // use default index parameters
+  cagra::index_params index_params;
+  // create and fill the index from a [N, D] dataset
+  auto index = cagra::build(res, index_params, dataset);
+
+  // Load CAGRA index as an HNSW index
+ hnsw::index_params hnsw_params;
+ auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ // save HNSW index to a file
+ hnsw::serialize(res, "index.bin", *hnsw_index);
+ // Deserialize the HNSW index
+ hnsw::index<int8_t>* loaded_hnsw_index = nullptr;
+ hnsw::deserialize(
+   res, hnsw_params, "index.bin", index->dim(), index->metric(), &loaded_hnsw_index);
+
+  // Delete index after use
+  delete loaded_hnsw_index;
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1023,6 +1528,14 @@ index<float>** index);
 The graph artifact supplies the index dimensions, metric, and construction metadata. The attached dataset must have the recorded shape, but its element type may differ from the type used to construct the graph. The output pointer selects the attached dataset type. The loader accepts row-major `.npy` files and ANN benchmark binary files with a `[uint32 rows, uint32 cols]` header. Binary extensions must match the output index type: `.fbin` for `float`, `.f16bin` or `.fp16.fbin` for `half`, `.u8bin` for `uint8_t`, and `.i8bin` for `int8_t`.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  hnsw::index<float>* index = nullptr;
+  hnsw::deserialize(res, "hnsw_index.cuvs", "dataset.fbin", &index);
+  // ... search index ...
+  delete index;
+```
 
 **Parameters**
 
@@ -1145,6 +1658,14 @@ Materializes a `GRAPH_ONLY` artifact (graph topology only, stored in ACE order) 
 The element data type (`float`, `half`, `uint8_t` or `int8_t`) is inferred from the external dataset, so materialization supports an original dataset dtype that differs from the graph's construction dtype.
 
 Usage example:
+
+```cpp
+  using namespace cuvs::neighbors;
+  hnsw::materialize_params materialize_params;
+  materialize_params.dataset_path = "dataset.fbin";
+  hnsw::materialize_to_hnswlib(
+    res, materialize_params, "layered_artifact.cuvs", "index.bin", dim, metric);
+```
 
 **Parameters**
 

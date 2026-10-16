@@ -137,6 +137,51 @@ Multi-GPU dispatch is selected automatically based on the handle state:
 
 With `params.init == InitMethod::KMeansPlusPlus` in multi-GPU mode, the effective initialization sample must fit in GPU memory on every rank because it is materialized on every device. Rank 0 must also have enough GPU memory for the seeding workspace before centroids are broadcast.
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <raft/core/resource/cuda_stream_pool.hpp>
+  #include <raft/core/pinned_mdarray.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  #include <rmm/cuda_device.hpp>
+  #include <rmm/cuda_stream_pool.hpp>
+  #include <rmm/mr/per_device_resource.hpp>
+  #include <rmm/mr/pool_memory_resource.hpp>
+  #include <memory>
+  using namespace cuvs::cluster;
+  ...
+  // Recommended for OOC fits: pool allocations and use one auxiliary copy stream.
+  rmm::mr::pool_memory_resource pool_mr(
+    rmm::mr::get_current_device_resource_ref(),
+    rmm::percent_of_free_device_memory(80));
+  rmm::mr::set_current_device_resource(pool_mr);
+  raft::resources handle;
+  raft::resource::set_cuda_stream_pool(
+    handle, std::make_shared<rmm::cuda_stream_pool>(1));
+
+  cuvs::cluster::kmeans::params params;
+  params.n_clusters = 100;
+  params.device_buffer_samples = 100000;
+  float inertia;
+  int64_t n_iter;
+
+  // Pinned host input is important for OOC throughput.
+  auto h_X = raft::make_pinned_matrix<float, int64_t>(handle, n_samples, n_features);
+  auto X =
+    raft::make_host_matrix_view<const float, int64_t>(h_X.data_handle(), n_samples, n_features);
+
+  // Centroids on device
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, params.n_clusters,
+n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids.view(),
+              raft::make_host_scalar_view(&inertia),
+              raft::make_host_scalar_view(&n_iter));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -197,6 +242,25 @@ raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int> n_iter);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids,
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -225,6 +289,26 @@ std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
 raft::device_matrix_view<float, int64_t> centroids,
 raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int64_t> n_iter);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int64_t n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, params.n_clusters,
+n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids,
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
 ```
 
 **Parameters**
@@ -257,6 +341,25 @@ raft::host_scalar_view<double> inertia,
 raft::host_scalar_view<int> n_iter);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids,
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -285,6 +388,26 @@ std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
 raft::device_matrix_view<double, int64_t> centroids,
 raft::host_scalar_view<double> inertia,
 raft::host_scalar_view<int64_t> n_iter);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int64_t n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<double, int64_t>(handle, params.n_clusters,
+n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids,
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
 ```
 
 **Parameters**
@@ -317,6 +440,25 @@ raft::host_scalar_view<int8_t> inertia,
 raft::host_scalar_view<int> n_iter);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids,
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -345,6 +487,23 @@ raft::device_matrix_view<float, int64_t> centroids,
 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15;
+  int64_t n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -369,6 +528,22 @@ cuvs::cluster::kmeans::balanced_params const& params,
 raft::device_matrix_view<const int8_t, int64_t> X,
 raft::device_matrix_view<float, int64_t> centroids,
 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids);
 ```
 
 **Parameters**
@@ -397,6 +572,22 @@ raft::device_matrix_view<float, int64_t> centroids,
 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -421,6 +612,22 @@ cuvs::cluster::kmeans::balanced_params const& params,
 raft::device_matrix_view<const uint8_t, int64_t> X,
 raft::device_matrix_view<float, int64_t> centroids,
 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids);
 ```
 
 **Parameters**
@@ -451,6 +658,36 @@ raft::device_matrix_view<const float, int> centroids,
 raft::device_vector_view<int, int> labels,
 bool normalize_weight,
 raft::host_scalar_view<float> inertia);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids.view(),
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+  ...
+  auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  std::nullopt,
+                  centroids.view(),
+                  false,
+                  labels.view(),
+                  raft::make_scalar_view(&inertia));
 ```
 
 **Parameters**
@@ -485,6 +722,36 @@ bool normalize_weight,
 raft::host_scalar_view<float> inertia);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids.view(),
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+  ...
+  auto labels = raft::make_device_vector<int64_t, int>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  std::nullopt,
+                  centroids.view(),
+                  false,
+                  labels.view(),
+                  raft::make_scalar_view(&inertia));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -515,6 +782,36 @@ raft::device_matrix_view<const double, int> centroids,
 raft::device_vector_view<int, int> labels,
 bool normalize_weight,
 raft::host_scalar_view<double> inertia);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids.view(),
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+  ...
+  auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  std::nullopt,
+                  centroids.view(),
+                  false,
+                  labels.view(),
+                  raft::make_scalar_view(&inertia));
 ```
 
 **Parameters**
@@ -549,6 +846,36 @@ bool normalize_weight,
 raft::host_scalar_view<double> inertia);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              std::nullopt,
+              centroids.view(),
+              raft::make_scalar_view(&inertia),
+              raft::make_scalar_view(&n_iter));
+  ...
+  auto labels = raft::make_device_vector<int64_t, int>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  std::nullopt,
+                  centroids.view(),
+                  false,
+                  labels.view(),
+                  raft::make_scalar_view(&inertia));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -578,6 +905,30 @@ raft::device_matrix_view<const float, int64_t> centroids,
 raft::device_vector_view<uint32_t, int64_t> labels);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids.view());
+  ...
+  auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  centroids.view(),
+                  labels.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -604,6 +955,30 @@ raft::device_matrix_view<const float, int64_t> centroids,
 raft::device_vector_view<int, int64_t> labels);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids.view());
+  ...
+  auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  centroids.view(),
+                  labels.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -630,6 +1005,30 @@ raft::device_matrix_view<const float, int64_t> centroids,
 raft::device_vector_view<int, int64_t> labels);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids.view());
+  ...
+  auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  centroids.view(),
+                  labels.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -654,6 +1053,30 @@ cuvs::cluster::kmeans::balanced_params const& params,
 raft::device_matrix_view<const float, int64_t> X,
 raft::device_matrix_view<const float, int64_t> centroids,
 raft::device_vector_view<uint32_t, int64_t> labels);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids.view());
+  ...
+  auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  centroids.view(),
+                  labels.view());
 ```
 
 **Parameters**
@@ -682,6 +1105,30 @@ raft::device_matrix_view<const float, int64_t> centroids,
 raft::device_vector_view<uint32_t, int64_t> labels);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids.view());
+  ...
+  auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  centroids.view(),
+                  labels.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -706,6 +1153,30 @@ cuvs::cluster::kmeans::balanced_params const& params,
 raft::device_matrix_view<const uint8_t, int64_t> X,
 raft::device_matrix_view<const float, int64_t> centroids,
 raft::device_vector_view<uint32_t, int64_t> labels);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+
+  kmeans::fit(handle,
+              params,
+              X,
+              centroids.view());
+  ...
+  auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
+
+  kmeans::predict(handle,
+                  params,
+                  X,
+                  centroids.view(),
+                  labels.view());
 ```
 
 **Parameters**
@@ -736,6 +1207,27 @@ std::optional<raft::device_matrix_view<float, int>> centroids,
 raft::device_vector_view<int, int> labels,
 raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int> n_iter);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+  auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
+
+  kmeans::fit_predict(handle,
+                      params,
+                      X,
+                      std::nullopt,
+                      centroids.view(),
+                      labels.view(),
+                      raft::make_scalar_view(&inertia),
+                      raft::make_scalar_view(&n_iter));
 ```
 
 **Parameters**
@@ -770,6 +1262,27 @@ raft::host_scalar_view<float> inertia,
 raft::host_scalar_view<int64_t> n_iter);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int64_t n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, params.n_clusters,
+n_features); auto labels = raft::make_device_vector<int64_t, int64_t>(handle, X.extent(0));
+
+  kmeans::fit_predict(handle,
+                      params,
+                      X,
+                      std::nullopt,
+                      centroids.view(),
+                      labels.view(),
+                      raft::make_scalar_view(&inertia),
+                      raft::make_scalar_view(&n_iter));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -800,6 +1313,27 @@ std::optional<raft::device_matrix_view<double, int>> centroids,
 raft::device_vector_view<int, int> labels,
 raft::host_scalar_view<double> inertia,
 raft::host_scalar_view<int> n_iter);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
+  auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
+
+  kmeans::fit_predict(handle,
+                      params,
+                      X,
+                      std::nullopt,
+                      centroids.view(),
+                      labels.view(),
+                      raft::make_scalar_view(&inertia),
+                      raft::make_scalar_view(&n_iter));
 ```
 
 **Parameters**
@@ -834,6 +1368,27 @@ raft::host_scalar_view<double> inertia,
 raft::host_scalar_view<int64_t> n_iter);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::params params;
+  int64_t n_features = 15, inertia, n_iter;
+  auto centroids = raft::make_device_matrix<double, int64_t>(handle, params.n_clusters,
+n_features); auto labels = raft::make_device_vector<int64_t, int64_t>(handle, X.extent(0));
+
+  kmeans::fit_predict(handle,
+                      params,
+                      X,
+                      std::nullopt,
+                      centroids.view(),
+                      labels.view(),
+                      raft::make_scalar_view(&inertia),
+                      raft::make_scalar_view(&n_iter));
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -863,6 +1418,24 @@ raft::device_matrix_view<float, int64_t> centroids,
 raft::device_vector_view<uint32_t, int64_t> labels);
 ```
 
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+  auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+
+  kmeans::fit_predict(handle,
+                      params,
+                      X,
+                      centroids.view(),
+                      labels.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -887,6 +1460,24 @@ cuvs::cluster::kmeans::balanced_params const& params,
 raft::device_matrix_view<const int8_t, int64_t> X,
 raft::device_matrix_view<float, int64_t> centroids,
 raft::device_vector_view<uint32_t, int64_t> labels);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+  using namespace  cuvs::cluster;
+  ...
+  raft::resources handle;
+  cuvs::cluster::kmeans::balanced_params params;
+  int64_t n_features = 15, n_clusters = 8;
+  auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+  auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+
+  kmeans::fit_predict(handle,
+                      params,
+                      X,
+                      centroids.view(),
+                      labels.view());
 ```
 
 **Parameters**
@@ -1277,6 +1868,29 @@ int kmax,
 int kmin    = 1,
 int maxiter = 100,
 float tol   = 1e-3);
+```
+
+```cpp
+  #include <raft/core/resources.hpp>
+  #include <cuvs/cluster/kmeans.hpp>
+
+  #include <raft/random/make_blobs.cuh>
+
+  using namespace  cuvs::cluster;
+
+  raft::handle_t handle;
+  int n_samples = 100, n_features = 15, n_clusters = 10;
+  auto X = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
+  auto labels = raft::make_device_vector<float, int>(handle, n_samples);
+
+  raft::random::make_blobs(handle, X, labels, n_clusters);
+
+  auto best_k = raft::make_host_scalar<int>(0);
+  auto n_iter = raft::make_host_scalar<int>(0);
+  auto inertia = raft::make_host_scalar<int>(0);
+
+  kmeans::find_k(handle, X, best_k.view(), inertia.view(), n_iter.view(), n_clusters+1);
+
 ```
 
 **Parameters**

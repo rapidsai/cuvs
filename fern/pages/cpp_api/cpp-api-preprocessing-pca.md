@@ -57,6 +57,31 @@ bool flip_signs_based_on_U = false);
 
 Computes the principal components, explained variances, singular values, and column means from the input data.
 
+```cpp
+#include <raft/core/resources.hpp>
+#include <cuvs/preprocessing/pca.hpp>
+
+raft::resources handle;
+
+cuvs::preprocessing::pca::params params;
+params.n_components = 2;
+
+auto input = raft::make_device_matrix<float, int>(handle, n_rows, n_cols);
+// ... fill input ...
+
+auto components       = raft::make_device_matrix<float, int, raft::col_major>(
+    handle, params.n_components, n_cols);
+auto explained_var    = raft::make_device_vector<float, int>(handle, params.n_components);
+auto explained_var_ratio = raft::make_device_vector<float, int>(handle, params.n_components);
+auto singular_vals    = raft::make_device_vector<float, int>(handle, params.n_components);
+auto mu               = raft::make_device_vector<float, int>(handle, n_cols);
+auto noise_vars       = raft::make_device_scalar<float>(handle);
+
+cuvs::preprocessing::pca::fit(handle, params,
+    input.view(), components.view(), explained_var.view(),
+    explained_var_ratio.view(), singular_vals.view(), mu.view(), noise_vars.view());
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |

@@ -183,6 +183,20 @@ The following distance metrics are supported:
 
 Usage example:
 
+```c
+  // Create cuvsResources_t
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+
+  // Assume a row-major dataset [n_rows, n_cols] is defined as `float* dataset`
+  cuvsVamanaIndexParams_t index_params;
+  cuvsVamanaIndexParamsCreate(&index_params);
+  index_params->metric = L2Expanded; // set distance metric
+  cuvsVamanaIndex_t index;
+  cuvsVamanaIndexCreate(&index);
+  cuvsVamanaBuild(res, index_params, dataset, index);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -213,6 +227,15 @@ bool include_dataset);
 Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
 
 Serialized Index is to be used by the DiskANN open-source repository for graph search.
+
+```c
+  // Create cuvsResources_t
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+
+  // create an index with `cuvsVamanaBuild`
+  cuvsVamanaSerialize(res, "/path/to/index", index, true);
+```
 
 **Parameters**
 

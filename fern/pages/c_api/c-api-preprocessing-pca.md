@@ -114,6 +114,36 @@ Computes the principal components, explained variances, singular values, and col
 
 The layout of `input` (C-contiguous / row-major or F-contiguous / col-major) is detected from its DLPack strides; `components` must use the same layout as `input`.
 
+```c
+#include <cuvs/core/c_api.h>
+#include <cuvs/preprocessing/pca.h>
+
+// Create cuvsResources_t
+cuvsResources_t res;
+cuvsResourcesCreate(&res);
+
+// Create PCA params
+cuvsPcaParams_t params;
+cuvsPcaParamsCreate(&params);
+params->n_components = 2;
+
+// Assume populated DLManagedTensor objects (float32, device memory)
+DLManagedTensor input;          // [n_rows x n_cols] (C- or F-contiguous)
+DLManagedTensor components;     // [n_components x n_cols] (same layout as input)
+DLManagedTensor explained_var;  // [n_components]
+DLManagedTensor explained_var_ratio; // [n_components]
+DLManagedTensor singular_vals;  // [n_components]
+DLManagedTensor mu;             // [n_cols]
+DLManagedTensor noise_vars;     // [1] (scalar)
+
+cuvsPcaFit(res, params, &input, &components, &explained_var,
+           &explained_var_ratio, &singular_vals, &mu, &noise_vars, false);
+
+// Cleanup
+cuvsPcaParamsDestroy(params);
+cuvsResourcesDestroy(res);
+```
+
 **Parameters**
 
 | Name | Direction | Type | Description |
