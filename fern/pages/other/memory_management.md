@@ -1,6 +1,6 @@
 # Memory Management
 
-NVIDIA cuVS uses NVIDIA RMM through RAFT so GPU algorithms can allocate temporary buffers, output arrays, and staging memory through one configurable memory layer. RMM helps NVIDIA cuVS interoperate with the broader GPU library ecosystem that either uses RMM directly or provides RMM adaptors, including RAPIDS libraries, PyTorch, CuPy, Faiss, and TensorFlow. This lets applications share memory resources and memory allocations across library boundaries without unnecessary copies.
+NVIDIA cuVS uses NVIDIA RMM through RAFT so GPU algorithms can allocate temporary buffers, output arrays, and staging memory through one configurable memory layer. RMM helps NVIDIA cuVS interoperate with the broader GPU library ecosystem that either uses RMM directly or provides RMM adaptors, including other CUDA-X libraries for data science, PyTorch, CuPy, Faiss, and TensorFlow. This lets applications share memory resources and memory allocations across library boundaries without unnecessary copies.
 
 The most common choice is to configure a device memory pool before creating NVIDIA cuVS resources or allocating device arrays. Pooling avoids repeated `cudaMalloc` and `cudaFree` calls, which can synchronize the device and add allocator overhead to workloads with many temporary buffers.
 
@@ -435,7 +435,7 @@ RMM separates allocation policy from algorithm code. An NVIDIA cuVS algorithm as
 This design gives users four practical benefits:
 
 - Allocation behavior can be tuned without changing NVIDIA cuVS API calls.
-- NVIDIA cuVS can share memory resources and allocations with other RMM-aware libraries, including RAPIDS libraries, PyTorch, CuPy, Faiss, and TensorFlow.
+- NVIDIA cuVS can share memory resources and allocations with other RMM-aware libraries, including other CUDA-X libraries for data science, PyTorch, CuPy, Faiss, and TensorFlow.
 - Data can move through compatible GPU libraries without extra copies solely to cross library boundaries.
 - Temporary allocations can be pooled to reduce allocator synchronization and fragmentation.
 
