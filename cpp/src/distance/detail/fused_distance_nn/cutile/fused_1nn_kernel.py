@@ -44,7 +44,7 @@ def _mma_rounding_mode(gpu_code: str):
     is emulated with integer code that nearly halves fused-1NN throughput on A100. Round to
     nearest with ties away (RA) is much cheaper there, and it is also how compute_tf32_norms()
     rounds the norms (cvt.rna). Casts that keep the dtype (half -> half) are unaffected. RA needs
-    tileiras >= 13.4;
+    tileiras >= 13.4; export_fused_1nn.py falls back to the default on older tileiras.
     """
     if gpu_code.startswith("sm_8") and _supports_rounding_mode():
         return ct.RoundingMode.RA
@@ -63,6 +63,7 @@ def make_kernel(
     matrix_layout: str = "strict",
     occupancy: int | None = None,
     num_ctas: int | None = None,
+    mma_rounding: bool = True,
 ):
     """Build the flat-reduction runtime-metric cuTile kernel."""
     if data_type not in ("half", "float"):
@@ -75,7 +76,7 @@ def make_kernel(
         raise ValueError(f"Unsupported matrix_layout {matrix_layout!r}")
 
     mma_dtype = ct.tfloat32 if data_type == "float" else ct.float16
-    rmode = _mma_rounding_mode(gpu_code)
+    rmode = _mma_rounding_mode(gpu_code) if mma_rounding else None
     if rmode is None:
 
         def to_mma(tile):
