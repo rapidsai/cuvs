@@ -209,5 +209,51 @@ void test_small_scale_equal_norms(T scale)
 
 TEST(DistanceEucExpSmallScale, EqualNormsF) { test_small_scale_equal_norms<float>(1e-2f); }
 TEST(DistanceEucExpSmallScale, EqualNormsD) { test_small_scale_equal_norms<double>(1e-5); }
+
+template <typename Layout>
+void test_exact_self_distance_diagonal()
+{
+  raft::resources handle;
+  auto stream              = raft::resource::get_cuda_stream(handle);
+  constexpr int64_t n_rows = 50;
+  constexpr int64_t n_cols = 10;
+  constexpr bool row_major = std::is_same_v<Layout, raft::row_major>;
+  std::vector<float> h_x(n_rows * n_cols);
+  for (int64_t i = 0; i < n_rows; ++i) {
+    for (int64_t j = 0; j < n_cols; ++j) {
+      auto index = row_major ? i * n_cols + j : j * n_rows + i;
+      h_x[index] = static_cast<float>(((i + 3) * (j + 5)) % 37) / 37.0f;
+    }
+  }
+
+  auto x = raft::make_device_matrix<float, int64_t, Layout>(handle, n_rows, n_cols);
+  auto d = raft::make_device_matrix<float, int64_t, Layout>(handle, n_rows, n_rows);
+  raft::update_device(x.data_handle(), h_x.data(), h_x.size(), stream);
+
+  for (auto metric : {DistanceType::L2Expanded, DistanceType::L2SqrtExpanded}) {
+    cuvs::distance::pairwise_distance(handle,
+                                      raft::make_const_mdspan(x.view()),
+                                      raft::make_const_mdspan(x.view()),
+                                      d.view(),
+                                      metric);
+    std::vector<float> h_d(n_rows * n_rows);
+    raft::update_host(h_d.data(), d.data_handle(), h_d.size(), stream);
+    raft::resource::sync_stream(handle, stream);
+
+    for (int64_t i = 0; i < n_rows; ++i) {
+      EXPECT_EQ(h_d[i * n_rows + i], 0.0f) << "metric=" << static_cast<int>(metric) << " row=" << i;
+    }
+  }
+}
+
+TEST(DistanceEucExpSelfDistance, ExactDiagonalRowMajor)
+{
+  test_exact_self_distance_diagonal<raft::row_major>();
+}
+
+TEST(DistanceEucExpSelfDistance, ExactDiagonalColMajor)
+{
+  test_exact_self_distance_diagonal<raft::col_major>();
+}
 }  // end namespace distance
 }  // namespace cuvs
