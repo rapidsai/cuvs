@@ -14,8 +14,7 @@
 
 // Warp-level tensor-core dot products of i4 codes (0..15, two per byte) staged in shared memory as
 // rows of RowStride bytes. A warp owns a WarpTile x WarpTile block of the output: accumulate() adds
-// the dot products over one staged K range, store() writes the raw sums as raw_t. The u8 (wmma)
-// and fp8 (mma.sync) variants share this interface, so callers can switch between them.
+// the dot products over one staged K range, store() writes the raw sums as raw_t.
 
 namespace cuvs::neighbors::nn_descent::detail {
 
@@ -126,123 +125,5 @@ struct i4_warp_mma_u8 {
     }
   }
 };
-
-// fp8 mma.sync needs sm_89+.
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 890)
-// A 4-bit code c (0..15) masked into its own byte and read as e4m3 is c / kE4m3CodeScale:
-//   c    byte   e4m3 value
-//   0    0x00   0
-//   1    0x01   1 / 512
-//   ...
-//   15   0x0F   15 / 512
-// so splitting a packed word into its low and high nibbles, one code per byte, is the whole
-// expansion to e4m3, and every product carries 1 / kE4m3CodeScale^2, removed in store().
-// Codes 1..7 are e4m3 subnormals (exponent bits 0000). Hardware that flushed subnormal MMA inputs
-// to zero would silently drop them; we accept that risk because e4m3 defines these values as part
-// of its (already small) range and the fp8 MMA paths honor them. nvcc's -ftz does not apply: it
-// covers f32 arithmetic, and every f32 value here is a normal number.
-constexpr int kE4m3CodeScale = 512;
-
-// c += a * b over one m16n8k32 tile. The tensor core's fp8 accumulator keeps far fewer bits than
-// f32, so chaining c through it drops low bits of the sums. Each MMA starts from zero instead --
-// one tile's sum fits exactly -- and the running sum is kept with ordinary f32 adds.
-__device__ __forceinline__ void mma_e4m3_m16n8k32(float (&c)[4],
-                                                  const uint32_t (&a)[4],
-                                                  const uint32_t (&b)[2])
-{
-  float d[4];
-  asm(
-    "mma.sync.aligned.m16n8k32.row.col.f32.e4m3.e4m3.f32 "
-    "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %10, %10, %10};"
-    : "=f"(d[0]), "=f"(d[1]), "=f"(d[2]), "=f"(d[3])
-    : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]), "f"(0.0f));
-#pragma unroll
-  for (int i = 0; i < 4; ++i) {
-    c[i] += d[i];
-  }
-}
-
-// Feeds the 4-bit codes to mma.sync as e4m3, expanded in registers from plain 32-bit LDS.
-template <int WarpTile, int RowStride>
-struct i4_warp_mma_fp8 {
-  using raw_t = float;
-
-  static constexpr int MMA_M = 16;
-  static constexpr int MMA_N = 8;
-  // A k-step reads 16 packed bytes = 32 codes, expanded to e4m3 and consumed by one MMA.
-  static constexpr int KSTEP_BYTES = 16;
-  static constexpr int SUB_M       = WarpTile / MMA_M;
-  static constexpr int SUB_N       = WarpTile / MMA_N;
-  static_assert(WarpTile % MMA_M == 0 && WarpTile % MMA_N == 0,
-                "the warp tile must be a whole number of native MMA tiles");
-  static_assert(RowStride % 4 == 0, "rows must stay 4-byte aligned for the u32 fragment loads");
-
-  float c[SUB_M][SUB_N][4] = {};
-
-  // m16n8k32 fragment coordinates: `group` is the A row (and +8) and the B column this lane holds;
-  // `quad` picks its 4-byte slice of the k-step. A and B read the same slice, and expanding it to
-  // (low nibbles -> k 0..15, high nibbles -> k 16..31) the same way keeps their k orders aligned.
-  // Kept rolled for the same register reason as the u8 path.
-  template <int RowBytes>
-  __device__ __forceinline__ void accumulate(const uint8_t (*a)[RowStride],
-                                             const uint8_t (*b)[RowStride],
-                                             int row0,
-                                             int col0)
-  {
-    constexpr uint32_t kLowNibbles = 0x0f0f0f0fu;
-    const int lane                 = threadIdx.x % raft::warp_size();
-    const int group                = lane / 4;
-    const int quad                 = lane % 4;
-#pragma unroll 1
-    for (int kk = 0; kk < RowBytes / KSTEP_BYTES; ++kk) {
-      const int byte0 = kk * KSTEP_BYTES + quad * 4;
-      uint32_t a_frag[SUB_M][4];
-      uint32_t b_frag[SUB_N][2];
-      for (int msub = 0; msub < SUB_M; ++msub) {
-        const int row     = row0 + msub * MMA_M + group;
-        const uint32_t r0 = *reinterpret_cast<const uint32_t*>(a[row] + byte0);
-        const uint32_t r8 = *reinterpret_cast<const uint32_t*>(a[row + 8] + byte0);
-        a_frag[msub][0]   = r0 & kLowNibbles;
-        a_frag[msub][2]   = (r0 >> 4) & kLowNibbles;
-        a_frag[msub][1]   = r8 & kLowNibbles;
-        a_frag[msub][3]   = (r8 >> 4) & kLowNibbles;
-      }
-      for (int nsub = 0; nsub < SUB_N; ++nsub) {
-        const uint32_t w =
-          *reinterpret_cast<const uint32_t*>(b[col0 + nsub * MMA_N + group] + byte0);
-        b_frag[nsub][0] = w & kLowNibbles;
-        b_frag[nsub][1] = (w >> 4) & kLowNibbles;
-      }
-      for (int msub = 0; msub < SUB_M; ++msub) {
-        for (int nsub = 0; nsub < SUB_N; ++nsub) {
-          mma_e4m3_m16n8k32(c[msub][nsub], a_frag[msub], b_frag[nsub]);
-        }
-      }
-    }
-  }
-
-  // Lane (group, quad) holds columns quad*2, +1 of rows group and group+8. Runs once, after every
-  // K chunk is accumulated, so this is where the codes' 1 / kE4m3CodeScale^2 comes off.
-  template <int Stride>
-  __device__ __forceinline__ void store(raw_t* dst, int row0, int col0) const
-  {
-    static_assert(Stride % 2 == 0, "float2 stores need even row strides");
-    constexpr float code_scale_sq = kE4m3CodeScale * kE4m3CodeScale;
-    const int lane                = threadIdx.x % raft::warp_size();
-    const int group               = lane / 4;
-    const int quad                = lane % 4;
-    for (int msub = 0; msub < SUB_M; ++msub) {
-      for (int nsub = 0; nsub < SUB_N; ++nsub) {
-        for (int h = 0; h < 2; ++h) {
-          const int row = row0 + msub * MMA_M + group + h * 8;
-          const int col = col0 + nsub * MMA_N + quad * 2;
-          *reinterpret_cast<float2*>(dst + row * Stride + col) = make_float2(
-            c[msub][nsub][h * 2] * code_scale_sq, c[msub][nsub][h * 2 + 1] * code_scale_sq);
-        }
-      }
-    }
-  }
-};
-#endif
 
 }  // namespace cuvs::neighbors::nn_descent::detail

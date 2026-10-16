@@ -1498,7 +1498,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
     // visit idx_in_list < new_size, so the cell is never read either way.
     if (row >= new_size || col >= new_size) continue;
     s_distances[row * SKEWED_MAX_NUM_BI_SAMPLES + col] =
-      bbq_calculate_metric(static_cast<float>(acc[k]),
+      bbq_calculate_metric(acc[k],
                            s_document_factors[row],
                            my_col_factors,
                            dataset_document,
@@ -1589,7 +1589,7 @@ RAFT_KERNEL __launch_bounds__(BLOCK_SIZE)
     const int col = pair_idx % MAX_NUM_BI_SAMPLES;
     if (row >= new_size || col >= old_size) continue;
     s_distances[row * SKEWED_MAX_NUM_BI_SAMPLES + col] =
-      bbq_calculate_metric(static_cast<float>(acc_old[k]),
+      bbq_calculate_metric(acc_old[k],
                            s_document_factors[row],
                            my_old_col_factors,
                            dataset_document,
@@ -1684,11 +1684,7 @@ __launch_bounds__(BLOCK_SIZE)
   constexpr int MMA_PAD       = 16;
   // Strides are in bytes, though the data is packed 4b.
   constexpr int ROW_STRIDE = BBQ_ROW_BYTES + MMA_PAD;
-#if __CUDA_ARCH__ >= 1030
-  using warp_mma = i4_warp_mma_fp8<WARP_TILE, ROW_STRIDE>;
-#else
-  using warp_mma = i4_warp_mma_u8<WARP_TILE, ROW_STRIDE>;
-#endif
+  using warp_mma           = i4_warp_mma_u8<WARP_TILE, ROW_STRIDE>;
   static_assert(BBQ_ROW_BYTES % warp_mma::KSTEP_BYTES == 0, "a tile must be whole k-steps");
 
   constexpr int MMA_STORE_STRIDE = SKEWED_MAX_NUM_BI_SAMPLES;
@@ -1814,7 +1810,7 @@ __launch_bounds__(BLOCK_SIZE)
       const int distance0    = row * MMA_STORE_STRIDE + col;
       const Index_t doc_id   = new_neighbors[row];
       const Index_t query_id = col_neighbors[col];
-      const float raw        = static_cast<float>(raw_view[distance0]);
+      const auto raw         = static_cast<uint32_t>(raw_view[distance0]);
       s_distances[distance0] = bbq_calculate_metric(raw,
                                                     s_document_factors[row],
                                                     my_col_factors,

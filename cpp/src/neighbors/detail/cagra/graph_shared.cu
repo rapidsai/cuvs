@@ -182,7 +182,7 @@ __device__ __forceinline__ float bbq_row_distance(
                                                &quantizer_query.codes(row_query, 0),
                                                quantizer_query.layout,
                                                bbq::get_encoded_row_length(quantizer_document));
-  return bbq::bbq_calculate_metric(static_cast<float>(raw),
+  return bbq::bbq_calculate_metric(raw,
                                    bbq::get_dequant_factors(quantizer_document, row_document),
                                    bbq::get_dequant_factors(quantizer_query, row_query),
                                    quantizer_document,
