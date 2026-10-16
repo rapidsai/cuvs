@@ -50,19 +50,14 @@ void gather_layered_hnsw_vectors(raft::resources const& res,
   rmm::device_uvector<uint8_t> values(batch_rows * row_bytes, stream);
   for (size_t start = 0; start < rows; start += batch_rows) {
     const auto count = std::min(batch_rows, rows - start);
-    RAFT_CUDA_TRY(cudaMemcpyAsync(row_ids.data(),
-                                  host_row_ids + start,
-                                  count * sizeof(size_t),
-                                  cudaMemcpyHostToDevice,
-                                  stream));
+    raft::update_device(row_ids.data(), host_row_ids + start, count, stream);
     raft::matrix::gather(
       source_bytes, row_bytes, source_rows, row_ids.data(), count, values.data(), stream);
     RAFT_CUDA_TRY(cudaGetLastError());
-    RAFT_CUDA_TRY(cudaMemcpyAsync(static_cast<uint8_t*>(host_output) + start * row_bytes,
-                                  values.data(),
-                                  count * row_bytes,
-                                  cudaMemcpyDeviceToHost,
-                                  stream));
+    raft::update_host(static_cast<uint8_t*>(host_output) + start * row_bytes,
+                      values.data(),
+                      count * row_bytes,
+                      stream);
     raft::resource::sync_stream(res);
   }
 }
