@@ -679,14 +679,12 @@ void write_partitioned_level(raft::resources const& res,
   auto promoted_vectors =
     raft::make_host_matrix<T, int64_t>(count, static_cast<int64_t>(layout.dimension));
   std::vector<uint32_t> promoted_ids(count);
-  std::vector<int64_t> core_promoted_position(resident.core_rows, -1);
   for (uint64_t promoted = 0; promoted < count; ++promoted) {
     uint64_t source = promoted_rows[promoted];
     std::copy(&resident.vectors(source, 0),
               &resident.vectors(source, 0) + layout.dimension,
               &promoted_vectors(promoted, 0));
     promoted_ids[promoted] = resident.local_to_global[source];
-    if (source < resident.core_rows) { core_promoted_position[source] = promoted; }
   }
 
   uint64_t neighbor_count = count > 1 ? std::min<uint64_t>(layout.M, count - 1) : 0;
@@ -697,10 +695,10 @@ void write_partitioned_level(raft::resources const& res,
   }
 
   std::vector<uint32_t> record(1 + layout.M, std::numeric_limits<uint32_t>::max());
-  for (uint64_t core = 0; core < resident.core_rows; ++core) {
-    int64_t promoted = core_promoted_position[core];
-    if (promoted < 0) { continue; }
-    record[0] = resident.local_to_global[core];
+  // Promoted rows retain source order, so core rows precede spill rows.
+  for (uint64_t promoted = 0; promoted < count && promoted_rows[promoted] < resident.core_rows;
+       ++promoted) {
+    record[0] = promoted_ids[promoted];
     std::fill(record.begin() + 1, record.end(), std::numeric_limits<uint32_t>::max());
     for (uint64_t neighbor = 0; neighbor < neighbor_count; ++neighbor) {
       uint32_t local = neighbors(promoted, neighbor);
