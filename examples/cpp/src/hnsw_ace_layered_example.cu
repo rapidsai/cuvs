@@ -241,37 +241,28 @@ int main(int argc, char** argv)
     queries_host.data_handle(), n_queries, n_dim);
 
   std::filesystem::create_directories(build_dir);
+  auto dataset_path = write_local_dataset(dataset_host_view, build_dir + "/dataset.npy");
+  auto hnsw_params  = make_hnsw_params(build_method, build_dir);
 
 #if HNSW_ACE_LAYERED_USE_QUANTIZATION
   auto dataset_i8      = quantize_dataset(dev_resources, dataset_host_view);
   auto dataset_i8_view = raft::make_host_matrix_view<const int8_t, int64_t, raft::row_major>(
     dataset_i8.data_handle(), n_samples, n_dim);
-  auto dataset_path = write_local_dataset(dataset_host_view, build_dir + "/dataset.npy");
-  auto hnsw_params  = make_hnsw_params(build_method, build_dir);
 
   std::cout << "[stage 2] Build graph-only HNSW artifact from int8 data" << std::endl;
   auto artifact_path = hnsw_build<int8_t>(
     dev_resources, hnsw_params, dataset_i8_view, build_dir + "/saved_graph.cuvs");
+#else
+  std::cout << "[stage 2] Build layered HNSW index" << std::endl;
+  auto artifact_path = hnsw_build<float>(
+    dev_resources, hnsw_params, dataset_host_view, build_dir + "/saved_graph.cuvs");
+#endif
 
   std::cout << "[stage 3] Attach original float dataset" << std::endl;
   auto hnsw_index = hnsw_deserialize<float>(dev_resources, artifact_path, dataset_path);
 
   std::cout << "[stage 4] Search float HNSW index" << std::endl;
   hnsw_search<float>(dev_resources, *hnsw_index, queries_host_view);
-#else
-  auto dataset_path = write_local_dataset(dataset_host_view, build_dir + "/dataset.npy");
-  auto hnsw_params  = make_hnsw_params(build_method, build_dir);
-
-  std::cout << "[stage 2] Build layered HNSW index" << std::endl;
-  auto artifact_path = hnsw_build<float>(
-    dev_resources, hnsw_params, dataset_host_view, build_dir + "/saved_graph.cuvs");
-
-  std::cout << "[stage 3] Deserialize layered HNSW index" << std::endl;
-  auto hnsw_index = hnsw_deserialize<float>(dev_resources, artifact_path, dataset_path);
-
-  std::cout << "[stage 4] Search HNSW index" << std::endl;
-  hnsw_search<float>(dev_resources, *hnsw_index, queries_host_view);
-#endif
 
   return 0;
 }
