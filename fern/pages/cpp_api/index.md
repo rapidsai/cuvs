@@ -11,7 +11,6 @@ These pages are generated from the documented public headers in the cuVS source 
 
 ## Common
 
-- [Binary](/api-reference/cpp-api-core-dataset-binary)
 - [Bloom Filter](/api-reference/cpp-api-core-bloom-filter)
 - [Common Types](/api-reference/cpp-api-common-types)
 - [Roaring Allowlist](/api-reference/cpp-api-core-roaring-allowlist)
@@ -32,7 +31,6 @@ These pages are generated from the documented public headers in the cuVS source 
 - [Epsilon Neighborhood](/api-reference/cpp-api-neighbors-epsilon-neighborhood)
 - [HNSW](/api-reference/cpp-api-neighbors-hnsw)
 - [Index](/api-reference/cpp-api-neighbors-composite-index)
-- [IVF Binary](/api-reference/cpp-api-neighbors-ivf-binary)
 - [IVF Flat](/api-reference/cpp-api-neighbors-ivf-flat)
 - [IVF PQ](/api-reference/cpp-api-neighbors-ivf-pq)
 - [IVF Rabitq](/api-reference/cpp-api-neighbors-ivf-rabitq)
