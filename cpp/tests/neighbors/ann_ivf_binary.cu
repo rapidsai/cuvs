@@ -109,12 +109,8 @@ TEST(IvfBinary, ExhaustiveSearchMatchesBruteForce)
       auto codes       = raft::make_device_matrix<uint8_t, int64_t>(handle, n_rows, n_bytes);
       auto query_codes = raft::make_device_matrix<uint8_t, int64_t>(handle, n_queries, n_bytes);
       binary::transform(handle, quantizer, raft::make_const_mdspan(data_dev.view()), codes.view());
-      binary::transform(
-        handle, quantizer, raft::make_const_mdspan(queries_dev.view()), query_codes.view());
       auto dataset = make_device_binary_dataset_view<int64_t>(
         raft::make_const_mdspan(codes.view()), quantizer, dim);
-      auto encoded_queries = make_device_binary_dataset_view<int64_t>(
-        raft::make_const_mdspan(query_codes.view()), quantizer, dim);
 
       auto params = small_params(16);
       auto idx    = build(handle, params, dataset);
@@ -122,28 +118,30 @@ TEST(IvfBinary, ExhaustiveSearchMatchesBruteForce)
       ASSERT_EQ(idx.encoded_dim(), n_bytes);
       ASSERT_EQ(idx.size(), n_rows);
 
-      auto codes_host       = to_host(handle, codes.data_handle(), codes.size());
-      auto query_codes_host = to_host(handle, query_codes.data_handle(), query_codes.size());
+      auto codes_host = to_host(handle, codes.data_handle(), codes.size());
 
       search_params search_params;
       search_params.n_probes = params.n_lists;
-      // k > 256 takes the path without the local top-k
-      for (int64_t k : {10, 100, 1025}) {
-        for (bool raw_queries : {true, false}) {
+      // Query codes may be produced using a different quantizer from the build dataset.
+      for (auto query_threshold : {binary::bit_threshold::zero, binary::bit_threshold::mean}) {
+        binary::params query_quantizer_params;
+        query_quantizer_params.threshold = query_threshold;
+        auto query_quantizer =
+          binary::train(handle, query_quantizer_params, raft::make_const_mdspan(data_dev.view()));
+        binary::transform(
+          handle, query_quantizer, raft::make_const_mdspan(queries_dev.view()), query_codes.view());
+        auto query_codes_host = to_host(handle, query_codes.data_handle(), query_codes.size());
+        // Include a k larger than the local top-k capacity.
+        for (int64_t k : {10, 100, 1025}) {
           SCOPED_TRACE(k);
           auto ids_dev       = raft::make_device_matrix<int64_t, int64_t>(handle, n_queries, k);
           auto distances_dev = raft::make_device_matrix<float, int64_t>(handle, n_queries, k);
-          if (raw_queries) {
-            search(handle,
-                   search_params,
-                   idx,
-                   raft::make_const_mdspan(queries_dev.view()),
-                   ids_dev.view(),
-                   distances_dev.view());
-          } else {
-            search(
-              handle, search_params, idx, encoded_queries, ids_dev.view(), distances_dev.view());
-          }
+          search(handle,
+                 search_params,
+                 idx,
+                 raft::make_const_mdspan(query_codes.view()),
+                 ids_dev.view(),
+                 distances_dev.view());
           auto ids       = to_host(handle, ids_dev.data_handle(), ids_dev.size());
           auto distances = to_host(handle, distances_dev.data_handle(), distances_dev.size());
           for (int64_t q = 0; q < n_queries; ++q) {
@@ -190,13 +188,19 @@ TEST(IvfBinary, SerializationRoundTrip)
   for (auto& x : queries) {
     x = static_cast<uint8_t>(rng());
   }
-  auto codes         = to_device(handle, data, n_rows, n_bytes);
-  auto query_codes   = to_device(handle, queries, n_queries, n_bytes);
   const uint32_t dim = 100;
+  // The unused high bits of the final byte are not part of the logical vector.
+  for (int64_t row = 0; row < n_rows; ++row) {
+    data[(row + 1) * n_bytes - 1] &= (1u << (dim % 8)) - 1;
+  }
+  for (int64_t row = 0; row < n_queries; ++row) {
+    queries[(row + 1) * n_bytes - 1] &= (1u << (dim % 8)) - 1;
+  }
+  auto codes       = to_device(handle, data, n_rows, n_bytes);
+  auto query_codes = to_device(handle, queries, n_queries, n_bytes);
   const device_binary_dataset_view<float, int64_t> dataset{
     raft::make_const_mdspan(codes.view()), zero_threshold(), dim};
-  const device_binary_dataset_view<float, int64_t> encoded_queries{
-    raft::make_const_mdspan(query_codes.view()), zero_threshold(), dim};
+  auto encoded_queries = raft::make_const_mdspan(query_codes.view());
 
   auto params             = small_params(8);
   params.adaptive_centers = true;
@@ -309,19 +313,13 @@ TEST(IvfBinary, RejectsMismatchedInputs)
                  raft::make_const_mdspan(data.view()), zero_threshold(), 17}),
                raft::logic_error);
 
-  // A different threshold binarizes the data differently
-  auto threshold = raft::make_device_vector<float, int64_t>(handle, 8);
-  raft::matrix::fill(handle, threshold.view(), 1.0f);
-  const device_binary_dataset_view<float, int64_t> other{
-    raft::make_const_mdspan(data.view()),
-    binary_dictionary_view<float>{raft::make_const_mdspan(threshold.view())},
-    8};
-  EXPECT_THROW(extend(handle, other, std::nullopt, &idx), raft::logic_error);
-  EXPECT_THROW(search(handle, search_params{}, idx, other, ids.view(), dist.view()),
-               raft::logic_error);
+  // Reject a different logical dimension, even when the encoded byte width matches.
+  const device_binary_dataset_view<float, int64_t> other_dim{
+    raft::make_const_mdspan(data.view()), zero_threshold(), 7};
+  EXPECT_THROW(extend(handle, other_dim, std::nullopt, &idx), raft::logic_error);
 
-  // The dimension of the raw queries must match the index
-  auto queries = raft::make_device_matrix<float, int64_t>(handle, 1, 9);
+  // Query width is measured in packed bytes.
+  auto queries = raft::make_device_matrix<uint8_t, int64_t>(handle, 1, 2);
   EXPECT_THROW(search(handle,
                       search_params{},
                       idx,
@@ -329,6 +327,58 @@ TEST(IvfBinary, RejectsMismatchedInputs)
                       ids.view(),
                       dist.view()),
                raft::logic_error);
+}
+
+TEST(IvfBinary, ExtendAcceptsDifferentThresholds)
+{
+  raft::resources handle;
+  auto data            = to_device(handle, std::vector<uint8_t>{1, 3}, 2, 1);
+  auto build_threshold = raft::make_device_vector<float, int64_t>(handle, 8);
+  raft::matrix::fill(handle, build_threshold.view(), 0.0f);
+  const device_binary_dataset_view<float, int64_t> dataset{
+    raft::make_const_mdspan(data.view()),
+    binary_dictionary_view<float>{raft::make_const_mdspan(build_threshold.view())},
+    8};
+  auto params             = small_params(1);
+  params.adaptive_centers = true;
+  auto idx                = build(handle, params, dataset);
+
+  auto more          = to_device(handle, std::vector<uint8_t>{0xf0}, 1, 1);
+  auto new_threshold = raft::make_device_vector<float, int64_t>(handle, 8);
+  raft::matrix::fill(handle, new_threshold.view(), 1.0f);
+  const device_binary_dataset_view<float, int64_t> new_vectors{
+    raft::make_const_mdspan(more.view()),
+    binary_dictionary_view<float>{raft::make_const_mdspan(new_threshold.view())},
+    8};
+  auto new_ids = to_device(handle, std::vector<int64_t>{2}, 1, 1);
+  extend(handle,
+         new_vectors,
+         std::make_optional(
+           raft::make_device_vector_view<const int64_t, int64_t>(new_ids.data_handle(), 1)),
+         &idx);
+  ASSERT_EQ(idx.size(), 3);
+  EXPECT_EQ(to_host(handle, idx.center_counts().data_handle(), 8),
+            (std::vector<uint32_t>{2, 1, 0, 0, 1, 1, 1, 1}));
+  // Extending does not replace the quantizer metadata captured at build time.
+  EXPECT_EQ(to_host(handle, idx.quantizer().threshold.data_handle(), 8),
+            std::vector<float>(8, 0.0f));
+
+  auto ids       = raft::make_device_matrix<int64_t, int64_t>(handle, 1, 3);
+  auto distances = raft::make_device_matrix<float, int64_t>(handle, 1, 3);
+  search_params search_params;
+  search_params.n_probes = 1;
+  search(
+    handle, search_params, idx, raft::make_const_mdspan(more.view()), ids.view(), distances.view());
+  auto result_ids       = to_host(handle, ids.data_handle(), 3);
+  auto result_distances = to_host(handle, distances.data_handle(), 3);
+  const std::vector<float> expected{5, 6, 0};
+  for (int64_t i = 0; i < 3; ++i) {
+    ASSERT_GE(result_ids[i], 0);
+    ASSERT_LT(result_ids[i], 3);
+    EXPECT_EQ(result_distances[i], expected[result_ids[i]]);
+  }
+  std::sort(result_ids.begin(), result_ids.end());
+  EXPECT_EQ(result_ids, (std::vector<int64_t>{0, 1, 2}));
 }
 
 TEST(IvfBinary, SearchHonorsSampleFilter)
@@ -365,7 +415,7 @@ TEST(IvfBinary, SearchHonorsSampleFilter)
   search(handle,
          search_params,
          idx,
-         zero_threshold_dataset(query_codes),
+         raft::make_const_mdspan(query_codes.view()),
          ids_dev.view(),
          distances_dev.view(),
          filter);

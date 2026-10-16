@@ -79,8 +79,8 @@ struct search_params : cuvs::neighbors::search_params {
  * @brief IVF index of bit-packed binary vectors searched with the Hamming distance.
  *
  * The index stores the codes of a binary-quantized dataset (see `device_binary_dataset_view`),
- * together with the quantizer that produced them, so it can binarize raw queries consistently with
- * the data. Neighbors are returned with their Hamming distances, i.e. the number of differing bits.
+ * together with the quantizer that produced them. Queries must be supplied as bit-packed bytes.
+ * Neighbors are returned with their Hamming distances, i.e. the number of differing bits.
  */
 struct index : cuvs::neighbors::index {
   using index_params_type  = ivf_binary::index_params;
@@ -122,7 +122,7 @@ struct index : cuvs::neighbors::index {
    * empty unless the centers are adaptive.
    */
   raft::device_matrix_view<const uint32_t, int64_t, raft::row_major> center_counts() const noexcept;
-  /** The quantizer that binarizes raw queries; its threshold is empty for the zero threshold. */
+  /** The build dataset's quantizer, available for external encoding of queries or new vectors. */
   const preprocessing::quantize::binary::quantizer<float>& quantizer() const noexcept;
 
  private:
@@ -170,7 +170,10 @@ auto build(raft::resources const& handle,
            device_binary_dataset_view<float, int64_t> dataset) -> index;
 
 /**
- * @brief Add vectors to the index. The dictionary of the new vectors must match the index.
+ * @brief Add bit-packed vectors to the index.
+ *
+ * The supplied codes are used as-is. The dictionary of the new vectors is not compared with or
+ * copied into the index; choosing the quantizer is the caller's responsibility.
  *
  * @param[in] handle
  * @param[in] new_vectors the binary-quantized vectors to add
@@ -189,12 +192,16 @@ void extend(raft::resources const& handle,
  * @{
  */
 /**
- * @brief Search the index with raw queries, binarized with the quantizer retained by the index.
+ * @brief Search the index with bit-packed byte queries using Hamming distance.
+ *
+ * Each query has `index.encoded_dim()` bytes, with bit `i` stored in bit `i % 8` of byte `i / 8`.
+ * Unused bits in the final byte must be zero. The supplied codes are searched as-is, without
+ * quantization or threshold comparisons; choosing the quantizer is the caller's responsibility.
  *
  * @param[in] handle
  * @param[in] params configure the search
  * @param[in] index the index
- * @param[in] queries a device matrix [n_queries, dim] of unquantized queries
+ * @param[in] queries a device matrix [n_queries, index.encoded_dim()] of bit-packed queries
  * @param[out] neighbors ids of the k nearest neighbors [n_queries, k]
  * @param[out] distances Hamming distances to the neighbors [n_queries, k]
  * @param[in] sample_filter an optional device filter on the dataset ids
@@ -202,29 +209,7 @@ void extend(raft::resources const& handle,
 void search(raft::resources const& handle,
             const search_params& params,
             const index& index,
-            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
-            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            const cuvs::neighbors::filtering::base_filter& sample_filter =
-              cuvs::neighbors::filtering::none_sample_filter{});
-
-/**
- * @brief Search the index with queries that are already binary-quantized.
- *
- * The dictionary of the queries must match the one of the index.
- *
- * @param[in] handle
- * @param[in] params configure the search
- * @param[in] index the index
- * @param[in] queries the binary-quantized queries
- * @param[out] neighbors ids of the k nearest neighbors [n_queries, k]
- * @param[out] distances Hamming distances to the neighbors [n_queries, k]
- * @param[in] sample_filter an optional device filter on the dataset ids
- */
-void search(raft::resources const& handle,
-            const search_params& params,
-            const index& index,
-            device_binary_dataset_view<float, int64_t> queries,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =

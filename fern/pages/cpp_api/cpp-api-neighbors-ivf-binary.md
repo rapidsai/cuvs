@@ -61,7 +61,7 @@ struct search_params : cuvs::neighbors::search_params {
 
 IVF index of bit-packed binary vectors searched with the Hamming distance.
 
-The index stores the codes of a binary-quantized dataset (see `device_binary_dataset_view`), together with the quantizer that produced them, so it can binarize raw queries consistently with the data. Neighbors are returned with their Hamming distances, i.e. the number of differing bits.
+The index stores the codes of a binary-quantized dataset (see `device_binary_dataset_view`), together with the quantizer that produced them. Queries must be supplied as bit-packed bytes. Neighbors are returned with their Hamming distances, i.e. the number of differing bits.
 
 ```cpp
 struct index;
@@ -228,7 +228,7 @@ empty unless the centers are adaptive.
 <a id="neighbors-ivf-binary-index-quantizer"></a>
 ### neighbors::ivf_binary::index::quantizer
 
-The quantizer that binarizes raw queries; its threshold is empty for the zero threshold.
+The build dataset's quantizer, available for external encoding of queries or new vectors.
 
 ```cpp
 const preprocessing::quantize::binary::quantizer<float>& quantizer() const noexcept;
@@ -270,7 +270,7 @@ Usage example:
 <a id="neighbors-ivf-binary-extend"></a>
 ### neighbors::ivf_binary::extend
 
-Add vectors to the index. The dictionary of the new vectors must match the index.
+Add bit-packed vectors to the index.
 
 ```cpp
 void extend(raft::resources const& handle,
@@ -278,6 +278,8 @@ device_binary_dataset_view<float, int64_t> new_vectors,
 std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
 index* index);
 ```
+
+The supplied codes are used as-is. The dictionary of the new vectors is not compared with or copied into the index; choosing the quantizer is the caller's responsibility.
 
 **Parameters**
 

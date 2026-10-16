@@ -16,7 +16,6 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_binary.hpp>
-#include <cuvs/preprocessing/quantize/binary.hpp>
 #include <cuvs/selection/select_k.hpp>
 
 #include <raft/core/operators.hpp>

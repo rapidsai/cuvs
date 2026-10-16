@@ -10,12 +10,8 @@
 #include "ivf_binary_search.cuh"
 
 #include <cuvs/neighbors/ivf_binary.hpp>
-#include <cuvs/preprocessing/quantize/binary.hpp>
 
 #include <raft/core/serialize.hpp>
-#include <raft/util/cudart_utils.hpp>
-
-#include <vector>
 
 namespace cuvs::neighbors::ivf_binary {
 namespace {
@@ -23,31 +19,6 @@ namespace {
 // Serialization version of the index: the header, the quantizer and the centers, followed by
 // the inverted lists in the IVF-Flat format.
 constexpr int kSerializationVersion = 1;
-
-// Whether the dictionary of a dataset binarizes the vectors in the same way as the index does.
-bool same_dictionary(raft::resources const& handle,
-                     const index& idx,
-                     binary_dictionary_view<float> dictionary)
-{
-  const auto stored = idx.quantizer().threshold.view();
-  if (stored.extent(0) == 0 && dictionary.threshold.extent(0) == 0) { return true; }
-  // An empty threshold is the zero threshold
-  std::vector<float> a(idx.dim(), 0.0f);
-  std::vector<float> b(idx.dim(), 0.0f);
-  auto stream = raft::resource::get_cuda_stream(handle);
-  if (stored.extent(0) > 0) { raft::update_host(a.data(), stored.data_handle(), a.size(), stream); }
-  if (dictionary.threshold.extent(0) > 0) {
-    raft::update_host(b.data(), dictionary.threshold.data_handle(), b.size(), stream);
-  }
-  raft::resource::sync_stream(handle);
-  return a == b;
-}
-
-void check_queries(const index& idx, const device_binary_dataset_view<float, int64_t>& dataset)
-{
-  RAFT_EXPECTS(dataset.dim() == idx.dim(),
-               "The dimension of the vectors must equal the dimension of the index.");
-}
 
 void serialize_impl(raft::resources const& handle, std::ostream& os, const index& idx)
 {
@@ -131,9 +102,8 @@ void extend(raft::resources const& handle,
             index* index)
 {
   RAFT_EXPECTS(index != nullptr, "index cannot be empty.");
-  check_queries(*index, new_vectors);
-  RAFT_EXPECTS(same_dictionary(handle, *index, new_vectors.const_dictionary_view()),
-               "The dictionary of the new vectors must match the dictionary of the index.");
+  RAFT_EXPECTS(new_vectors.dim() == index->dim(),
+               "The dimension of the vectors must equal the dimension of the index.");
   if (new_indices.has_value()) {
     RAFT_EXPECTS(new_vectors.n_rows() == new_indices->extent(0),
                  "new_vectors and new_indices have different number of rows");
@@ -148,39 +118,12 @@ void extend(raft::resources const& handle,
 void search(raft::resources const& handle,
             const search_params& params,
             const index& index,
-            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter)
 {
-  RAFT_EXPECTS(queries.extent(1) == index.dim(),
-               "Number of query dimensions should equal the dimension of the index.");
-  auto codes =
-    raft::make_device_matrix<uint8_t, int64_t>(handle, queries.extent(0), index.encoded_dim());
-  cuvs::preprocessing::quantize::binary::transform(
-    handle, index.quantizer(), queries, codes.view());
-  detail::search(handle,
-                 params,
-                 index,
-                 raft::make_const_mdspan(codes.view()),
-                 neighbors,
-                 distances,
-                 sample_filter);
-}
-
-void search(raft::resources const& handle,
-            const search_params& params,
-            const index& index,
-            device_binary_dataset_view<float, int64_t> queries,
-            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            const cuvs::neighbors::filtering::base_filter& sample_filter)
-{
-  check_queries(index, queries);
-  RAFT_EXPECTS(same_dictionary(handle, index, queries.const_dictionary_view()),
-               "The dictionary of the queries must match the dictionary of the index.");
-  detail::search(
-    handle, params, index, queries.data_const_view(), neighbors, distances, sample_filter);
+  detail::search(handle, params, index, queries, neighbors, distances, sample_filter);
 }
 
 void serialize(raft::resources const& handle, std::ostream& os, const index& index)
