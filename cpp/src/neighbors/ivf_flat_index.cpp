@@ -14,7 +14,7 @@
 
 namespace cuvs::neighbors::ivf_flat {
 namespace {
-uint32_t storage_dim(cuvs::distance::DistanceType metric, uint32_t dim)
+uint32_t calculate_storage_dim(cuvs::distance::DistanceType metric, uint32_t dim)
 {
   return metric == cuvs::distance::DistanceType::BitwiseHamming && dim > 0 ? (dim - 1) / 8 + 1
                                                                            : dim;
@@ -48,7 +48,7 @@ index<T, IdxT>::index(raft::resources const& res,
                       bool conservative_memory_allocation,
                       uint32_t dim)
   : cuvs::neighbors::index(),
-    veclen_(calculate_veclen(storage_dim(metric, dim))),
+    veclen_(calculate_veclen(calculate_storage_dim(metric, dim))),
     metric_(metric),
     adaptive_centers_(adaptive_centers),
     conservative_memory_allocation_{conservative_memory_allocation},
@@ -57,14 +57,15 @@ index<T, IdxT>::index(raft::resources const& res,
     centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
                ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)
                : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
-    binary_centers_(
-      metric != cuvs::distance::DistanceType::BitwiseHamming
-        ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
-        : raft::make_device_matrix<uint8_t, int64_t>(res, n_lists, storage_dim(metric, dim))),
-    binary_center_counts_(metric == cuvs::distance::DistanceType::BitwiseHamming && adaptive_centers
-                            ? raft::make_device_matrix<uint32_t, int64_t>(
-                                res, n_lists, expanded_binary_dim(storage_dim(metric, dim)))
-                            : raft::make_device_matrix<uint32_t, int64_t>(res, 0, 0)),
+    binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
+                      ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
+                      : raft::make_device_matrix<uint8_t, int64_t>(
+                          res, n_lists, calculate_storage_dim(metric, dim))),
+    binary_center_counts_(
+      metric == cuvs::distance::DistanceType::BitwiseHamming && adaptive_centers
+        ? raft::make_device_matrix<uint32_t, int64_t>(
+            res, n_lists, expanded_binary_dim(calculate_storage_dim(metric, dim)))
+        : raft::make_device_matrix<uint32_t, int64_t>(res, 0, 0)),
     center_norms_(std::nullopt),
     binary_index_(metric == cuvs::distance::DistanceType::BitwiseHamming),
     dim_(dim),
