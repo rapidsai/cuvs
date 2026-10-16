@@ -197,7 +197,7 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
 <a id="neighbors-ivf-flat-index-binary-centers"></a>
 ### neighbors::ivf_flat::index::binary_centers
 
-Packed binary cluster centers, with `dim()` bytes per center.
+Packed binary cluster centers, with `storage_dim()` bytes per center.
 
 ```cpp
 raft::device_matrix_view<uint8_t, int64_t, raft::row_major> binary_centers() noexcept;
@@ -207,11 +207,11 @@ raft::device_matrix_view<uint8_t, int64_t, raft::row_major> binary_centers() noe
 
 `raft::device_matrix_view<uint8_t, int64_t, raft::row_major>`
 
-A mutable device view of shape [n_lists, dim], or an empty view for nonbinary indexes.
+A mutable device view of shape [n_lists, storage_dim], or an empty view for nonbinary indexes.
 
 **Additional overload:** `neighbors::ivf_flat::index::binary_centers`
 
-Packed binary cluster centers, with `dim()` bytes per center.
+Packed binary cluster centers, with `storage_dim()` bytes per center.
 
 ```cpp
 raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> binary_centers() const noexcept;
@@ -221,7 +221,7 @@ raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> binary_centers
 
 `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>`
 
-A read-only device view of shape [n_lists, dim], or an empty view for nonbinary indexes.
+A read-only device view of shape [n_lists, storage_dim], or an empty view for nonbinary indexes.
 
 <a id="neighbors-ivf-flat-index-binary-center-counts"></a>
 ### neighbors::ivf_flat::index::binary_center_counts
@@ -236,7 +236,7 @@ raft::device_matrix_view<uint32_t, int64_t, raft::row_major> binary_center_count
 
 `raft::device_matrix_view<uint32_t, int64_t, raft::row_major>`
 
-A mutable device view of shape [n_lists, dim * 8], or an empty view when unused.
+A mutable device view of shape [n_lists, storage_dim * 8], or empty when unused.
 
 **Additional overload:** `neighbors::ivf_flat::index::binary_center_counts`
 
@@ -251,7 +251,7 @@ const noexcept;
 
 `raft::device_matrix_view<const uint32_t, int64_t, raft::row_major>`
 
-A read-only device view of shape [n_lists, dim * 8], or an empty view when unused.
+A read-only device view of shape [n_lists, storage_dim * 8], or empty when unused.
 
 <a id="neighbors-ivf-flat-index-center-norms"></a>
 ### neighbors::ivf_flat::index::center_norms
@@ -303,13 +303,24 @@ IdxT size() const noexcept;
 <a id="neighbors-ivf-flat-index-dim"></a>
 ### neighbors::ivf_flat::index::dim
 
-Dimensionality of the data.
+Logical dimensionality of the data, measured in bits for a binary index.
 
 ```cpp
 uint32_t dim() const noexcept;
 ```
 
-**Note:** For binary index, this returns the dimensionality of the byte dataset, which is the<br />number of bits / 8.
+**Returns**
+
+`uint32_t`
+
+<a id="neighbors-ivf-flat-index-storage-dim"></a>
+### neighbors::ivf_flat::index::storage_dim
+
+Number of stored elements per vector, measured in bytes for a binary index.
+
+```cpp
+uint32_t storage_dim() const noexcept;
+```
 
 **Returns**
 
@@ -655,6 +666,31 @@ Usage example:
 
 **Additional overload:** `neighbors::ivf_flat::build`
 
+Build a BitwiseHamming index from a tightly packed bitmap dataset.
+
+```cpp
+auto build(raft::resources const& handle,
+const cuvs::neighbors::ivf_flat::index_params& index_params,
+cuvs::device_bitmap_dataset_view<int64_t> dataset)
+-> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+```
+
+Rows are repacked to byte boundaries at the API boundary; unused bits in the final byte are cleared.
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `index_params` |  | `const cuvs::neighbors::ivf_flat::index_params&` |  |
+| `dataset` |  | [`cuvs::device_bitmap_dataset_view<int64_t>`](/api-reference/cpp-api-core-dataset-bitmap#device-bitmap-dataset-view) |  |
+
+**Returns**
+
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index)
+
+**Additional overload:** `neighbors::ivf_flat::build`
+
 Build the index from the dataset for efficient search.
 
 ```cpp
@@ -961,7 +997,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -987,7 +1023,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1016,7 +1052,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1042,7 +1078,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1071,7 +1107,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1099,7 +1135,7 @@ If the original index is empty (`orig_index.size() == 0`), you can pass `std::nu
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const int8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1128,7 +1164,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1154,9 +1190,58 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::device_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` | optional raft::device_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
+
+**Returns**
+
+`void`
+
+**Additional overload:** `neighbors::ivf_flat::extend`
+
+Build a new index by extending a binary index with a tightly packed bitmap dataset.
+
+```cpp
+auto extend(raft::resources const& handle,
+cuvs::device_bitmap_dataset_view<int64_t> new_vectors,
+std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
+-> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `new_vectors` |  | [`cuvs::device_bitmap_dataset_view<int64_t>`](/api-reference/cpp-api-core-dataset-bitmap#device-bitmap-dataset-view) |  |
+| `new_indices` |  | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` |  |
+| `idx` |  | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) |  |
+
+**Returns**
+
+[`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index)
+
+**Additional overload:** `neighbors::ivf_flat::extend`
+
+Extend a binary index in-place with a tightly packed bitmap dataset.
+
+```cpp
+void extend(raft::resources const& handle,
+cuvs::device_bitmap_dataset_view<int64_t> new_vectors,
+std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
+```
+
+**Parameters**
+
+| Name | Direction | Type | Description |
+| --- | --- | --- | --- |
+| `handle` |  | `raft::resources const&` |  |
+| `new_vectors` |  | [`cuvs::device_bitmap_dataset_view<int64_t>`](/api-reference/cpp-api-core-dataset-bitmap#device-bitmap-dataset-view) |  |
+| `new_indices` |  | `std::optional<raft::device_vector_view<const int64_t, int64_t>>` |  |
+| `idx` |  | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) |  |
 
 **Returns**
 
@@ -1185,7 +1270,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<float, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1213,7 +1298,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<float, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1244,7 +1329,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<half, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1272,7 +1357,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<half, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1303,7 +1388,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1331,7 +1416,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const int8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1362,7 +1447,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | in | [`const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>&`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | original index |
 
@@ -1390,7 +1475,7 @@ Usage example:
 | Name | Direction | Type | Description |
 | --- | --- | --- | --- |
 | `handle` | in | `raft::resources const&` |  |
-| `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | raft::host_matrix_view to a row-major matrix [n_rows, index.dim()] |
+| `new_vectors` | in | `raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>` | row-major matrix [n_rows, index.storage_dim()] |
 | `new_indices` | in | `std::optional<raft::host_vector_view<const int64_t, int64_t>>` | optional raft::host_vector_view to a vector of indices [n_rows]. If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt` here to imply a continuous range `[0...n_rows)`. |
 | `idx` | inout | [`cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*`](/api-reference/cpp-api-neighbors-ivf-flat#neighbors-ivf-flat-index) | pointer to index, to be overwritten in-place |
 
@@ -1942,7 +2027,7 @@ Usage example:
 | `list_data` | in | [`raft::device_mdspan<const float, typename list_spec<uint32_t, float, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
-| `codes` | inout | `raft::device_matrix_view<float, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
+| `codes` | inout | `raft::device_matrix_view<float, uint32_t, raft::row_major>` | the destination buffer [n_take, index.storage_dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
 
 **Returns**
 
@@ -1972,7 +2057,7 @@ Usage example:
 | `list_data` | in | [`raft::device_mdspan<const half, typename list_spec<uint32_t, half, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
-| `codes` | inout | `raft::device_matrix_view<half, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
+| `codes` | inout | `raft::device_matrix_view<half, uint32_t, raft::row_major>` | the destination buffer [n_take, index.storage_dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
 
 **Returns**
 
@@ -2002,7 +2087,7 @@ Usage example:
 | `list_data` | in | [`raft::device_mdspan<const int8_t, typename list_spec<uint32_t, int8_t, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
-| `codes` | inout | `raft::device_matrix_view<int8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
+| `codes` | inout | `raft::device_matrix_view<int8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.storage_dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
 
 **Returns**
 
@@ -2032,7 +2117,7 @@ Usage example:
 | `list_data` | in | [`raft::device_mdspan<const uint8_t, typename list_spec<uint32_t, uint8_t, int64_t>::list_extents, raft::row_major>`](/api-reference/cpp-api-neighbors-ivf-pq#list-extents) | block to read from |
 | `veclen` | in | `uint32_t` | size of interleaved data chunks |
 | `offset` | in | `uint32_t` | How many records in the list to skip. |
-| `codes` | inout | `raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
+| `codes` | inout | `raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>` | the destination buffer [n_take, index.storage_dim()]. The length `n_take` defines how many records to unpack, it must be &lt;= the list size. |
 
 **Returns**
 

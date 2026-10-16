@@ -331,7 +331,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
     auto& lists = idx.lists();
 
     // conservative memory allocation for codepacking
-    auto list_device_spec = list_spec<uint32_t, DataT, IdxT>{idx.dim(), false};
+    auto list_device_spec = list_spec<uint32_t, DataT, IdxT>{idx.storage_dim(), false};
 
     for (uint32_t label = 0; label < idx.n_lists(); label++) {
       uint32_t list_size = list_sizes.data_handle()[label];
@@ -348,20 +348,22 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
       if (list_size > 0) {
         uint32_t padded_list_size = interleaved_group::roundUp(list_size);
-        uint32_t n_elems          = padded_list_size * idx.dim();
+        uint32_t n_elems          = padded_list_size * idx.storage_dim();
         auto& list_data           = lists[label]->data;
         auto& list_inds           = extend_index.lists()[label]->indices;
 
         // fetch the flat codes
-        auto flat_codes = raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.dim());
+        auto flat_codes =
+          raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.storage_dim());
 
-        raft::matrix::gather(
-          handle_,
-          raft::make_device_matrix_view<const DataT, uint32_t>(
-            (const DataT*)database.data(), static_cast<uint32_t>(ps.num_db_vecs), idx.dim()),
-          raft::make_device_vector_view<const IdxT, uint32_t>((const IdxT*)list_inds.data_handle(),
-                                                              list_size),
-          flat_codes.view());
+        raft::matrix::gather(handle_,
+                             raft::make_device_matrix_view<const DataT, uint32_t>(
+                               (const DataT*)database.data(),
+                               static_cast<uint32_t>(ps.num_db_vecs),
+                               idx.storage_dim()),
+                             raft::make_device_vector_view<const IdxT, uint32_t>(
+                               (const IdxT*)list_inds.data_handle(), list_size),
+                             flat_codes.view());
 
         helpers::codepacker::pack(
           handle_, make_const_mdspan(flat_codes.view()), idx.veclen(), 0, list_data.view());
@@ -372,7 +374,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           raft::linalg::map_offset(
             handle_,
             mask.view(),
-            [dim = idx.dim(),
+            [dim = idx.storage_dim(),
              list_size,
              padded_list_size,
              chunk_size = raft::util::FastIntDiv<int64_t>(idx.veclen())] __device__(auto i) {
@@ -418,7 +420,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         }
 
         auto unpacked_flat_codes =
-          raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.dim());
+          raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.storage_dim());
 
         helpers::codepacker::unpack(
           handle_, list_data.view(), idx.veclen(), 0, unpacked_flat_codes.view());
