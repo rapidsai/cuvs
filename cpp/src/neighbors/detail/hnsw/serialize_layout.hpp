@@ -118,48 +118,6 @@ struct hnsw_serialize_layout {
 };
 
 template <typename T, typename DistT>
-hnsw_serialize_layout make_hnsw_serialize_layout(hnswlib::SpaceInterface<DistT>* space,
-                                                 uint64_t rows,
-                                                 size_t dimension,
-                                                 size_t graph_degree,
-                                                 size_t ef_construction,
-                                                 bool hierarchy,
-                                                 const hierarchy_summary& summary)
-{
-  if (rows == 0 || rows > std::numeric_limits<uint32_t>::max()) {
-    throw std::invalid_argument("invalid HNSW row count");
-  }
-  auto algorithm = std::make_unique<hnswlib::HierarchicalNSW<DistT>>(
-    space, 1, (graph_degree + 1) / 2, ef_construction);
-  hnsw_serialize_layout layout;
-  layout.offset_level0         = algorithm->offsetLevel0_;
-  layout.rows                  = static_cast<size_t>(rows);
-  layout.size_data_per_element = algorithm->size_data_per_element_;
-  layout.label_offset          = algorithm->label_offset_;
-  layout.offset_data           = algorithm->offsetData_;
-  layout.max_level             = hierarchy ? static_cast<int>(summary.max_level) : 1;
-  layout.entry_point           = hierarchy ? summary.entry_point : static_cast<uint32_t>(rows / 2);
-  layout.maxM                  = algorithm->maxM_;
-  layout.maxM0                 = algorithm->maxM0_;
-  layout.M                     = algorithm->M_;
-  layout.mult                  = algorithm->mult_;
-  layout.ef_construction       = algorithm->ef_construction_;
-  layout.dimension             = dimension;
-  layout.element_size          = sizeof(T);
-  layout.graph_degree          = graph_degree;
-  layout.upper_block_size      = algorithm->size_links_per_element_;
-
-  const size_t expected_base =
-    sizeof(uint32_t) + layout.maxM0 * sizeof(uint32_t) + dimension * sizeof(T) + sizeof(size_t);
-  RAFT_EXPECTS(layout.size_data_per_element == expected_base, "Unexpected hnswlib base row layout");
-  RAFT_EXPECTS(layout.maxM0 >= graph_degree && layout.maxM0 - graph_degree <= 1,
-               "Unexpected hnswlib base degree");
-  RAFT_EXPECTS(layout.upper_block_size == sizeof(uint32_t) + layout.M * sizeof(uint32_t),
-               "Unexpected hnswlib upper row layout");
-  return layout;
-}
-
-template <typename T, typename DistT>
 hnsw_serialize_layout hnsw_serialize_layout_from_algorithm(
   const hnswlib::HierarchicalNSW<DistT>& algorithm,
   uint64_t rows,
@@ -183,6 +141,34 @@ hnsw_serialize_layout hnsw_serialize_layout_from_algorithm(
   layout.element_size          = sizeof(T);
   layout.graph_degree          = graph_degree;
   layout.upper_block_size      = algorithm.size_links_per_element_;
+  return layout;
+}
+
+template <typename T, typename DistT>
+hnsw_serialize_layout make_hnsw_serialize_layout(hnswlib::SpaceInterface<DistT>* space,
+                                                 uint64_t rows,
+                                                 size_t dimension,
+                                                 size_t graph_degree,
+                                                 size_t ef_construction,
+                                                 bool hierarchy,
+                                                 const hierarchy_summary& summary)
+{
+  if (rows == 0 || rows > std::numeric_limits<uint32_t>::max()) {
+    throw std::invalid_argument("invalid HNSW row count");
+  }
+  auto algorithm = std::make_unique<hnswlib::HierarchicalNSW<DistT>>(
+    space, 1, (graph_degree + 1) / 2, ef_construction);
+  auto layout = hnsw_serialize_layout_from_algorithm<T>(*algorithm, rows, dimension, graph_degree);
+  layout.max_level   = hierarchy ? static_cast<int>(summary.max_level) : 1;
+  layout.entry_point = hierarchy ? summary.entry_point : static_cast<uint32_t>(rows / 2);
+
+  const size_t expected_base =
+    sizeof(uint32_t) + layout.maxM0 * sizeof(uint32_t) + dimension * sizeof(T) + sizeof(size_t);
+  RAFT_EXPECTS(layout.size_data_per_element == expected_base, "Unexpected hnswlib base row layout");
+  RAFT_EXPECTS(layout.maxM0 >= graph_degree && layout.maxM0 - graph_degree <= 1,
+               "Unexpected hnswlib base degree");
+  RAFT_EXPECTS(layout.upper_block_size == sizeof(uint32_t) + layout.M * sizeof(uint32_t),
+               "Unexpected hnswlib upper row layout");
   return layout;
 }
 
