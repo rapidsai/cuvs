@@ -849,39 +849,6 @@ Note that a dataset residing in host memory produces a host-backed index, which 
 
 A `CUVS_DATASET_LAYOUT_PQ` dataset created by `cuvsDatasetMakePQ` builds an iterative CAGRA-Q index. VPQ input requires `L2Expanded` and `ITERATIVE_CAGRA_SEARCH` (or `AUTO_SELECT`), and the VPQ dataset must outlive the index because the index stores a non-owning view. A `CUVS_DATASET_LAYOUT_BBQ` dataset builds a graph-only index; attach a searchable dataset with `cuvsCagraUpdateDataset` before search.
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here holding a device padded dataset
-DLManagedTensor dataset;
-
-// Wrap it in a non-owning dataset handle
-cuvsDataset_t dataset_view;
-cuvsError_t view_create_status = cuvsDatasetMakePaddedView(res, &dataset, &dataset_view);
-
-// Create default index params
-cuvsCagraIndexParams_t params;
-cuvsError_t params_create_status = cuvsCagraIndexParamsCreate(&params);
-
-// Create CAGRA index
-cuvsCagraIndex_t index;
-cuvsError_t index_create_status = cuvsCagraIndexCreate(&index);
-
-// Build the CAGRA Index
-cuvsError_t build_status = cuvsCagraBuild(res, params, dataset_view, index);
-
-// de-allocate `dataset_view`, `params`, `index` and `res`
-cuvsError_t view_destroy_status = cuvsDatasetDestroy(dataset_view);
-cuvsError_t params_destroy_status = cuvsCagraIndexParamsDestroy(params);
-cuvsError_t index_destroy_status = cuvsCagraIndexDestroy(index);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -914,32 +881,6 @@ DLManagedTensor* queries,
 DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter filter);
-```
-
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-DLManagedTensor queries;
-DLManagedTensor neighbors;
-
-// Create default search params
-cuvsCagraSearchParams_t params;
-cuvsError_t params_create_status = cuvsCagraSearchParamsCreate(&params);
-
-// Search the `index` built using `cuvsCagraBuild`
-cuvsError_t search_status = cuvsCagraSearch(res, params, index, &queries, &neighbors,
-&distances);
-
-// de-allocate `params` and `res`
-cuvsError_t params_destroy_status = cuvsCagraSearchParamsDestroy(params);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
 ```
 
 **Parameters**
@@ -1068,18 +1009,6 @@ NOTE: The saved index can only be read by the hnswlib wrapper in cuVS, as the se
 
 Experimental, both the API and the serialization format are subject to change.
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// create an index with `cuvsCagraBuild`
-cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1161,29 +1090,6 @@ DLManagedTensor* dataset,
 cuvsCagraIndex_t index);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Create CAGRA index
-cuvsCagraIndex_t index;
-cuvsError_t index_create_status = cuvsCagraIndexCreate(&index);
-
-// Assume a populated `DLManagedTensor` type here for the graph and dataset
-DLManagedTensor dataset;
-DLManagedTensor graph;
-
-cuvsDistanceType metric = L2Expanded;
-
-// Build the CAGRA Index from the graph/dataset
-cuvsError_t status = cuvsCagraIndexFromArgs(res, metric, &graph, &dataset, index);
-
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1225,38 +1131,6 @@ Input indices must have:
 The resulting output index will have the same data type as the input indices.
 
 Example:
-
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-cuvsCagraIndex_t index1, index2, merged_index;
-cuvsCagraIndexCreate(&index1);
-cuvsCagraIndexCreate(&index2);
-cuvsCagraIndexCreate(&merged_index);
-
-// Assume index1 and index2 have device datasets and were built using cuvsCagraBuild.
-
-cuvsCagraIndexParams_t merge_params;
-cuvsError_t params_create_status = cuvsCagraIndexParamsCreate(&merge_params);
-
-cuvsDataset_t merged_dataset;
-cuvsDatasetCreate(&merged_dataset);
-cuvsFilter filter = {.type = NO_FILTER, .addr = 0};
-
-cuvsError_t merge_status = cuvsCagraMerge(res, merge_params, (cuvsCagraIndex_t[]){index1,
-index2}, 2, filter, merged_dataset, merged_index);
-
-// Use merged_index for search operations
-
-cuvsCagraIndexDestroy(merged_index);
-cuvsDatasetDestroy(merged_dataset);
-cuvsError_t params_destroy_status = cuvsCagraIndexParamsDestroy(merge_params);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
 
 **Parameters**
 

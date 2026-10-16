@@ -59,17 +59,6 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  raft::resources res;
-  // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
-  auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
-  ivf_pq::index_params index_params =
-    ivf_pq::index_params::from_dataset(dataset.extents(), cuvs::distance::InnerProduct);
-  // modify/update index_params as needed
-  index_params.add_data_on_build = true;
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -596,18 +585,6 @@ uint32_t get_list_size_in_bytes(uint32_t label) const override;
 
 Usage example:
 
-```cpp
-  raft::resources res;
-  // use default index params
-  ivf_pq::index_params index_params;
-  // extend the IVF lists while building the index
-  index_params.add_data_on_build = true;
-  // create and fill the index from a [N, D] dataset
-  auto index = cuvs::neighbors::ivf_pq::build(res, index_params, dataset);
-  // Fetch the size of the fourth list
-  uint32_t size = index.get_list_size_in_bytes(3);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -654,14 +631,6 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -694,15 +663,6 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -728,14 +688,6 @@ raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -769,15 +721,6 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -803,14 +746,6 @@ raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -844,15 +779,6 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -878,14 +804,6 @@ raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -919,15 +837,6 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -955,17 +864,6 @@ raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -1001,18 +899,6 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1040,17 +926,6 @@ raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -1084,15 +959,6 @@ NB: Currently, the following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1118,14 +984,6 @@ raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -1161,18 +1019,6 @@ Note, if index_params.add_data_on_build is set to true, the user can set a strea
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1200,17 +1046,6 @@ raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -1245,18 +1080,6 @@ NB: Currently, the following distance metrics are supported:
 Note, if index_params.add_data_on_build is set to true, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping. This is only applicable if index_params.add_data_on_build is set to true
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // create and fill the index from a [N, D] dataset
-  ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
-  ivf_pq::build(handle, index_params, dataset, index);
-```
 
 **Parameters**
 
@@ -1432,18 +1255,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1470,18 +1281,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1509,18 +1308,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1547,18 +1334,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1586,18 +1361,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1623,18 +1386,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
 
 **Parameters**
 
@@ -1663,18 +1414,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -1700,18 +1439,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // fill the index with the data
-  std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
 
 **Parameters**
 
@@ -1741,21 +1468,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
 
 **Parameters**
 
@@ -1784,21 +1496,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
 
 **Parameters**
 
@@ -1828,21 +1525,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
 
 **Parameters**
 
@@ -1871,21 +1553,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
 
 **Parameters**
 
@@ -1915,21 +1582,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
 
 **Parameters**
 
@@ -1958,21 +1610,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-```
 
 **Parameters**
 
@@ -2002,21 +1639,6 @@ const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
-```
 
 **Parameters**
 
@@ -2045,22 +1667,6 @@ cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 Note, the user can set a stream pool in the input raft::resource with at least one stream to enable kernel and copy overlapping.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  ivf_pq::index_params index_params;
-  index_params.add_data_on_build = false;      // don't populate index on build
-  index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
-  // train the index from a [N, D] dataset
-  auto index_empty = ivf_pq::build(handle, index_params, dataset);
-  // optional: create a stream pool with at least one stream to enable kernel and copy
-  // overlapping
-  raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
-  // fill the index with the data
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
-  ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
-
-```
 
 **Parameters**
 
@@ -2189,17 +1795,6 @@ std::ostream& os,
 const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 ```
 
-```cpp
-#include <raft/core/resources.hpp>
-
-raft::resources handle;
-
-// create an output stream
-std::ostream os(std::cout.rdbuf());
-// create an index with `auto index = ivf_pq::build(...);`
-cuvs::neighbors::ivf_pq::serialize(handle, os, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2220,17 +1815,6 @@ Save the index to file.
 void serialize(raft::resources const& handle,
 const std::string& filename,
 const cuvs::neighbors::ivf_pq::index<int64_t>& index);
-```
-
-```cpp
-#include <raft/core/resources.hpp>
-
-raft::resources handle;
-
-// create a string with a filepath
-std::string filename("/path/to/index");
-// create an index with `auto index = ivf_pq::build(...);`
-cuvs::neighbors::ivf_pq::serialize(handle, filename, index);
 ```
 
 **Parameters**
@@ -2256,21 +1840,6 @@ std::istream& str,
 cuvs::neighbors::ivf_pq::index<int64_t>* index);
 ```
 
-```cpp
-#include <raft/core/resources.hpp>
-
-raft::resources handle;
-
-// create an input stream
-std::istream is(std::cin.rdbuf());
-
-using IdxT = int64_t; // type of the index
-// create an empty index
-cuvs::neighbors::ivf_pq::index<IdxT> index(handle);
-
-cuvs::neighbors::ivf_pq::deserialize(handle, is, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2291,20 +1860,6 @@ Load index from file.
 void deserialize(raft::resources const& handle,
 const std::string& filename,
 cuvs::neighbors::ivf_pq::index<int64_t>* index);
-```
-
-```cpp
-#include <raft/core/resources.hpp>
-
-raft::resources handle;
-
-// create a string with a filepath
-std::string filename("/path/to/index");
-using IdxT = int64_t; // type of the index
-// create an empty index
-ivf_pq::index<IdxT> index(handle);
-
-cuvs::neighbors::ivf_pq::deserialize(handle, filename, &index);
 ```
 
 **Parameters**
@@ -2340,16 +1895,6 @@ Bit compression is removed, which means output will have pq_dim dimensional vect
 
 Usage example:
 
-```cpp
-  auto list_data = index.lists()[label]->data.view();
-  // allocate the buffer for the output
-  uint32_t n_take = 4;
-  auto codes = raft::make_device_matrix<uint8_t>(res, n_take, index.pq_dim());
-  uint32_t offset = 0;
-  // unpack n_take elements from the list
-  ivf_pq::helpers::codepacker::unpack(res, list_data, index.pq_bits(), offset, codes.view());
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2382,19 +1927,6 @@ uint8_t* codes);
 ```
 
 Usage example:
-
-```cpp
-  raft::resources res;
-  auto list_data = index.lists()[label]->data.view();
-  // allocate the buffer for the output
-  uint32_t n_rows = 4;
-  auto codes = raft::make_device_matrix<uint8_t>(
-    res, n_rows, raft::ceildiv(index.pq_dim() * index.pq_bits(), 8));
-  uint32_t offset = 0;
-  // unpack n_rows elements from the list
-  ivf_pq::helpers::codepacker::unpack_contiguous(
-    res, list_data, index.pq_bits(), offset, n_rows, index.pq_dim(), codes.data_handle());
-```
 
 **Parameters**
 
@@ -2430,16 +1962,6 @@ raft::row_major> list_data);
 NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
 
 Usage example:
-
-```cpp
-  auto list_data  = index.lists()[label]->data.view();
-  // allocate the buffer for the input codes
-  auto codes = raft::make_device_matrix<uint8_t>(res, n_vec, index.pq_dim());
-  ... prepare n_vecs to pack into the list in codes ...
-  // write codes into the list starting from the 42nd position
-  ivf_pq::helpers::codepacker::pack(
-      res, make_const_mdspan(codes.view()), index.pq_bits(), 42, list_data);
-```
 
 **Parameters**
 
@@ -2478,19 +2000,6 @@ NB: no memory allocation happens here; the list must fit the data (offset + n_ro
 
 Usage example:
 
-```cpp
-  raft::resources res;
-  auto list_data  = index.lists()[label]->data.view();
-  // allocate the buffer for the input codes
-  auto codes = raft::make_device_matrix<uint8_t>(
-    res, n_rows, raft::ceildiv(index.pq_dim() * index.pq_bits(), 8));
-  ... prepare compressed vectors to pack into the list in codes ...
-  // write codes into the list starting from the 42nd position. If the current size of the list
-  // is greater than 42, this will overwrite the codes starting at this offset.
-  ivf_pq::helpers::codepacker::pack_contiguous(
-    res, codes.data_handle(), n_rows, index.pq_dim(), index.pq_bits(), 42, list_data);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2525,16 +2034,6 @@ The list is identified by its label.
 NB: no memory allocation happens here; the list must fit the data (offset + n_vec).
 
 Usage example:
-
-```cpp
-  // We will write into the 137th cluster
-  uint32_t label = 137;
-  // allocate the buffer for the input codes
-  auto codes = raft::make_device_matrix<const uint8_t>(res, n_vec, index.pq_dim());
-  ... prepare n_vecs to pack into the list in codes ...
-  // write codes into the list starting from the 42nd position
-  ivf_pq::helpers::codepacker::pack_list_data(res, &index, codes_to_pack, label, 42);
-```
 
 **Parameters**
 
@@ -2572,26 +2071,6 @@ NB: no memory allocation happens here; the list into which the vectors are packe
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  raft::resources res;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // create and fill the index from a [N, D] dataset
-  auto index = ivf_pq::build(res, index_params, dataset, N, D);
-  // allocate the buffer for n_rows input codes. Each vector occupies
-  // raft::ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes because
-  // codes are compressed and without gaps.
-  auto codes = raft::make_device_matrix<const uint8_t>(
-    res, n_rows, raft::ceildiv(index.pq_dim() * index.pq_bits(), 8));
-  ... prepare the compressed vectors to pack into the list in codes ...
-  // the first n_rows codes in the fourth IVF list are to be overwritten.
-  uint32_t label = 3;
-  // write codes into the list starting from the 0th position
-  ivf_pq::helpers::codepacker::pack_contiguous_list_data(
-    res, &index, codes.data_handle(), n_rows, label, 0);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2622,19 +2101,6 @@ uint32_t offset);
 
 Usage example:
 
-```cpp
-  // We will unpack the fourth cluster
-  uint32_t label = 3;
-  // Get the list size
-  uint32_t list_size = 0;
-  raft::copy(&list_size, index.list_sizes().data_handle() + label, 1,
-resource::get_cuda_stream(res)); resource::sync_stream(res);
-  // allocate the buffer for the output
-  auto codes = raft::make_device_matrix<uint8_t>(res, list_size, index.pq_dim());
-  // unpack the whole list
-  ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.view(), label, 0);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2662,20 +2128,6 @@ uint32_t label);
 ```
 
 Usage example:
-
-```cpp
-  // We will unpack the fourth cluster
-  uint32_t label = 3;
-  // Create the selection vector
-  auto selected_indices = raft::make_device_vector<uint32_t>(res, 4);
-  ... fill the indices ...
-  resource::sync_stream(res);
-  // allocate the buffer for the output
-  auto codes = raft::make_device_matrix<float>(res, selected_indices.size(), index.pq_dim());
-  // decode the whole list
-  ivf_pq::helpers::codepacker::unpack_list_data(
-      res, index, selected_indices.view(), codes.view(), label);
-```
 
 **Parameters**
 
@@ -2707,23 +2159,6 @@ uint32_t offset);
 
 Usage example:
 
-```cpp
-  raft::resources res;
-  // We will unpack the whole fourth cluster
-  uint32_t label = 3;
-  // Get the list size
-  uint32_t list_size = 0;
-  raft::update_host(&list_size, index.list_sizes().data_handle() + label, 1,
-    raft::resource::get_cuda_stream(res));
-  raft::resource::sync_stream(res);
-  // allocate the buffer for the output
-  auto codes = raft::make_device_matrix<uint8_t>(res, list_size, raft::ceildiv(index.pq_dim() *
-     index.pq_bits(), 8));
-  // unpack the whole list
-  ivf_pq::helpers::codepacker::unpack_contiguous_list_data(res, index, codes.data_handle(),
-     list_size, label, 0);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2754,20 +2189,6 @@ uint32_t offset);
 
 Usage example:
 
-```cpp
-  // We will reconstruct the fourth cluster
-  uint32_t label = 3;
-  // Get the list size
-  uint32_t list_size = 0;
-  raft::copy(&list_size, index.list_sizes().data_handle() + label, 1,
-  resource::get_cuda_stream(res)); resource::sync_stream(res);
-  // allocate the buffer for the output
-  auto decoded_vectors = raft::make_device_matrix<float>(res, list_size, index.dim());
-  // decode the whole list
-  ivf_pq::helpers::codepacker::reconstruct_list_data(res, index, decoded_vectors.view(), label,
-0);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2795,21 +2216,6 @@ uint32_t label);
 ```
 
 Usage example:
-
-```cpp
-  // We will reconstruct the fourth cluster
-  uint32_t label = 3;
-  // Create the selection vector
-  auto selected_indices = raft::make_device_vector<uint32_t>(res, 4);
-  ... fill the indices ...
-  resource::sync_stream(res);
-  // allocate the buffer for the output
-  auto decoded_vectors = raft::make_device_matrix<float>(
-                            res, selected_indices.size(), index.dim());
-  // decode the whole list
-  ivf_pq::helpers::codepacker::reconstruct_list_data(
-      res, index, selected_indices.view(), decoded_vectors.view(), label);
-```
 
 **Parameters**
 
@@ -2840,22 +2246,6 @@ uint32_t label);
 ```
 
 Usage example:
-
-```cpp
-  // We will extend the fourth cluster
-  uint32_t label = 3;
-  // We will fill 4 new vectors
-  uint32_t n_vec = 4;
-  // Indices of the new vectors
-  auto indices = raft::make_device_vector<uint32_t>(res, n_vec);
-  ... fill the indices ...
-  auto new_codes = raft::make_device_matrix<uint8_t, uint32_t, row_major> new_codes(
-      res, n_vec, index.pq_dim());
-  ... fill codes ...
-  // extend list with new codes
-  ivf_pq::helpers::codepacker::extend_list_with_codes(
-      res, &index, codes.view(), indices.view(), label);
-```
 
 **Parameters**
 
@@ -2889,23 +2279,6 @@ This is similar to extend_list_with_codes but takes codes in contiguous packed f
 
 Usage example:
 
-```cpp
-  // We will extend the fourth cluster
-  uint32_t label = 3;
-  // We will fill 4 new vectors
-  uint32_t n_vec = 4;
-  // Indices of the new vectors
-  auto indices = raft::make_device_vector<int64_t>(res, n_vec);
-  ... fill the indices ...
-  // Allocate buffer for packed codes
-  uint32_t code_size = raft::ceildiv(index.pq_dim() * index.pq_bits(), 8u);
-  auto new_codes = raft::make_device_matrix<uint8_t, uint32_t, row_major>(res, n_vec, code_size);
-  ... fill codes ...
-  // extend list with new codes
-  ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes(
-      res, &index, new_codes.view(), indices.view(), label);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2935,22 +2308,6 @@ uint32_t label);
 
 Usage example:
 
-```cpp
-  // We will extend the fourth cluster
-  uint32_t label = 3;
-  // We will extend with 4 new vectors
-  uint32_t n_vec = 4;
-  // Indices of the new vectors
-  auto indices = raft::make_device_vector<uint32_t>(res, n_vec);
-  ... fill the indices ...
-  auto new_vectors = raft::make_device_matrix<float, uint32_t, row_major> new_codes(
-      res, n_vec, index.dim());
-  ... fill vectors ...
-  // extend list with new vectors
-  ivf_pq::helpers::codepacker::extend_list(
-      res, &index, new_vectors.view(), indices.view(), label);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -2976,11 +2333,6 @@ void erase_list(raft::resources const& res, index<int64_t>* index, uint32_t labe
 
 Usage example:
 
-```cpp
-  // We will erase the fourth cluster (label = 3)
-  ivf_pq::helpers::erase_list(res, &index, 3);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -3003,17 +2355,6 @@ void reset_index(const raft::resources& res, index<int64_t>* index);
 ```
 
 Usage example:
-
-```cpp
-  raft::resources res;
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // initialize an empty index
-  ivf_pq::index<int64_t> index(res, index_params, D);
-  // reset the index's state and list sizes
-  ivf_pq::helpers::reset_index(res, &index);
-```
 
 **Parameters**
 
@@ -3116,15 +2457,6 @@ raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers);
 
 Usage example:
 
-```cpp
-  raft::resources res;
-  // allocate the buffer for the output centers
-  auto cluster_centers = raft::make_device_matrix<float, uint32_t>(
-    res, index.n_lists(), index.dim());
-  // Extract the IVF centroids into the buffer
-  cuvs::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -3168,24 +2500,6 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  raft::resources res;
-  // use default index parameters
-  ivf_pq::index_params index_params;
-  // initialize an empty index
-  ivf_pq::index<int64_t> index(res, index_params, D);
-  ivf_pq::helpers::reset_index(res, &index);
-  // resize the first IVF list to hold 5 records
-  auto spec = ivf_pq::list_spec_interleaved<uint32_t, int64_t>{
-    index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
-  uint32_t new_size = 5;
-  ivf_pq::helpers::resize_list(res, index.lists()[0], spec, new_size, 0);
-  raft::update_device(index.list_sizes().data_handle(), &new_size, 1, stream);
-  // recompute the internal state of the index
-  ivf_pq::helpers::recompute_internal_state(res, &index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -3212,19 +2526,6 @@ bool force_random_rotation);
 This standalone helper generates a rotation matrix without requiring an index object. Users can call this to prepare a rotation matrix before building from precomputed data.
 
 Usage example:
-
-```cpp
-  raft::resources res;
-  uint32_t dim = 128, pq_dim = 32;
-  uint32_t rot_dim = pq_dim * ((dim + pq_dim - 1) / pq_dim);  // rounded up
-
-  // Allocate rotation matrix buffer [rot_dim, dim]
-  auto rotation_matrix = raft::make_device_matrix<float, uint32_t>(res, rot_dim, dim);
-
-  // Generate the rotation matrix
-  ivf_pq::helpers::make_rotation_matrix(
-    res, rotation_matrix.view(), true);
-```
 
 **Parameters**
 
@@ -3280,17 +2581,6 @@ This helper resizes an IVF list that uses the flat (non-interleaved) PQ code lay
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  raft::resources res;
-  // Assuming index uses FLAT layout
-  auto spec = ivf_pq::list_spec_flat<uint32_t, int64_t>{
-    index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
-  uint32_t old_size = current_list_size;
-  uint32_t new_size = old_size + n_new_vectors;
-  ivf_pq::helpers::resize_list(res, index.lists()[label], spec, new_size, old_size);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -3320,17 +2610,6 @@ uint32_t old_used_size);
 This helper resizes an IVF list that uses the interleaved PQ code layout (default). If the new size exceeds the current capacity, a new list is allocated and existing data is copied. The function handles the type casting internally.
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  raft::resources res;
-  // Assuming index uses INTERLEAVED layout (default)
-  auto spec = ivf_pq::list_spec_interleaved<uint32_t, int64_t>{
-    index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
-  uint32_t old_size = current_list_size;
-  uint32_t new_size = old_size + n_new_vectors;
-  ivf_pq::helpers::resize_list(res, index.lists()[label], spec, new_size, old_size);
-```
 
 **Parameters**
 

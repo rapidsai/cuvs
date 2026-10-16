@@ -149,29 +149,6 @@ Note: Only contiguous row- or column-major layouts supported currently.
 
 Usage example:
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <cuvs/distance/distance.hpp>
-
-raft::resources handle;
-int n_samples = 5000;
-int n_features = 50;
-
-auto input = raft::make_device_matrix<float>(handle, n_samples, n_features);
-
-// ... fill input with data ...
-
-auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
-
-auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-cuvs::distance::pairwise_distance(handle,
-                                  raft::make_const(input.view()),
-                                  raft::make_const(input.view()),
-                                  output.view(),
-                                  metric);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -204,29 +181,6 @@ double metric_arg = 2.0f);
 Note: Only contiguous row- or column-major layouts supported currently.
 
 Usage example:
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <cuvs/distance/distance.hpp>
-
-raft::resources handle;
-int n_samples = 5000;
-int n_features = 50;
-
-auto input = raft::make_device_matrix<double>(handle, n_samples, n_features);
-
-// ... fill input with data ...
-
-auto output = raft::make_device_matrix<double>(handle, n_samples, n_samples);
-
-auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-cuvs::distance::pairwise_distance(handle,
-                                  raft::make_const(input.view()),
-                                  raft::make_const(input.view()),
-                                  output.view(),
-                                  metric);
-```
 
 **Parameters**
 
@@ -261,29 +215,6 @@ Note: Only contiguous row- or column-major layouts supported currently.
 
 Usage example:
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <cuvs/distance/distance.hpp>
-
-raft::resources handle;
-int n_samples = 5000;
-int n_features = 50;
-
-auto input = raft::make_device_matrix<float>(handle, n_samples, n_features);
-
-// ... fill input with data ...
-
-auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
-
-auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-cuvs::distance::pairwise_distance(handle,
-                                  raft::make_const(input.view()),
-                                  raft::make_const(input.view()),
-                                  output.view(),
-                                  metric);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -316,29 +247,6 @@ float metric_arg = 2.0f);
 Note: Only contiguous row- or column-major layouts supported currently.
 
 Usage example:
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <cuvs/distance/distance.hpp>
-
-raft::resources handle;
-int n_samples = 5000;
-int n_features = 50;
-
-auto input = raft::make_device_matrix<float>(handle, n_samples, n_features);
-
-// ... fill input with data ...
-
-auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
-
-auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-cuvs::distance::pairwise_distance(handle,
-                                  raft::make_const(input.view()),
-                                  raft::make_const(input.view()),
-                                  output.view(),
-                                  metric);
-```
 
 **Parameters**
 
@@ -373,29 +281,6 @@ Note: Only contiguous row- or column-major layouts supported currently.
 
 Usage example:
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <cuvs/distance/distance.hpp>
-
-raft::resources handle;
-int n_samples = 5000;
-int n_features = 50;
-
-auto input = raft::make_device_matrix<double>(handle, n_samples, n_features);
-
-// ... fill input with data ...
-
-auto output = raft::make_device_matrix<double>(handle, n_samples, n_samples);
-
-auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-cuvs::distance::pairwise_distance(handle,
-                                  raft::make_const(input.view()),
-                                  raft::make_const(input.view()),
-                                  output.view(),
-                                  metric);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -429,29 +314,6 @@ Note: Only contiguous row- or column-major layouts supported currently.
 
 Usage example:
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <cuvs/distance/distance.hpp>
-
-raft::resources handle;
-int n_samples = 5000;
-int n_features = 50;
-
-auto input = raft::make_device_matrix<float>(handle, n_samples, n_features);
-
-// ... fill input with data ...
-
-auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
-
-auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-cuvs::distance::pairwise_distance(handle,
-                                  raft::make_const(input.view()),
-                                  raft::make_const(input.view()),
-                                  output.view(),
-                                  metric);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -480,28 +342,6 @@ cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
 ```
 
-```cpp
-#include <raft/core/device_resources.hpp>
-#include <raft/core/device_csr_matrix.hpp>
-#include <raft/core/device_mdspan.hpp>
-
-int x_n_rows = 100000;
-int y_n_rows = 50000;
-int n_cols = 10000;
-
-raft::device_resources handle;
-auto x = raft::make_device_csr_matrix<float>(handle, x_n_rows, n_cols);
-auto y = raft::make_device_csr_matrix<float>(handle, y_n_rows, n_cols);
-
-...
-// populate data
-...
-
-auto out = raft::make_device_matrix<float>(handle, x_nrows, y_nrows);
-auto metric = cuvs::distance::DistanceType::L2Expanded;
-cuvs::pairwise_distance(handle, x.view(), y.view(), out, metric);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -528,28 +368,6 @@ raft::device_csr_matrix_view<const double, int, int, int> y,
 raft::device_matrix_view<double, int, raft::row_major> dist,
 cuvs::distance::DistanceType metric,
 float metric_arg = 2.0f);
-```
-
-```cpp
-#include <raft/core/device_resources.hpp>
-#include <raft/core/device_csr_matrix.hpp>
-#include <raft/core/device_mdspan.hpp>
-
-int x_n_rows = 100000;
-int y_n_rows = 50000;
-int n_cols = 10000;
-
-raft::device_resources handle;
-auto x = raft::make_device_csr_matrix<double>(handle, x_n_rows, n_cols);
-auto y = raft::make_device_csr_matrix<double>(handle, y_n_rows, n_cols);
-
-...
-// populate data
-...
-
-auto out = raft::make_device_matrix<double>(handle, x_nrows, y_nrows);
-auto metric = cuvs::distance::DistanceType::L2Expanded;
-cuvs::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
 ```
 
 **Parameters**

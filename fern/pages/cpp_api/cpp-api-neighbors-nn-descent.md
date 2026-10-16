@@ -239,17 +239,6 @@ The following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::device_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -284,17 +273,6 @@ The following distance metrics are supported:
 - L1
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::host_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
 
 **Template Parameters**
 
@@ -338,17 +316,6 @@ The following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::device_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -383,17 +350,6 @@ The following distance metrics are supported:
 - L1
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::host_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
 
 **Template Parameters**
 
@@ -438,17 +394,6 @@ The following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::device_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -484,17 +429,6 @@ The following distance metrics are supported:
 - BitwiseHamming
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::host_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
 
 **Template Parameters**
 
@@ -539,17 +473,6 @@ The following distance metrics are supported:
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::device_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -585,17 +508,6 @@ The following distance metrics are supported:
 - BitwiseHamming
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // use default index parameters
-  nn_descent::index_params index_params;
-  // create and fill the index from a [N, D] raft::host_matrix_view dataset
-  auto index = nn_descent::build(res, index_params, dataset);
-  // index.graph() provides a raft::host_matrix_view of an
-  // all-neighbors knn graph of dimensions [N, k] of the input
-  // dataset
-```
 
 **Template Parameters**
 

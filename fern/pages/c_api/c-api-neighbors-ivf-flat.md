@@ -271,34 +271,6 @@ DLManagedTensor* dataset,
 cuvsIvfFlatIndex_t index);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/ivf_flat.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-
-// Create default index params
-cuvsIvfFlatIndexParams_t index_params;
-cuvsError_t params_create_status = cuvsIvfFlatIndexParamsCreate(&index_params);
-
-// Create IVF-Flat index
-cuvsIvfFlatIndex_t index;
-cuvsError_t index_create_status = cuvsIvfFlatIndexCreate(&index);
-
-// Build the IVF-Flat Index
-cuvsError_t build_status = cuvsIvfFlatBuild(res, index_params, &dataset, index);
-
-// de-allocate `index_params`, `index` and `res`
-cuvsError_t params_destroy_status = cuvsIvfFlatIndexParamsDestroy(index_params);
-cuvsError_t index_destroy_status = cuvsIvfFlatIndexDestroy(index);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -333,32 +305,6 @@ DLManagedTensor* distances,
 cuvsFilter filter);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/ivf_flat.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-DLManagedTensor queries;
-DLManagedTensor neighbors;
-
-// Create default search params
-cuvsIvfFlatSearchParams_t search_params;
-cuvsError_t params_create_status = cuvsIvfFlatSearchParamsCreate(&search_params);
-
-// Search the `index` built using `ivfFlatBuild`
-cuvsError_t search_status = cuvsIvfFlatSearch(res, search_params, index, &queries, &neighbors,
-&distances);
-
-// de-allocate `search_params` and `res`
-cuvsError_t params_destroy_status = cuvsIvfFlatSearchParamsDestroy(search_params);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -389,17 +335,6 @@ cuvsIvfFlatIndex_t index);
 ```
 
 Experimental, both the API and the serialization format are subject to change.
-
-```cpp
-#include <cuvs/neighbors/ivf_flat.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// create an index with `cuvsIvfFlatBuild`
-cuvsIvfFlatSerialize(res, "/path/to/index", index, true);
-```
 
 **Parameters**
 

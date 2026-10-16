@@ -2519,11 +2519,6 @@ def render_native_function(
         lines.extend(render_doxygen_details(entry.details))
         lines.append("")
 
-    for code_language, code_lines in entry.code_blocks:
-        lines.extend(
-            [f"```{code_language or language}", *code_lines, "```", ""]
-        )
-
     if entry.tparams:
         lines.extend(["**Template Parameters**", ""])
         lines.extend(

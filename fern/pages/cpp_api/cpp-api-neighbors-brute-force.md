@@ -357,13 +357,6 @@ raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
 
 Usage example:
 
-```cpp
-  using namespace cuvs::neighbors;
-  // create and fill the index from a [N, D] dataset
-  brute_force::index_params index_params;
-  auto index = brute_force::build(handle, index_params, dataset);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -411,13 +404,6 @@ raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
 ```
 
 Usage example:
-
-```cpp
-  using namespace cuvs::neighbors;
-  // create and fill the index from a [N, D] dataset
-  brute_force::index_params index_params;
-  auto index = brute_force::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -467,11 +453,6 @@ raft::device_matrix_view<const float, int64_t, raft::col_major> dataset)
 
 Usage example:
 
-```cpp
-  brute_force::index_params index_params;
-  auto index = brute_force::build(handle, index_params, dataset);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -496,11 +477,6 @@ raft::device_matrix_view<const half, int64_t, raft::col_major> dataset)
 ```
 
 Usage example:
-
-```cpp
-  brute_force::index_params index_params;
-  auto index = brute_force::build(handle, index_params, dataset);
-```
 
 **Parameters**
 
@@ -604,18 +580,6 @@ bool include_dataset = true);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create a string with a filepath
-std::string filename("/path/to/index");
-// create an index with `auto index = brute_force::build(...);`
-cuvs::neighbors::brute_force::serialize(handle, filename, index);
-```
-
 **Template Parameters**
 
 | Name | Type | Description |
@@ -647,18 +611,6 @@ bool include_dataset = true);
 ```
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create a string with a filepath
-std::string filename("/path/to/index");
-// create an index with `auto index = brute_force::build(...);`
-cuvs::neighbors::brute_force::serialize(handle, filename, index);
-```
 
 **Template Parameters**
 
@@ -692,18 +644,6 @@ bool include_dataset = true);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create an output stream
-std::ostream os(std::cout.rdbuf());
-// create an index with `auto index = cuvs::neighbors::brute_force::build(...);`
-cuvs::neighbors::brute_force::serialize(handle, os, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -729,18 +669,6 @@ bool include_dataset = true);
 ```
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create an output stream
-std::ostream os(std::cout.rdbuf());
-// create an index with `auto index = cuvs::neighbors::brute_force::build(...);`
-cuvs::neighbors::brute_force::serialize(handle, os, index);
-```
 
 **Parameters**
 
@@ -768,19 +696,6 @@ cuvs::neighbors::brute_force::index<half, float>* index);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create a string with a filepath
-std::string filename("/path/to/index");
-using T    = half; // data element type
-brute_force::index<T, float> index(handle);
-cuvs::neighbors::brute_force::deserialize(handle, filename, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -804,19 +719,6 @@ cuvs::neighbors::brute_force::index<float, float>* index);
 ```
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create a string with a filepath
-std::string filename("/path/to/index");
-using T    = float; // data element type
-brute_force::index<T, float> index(handle);
-cuvs::neighbors::brute_force::deserialize(handle, filename, index);
-```
 
 **Parameters**
 
@@ -842,19 +744,6 @@ cuvs::neighbors::brute_force::index<half, float>* index);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create an input stream
-std::istream is(std::cin.rdbuf());
-using T    = half; // data element type
-brute_force::index<T, float> index(handle);
-cuvs::neighbors::brute_force::deserialize(handle, is, index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -878,19 +767,6 @@ cuvs::neighbors::brute_force::index<float, float>* index);
 ```
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-
-raft::resources handle;
-
-// create an input stream
-std::istream is(std::cin.rdbuf());
-using T    = float; // data element type
-brute_force::index<T, float> index(handle);
-cuvs::neighbors::brute_force::deserialize(handle, is, index);
-```
 
 **Parameters**
 

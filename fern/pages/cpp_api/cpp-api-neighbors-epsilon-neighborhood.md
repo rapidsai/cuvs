@@ -26,21 +26,6 @@ cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded
 
 Currently, only L2Unexpanded (L2-squared) distance metric is supported. Other metrics will throw an exception.
 
-```cpp
- #include <cuvs/neighbors/epsilon_neighborhood.hpp>
- #include <raft/core/resources.hpp>
- #include <raft/core/device_mdarray.hpp>
- using namespace cuvs::neighbors;
- raft::resources handle;
- ...
- auto x = raft::make_device_matrix<float, int64_t>(handle, m, k);
- auto y = raft::make_device_matrix<float, int64_t>(handle, n, k);
- auto adj = raft::make_device_matrix<bool, int64_t>(handle, m, n);
- auto vd = raft::make_device_vector<int, int64_t>(handle, m + 1);
- epsilon_neighborhood::compute(handle, x.view(), y.view(), adj.view(), vd.view(),
-                               eps, cuvs::distance::DistanceType::L2Unexpanded);
-```
-
 **Template Parameters**
 
 | Name | Type | Description |

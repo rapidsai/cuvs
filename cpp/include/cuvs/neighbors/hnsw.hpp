@@ -1501,7 +1501,9 @@ struct materialize_params {
  * @param[in] dim dimensions of the training dataset
  * @param[in] metric distance metric. Supported metrics ("L2Expanded", "InnerProduct")
  *
- * Usage example:
+ * See the [layered HNSW
+ * example](https://github.com/NVIDIA/cuvs/blob/main/examples/cpp/src/hnsw_ace_layered_example.cu)
+ * for a complete materialization and search workflow.
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   hnsw::materialize_params materialize_params;

@@ -29,13 +29,6 @@ Multiple batches use one input buffer per GPU by default. Call cuvsMultiGpuResou
 
 A per-device memory pool is optional but recommended. Configure both before the fit:
 
-```c
-  cuvsMultiGpuResourcesSetMemoryPool(res, 80);
-  cuvsMultiGpuResourcesSetStreamPool(res, 1);
-  cuvsMultiGpuKMeansFit(
-    res, params, X, sample_weight, centroids, &inertia, &n_iter);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |

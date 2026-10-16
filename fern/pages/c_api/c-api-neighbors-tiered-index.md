@@ -176,33 +176,6 @@ DLManagedTensor* dataset,
 cuvsTieredIndex_t index);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/tiered_index.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-
-// Create TieredIndex index
-cuvsTieredIndex_t index;
-cuvsError_t index_create_status = cuvsTieredIndexCreate(&index);
-
-// Create default index params
-cuvsTieredIndexParams_t index_params;
-cuvsError_t params_create_status = cuvsTieredIndexParamsCreate(&index_params);
-
-// Build the TieredIndex Index
-cuvsError_t build_status = cuvsTieredIndexBuild(res, index_params, &dataset_tensor, index);
-
-// de-allocate `index` and `res`
-cuvsError_t index_destroy_status = cuvsTieredIndexDestroy(index);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -231,30 +204,6 @@ DLManagedTensor* queries,
 DLManagedTensor* neighbors,
 DLManagedTensor* distances,
 cuvsFilter prefilter);
-```
-
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/tiered_index.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-DLManagedTensor queries;
-DLManagedTensor neighbors;
-DLManagedTensor bitmap;
-
-cuvsFilter prefilter{(uintptr_t)&bitmap, BITMAP};
-
-// Search the `index` built using `cuvsTieredIndexBuild`
-cuvsError_t search_status = cuvsTieredIndexSearch(res, index, &queries, &neighbors, &distances,
-prefilter);
-
-// de-allocate `res`
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
 ```
 
 **Parameters**

@@ -58,33 +58,6 @@ This function computes the spectral embedding of the input dataset by:
 3. Finding the eigenvectors corresponding to the smallest eigenvalues
 4. Using these eigenvectors as the embedding coordinates
 
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/preprocessing/spectral_embedding.hpp>
-
-raft::resources handle;
-
-// Set up parameters
-cuvs::preprocessing::spectral_embedding::params params;
-params.n_components = 2;
-params.n_neighbors = 15;
-params.norm_laplacian = true;
-params.drop_first = true;
-params.seed = 42;
-
-// Create input dataset (n_samples x n_features)
-auto dataset = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
-// ... fill dataset ...
-
-// Create output embedding matrix (n_samples x n_components)
-auto embedding = raft::make_device_matrix<float, int, raft::col_major>(
-    handle, n_samples, params.n_components);
-
-// Perform spectral embedding
-cuvs::preprocessing::spectral_embedding::transform(
-    handle, params, dataset.view(), embedding.view());
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -116,32 +89,6 @@ The function:
 1. Converts the COO matrix to the graph Laplacian
 2. Computes eigenvectors of the Laplacian
 3. Returns the eigenvectors as the embedding
-
-```cpp
-#include <raft/core/resources.hpp>
-#include <cuvs/preprocessing/spectral_embedding.hpp>
-
-raft::resources handle;
-
-// Set up parameters
-cuvs::preprocessing::spectral_embedding::params params;
-params.n_components = 2;
-params.norm_laplacian = true;
-params.drop_first = true;
-params.seed = 42;
-
-// Assume we have a precomputed connectivity graph as COO matrix
-// connectivity_graph represents weighted edges between samples
-raft::device_coo_matrix<float, int, int, int> connectivity_graph(...);
-
-// Create output embedding matrix (n_samples x n_components)
-auto embedding = raft::make_device_matrix<float, int, raft::col_major>(
-    handle, n_samples, params.n_components);
-
-// Perform spectral embedding
-cuvs::preprocessing::spectral_embedding::transform(
-    handle, params, connectivity_graph.view(), embedding.view());
-```
 
 **Parameters**
 

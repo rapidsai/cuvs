@@ -83,29 +83,6 @@ float metric_arg,
 cuvsBruteForceIndex_t index);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/brute_force.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-
-// Create BRUTEFORCE index
-cuvsBruteForceIndex_t index;
-cuvsError_t index_create_status = cuvsBruteForceIndexCreate(&index);
-
-// Build the BRUTEFORCE Index
-cuvsError_t build_status = cuvsBruteForceBuild(res, &dataset_tensor, L2Expanded, 0.f, index);
-
-// de-allocate `index` and `res`
-cuvsError_t index_destroy_status = cuvsBruteForceIndexDestroy(index);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -140,30 +117,6 @@ DLManagedTensor* distances,
 cuvsFilter prefilter);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/brute_force.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-DLManagedTensor queries;
-DLManagedTensor neighbors;
-DLManagedTensor bitmap;
-
-cuvsFilter prefilter{(uintptr_t)&bitmap, BITMAP};
-
-// Search the `index` built using `cuvsBruteForceBuild`
-cuvsError_t search_status = cuvsBruteForceSearch(res, index, &queries, &neighbors, &distances,
-prefilter);
-
-// de-allocate `res`
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -194,17 +147,6 @@ cuvsBruteForceIndex_t index);
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
 
-```c
-#include <cuvs/neighbors/brute_force.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// create an index with `cuvsBruteforceBuild`
-cuvsBruteForceSerialize(res, "/path/to/index", index);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -229,19 +171,6 @@ cuvsBruteForceIndex_t index);
 ```
 
 The serialization format can be subject to changes, therefore loading an index saved with a previous version of cuvs is not guaranteed to work.
-
-```c
-#include <cuvs/neighbors/brute_force.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Deserialize an index previously built with `cuvsBruteforceBuild`
-cuvsBruteForceIndex_t index;
-cuvsBruteForceIndexCreate(&index);
-cuvsBruteForceDeserialize(res, "/path/to/index", index);
-```
 
 **Parameters**
 

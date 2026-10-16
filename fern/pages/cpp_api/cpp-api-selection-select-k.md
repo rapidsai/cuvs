@@ -30,19 +30,6 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 
 Example usage
 
-```cpp
-  using namespace raft;
-  // get a 2D row-major array of values to search through
-  auto in_values = {... input device_matrix_view<const float, int64_t, row_major> ...}
-  // prepare output arrays
-  auto out_extents = make_extents<int64_t>(in_values.extent(0), k);
-  auto out_values  = make_device_mdarray<float>(handle, out_extents);
-  auto out_indices = make_device_mdarray<int64_t>(handle, out_extents);
-  // search `k` smallest values in each row
-  cuvs::selection::select_k(
-    handle, in_values, std::nullopt, out_values.view(), out_indices.view(), true);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -82,19 +69,6 @@ If you think of the input data `in_val` as a row-major matrix with `len` columns
 
 Example usage
 
-```cpp
-  using namespace raft;
-  // get a 2D row-major array of values to search through
-  auto in_values = {... input device_matrix_view<const float, int64_t, row_major> ...}
-  // prepare output arrays
-  auto out_extents = make_extents<int64_t>(in_values.extent(0), k);
-  auto out_values  = make_device_mdarray<float>(handle, out_extents);
-  auto out_indices = make_device_mdarray<uint32_t>(handle, out_extents);
-  // search `k` smallest values in each row
-  cuvs::selection::select_k(
-    handle, in_values, std::nullopt, out_values.view(), out_indices.view(), true);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
@@ -133,19 +107,6 @@ std::optional<raft::device_vector_view<const uint32_t, int64_t>> len_i = std::nu
 If you think of the input data `in_val` as a row-major matrix with `len` columns and `batch_size` rows, then this function selects `k` smallest/largest values in each row and fills in the row-major matrix `out_val` of size (batch_size, k).
 
 Example usage
-
-```cpp
-  using namespace raft;
-  // get a 2D row-major array of values to search through
-  auto in_values = {... input device_matrix_view<const half, int64_t, row_major> ...}
-  // prepare output arrays
-  auto out_extents = make_extents<int64_t>(in_values.extent(0), k);
-  auto out_values  = make_device_mdarray<half>(handle, out_extents);
-  auto out_indices = make_device_mdarray<uint32_t>(handle, out_extents);
-  // search `k` smallest values in each row
-  cuvs::selection::select_k(
-    handle, in_values, std::nullopt, out_values.view(), out_indices.view(), true);
-```
 
 **Parameters**
 

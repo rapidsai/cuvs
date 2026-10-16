@@ -179,34 +179,6 @@ DLManagedTensor* graph,
 cuvsNNDescentIndex_t index);
 ```
 
-```c
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/nn_descent.h>
-
-// Create cuvsResources_t
-cuvsResources_t res;
-cuvsError_t res_create_status = cuvsResourcesCreate(&res);
-
-// Assume a populated `DLManagedTensor` type here
-DLManagedTensor dataset;
-
-// Create default index params
-cuvsNNDescentIndexParams_t index_params;
-cuvsError_t params_create_status = cuvsNNDescentIndexParamsCreate(&index_params);
-
-// Create NN-Descent index
-cuvsNNDescentIndex_t index;
-cuvsError_t index_create_status = cuvsNNDescentIndexCreate(&index);
-
-// Build the NN-Descent Index
-cuvsError_t build_status = cuvsNNDescentBuild(res, index_params, &dataset, index);
-
-// de-allocate `index_params`, `index` and `res`
-cuvsError_t params_destroy_status = cuvsNNDescentIndexParamsDestroy(index_params);
-cuvsError_t index_destroy_status = cuvsNNDescentIndexDestroy(index);
-cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |

@@ -150,12 +150,6 @@ X may reside on either host (CPU) or device (GPU) memory. When X is on the host 
 
 A memory pool is optional but recommended, especially for repeated fits:
 
-```c
-  cuvsResourcesSetMemoryPool(res, 80);
-  cuvsResourcesSetStreamPool(res, 1);
-  cuvsKMeansFit(res, params, X, sample_weight, centroids, &inertia, &n_iter);
-```
-
 **Parameters**
 
 | Name | Direction | Type | Description |
