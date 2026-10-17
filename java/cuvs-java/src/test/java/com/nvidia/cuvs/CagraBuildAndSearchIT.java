@@ -693,6 +693,53 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   /**
+   * A prefilter that excludes every row leaves nothing to return. The search used to read a
+   * {@link BitSet} with no bits set as "no filter" and returned the excluded rows.
+   */
+  @Test
+  public void testPrefilterExcludingEveryRowReturnsNothing() throws Throwable {
+    float[][] dataset = createSampleData();
+    float[][] queries = {{0.48216683f, 0.0428398f}, {0.74021935f, 0.9209938f}};
+
+    CagraIndexParams indexParams =
+        new CagraIndexParams.Builder()
+            .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+            .withGraphDegree(2)
+            .withIntermediateGraphDegree(3)
+            .withMetric(CuvsDistanceType.L2Expanded)
+            .build();
+
+    try (CuVSResources resources = CheckedCuVSResources.create();
+        CagraIndex index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(dataset)
+                .withIndexParams(indexParams)
+                .build();
+        var hostVectors = CuVSMatrix.ofArray(dataset);
+        var deviceVectors = hostVectors.toDevice(resources);
+        var indexDataset = index.makePaddedDataset(deviceVectors);
+        var queryVectors = CuVSMatrix.ofArray(queries)) {
+      index.updateDataset(indexDataset);
+
+      for (var algo :
+          new CagraSearchParams.SearchAlgo[] {
+            CagraSearchParams.SearchAlgo.SINGLE_CTA, CagraSearchParams.SearchAlgo.MULTI_CTA
+          }) {
+        CagraQuery query =
+            new CagraQuery.Builder(resources)
+                .withTopK(2)
+                .withSearchParams(new CagraSearchParams.Builder().withAlgo(algo).build())
+                .withQueryVectors(queryVectors)
+                .withPrefilter(new BitSet(dataset.length), dataset.length)
+                .build();
+
+        List<Map<Integer, Float>> results = index.search(query).getResults();
+        assertEquals(algo.toString(), List.of(Map.of(), Map.of()), results);
+      }
+    }
+  }
+
+  /**
    * Regression test for a bug in {@code CagraIndexImpl.search}: the {@code distances} output tensor
    * was described (dtype and buffer size) using the <em>query</em> vectors' data type instead of the
    * float32 type the C API mandates. Float queries masked the bug because their dtype already matches
