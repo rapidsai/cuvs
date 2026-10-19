@@ -27,10 +27,14 @@ The common source-build prerequisites are:
 
 1. CMake 4.0 or newer.
 2. GCC 13.3 or newer.
-3. CUDA Toolkit 12.2 or newer.
-4. An Ampere architecture GPU or newer.
-5. A Python 3 interpreter.
-6. For CUDA Toolkit 13.1 or newer, cuTile: the `cuda.tile` Python package, `tileiras` and `bin2c`. With conda install `cutile-python` and `cuda-tileiras`; with pip install `cuda-tile[tileiras]`.
+3. A Python 3 interpreter.
+4. CUDA Toolkit 12.9 or newer.
+7. For CUDA Toolkit 12:
+  * Volta architecture or better ([Compute Capability](https://docs.nvidia.com/deploy/cuda-compatibility/latest/) >=7.0)
+7. For CUDA Toolkit 13 or newer:
+  * Turing architecture or better (Compute Capability >=7.5) with CUDA 13.x
+  * cuTile: the `cuda.tile` Python package, `tileiras` and `bin2c`. With conda install `cutile-python` and `cuda-tileiras`; with pip install `cuda-tile` and `cuda-toolkit[tileiras]`.
+
 
 Optional components have additional requirements:
 
