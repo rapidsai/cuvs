@@ -36,10 +36,10 @@ SPDX-License-Identifier: Apache-2.0
   <scm child.scm.connection.inherit.append.path="false"
        child.scm.developerConnection.inherit.append.path="false"
        child.scm.url.inherit.append.path="false">
-      <connection>scm:git:https://github.com/rapidsai/cuvs.git</connection>
-      <developerConnection>scm:git:git@github.com:rapidsai/cuvs.git</developerConnection>
+      <connection>scm:git:https://github.com/NVIDIA/cuvs.git</connection>
+      <developerConnection>scm:git:git@github.com:NVIDIA/cuvs.git</developerConnection>
       <tag>HEAD</tag>
-      <url>https://github.com/rapidsai/cuvs</url>
+      <url>https://github.com/NVIDIA/cuvs</url>
   </scm>
 
   <developers>
@@ -427,6 +427,12 @@ SPDX-License-Identifier: Apache-2.0
                 </googleJavaFormat>
             </java>
         </configuration>
+      </plugin>
+      <plugin>
+        <!-- Pins the version used by the install phase and by 'mvn install:install-file' in ci/*_lucene.sh. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.1.4</version>
       </plugin>
     </plugins>
   </build>
