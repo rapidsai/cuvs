@@ -487,7 +487,7 @@ dependencies:
           # We always want nvJitLink >= whatever minor version was available in the build environment
           # nvJitLink tends to follow the CTK's minor versions, but check at https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
           #
-          # ref: https://github.com/rapidsai/cudf/pull/20873
+          # ref: https://github.com/NVIDIA/cudf/pull/20873
           - matrix:
               cuda: "12.9"
               use_cuda_wheels: "true"
@@ -519,7 +519,7 @@ dependencies:
           - cupy>=14.0.1,!=14.1.0
     # NOTE: This is intentionally not broken into groups by a 'cuda_suffixed' selector like
     #       other packages with -cu{nn}x suffixes in this file.
-    #       All RAPIDS wheel builds (including in devcontainers) expect cupy to be suffixed.
+    #       All wheel builds (including in devcontainers) expect cupy to be suffixed.
     specific:
       - output_types: constraints
         matrices:
@@ -626,12 +626,12 @@ dependencies:
               dependencies: "oldest"
               cuda: "12.*"
             packages:
-              - cuda-bindings==12.9.2
+              - cuda-bindings==12.9.3
           - matrix:
               dependencies: "oldest"
               cuda: "13.*"
             packages:
-              - cuda-bindings==13.0.1
+              - cuda-bindings==13.0.2
           - matrix:
             packages:
   test_py_cuvs:
@@ -716,11 +716,11 @@ dependencies:
           - matrix:
               cuda: "12.*"
             packages:
-              - cuda-bindings>=12.9.2,<13.0
+              - cuda-bindings>=12.9.3,<13.0
           # fallback to CUDA 13 versions if 'cuda' is '13.*' or not provided
           - matrix:
             packages:
-              - cuda-bindings>=13.0.1,<14.0
+              - cuda-bindings>=13.0.2,<14.0
   depends_on_cuvs:
     common:
       - output_types: conda
