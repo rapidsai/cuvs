@@ -139,7 +139,7 @@ Keep public interfaces and builders readable. Prefer clear Java names over nativ
 
 ### Copyright
 
-RAPIDS pre-commit hooks and the Java Spotless configuration check copyright headers on modified tracked files. Use the repository Java license header and avoid hand-editing generated binding files unless the generator is being updated.
+Pre-commit hooks and the Java Spotless configuration check copyright headers on modified tracked files. Use the repository Java license header and avoid hand-editing generated binding files unless the generator is being updated.
 
 ## Code Quality
 
