@@ -8,7 +8,7 @@ All NVIDIA cuVS routine implementations live in the C++ core. For every non-C++ 
 
 Pre-compiled NVIDIA cuVS packages are available for Linux on x86_64 and aarch64. Native Windows support is not available at this time. On Windows, use WSL2 with GPU passthrough. See the [RAPIDS WSL2 guide](https://rapids.ai/start.html#wsl2).
 
-Source builds and package installs require a supported NVIDIA GPU. For current source builds, use CUDA Toolkit 12.2 or newer and an Ampere architecture GPU or newer, which means compute capability 8.0 or higher.
+Source builds and package installs require a supported NVIDIA GPU. For current source builds, use CUDA Toolkit 12.9 or newer and an Volta architecture GPU or newer, which means compute capability 7.0 or higher.
 
 ## Language Guides
 
