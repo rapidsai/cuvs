@@ -547,7 +547,7 @@ pub fn merged_dataset_offsets(
     let mut offsets = vec![0i64; indices.len() + 1];
     let result = with_filter(filter, |c_filter| {
         check_cuvs(unsafe {
-            ffi::cuvsCagraMergedDatasetOffsets(
+            ffi::cuvsMergedDatasetOffsets(
                 res.handle(),
                 datasets.as_mut_ptr(),
                 datasets.len(),

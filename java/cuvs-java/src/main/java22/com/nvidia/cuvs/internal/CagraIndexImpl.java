@@ -1430,6 +1430,17 @@ public class CagraIndexImpl implements CagraIndex {
     return datasetsSegment;
   }
 
+  /** Builds the native {@code cuvsCagraIndex_t[]} array for merge-family calls. */
+  private static MemorySegment buildIndicesSegment(Arena arena, CagraIndex[] indexes) {
+    MemorySegment indexesSegment = arena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
+    for (int i = 0; i < indexes.length; i++) {
+      CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
+      indexesSegment.setAtIndex(
+          ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
+    }
+    return indexesSegment;
+  }
+
   /** Sum of {@link CagraIndex#size()} across every element of {@code indexes}. */
   private static long totalRows(CagraIndex[] indexes) {
     long total = 0;

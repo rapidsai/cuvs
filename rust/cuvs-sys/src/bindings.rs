@@ -1817,7 +1817,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     #[must_use]
-    pub fn cuvsCagraMergedDatasetOffsets(
+    pub fn cuvsMergedDatasetOffsets(
         res: cuvsResources_t,
         datasets: *mut cuvsDataset_t,
         num_datasets: usize,
