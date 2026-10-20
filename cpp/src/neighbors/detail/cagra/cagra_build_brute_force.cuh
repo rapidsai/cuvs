@@ -247,11 +247,11 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
                      graph_build_params::brute_force_params params)
 {
-  auto const partition_size            = static_cast<size_t>(dataset.extent(0));
-  auto const intermediate_graph_degree = static_cast<size_t>(knn_graph.extent(1));
+  auto const partition_size = static_cast<size_t>(dataset.extent(0));
+  auto const graph_degree   = static_cast<size_t>(knn_graph.extent(1));
   RAFT_EXPECTS(knn_graph.extent(0) == dataset.extent(0),
                "CAGRA: kNN graph and dataset must have the same number of rows");
-  RAFT_EXPECTS(intermediate_graph_degree > 0 && partition_size > intermediate_graph_degree,
+  RAFT_EXPECTS(graph_degree > 0 && partition_size > graph_degree,
                "CAGRA: kNN graph degree must be positive and smaller than the dataset size");
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
     if constexpr (raft::is_host_mdspan_v<decltype(dataset)>) {
@@ -277,9 +277,24 @@ void build_knn_graph(raft::resources const& res,
 
       // Size result buffers from the full remaining workspace after building the index.
       // Allocate them from the large workspace resource, as in the other graph builders.
-      auto const free_bytes     = raft::resource::get_workspace_free_bytes(res);
-      auto const top_k          = intermediate_graph_degree + 1;
-      auto const bytes_per_row  = top_k * (sizeof(int64_t) + sizeof(float));
+      auto free_bytes  = raft::resource::get_workspace_free_bytes(res);
+      auto const top_k = graph_degree + 1;
+      // Fused L2 search needs norm workspace for both the index and query rows.
+      free_bytes -= std::min(free_bytes, partition_size * sizeof(float));
+      auto bytes_per_row = top_k * (sizeof(int64_t) + sizeof(float)) + sizeof(float);
+      auto const metric  = params.build_params.metric;
+      bool const fused_l2 =
+        top_k <= 64 && (metric == cuvs::distance::DistanceType::L2Expanded ||
+                        metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                        metric == cuvs::distance::DistanceType::L2Unexpanded ||
+                        metric == cuvs::distance::DistanceType::L2SqrtUnexpanded);
+      if (!fused_l2) {
+        // Tiled search (including inner product for any k) also allocates pairwise
+        // distances, intermediate top-k lists, and selection/sorting scratch.
+        // Bound each tile/list by a full index row to avoid depending on tile sizing.
+        bytes_per_row += partition_size * (2 * sizeof(int64_t) + 3 * sizeof(float)) +
+                         2 * top_k * (sizeof(int64_t) + sizeof(float));
+      }
       auto const max_batch_size = std::min(partition_size, free_bytes / bytes_per_row);
       RAFT_EXPECTS(max_batch_size > 0,
                    "CAGRA: insufficient workspace for a brute-force kNN query batch");
@@ -312,9 +327,9 @@ void build_knn_graph(raft::resources const& res,
             RAFT_EXPECTS(neighbor >= 0 && static_cast<size_t>(neighbor) < partition_size,
                          "CAGRA: brute-force kNN returned an invalid neighbor");
             knn_graph(offset + row, output_rank++) = static_cast<IdxT>(neighbor);
-            if (output_rank == intermediate_graph_degree) { break; }
+            if (output_rank == graph_degree) { break; }
           }
-          RAFT_EXPECTS(output_rank == intermediate_graph_degree,
+          RAFT_EXPECTS(output_rank == graph_degree,
                        "CAGRA: brute-force kNN did not return enough non-self neighbors");
         }
       }
