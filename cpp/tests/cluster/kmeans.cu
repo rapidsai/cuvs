@@ -17,7 +17,6 @@
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -750,15 +749,6 @@ constexpr float byte_divisor()
 }
 
 template <typename ByteT>
-struct byte_blob_quantizer {
-  RAFT_INLINE_FUNCTION ByteT operator()(float value) const
-  {
-    constexpr int offset = std::is_same_v<ByteT, uint8_t> ? 128 : 0;
-    return static_cast<ByteT>(static_cast<int>(value * 42.0f) + offset);
-  }
-};
-
-template <typename ByteT>
 class KmeansByteFitTest : public ::testing::Test {
  protected:
   static constexpr int64_t n_samples  = 11;
@@ -773,7 +763,6 @@ class KmeansByteFitTest : public ::testing::Test {
     auto stream = raft::resource::get_cuda_stream(handle);
     auto blobs  = raft::make_device_matrix<float, int64_t>(handle, rows, n_features);
     auto labels = raft::make_device_vector<int64_t, int64_t>(handle, rows);
-    auto bytes  = raft::make_device_matrix<ByteT, int64_t>(handle, rows, n_features);
 
     // Match the balanced k-means byte tests: seeded float blobs, then scale and quantize.
     raft::random::make_blobs<float, int64_t>(blobs.data_handle(),
@@ -790,24 +779,19 @@ class KmeansByteFitTest : public ::testing::Test {
                                              -1.0f,
                                              1.0f,
                                              uint64_t{1234});
-    raft::linalg::unaryOp(bytes.data_handle(),
-                          blobs.data_handle(),
-                          rows * n_features,
-                          byte_blob_quantizer<ByteT>{},
-                          stream.get());
-
-    h_byte_input.resize(rows * n_features);
+    h_float_input.resize(rows * n_features);
     std::vector<int64_t> h_labels(rows);
-    raft::copy(h_byte_input.data(), bytes.data_handle(), h_byte_input.size(), stream);
+    raft::copy(h_float_input.data(), blobs.data_handle(), h_float_input.size(), stream);
     raft::copy(h_labels.data(), labels.data_handle(), h_labels.size(), stream);
     raft::resource::sync_stream(handle);
 
-    // Use the quantized values for the float reference, including initial centroids.
-    h_float_input.resize(h_byte_input.size());
-    std::transform(
-      h_byte_input.begin(), h_byte_input.end(), h_float_input.begin(), [](ByteT value) {
-        return static_cast<float>(value) / byte_divisor<ByteT>();
-      });
+    // Quantize on the host, then use the encoded values for the float reference.
+    h_byte_input.resize(h_float_input.size());
+    constexpr int offset = std::is_same_v<ByteT, uint8_t> ? 128 : 0;
+    for (std::size_t i = 0; i < h_byte_input.size(); ++i) {
+      h_byte_input[i]  = static_cast<ByteT>(static_cast<int>(h_float_input[i] * 42.0f) + offset);
+      h_float_input[i] = static_cast<float>(h_byte_input[i]) / byte_divisor<ByteT>();
+    }
     h_initial_centroids.resize(n_clusters * n_features);
     for (int64_t cluster = 0; cluster < n_clusters; ++cluster) {
       auto row = std::find(h_labels.begin(), h_labels.end(), cluster);
@@ -1015,30 +999,26 @@ TYPED_TEST(KmeansByteFitTest, DefaultInitializationRetainsEnoughRowsForClusters)
   auto params                  = this->make_params(cuvs::cluster::kmeans::params::KMeansPlusPlus);
   params.device_buffer_samples = 0;
   params.max_iter              = 0;
-  params.init_size             = TestFixture::n_clusters;
   // Scalable seeding's random fallback uses std::rand rather than params.rng_state.
   // Reset it before each fit so reference and byte runs choose the same fallback rows.
   const auto fallback_seed = static_cast<unsigned int>(params.rng_state.seed);
-  std::vector<byte_fit_result> expected;
-  for (double oversampling_factor : {0.0, 2.0}) {
-    params.oversampling_factor = oversampling_factor;
-    std::srand(fallback_seed);
-    expected.push_back(this->fit_host(this->h_float_input, params, false));
-  }
 
-  // This limit makes conversion use one row, but seeding still needs at least K rows.
-  // In particular, scalable seeding must not gather more random centers than sampled rows.
+  // This limit makes byte conversion use one row; float seeding can still use K rows.
   raft::resource::set_workspace_to_global_resource(this->handle, std::size_t{128});
-  params.init_size = 0;
-  for (int scalable = 0; scalable < 2; ++scalable) {
-    SCOPED_TRACE(scalable ? "scalable KMeansPlusPlus" : "classic KMeansPlusPlus");
-    params.oversampling_factor = scalable ? 2.0 : 0.0;
+  for (double oversampling_factor : {0.0, 2.0}) {
+    SCOPED_TRACE(oversampling_factor);
+    params.oversampling_factor = oversampling_factor;
+    params.init_size           = TestFixture::n_clusters;
+    std::srand(fallback_seed);
+    const auto expected = this->fit_host(this->h_float_input, params, false);
+
+    params.init_size = 0;
     std::srand(fallback_seed);
     const auto host = this->fit_host(this->h_byte_input, params, false);
     std::srand(fallback_seed);
     const auto device = this->fit_byte_device(params, false);
-    this->expect_result_near(expected[scalable], host);
-    this->expect_result_near(expected[scalable], device);
+    this->expect_result_near(expected, host);
+    this->expect_result_near(expected, device);
   }
 }
 
@@ -1048,6 +1028,7 @@ TYPED_TEST(KmeansByteFitTest, ConversionBudgetIsIndependentOfHostStagingSize)
   constexpr int64_t outer_rows          = 133;
   constexpr int64_t conversion_rows     = 64;
   constexpr std::size_t workspace_limit = 8192;
+  constexpr auto conversion_bytes       = conversion_rows * TestFixture::n_features * sizeof(float);
 
   this->generate_inputs(n_rows);
 
@@ -1085,20 +1066,25 @@ TYPED_TEST(KmeansByteFitTest, ConversionBudgetIsIndependentOfHostStagingSize)
         const auto staging_bytes =
           staging_slots * staging_rows *
           (TestFixture::n_features * sizeof(TypeParam) + (weighted ? sizeof(float) : 0));
-        constexpr auto conversion_bytes = conversion_rows * TestFixture::n_features * sizeof(float);
         // Check actual allocations, so a full-size float expansion cannot pass merely by
         // producing the same numerical answer. Staging zero must retain every byte row.
         EXPECT_EQ(allocations.get_bytes_counter().peak, staging_bytes + conversion_bytes);
         EXPECT_EQ(allocations.get_bytes_counter().value, 0);
-
-        allocations.push_counters();
-        const auto device = this->fit_byte_device(params, weighted);
-        this->expect_result_near(expected[weighted], device);
-        EXPECT_EQ(allocations.get_bytes_counter().peak, conversion_bytes);
-        EXPECT_EQ(allocations.get_bytes_counter().value, 0);
-        allocations.pop_counters();
       }
     }
+  }
+
+  // Device input ignores host staging and prefetch settings.
+  params.device_buffer_samples = outer_rows;
+  for (bool weighted : {false, true}) {
+    SCOPED_TRACE(weighted ? "device with weights" : "device unweighted");
+    rmm::mr::statistics_resource_adaptor allocations{rmm::mr::get_current_device_resource_ref()};
+    raft::resource::set_large_workspace_resource(this->handle,
+                                                 raft::mr::device_resource{allocations});
+    const auto device = this->fit_byte_device(params, weighted);
+    this->expect_result_near(expected[weighted], device);
+    EXPECT_EQ(allocations.get_bytes_counter().peak, conversion_bytes);
+    EXPECT_EQ(allocations.get_bytes_counter().value, 0);
   }
 }
 

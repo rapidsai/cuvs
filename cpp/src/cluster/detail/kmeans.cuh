@@ -903,10 +903,9 @@ void kmeans_fit(
   rmm::device_uvector<char> assignment_output(0, stream);
   constexpr bool full_norms = data_on_device && same_type;
   auto minClusterDistance   = raft::make_device_vector<MathT, IndexT>(handle, compute_batch_rows);
-  const IndexT l2_norm_size = full_norms ? n_samples : compute_batch_rows;
-  auto L2NormBatch          = raft::make_device_vector<MathT, IndexT>(handle, l2_norm_size);
+  auto L2NormBatch          = raft::make_device_vector<MathT, IndexT>(handle, compute_batch_rows);
   auto Tf32NormBatch        = raft::make_device_vector<MathT, IndexT>(
-    handle, kmeans_may_require_tf32_norms_v<MathT> ? l2_norm_size : IndexT{0});
+    handle, kmeans_may_require_tf32_norms_v<MathT> ? compute_batch_rows : IndexT{0});
   auto batch_weights_buf = raft::make_device_vector<MathT, IndexT>(handle, compute_batch_rows);
   rmm::device_uvector<MathT> L2NormBuf_OR_DistBuf(0, stream);
   rmm::device_uvector<MathT> mapped_data_buf(
@@ -1134,16 +1133,14 @@ void kmeans_fit(
           // dispatch both at batch-ready.
           if (row_offset == 0) { prefetch_batch((batch_pos + 1) % data_batches.num_batches()); }
 
-          const auto l2_norm_offset =
-            full_norms ? static_cast<IndexT>(data_batch.offset()) + row_offset : IndexT{0};
           auto l2_const_view = raft::make_device_vector_view<const MathT, IndexT>(
-            L2NormBatch.data_handle() + l2_norm_offset, cur_batch_size);
+            L2NormBatch.data_handle(), cur_batch_size);
           std::optional<raft::device_vector_view<const MathT, IndexT>> tf32_const_view =
             std::nullopt;
           if constexpr (kmeans_may_require_tf32_norms_v<MathT>) {
             if (batch_uses_tf32) {
               tf32_const_view = raft::make_device_vector_view<const MathT, IndexT>(
-                Tf32NormBatch.data_handle() + l2_norm_offset, cur_batch_size);
+                Tf32NormBatch.data_handle(), cur_batch_size);
             }
           }
 
@@ -1237,10 +1234,8 @@ void kmeans_fit(
           if constexpr (!full_norms) {
             if (need_compute_norms) { compute_batch_norms(batch_data, cur_batch_size, false); }
           }
-          const auto l2_norm_offset =
-            full_norms ? static_cast<IndexT>(data_batch.offset()) + row_offset : IndexT{0};
           auto l2_const_view = raft::make_device_vector_view<const MathT, IndexT>(
-            L2NormBatch.data_handle() + l2_norm_offset, cur_batch_size);
+            L2NormBatch.data_handle(), cur_batch_size);
           std::optional<raft::device_vector_view<const MathT, IndexT>> batch_sw = std::nullopt;
           if (weight_ptr != nullptr) {
             batch_sw = cur_batch_weights(
