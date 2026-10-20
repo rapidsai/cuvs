@@ -70,13 +70,10 @@ constexpr auto kmeans_workspace_budget(std::size_t free_bytes) -> std::size_t
 }
 
 template <typename IndexT>
-constexpr auto resolve_kmeans_batch_rows(IndexT n_rows,
-                                         IndexT requested_rows,
-                                         std::size_t free_bytes,
-                                         std::size_t bytes_per_row) -> IndexT
+constexpr auto kmeans_batch_rows(IndexT n_rows, std::size_t free_bytes, std::size_t bytes_per_row)
+  -> IndexT
 {
   if (n_rows <= IndexT{0}) { return IndexT{0}; }
-  if (requested_rows > IndexT{0}) { return std::min(requested_rows, n_rows); }
   if (bytes_per_row == 0) { return n_rows; }
 
   constexpr auto max_index = static_cast<std::size_t>(std::numeric_limits<IndexT>::max());

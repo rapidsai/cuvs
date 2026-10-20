@@ -129,7 +129,8 @@ struct params : base_params {
    * device floating-point input always uses the full dataset.
    *
    * Zero uses `min(3 * n_clusters, n_samples)`; byte input also limits the
-   * default to the effective batch size.
+   * default to the automatically selected conversion batch size, but keeps at
+   * least `min(n_clusters, n_samples)` rows for seeding.
    *
    * In batched multi-GPU host-data fits, every device must hold the sample,
    * and rank 0 must also hold the seeding workspace.
@@ -139,16 +140,22 @@ struct params : base_params {
   int64_t init_size = 0;
 
   /**
-   * Number of samples to process per GPU batch. This applies to host
-   * floating-point input and to byte input in either memory location. Zero
-   * processes all host floating-point rows at once and automatically sizes byte
-   * batches; device floating-point input ignores this parameter.
+   * Number of host-resident samples to buffer on the GPU. Zero buffers all
+   * rows at once. Device-resident input ignores this parameter.
    *
-   * Host input is double-buffered when the handle has an auxiliary stream.
-   * In floating-point multi-GPU mode this is a per-rank batch size, clamped to
-   * the local sample count. Byte-input Lloyd k-means is single-GPU only.
+   * Byte input is staged in its original type, then converted to float in
+   * smaller batches. For both host and device byte input, conversion batches
+   * use the smaller of 80% of free workspace and 512 MiB for the float buffer
+   * and per-row scratch. The row count is rounded down to a multiple of 64
+   * when possible and clamped to the buffered input size. Host staging buffers
+   * are additional to this conversion workspace budget.
    *
-   * Default: 0.
+   * Host inputs spanning multiple buffers are double-buffered when the handle
+   * has an auxiliary stream. In floating-point multi-GPU mode this is a
+   * per-rank buffer size, clamped to the local sample count. Byte-input Lloyd
+   * k-means is single-GPU only.
+   *
+   * Default: 0 (buffer all host rows).
    */
   int64_t device_buffer_samples = 0;
 };
