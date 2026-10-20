@@ -157,7 +157,7 @@ Abstract base class for IVF list data.
 
 This allows polymorphic access to list data regardless of the underlying layout.
 
-TODO: Make this struct internal (tracking issue: https://github.com/nvidia/cuvs/issues/1726)
+TODO: Make this struct internal (tracking issue: https://github.com/NVIDIA/cuvs/issues/1726)
 
 ```cpp
 template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
@@ -552,8 +552,18 @@ struct udf_filter : public base_filter {
 ### neighbors::distribution_mode
 
 ```cpp
-enum distribution_mode;
+enum distribution_mode {
+  REPLICATED,
+  SHARDED
+};
 ```
+
+**Values**
+
+| Name | Value |
+| --- | --- |
+| `REPLICATED` | `` |
+| `SHARDED` | `` |
 
 <a id="neighbors-mg-index-params"></a>
 ### neighbors::mg_index_params

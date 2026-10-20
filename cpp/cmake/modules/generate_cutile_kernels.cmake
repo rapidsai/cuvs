@@ -30,6 +30,9 @@ endfunction()
 function(_cutile_detect)
   set_property(GLOBAL PROPERTY CUVS_CUTILE_ENABLED 0)
 
+  # Use the vendored upstream finder until the minimum CMake version is 4.3, when we can use cmake
+  # -E bin2c for embedding instead. The finder also supports conda's nvcc symlink layout.
+  list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../thirdparty/cmake")
   find_package(CUDAToolkit REQUIRED)
   if(CUDAToolkit_VERSION VERSION_LESS 13.0)
     message(STATUS "cuTile disabled: requires CUDA 13.0+ (found ${CUDAToolkit_VERSION}).")
@@ -43,23 +46,8 @@ function(_cutile_detect)
     set(missing_prefix "cuTile is required with CUDA 13.1+ (found ${CUDAToolkit_VERSION})")
   endif()
 
-  # bin2c is installed next to the real nvcc. In conda environments, CUDAToolkit_BIN_DIR is
-  # targets/<arch>/bin, which only contains an nvcc symlink, so also search the symlink target's
-  # directory.
-  set(bin2c_dirs ${CUDAToolkit_BIN_DIR})
-  if(CUDAToolkit_NVCC_EXECUTABLE)
-    get_filename_component(nvcc_real_path "${CUDAToolkit_NVCC_EXECUTABLE}" REALPATH)
-    get_filename_component(nvcc_real_dir "${nvcc_real_path}" DIRECTORY)
-    list(APPEND bin2c_dirs "${nvcc_real_dir}")
-  endif()
-  find_program(
-    CUVS_CUTILE_BIN2C
-    NAMES bin2c
-    PATHS ${bin2c_dirs}
-    NO_DEFAULT_PATH
-  )
-  if(NOT CUVS_CUTILE_BIN2C)
-    message(${missing_level} "${missing_prefix}: bin2c not found in ${bin2c_dirs}.")
+  if(NOT TARGET CUDA::bin2c)
+    message(${missing_level} "${missing_prefix}: CUDA::bin2c target not found.")
     return()
   endif()
 
@@ -83,7 +71,7 @@ function(_cutile_detect)
   message(STATUS "Using cuTile Python: ${python}")
   set_property(GLOBAL PROPERTY CUVS_CUTILE_ENABLED 1)
   set_property(GLOBAL PROPERTY CUVS_CUTILE_PYTHON "${python}")
-  set_property(GLOBAL PROPERTY CUVS_CUTILE_BIN2C "${CUVS_CUTILE_BIN2C}")
+  set_property(GLOBAL PROPERTY CUVS_CUTILE_BIN2C "$<TARGET_FILE:CUDA::bin2c>")
 endfunction()
 
 # Returns whether cuTile can be built, and the python interpreter and bin2c to build it with, in the
