@@ -4380,11 +4380,19 @@ void distribute(const raft::resources& clique,
                 cuvs::neighbors::mg_index<cagra::device_padded_index<T, IdxT>, T, IdxT>* index);
 
 /**
- * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
- * @param res RAFT resources.
- * @param dataset Row-major host dataset of float or half values.
- * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
- * @param build_params Brute-force index and search parameters.
+ * @brief Build an exact kNN graph using brute-force search.
+ * @ingroup cagra_cpp_index_build
+ *
+ * Each row of the output contains the nearest neighbor indices for the corresponding dataset
+ * point, ordered by distance and excluding the point itself. The graph is stored in host memory.
+ * The dataset is processed in chunks, allowing graphs larger than available device memory to be
+ * built.
+ *
+ * @param[in] res RAFT resources.
+ * @param[in] dataset Row-major host dataset of float values, with shape [n_rows, dim].
+ * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
+ * 1].
+ * @param[in] build_params Brute-force index and search parameters.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -4392,11 +4400,19 @@ void build_knn_graph(raft::resources const& res,
                      graph_build_params::brute_force_params build_params);
 
 /**
- * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
- * @param res RAFT resources.
- * @param dataset Row-major device dataset of float or half values.
- * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
- * @param build_params Brute-force index and search parameters.
+ * @brief Build an exact kNN graph using brute-force search.
+ * @ingroup cagra_cpp_index_build
+ *
+ * Each row of the output contains the nearest neighbor indices for the corresponding dataset
+ * point, ordered by distance and excluding the point itself. The graph is stored in host memory.
+ * The dataset is processed in chunks, allowing graphs larger than available device memory to be
+ * built.
+ *
+ * @param[in] res RAFT resources.
+ * @param[in] dataset Row-major device dataset of float values, with shape [n_rows, dim].
+ * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
+ * 1].
+ * @param[in] build_params Brute-force index and search parameters.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -4404,11 +4420,19 @@ void build_knn_graph(raft::resources const& res,
                      graph_build_params::brute_force_params build_params);
 
 /**
- * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
- * @param res RAFT resources.
- * @param dataset Row-major host dataset of float or half values.
- * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
- * @param build_params Brute-force index and search parameters.
+ * @brief Build an exact kNN graph using brute-force search.
+ * @ingroup cagra_cpp_index_build
+ *
+ * Each row of the output contains the nearest neighbor indices for the corresponding dataset
+ * point, ordered by distance and excluding the point itself. The graph is stored in host memory.
+ * The dataset is processed in chunks, allowing graphs larger than available device memory to be
+ * built.
+ *
+ * @param[in] res RAFT resources.
+ * @param[in] dataset Row-major host dataset of half values, with shape [n_rows, dim].
+ * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
+ * 1].
+ * @param[in] build_params Brute-force index and search parameters.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
@@ -4416,11 +4440,19 @@ void build_knn_graph(raft::resources const& res,
                      graph_build_params::brute_force_params build_params);
 
 /**
- * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
- * @param res RAFT resources.
- * @param dataset Row-major device dataset of float or half values.
- * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
- * @param build_params Brute-force index and search parameters.
+ * @brief Build an exact kNN graph using brute-force search.
+ * @ingroup cagra_cpp_index_build
+ *
+ * Each row of the output contains the nearest neighbor indices for the corresponding dataset
+ * point, ordered by distance and excluding the point itself. The graph is stored in host memory.
+ * The dataset is processed in chunks, allowing graphs larger than available device memory to be
+ * built.
+ *
+ * @param[in] res RAFT resources.
+ * @param[in] dataset Row-major device dataset of half values, with shape [n_rows, dim].
+ * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
+ * 1].
+ * @param[in] build_params Brute-force index and search parameters.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
