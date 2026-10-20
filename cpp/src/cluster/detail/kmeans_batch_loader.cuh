@@ -90,8 +90,9 @@ class kmeans_batch {
  *
  * The device specialization is a zero-copy view. The host specialization below owns the cyclic
  * H2D pipeline used by out-of-core KMeans: two buffers when prefetching is enabled, or one buffer
- * for serialized execution. Pageable host partitions use batch-sized pinned staging buffers;
- * the input itself is never registered or copied in full.
+ * for serialized execution. Pageable host partitions use batch-sized pinned staging buffers
+ * when there are multiple batches; a single batch is copied directly to device. The input
+ * itself is never registered.
  */
 template <typename DataT, typename IndexT, bool DataOnDevice>
 class kmeans_batch_loader;
@@ -210,10 +211,12 @@ class kmeans_batch_loader<DataT, IndexT, false> {
       buffer_ptrs_[1] = buffer_1_.data();
     }
 
-    if (std::any_of(
+    if (num_batches() > 1 &&
+        std::any_of(
           pageable_partitions_.begin(), pageable_partitions_.end(), [](bool v) { return v; })) {
       // Only a batch-sized host allocation per device slot. Already pinned/registered inputs
-      // retain the original direct H2D path without staging memory.
+      // and single-batch inputs use direct H2D copies without staging memory. A single batch
+      // stays resident, so there is no subsequent transfer to overlap with compute.
       for (int slot = 0; slot < num_slots(); ++slot) {
         host_buffers_[slot].emplace(
           raft::make_pinned_vector<DataT, std::size_t>(res, max_batch_elements));
@@ -372,8 +375,9 @@ class kmeans_batch_loader<DataT, IndexT, false> {
     auto const* source =
       batch.input.data_handle() + batch.descriptor.offset() * batch.input.extent(1);
     const auto elements = batch.descriptor.size() * batch.input.extent(1);
-    const bool pageable = pageable_partitions_[batch.descriptor.partition()];
-    if (pageable) {
+    const bool use_host_staging =
+      host_buffers_[slot].has_value() && pageable_partitions_[batch.descriptor.partition()];
+    if (use_host_staging) {
       // The host slot can be refilled after its previous H2D, while its device slot is computing.
       if (host_reusable_[slot] != nullptr) {
         RAFT_CUDA_TRY(cudaEventSynchronize(host_reusable_[slot]));
@@ -385,8 +389,11 @@ class kmeans_batch_loader<DataT, IndexT, false> {
     }
     // Pinned H2D submission returns without waiting for the device-slot reuse event. Direct
     // pageable cudaMemcpyAsync may block here and prevent the next batch's compute being queued.
+    // With a single resident batch there is no next batch, so staging is unnecessary.
     raft::copy(buffer_ptrs_[slot], source, elements, copy_stream_);
-    if (pageable) { RAFT_CUDA_TRY(cudaEventRecord(host_reusable_[slot], copy_stream_.get())); }
+    if (use_host_staging) {
+      RAFT_CUDA_TRY(cudaEventRecord(host_reusable_[slot], copy_stream_.get()));
+    }
   }
 
   static bool is_pageable(DataT const* ptr)
