@@ -339,7 +339,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     {search_algo::AUTO, "auto"}                   //
   };
   std::vector<std::string> build_algo = {
-    "IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO", "BRUTE_FORCE"};
+    "IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "BRUTE_FORCE", "AUTO"};
   std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", degree=" << p.graph_degree << ", k=" << p.k << ", " << algo_name[p.algo]
