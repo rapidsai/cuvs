@@ -253,6 +253,13 @@ void build_knn_graph(raft::resources const& res,
                "CAGRA: kNN graph and dataset must have the same number of rows");
   RAFT_EXPECTS(graph_degree > 0 && partition_size > graph_degree,
                "CAGRA: kNN graph degree must be positive and smaller than the dataset size");
+  auto const metric = params.build_params.metric;
+  RAFT_EXPECTS(metric == cuvs::distance::DistanceType::L2Expanded ||
+                 metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                 metric == cuvs::distance::DistanceType::InnerProduct ||
+                 metric == cuvs::distance::DistanceType::CosineExpanded,
+               "CAGRA: brute-force kNN graph build supports only L2Expanded, L2SqrtExpanded, "
+               "InnerProduct and CosineExpanded metrics");
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
     if constexpr (raft::is_host_mdspan_v<decltype(dataset)>) {
       build_brute_force_host_knn_graph(res, dataset, knn_graph, params);
@@ -277,17 +284,14 @@ void build_knn_graph(raft::resources const& res,
 
       // Size result buffers from the full remaining workspace after building the index.
       // Allocate them from the large workspace resource, as in the other graph builders.
-      auto free_bytes  = raft::resource::get_workspace_free_bytes(res);
-      auto const top_k = graph_degree + 1;
-      // Fused L2 search needs norm workspace for both the index and query rows.
-      free_bytes -= std::min(free_bytes, partition_size * sizeof(float));
-      auto bytes_per_row = top_k * (sizeof(int64_t) + sizeof(float)) + sizeof(float);
-      auto const metric  = params.build_params.metric;
-      bool const fused_l2 =
-        top_k <= 64 && (metric == cuvs::distance::DistanceType::L2Expanded ||
-                        metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                        metric == cuvs::distance::DistanceType::L2Unexpanded ||
-                        metric == cuvs::distance::DistanceType::L2SqrtUnexpanded);
+      auto free_bytes     = raft::resource::get_workspace_free_bytes(res);
+      auto const top_k    = graph_degree + 1;
+      auto bytes_per_row  = top_k * (sizeof(int64_t) + sizeof(float));
+      bool const fused_l2 = top_k <= 64 && (metric == cuvs::distance::DistanceType::L2Expanded ||
+                                            metric == cuvs::distance::DistanceType::L2SqrtExpanded);
+      // Fused L2 allocates norm workspace for both inputs; tiled search reuses index norms.
+      if (fused_l2) { free_bytes -= std::min(free_bytes, partition_size * sizeof(float)); }
+      if (metric != cuvs::distance::DistanceType::InnerProduct) { bytes_per_row += sizeof(float); }
       if (!fused_l2) {
         // Tiled search (including inner product for any k) also allocates pairwise
         // distances, intermediate top-k lists, and selection/sorting scratch.

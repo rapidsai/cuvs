@@ -1228,7 +1228,7 @@ Each row of the output contains the nearest neighbor indices for the correspondi
 | `res` | in | `raft::resources const&` | RAFT resources. |
 | `dataset` | in | `raft::host_matrix_view<const float, int64_t, raft::row_major>` | Row-major host dataset of float values, with shape [n_rows, dim]. |
 | `knn_graph` | out | `raft::host_matrix_view<uint32_t, int64_t, raft::row_major>` | Host output with shape [n_rows, degree], where degree is in [1, n_rows - 1]. |
-| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. |
+| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. Supported metrics are L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded. |
 
 **Returns**
 
@@ -1254,7 +1254,7 @@ Each row of the output contains the nearest neighbor indices for the correspondi
 | `res` | in | `raft::resources const&` | RAFT resources. |
 | `dataset` | in | `raft::device_matrix_view<const float, int64_t, raft::row_major>` | Row-major device dataset of float values, with shape [n_rows, dim]. |
 | `knn_graph` | out | `raft::host_matrix_view<uint32_t, int64_t, raft::row_major>` | Host output with shape [n_rows, degree], where degree is in [1, n_rows - 1]. |
-| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. |
+| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. Supported metrics are L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded. |
 
 **Returns**
 
@@ -1280,7 +1280,7 @@ Each row of the output contains the nearest neighbor indices for the correspondi
 | `res` | in | `raft::resources const&` | RAFT resources. |
 | `dataset` | in | `raft::host_matrix_view<const half, int64_t, raft::row_major>` | Row-major host dataset of half values, with shape [n_rows, dim]. |
 | `knn_graph` | out | `raft::host_matrix_view<uint32_t, int64_t, raft::row_major>` | Host output with shape [n_rows, degree], where degree is in [1, n_rows - 1]. |
-| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. |
+| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. Supported metrics are L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded. |
 
 **Returns**
 
@@ -1306,7 +1306,7 @@ Each row of the output contains the nearest neighbor indices for the correspondi
 | `res` | in | `raft::resources const&` | RAFT resources. |
 | `dataset` | in | `raft::device_matrix_view<const half, int64_t, raft::row_major>` | Row-major device dataset of half values, with shape [n_rows, dim]. |
 | `knn_graph` | out | `raft::host_matrix_view<uint32_t, int64_t, raft::row_major>` | Host output with shape [n_rows, degree], where degree is in [1, n_rows - 1]. |
-| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. |
+| `build_params` | in | `graph_build_params::brute_force_params` | Brute-force index and search parameters. Supported metrics are L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded. |
 
 **Returns**
 

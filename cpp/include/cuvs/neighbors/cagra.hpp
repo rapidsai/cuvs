@@ -4392,7 +4392,8 @@ void distribute(const raft::resources& clique,
  * @param[in] dataset Row-major host dataset of float values, with shape [n_rows, dim].
  * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
  * 1].
- * @param[in] build_params Brute-force index and search parameters.
+ * @param[in] build_params Brute-force index and search parameters. Supported metrics are
+ * L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -4412,7 +4413,8 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] dataset Row-major device dataset of float values, with shape [n_rows, dim].
  * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
  * 1].
- * @param[in] build_params Brute-force index and search parameters.
+ * @param[in] build_params Brute-force index and search parameters. Supported metrics are
+ * L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -4432,7 +4434,8 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] dataset Row-major host dataset of half values, with shape [n_rows, dim].
  * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
  * 1].
- * @param[in] build_params Brute-force index and search parameters.
+ * @param[in] build_params Brute-force index and search parameters. Supported metrics are
+ * L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
@@ -4452,7 +4455,8 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] dataset Row-major device dataset of half values, with shape [n_rows, dim].
  * @param[out] knn_graph Host output with shape [n_rows, degree], where degree is in [1, n_rows -
  * 1].
- * @param[in] build_params Brute-force index and search parameters.
+ * @param[in] build_params Brute-force index and search parameters. Supported metrics are
+ * L2Expanded, L2SqrtExpanded, InnerProduct and CosineExpanded.
  */
 void build_knn_graph(raft::resources const& res,
                      raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
