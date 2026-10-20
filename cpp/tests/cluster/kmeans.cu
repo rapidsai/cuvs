@@ -17,6 +17,8 @@
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/unary_op.cuh>
+#include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -31,6 +33,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -747,18 +750,13 @@ constexpr float byte_divisor()
 }
 
 template <typename ByteT>
-std::vector<ByteT> make_byte_fit_input()
-{
-  // Interleave the two well-separated clusters so every outer batch exercises both signs/ranges.
-  // There are 11 rows, so a four-row device buffer also exercises a three-row final batch.
-  if constexpr (std::is_same_v<ByteT, int8_t>) {
-    return {-120, -110, -100, 72,  80, 88,  -112, -104, -96, 80,  88,  96,  -104, -98, -88, 88, 96,
-            104,  -96,  -90,  -80, 96, 104, 112,  -88,  -82, -72, 104, 112, 120,  112, 120, 127};
-  } else {
-    return {8,   16, 24, 200, 208, 216, 16,  24, 32, 208, 216, 224, 24,  32,  40,  216, 224,
-            232, 32, 40, 48,  224, 232, 240, 40, 48, 56,  232, 240, 248, 240, 248, 255};
+struct byte_blob_quantizer {
+  RAFT_INLINE_FUNCTION ByteT operator()(float value) const
+  {
+    constexpr int offset = std::is_same_v<ByteT, uint8_t> ? 128 : 0;
+    return static_cast<ByteT>(static_cast<int>(value * 42.0f) + offset);
   }
-}
+};
 
 template <typename ByteT>
 class KmeansByteFitTest : public ::testing::Test {
@@ -768,23 +766,67 @@ class KmeansByteFitTest : public ::testing::Test {
   static constexpr int64_t n_clusters = 2;
   static constexpr int64_t batch_rows = 4;
 
-  void SetUp() override
+  void SetUp() override { generate_inputs(n_samples); }
+
+  void generate_inputs(int64_t rows)
   {
-    h_byte_input = make_byte_fit_input<ByteT>();
+    auto stream = raft::resource::get_cuda_stream(handle);
+    auto blobs  = raft::make_device_matrix<float, int64_t>(handle, rows, n_features);
+    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, rows);
+    auto bytes  = raft::make_device_matrix<ByteT, int64_t>(handle, rows, n_features);
+
+    // Match the balanced k-means byte tests: seeded float blobs, then scale and quantize.
+    raft::random::make_blobs<float, int64_t>(blobs.data_handle(),
+                                             labels.data_handle(),
+                                             rows,
+                                             n_features,
+                                             n_clusters,
+                                             stream.get(),
+                                             true,
+                                             nullptr,
+                                             nullptr,
+                                             0.1f,
+                                             true,
+                                             -1.0f,
+                                             1.0f,
+                                             uint64_t{1234});
+    raft::linalg::unaryOp(bytes.data_handle(),
+                          blobs.data_handle(),
+                          rows * n_features,
+                          byte_blob_quantizer<ByteT>{},
+                          stream.get());
+
+    h_byte_input.resize(rows * n_features);
+    std::vector<int64_t> h_labels(rows);
+    raft::copy(h_byte_input.data(), bytes.data_handle(), h_byte_input.size(), stream);
+    raft::copy(h_labels.data(), labels.data_handle(), h_labels.size(), stream);
+    raft::resource::sync_stream(handle);
+
+    // Use the quantized values for the float reference, including initial centroids.
     h_float_input.resize(h_byte_input.size());
     std::transform(
       h_byte_input.begin(), h_byte_input.end(), h_float_input.begin(), [](ByteT value) {
         return static_cast<float>(value) / byte_divisor<ByteT>();
       });
+    h_initial_centroids.resize(n_clusters * n_features);
+    for (int64_t cluster = 0; cluster < n_clusters; ++cluster) {
+      auto row = std::find(h_labels.begin(), h_labels.end(), cluster);
+      ASSERT_NE(row, h_labels.end());
+      std::copy_n(h_float_input.begin() + (row - h_labels.begin()) * n_features,
+                  n_features,
+                  h_initial_centroids.begin() + cluster * n_features);
+    }
 
-    // Positive, nonuniform and fractional weights force genuinely fractional output centroids.
-    h_weights = {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 2.75f, 3.25f};
+    // Nonuniform fractional weights have a period distinct from either batch size.
+    h_weights.resize(rows);
+    for (int64_t row = 0; row < rows; ++row) {
+      h_weights[row] = 0.5f + 0.25f * static_cast<float>(row % 17);
+    }
     if constexpr (std::is_same_v<ByteT, int8_t>) {
-      h_initial_centroids = {-0.91f, -0.83f, -0.76f, 0.79f, 0.85f, 0.92f};
       EXPECT_LT(*std::min_element(h_byte_input.begin(), h_byte_input.end()), ByteT{0});
     } else {
-      h_initial_centroids = {0.07f, 0.13f, 0.19f, 0.83f, 0.89f, 0.95f};
-      EXPECT_GT(*std::max_element(h_byte_input.begin(), h_byte_input.end()), ByteT{240});
+      EXPECT_GT(*std::max_element(h_byte_input.begin(), h_byte_input.end()),
+                static_cast<ByteT>(std::numeric_limits<int8_t>::max()));
     }
   }
 
@@ -974,9 +1016,13 @@ TYPED_TEST(KmeansByteFitTest, DefaultInitializationRetainsEnoughRowsForClusters)
   params.device_buffer_samples = 0;
   params.max_iter              = 0;
   params.init_size             = TestFixture::n_clusters;
+  // Scalable seeding's random fallback uses std::rand rather than params.rng_state.
+  // Reset it before each fit so reference and byte runs choose the same fallback rows.
+  const auto fallback_seed = static_cast<unsigned int>(params.rng_state.seed);
   std::vector<byte_fit_result> expected;
   for (double oversampling_factor : {0.0, 2.0}) {
     params.oversampling_factor = oversampling_factor;
+    std::srand(fallback_seed);
     expected.push_back(this->fit_host(this->h_float_input, params, false));
   }
 
@@ -987,8 +1033,10 @@ TYPED_TEST(KmeansByteFitTest, DefaultInitializationRetainsEnoughRowsForClusters)
   for (int scalable = 0; scalable < 2; ++scalable) {
     SCOPED_TRACE(scalable ? "scalable KMeansPlusPlus" : "classic KMeansPlusPlus");
     params.oversampling_factor = scalable ? 2.0 : 0.0;
-    const auto host            = this->fit_host(this->h_byte_input, params, false);
-    const auto device          = this->fit_byte_device(params, false);
+    std::srand(fallback_seed);
+    const auto host = this->fit_host(this->h_byte_input, params, false);
+    std::srand(fallback_seed);
+    const auto device = this->fit_byte_device(params, false);
     this->expect_result_near(expected[scalable], host);
     this->expect_result_near(expected[scalable], device);
   }
@@ -1001,18 +1049,7 @@ TYPED_TEST(KmeansByteFitTest, ConversionBudgetIsIndependentOfHostStagingSize)
   constexpr int64_t conversion_rows     = 64;
   constexpr std::size_t workspace_limit = 8192;
 
-  const auto original_input = this->h_byte_input;
-  this->h_byte_input.resize(n_rows * TestFixture::n_features);
-  this->h_float_input.resize(this->h_byte_input.size());
-  this->h_weights.resize(n_rows);
-  for (std::size_t i = 0; i < this->h_byte_input.size(); ++i) {
-    this->h_byte_input[i]  = original_input[i % original_input.size()];
-    this->h_float_input[i] = static_cast<float>(this->h_byte_input[i]) / byte_divisor<TypeParam>();
-  }
-  for (int64_t row = 0; row < n_rows; ++row) {
-    // The weight period differs from the data period and both batch sizes, exposing bad offsets.
-    this->h_weights[row] = 0.5f + 0.25f * static_cast<float>(row % 17);
-  }
+  this->generate_inputs(n_rows);
 
   auto params                  = this->make_params(cuvs::cluster::kmeans::params::Array);
   params.device_buffer_samples = outer_rows;
