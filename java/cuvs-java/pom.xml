@@ -177,9 +177,16 @@ SPDX-License-Identifier: Apache-2.0
                 </executions>
             </plugin>
             <plugin>
+                <!-- Keep at 3.5.x: 3.6.0 switches to the JUnit Platform provider, which breaks '-Dtest=Class#method' filtering with the randomizedtesting runner (surefire-junit4 is not published past 3.5.6). -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.6</version>
+            </plugin>
+            <plugin>
+                <!-- Keep at 3.5.x: 3.6.0 switches to the JUnit Platform provider, which breaks '-Dtest=Class#method' filtering with the randomizedtesting runner (surefire-junit4 is not published past 3.5.6). -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.5.6</version>
                 <configuration>
                     <forkCount>1</forkCount>
                     <argLine>--enable-native-access=com.nvidia.cuvs</argLine>
@@ -232,6 +239,9 @@ SPDX-License-Identifier: Apache-2.0
                 </executions>
                 <configuration>
                     <excludeResources>true</excludeResources>
+                    <archive>
+                        <addMavenDescriptor>false</addMavenDescriptor>
+                    </archive>
                 </configuration>
             </plugin>
             <plugin>
@@ -354,7 +364,7 @@ SPDX-License-Identifier: Apache-2.0
                                     <goal>copy-resources</goal>
                                 </goals>
                                 <configuration>
-                                    <overwrite>true</overwrite>
+                                    <changeDetection>always</changeDetection>
                                     <outputDirectory>${project.build.directory}/native-libs/${os.arch}/${os.name}</outputDirectory>
                                     <resources>
                                         <resource>
@@ -440,7 +450,7 @@ SPDX-License-Identifier: Apache-2.0
                                     <goal>copy-resources</goal>
                                 </goals>
                                 <configuration>
-                                    <overwrite>true</overwrite>
+                                    <changeDetection>always</changeDetection>
                                     <outputDirectory>${project.build.directory}/native-libs/${os.arch}/${os.name}</outputDirectory>
                                     <resources>
                                         <resource>
@@ -526,7 +536,7 @@ SPDX-License-Identifier: Apache-2.0
                                     <goal>copy-resources</goal>
                                 </goals>
                                 <configuration>
-                                    <overwrite>true</overwrite>
+                                    <changeDetection>always</changeDetection>
                                     <outputDirectory>${project.build.directory}/native-libs/${os.arch}/${os.name}</outputDirectory>
                                     <resources>
                                         <resource>
@@ -612,7 +622,7 @@ SPDX-License-Identifier: Apache-2.0
                                     <goal>copy-resources</goal>
                                 </goals>
                                 <configuration>
-                                    <overwrite>true</overwrite>
+                                    <changeDetection>always</changeDetection>
                                     <outputDirectory>${project.build.directory}/native-libs/${os.arch}/${os.name}</outputDirectory>
                                     <resources>
                                         <resource>
