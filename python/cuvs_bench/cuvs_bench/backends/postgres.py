@@ -185,6 +185,7 @@ class PostgresBackend(BenchmarkBackend):
         self._conn = None
         self._schema = None
         self._index = None
+        self._measurement_metadata = {}
 
     @property
     def algo(self):
@@ -233,6 +234,12 @@ class PostgresBackend(BenchmarkBackend):
             if self.algo == "pgcuvs_cagra":
                 self._conn.execute("SET cuvs.search_mode = 'cagra'")
                 self._conn.execute("SET cuvs.cpu_hnsw_fallback = off")
+                self._conn.execute("SET cuvs.cagra_batch_wait_us = 0")
+                self._measurement_metadata["cagra_batch_wait_us"] = int(
+                    self._conn.execute(
+                        "SHOW cuvs.cagra_batch_wait_us"
+                    ).fetchone()[0]
+                )
             if "index_dir" in self.config:
                 self._conn.execute(
                     "SELECT set_config('cuvs.index_dir', %s, false)",
@@ -247,6 +254,7 @@ class PostgresBackend(BenchmarkBackend):
             "measurement_boundary": "end_to_end_sql",
             "axis": "single_client_latency",
             "build_params": json.dumps(idx.build_param, sort_keys=True),
+            **self._measurement_metadata,
         }
 
     def _create_index(self, name, method, params):
@@ -346,8 +354,13 @@ class PostgresBackend(BenchmarkBackend):
                         },
                     )
             result.build_time_seconds = time.perf_counter() - started
-            self._index = idx
             relation = f"{schema}.ann"
+            disk_bytes = int(
+                conn.execute(
+                    "SELECT pg_relation_size(%s::regclass)", (relation,)
+                ).fetchone()[0]
+            )
+            self._measurement_metadata["index_disk_bytes"] = disk_bytes
             if self.algo == "pgcuvs_cagra":
                 row = conn.execute(
                     "SELECT vram_bytes FROM pg_stat_gpu_search "
@@ -358,14 +371,28 @@ class PostgresBackend(BenchmarkBackend):
                     raise RuntimeError(
                         "No resident CAGRA VRAM accounting available"
                     )
-                result.metadata["index_size_source"] = "daemon_vram_bytes"
+                result.index_size_bytes = int(row[0])
+                self._measurement_metadata.update(
+                    index_size_source="daemon_vram_bytes",
+                    daemon_vram_bytes=result.index_size_bytes,
+                )
             else:
-                row = conn.execute(
-                    "SELECT pg_relation_size(%s::regclass)", (relation,)
-                ).fetchone()
-                result.metadata["index_size_source"] = "pg_relation_size"
-            result.index_size_bytes = int(row[0])
-            result.metadata["index_size_bytes"] = result.index_size_bytes
+                result.index_size_bytes = disk_bytes
+                started = time.perf_counter()
+                blocks = conn.execute(
+                    "SELECT pg_prewarm(%s::regclass, 'buffer')", (relation,)
+                ).fetchone()[0]
+                self._measurement_metadata.update(
+                    index_size_source="pg_relation_size",
+                    prewarm_method="pg_prewarm_buffer",
+                    prewarm_blocks=int(blocks),
+                    prewarm_seconds=time.perf_counter() - started,
+                )
+            self._measurement_metadata["index_size_bytes"] = (
+                result.index_size_bytes
+            )
+            result.metadata.update(self._measurement_metadata)
+            self._index = idx
         except Exception as exc:
             result.success = False
             result.error_message = str(exc)
@@ -527,6 +554,7 @@ class PostgresBackend(BenchmarkBackend):
             self._conn = None
             self._schema = None
             self._index = None
+            self._measurement_metadata = {}
 
 
 def register():

@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import numpy as np
 import pytest
@@ -378,6 +378,114 @@ def test_cagra_reads_observed_query_count():
     assert backend._gpu_search_count() == 42
 
 
+def test_cagra_connection_disables_batching_and_records_effective_value(
+    monkeypatch,
+):
+    psycopg = pytest.importorskip("psycopg")
+    adapter = pytest.importorskip("pgvector.psycopg")
+    conn = Mock()
+    conn.execute.return_value.fetchall.return_value = [
+        ("vector",),
+        ("pg_cuvs",),
+    ]
+    conn.execute.return_value.fetchone.return_value = ("0",)
+    monkeypatch.setattr(psycopg, "connect", Mock(return_value=conn))
+    monkeypatch.setattr(adapter, "register_vector", Mock())
+    backend = PostgresBackend({"algo": "pgcuvs_cagra"})
+    assert backend._connect() is conn
+    conn.execute.assert_any_call("SET cuvs.cagra_batch_wait_us = 0")
+    conn.execute.assert_any_call("SHOW cuvs.cagra_batch_wait_us")
+    assert backend._metadata(index())["cagra_batch_wait_us"] == 0
+
+
+@pytest.mark.parametrize(
+    "algo",
+    [
+        "pgvector_hnsw",
+        "pgvector_ivfflat",
+        "pgcuvs_hnsw_import",
+        "pgcuvs_cagra",
+    ],
+)
+def test_build_records_resources_and_prewarms_cpu_index(
+    algo, monkeypatch, tmp_path
+):
+    pytest.importorskip("psycopg")
+    from cuvs_bench.backends import postgres
+    from cuvs_bench.run.data_export import write_results_to_csv
+
+    conn = MagicMock()
+
+    def execute(statement, params=None):
+        row = (8192,)
+        if isinstance(statement, str):
+            if "vram_bytes" in statement:
+                row = (65536,)
+            elif "pg_prewarm" in statement:
+                row = (1,)
+        return SimpleNamespace(fetchone=lambda: row)
+
+    conn.execute.side_effect = execute
+    backend = PostgresBackend({"algo": algo})
+    monkeypatch.setattr(backend, "_connect", lambda: conn)
+    monkeypatch.setattr(backend, "_create_index", Mock())
+    ticks = iter([10.0, 12.0, 20.0, 23.0])
+    monkeypatch.setattr(postgres.time, "perf_counter", lambda: next(ticks))
+    ds, idx = dataset(), index(algo, build={"graph_degree": 32})
+    if algo == "pgvector_hnsw":
+        idx.build_param = {"m": 8}
+    elif algo == "pgvector_ivfflat":
+        idx.build_param = {"lists": 4}
+    built = backend.build(ds, [idx])
+    assert built.success, built.error_message
+    assert built.build_time_seconds == 2
+    assert built.metadata["index_disk_bytes"] == 8192
+    if algo == "pgcuvs_cagra":
+        assert built.index_size_bytes == 65536
+        assert built.metadata["daemon_vram_bytes"] == 65536
+        assert built.metadata["index_size_source"] == "daemon_vram_bytes"
+        assert not any(
+            "pg_prewarm" in str(call.args[0])
+            for call in conn.execute.call_args_list
+        )
+    else:
+        assert built.index_size_bytes == 8192
+        assert built.metadata["prewarm_method"] == "pg_prewarm_buffer"
+        assert built.metadata["prewarm_blocks"] == 1
+        assert built.metadata["prewarm_seconds"] == 3
+    assert backend._metadata(idx)["index_disk_bytes"] == 8192
+    write_results_to_csv([built], ds.name, str(tmp_path), 5, 10000)
+    path = tmp_path / ds.name / "result" / "build" / f"{algo},base.csv"
+    with path.open() as handle:
+        row = next(csv.DictReader(handle))
+    assert int(row["index_disk_bytes"]) == 8192
+    if algo == "pgcuvs_cagra":
+        assert int(row["daemon_vram_bytes"]) == 65536
+    else:
+        assert row["prewarm_method"] == "pg_prewarm_buffer"
+
+
+@pytest.mark.postgres
+def test_live_prewarm_failure_prevents_search(live_backend, monkeypatch):
+    # Exercise failure after CREATE INDEX without changing extension privileges.
+    conn = live_backend._connect()
+    execute = conn.execute
+
+    def reject_prewarm(statement, params=None):
+        if isinstance(statement, str) and "pg_prewarm" in statement:
+            raise RuntimeError("prewarm unavailable")
+        return execute(statement, params)
+
+    monkeypatch.setattr(conn, "execute", reject_prewarm)
+    ds, idx = dataset(), index()
+    built = live_backend.build(ds, [idx])
+    assert not built.success
+    assert "prewarm unavailable" in built.error_message
+    result = live_backend.search(ds, [idx], 5)[0]
+    assert not result.success
+    assert "Build this index" in result.error_message
+
+
 @pytest.fixture
 def live_backend():
     conninfo = os.environ.get("CUVS_BENCH_POSTGRES_DSN")
@@ -422,6 +530,16 @@ def test_live_build_search_and_cleanup(live_backend, algo, build, search):
     assert result.queries_per_second > 0
     assert result.latency_percentiles["p50_ms"] > 0
     assert result.metadata["measurement_boundary"] == "end_to_end_sql"
+    assert built.metadata["prewarm_method"] == "pg_prewarm_buffer"
+    block_size = int(
+        live_backend._conn.execute("SHOW block_size").fetchone()[0]
+    )
+    assert (
+        built.metadata["prewarm_blocks"] * block_size == built.index_size_bytes
+    )
+    assert (
+        result.metadata["prewarm_blocks"] == built.metadata["prewarm_blocks"]
+    )
     schema = live_backend._schema
     conn = live_backend._conn
     live_backend.cleanup()
@@ -523,12 +641,27 @@ def test_live_index_size_survives_csv_export(live_backend, tmp_path):
     ds, idx = dataset(), index()
     built = live_backend.build(ds, [idx])
     assert built.success, built.error_message
-    write_results_to_csv([built], ds.name, str(tmp_path), 5, 10000)
+    searched = live_backend.search(ds, [idx], 5)[0]
+    assert searched.success, searched.error_message
+    write_results_to_csv([built, searched], ds.name, str(tmp_path), 5, 10000)
     path = tmp_path / ds.name / "result" / "build" / "pgvector_hnsw,base.csv"
     with path.open() as handle:
         row = next(csv.DictReader(handle))
     assert int(row["index_size_bytes"]) == built.index_size_bytes > 0
     assert row["index_size_source"] == "pg_relation_size"
+    assert int(row["index_disk_bytes"]) == built.index_size_bytes
+    assert row["prewarm_method"] == "pg_prewarm_buffer"
+    path = (
+        tmp_path
+        / ds.name
+        / "result"
+        / "search"
+        / "pgvector_hnsw,base,k5,bs10000,raw.csv"
+    )
+    with path.open() as handle:
+        row = next(csv.DictReader(handle))
+    assert int(row["index_disk_bytes"]) == built.index_size_bytes
+    assert int(row["prewarm_blocks"]) == built.metadata["prewarm_blocks"]
 
 
 def test_orchestrator_recomputes_recall_from_neighbor_ids():
@@ -559,7 +692,8 @@ def test_real_gpu_build_search_and_hnsw_export(algo):
     # Exercise the connection override with a valid conflicting startup value.
     if algo == "pgcuvs_cagra":
         conninfo = make_conninfo(
-            conninfo, options="-c cuvs.cpu_hnsw_fallback=on"
+            conninfo,
+            options="-c cuvs.cpu_hnsw_fallback=on -c cuvs.cagra_batch_wait_us=1000",
         )
     rng = np.random.default_rng(20261016)
     base = rng.normal(size=(4096, 32)).astype(np.float32)
@@ -595,8 +729,13 @@ def test_real_gpu_build_search_and_hnsw_export(algo):
         built = backend.build(ds, [idx])
         assert built.success, built.error_message
         assert built.index_size_bytes > 0
+        assert built.metadata["index_disk_bytes"] > 0
         source = f"{backend._schema}.source_graph"
         if algo == "pgcuvs_cagra":
+            assert built.metadata["cagra_batch_wait_us"] == 0
+            assert (
+                built.metadata["daemon_vram_bytes"] == built.index_size_bytes
+            )
             assert (
                 backend._conn.execute(
                     "SHOW cuvs.cpu_hnsw_fallback"
@@ -616,9 +755,18 @@ def test_real_gpu_build_search_and_hnsw_export(algo):
         # A broad sanity bound catches broken IDs, not production ANN quality.
         assert result.recall > 0.8
         if algo == "pgcuvs_cagra":
+            assert result.metadata["cagra_batch_wait_us"] == 0
+            assert (
+                result.metadata["index_disk_bytes"]
+                == built.metadata["index_disk_bytes"]
+            )
             assert result.metadata["observed_search_mode"] == "gpu_cagra"
             assert result.metadata["gpu_queries"] == len(queries)
         else:
+            assert (
+                result.metadata["prewarm_blocks"]
+                == built.metadata["prewarm_blocks"]
+            )
             after = backend._conn.execute(
                 "SELECT search_count FROM pg_stat_gpu_search "
                 "WHERE index_oid=%s::regclass",

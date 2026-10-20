@@ -38,11 +38,14 @@ On a PostgreSQL server with pgvector installed, create a dedicated database:
 ```bash
 createdb cuvs_bench
 psql -X -v ON_ERROR_STOP=1 -d cuvs_bench -c 'CREATE EXTENSION vector;'
+psql -X -v ON_ERROR_STOP=1 -d cuvs_bench -c 'CREATE EXTENSION pg_prewarm;'
 export PGDATABASE=cuvs_bench
 # Remote server: set PGHOST/PGPORT/PGUSER; use .pgpass or PGSERVICE for credentials.
 ```
 
-The role needs CREATE privilege on this database. CAGRA measurements also need
+An administrator must install `pg_prewarm` for CPU index warming. The benchmark
+role needs permission to execute `pg_prewarm(regclass, text, text, bigint, bigint)`
+and CREATE privilege on this database. CAGRA measurements also need
 SELECT privilege on `pg_stat_gpu_search` for the VRAM and GPU-dispatch checks.
 An administrator must grant this to an ordinary benchmark role, for example
 `GRANT SELECT ON pg_stat_gpu_search TO benchmark_role;` (replace the role name).
@@ -88,6 +91,7 @@ systemctl is-active postgresql@16-main pg-cuvs-server
 createdb cuvs_bench
 psql -X -v ON_ERROR_STOP=1 -d cuvs_bench \
   -c 'CREATE EXTENSION IF NOT EXISTS vector;' \
+  -c 'CREATE EXTENSION IF NOT EXISTS pg_prewarm;' \
   -c 'CREATE EXTENSION pg_cuvs;'
 psql -X -d cuvs_bench -c 'SHOW shared_preload_libraries;'
 nvidia-smi
@@ -146,8 +150,11 @@ cell. Keep `ef_search` or `candidates` >= `count`. The HNSW export uses
 
 CSV files appear under `datasets/wiki_all_1M/result/{build,search}/`. Standard
 cuvs-bench plotting tools can consume them. Retain every build cell and search
-point when selecting matched-recall Pareto points. Apply a recall threshold
-before selecting the fastest point.
+point when selecting matched-recall Pareto points. Follow the
+[cuVS Methodologies](https://docs.nvidia.com/cuvs/user-guide/benchmarking-guide/methodologies):
+compare Pareto points within the same recall bucket and average their associated
+build times for that bucket. A single fastest point above a recall threshold is
+not a substitute for that bucket summary.
 
 ### A bounded wiki_all_1M CLI validation sweep
 
@@ -194,6 +201,50 @@ another engine, machine, or measurement boundary.
 To exercise the GPU build axis as well, set `graph_degree` to `[32, 64]` in
 the two GPU grids. Each then produces two build rows and four raw search rows.
 
+### Repeat builds in separate result directories
+
+Run each build cell twice with the same server, data, configuration and search
+grid. Use a new result root for each repetition: rerunning into the same root
+can overwrite CSV rows with the same index label. For example, after creating
+the validation grids above, prepare two roots sharing only the input files:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+
+source = Path("datasets/wiki_all_1M").resolve()
+for repeat in (1, 2):
+    target = Path(f"pg-repeats/run-{repeat}/wiki_all_1M")
+    target.mkdir(parents=True)  # Refuse to mix with an earlier repetition.
+    for name in ("base.1M.fbin", "queries.fbin", "groundtruth.1M.neighbors.ibin"):
+        (target / name).symlink_to((source / name).resolve(strict=True))
+PY
+for repeat in 1 2; do
+  for algo in pgcuvs_cagra pgcuvs_hnsw_import pgvector_hnsw pgvector_ivfflat; do
+    python -m cuvs_bench.run --backend-config pg-backend.yaml \
+      --dataset wiki_all_1M --dataset-path "pg-repeats/run-$repeat" \
+      --configuration pg-validation-grids --algorithms "$algo" \
+      --groups validation -k 10 --batch-size 10000 --search-mode latency --force
+  done
+done
+```
+
+Keep both repetitions' `result/build` and `result/search` trees. To summarize
+build repeatability, join the two build CSVs on `build_params` (the sorted JSON
+parameter object) within each algorithm/group and take the arithmetic mean of
+the two `time` values. The full `index_name` includes each repetition's result
+root, so it differs between repetitions and is not a shared join key. Check
+that each expected cell succeeded in both repetitions before computing the
+mean; a missing or failed cell is not a zero-time build. This mean still
+measures only CREATE INDEX, including conversion for export.
+
+For recall-bucket comparisons, calculate the Pareto frontier separately in
+each repetition and average the build times associated with its frontier
+points in each bucket, following the linked methodology. Report both bucket
+summaries and their arithmetic mean, with the raw search points retained.
+Leave buckets without Pareto points unmeasured. Do not choose a different
+recall bucket or the fastest repetition to fill a missing result.
+
 ## Measurement contract
 
 - File reading, binary COPY and ANALYZE are outside the build timer.
@@ -207,16 +258,31 @@ the two GPU grids. Each then produces two build rows and four raw search rows.
   resident `gpu_cagra` mode and exactly one additional GPU search per measured
   query. Missing/reset counters, CPU mode or an unavailable daemon fail the
   point instead of producing a GPU-labeled measurement.
+- CAGRA connections explicitly set `cuvs.cagra_batch_wait_us = 0`. The effective
+  value read from the session is recorded as `cagra_batch_wait_us` in build and
+  search CSV metadata.
+- After each pgvector or exported CPU index build, `pg_prewarm(..., 'buffer')`
+  reads every block of that index before timed search. `prewarm_method`,
+  `prewarm_blocks` and `prewarm_seconds` are recorded in build and search rows;
+  this step is outside both timers and fails the build if unavailable. It does
+  not warm the entire heap or guarantee that an index larger than
+  `shared_buffers` remains fully resident. Record the server memory settings
+  when comparing runs.
 - IDs are corpus offsets. Missing neighbors stay `-1` with infinite distance.
   The orchestrator calculates recall using actual IDs and ground truth.
 - CPU index size is `pg_relation_size`. CAGRA size comes from the daemon's
   `pg_stat_gpu_search.vram_bytes`; missing accounting fails the build. Disk
-  bytes and daemon VRAM bytes are different resources, labeled in metadata.
+  relation bytes are also recorded as `index_disk_bytes` for every algorithm,
+  alongside `daemon_vram_bytes` for CAGRA. Both build and search rows retain
+  these metadata. `index_size_bytes` preserves the original per-algorithm
+  quantity identified by `index_size_source`. Relation bytes exclude the heap
+  and any daemon files outside PostgreSQL; daemon accounting is not total
+  process/GPU memory. These columns are not a common total-memory metric.
 
 ## Validate
 
 CPU contracts require no database. Live tests need a disposable database with
-the vector extension installed:
+the vector and pg_prewarm extensions installed:
 
 ```bash
 python -m pip install pytest
