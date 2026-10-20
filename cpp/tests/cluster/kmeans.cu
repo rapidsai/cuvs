@@ -932,23 +932,6 @@ class KmeansByteFitTest : public ::testing::Test {
 using KmeansByteTypes = ::testing::Types<int8_t, uint8_t>;
 TYPED_TEST_SUITE(KmeansByteFitTest, KmeansByteTypes);
 
-TYPED_TEST(KmeansByteFitTest, ArrayHostAndDeviceMatchNormalizedFloat)
-{
-  auto params = this->make_params(cuvs::cluster::kmeans::params::Array);
-  for (bool weighted : {false, true}) {
-    SCOPED_TRACE(weighted ? "nonuniform weights" : "unweighted");
-    const auto expected = this->fit_host(this->h_float_input, params, weighted);
-    const auto host     = this->fit_host(this->h_byte_input, params, weighted);
-    const auto device   = this->fit_byte_device(params, weighted);
-    this->expect_result_near(expected, host);
-    this->expect_result_near(expected, device);
-    if (weighted) {
-      EXPECT_TRUE(this->has_fractional_byte_coordinate(host));
-      EXPECT_TRUE(this->has_fractional_byte_coordinate(device));
-    }
-  }
-}
-
 TYPED_TEST(KmeansByteFitTest, FixedSeedInitializersMatchNormalizedFloat)
 {
   for (auto init :
@@ -1061,6 +1044,7 @@ TYPED_TEST(KmeansByteFitTest, ConversionBudgetIsIndependentOfHostStagingSize)
 
         const auto host = this->fit_host(this->h_byte_input, params, weighted);
         this->expect_result_near(expected[weighted], host);
+        if (weighted) { EXPECT_TRUE(this->has_fractional_byte_coordinate(host)); }
         const auto staging_rows  = buffer_rows == 0 ? n_rows : buffer_rows;
         const auto staging_slots = prefetch && staging_rows < n_rows ? 2 : 1;
         const auto staging_bytes =
@@ -1083,6 +1067,7 @@ TYPED_TEST(KmeansByteFitTest, ConversionBudgetIsIndependentOfHostStagingSize)
                                                  raft::mr::device_resource{allocations});
     const auto device = this->fit_byte_device(params, weighted);
     this->expect_result_near(expected[weighted], device);
+    if (weighted) { EXPECT_TRUE(this->has_fractional_byte_coordinate(device)); }
     EXPECT_EQ(allocations.get_bytes_counter().peak, conversion_bytes);
     EXPECT_EQ(allocations.get_bytes_counter().value, 0);
   }
