@@ -81,8 +81,8 @@ constexpr auto kmeans_batch_rows(IndexT n_rows, std::size_t free_bytes, std::siz
     std::min(kmeans_workspace_budget(free_bytes) / bytes_per_row, max_index);
   IndexT candidate           = std::max<IndexT>(IndexT{1}, static_cast<IndexT>(candidate_size));
   constexpr IndexT alignment = IndexT{64};
-  candidate                  = candidate - candidate % alignment;
-  return std::min(std::max<IndexT>(IndexT{1}, candidate), n_rows);
+  if (candidate >= alignment) { candidate -= candidate % alignment; }
+  return std::min(candidate, n_rows);
 }
 
 #if defined(CUVS_CUTILE_ENABLED) && CUVS_CUTILE_ENABLED && CUDA_VERSION >= 13000

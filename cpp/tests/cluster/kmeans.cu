@@ -982,7 +982,7 @@ TYPED_TEST(KmeansByteFitTest, DefaultInitializationRetainsEnoughRowsForClusters)
 
   // This limit makes conversion use one row, but seeding still needs at least K rows.
   // In particular, scalable seeding must not gather more random centers than sampled rows.
-  raft::resource::set_workspace_to_global_resource(this->handle, std::size_t{1024});
+  raft::resource::set_workspace_to_global_resource(this->handle, std::size_t{128});
   params.init_size = 0;
   for (int scalable = 0; scalable < 2; ++scalable) {
     SCOPED_TRACE(scalable ? "scalable KMeansPlusPlus" : "classic KMeansPlusPlus");
@@ -1104,7 +1104,9 @@ TEST(KmeansBatchSizingTest, RoundsAndClampsConversionRows)
   constexpr std::size_t bytes_per_row = 100;
 
   EXPECT_EQ(kmeans_batch_rows(n_rows, 250 * bytes_per_row, bytes_per_row), 192);
-  EXPECT_EQ(kmeans_batch_rows(n_rows, 63 * bytes_per_row, bytes_per_row), 1);
+  EXPECT_EQ(kmeans_batch_rows(n_rows, 63 * bytes_per_row, bytes_per_row), 50);
+  EXPECT_EQ(kmeans_batch_rows(n_rows, 79 * bytes_per_row, bytes_per_row), 63);
+  EXPECT_EQ(kmeans_batch_rows(n_rows, 80 * bytes_per_row, bytes_per_row), 64);
   EXPECT_EQ(kmeans_batch_rows(int64_t{50}, 1000 * bytes_per_row, bytes_per_row), 50);
   EXPECT_EQ(kmeans_batch_rows(n_rows, 1, std::size_t{0}), n_rows);
   EXPECT_EQ(kmeans_batch_rows(int64_t{0}, 1, bytes_per_row), 0);
