@@ -8,6 +8,7 @@
 #include <cuvs/core/bitset.hpp>
 #include <cuvs/core/export.hpp>
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -254,7 +255,8 @@ using graph_build_params_t = std::variant<std::monostate,
                                           graph_build_params::ivf_pq_params,
                                           graph_build_params::nn_descent_params,
                                           graph_build_params::ace_params,
-                                          graph_build_params::iterative_search_params>;
+                                          graph_build_params::iterative_search_params,
+                                          graph_build_params::brute_force_params>;
 
 /**
  * @brief A strategy for selecting the graph build parameters based on similar HNSW index
@@ -317,6 +319,9 @@ struct index_params : cuvs::neighbors::index_params {
    * // 4. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
    * params.graph_build_params =
    * cagra::graph_build_params::iterative_search_params();
+   *
+   * // 5. Choose exact brute-force kNN construction (float and half datasets)
+   * params.graph_build_params = cagra::graph_build_params::brute_force_params{};
    * @endcode
    */
   graph_build_params_t graph_build_params;
@@ -4373,6 +4378,54 @@ template <typename T, typename IdxT>
 void distribute(const raft::resources& clique,
                 const std::string& filename,
                 cuvs::neighbors::mg_index<cagra::device_padded_index<T, IdxT>, T, IdxT>* index);
+
+/**
+ * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
+ * @param res RAFT resources.
+ * @param dataset Row-major host dataset of float or half values.
+ * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
+ * @param build_params Brute-force index and search parameters.
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     graph_build_params::brute_force_params build_params);
+
+/**
+ * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
+ * @param res RAFT resources.
+ * @param dataset Row-major device dataset of float or half values.
+ * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
+ * @param build_params Brute-force index and search parameters.
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     graph_build_params::brute_force_params build_params);
+
+/**
+ * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
+ * @param res RAFT resources.
+ * @param dataset Row-major host dataset of float or half values.
+ * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
+ * @param build_params Brute-force index and search parameters.
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     graph_build_params::brute_force_params build_params);
+
+/**
+ * @brief Build an exact, distance-ordered kNN graph, excluding self neighbors.
+ * @param res RAFT resources.
+ * @param dataset Row-major device dataset of float or half values.
+ * @param knn_graph Host output with matching rows and degree in [1, n_rows - 1].
+ * @param build_params Brute-force index and search parameters.
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     graph_build_params::brute_force_params build_params);
 
 /**
  * @brief Build a kNN graph using IVF-PQ.
