@@ -51,7 +51,6 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -1100,6 +1099,7 @@ bool ace_check_use_disk_mode(raft::resources const& res,
                              std::optional<double> max_host_memory_gb,
                              std::optional<double> max_gpu_memory_gb,
                              bool guarantee_connectivity,
+                             bool add_global_reverse_edges,
                              ace_memory_requirements& mem,
                              size_t nsubpartitions = 1)
 {
@@ -1153,6 +1153,12 @@ bool ace_check_use_disk_mode(raft::resources const& res,
   mem.cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
   mem.total_size       = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
                    mem.sub_graph_size + mem.cagra_graph_size + opt_host_ws_total;
+  if (add_global_reverse_edges) {
+    // The global merge keeps a full source graph copy and reserves one candidate per edge
+    // before deduplication, plus the per-partition vectors and their allocation counts.
+    mem.total_size +=
+      2 * mem.cagra_graph_size + n_partitions * (sizeof(std::vector<IdxT>) + sizeof(size_t));
+  }
 
   RAFT_LOG_INFO("ACE build: host memory estimate required=%.2f GiB available=%.2f GiB",
                 to_gib(mem.total_size),
@@ -1439,7 +1445,6 @@ void ace_merge_partition_reverse_edges(raft::resources const& res,
   auto const graph_degree   = static_cast<uint32_t>(graph.extent(1));
   auto const partition_size = static_cast<uint32_t>(partition_nodes.size());
   auto const num_candidates = candidate_sources.size();
-  std::sort(candidate_sources.begin(), candidate_sources.end());
 
   std::vector<IdxT> host_partition_graph(static_cast<size_t>(partition_size) * graph_degree);
   std::vector<IdxT> host_candidate_destinations(num_candidates);
@@ -1559,24 +1564,37 @@ void ace_add_global_reverse_edges(raft::resources const& res,
 
   auto source_graph = raft::make_host_matrix<IdxT, int64_t>(graph.extent(0), graph.extent(1));
   std::copy_n(graph.data_handle(), graph.size(), source_graph.data_handle());
-  std::vector<std::unordered_set<IdxT>> candidate_sets(n_partitions);
+  std::vector<size_t> candidate_counts(n_partitions, 0);
   for (size_t source = 0; source < dataset_size; ++source) {
     for (uint32_t rank = 0; rank < graph_degree; ++rank) {
       auto const destination = source_graph(source, rank);
       RAFT_EXPECTS(destination < dataset_size, "ACE: graph contains an invalid neighbor");
       auto const destination_partition = static_cast<size_t>(partition_labels(destination, 0));
-      candidate_sets[destination_partition].insert(static_cast<IdxT>(source));
+      ++candidate_counts[destination_partition];
+    }
+  }
+  std::vector<std::vector<IdxT>> partition_candidates(n_partitions);
+  for (size_t partition_id = 0; partition_id < n_partitions; ++partition_id) {
+    partition_candidates[partition_id].reserve(candidate_counts[partition_id]);
+  }
+  for (size_t source = 0; source < dataset_size; ++source) {
+    for (uint32_t rank = 0; rank < graph_degree; ++rank) {
+      auto const destination           = source_graph(source, rank);
+      auto const destination_partition = static_cast<size_t>(partition_labels(destination, 0));
+      partition_candidates[destination_partition].push_back(static_cast<IdxT>(source));
     }
   }
 
   for (size_t partition_id = 0; partition_id < n_partitions; ++partition_id) {
-    if (candidate_sets[partition_id].empty()) { continue; }
+    auto& candidate_sources = partition_candidates[partition_id];
+    if (candidate_sources.empty()) { continue; }
+    std::sort(candidate_sources.begin(), candidate_sources.end());
+    candidate_sources.erase(std::unique(candidate_sources.begin(), candidate_sources.end()),
+                            candidate_sources.end());
     auto const first = static_cast<size_t>(core_partition_offsets(partition_id));
     auto const last  = static_cast<size_t>(core_partition_offsets(partition_id + 1));
     std::vector<IdxT> partition_nodes(core_backward_mapping.data_handle() + first,
                                       core_backward_mapping.data_handle() + last);
-    std::vector<IdxT> candidate_sources(candidate_sets[partition_id].begin(),
-                                        candidate_sets[partition_id].end());
     ace_merge_partition_reverse_edges(
       res, source_graph.view(), graph, partition_nodes, std::move(candidate_sources));
   }
@@ -1684,6 +1702,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                                                           ace_params.max_host_memory_gb,
                                                           ace_params.max_gpu_memory_gb,
                                                           params.guarantee_connectivity,
+                                                          ace_params.add_global_reverse_edges,
                                                           mem,
                                                           ace_params.nsubpartitions);
     // Validate and adjust partitions if disk mode is enabled
