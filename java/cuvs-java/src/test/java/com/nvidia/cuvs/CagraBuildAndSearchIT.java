@@ -933,6 +933,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       log.trace("Building first index...");
       CagraIndex index1 =
           CagraIndex.newBuilder(resources)
@@ -1316,6 +1322,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
+
       CagraIndex index1 =
           CagraIndex.newBuilder(resources)
               .withDataset(vector1)
@@ -1474,6 +1486,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withGraphDegree(1)
               .withIntermediateGraphDegree(2)
               .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      // The merged fixture is too small to train even a 16-centroid IVF-PQ codebook.
+      CagraIndexParams mergeParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
               .build();
 
       try (CagraIndex index1 =

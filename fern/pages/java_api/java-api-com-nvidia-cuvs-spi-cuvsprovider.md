@@ -21,7 +21,7 @@ static Path tempDirectory()
 ```
 
 The temporary directory to use for intermediate operations.
-Defaults to \{@systemProperty java.io.tmpdir\}.
+Defaults to `java.io.tmpdir`.
 
 _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/spi/CuVSProvider.java:25`_
 
@@ -32,7 +32,7 @@ default Path nativeLibraryPath()
 ```
 
 The directory where to extract and install the native library.
-Defaults to \{@systemProperty java.io.tmpdir\}.
+Defaults to `java.io.tmpdir`.
 
 _Source: `java/cuvs-java/src/main/java/com/nvidia/cuvs/spi/CuVSProvider.java:33`_
 
@@ -316,7 +316,7 @@ wrapper type.
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDatasetHandleAddress` | native handle address of the caller-owned padded dataset (or padded dataset view) holding the concatenation of every input index's rows, in `indexes` order |
-| `offsets` | Per-index starting row within the merged dataset. Array of \{@code indexes.length + 1\} entries; the last entry must equal the merged dataset's row count |
+| `offsets` | Per-index starting row within the merged dataset. Array of `indexes.length + 1` entries; the last entry must equal the merged dataset's row count |
 | `mergeParams` | Parameters to control the merge operation, or null to use defaults |
 
 **Returns**
@@ -343,9 +343,7 @@ is null).
 
 This is declared as a `default` method so that adding it does not break binary
 compatibility with providers compiled against an earlier version of this interface; the
-default implementation falls back to \{@link #mergeCagraIndexes(CagraIndex[], long, long[],
-CagraIndexParams)\} when `filter` is null, and otherwise throws \{@link
-UnsupportedOperationException\}.
+default implementation falls back to long, long[], CagraIndexParams) when `filter` is null, and otherwise throws `UnsupportedOperationException`.
 
 **Parameters**
 
@@ -353,7 +351,7 @@ UnsupportedOperationException\}.
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDatasetHandleAddress` | native handle address of the caller-owned padded dataset (or padded dataset view) holding the concatenation of every input index's surviving rows, in `indexes` order |
-| `offsets` | Per-index starting row within the merged dataset. Array of \{@code indexes.length + 1\} entries; the last entry must equal the merged dataset's row count |
+| `offsets` | Per-index starting row within the merged dataset. Array of `indexes.length + 1` entries; the last entry must equal the merged dataset's row count |
 | `filter` | Bitset selecting which rows (over the concatenation of every index's rows, in `indexes` order) survive into the merged dataset; a set bit keeps the row. Pass null for an unfiltered merge |
 | `mergeParams` | Parameters to control the merge operation, or null to use defaults |
 
@@ -391,7 +389,7 @@ implementation throws `UnsupportedOperationException`.
 
 **Returns**
 
-Array of `indexes.length + 1` entries, as described in \{@link CagraIndex#mergedDatasetOffsets(CagraIndex[], BitSet)\}
+Array of `indexes.length + 1` entries, as described in BitSet)
 
 **Throws**
 
@@ -411,8 +409,7 @@ Concatenates every input index's dataset (unfiltered, in `indexes` order) into a
 allocated, owning padded dataset.
 
 See `CagraIndex#concatenateDatasets(CagraIndex[])` for the full contract. This is
-declared as a `default` method for the same binary-compatibility reason as \{@link
-#mergeCagraIndexes(CagraIndex[], long, long[], BitSet, CagraIndexParams)\}; the default
+declared as a `default` method for the same binary-compatibility reason as long, long[], BitSet, CagraIndexParams); the default
 implementation throws `UnsupportedOperationException`.
 
 **Parameters**
@@ -423,7 +420,7 @@ implementation throws `UnsupportedOperationException`.
 
 **Returns**
 
-A newly allocated owning padded dataset, as described in \{@link CagraIndex#concatenateDatasets(CagraIndex[])\}
+A newly allocated owning padded dataset, as described in `CagraIndex#concatenateDatasets(CagraIndex[])`
 
 **Throws**
 
@@ -456,7 +453,7 @@ the default implementation throws `UnsupportedOperationException`.
 
 **Returns**
 
-A newly allocated owning padded dataset, as described in \{@link CagraIndex#concatenateAndFilterDatasets(CagraIndex[], BitSet)\}
+A newly allocated owning padded dataset, as described in BitSet)
 
 **Throws**
 

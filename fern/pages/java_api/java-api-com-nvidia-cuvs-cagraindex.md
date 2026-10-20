@@ -412,14 +412,11 @@ static CagraIndex merge(CagraIndex[] indexes, PaddedDataset mergedDataset, long[
 
 Merges multiple CAGRA indexes into a single index using default merge parameters.
 
-The caller is responsible for concatenating every input index's dataset (in \{@code
-indexes\} order) into a single caller-owned padded dataset before calling this, and for
+The caller is responsible for concatenating every input index's dataset (in `indexes` order) into a single caller-owned padded dataset before calling this, and for
 providing `offsets`: entry `i` is the row at which `indexes[i]`'s rows
 start in `mergedDataset`, and the last entry (`offsets[indexes.length]`) must
-equal `mergedDataset`'s total row count. For example, with no filtering, \{@code
-offsets\} is simply the cumulative row counts of `indexes` in order. This mirrors the
-caller-owned-buffer contract used by `#updateDataset(PaddedDataset)`. Keep \{@code
-mergedDataset\} alive for as long as the returned index remains in use.
+equal `mergedDataset`'s total row count. For example, with no filtering, `offsets` is simply the cumulative row counts of `indexes` in order. This mirrors the
+caller-owned-buffer contract used by `#updateDataset(PaddedDataset)`. Keep `mergedDataset` alive for as long as the returned index remains in use.
 
 **Parameters**
 
@@ -427,7 +424,7 @@ mergedDataset\} alive for as long as the returned index remains in use.
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDataset` | Caller-owned padded dataset holding the concatenation of every input index's rows, in `indexes` order |
-| `offsets` | Per-index starting row within `mergedDataset`. Array of \{@code indexes.length + 1\} entries; the last entry must equal `mergedDataset`'s row count |
+| `offsets` | Per-index starting row within `mergedDataset`. Array of `indexes.length + 1` entries; the last entry must equal `mergedDataset`'s row count |
 
 **Returns**
 
@@ -458,7 +455,7 @@ See PaddedDataset, long[]) for the `mergedDataset`/
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDataset` | Caller-owned padded dataset holding the concatenation of every input index's rows, in `indexes` order |
-| `offsets` | Per-index starting row within `mergedDataset`. Array of \{@code indexes.length + 1\} entries; the last entry must equal `mergedDataset`'s row count |
+| `offsets` | Per-index starting row within `mergedDataset`. Array of `indexes.length + 1` entries; the last entry must equal `mergedDataset`'s row count |
 | `mergeParams` | Parameters to control the merge operation, or null to use defaults |
 
 **Returns**
@@ -485,8 +482,7 @@ BitSet)).
 
 See PaddedDataset, long[]) for the `mergedDataset`/
 `offsets` contract. When `filter` is non-null, `offsets` must be the ones
-returned by BitSet) called with the same \{@code
-filter\}, not the plain cumulative row counts.
+returned by BitSet) called with the same `filter`, not the plain cumulative row counts.
 
 **Parameters**
 
@@ -494,7 +490,7 @@ filter\}, not the plain cumulative row counts.
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDataset` | Caller-owned padded dataset holding the concatenation of every input index's surviving rows, in `indexes` order |
-| `offsets` | Per-index starting row within `mergedDataset`. Array of \{@code indexes.length + 1\} entries; the last entry must equal `mergedDataset`'s row count |
+| `offsets` | Per-index starting row within `mergedDataset`. Array of `indexes.length + 1` entries; the last entry must equal `mergedDataset`'s row count |
 | `filter` | Bitset selecting which rows (over the concatenation of every index's rows, in `indexes` order) survive into `mergedDataset`; a set bit keeps the row. Must be the same filter used to build `mergedDataset`. Pass null for an unfiltered merge |
 | `mergeParams` | Parameters to control the merge operation, or null to use defaults |
 
@@ -529,7 +525,7 @@ See PaddedDataset, long[]) for the `mergedDataset`/
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDataset` | Caller-owned padded dataset view holding the concatenation of every input index's rows, in `indexes` order |
-| `offsets` | Per-index starting row within `mergedDataset`. Array of \{@code indexes.length + 1\} entries; the last entry must equal `mergedDataset`'s row count |
+| `offsets` | Per-index starting row within `mergedDataset`. Array of `indexes.length + 1` entries; the last entry must equal `mergedDataset`'s row count |
 
 **Returns**
 
@@ -562,7 +558,7 @@ See PaddedDataset, long[]) for the `mergedDataset`/
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDataset` | Caller-owned padded dataset view holding the concatenation of every input index's rows, in `indexes` order |
-| `offsets` | Per-index starting row within `mergedDataset`. Array of \{@code indexes.length + 1\} entries; the last entry must equal `mergedDataset`'s row count |
+| `offsets` | Per-index starting row within `mergedDataset`. Array of `indexes.length + 1` entries; the last entry must equal `mergedDataset`'s row count |
 | `mergeParams` | Parameters to control the merge operation, or null to use defaults |
 
 **Returns**
@@ -597,7 +593,7 @@ See PaddedDataset, long[], BitSet, CagraIndexParams) for the
 | --- | --- |
 | `indexes` | Array of CAGRA indexes to merge |
 | `mergedDataset` | Caller-owned padded dataset view holding the concatenation of every input index's surviving rows, in `indexes` order |
-| `offsets` | Per-index starting row within `mergedDataset`. Array of \{@code indexes.length + 1\} entries; the last entry must equal `mergedDataset`'s row count |
+| `offsets` | Per-index starting row within `mergedDataset`. Array of `indexes.length + 1` entries; the last entry must equal `mergedDataset`'s row count |
 | `filter` | Bitset selecting which rows (over the concatenation of every index's rows, in `indexes` order) survive into `mergedDataset`; a set bit keeps the row. Must be the same filter used to build `mergedDataset`. Pass null for an unfiltered merge |
 | `mergeParams` | Parameters to control the merge operation, or null to use defaults |
 
@@ -621,8 +617,7 @@ static long[] mergedDatasetOffsets(CagraIndex[] indexes, BitSet filter) throws T
 
 Computes per-index write offsets for a bitset-filtered merged dataset buffer.
 
-For an unfiltered merge the offsets are simply the cumulative row counts of \{@code
-indexes\} in order, and this method is not needed. For a bitset-filtered merge, the number of
+For an unfiltered merge the offsets are simply the cumulative row counts of `indexes` in order, and this method is not needed. For a bitset-filtered merge, the number of
 surviving rows per index cannot be derived any other way; call this before
 BitSet) (or before building a
 filtered `mergedDataset` by hand) to get the matching offsets.
@@ -687,8 +682,7 @@ static PaddedDataset concatenateAndFilterDatasets(CagraIndex[] indexes, BitSet f
 
 Concatenates every input index's dataset (in `indexes` order), retaining only the rows
 selected by `filter`, into a freshly allocated, owning padded dataset, for use as
-`mergedDataset` in \{@link #merge(CagraIndex[], PaddedDataset, long[], BitSet,
-CagraIndexParams)\}.
+`mergedDataset` in PaddedDataset, long[], BitSet, CagraIndexParams).
 
 This is an optional convenience for building the filtered `mergedDataset`; callers
 that already have their own filtered, concatenated buffer are not required to use it. Call

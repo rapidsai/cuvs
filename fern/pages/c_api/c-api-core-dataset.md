@@ -143,7 +143,7 @@ Use `cuvsCagraIndexGetCuvsDataset` to obtain a `cuvsDataset_t` handle from each 
 | `res` | in | [`cuvsResources_t`](/api-reference/c-api-core-c-api#cuvsresources-t) | cuvsResources_t opaque C handle |
 | `datasets` | in | `cuvsDataset_t*` | Array of input cuvsDataset_t handles to concatenate, in the order they will be passed to `cuvsCagraMerge_v2` |
 | `num_datasets` | in | `size_t` | Number of input datasets |
-| `filter` | in | [`cuvsFilter`](/api-reference/c-api-core-filter#cuvsfilter) | Row filter. Pass `\{NO_FILTER, 0\}` (or a zero-initialized `cuvsFilter`) to concatenate all rows. Pass a `BITSET` filter to retain only the surviving rows. |
+| `filter` | in | [`cuvsFilter`](/api-reference/c-api-core-filter#cuvsfilter) | Row filter. Pass `{NO_FILTER, 0}` (or a zero-initialized `cuvsFilter`) to concatenate all rows. Pass a `BITSET` filter to retain only the surviving rows. |
 | `merged_dataset` | out | `cuvsDataset_t*` | Newly allocated owning dataset handle containing the concatenated (and optionally filtered) rows in `datasets` order. Caller must destroy it with `cuvsDatasetDestroy` when done. |
 
 **Returns**
