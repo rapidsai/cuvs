@@ -10,7 +10,6 @@
 #include "graph_core.cuh"
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
-#include <cuvs/neighbors/brute_force.hpp>
 #include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -78,59 +77,6 @@ void build_knn_graph(
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::cagra::graph_build_params::ivf_pq_params pq);
-
-// Exact kNN construction shared by ordinary CAGRA and ACE. Request one extra
-// neighbor and remove self by ID, including when duplicate vectors tie with self.
-template <typename T, typename IdxT, typename Layout, typename Accessor>
-void build_knn_graph(raft::resources const& res,
-                     raft::mdspan<const T, raft::matrix_extent<int64_t>, Layout, Accessor> dataset,
-                     raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
-                     graph_build_params::brute_force_params params)
-{
-  auto const partition_size            = static_cast<size_t>(dataset.extent(0));
-  auto const intermediate_graph_degree = static_cast<size_t>(knn_graph.extent(1));
-  RAFT_EXPECTS(knn_graph.extent(0) == dataset.extent(0),
-               "CAGRA: kNN graph and dataset must have the same number of rows");
-  RAFT_EXPECTS(intermediate_graph_degree > 0 && partition_size > intermediate_graph_degree,
-               "CAGRA: kNN graph degree must be positive and smaller than the dataset size");
-  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
-    auto device_queries =
-      raft::make_device_matrix<T, int64_t>(res, partition_size, dataset.extent(1));
-    raft::copy(res, device_queries.view(), dataset);
-    auto brute_force_index = cuvs::neighbors::brute_force::build(
-      res, params.build_params, raft::make_const_mdspan(device_queries.view()));
-    auto device_neighbors = raft::make_device_matrix<int64_t, int64_t>(
-      res, partition_size, intermediate_graph_degree + 1);
-    auto device_distances =
-      raft::make_device_matrix<float, int64_t>(res, partition_size, intermediate_graph_degree + 1);
-    cuvs::neighbors::brute_force::search(res,
-                                         params.search_params,
-                                         brute_force_index,
-                                         raft::make_const_mdspan(device_queries.view()),
-                                         device_neighbors.view(),
-                                         device_distances.view());
-
-    auto host_neighbors =
-      raft::make_host_matrix<int64_t, int64_t>(partition_size, intermediate_graph_degree + 1);
-    raft::copy(res, host_neighbors.view(), device_neighbors.view());
-    raft::resource::sync_stream(res);
-    for (size_t row = 0; row < partition_size; ++row) {
-      size_t output_rank = 0;
-      for (size_t rank = 0; rank < intermediate_graph_degree + 1; ++rank) {
-        auto const neighbor = host_neighbors(row, rank);
-        if (neighbor == static_cast<int64_t>(row)) { continue; }
-        RAFT_EXPECTS(neighbor >= 0 && static_cast<size_t>(neighbor) < partition_size,
-                     "CAGRA: brute-force kNN returned an invalid neighbor");
-        knn_graph(row, output_rank++) = static_cast<IdxT>(neighbor);
-        if (output_rank == intermediate_graph_degree) { break; }
-      }
-      RAFT_EXPECTS(output_rank == intermediate_graph_degree,
-                   "CAGRA: brute-force kNN did not return enough non-self neighbors");
-    }
-  } else {
-    RAFT_FAIL("CAGRA: brute-force kNN build supports only float and half datasets");
-  }
-}
 
 template <typename IdxT>
 void write_to_graph(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
@@ -1022,12 +968,11 @@ inline void validate_cagra_knn_graph_build_constraints(index_params const& param
       std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params) ||
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
-    "The selected CAGRA graph builder does not support BitwiseHamming as a metric. Please "
+    "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
     "use nn-descent or the iterative CAGRA search build.");
   RAFT_EXPECTS(
     params.metric != cuvs::distance::DistanceType::CosineExpanded ||
       std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params) ||
-      std::holds_alternative<cagra::graph_build_params::brute_force_params>(knn_build_params) ||
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
     "CosineExpanded distance is not supported for iterative CAGRA graph build.");
 
@@ -1038,8 +983,7 @@ inline void validate_cagra_knn_graph_build_constraints(index_params const& param
 }
 
 /**
- * Iterative / IVF-PQ / NN-descent / brute-force KNN graph construction and `optimize` → final host
- * CAGRA graph.
+ * Iterative / IVF-PQ / NN-descent KNN graph construction and `optimize` → final host CAGRA graph.
  *
  * @param knn_graph_dataset  mdspan passed to IVF-PQ / NN-descent `build_knn_graph` (any stride).
  */
@@ -1068,10 +1012,6 @@ auto build_cagra_host_graph_from_knn_params(raft::resources const& res,
       ivf_pq_params.build_params.metric = params.metric;
     }
     build_knn_graph(res, knn_graph_dataset, knn_graph->view(), ivf_pq_params);
-  } else if (std::holds_alternative<graph_build_params::brute_force_params>(knn_build_params)) {
-    auto brute_force_params = std::get<graph_build_params::brute_force_params>(knn_build_params);
-    brute_force_params.build_params.metric = params.metric;
-    build_knn_graph(res, knn_graph_dataset, knn_graph->view(), brute_force_params);
   } else {
     auto nn_descent_params =
       std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);

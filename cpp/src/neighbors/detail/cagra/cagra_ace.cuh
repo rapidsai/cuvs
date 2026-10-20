@@ -26,6 +26,7 @@
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/util/file_io.hpp>
 #include <cuvs/util/host_memory.hpp>
@@ -535,9 +536,7 @@ auto ace_build_partial_knn_graph(
   raft::resources const& res,
   raft::host_matrix_view<const T, int64_t, row_major> core_argument_partition,
   size_t intermediate_graph_degree,
-  cuvs::distance::DistanceType metric,
-  graph_build_params::ace_params::knn_graph_build_algo knn_build_algo)
-  -> raft::host_matrix<IdxT, int64_t>
+  cuvs::distance::DistanceType metric) -> raft::host_matrix<IdxT, int64_t>
 {
   auto const partition_size = static_cast<size_t>(core_argument_partition.extent(0));
   RAFT_EXPECTS(partition_size > intermediate_graph_degree,
@@ -546,17 +545,11 @@ auto ace_build_partial_knn_graph(
                intermediate_graph_degree);
 
   auto knn_graph = raft::make_host_matrix<IdxT, int64_t>(partition_size, intermediate_graph_degree);
-  if (knn_build_algo == graph_build_params::ace_params::knn_graph_build_algo::IVF_PQ) {
-    auto knn_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
-      raft::make_extents<int64_t>(partition_size, core_argument_partition.extent(1)), metric);
-    knn_params.search_params.n_probes =
-      std::min(knn_params.search_params.n_probes * 2u, knn_params.build_params.n_lists);
-    build_knn_graph(res, core_argument_partition, knn_graph.view(), knn_params);
-  } else {
-    auto knn_params                = graph_build_params::brute_force_params{};
-    knn_params.build_params.metric = metric;
-    build_knn_graph(res, core_argument_partition, knn_graph.view(), knn_params);
-  }
+  auto knn_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+    raft::make_extents<int64_t>(partition_size, core_argument_partition.extent(1)), metric);
+  knn_params.search_params.n_probes =
+    std::min(knn_params.search_params.n_probes * 2u, knn_params.build_params.n_lists);
+  build_knn_graph(res, core_argument_partition, knn_graph.view(), knn_params);
 
   return knn_graph;
 }
@@ -568,36 +561,16 @@ auto ace_build_pruned_partial_graph(
   raft::host_matrix_view<const T, int64_t, row_major> core_argument_partition,
   size_t intermediate_graph_degree,
   size_t graph_degree,
-  cuvs::distance::DistanceType metric,
-  graph_build_params::ace_params::knn_graph_build_algo knn_build_algo)
-  -> raft::host_matrix<IdxT, int64_t>
+  cuvs::distance::DistanceType metric) -> raft::host_matrix<IdxT, int64_t>
 {
   auto knn_graph = ace_build_partial_knn_graph<T, IdxT>(
-    res, core_argument_partition, intermediate_graph_degree, metric, knn_build_algo);
+    res, core_argument_partition, intermediate_graph_degree, metric);
   auto partial_graph =
     raft::make_host_matrix<IdxT, int64_t>(core_argument_partition.extent(0), graph_degree);
   graph::prune_graph_gpu<IdxT>(res, knn_graph.view(), partial_graph.view());
   return partial_graph;
 }
 
-// Original ACE mode: optimize each partial graph, including its local reverse-edge merge.
-template <typename T, typename IdxT>
-auto ace_build_optimized_partial_graph(
-  raft::resources const& res,
-  raft::host_matrix_view<const T, int64_t, row_major> core_argument_partition,
-  size_t intermediate_graph_degree,
-  size_t graph_degree,
-  cuvs::distance::DistanceType metric,
-  graph_build_params::ace_params::knn_graph_build_algo knn_build_algo,
-  bool guarantee_connectivity) -> raft::host_matrix<IdxT, int64_t>
-{
-  auto knn_graph = ace_build_partial_knn_graph<T, IdxT>(
-    res, core_argument_partition, intermediate_graph_degree, metric, knn_build_algo);
-  auto partial_graph =
-    raft::make_host_matrix<IdxT, int64_t>(core_argument_partition.extent(0), graph_degree);
-  graph::optimize<IdxT>(res, knn_graph.view(), partial_graph.view(), guarantee_connectivity);
-  return partial_graph;
-}
 // ACE: Adjust IDs from core and augmented partitions to global reordered IDs
 
 template <typename IdxT>
@@ -1908,11 +1881,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
       };
       std::optional<raft::host_matrix<IdxT, int64_t>> partial_sub_graph;
       std::optional<sub_index_t> sub_index;
-      const bool build_partial_graph_on_host =
-        ace_params.add_global_reverse_edges ||
-        ace_params.partial_graph_knn_build_algo ==
-          graph_build_params::ace_params::knn_graph_build_algo::BRUTE_FORCE;
-      if (build_partial_graph_on_host) {
+      if (ace_params.add_global_reverse_edges) {
         auto core_argument_partition =
           raft::make_host_matrix<T, int64_t>(sub_dataset_size, dataset_dim);
         if (use_disk_mode) {
@@ -1941,24 +1910,8 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
         read_end                          = std::chrono::high_resolution_clock::now();
         auto core_argument_partition_view = raft::make_host_matrix_view<const T, int64_t>(
           core_argument_partition.data_handle(), sub_dataset_size, dataset_dim);
-        if (ace_params.add_global_reverse_edges) {
-          partial_sub_graph.emplace(
-            ace_build_pruned_partial_graph<T, IdxT>(res,
-                                                    core_argument_partition_view,
-                                                    intermediate_degree,
-                                                    graph_degree,
-                                                    params.metric,
-                                                    ace_params.partial_graph_knn_build_algo));
-        } else {
-          partial_sub_graph.emplace(
-            ace_build_optimized_partial_graph<T, IdxT>(res,
-                                                       core_argument_partition_view,
-                                                       intermediate_degree,
-                                                       graph_degree,
-                                                       params.metric,
-                                                       ace_params.partial_graph_knn_build_algo,
-                                                       params.guarantee_connectivity));
-        }
+        partial_sub_graph.emplace(ace_build_pruned_partial_graph<T, IdxT>(
+          res, core_argument_partition_view, intermediate_degree, graph_degree, params.metric));
       } else {
         sub_index.emplace([&]() -> sub_index_t {
           if (use_disk_mode) {
@@ -2092,7 +2045,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                                               augmented_backward_mapping.view(),
                                               core_forward_mapping.view());
         };
-        if (build_partial_graph_on_host) {
+        if (ace_params.add_global_reverse_edges) {
           auto partial_sub_graph_device =
             raft::make_device_matrix<IdxT, int64_t>(res, core_sub_dataset_size, graph_degree);
           raft::copy(res,
@@ -2116,7 +2069,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
       } else {
         auto sub_search_graph =
           raft::make_host_matrix<IdxT, int64_t>(core_sub_dataset_size, graph_degree);
-        if (build_partial_graph_on_host) {
+        if (ace_params.add_global_reverse_edges) {
           std::copy_n(partial_sub_graph->data_handle(),
                       sub_search_graph.size(),
                       sub_search_graph.data_handle());
