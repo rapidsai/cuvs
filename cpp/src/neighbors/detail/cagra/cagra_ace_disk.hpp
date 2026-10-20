@@ -51,7 +51,7 @@ void ace_disk_host_io(cuvs::util::file_descriptor const& fd,
   }
 }
 
-// Spool cross-partition edges while the pruned core rows are still in memory. A single
+// Spool all edges while the pruned core rows are still in memory. A single
 // bounded buffer is sorted into destination-partition runs before writing; only one bucket
 // file is open at a time. Neither candidate sets nor a second full graph are kept in RAM.
 template <typename IdxT>
@@ -134,7 +134,6 @@ class ace_disk_reverse_edges {
         RAFT_EXPECTS(
           static_cast<uint64_t>(destination) < static_cast<uint64_t>(offsets_(offsets_.size() - 1)),
           "ACE: graph contains an invalid neighbor");
-        if (destination >= first && destination < last) { continue; }
         buffer_(buffer_count_++) = {destination, static_cast<IdxT>(first + row), rank};
         if (buffer_count_ == capacity_) { flush(); }
       }

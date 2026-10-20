@@ -227,7 +227,7 @@ struct ace_params {
    *
    * Each partition first builds an intermediate kNN graph and prunes it without a local
    * reverse-edge merge. Then build the reverse-edge graph globally and merge it into the pruned
-   * graph. In disk mode (explicit or automatic), cross-partition incoming edges are buffered
+   * graph. In disk mode (explicit or automatic), incoming edges are buffered
    * to temporary files while building each pruned partition, then merged on the CPU one
    * destination partition at a time, retaining at most `ceil(graph_degree / 2)` incoming candidates
    * per node in memory.

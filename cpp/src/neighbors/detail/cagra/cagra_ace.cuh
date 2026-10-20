@@ -1561,14 +1561,11 @@ void ace_add_global_reverse_edges(raft::resources const& res,
   std::copy_n(graph.data_handle(), graph.size(), source_graph.data_handle());
   std::vector<std::unordered_set<IdxT>> candidate_sets(n_partitions);
   for (size_t source = 0; source < dataset_size; ++source) {
-    auto const source_partition = static_cast<size_t>(partition_labels(source, 0));
     for (uint32_t rank = 0; rank < graph_degree; ++rank) {
       auto const destination = source_graph(source, rank);
       RAFT_EXPECTS(destination < dataset_size, "ACE: graph contains an invalid neighbor");
       auto const destination_partition = static_cast<size_t>(partition_labels(destination, 0));
-      if (source_partition != destination_partition) {
-        candidate_sets[destination_partition].insert(static_cast<IdxT>(source));
-      }
+      candidate_sets[destination_partition].insert(static_cast<IdxT>(source));
     }
   }
 
@@ -2131,7 +2128,7 @@ auto build_ace(raft::resources const& res, const index_params& params, DatasetVi
                   n_partitions);
 
     if (ace_params.add_global_reverse_edges) {
-      RAFT_LOG_INFO("ACE: Adding global cross-partition reverse edges partition by partition");
+      RAFT_LOG_INFO("ACE: Adding global reverse edges partition by partition");
       if (disk_reverse_edges.has_value()) {
         disk_reverse_edges->merge(graph_fd, graph_header_size);
         disk_reverse_edges.reset();
