@@ -32,25 +32,18 @@ inline size_t brute_force_host_chunk_size(
 {
   // Two translation offsets for the direct partition merge.
   free_bytes -= std::min(free_bytes, 2 * sizeof(int64_t));
-  size_t low = 0, high = rows;
-  while (low < high) {
-    auto const mid = low + (high - low + 1) / 2;
-    // Local search results, two 2*k merge buffers, and room for
-    // selection/sorting scratch. All explicit buffers are allocated once.
-    auto const result_bytes =
-      (std::min(mid, top_k) + 6 * top_k) * (sizeof(int64_t) + sizeof(float));
-    // The tiled search uses at most 1024 query rows at a time, and at most `mid`
-    // reference columns for both pairwise distances and intermediate top-k results.
-    auto const scratch_bytes = std::min(mid, size_t{1024}) * (sizeof(int64_t) + 2 * sizeof(float));
-    auto const bytes_per_row =
-      2 * dim * element_size + result_bytes + 2 * sizeof(float) + scratch_bytes;
-    if (bytes_per_row <= free_bytes / mid) {
-      low = mid;
-    } else {
-      high = mid - 1;
-    }
-  }
-  return low;
+  auto const data_bytes_per_row = 2 * dim * element_size;
+  // Per query, 7 = 1 top_k list for local results + 2 lists in each of the two
+  // merge buffers + 2 lists reserved for selection/sorting scratch. The first
+  // 5 lists are explicit allocations; the final 2 are a conservative allowance,
+  // not an exact scratch requirement of the selection library.
+  auto const result_bytes_per_row = 7 * top_k * (sizeof(int64_t) + sizeof(float));
+  // Bound the query tile by the whole dataset (up to the search limit of 1024),
+  // rather than the unknown chunk size. This may overestimate scratch, never underestimate it.
+  auto const scratch_bytes_per_row =
+    std::min(rows, size_t{1024}) * (sizeof(int64_t) + 2 * sizeof(float)) + 2 * sizeof(float);
+  auto const bytes_per_row = data_bytes_per_row + result_bytes_per_row + scratch_bytes_per_row;
+  return std::min(rows, free_bytes / bytes_per_row);
 }
 
 template <typename T, typename IdxT, typename Layout, typename Accessor>
